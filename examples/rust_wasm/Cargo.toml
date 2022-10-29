@@ -1,0 +1,17 @@
+[package]
+name = "redgold-rust-wasm-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+#wasm-bindgen = "0.2.81"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+opt-level = 's'
+debug = false
+codegen-units = 1
+panic = 'abort'

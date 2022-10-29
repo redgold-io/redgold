@@ -1,0 +1,28 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url uri('https://jitpack.io') }
+
+    }
+    dependencies {
+        classpath 'com.github.i-net-software:jwebassembly-gradle:master-SNAPSHOT'
+        //classpath 'gradle.plugin.de.inetsoftware:jwebassembly-gradle:+'
+    }
+}
+
+apply plugin: 'de.inetsoftware.jwebassembly'
+
+// declare your Java sources like you do it for your other Java projects
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+}
+
+wasm {
+  format = 'Binary'        // possible values are 'Text' and 'Binary'. 'Binary' is the default value.
+  compilerVersion = 'com.github.i-net-software:jwebassembly:master-SNAPSHOT'
+  classpath = sourceSet.compileClasspath // files(...) // specify libraries, default is sourceSet.compileClasspath
+}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Redgold Testnet Canary
+
+[Service]
+ExecStart=/root/redgold_linux debug-canary
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,88 @@
+
+buildscript {
+    repositories {
+        maven { url uri('https://jitpack.io') }
+    }
+    dependencies {
+        classpath 'com.github.i-net-software:jwebassembly-gradle:master-SNAPSHOT'
+    }
+}
+
+
+plugins {
+    id 'java-library'
+}
+
+sourceCompatibility = 1.8
+
+group 'hello'
+archivesBaseName = 'world'
+version = '0.4'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' } // for snapshot of the API
+}
+
+dependencies {
+    compileOnly 'com.github.i-net-software:jwebassembly-api:master-SNAPSHOT'
+    // compileOnly 'com.github.i-net-software:jwebassembly-runtime:master-SNAPSHOT'
+}
+
+apply plugin: 'de.inetsoftware.jwebassembly'
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+        resources {
+            srcDir 'src'
+        }
+    }
+    test {
+        java {
+            srcDir 'test'
+        }
+        resources {
+            srcDir 'test'
+        }
+    }
+}
+
+compileJava.options.encoding = 'UTF-8'
+compileJava.options.compilerArgs += ['-Xlint:all', '-Xlint:-serial', '-Xlint:-fallthrough']
+compileTestJava.options.encoding = 'UTF-8'
+javadoc.options.encoding = 'UTF-8'
+
+jar {
+    manifest {
+        attributes( 'Specification-Title': 'JWebAssembly-helloworld',
+                    'Specification-Vendor': 'i-net software',
+                    'Specification-Version': version,
+                    'Implementation-Title': 'JWebAssembly-Compiler',
+                    'Implementation-Vendor': 'i-net software',
+                    'Implementation-Version': version)
+    }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.java
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+build {
+    dependsOn sourcesJar
+    dependsOn javadocJar
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+

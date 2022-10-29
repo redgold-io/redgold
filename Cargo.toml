@@ -1,0 +1,111 @@
+[package]
+name = "redgold"
+version = "0.1.0"
+edition = "2021"
+authors = ["Redgold Labs"]
+description = "A relative proof conflict resolution & irreversibility service for executor contracts"
+documentation = "https://redgold.app/docs"
+readme = "README.md"
+homepage = "https://redgold.app"
+repository = "https://github.com/redgold-app/redgold"
+license = "MIT"
+keywords = ["crypto", "cryptocurrency", "trust",
+    "reputation", "custodial", "decentralized", "p2p", "contracts", "peer-to-peer", "merkle"]
+categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slugs
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[workspace]
+members = [
+    "app",
+    "core",
+    "data",
+    "schema",
+    "sdk",
+#    "runtime"
+]
+exclude = ["examples/rust_wasm"]
+
+[dependencies]
+redgold-schema = { path = "schema"}
+#redgold-runtime = { path = "runtime"}
+tempfile = "3.3.0"
+filepath = "0.1.2"
+svg = "0.10.0"
+noise = "0.7.0"
+bs58 = "0.4.0"
+dirs = "4.0.0"
+sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
+error-chain = "0.12.4"
+backtrace = "0.3.65"
+#btc-transaction-utils = "0.9.0" # build conflict, out of date anyways
+# todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
+#swagger = "2.2" # breaks openssl?
+flume = "0.10.12"
+multihash = "*"
+dotenv = "0.15.0"
+futures = "0.3.1"
+bitcoin-wallet = "1.1.0"
+rust-crypto = "0.2.36"
+prost = "0.8"
+hdpath = { version = "0.5.0", features = ["with-bitcoin"] }
+dashmap = "4.0.2"
+rusqlite = "0.25.3"
+default-args = "1.0.0"
+crossbeam-channel = "0.5.1"
+crossbeam = "0.8.1"
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
+eframe = "0.14.0" # Gives us egui, epi and web+native backends
+strum = "0.21"
+strum_macros = "0.21"
+image = { version = "0.23", default-features = false, features = ["jpeg", "png"] }
+zxcvbn = '2.1.1'
+rand = '0.8.4'
+clap = { version = "3.1.17", features = ["derive"] }
+log = "0.4.14"
+hex = "0.4.3"
+void = "1.0.2"
+async-std = { version = "1.6.2", features = ["attributes"] }
+async-trait = "0.1.56"
+env_logger = "0.9.0"
+structopt = "0.3.21"
+warp = "0.3"
+reqwest = { version = "0.11", features = ["json"] }
+prost-helper = "0.5.0"
+serde = "1.0.130"
+serde_json = "1.0.59"
+base64 = "0.13.0"
+serde_with = { version = "1.10.0", features = ["hex"] }
+log4rs = "1.0.0"
+metrics = "0.18.1"
+ssh2 = "0.9.1"
+ndarray = "0.15.3"
+chrono = "0.4.19"
+config = "0.11.0"
+bdk = "0.14.0"
+miniscript = "6.0.1"
+itertools = "0.10.1"
+bytes = "1.1.0"
+
+[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
+redgold-data = { path = "data"}
+metrics-exporter-prometheus = "0.9.0"
+libp2p = "0.44.0"
+tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
+
+
+[dependencies.bitcoin]
+version = "0.21"
+features = ["serde", "bitcoinconsensus"]
+
+#[build-dependencies]
+#sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
+#prost-build = "0.8"
+#prost-serde = "0.2.0"
+#serde = "1.0.130"
+#serde_json = "1.0.59"
+#tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
+#rusqlite = "0.25.3"
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3

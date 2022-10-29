@@ -1,0 +1,158 @@
+{
+  "includes": ["src"],
+  "files": ["src/structs.proto"],
+  "output": "build",
+  "opts": [
+    {
+      "scope": "type",
+      "description": "serde support for message",
+      "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize)]",
+      "paths": [
+        "structs.Transaction", "structs.Proof",
+        "structs.PoWProof", "structs.ProductId",
+        "structs.Input", "structs.Output",
+        "structs.ObservationMetadata", "structs.Observation",
+        "structs.MerkleNode", "structs.MerkleProof", "structs.MerkleProofElement",
+        "structs.ResponseMetadata", "structs.ErrorInfo", "structs.ErrorDetails",
+        "structs.Request", "structs.Response",
+        "structs.ControlRequest", "structs.ControlResponse",
+        "structs.AddPeerFullRequest",
+        "structs.PublicRequest", "structs.PublicResponse",
+        "structs.SubmitTransactionRequest", "structs.SubmitTransactionResponse",
+        "structs.GossipTransactionRequest", "structs.GossipTransactionResponse",
+        "structs.GossipObservationRequest", "structs.GossipObservationResponse",
+        "structs.QueryTransactionRequest", "structs.QueryTransactionResponse",
+        "structs.ResolveHashRequest", "structs.ResolveHashResponse",
+        "structs.AboutNodeRequest", "structs.AboutNodeResponse",
+        "structs.DownloadRequest", "structs.DownloadResponse",
+        "structs.ObservationProof",
+        "structs.OutputContract",
+        "structs.TypedValue",
+        "structs.TimeLockWindow",
+        "structs.KeyValueOption",
+        "structs.TransactionContract",
+        "structs.TransactionData",
+        "structs.CodeExecutionContract",
+        "structs.UtxoEntry",
+        "structs.ObservationEdge",
+        "structs.BytesData",
+        "structs.TransactionOptions",
+        "structs.Tombstone",
+        "structs.TrustLabel",
+        "structs.NodeMetadata",
+        "structs.PeerData",
+        "structs.StandardData",
+        "structs.KeyedTypedValue",
+        "structs.TransactionEntry",
+        "structs.ObservationEntry",
+        "structs.QueryAddressesRequest",
+        "structs.QueryAddressesResponse",
+        "structs.Address",
+        "structs.StoredPeerData",
+        "structs.PartitionInfo",
+        "structs.Signature",
+        "structs.PublicKey",
+        "structs.MatrixTypedValue",
+        "structs.Hash",
+        "structs.Block",
+        "structs.BlockMetadata",
+        "structs.StructMetadata",
+        "structs.AddressBlock",
+        "structs.FaucetRequest",
+        "structs.FaucetResponse",
+        "structs.RecentTransactionsRequest",
+        "structs.RecentTransactionsResponse",
+        "structs.HashSearchRequest",
+        "structs.HashSearchResponse",
+        "structs.TransactionInfo",
+        "structs.TransactionAmount",
+        "structs.AddressInfo",
+        "structs.GetPeersInfoResponse",
+        "structs.GetPeersInfoRequest",
+        "structs.VersionInfo"
+      ]
+    },
+    {
+      "scope": "type",
+      "description": "serde support for enum",
+      "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString)]",
+      "paths": [
+        "structs.State",
+        "structs.HashType",
+        "structs.Error",
+        "structs.StandardContractType",
+        "structs.DownloadDataType",
+        "structs.NetworkEnvironment",
+        "structs.BytesDecoder",
+        "structs.NodeType",
+        "structs.SignatureType",
+        "structs.PublicKeyType",
+        "structs.HashFormatType",
+        "structs.AddressType"
+      ]
+    },
+    {
+      "scope": "field",
+      "description": "hex bytes",
+      "attr": "#[serde_as(as = \"serde_with::hex::Hex\")]",
+      "paths": [
+        "structs.PoWProof.proof",
+        "structs.AddPeerFull.id", "structs.AddPeerFull.public_key",
+        "structs.ResolveHashRequest.hash",
+        "structs.ResolveHashResponse.data",
+        "structs.ObservationEdge.root",
+        "structs.ObservationEdge.leaf_hash",
+        "structs.ObservationEdge.observation_hash",
+        "structs.UtxoEntry.transaction_hash",
+        "structs.UtxoEntry.address",
+        "structs.BytesData.bytes_value",
+        "structs.Tombstone.hash",
+        "structs.NodeMetadata.multi_hash",
+        "structs.NodeMetadata.public_key",
+        "structs.AddressBlock.hash",
+        "structs.AddressBlock.address",
+        "structs.TrustLabel.peer_id"
+      ]
+    },
+    {
+      "scope": "field",
+      "description": "base64 bytes",
+      "attr": "#[serde(serialize_with = \"crate::process_transaction::as_base64\", deserialize_with = \"crate::process_transaction::from_base64\")]",
+      "paths": []
+    },
+    {
+      "scope": "field",
+      "description": "skip string default values",
+      "attr": "#[serde(skip_serializing_if = \"String::is_empty\", default)]",
+      "paths": []
+    },
+    {
+      "scope": "field",
+      "description": "skip null values",
+      "attr": "#[serde(deserialize_with = \"prost_helper::deserialize_null_default\")]",
+      "paths": []
+    },
+    {
+      "scope": "field",
+      "description": "skip 0 for any num",
+      "attr": "#[serde(skip_serializing_if = \"prost_helper::is_zero\")]",
+      "paths": []
+    },
+    {
+      "scope": "field",
+      "description": "skip the field for serialization",
+      "attr": "#[serde(skip_serializing)]",
+      "paths": []
+    },
+    {
+      "scope": "bytes",
+      "description": "use bytes::Bytes for given bytes field",
+      "paths": []
+    },
+    {
+      "scope": "btree_map",
+      "description": "use BtreeMap for given map field",
+      "paths": []
+    }
+  ]
+}

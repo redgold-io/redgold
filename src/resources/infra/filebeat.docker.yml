@@ -1,0 +1,34 @@
+filebeat.config:
+  modules:
+    path: ${path.config}/modules.d/*.yml
+    reload.enabled: false
+
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
+
+#filebeat.inputs:
+  # filestream is an input for collecting log messages from files. It is going to replace log input in the future.
+#  - type: log
+    # Change to true to enable this input configuration.
+#    enabled: true
+    # Paths that should be crawled and fetched. Glob based paths.
+#    paths:
+#      - /root/.rg/test/log/*.log
+#      - /root/.rg/test/canary/log/*.log
+      # Todo: update this path to logs
+      #- c:\programdata\elasticsearch\logs\*
+  # - type: journald
+  #   id: service-vault
+  #   include_matches:
+  #     - _SYSTEMD_UNIT=redgold-testnet.service
+
+processors:
+  - add_docker_metadata: ~
+#- add_cloud_metadata: ~
+
+output.elasticsearch:
+  hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
+  username: '${ELASTICSEARCH_USERNAME:}'
+  password: '${ELASTICSEARCH_PASSWORD:}'

@@ -1,0 +1,120 @@
+use crate::structs::{Block, Error, ErrorInfo, Hash, StructMetadata};
+use crate::{error_message};
+use crate::{HashClear, SafeBytesAccess};
+use crate::{ProtoHashable, WithMetadataHashableFields};
+
+impl HashClear for Block {
+    fn hash_clear(&mut self) {
+        self.transactions.clear();
+        self.hash = None;
+    }
+}
+
+impl WithMetadataHashableFields for Block {
+    fn set_hash(&mut self, hash: Hash) {
+        self.hash = Some(hash);
+    }
+
+    fn stored_hash_opt(&self) -> Option<Hash> {
+        self.hash.clone()
+    }
+
+    fn struct_metadata_opt(&self) -> Option<StructMetadata> {
+        self.struct_metadata.clone()
+    }
+}
+
+impl Block {
+    // Change this to something off of prost message
+    // pub fn proto_serialize(&self) -> Vec<u8> {
+    //     return self.encode_to_vec();
+    // }
+    //
+    // pub fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
+    //     // TODO: Automap this error with a generic _.to_string() trait implicit?
+    //     return Block::decode(&*bytes)
+    //         .map_err(|e| error_message(Error::ProtoDecoderFailure, e.to_string()));
+    // }
+    //
+    // pub fn hash_clear(&mut self) {
+    //     self.transactions.clear();
+    //     self.hash = None;
+    // }
+
+    pub fn with_hash(&mut self) -> &mut Block {
+        let hash = self.calculate_hash();
+        self.hash = Some(hash);
+        self
+    }
+    //
+    // pub fn calculate_hash(&self) -> Hash {
+    //     let mut clone = self.clone();
+    //     clone.hash_clear();
+    //     let input = clone.proto_serialize();
+    //     let multihash = constants::HASHER.digest(&input);
+    //     return multihash.into();
+    // }
+
+    // TODO: Move to trait
+    pub fn hash_hex(&self) -> String {
+        return hex::encode(self.calculate_hash().bytes.expect("Bytes").bytes_value);
+    }
+
+    pub fn time(&self) -> Result<i64, ErrorInfo> {
+        Ok(self
+            .struct_metadata
+            .as_ref()
+            .ok_or(error_message(Error::MissingField, "struct_metadata"))?
+            .time)
+    }
+
+    pub fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+        Ok(self
+            .hash
+            .as_ref()
+            .ok_or(error_message(Error::MissingField, "hash"))?
+            .bytes
+            .safe_bytes()?)
+    }
+
+    // pub fn from(transactions: Vec<Transaction>, last_time: i64, ) {
+    //     if let Some(txa) = txs {
+    //         // TODO: re-query observation edge here.
+    //         let leafs = transactions
+    //             .clone()
+    //             .iter()
+    //             .map(|e| e.hash_vec().clone())
+    //             .collect_vec();
+    //         let mut block = Block {
+    //             // TODO: use a real merkle root here
+    //             merkle_root: Some(rg_merkle::build_root_simple(&leafs)),
+    //             transactions: vec, // TODO: can leave this blank and enforce it properly
+    //             // to remove the clone on hash calculation? That's clever do it as part
+    //             // of a constructor function.
+    //             struct_metadata: struct_metadata(last_time as i64),
+    //             previous_block_hash: self.last_block.hash.clone(),
+    //             metadata: None,
+    //             hash: None,
+    //             height: self.last_block.height + 1,
+    //         }
+    //             .with_hash();
+    // }
+}
+
+#[test]
+fn verify_hash_equivalent_schema_change() {
+    let block = Block {
+        merkle_root: None,
+        transactions: vec![],
+        struct_metadata: None,
+        previous_block_hash: None,
+        metadata: None,
+        hash: None,
+        height: 0,
+    };
+    // before adding 'test_field: Option<String>'
+    // 1440a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26
+    println!("Hash hex empty block: {}", block.hash_hex());
+    // same hash after adding test_field: None to schema, verifying we can evolve schema while
+    // keeping hashes consistent so long as all fields are None at first.
+}
