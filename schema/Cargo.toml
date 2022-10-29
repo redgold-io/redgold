@@ -1,0 +1,40 @@
+[package]
+name = "redgold-schema"
+version = "0.1.0"
+edition = "2021"
+authors = ["Redgold Labs"]
+description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
+documentation = "https://redgold.app/docs"
+readme = "README.md"
+homepage = "https://redgold.app"
+repository = "https://github.com/redgold-app/redgold"
+license = "MIT"
+keywords = ["crypto", "cryptocurrency", "trust",
+    "reputation", "custodial", "decentralized", "p2p", "contracts", "peer-to-peer", "merkle"]
+categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slugs
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+multihash = "*"
+prost = "0.8"
+serde = "1.0.130"
+serde_json = "1.0.59"
+serde_with = { version = "1.10.0", features = ["hex"] }
+hdpath = { version = "0.5.0", features = ["with-bitcoin"] }
+hex = "0.4.3"
+bitcoin-wallet = "1.1.0"
+rust-crypto = "0.2.36"
+itertools = "0.10.1"
+strum = "0.21"
+strum_macros = "0.21"
+backtrace = "0.3.65"
+
+[dependencies.bitcoin]
+version = "0.21"
+features = ["serde", "bitcoinconsensus"]
+
+[build-dependencies]
+prost-build = "0.8"
+prost-serde = "0.2.0"
+serde = "1.0.130"
+serde_json = "1.0.59"

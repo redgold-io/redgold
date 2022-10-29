@@ -1,0 +1,15 @@
+[package]
+name = "redgold-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Redgold Labs"]
+description = "A relative proof conflict resolution & irreversibility service for executor contracts"
+documentation = "https://redgold.app/docs"
+readme = "README.md"
+homepage = "https://redgold.app"
+repository = "https://github.com/redgold-app/redgold"
+license = "MIT"
+keywords = ["crypto", "cryptocurrency", "trust",
+    "reputation", "custodial", "decentralized", "p2p", "smart", "contracts", "peer-to-peer", "merkle"]
+categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slugs
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

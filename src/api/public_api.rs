@@ -1,0 +1,679 @@
+use std::future::Future;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use bytes::Bytes;
+use futures::TryFutureExt;
+
+use itertools::Itertools;
+use log::{debug, info};
+use rand::rngs::OsRng;
+use rand::RngCore;
+use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
+use warp::reply::Json;
+use warp::Filter;
+use warp::http::Response;
+use redgold_schema::{empty_public_request, empty_public_response, ProtoHashable, SafeOption};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
+
+use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::relay::Relay;
+use crate::data::data_store::DataStore;
+use crate::genesis::create_genesis_transaction;
+use crate::schema::structs::{
+    Address, AddressType, ErrorInfo, QueryAddressesRequest, QueryTransactionResponse,
+};
+use crate::schema::structs::{
+    PublicRequest, PublicResponse, ResponseMetadata, SubmitTransactionRequest,
+    SubmitTransactionResponse,
+};
+use crate::schema::structs::{QueryAddressesResponse, Transaction};
+use crate::schema::{bytes_data, error_info};
+use crate::schema::{response_metadata, SafeBytesAccess, WithMetadataHashable};
+use crate::{schema, util};
+use crate::api::faucet::faucet_request;
+use crate::api::hash_query::hash_query;
+use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::node_config::NodeConfig;
+use crate::util::lang_util::SameResult;
+use crate::util::runtimes::build_runtime;
+
+// https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
+
+#[derive(Clone)]
+pub struct PublicClient {
+    pub url: String,
+    pub port: u16,
+    pub timeout: Duration,
+}
+
+impl PublicClient {
+    // pub fn default() -> Self {
+    //     PublicClient::local(3030)
+    // }
+
+    pub fn local(port: u16) -> Self {
+        Self {
+            url: "localhost".to_string(),
+            port,
+            timeout: Duration::from_secs(30),
+        }
+    }
+
+    pub fn from(url: String, port: u16) -> Self {
+        Self {
+            url,
+            port,
+            timeout: Duration::from_secs(30),
+        }
+    }
+
+    pub fn from_env(url: String, network: NetworkEnvironment) -> Self {
+        Self {
+            url,
+            port: network.default_port_offset(),
+            timeout: Duration::from_secs(30),
+        }
+    }
+
+    //
+    // pub fn local_timeout(port: u16, timeout: Duration) -> Self {
+    //     Self {
+    //         url: "localhost".to_string(),
+    //         port,
+    //         timeout,
+    //     }
+    // }
+
+    fn formatted_url(&self) -> String {
+        return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();
+    }
+    #[allow(dead_code)]
+    pub async fn request(&self, r: &PublicRequest) -> Result<PublicResponse, ErrorInfo> {
+        use reqwest::ClientBuilder;
+        let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
+        // // .default_headers(headers)
+        // // .gzip(true)
+        // .timeout(self.timeout)
+        // .build()?;
+        // info!("{:?}", "");
+        // info!(
+        //     "Sending PublicRequest: {:?}",
+        //     serde_json::to_string(&r.clone()).unwrap()
+        // );
+        let sent = client
+            .post(self.formatted_url() + "/request")
+            .json(r)
+            .send();
+        let response = sent.await;
+        match response {
+            Ok(r) => match r.json::<PublicResponse>().await {
+                Ok(res) => Ok(res),
+                Err(e) => Err(schema::error_info(e.to_string())),
+            },
+            Err(e) => Err(error_info(e.to_string())),
+        }
+    }
+
+    pub async fn send_transaction(
+        &self,
+        t: &Transaction,
+        sync: bool,
+    ) -> Result<PublicResponse, ErrorInfo> {
+        // use reqwest::ClientBuilder;
+        // let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
+        // // .default_headers(headers)
+        // // .gzip(true)
+        // .timeout(self.timeout)
+        // .build()?;
+        // info!("{:?}", "");
+        let mut request = empty_public_request();
+        request.submit_transaction_request = Some(SubmitTransactionRequest {
+                transaction: Some(t.clone()),
+                sync_query_response: sync,
+            });
+        debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
+        self.request(&request).await
+    }
+
+    pub async fn faucet(
+        &self,
+        t: &Address,
+        sync: bool,
+    ) -> Result<FaucetResponse, ErrorInfo> {
+        let mut request = empty_public_request();
+        request.faucet_request = Some(FaucetRequest {
+            address: Some(t.clone()),
+            });
+        info!("Sending faucet request: {}", t.clone().render_string().expect("r"));
+        Ok(self.request(&request).await?.as_error()?.faucet_response.safe_get()?.clone())
+    }
+
+    #[allow(dead_code)]
+    pub async fn query_addresses(
+        &self,
+        addresses: Vec<Vec<u8>>,
+    ) -> Result<PublicResponse, ErrorInfo> {
+        let mut request = empty_public_request();
+        request.query_addresses_request = Some(QueryAddressesRequest {
+                addresses: addresses
+                    .iter()
+                    .map(|a| Address {
+                        address: bytes_data(a.clone()),
+                        address_type: Some(AddressType::StandardKeyhash as i32),
+                    })
+                    .collect_vec(),
+            });
+        self.request(&request).await
+    }
+
+    #[allow(dead_code)]
+    pub async fn query_address(
+        &self,
+        addresses: Vec<Address>,
+    ) -> Result<PublicResponse, ErrorInfo> {
+        let mut request = empty_public_request();
+        request.query_addresses_request = Some(QueryAddressesRequest {
+                addresses
+            });
+        self.request(&request).await
+    }
+
+    #[allow(dead_code)]
+    pub async fn query_hash(
+        &self,
+        input: String,
+    ) -> Result<HashSearchResponse, ErrorInfo> {
+        let mut request = empty_public_request();
+        request.hash_search_request = Some(HashSearchRequest {
+            search_string: input
+        });
+        Ok(self.request(&request).await?.as_error()?.hash_search_response.safe_get()?.clone())
+    }
+
+    pub async fn about(&self) -> Result<AboutNodeResponse, ErrorInfo> {
+        let mut request = empty_public_request();
+        request.about_node_request = Some(AboutNodeRequest{ verbose: true });
+        let result = self.request(&request).await;
+        let result1 = result?.as_error();
+        let option = result1?.about_node_response;
+        let result2 = option.safe_get_msg("Missing response");
+        Ok(result2?.clone())
+    }
+
+}
+//
+// async fn request(t: &Transaction) -> Result<Response, Box<dyn std::error::Error>> {
+//     let client = reqwest::Client::new();
+//     let res = client
+//         .post("http://localhost:3030/request")
+//         .json(&t)
+//         .send()
+//         .await?
+//         .json::<Response>()
+//         .await?;
+//     Ok(res)
+// }
+
+// #[test]
+// fn test_enum_ser() {
+//     State::Pending.
+// }
+
+// TODO: wrapper function to handle errors and return as json
+// TODO: wrapper function to covnert result to warp json
+
+async fn process_request(request: PublicRequest, relay: Relay) -> Json {
+    // info!(
+    //     "Received publicRequest: {}",
+    //     serde_json::to_string(&request.clone()).expect("json decode")
+    // );
+    //
+    let mut response1 = empty_public_response();
+
+    if let Some(submit_request) = request.submit_transaction_request {
+        // info!(
+        //     "Received submit transaction request: {}",
+        //     serde_json::to_string(&submit_request.clone()).unwrap()
+        // );
+        // TODO: Replace this with an async channel of some kind.
+        // later replace it with something as a strict dependency here.
+        let (sender, receiver) = flume::unbounded::<PublicResponse>();
+        let message = TransactionMessage {
+            transaction: submit_request.transaction.as_ref().unwrap().clone(),
+            response_channel: match submit_request.sync_query_response {
+                true => Some(sender),
+                false => None,
+            },
+        };
+        relay
+            .clone()
+            .transaction
+            .sender
+            .send(message)
+            .expect("send");
+
+        if !submit_request.sync_query_response {
+            response1.submit_transaction_response = Some(SubmitTransactionResponse {
+                transaction_hash: submit_request
+                    .transaction
+                    .as_ref()
+                    .expect("tx")
+                    .hash()
+                    .into(),
+                query_transaction_response: None,
+            });
+        } else {
+            // info!("API server awaiting transaction results");
+            let recv = receiver.recv_async_err().await;
+            // (Duration::from_secs(70));
+            // info!(
+            // "API server got transaction results or timeout, success: {:?}",
+            // recv.clone().is_ok()
+        // );
+            match recv {
+                Ok(r) => {
+                    response1 = r
+                }
+                Err(e) => {
+                    response1.response_metadata = Some(ResponseMetadata {
+                        success: false,
+                        error_info: Some(e),
+                    });
+                }
+            }
+        }
+    }
+    match request.query_transaction_request {
+        None => {}
+        Some(_) => {}
+    }
+    if let Some(r) = request.query_addresses_request {
+        // TODO: make this thing async and map errors to rejections
+        match DataStore::map_err_sqlx(relay.clone().ds.query_utxo_address(r.addresses).await) {
+            Err(e) => {
+                response1.response_metadata = Some(ResponseMetadata {
+                    success: false,
+                    error_info: Some(e),
+                });
+            }
+            Ok(k) => {
+                response1.query_addresses_response = Some(QueryAddressesResponse { utxo_entries: k });
+            }
+        }
+    }
+    if let Some(r) = request.about_node_request {
+        response1.about_node_response = Some(AboutNodeResponse{
+            latest_metadata: Some(relay.node_config.peer_data_tx())
+        });
+    }
+    if let Some(r) = request.hash_search_request {
+        match hash_query(relay.clone(), r.search_string).await {
+            Ok(res) => {
+                response1.hash_search_response = Some(res);
+            },
+            Err(e) => {
+                response1.response_metadata = Some(ResponseMetadata {
+                    success: false,
+                    error_info: Some(e),
+                });
+            }
+        };
+    }
+
+    // info!("Public API response: {}", serde_json::to_string(&response1.clone()).unwrap());
+    warp::reply::json(&response1)
+}
+
+pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
+    let relay2 = relay.clone();
+
+    let hello = warp::get()
+        .and(warp::path("hello")).and_then(|| async move {
+        let res: Result<&str, warp::reject::Rejection> = Ok("hello");
+        res
+    });
+
+    let trelay = relay.clone();
+    let transaction = warp::post()
+        .and(warp::path("request"))
+        // Only accept bodies smaller than 16kb...
+        .and(warp::body::content_length_limit(1024 * 16))
+        .and(warp::body::json::<PublicRequest>())
+        .and_then(move |request: PublicRequest| {
+            let relay3 = trelay.clone();
+            async move {
+                let res: Result<Json, warp::reject::Rejection> =
+                    Ok(process_request(request, relay3.clone()).await);
+                res
+            }
+        });
+
+    let faucet_relay = relay.clone();
+
+    let faucet = warp::get()
+        .and(warp::path("faucet"))
+        .and(warp::path::param())
+        .and_then(move |address: String| {
+            let relay3 = faucet_relay.clone();
+            async move {
+                let res: Result<Json, warp::reject::Rejection> =
+                    Ok(faucet_request(address, relay3.clone()).await
+                        .map_err(|e| warp::reply::json(&e))
+                        .map(|r| warp::reply::json(&r))
+                        .combine()
+                    );
+                res
+            }
+        });
+    let qry_relay = relay.clone();
+
+    let query_hash = warp::get()
+        .and(warp::path("query"))
+        .and(warp::path::param())
+        .and_then(move |address: String| {
+            let relay3 = qry_relay.clone();
+            async move {
+                let res: Result<Json, warp::reject::Rejection> =
+                    Ok(hash_query(relay3.clone(), address).await
+                        .map_err(|e| warp::reply::json(&e))
+                        .map(|r| warp::reply::json(&r))
+                        .combine()
+                    );
+                res
+            }
+        });
+
+    let a_relay = relay.clone();
+
+    let about = warp::get()
+        .and(warp::path("about"))
+        .and_then(move || {
+            let relay3 = a_relay.clone();
+            async move {
+                let res: Result<Json, warp::reject::Rejection> = {
+                    Ok(warp::reply::json(&AboutNodeResponse{
+                        latest_metadata: Some(relay3.node_config.peer_data_tx())
+                    }))
+                };
+                res
+            }
+        });
+
+    let bin_relay = relay.clone();
+
+    let request_normal = warp::post()
+        .and(warp::path("request_peer"))
+        .and(warp::body::json::<Request>())
+        .and(warp::addr::remote())
+        .and_then(move |request: Request, address: Option<SocketAddr>| {
+            let relay3 = bin_relay.clone();
+            async move {
+                info!{"Warp request from {:?}", address};
+                let res: Result<Json, warp::reject::Rejection> =
+                    Ok(PeerRxEventHandler::request_response(relay3, request).await
+                        .map_err(|e| warp::reply::json(&e))
+                        .map(|r| warp::reply::json(&r))
+                        .combine()
+                    );
+                res
+            }
+        });
+
+    let bin_relay2 = relay.clone();
+
+    use prost::Message;
+    let request_bin = warp::post()
+        .and(warp::path("request_proto"))
+        .and(warp::body::bytes())
+        .and(warp::addr::remote())
+        .and_then(move |reqb: Bytes, address: Option<SocketAddr>| {
+            let relay3 = bin_relay2.clone();
+            let vec_b = reqb.to_vec();
+            let req = async { Request::deserialize(vec_b).map_err(|e|
+                ErrorInfo::error_info(format!("Request decode error {}", e)))};
+            async move {
+                // info!{"Warp request from {:?}", address};
+                let res: Result<Response<Vec<u8>>, warp::reject::Rejection> = {
+                    Ok({
+                        let c = new_channel::<RResponse>();
+
+                        let response: Result<RResponse, ErrorInfo> = req.and_then(|request| {
+                            let mut msg = PeerMessage::empty();
+                            msg.request = request;
+                            msg.response = Some(c.sender.clone());
+                            relay3.peer_message_rx.send(msg)
+                            // PeerRxEventHandler::request_response(relay3, request)
+                        }).and_then(|()| {
+                            async {
+                                c.receiver.recv_timeout(Duration::from_secs(20)).map_err(|e| {
+                                    ErrorInfo::error_info(format!("Request timeout {}", e))
+                                })
+                            }
+                        })
+                            .await;
+                        // info!("request_proto response: {:?}", response.clone());
+                        response
+                            .map_err(|e| {
+                                let rr = RResponse::from_error_info(e);
+                                let r = rr.encode_to_vec();
+                                let res = Response::builder().body(r).expect("a");
+                                res
+                            })
+                            .map(|r| {
+                                let rr = r.encode_to_vec();
+                                let res = Response::builder().body(rr).expect("a");
+                                res
+                            })
+                            .combine()
+                    })
+                };
+                res
+            }
+        });
+
+    let port = relay2.node_config.public_port();
+    info!("Running public API on port: {:?}", port.clone());
+    Ok(warp::serve(hello.or(transaction).or(faucet).or(query_hash).or(about).or(request_normal).or(request_bin))
+        .run(([0, 0, 0, 0], port))
+        .await)
+}
+
+pub fn start_server(relay: Relay, runtime: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>> {
+    info!(
+        "Starting PublicAPI server on port {:?}",
+        relay.clone().node_config.public_port()
+    );
+    let handle = runtime.spawn(run_server(relay.clone()));
+    info!(
+        "Started PublicAPI server on port {:?}",
+        relay.clone().node_config.public_port()
+    );
+    return handle;
+}
+
+#[allow(dead_code)]
+async fn mock_relay(relay: Relay) {
+    loop {
+        let tm = relay.transaction.receiver.recv().unwrap();
+        let mut response = empty_public_response();
+        response.submit_transaction_response = Some(SubmitTransactionResponse {
+                transaction_hash: create_genesis_transaction().hash().into(),
+                query_transaction_response: Some(QueryTransactionResponse {
+                    observation_proofs: vec![],
+                    block_hash: None,
+                }),
+            });
+        tm.response_channel
+            .unwrap()
+            .send(response)
+            .expect("send");
+    }
+}
+//
+// #[tokio::test]
+// async fn run_warp_debug() {
+//     // Only for debug
+//     util::init_logger().expect("log");
+//     let relay = Relay::default().await;
+//     info!("Starting on: {:?}", relay.node_config.public_port);
+//     let runtimes = crate::node::NodeRuntimes::default();
+//     let res = crate::api::public_api::start_server(relay.clone(), runtimes.public_api.clone());
+//     res.await.expect("victree");
+//     // run_server(relay).await;
+// }
+
+// #[tokio::test]
+#[test]
+fn test_warp_basic() {
+    util::init_logger().expect("log");
+
+    let arc2 = build_runtime(2, "test-public-api");
+
+    let runtime = Arc::new(
+        Builder::new_multi_thread()
+            .worker_threads(2)
+            .thread_name("public-api-test")
+            .thread_stack_size(3 * 1024 * 1024)
+            .enable_all()
+            .build()
+            .unwrap(),
+    );
+
+    let mut relay = arc2.block_on(Relay::default());
+    let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
+    relay.node_config.public_port = Some(offset);
+    start_server(relay.clone(), arc2.clone());
+    runtime
+        .clone()
+        .block_on(async { sleep(Duration::new(3, 0)).await });
+    let res = runtime.clone().block_on(async move {
+        PublicClient::local(offset)
+            .send_transaction(&create_genesis_transaction(), false)
+            .await
+            .unwrap()
+    });
+    let relay_t = relay.transaction.receiver.recv();
+    assert_eq!(create_genesis_transaction(), relay_t.unwrap().transaction);
+    let mut response = empty_public_response();
+    response.submit_transaction_response = Some(SubmitTransactionResponse {
+            transaction_hash: create_genesis_transaction().hash().into(),
+            query_transaction_response: None
+        });
+    assert_eq!(
+        response,
+        res
+    );
+
+    let res2 = runtime.clone().block_on(async move {
+        PublicClient::local(offset)
+            .query_addresses(vec![])
+            .await
+            .unwrap()
+    });
+    println!("response: {:?}", res2);
+}
+
+//
+// #[test]
+// fn test_warp_basic2() {
+//     util::init_logger().expect("log");
+//
+//     let arc2 = build_runtime(2, "test-public-api");
+//
+//     let runtime = Arc::new(
+//         Builder::new_multi_thread()
+//             .worker_threads(2)
+//             .thread_name("public-api-test")
+//             .thread_stack_size(3 * 1024 * 1024)
+//             .enable_all()
+//             .build()
+//             .unwrap(),
+//     );
+//
+//     let mut relay = arc2.block_on(Relay::default());
+//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
+//     relay.node_config.public_port = Some(offset);
+//     start_server(relay.clone(), arc2.clone());
+//     runtime
+//         .clone()
+//         .block_on(async { sleep(Duration::new(3, 0)).await });
+//     let request = Request::empty().about();
+//     let res = runtime.clone().block_on(async move {
+//         crate::api::Client::new("localhost".into(), offset)
+//             .proto_post(&request, "request_proto".into())
+//             .await
+//     });
+//
+//     println!("response: {:?}", res);
+// }
+//
+// #[test]
+// fn test_warp_basic3() {
+//     util::init_logger().expect("log");
+//
+//     let arc2 = build_runtime(2, "test-public-api");
+//
+//     let runtime = Arc::new(
+//         Builder::new_multi_thread()
+//             .worker_threads(2)
+//             .thread_name("public-api-test")
+//             .thread_stack_size(3 * 1024 * 1024)
+//             .enable_all()
+//             .build()
+//             .unwrap(),
+//     );
+//
+//     let mut relay = arc2.block_on(Relay::default());
+//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
+//     relay.node_config.public_port = Some(offset);
+//     start_server(relay.clone(), arc2.clone());
+//     runtime
+//         .clone()
+//         .block_on(async { sleep(Duration::new(3, 0)).await });
+//     let request = Request::empty().about();
+//     let res = runtime.clone().block_on(async move {
+//         crate::api::Client::new("localhost".into(), offset)
+//             .json_post::<Request, RResponse>(&request, "request_peer".into())
+//             .await
+//     });
+//
+//     println!("response: {:?}", res);
+// }
+
+
+//
+// #[tokio::test]
+// async fn test_warp_basic_timeout() {
+//     init_logger();
+//     info!("starting test");
+//     let mut relay = Relay::default();
+//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
+//     relay.node_config.public_port = Some(offset);
+//     start_server(relay.clone());
+//     info!("started server");
+//
+//     sleep(Duration::new(1, 0)).await;
+//     let client = PublicClient::local_timeout(offset, Duration::new(0, 1));
+//     info!("starting send");
+//     // outer timeout seems not to work properly.
+//     let res = timeout(
+//         Duration::from_secs(1),
+//         client.send_transaction(&create_genesis_transaction(), true),
+//     )
+//     .await
+//     .unwrap();
+//     assert!(res.is_err())
+// }
+
+#[ignore]
+#[test]
+fn test_public_api_lb() {
+    let mut config = NodeConfig::default();
+    config.network == NetworkEnvironment::Dev;
+    let c = config.lb_client();
+    let rt = build_runtime(1, "test");
+    println!("{:?}", rt.block_on(c.about()));
+}

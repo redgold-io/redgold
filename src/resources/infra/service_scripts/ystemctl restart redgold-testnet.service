@@ -1,0 +1,14 @@
+● redgold-testnet.service - Redgold Testnet
+     Loaded: loaded (/etc/systemd/system/redgold-testnet.service; disabled; vendor preset: enabled)
+     Active: inactive (dead)
+
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41300K .......... .......... .......... .......... .......... 99% 9.06M 0s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41350K .......... .......... .......... .......... .......... 99% 14.1M 0s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41400K .......... .......... .......... .......... .......... 99% 90.8M 0s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41450K .......... .......... .......... .......... .......... 99% 73.9M 0s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41500K .......... .......... .......... .......... .......... 99% 61.2M 0s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41550K .......... .......... .......... .......... .......... 99% 44.2M 0s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]:  41600K .......... .......... ....                            100%  200M=1.5s
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]: 2022-06-09 07:06:22 (26.9 MB/s) - ‘/root/redgold_linux_updated’ saved [42623296/42623296]
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]: 2022-06-09T07:06:22.776871845-04:00 INFO redgold::util::auto_update - Chmod output:  chmod: cannot access 'redgold_linux_updated': No such file or directory
+Jun 09 07:06:22 redgold.cash redgold_linux[1321744]: 2022-06-09T07:06:22.776886444-04:00 INFO redgold::util::auto_update - Shutting down for update to new version

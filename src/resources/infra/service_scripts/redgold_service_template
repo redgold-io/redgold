@@ -1,0 +1,11 @@
+[Unit]
+Description=Redgold Testnet
+
+[Service]
+ExecStartPre=cp /root/redgold_linux_updated /root/redgold_linux
+ExecStart=/root/redgold_linux
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,94 @@
+version: "3.7"
+volumes:
+  prometheus_data: {}
+services:
+  kibana:
+    image: docker.elastic.co/kibana/kibana-oss:7.6.2
+    container_name: kibana
+    #    user: root
+    ports:
+      - 5601:5601
+    expose:
+      - 5601
+    restart: unless-stopped
+  #    volumes:
+  #      - /root/data/kibana.yml:/usr/share/kibana/config/kibana.yml
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.8.0
+    user: root
+    restart: unless-stopped
+    environment:
+      discovery.type: "single-node"
+    #      volumes:
+    ports:
+      - 9200:9200
+    volumes:
+      - ~/.rg/all/data/esdata:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+  filebeat:
+    container_name: filebeat
+    image: docker.elastic.co/beats/filebeat-oss:7.8.0
+    user: root
+    restart: unless-stopped
+    volumes:
+      - ~/.rg/all/filebeat.docker.yml:/usr/share/filebeat/filebeat.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  node-exporter:
+    image: prom/node-exporter:latest
+    user: root
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    expose:
+      - 9100
+    network_mode: host
+  prometheus:
+    image: prom/prometheus:latest
+    user: root
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ~/.rg/all/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ~/.rg/all/data/prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    ports:
+      - 9090:9090
+    network_mode: host
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    user: root
+    expose:
+      - 3000
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/var/lib/grafana/grafana_secret
+    volumes:
+      - ~/.rg/all/grafana_secret:/var/lib/grafana/grafana_secret
+      - ~/.rg/all/data/grafana:/var/lib/grafana
+    network_mode: host

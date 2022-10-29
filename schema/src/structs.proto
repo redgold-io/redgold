@@ -1,0 +1,743 @@
+syntax = "proto3";
+
+package structs;
+
+// TODO: Schema version hash
+
+enum SignatureType {
+  ECDSA = 0;
+}
+
+message Signature {
+  BytesData bytes = 1;
+  SignatureType signature_type = 2;
+}
+
+enum PublicKeyType {
+  secp256k1 = 0;
+}
+
+message PublicKey {
+  BytesData bytes = 1;
+  PublicKeyType key_type = 2;
+}
+
+// TODO: BytesData for signature?
+// Multiple public key types
+// TODO: Move the 'repeated' into this so that we encompass multi-sig proofs inside a single class
+message Proof {
+  Signature signature = 1;
+  PublicKey public_key = 2;
+}
+
+// TODO: refactor
+message PoWProof {
+  uint32 proof_type = 1;
+  bytes proof = 2;
+}
+
+message ProductId {
+  Hash network = 1;
+  Hash product = 2;
+}
+
+// TODO: We need to handle case where UtxoId is missing, a floating dependency or input based on code execution.
+
+// TODO: Should we unify transaction hash / output_index into UtxoId?
+// TODO: Support other output extraction operations, a function that processes a transaction and results ?
+message Input {
+  // should this be called id? or transaction_hash
+  Hash transaction_hash = 1;
+  int64 output_index = 2;
+  repeated Proof proof = 3;
+  ProductId product_id = 4;
+  // Hydration purposes only! Not used for hashes
+  Output output = 5;
+}
+
+message TrustLabel {
+  // TODO: Should this be bytesData?
+  bytes peer_id = 1;
+  double label = 2;
+  optional double confidence = 3;
+  optional double hardness = 5;
+  optional StandardData data = 6;
+}
+
+message PartitionInfo {
+  // etc.
+  optional double utxo_distance = 1;
+}
+
+// This also needs a proof maybe?
+message NodeMetadata {
+  string external_address = 1;
+  bytes multi_hash = 2;
+  // May not be to store public key if we merkle the multi_hashes too.
+  bytes public_key = 3;
+  optional NodeType node_type = 5;
+  optional VersionInfo version_info = 6;
+  optional PartitionInfo partition_info = 7;
+  optional int64 port_offset = 8;
+}
+
+message VersionInfo {
+  optional BytesData checksum_hash = 1;
+  optional BytesData next_checksum_hash = 2;
+  optional int64 next_upgrade_time = 3;
+}
+
+message PeerData {
+  optional bytes peer_id = 1;
+  optional MerkleProof merkle_proof = 2;
+  optional Proof proof = 3;
+  repeated NodeMetadata node_metadata = 4;
+  repeated TrustLabel labels = 5;
+  optional VersionInfo version_info = 6;
+}
+
+// should i use kv pairs here to capture other features?
+// or a typedValue or something?
+message StoredPeerData {
+  PeerData peer_data = 1;
+  uint64 time = 2;
+  optional TrustLabel secret_label = 3;
+  optional double deterministic_trust = 4;
+  optional double trust_score = 5;
+  optional StandardData data = 6;
+}
+
+enum BytesDecoder {
+  STANDARD = 0;
+}
+
+message BytesData {
+  bytes bytes_value = 1;
+  BytesDecoder bytes_decoder = 2;
+  int64 version = 3;
+}
+
+enum HashFormatType {
+  Multihash = 0;
+  // Remove after adapting to multihash
+  Legacy = 1;
+}
+
+message Hash {
+  BytesData bytes = 1;
+  HashFormatType hash_format_type = 2;
+}
+
+// Where to store parquet schema, avro schema, etc. etc.
+
+// Generic data structure designed to hold arbitrary data in a common format.
+// This should be considered supplementary to using a regular schema, not a
+// complete substitute.
+message StandardData {
+  // Standard currency style field
+  optional int64 amount = 1;
+
+  // Direct data storage for small values
+  optional TypedValue typed_value = 2;
+  repeated TypedValue typed_value_list = 3;
+  optional KeyedTypedValue keyed_typed_value = 4;
+  repeated KeyedTypedValue keyed_typed_value_list = 5;
+  optional MatrixTypedValue matrix_typed_value = 6;
+  repeated MatrixTypedValue matrix_typed_value_list = 7;
+  // TODO: ResolvableDataReference fields for larger amounts of data
+  // matrix typed value
+  // Peer metadata field
+  optional PeerData peer_data = 8;
+}
+
+message KeyedTypedValue {
+  TypedValue key = 1;
+  TypedValue value = 2;
+}
+
+message MatrixTypedValue {
+  TypedValue key_i = 1;
+  TypedValue key_j = 2;
+  TypedValue value = 3;
+}
+
+message TypedValue {
+  // amount
+  optional BytesData bytes_value = 2;
+  optional string string_value = 3;
+  optional uint64 uint64_value = 1;
+  optional int64 int64_value = 5;
+  optional float float_value = 7;
+  optional double double_value = 4;
+  optional bool bool_value = 6;
+  // TODO: consider adding the rest of the proto types?
+}
+
+enum StandardContractType {
+  CURRENCY = 0;
+  DEPOSIT = 1;
+  SWAP = 2;
+}
+
+message KeyValueOption {
+  string key = 1;
+  string value = 2;
+}
+
+message CodeExecutionContract {
+  optional BytesData hash_contract_reference = 1;
+  optional BytesData raw_dynamic_contract = 2;
+}
+
+message OutputContract {
+  // hash references, same issue as other thing
+  optional StandardContractType standard_contract_type = 1;
+  optional CodeExecutionContract code_execution_contract = 2;
+  optional double threshold = 3;
+  repeated double weights = 4;
+}
+
+message Output {
+  Address address = 1;
+  ProductId product_id = 5;
+  repeated Proof counter_party_proofs = 6;
+  // change to outputData?
+  StandardData data = 7;
+  OutputContract contract = 8;
+}
+
+// monthly / daily / window size + window center
+message TimeLockWindow {
+  uint64 delay = 1;
+  uint64 offset = 2;
+  uint64 window_size = 3;
+}
+
+message TransactionAmount {
+  int64 amount = 1;
+}
+
+message TransactionData {
+  optional string message = 1;
+  optional uint64 time = 2;
+  optional StandardData standard_data = 3;
+}
+
+message TransactionContract {
+  // input gets signed with a proof;
+  // output gets signed with a counter-party proof;
+  // transaction then
+  // should this confirmation thing be on the output or the transaction??? Transaction
+  optional bool confirmation_= 1;
+  repeated Proof confirmation_proofs = 2;
+  // How long the network / each node must wait between PENDING and finalization
+  optional uint64 finalize_window = 3;
+  // How long the network must wait after FINALIZED to use.
+  optional uint64 lock_period = 4;
+  // Used to allow network criteria to vote on reversing in event of hacking.
+  optional bool network_reversible = 5;
+
+  optional TimeLockWindow time_lock_window = 6;
+  repeated KeyValueOption options = 7;
+
+  // Used only for anti-spam limiting at low limits.
+  optional PoWProof pow_proof = 8;
+}
+
+enum NetworkEnvironment {
+  // Production release, using real data and currency
+ MAIN = 0;
+ // Pre-production release, used for integration testing with release version before updating main net
+ TEST = 1;
+ // Latest dev branch code, continuously updated from latest build, unstable and non-release version
+ DEV = 2;
+ // Latest staging branch code, continuously updated but considered stable, upon verification is rolled to test net
+ STAGING = 3;
+ // Performance testing network, used for debugging performance issues and not tied to a particular version or stage
+  // Can be manually set as for debugging, generally paired with staging code.
+ PERF = 4;
+ // Manually deployed network over arbitrary machines
+  INTEGRATION = 5;
+ // Designation for an entire network running as local processes not connecting to external services
+ LOCAL = 6;
+ // Designation for an entire network running within a single process. Either with mock-ups or other testing
+  // harnesses -- generally used for debugging within an IDE,
+ DEBUG = 7;
+ // Operations which can potentially span all networks, like a host manager or infrastructure configuration.
+ ALL = 8;
+  // Testing branch before dev, force push commits here for manual debugging, one user at a time.
+  PREDEV = 9;
+}
+
+message TransactionOptions {
+  optional int64 salt = 1;
+  optional NetworkEnvironment network_type = 2;
+  repeated KeyValueOption key_value_options = 3;
+  optional TransactionData data = 4;
+  optional TransactionContract contract = 5;
+}
+
+message Transaction {
+  repeated Input inputs = 1;
+  repeated Output outputs = 2;
+  StructMetadata struct_metadata = 3;
+  TransactionOptions options = 4;
+  Hash hash = 5;
+}
+
+message BlockMetadata {
+}
+
+message StructMetadata {
+  int64 time = 1;
+  int32 version = 2;
+}
+
+message AddressBlock {
+  bytes address = 1;
+  int64 balance = 2;
+  int64 height = 3;
+  bytes hash = 4;
+}
+
+message Block {
+  Hash merkle_root = 1;
+  // These are dropped for the hash calculation as the merkle root is present.
+  repeated Transaction transactions = 2;
+  StructMetadata struct_metadata = 3;
+  Hash previous_block_hash = 4;
+  optional BlockMetadata metadata = 5;
+  // This is dropped for hash calculation as it represents the calculation after the fact,
+  // Only stored for ease of preventing excess recalculations.
+  Hash hash = 6;
+  // Not really needed for hash calc, but harmless to include
+  int64 height = 7;
+}
+
+enum State {
+  PENDING = 0;
+  FINALIZED = 1;
+}
+
+enum HashType {
+  TRANSACTION = 0;
+  OBSERVATION_METADATA = 1;
+  OBSERVATION_MERKLE_ROOT = 2;
+  TOMBSTONE = 3;
+}
+
+message Tombstone {
+  bytes hash = 1;
+  // TODO: Other fields for the reason 'why'
+}
+
+message ObservationData {
+  Transaction transaction = 1;
+  Observation observation = 2;
+}
+
+// Update all these hashes / structmetadata fields.
+message ObservationMetadata {
+  Hash observed_hash = 1;
+  HashType hash_type = 2;
+  optional State state = 3;
+  StructMetadata struct_metadata = 4;
+  Hash hash = 5;
+}
+
+// TODO: Salt? Peer identifier? Etc
+message Observation {
+  // Merkle root of observations
+  Hash merkle_root = 1;
+  // Observations
+  repeated ObservationMetadata observations = 2;
+  // Signature associated with peer
+  Proof proof = 3;
+  StructMetadata struct_metadata = 4;
+  Hash hash = 5;
+}
+
+// Derived data structure, not a primary chain data structure
+message ObservationEdge {
+    bytes root = 1;
+    bytes leaf_hash = 2;
+    bytes observation_hash = 3;
+    ObservationMetadata observation_metadata = 4;
+    MerkleProof merkle_proof = 5;
+    uint64 time = 6;
+}
+
+// Derived data structure, not a primary chain data structure
+message UtxoEntry {
+  bytes transaction_hash = 1;
+  int64 output_index = 2;
+  // This is duplicated, but used for indexing.
+  bytes address = 3;
+  Output output = 4;
+  int64 time = 5;
+  // Consider adding additional fields to index here? amount? etc. for now just de-ser
+}
+
+//}
+// should we add longer confirmation windows to transactions for fee?
+// let's just assume the deposit addresses are well known?
+// assume addresses are well known enough -- but network still needs to confirm that address is usable. ?? or does it
+// or should we issue a unique deposit address per input?
+
+// should we even have a deposit request??
+// Should we just move this out of the schema entirely and use it as rest api call ? or leave it?
+// Should a deposit just be a regular transaction?
+// This type doesn't have a double spending issue, only requires single finalization.
+// DepositRequest does not need to be observed. It only needs to be signed.
+// how the hell do we collect the fee?
+// just collect a fee from a redgold input to deposit.
+//message DepositMulti {
+//  repeated DepositInput inputs = 1;
+//  repeated DepositOutput outputs = 2;
+//  optional uint32 version = 6;
+//  optional PoWProof anti_spam_proof = 7;
+//  optional uint64 request_ttl_seconds = 8; // default 1 day
+//}
+
+// Let's assume deposit has already happened and this is the 'claim' of it.
+// Deposit address is currently just requested from active nodes.
+// They must agree on the main deposit address, and maintain old ones periodically.
+// Deposit should be rejected if not confirmed -- but it can later be re-attempted.
+// Once a deposit has been claimed it's 'used' in same way UTXO's are.
+// How do we map from a deposit to an amount??
+
+// screw it just use transaction?
+//
+//message Deposit {
+//  bytes source_address = 1;
+//  uint32 network = 2;
+//  bytes destination_address = 3;
+//  repeated Proof source_proof = 4;
+//  OperationMetadata metadata =  5;
+//}
+
+// when the deposit is finalized, how do we determine the actual amount?
+//
+//message Deposit {
+//  bytes deposit_request_hash = 1;
+//  Proof control_proof = 2;
+//  optional uint32 version = 3;
+//}
+
+// maybe a deposit should just be to a wrapped coin?
+// that adds tons of complication..
+
+// actually, wrapped bitcoin is fine, that's easily composible actually? maybe
+
+
+// These should both be broadcasts at some point
+// Consider using a response here if needed.
+message GossipTransactionRequest {
+  Transaction transaction = 1;
+}
+
+message GossipObservationRequest {
+  Observation observation = 1;
+}
+
+message ResolveHashRequest {
+  bytes hash = 1;
+  HashType hash_type = 2;
+}
+
+// Add request id's here??
+
+message ResolveHashResponse {
+  bytes data = 1;
+  HashType hash_type = 2;
+}
+
+enum DownloadDataType {
+  UTXO_ENTRY = 0;
+  TRANSACTION_ENTRY = 1;
+  OBSERVATION_ENTRY = 2;
+  OBSERVATION_EDGE_ENTRY = 3;
+
+  // Currently unsupported
+  BLOCK_ENTRY = 4;
+  SNAPSHOT_ENTRY = 5;
+}
+
+message DownloadRequest {
+    uint64 start_time = 1;
+    uint64 end_time = 2;
+    DownloadDataType data_type = 3;
+    optional uint64 offset = 4;
+}
+
+// Only used temporarily for download, not reliable 'time' value
+message TransactionEntry {
+  uint64 time = 1;
+  Transaction transaction = 2;
+}
+
+message ObservationEntry {
+  uint64 time = 1;
+  Observation observation = 2;
+}
+
+message DownloadResponse {
+  repeated UtxoEntry utxo_entries = 1;
+  repeated TransactionEntry transactions = 2;
+  repeated ObservationEntry observations = 3;
+  repeated ObservationEdge observation_edges = 4;
+  bool complete_response = 5;
+}
+//
+//message DownloadMetadataRequest {
+//  optional bool debug = 1;
+//}
+//
+//message DownloadMetadataResponse {
+//
+//}
+
+message GetPeersInfoRequest {
+
+}
+
+message GetPeersInfoResponse {
+  repeated Transaction peers = 1;
+}
+
+message Request {
+  optional GossipTransactionRequest gossip_transaction_request = 1;
+  optional GossipObservationRequest gossip_observation_request = 2;
+  optional ResolveHashRequest resolve_hash_request = 3;
+  optional DownloadRequest download_request = 4;
+  AboutNodeRequest about_node_request = 5;
+  Proof proof = 7;
+  NodeMetadata node_metadata = 8;
+  GetPeersInfoRequest get_peers_info_request = 9;
+  //  optional DownloadMetadataRequest download_metadata_request = 5;
+}
+
+message Response {
+  ResponseMetadata response_metadata = 1;
+  // Pull in other response classes if needed.
+  optional ResolveHashResponse resolve_hash_response = 2;
+  optional DownloadResponse download_response = 3;
+  AboutNodeResponse about_node_response = 4;
+  GetPeersInfoResponse get_peers_info_response = 5;
+  NodeMetadata node_metadata = 6;
+  Proof proof = 7;
+}
+
+message QueryTransactionRequest {
+  Hash transaction_id = 1;
+}
+
+
+message MerkleProof {
+  Hash root = 1;
+  Hash leaf = 2;
+  repeated Hash nodes = 3;
+}
+
+message ObservationProof {
+  MerkleProof merkle_proof = 1;
+  ObservationMetadata metadata = 2;
+  Proof proof = 3;
+}
+
+message QueryTransactionResponse {
+  repeated ObservationProof observation_proofs = 1;
+  Hash block_hash = 2;
+}
+
+message SubmitTransactionRequest {
+  Transaction transaction = 1;
+  bool sync_query_response = 2;
+}
+
+message SubmitTransactionResponse {
+  Hash transaction_hash = 1;
+  optional QueryTransactionResponse query_transaction_response = 2;
+}
+
+message AboutNodeRequest {
+  bool verbose = 1;
+}
+
+message AboutNodeResponse {
+  Transaction latest_metadata = 2;
+}
+
+enum AddressType {
+  STANDARD_KEYHASH = 0;
+  MULTIHASH_KEYHASH = 1;
+  BITCOIN_COMPAT_ADDRESS = 2;
+  ETHEREUM_COMPAT_ADDRESS = 3;
+  PUBLIC_KEY_DIRECT_ADDRESS = 4;
+}
+
+message Address {
+  BytesData address = 1;
+  optional AddressType address_type = 2;
+}
+
+message QueryAddressesRequest {
+  repeated Address addresses = 1;
+}
+
+message QueryAddressesResponse {
+  repeated UtxoEntry utxo_entries = 1;
+}
+
+message FaucetRequest {
+  Address address = 1;
+}
+
+message FaucetResponse {
+  Hash transaction_hash = 1;
+}
+
+message RecentTransactionsRequest {}
+message RecentTransactionsResponse {
+  repeated Transaction transactions = 1;
+}
+
+message HashSearchRequest {
+  string search_string = 1;
+  // TODO: Optional data types etc.
+}
+
+message TransactionInfo {
+  Transaction transaction = 1;
+  repeated ObservationProof observation_proofs = 2;
+}
+
+message AddressInfo {
+  Address address = 1;
+  repeated UtxoEntry utxo_entries = 2;
+  int64 balance = 3;
+}
+
+message HashSearchResponse {
+  TransactionInfo transaction_info = 1;
+  AddressInfo address_info = 2;
+  Observation observation = 3;
+  PeerData peer_data = 4;
+}
+
+message PublicRequest {
+  optional SubmitTransactionRequest submit_transaction_request = 1;
+  optional QueryTransactionRequest query_transaction_request = 2;
+  optional AboutNodeRequest about_node_request = 3;
+  optional QueryAddressesRequest query_addresses_request = 4;
+  // Debug only
+  FaucetRequest faucet_request = 5;
+  RecentTransactionsRequest recent_transactions_request = 6;
+  HashSearchRequest hash_search_request = 7;
+}
+
+
+message PublicResponse {
+  optional ResponseMetadata response_metadata = 1;
+  optional SubmitTransactionResponse submit_transaction_response = 2;
+  optional QueryTransactionResponse query_transaction_response = 3;
+  optional AboutNodeResponse about_node_response = 4;
+  optional QueryAddressesResponse query_addresses_response = 5;
+  FaucetResponse faucet_response = 6;
+  RecentTransactionsResponse recent_transactions_response = 7;
+  HashSearchResponse hash_search_response = 8;
+}
+
+message ErrorDetails {
+  string detail_name = 1;
+  string detail = 2;
+}
+
+message ErrorInfo {
+  Error code = 1;
+  string description = 2;
+  string description_extended = 3;
+  string message = 4;
+  repeated ErrorDetails details = 5;
+  bool retriable = 6;
+}
+
+message ResponseMetadata {
+  bool success = 1;
+  ErrorInfo error_info = 2;
+}
+
+message AddPeerFullRequest {
+  bytes id = 1;
+  double trust = 2;
+  bytes public_key = 3;
+  string address = 4;
+  bool connect_to_peer = 5;
+}
+
+message ControlRequest {
+  optional AddPeerFullRequest add_peer_full_request = 1;
+}
+
+message UpdatePeerTrustRequest {}
+
+
+message ControlResponse {
+  ResponseMetadata response_metadata = 1;
+}
+
+enum Error {
+  /// Signature failed verification
+  IncorrectSignature = 0;
+  MissingInputs = 1;
+  MissingOutputs = 2;
+  InvalidAddressInputIndex = 3;
+  InvalidHashLength = 4;
+  TransactionAlreadyProcessing = 5;
+  UnknownUTXO = 6;
+  BalanceMismatch = 7;
+  InsufficientBalance = 8;
+  InsufficientFee = 9;
+  MissingProof = 10;
+  TransactionRejectedDoubleSpend = 11;
+  InternalDatabaseError = 12;
+  AddressPublicKeyProofMismatch = 13;
+  UnknownError = 14;
+  DatabaseFailure = 15;
+  MissingField = 16;
+  ProtoDecoderFailure = 17;
+  InvalidNetworkEnvironment = 18;
+  DataStoreInternalCorruption = 19;
+  HexDecodeFailure = 20;
+  AddressDecodeFailure = 21;
+  UnsupportedCurrency = 22;
+  AddressNotFound = 23;
+  UnknownTransaction = 24;
+  UnknownBlock = 25;
+  InternalChannelSendError = 26;
+  InternalChannelReceiveError = 27;
+  ParseFailure = 28;
+  DeserializationFailure = 29;
+  SerializationFailure = 30;
+}
+
+enum NodeType {
+  Ephemeral = 0;
+  Static = 1;
+}
+
+enum NodeState {
+  Ready = 0;
+  Offline = 2;
+  Initializing = 3;
+  Downloading = 4;
+  Synchronizing = 5;
+  ShuttingDown = 6;
+}
+
+enum KeyType {
+  Transport = 0;
+  ObservationMerkle = 2;
+  Deposit = 3;
+  Reward = 4;
+}

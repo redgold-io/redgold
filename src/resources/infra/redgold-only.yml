@@ -1,0 +1,33 @@
+version: "3.7"
+services:
+  redgold:
+    user: root
+    image: redgoldio/redgold:${REDGOLD_NETWORK:-dev}
+    container_name: redgold-${REDGOLD_NETWORK:-dev}
+    restart: unless-stopped
+    env_file:
+      - ./var.env
+#    environment:
+#      - REDGOLD_NETWORK=${REDGOLD_NETWORK:-dev}
+#      - REDGOLD_GENESIS=${REDGOLD_GENESIS:-false}
+    ports:
+      - ${REDGOLD_METRICS_PORT:-16179}:16179
+      - ${REDGOLD_P2P_PORT:-16180}:16180
+      - ${REDGOLD_PUBLIC_PORT:-16181}:16181
+      - ${REDGOLD_CONTROL_PORT:-16182}:16182
+    volumes:
+      - ~/.rg:/root/.rg
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host
+    command: ["--network", "${REDGOLD_NETWORK:-dev}"]
+    labels:
+      - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower-${REDGOLD_NETWORK:-dev}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 120 --scope redgold-${REDGOLD_NETWORK:-dev}
+    labels:
+      - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"
