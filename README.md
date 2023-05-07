@@ -1,4 +1,4 @@
-# <img src="src/resources/logo_small.png" width="4%" height="4%"> Redgold
+# <img src="src/resources/svg_rg_2_crop.png" width="9%" height="9%"> Redgold
 
 
 ![Dev](https://github.com/redgold-labs/redgold/actions/workflows/ci.yml/badge.svg?branch=dev) | 

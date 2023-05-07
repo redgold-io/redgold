@@ -57,7 +57,7 @@ impl Block {
 
     // TODO: Move to trait
     pub fn hash_hex(&self) -> String {
-        return hex::encode(self.calculate_hash().bytes.expect("Bytes").bytes_value);
+        return hex::encode(self.calculate_hash().bytes.expect("Bytes").value);
     }
 
     pub fn time(&self) -> Result<i64, ErrorInfo> {

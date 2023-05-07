@@ -50,6 +50,14 @@ Main command from this guide that you'll need to install trezor cli:
 
 `pip3 install trezor`
 
+`WARNING: The script trezorctl is installed in '/Users/user/Library/Python/3.9/bin' which is not on PATH.`
+
+`Error: DataError: Forbidden key path`
+
+`https://forum.trezor.io/t/how-to-fix-error-forbidden-key-path/8642`
+
+Add to path
+
 `redgold --trezor send --address <DESTINATION_ADDRESS> `
 
 ## Swaps

@@ -23,12 +23,12 @@ pub struct TransactionWithKey {
 #[derive(Clone)]
 pub struct TransactionGenerator {
     // runtime: Arc<Runtime>,
-    finished_pool: Vec<SpendableUTXO>,
+    pub finished_pool: Vec<SpendableUTXO>,
     pending_pool: Vec<SpendableUTXO>,
     offset: usize,
     min_offset: usize,
     max_offset: usize,
-    wallet: Wallet, // default_client: Option<PublicClient>
+    pub wallet: Wallet, // default_client: Option<PublicClient>
 }
 
 impl TransactionGenerator {
@@ -61,7 +61,7 @@ impl TransactionGenerator {
             pending_pool: vec![],
             offset: 1,
             min_offset: 1,
-            max_offset: 1000,
+            max_offset: 49,
             wallet: Wallet::default()
         }
     }

@@ -10,6 +10,8 @@ pub mod address_block;
 pub mod peer;
 pub mod config;
 pub mod servers;
+pub mod transaction_store;
+pub mod mp_store;
 
 #[derive(Clone)]
 pub struct DataStoreContext {

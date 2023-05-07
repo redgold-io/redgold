@@ -43,6 +43,7 @@ jobs:
 #    needs: [test]
     if:
       contains('
+      refs/heads/predev
       refs/heads/dev
       refs/heads/staging
       refs/heads/test
@@ -130,6 +131,7 @@ jobs:
     needs: [build-linux] #, build-mac]
     if:
         contains('
+          refs/heads/predev
           refs/heads/dev
           refs/heads/staging
           refs/heads/test
@@ -167,6 +169,7 @@ jobs:
 
       # Docker Image
       # TODO: This works but need to setup self hosted registry also
+      - run: rm -rf docker-build-tmp || true
       - run: mkdir docker-build-tmp
       - run: cp ./redgold_linux docker-build-tmp/redgold; chmod +x docker-build-tmp/redgold
       - run: cp release.Dockerfile docker-build-tmp/release.Dockerfile
@@ -225,7 +228,13 @@ jobs:
 #      - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha256_checksum
 #      - run: aws s3 cp mac_sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha512_checksum
 
-      - uses: dev-drprasad/delete-tag-and-release@v0.2.0
+#      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
+#        with:
+#          tag_name: v0.1.0 #(required) tag name to delete
+#          github_token: ${{ secrets.GITHUB_TOKEN }} # (required) a GitHub token with write access to the repo that needs to be modified
+#          delete_release: true #(optional) default: true
+#          repo: <owner>/<repoName> #(optional) target repository. default: repo running this action
+      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
           delete_release: true # default: false
           tag_name: release/${{ env.BRANCH }} # tag name to delete

@@ -1,0 +1,4 @@
+host, index, peer_id_index, network_environment, username, key_path
+some_host, 0, 0, all, root, /home/user1/.ssh/id_rsa
+20.1.2.1, 1, 0, all, root, /home/user1/.ssh/id_rsa
+your_hostname_url.com, 2, 0, all, root, /home/user1/.ssh/id_rsa

@@ -1,3 +1,4 @@
+# TODO: Delete this if no longer needed.
 version: "3.7"
 volumes:
   prometheus_data: {}

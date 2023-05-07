@@ -9,6 +9,7 @@ use crate::util::metrics_registry;
 use crate::util::runtimes::build_runtime;
 use std::thread::sleep;
 use std::time::Duration;
+use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use redgold_schema::structs::ErrorInfo;
 use crate::core::internal_message::FutLoopPoll;
@@ -28,7 +29,7 @@ pub fn main_from_args(opts: RgArgs) {
     }
     // TODO: Change the port here by first parsing args associated with metrics / logs
     crate::util::init_logger_with_config(node_config.clone()).expect("Logger to start properly");
-    metrics_registry::register_metrics();
+    metrics_registry::register_metrics(node_config.port_offset);
 
     info!("Starting node main method");
     increment_counter!("redgold.node.main_started");
@@ -42,7 +43,11 @@ pub fn main_from_args(opts: RgArgs) {
             let mut relay = simple_runtime.block_on(Relay::new(node_config.clone()));
 
             Node::prelim_setup(relay.clone(), runtimes.clone()).expect("prelim");
-            let mut futures = Node::start_services(relay.clone(), runtimes.clone());
+            let mut join_handles = Node::start_services(relay.clone(), runtimes.clone());
+            let mut futures = FuturesUnordered::new();
+            for jhi in join_handles {
+                futures.push(jhi);
+            }
             let res = Node::from_config(relay, runtimes);
             match res {
                 Ok(_) => {

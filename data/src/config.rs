@@ -12,7 +12,7 @@ pub struct ConfigStore {
 
 impl ConfigStore {
 
-    pub async fn insert_config(
+    pub async fn insert_update(
         &self,
         key: String,
         value: String

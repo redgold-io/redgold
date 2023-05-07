@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use backtrace::Backtrace;
 use itertools::Itertools;
 use multihash::{Multihash, MultihashDigest};
@@ -8,7 +9,7 @@ use structs::{
     StructMetadata, Transaction,
 };
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerData, Proof, PublicRequest, PublicResponse, Request, Response, SignatureType};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType};
 use crate::util::{dhash_str, dhash_vec};
 use crate::util::wallet::{generate_key, generate_key_i};
 
@@ -30,15 +31,23 @@ pub mod merkle_proof;
 pub mod errors;
 pub mod transaction_builder;
 pub mod response;
+pub mod servers;
+pub mod peers;
+pub mod multiparty;
+pub mod signature;
+pub mod udp;
+pub mod control;
+pub mod public_key;
 
 
 use std::str::FromStr;
+use bitcoin::util::psbt::serialize::Deserialize;
 use serde::Serialize;
 
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {
     Some(BytesData {
-        bytes_value: data,
-        bytes_decoder: BytesDecoder::Standard as i32,
+        value: data,
+        decoder: BytesDecoder::Standard as i32,
         version: constants::STANDARD_VERSION,
     })
 }
@@ -118,7 +127,7 @@ impl SafeBytesAccess for Option<BytesData> {
         Ok(self
             .as_ref() // TODO: parent Field message? necessary or not?
             .ok_or(error_message(Error::MissingField, "bytes data"))?
-            .bytes_value
+            .value
             .clone())
     }
 }
@@ -212,7 +221,7 @@ where
     fn calculate_hash(&self) -> Hash {
         let mut clone = self.clone();
         clone.hash_clear();
-        let input = self.proto_serialize();
+        let input = clone.proto_serialize();
         let multihash = constants::HASHER.digest(&input);
         return multihash.into();
     }
@@ -299,6 +308,18 @@ pub trait SafeOption<T> {
     fn safe_get_msg<S: Into<String>>(&self, msg: S) -> Result<&T, ErrorInfo>;
 }
 
+//
+// pub trait SafeOptionJson<T> {
+//     fn safe_get_or_json(&self) -> Result<&T, ErrorInfo>;
+// }
+//
+//
+// impl<T> SafeOptionJson<T> for Option<T> where T: Serialize {
+//     fn safe_get_or_json(&self) -> Result<&T, ErrorInfo> {
+//         self.as_ref().ok_or(error_message(Error::MissingField, serde_json::to_string(&self).unwrap_or("Json serialization error of missing field data".to_string())))
+//     }
+// }
+
 impl<T> SafeOption<T> for Option<T> {
     fn safe_get(&self) -> Result<&T, ErrorInfo> {
         self.as_ref().ok_or(error_message(
@@ -324,15 +345,33 @@ pub fn response_metadata() -> Option<ResponseMetadata> {
     })
 }
 
-pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
-    ErrorInfo {
-        code: crate::structs::Error::UnknownError as i32,
-        description: message.into(),
-        description_extended: "".to_string(),
-        message: "".to_string(),
-        details: vec![],
-        retriable: false,
+
+
+pub trait ErrorInfoContext<T, E> {
+    /// Wrap the error value with additional context.
+    fn error_info<C: Into<String>>(self, context: C) -> Result<T, ErrorInfo>
+        where
+            C: Display + Send + Sync + 'static;
+}
+
+use anyhow::{anyhow, Context, Result};
+
+impl<T, E> ErrorInfoContext<T, E> for Result<T, E>
+    where
+        E: std::error::Error + Send + Sync + 'static,
+{
+    fn error_info<C: Into<String>>(self, context: C) -> Result<T, ErrorInfo>
+        where
+            C: Display + Send + Sync + 'static {
+        // Not using map_err to save 2 useless frames off the captured backtrace
+        // in ext_context.
+        self.context(context).map_err(|e| error_info(e.to_string()))
     }
+}
+
+
+pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
+    error_message(crate::structs::Error::UnknownError, message.into())
 }
 
 pub fn error_from_code(error_code: structs::Error) -> ErrorInfo {
@@ -370,7 +409,7 @@ pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
 pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
-    let stack = slice_vec_eager(stacktrace_abridged, 0, 30).join("\n").to_string();
+    let stack = slice_vec_eager(stacktrace_abridged, 13, 30).join("\n").to_string();
     ErrorInfo {
         code: error_code as i32,
         // TODO: From error code map
@@ -545,7 +584,8 @@ impl Request {
             about_node_request: None,
             proof: None,
             node_metadata: None,
-            get_peers_info_request: None
+            get_peers_info_request: None,
+            multiparty_threshold_request: None,
         }
     }
 
@@ -556,7 +596,9 @@ impl Request {
 
     pub fn with_auth(&mut self, key_pair: &KeyPair) -> &mut Request {
         let hash = self.calculate_hash();
+        // println!("with_auth hash: {:?}", hash.hex());
         let proof = Proof::from_keypair_hash(&hash, &key_pair);
+        proof.verify_hash(&hash).expect("immediate verify");
         self.proof = Some(proof);
         self
     }
@@ -566,60 +608,25 @@ impl Request {
         self
     }
 
-}
-
-impl HashClear for Response {
-    fn hash_clear(&mut self) {
-        self.proof = None;
-    }
-}
-
-impl Response {
-    pub fn serialize(&self) -> Vec<u8> {
-        return self.encode_to_vec();
-    }
-
-    pub fn deserialize(bytes: Vec<u8>) -> Result<Self, DecodeError> {
-        return Response::decode(&*bytes);
-    }
-
-    pub fn empty_success() -> Response {
-        Response {
-            response_metadata: response_metadata(),
-            resolve_hash_response: None,
-            download_response: None,
-            about_node_response: None,
-            get_peers_info_response: None,
-            node_metadata: None,
-            proof: None
-        }
-    }
-    pub fn from_error_info(error_info: ErrorInfo) -> Response {
-        Response {
-            response_metadata: Some(ResponseMetadata {
-                success: false,
-                error_info: Some(error_info),
-            }),
-            resolve_hash_response: None,
-            download_response: None,
-            about_node_response: None,
-            get_peers_info_response: None,
-            node_metadata: None,
-            proof: None
-        }
-    }
-
-    pub fn with_auth(&mut self, key_pair: &KeyPair) -> &mut Response {
+    pub fn verify_auth(&self) -> Result<PublicKey, ErrorInfo> {
         let hash = self.calculate_hash();
-        let proof = Proof::from_keypair_hash(&hash, &key_pair);
-        self.proof = Some(proof);
-        self
+        // println!("verify_auth hash: {:?}", hash.hex());
+        self.proof.safe_get()?.verify_hash(&hash)?;
+        let proof = self.proof.safe_get()?;
+        let pk = proof.public_key.safe_get()?;
+        Ok(pk.clone())
     }
 
-    pub fn with_metadata(&mut self, node_metadata: NodeMetadata) -> &mut Response {
-        self.node_metadata = Some(node_metadata);
-        self
-    }
+}
+
+#[test]
+fn verify_request_auth() {
+    let tc = TestConstants::new();
+    let mut req = Request::empty();
+    req.about();
+    req.with_auth(&tc.key_pair());
+    // println!("after with auth assign proof {}", req.calculate_hash().hex());
+    let pk = req.verify_auth().unwrap();
 
 }
 
@@ -644,18 +651,24 @@ impl NetworkEnvironment {
         let string2 = util::make_ascii_titlecase(&mut *n);
         NetworkEnvironment::from_str(&*string2).expect("error parsing network environment")
     }
+    pub fn parse_safe(from_str: String) -> Result<Self, ErrorInfo> {
+        let mut n = from_str.clone();
+        let string2 = util::make_ascii_titlecase(&mut *n);
+        NetworkEnvironment::from_str(&*string2).error_info("error parsing network environment")
+    }
+
     pub fn default_port_offset(&self) -> u16 {
         let port = match self {
-            NetworkEnvironment::Main => {16380}
+            NetworkEnvironment::Main => {16180}
             NetworkEnvironment::Test => {16280}
-            NetworkEnvironment::Dev => {16180}
-            NetworkEnvironment::Staging => {16280}
-            NetworkEnvironment::Perf => {16180}
-            NetworkEnvironment::Integration => {15980}
-            NetworkEnvironment::Local => {16180}
-            NetworkEnvironment::Debug => {16180}
-            NetworkEnvironment::All => {16180}
-            NetworkEnvironment::Predev => {16080}
+            NetworkEnvironment::Staging => {16380}
+            NetworkEnvironment::Dev => {16480}
+            NetworkEnvironment::Predev => {16580}
+            NetworkEnvironment::Perf => {16680}
+            NetworkEnvironment::Integration => {16780}
+            NetworkEnvironment::Local => {16880}
+            NetworkEnvironment::Debug => {16980}
+            NetworkEnvironment::All => {17080}
         };
         port as u16
     }
@@ -693,11 +706,26 @@ impl PublicResponse {
 }
 
 pub fn json<T: Serialize>(t: &T) -> Result<String, ErrorInfo> {
-    serde_json::to_string(&t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {}", e)))
+    serde_json::to_string(&t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
 }
 
-impl NodeMetadata {
-    pub fn port_or(&self, network: NetworkEnvironment) -> u16 {
-        self.port_offset.unwrap_or(network.default_port_offset() as i64) as u16
+pub fn json_or<T: Serialize>(t: &T) -> String {
+    json(t).unwrap_or("json ser failure of error".to_string())
+}
+
+pub fn json_pretty<T: Serialize>(t: &T) -> Result<String, ErrorInfo> {
+    serde_json::to_string_pretty(&t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
+}
+
+pub fn json_from<'a, T: serde::Deserialize<'a>>(t: &'a str) -> Result<T, ErrorInfo> {
+    serde_json::from_str(t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
+}
+
+impl PeerId {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self {
+            peer_id: bytes_data(bytes),
+            known_proof: vec![],
+        }
     }
 }

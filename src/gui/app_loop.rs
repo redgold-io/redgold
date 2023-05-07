@@ -90,7 +90,12 @@ fn random_bytes() -> [u8; 32] {
     return rand::thread_rng().gen::<[u8; 32]>();
 }
 
-#[derive(Debug)]
+use strum::IntoEnumIterator; // 0.17.1
+use strum_macros::EnumIter; // 0.17.1
+
+
+
+#[derive(Debug, EnumIter)]
 #[repr(i32)]
 pub enum Tab {
     Home,
@@ -117,7 +122,7 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::CtxRef, _frame: &mut epi:
                     if local_state.session_password_hashed.unwrap() == local_state.hash_password() {
                         local_state.session_locked = false;
                     } else {
-                        panic!("Fuck");
+                        panic!("Session password state error");
                     }
                 } else {
                     local_state.store_password();
@@ -145,10 +150,12 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
     // Pick whichever suits you.
     // Tip: a good default choice is to just keep the `CentralPanel`.
     // For inspiration and more examples, go to https://emilk.github.io/egui
-    if local_state.session_password_hashed.is_none() || local_state.session_locked {
-        update_lock_screen(app, ctx, frame);
-        return;
-    }
+
+    // TODO: Change this to lock screen state transition, also enable it only based on a lock button
+    // if local_state.session_password_hashed.is_none() || local_state.session_locked {
+    //     update_lock_screen(app, ctx, frame);
+    //     return;
+    // }
 
     // egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
     //     // The top panel is often a good place for a menu bar:
@@ -196,14 +203,20 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
                     // if ui.button("Home").clicked() {
                     //     *tab = Tab::Home;
                     // }
-
-                    if ui.button("Wallet").clicked() {
-                        *tab = Tab::Wallet;
+                    for tab_i in Tab::iter() {
+                        let tab_str = format!("{:?}", tab_i);
+                        if ui.button(tab_str).clicked() {
+                            *tab = tab_i;
+                        }
                     }
-
-                    if ui.button("Settings").clicked() {
-                        *tab = Tab::Wallet;
-                    }
+                    //
+                    // if ui.button("Wallet").clicked() {
+                    //     *tab = Tab::Wallet;
+                    // }
+                    //
+                    // if ui.button("Settings").clicked() {
+                    //     *tab = Tab::Wallet;
+                    // }
                 },
             );
 
@@ -222,7 +235,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
         // The central panel the region left after adding TopPanel's and SidePanel's
         match tab {
             Tab::Home => {
-                ui.heading("egui template");
+                ui.heading("Network Status: ");
             }
             Tab::Wallet => {
                 if local_state.active_passphrase.is_none() {

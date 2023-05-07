@@ -3,10 +3,6 @@ use std::time::Duration;
 
 /*
 
-pub const DEFAULT_PORT_OFFSET: u16 = 16180;
-#[allow(dead_code)]
-pub const TESTNET_PORT_OFFSET: u16 = 16280;
-
 pub const STANDARD_FINALIZATION_INTERVAL_MILLIS: u64 = 60_000;
 pub const DEBUG_FINALIZATION_INTERVAL_MILLIS: u64 = 2000;
 pub const OBSERVATION_FORMATION_TIME_MILLIS: u64 = 5_000;

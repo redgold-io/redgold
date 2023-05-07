@@ -21,6 +21,7 @@ To avoid this property, Ferguson and Schneier suggested using SHA256d = SHA256(S
   and would use HMAC with constant key, or truncated SHA512 instead.
  */
 
+// TODO: Replace with our own signature type
 pub fn sign(hash: &Vec<u8>, key: &SecretKey) -> Result<Vec<u8>, ErrorInfo> {
     let mut ret = [0u8; 32];
     ret[..].copy_from_slice(&hash[0..32]);
@@ -31,7 +32,7 @@ pub fn sign(hash: &Vec<u8>, key: &SecretKey) -> Result<Vec<u8>, ErrorInfo> {
         )
     })?;
     let signature: Signature = Secp256k1::new().sign(&message, &key);
-    let sig_ser = signature.serialize_der().to_vec();
+    let sig_ser = signature.serialize_compact().to_vec();
     return Ok(sig_ser);
 }
 
@@ -44,8 +45,9 @@ pub fn sign_hash(hash: &structs::Hash, key: &SecretKey) -> Result<Vec<u8>, Error
 fn test_sign() {
     let tc: TestConstants = TestConstants::new();
     let sig = sign(&tc.hash_vec, &tc.secret).expect("worked");
+    println!("{}", hex::encode(sig.clone()));
     assert_eq!(
-        hex::decode("3045022100de287f019fbab3621d6604d800d3ed102afc5c49ac2be25f8eb677987072109f0220232508b061942cfbd1fd2c7e18a172a33ca8b6ad3739b410b01d18ed85bc25bb").unwrap(),
+        hex::decode("de287f019fbab3621d6604d800d3ed102afc5c49ac2be25f8eb677987072109f232508b061942cfbd1fd2c7e18a172a33ca8b6ad3739b410b01d18ed85bc25bb").unwrap(),
         sig
     );
 }
@@ -59,7 +61,7 @@ pub fn verify(hash: &Vec<u8>, signature: &Vec<u8>, public_key: &Vec<u8>) -> Resu
             "Signature message construction failure",
         )
     })?;
-    let decoded_signature = Signature::from_der(signature).map_err(|e| {
+    let decoded_signature = Signature::from_compact(signature).map_err(|e| {
         error_message(
             structs::Error::IncorrectSignature,
             "Decoded signature message construction failure",
@@ -84,7 +86,7 @@ pub fn verify(hash: &Vec<u8>, signature: &Vec<u8>, public_key: &Vec<u8>) -> Resu
 
 #[test]
 fn test_verify() {
-    let sig = "3045022100de287f019fbab3621d6604d800d3ed102afc5c49ac2be25f8eb677987072109f0220232508b061942cfbd1fd2c7e18a172a33ca8b6ad3739b410b01d18ed85bc25bb";
+    let sig = "de287f019fbab3621d6604d800d3ed102afc5c49ac2be25f8eb677987072109f232508b061942cfbd1fd2c7e18a172a33ca8b6ad3739b410b01d18ed85bc25bb";
     let tc: TestConstants = TestConstants::new();
     assert!(verify(
         &tc.hash_vec,

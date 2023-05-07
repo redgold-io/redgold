@@ -45,11 +45,11 @@ async fn init_db() {
         .run(&pool)
         .await
         .expect("Wtf");
-    println!("Build script ran");
+    println!("SQL migrations Build script ran");
 }
 
 fn main() {
-    println!("Build script started");
+    println!("Datastore SQL migrations build script started");
 
     Builder::new_current_thread()
         .enable_all()

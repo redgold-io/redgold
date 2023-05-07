@@ -41,7 +41,7 @@ ssh root@redgold.cash '
  */
 
 pub struct SSH {
-    addr: String,
+    host: String,
     user: Option<String>,
     private_key_path: Option<String>,
     session: Option<Session>
@@ -55,11 +55,16 @@ pub struct SSHResult {
 
 // https://grafana.com/docs/grafana-cloud/quickstart/docker-compose-linux/
 impl SSH {
+
+    fn allow_tcp(&mut self, port: u16) -> SSHResult {
+        self.exec(format!("sudo ufw allow proto tcp from any to any port {:?}", port), true)
+    }
+
     fn session(&mut self) -> Session {
         if let Some(s) = &self.session {
             return s.clone();
         }
-        let tcp = TcpStream::connect(self.addr.clone()).unwrap();
+        let tcp = TcpStream::connect(self.host.clone()).unwrap();
         let mut sess = Session::new().unwrap();
         sess.set_tcp_stream(tcp);
         sess.handshake().unwrap();
@@ -205,11 +210,15 @@ impl SSH {
         let x = key_path
             .map(|x| x.into());
         SSH {
-            addr: format!("{}:22", host.into()),
+            host: format!("{}:22", host.into()),
             user: None,
             private_key_path: x,
             session: None
         }
+    }
+
+    pub fn docker_logs(&mut self) {
+        self.exec("docker logs --tail 1000 redgold-predev", true);
     }
 
 }
@@ -230,14 +239,17 @@ impl SSH {
 // }
 
 // https://grafana.com/docs/grafana/latest/installation/docker/
-#[ignore]
+// #[ignore]
 #[test]
 fn debug_ssh() {
-    let do_run = std::env::var("REDGOLD_LOCAL_DEBUG");
-    if do_run.is_err() {
-        return;
-    }
+    // let do_run = std::env::var("REDGOLD_LOCAL_DEBUG");
+    // if do_run.is_err() {
+    //     return;
+    // }
 
+    // let mut ssh = SSH::new_ssh("lb.redgold.io", None);
+    //
+    // ssh.docker_logs();
     // Connect to the local SSH server
     // let ssh = SSH {
     //     addr: "redgold.cash:22".to_string(),
@@ -424,18 +436,18 @@ bitcoin-cli sethdseed true "wifkey"
 
 
 */
-
-#[test]
-fn test_wif_key_dump() {
-    let sk = Wallet::default().seed;
-
-    let epk = ExtendedPrivKey::new_master(Network::Testnet, &*sk.0).expect("key");
-    //
-    // let pk = bitcoin::util::key::PrivateKey {
-    //     compressed: false,
-    //     network: Network::Testnet,
-    //     key: sk,
-    // };
-    let wif = epk.private_key.to_wif();
-    println!("WIF key: {}", wif);
-}
+//
+// #[test]
+// fn test_wif_key_dump() {
+//     let sk = Wallet::default().seed;
+//
+//     let epk = ExtendedPrivKey::new_master(Network::Testnet, &*sk.0).expect("key");
+//     //
+//     // let pk = bitcoin::util::key::PrivateKey {
+//     //     compressed: false,
+//     //     network: Network::Testnet,
+//     //     key: sk,
+//     // };
+//     let wif = epk.private_key.to_wif();
+//     println!("WIF key: {}", wif);
+// }

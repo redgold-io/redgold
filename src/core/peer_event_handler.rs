@@ -8,7 +8,7 @@ use tokio::select;
 use tokio::task::JoinHandle;
 use redgold_schema::SafeOption;
 use redgold_schema::structs::{ErrorInfo, PeerData};
-use crate::api::Client;
+use crate::api::HTTPClient;
 use crate::core::internal_message::{FutLoopPoll, PeerMessage, SendErrorInfo};
 use crate::core::peer_rx_event_handler::rest_peer;
 
@@ -42,7 +42,7 @@ impl PeerOutgoingEventHandler {
                     crate::core::internal_message::FutLoopPoll::map_fut(res)?;
                 }
                 m = self.relay.peer_message_tx.receiver.recv_async_err() => {
-                    let message = m?;
+                    let message: PeerMessage = m?;
                     let ser_msg = json(&message.request.clone())?;
                     // info!("PeerOutgoingEventHandler received message {}", ser_msg);
                     let peers = self.relay.ds.peer_store.all_peers().await?;
@@ -53,7 +53,9 @@ impl PeerOutgoingEventHandler {
 
                         let vec = pk.serialize().to_vec();
                         let peer = peers.iter()
-                            .find(|p| p.node_metadata.iter().find(|nmd| nmd.public_key == vec).is_some());
+                            .find(|p| p.node_metadata.iter().find(|nmd|
+                            nmd.public_key_bytes().map(|v| v == vec).unwrap_or(false)
+                        ).is_some());
                         match peer {
                             None => {
                                 error!("Peer public key not found to send message to {}", hex::encode(vec));
@@ -64,7 +66,7 @@ impl PeerOutgoingEventHandler {
                         }
 
                         } else {
-                        info!("Attempting broadcast");
+                        info!("Attempting broadcast to {}", &peers.len());
                         for pd in &peers {
                             futs.futures.push(self.rt.spawn(Self::send_message_rest(message.clone(), pd.clone(), self.relay.node_config.clone())));
                         }

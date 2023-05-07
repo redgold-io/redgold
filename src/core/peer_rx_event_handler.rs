@@ -1,5 +1,5 @@
 use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
-use crate::core::relay::Relay;
+use crate::core::relay::{MultipartyRequestResponse, Relay};
 use crate::data::data_store::DataStore;
 use crate::data::download::process_download_request;
 use crate::schema::response_metadata;
@@ -16,15 +16,16 @@ use metrics::increment_counter;
 use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, Request};
-use redgold_schema::{SafeBytesAccess, SafeOption, WithMetadataHashable};
-use crate::core::internal_message::{FutLoopPoll, PeerMessage, SendErrorInfo, TransactionMessage};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, MultipartyThresholdResponse, Request};
+use redgold_schema::{json_or, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use crate::core::internal_message::{FutLoopPoll, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
 use crate::util::lang_util::SameResult;
 use crate::schema::json;
 
 pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, mut request: Request) -> Result<Response, ErrorInfo> {
-    let client = crate::api::Client::new(ip, port as u16);
+    let client = crate::api::HTTPClient::new(ip, port as u16);
     client.proto_post(
         request
             .with_auth(&nc.wallet().active_keypair())
@@ -44,13 +45,13 @@ impl PeerRxEventHandler {
     ) -> Result<(), ErrorInfo> {
 
         // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let response = Self::request_response(relay.clone(), pm.request.clone()).await
+        let response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine();
         if let Some(c) = pm.response {
             // info!("Sending response to channel");
             c.send_err(response)?;
         } else {
-            info!("No response channel");
+            // info!("No response channel");
         }
 
         let peers = relay.ds.peer_store.all_peers().await?;
@@ -59,7 +60,11 @@ impl PeerRxEventHandler {
             if let Some(pk) = prf.public_key {
 
                 let known_peer = peers.iter().find(|p|
-                    p.node_metadata.iter().find(|nmd| nmd.public_key == pk.bytes.safe_bytes().unwrap()).is_some()
+                    p.node_metadata.iter().find(|nmd|
+                        match (nmd.public_key_bytes().ok(), pk.bytes.safe_bytes().ok()) {
+                            (Some(pk1), Some(pk2)) => pk1 == pk2,
+                            _ => false
+                        }).is_some()
                 );
                 // info!("Is peer known?: {:?}", json(&known_peer.clone())?);
 
@@ -97,11 +102,12 @@ impl PeerRxEventHandler {
     ) -> Result<(), ErrorInfo> {
         let res = response?.about_node_response.safe_get()?.latest_metadata.safe_get()?.clone();
         // TODO: Validate transaction here
+        info!("Added new peer: {}", json(&res)?);
         relay.ds.peer_store.add_peer(&res, 0f64).await?;
         Ok(())
     }
 
-    pub async fn request_response(relay: Relay, request: Request) -> Result<Response, ErrorInfo> {
+    pub async fn request_response(relay: Relay, request: Request, arc: Arc<Runtime>) -> Result<Response, ErrorInfo> {
 
         let mut response = Response::empty_success();
         if let Some(t) = request.gossip_transaction_request {
@@ -132,7 +138,47 @@ impl PeerRxEventHandler {
 
         if let Some(abr) = request.about_node_request {
             // info!("Received about request");
-            response.about_node_response = Some(AboutNodeResponse{ latest_metadata: Some(relay.node_config.peer_data_tx())})
+            let mut abr = AboutNodeResponse::empty();
+            abr.latest_metadata = Some(relay.node_config.peer_data_tx());
+            response.about_node_response = Some(abr);
+        }
+
+        if let Some(r) = request.multiparty_threshold_request {
+            info!("Received multiparty threshold request");
+            // let (sender, rec) =
+            //     flume::bounded::<MultipartyThresholdResponse>(1);
+            // let result = relay.multiparty.sender.send(MultipartyRequestResponse{
+            //     request: Some(r),
+            //     response: None,
+            //     sender: Some(sender),
+            //     origin: request.node_metadata.clone(),
+            //     internal_subscribe: None,
+            // }).expect("Multiparty send failure");
+            // let result = rec.recv_async_err().await?;
+            // response.multiparty_threshold_response = Some(result);
+            let mut res_inner = MultipartyThresholdResponse::empty();
+
+            if let Some(k) = r.initiate_keygen {
+                // TODO Track future with loop poll pattern
+                // oh wait can we remove this spawn entirely?
+                info!("Received MP request on peer rx: {}", json_or(&k));
+                let rel2 = relay.clone();
+                arc.spawn(async move {
+                    let result1 = initiate_mp_keygen_follower(
+                        rel2.clone(), k).await;
+                    let mp_response: String = result1.clone()
+                        .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+                    info!("Multiparty response from follower: {}", mp_response);
+                });
+                // });
+            }
+            if let Some(k) = r.initiate_signing {
+                let rel2 = relay.clone();
+                arc.spawn(async move {
+                    initiate_mp_keysign_follower(rel2.clone(), k).await;
+                });
+            }
+
         }
         // info!(
         //                 "Preparing response to peer RX event handler: {}",
@@ -185,12 +231,13 @@ pub async fn libp2p_handle_inbound2(
     );
     info!("Is peer known?: {:?}", serde_json::to_string(&known_peer.clone()).unwrap());
 
-    let response = PeerRxEventHandler::request_response(relay.clone(), request.clone()).await?;
+    let response = PeerRxEventHandler::request_response(
+        relay.clone(), request.clone(), rt.clone()).await?;
 
     if known_peer.is_none() {
         let client = p2p_client.clone();
         let relay = relay.clone();
-        info!("Requesting peer info on runtime");
+        // info!("Requesting peer info on runtime");
         rt.spawn(async move {
             libp2p_request_peer_info(client, peer, remote_address, relay).await;
         });
@@ -207,7 +254,7 @@ async fn libp2p_handle_about_response(
 ) -> Result<(), ErrorInfo> {
     let res = response?.about_node_response.safe_get()?.latest_metadata.safe_get()?.clone();
     // TODO: Validate transaction here
-    relay.ds.peer_store.add_peer(&res, 0f64).await?;
+    // relay.ds.peer_store.add_peer(&res, 0f64).await?;
     Ok(())
 }
 
