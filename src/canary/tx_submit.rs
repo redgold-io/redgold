@@ -5,9 +5,10 @@ use crate::schema::WithMetadataHashable;
 use log::{error, info};
 use std::borrow::Borrow;
 use std::sync::{Arc, Mutex};
+use itertools::Itertools;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-use redgold_schema::empty_public_response;
+use redgold_schema::{empty_public_response, SafeBytesAccess};
 use redgold_schema::util::wallet::Wallet;
 
 pub struct TransactionSubmitter {
@@ -23,9 +24,9 @@ impl TransactionSubmitter {
         utxos: Vec<SpendableUTXO>,
     ) -> Self {
         let mut generator = TransactionGenerator::default(utxos.clone());
-        if utxos.is_empty() {
-            generator = generator.with_genesis().clone();
-        }
+        // if utxos.is_empty() {
+        //     generator = generator.with_genesis().clone();
+        // }
         Self {
             generator: Arc::new(Mutex::new(generator)),
             runtime,
@@ -41,9 +42,9 @@ impl TransactionSubmitter {
         wallet: Wallet
     ) -> Self {
         let mut generator = TransactionGenerator::default_adv(utxos.clone(), min_offset, max_offset, wallet);
-        if utxos.is_empty() {
-            generator = generator.with_genesis().clone();
-        }
+        // if utxos.is_empty() {
+        //     generator = generator.with_genesis().clone();
+        // }
         Self {
             generator: Arc::new(Mutex::new(generator)),
             runtime,
@@ -104,7 +105,7 @@ impl TransactionSubmitter {
         res
     }
 
-    pub(crate) fn submit(&self) -> PublicResponse {
+    pub fn submit(&self) -> PublicResponse {
         let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
         let res = self.block(self.spawn(transaction.clone().transaction));
         if res.clone().accepted() {
@@ -113,8 +114,33 @@ impl TransactionSubmitter {
         res
     }
 
+    pub fn with_faucet(&self) {
+        let pc = &self.client;
+        let w = Wallet::from_phrase("random").key_at(0);
+        let a = w.address_typed();
+        let vec_a = a.address.safe_bytes().expect("a");
+        let res = self.runtime.block_on(pc.faucet(&a, true)).expect("faucet");
+        // let h = res.transaction_hash.expect("tx hash");
+        // let q = self.runtime.block_on(pc.query_hash(h.hex())).expect("query hash");
+        // let tx_info = q.transaction_info.expect("transaction");
+        // assert!(!tx_info.observation_proofs.is_empty());
+        // let tx = tx_info.transaction.expect("tx");// TODO: does this matter 0 time?
+        let tx = res.transaction.expect("tx");
+        let vec = tx.to_utxo_entries(0);
+        let vec1 = vec.iter().filter(|u|
+            u.address == vec_a).collect_vec();
+        let matching_entries = vec1.get(0);
+        let utxos = matching_entries.expect("utxo").clone().clone();
+
+        self.generator.lock().unwrap().finished_pool.push(
+            SpendableUTXO{
+                utxo_entry: utxos,
+                key_pair: w
+            });
+    }
+
     // TODO: make interior here a function
-    pub(crate) fn submit_split(&self) -> Vec<PublicResponse> {
+    pub fn submit_split(&self) -> Vec<PublicResponse> {
         let transaction = self.generator.lock().unwrap().generate_split_tx().clone();
         let mut h = vec![];
         for x in transaction {

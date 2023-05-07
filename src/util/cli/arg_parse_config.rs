@@ -16,6 +16,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use redgold_schema::structs::ErrorInfo;
+use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{RgArgs, RgTopLevelSubcommand};
 use crate::util::cli::commands::mnemonic_fingerprint;
@@ -59,6 +60,7 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
             NetworkEnvironment::from_str(&*string2).expect("error parsing network environment")
         }
     };
+    node_config.port_offset = node_config.network.default_port_offset();
 
     if node_config.network == NetworkEnvironment::Local || node_config.network == NetworkEnvironment::Debug {
         node_config.disable_auto_update = true;
@@ -96,6 +98,13 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
         Some(p) => p,
     };
 
+    let dbg_id: Option<i32> = opts.debug_id;
+    if dbg_id.is_some() {
+        let dbg_id = dbg_id.unwrap();
+        let offset = ((dbg_id * 1000) as u16);
+        node_config.port_offset = node_config.network.default_port_offset() + offset;
+    }
+
     node_config.data_store_path = data_store_file_path;
     node_config
 }
@@ -106,6 +115,7 @@ pub fn load_node_config(
     mut node_config: NodeConfig,
 ) -> Result<NodeConfig, NodeConfig> {
     // let mut node_config = NodeConfig::default();
+    let opts2 = opts.clone();
 
     let subcmd: Option<RgTopLevelSubcommand> = opts.subcmd;
     let mut is_canary = false;
@@ -122,7 +132,16 @@ pub fn load_node_config(
                 let image = Image::decode(bytes).unwrap();
                 let app = gui::ClientApp::from_logo(image);
                 let native_options = eframe::NativeOptions::default();
+                //
+                // icon_data: Some(
+                //     eframe::IconData::try_from_png_bytes(&include_bytes!("../../../media/icon.png")[..])
+                // .unwrap(),
+                // ),
+
                 eframe::run_native(Box::new(app), native_options);
+                // TODO: This is a hack to get the app to exit.
+                // Move this after logging initialized and metrics and data store but before node
+                return Err(node_config);
             }
             RgTopLevelSubcommand::Deploy(_) => {
                 // TODO: Get this from a master config database.
@@ -131,9 +150,6 @@ pub fn load_node_config(
                 // based on commit hashes etc. for proper CI so we have a built commit that
                 // matches properly.
                 // infra::
-            }
-            RgTopLevelSubcommand::AddServer(a) => {
-
             }
             _ => {}
         },
@@ -168,9 +184,12 @@ pub fn load_node_config(
         .map(fs::read_to_string)
         .map(|x| x.expect("Something went wrong reading the mnemonic_path file"));
     let mut default_data_dir = get_default_data_directory(node_config.network);
-    let dbg_id: Option<i32> = opts.debug_id ;
+    let dbg_id: Option<i32> = opts.debug_id;
     if dbg_id.is_some() {
-        default_data_dir = default_data_dir.join(format!("{}", dbg_id.unwrap()));
+        let dbg_id = dbg_id.unwrap();
+        default_data_dir = default_data_dir.join(format!("{}", dbg_id));
+        let offset = ((dbg_id * 1000) as u16);
+        node_config.port_offset = node_config.network.default_port_offset() + offset;
     }
 
     let default_path_mnemonic_path = &default_data_dir.join("mnemonic");
@@ -227,8 +246,8 @@ pub fn load_node_config(
     // TODO: Make this the actual class, way easier now
     node_config.mnemonic_words = mnemonic.to_string();
 
-    let peer_id_opt: Option<String> = opts.peer_id;
-    let peer_id_path_opt: Option<String> = opts.peer_id_path;
+    let peer_id_opt: Option<String> = opts.peer_id.clone();
+    let peer_id_path_opt: Option<String> = opts.peer_id_path.clone();
     let peer_id_from_opt: Option<Vec<u8>> = (peer_id_opt)
         .or_else(|| {
             peer_id_path_opt.map(|p| {
@@ -294,16 +313,16 @@ pub fn load_node_config(
 
     use std::process::Command;
 
-    let mut echo_hello = Command::new("md5sum");
-    echo_hello.arg(path_str.clone());
-    let hello_1 = echo_hello.output().expect("Ouput from command failure");
-    let string1 = String::from_utf8(hello_1.stdout).expect("String decode failure");
-    let md5stdout: String = string1
-        .split_whitespace()
-        .next()
-        .expect("first output")
-        .clone()
-        .to_string();
+    // let mut echo_hello = Command::new("md5sum");
+    // echo_hello.arg(path_str.clone());
+    // let hello_1 = echo_hello.output().expect("Ouput from command failure");
+    // let string1 = String::from_utf8(hello_1.stdout).expect("String decode failure");
+    // let md5stdout: String = string1
+    //     .split_whitespace()
+    //     .next()
+    //     .expect("first output")
+    //     .clone()
+    //     .to_string();
 
     // info!("Md5sum stdout from shell script: {}", md5stdout);
 
@@ -327,9 +346,9 @@ pub fn load_node_config(
             RgTopLevelSubcommand::GenerateWords(m) => {
                 commands::generate_mnemonic(&m);
             }
-            RgTopLevelSubcommand::AddServer(a) => {
-                commands::add_server(a, node_config.clone());
-            }
+            // RgTopLevelSubcommand::AddServer(a) => {
+            //     commands::add_server(&a, &node_config);
+            // }
             _ => {
                 abort = false;
             }
@@ -354,9 +373,46 @@ pub fn load_node_config(
         node_config.external_ip = ip;
     }
 
-    Ok(node_config)
+    let mut at = ArgTranslate::new(runtime.clone(), &opts2, node_config);
+
+    // at.parse_seed();
+
+    Ok(at.node_config)
 
 }
+
+struct ArgTranslate {
+    runtime: Arc<Runtime>,
+    opts: RgArgs,
+    pub node_config: NodeConfig,
+}
+
+impl ArgTranslate {
+
+    pub fn new(runtime: Arc<Runtime>, opts: &RgArgs, mut node_config: NodeConfig) -> Self {
+        Self {
+            runtime,
+            opts: opts.clone(),
+            node_config
+        }
+    }
+
+    // pub fn parse_seed(&mut self) {
+    //     if let Some(a) = &self.opts.seed_address {
+    //         let default_port = self.node_config.network.default_port_offset();
+    //         let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+    //         self.node_config.seeds.push(SeedNode {
+    //             peer_id: vec![],
+    //             trust: 1.0,
+    //             public_key: None,
+    //             external_address: a.clone(),
+    //             port
+    //         });
+    //     }
+    // }
+}
+
+
 
 fn calc_sha_sum(path: String) -> String {
     util::cmd::run_cmd("shasum", vec!["-a", "256", &*path])
@@ -447,6 +503,9 @@ pub fn immediate_commands(opts: &RgArgs, config: &NodeConfig, simple_runtime: Ar
                 }
                 RgTopLevelSubcommand::Faucet(a) => {
                     simple_runtime.block_on(commands::faucet(&a, &config))
+                }
+                RgTopLevelSubcommand::AddServer(a) => {
+                    simple_runtime.block_on(commands::add_server(a, &config))
                 }
 
                 _ => {

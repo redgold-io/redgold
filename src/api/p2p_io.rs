@@ -155,37 +155,43 @@ impl P2P {
     //     Ok((p2p, runner))
     // }
 
-    pub fn new(relay: Relay, runtime: Arc<Runtime>, p2p_rx_s: mpsc::Sender<Event>) -> (P2P, Vec<JoinHandle<Result<(), ErrorInfo>>>) {
-        let port: u16 = relay.node_config.p2p_port();
-
-        let sk: &SecretKey = &relay.node_config.wallet().transport_key().secret_key;
-
-        let NetworkReturn {
-            mut client,
-            event_receiver,
-            event_loop,
-            peer_id,
-        } = runtime
-            .block_on(rgnetwork::new(to_libp2p_kp(&sk), relay.clone()))
-            .unwrap();
-        let c2 = client.clone();
-
-        let _event_loop = runtime.spawn(event_loop.run());
-        let bind_addr = format!("/ip4/0.0.0.0/tcp/{}", port);
-        let address_str_external = format!("/ip4/{}/tcp/{}", relay.node_config.external_ip, port);
-        let address: Multiaddr = bind_addr.parse().unwrap();
-        runtime
-            .block_on(client.start_listening(address))
-            .expect("Failed to start p2p address listener");
-
-        let p2p = P2P {
-            client,
-            address: address_str_external.parse().unwrap(),
-            peer_id,
-        };
-        let jh = runtime.spawn(P2P::event_process(event_receiver, c2, relay, p2p_rx_s, runtime.clone()));
-        (p2p, vec![_event_loop, jh])
-    }
+    // pub fn new(relay: Relay, runtime: Arc<Runtime>, p2p_rx_s: mpsc::Sender<Event>) -> (P2P, Vec<JoinHandle<Result<(), ErrorInfo>>>) {
+    //     let port: u16 = relay.node_config.p2p_port();
+    //
+    //     // TODO
+    //     /*
+    // = note: expected reference `&bitcoin::secp256k1::SecretKey`
+    //            found reference `&secp256k1::key::SecretKey`
+    // = note: perhaps two different versions of crate `secp256k1` are being used?
+    //      */
+    //     let sk: &SecretKey = &relay.node_config.wallet().transport_key().secret_key;
+    //
+    //     let NetworkReturn {
+    //         mut client,
+    //         event_receiver,
+    //         event_loop,
+    //         peer_id,
+    //     } = runtime
+    //         .block_on(rgnetwork::new(to_libp2p_kp(&sk), relay.clone()))
+    //         .unwrap();
+    //     let c2 = client.clone();
+    //
+    //     let _event_loop = runtime.spawn(event_loop.run());
+    //     let bind_addr = format!("/ip4/0.0.0.0/tcp/{}", port);
+    //     let address_str_external = format!("/ip4/{}/tcp/{}", relay.node_config.external_ip, port);
+    //     let address: Multiaddr = bind_addr.parse().unwrap();
+    //     runtime
+    //         .block_on(client.start_listening(address))
+    //         .expect("Failed to start p2p address listener");
+    //
+    //     let p2p = P2P {
+    //         client,
+    //         address: address_str_external.parse().unwrap(),
+    //         peer_id,
+    //     };
+    //     let jh = runtime.spawn(P2P::event_process(event_receiver, c2, relay, p2p_rx_s, runtime.clone()));
+    //     (p2p, vec![_event_loop, jh])
+    // }
 }
 //
 // pub struct P2PRunner {

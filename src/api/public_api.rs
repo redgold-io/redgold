@@ -2,20 +2,22 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use bitcoin::util::misc::hex_bytes;
 use bytes::Bytes;
 use futures::TryFutureExt;
 
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, error, info};
 use rand::rngs::OsRng;
 use rand::RngCore;
+use reqwest::ClientBuilder;
 use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use warp::reply::Json;
 use warp::Filter;
 use warp::http::Response;
-use redgold_schema::{empty_public_request, empty_public_response, ProtoHashable, SafeOption};
+use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, SafeOption};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -90,6 +92,11 @@ impl PublicClient {
     fn formatted_url(&self) -> String {
         return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();
     }
+
+    fn formatted_url_metrics(&self) -> String {
+        return "http://".to_owned() + &*self.url.clone() + ":" + &*(self.port - 2).to_string();
+    }
+
     #[allow(dead_code)]
     pub async fn request(&self, r: &PublicRequest) -> Result<PublicResponse, ErrorInfo> {
         use reqwest::ClientBuilder;
@@ -115,6 +122,17 @@ impl PublicClient {
             },
             Err(e) => Err(error_info(e.to_string())),
         }
+    }
+
+    pub async fn metrics(&self) -> Result<String, ErrorInfo>  {
+        let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
+        let sent = client
+            .get(self.formatted_url_metrics() + "/metrics")
+            .send();
+        let response = sent.await.map_err(|e | error_info(e.to_string()))?;
+        let x = response.text().await;
+        let text = x.map_err(|e | error_info(e.to_string()))?;
+        Ok(text)
     }
 
     pub async fn send_transaction(
@@ -148,7 +166,10 @@ impl PublicClient {
             address: Some(t.clone()),
             });
         info!("Sending faucet request: {}", t.clone().render_string().expect("r"));
-        Ok(self.request(&request).await?.as_error()?.faucet_response.safe_get()?.clone())
+        let response = self.request(&request).await?.as_error()?;
+        let res = json(&response)?;
+        info!("Faucet response: {}", res);
+        Ok(response.faucet_response.safe_get_msg(res)?.clone())
     }
 
     #[allow(dead_code)]
@@ -226,6 +247,18 @@ impl PublicClient {
 // TODO: wrapper function to covnert result to warp json
 
 async fn process_request(request: PublicRequest, relay: Relay) -> Json {
+    let response = process_request_inner(request, relay).await.map_err(|e| {
+        let mut response1 = empty_public_response();
+        response1.response_metadata = Some(ResponseMetadata {
+            success: false,
+            error_info: Some(e),
+        });
+        response1
+    }).combine();
+    warp::reply::json(&response)
+}
+
+async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<PublicResponse, ErrorInfo> {
     // info!(
     //     "Received publicRequest: {}",
     //     serde_json::to_string(&request.clone()).expect("json decode")
@@ -306,7 +339,12 @@ async fn process_request(request: PublicRequest, relay: Relay) -> Json {
     }
     if let Some(r) = request.about_node_request {
         response1.about_node_response = Some(AboutNodeResponse{
-            latest_metadata: Some(relay.node_config.peer_data_tx())
+            latest_metadata: Some(relay.node_config.peer_data_tx()),
+            latest_node_metadata: None,
+            num_known_peers: 0,
+            num_active_peers: 0,
+            recent_transactions: vec![],
+            pending_transactions: 0,
         });
     }
     if let Some(r) = request.hash_search_request {
@@ -323,8 +361,15 @@ async fn process_request(request: PublicRequest, relay: Relay) -> Json {
         };
     }
 
+    if let Some(f) = request.faucet_request {
+        if let Some(a) = f.address {
+            let fr = faucet_request(a.render_string()?, relay.clone()).await?;
+            response1.faucet_response = Some(fr);
+        }
+    }
+    Ok(response1)
+
     // info!("Public API response: {}", serde_json::to_string(&response1.clone()).unwrap());
-    warp::reply::json(&response1)
 }
 
 pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
@@ -393,11 +438,59 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move || {
             let relay3 = a_relay.clone();
             async move {
+                let mut abr = AboutNodeResponse::empty();
+                abr.latest_metadata = Some(relay3.node_config.peer_data_tx());
                 let res: Result<Json, warp::reject::Rejection> = {
-                    Ok(warp::reply::json(&AboutNodeResponse{
-                        latest_metadata: Some(relay3.node_config.peer_data_tx())
-                    }))
+                    Ok(warp::reply::json(&abr))
                 };
+                res
+            }
+        });
+
+    let p_relay = relay.clone();
+    let peers = warp::get()
+        .and(warp::path("peers"))
+        .and_then(move || {
+            let relay3 = p_relay.clone();
+            async move {
+                let ps = relay3.ds.peer_store.all_peers_nodes().await;
+                let res: Result<Json, warp::reject::Rejection> = Ok(ps
+                       .map_err(|e| warp::reply::json(&e))
+                       .map(|r| warp::reply::json(&r))
+                       .combine());
+                res
+            }
+        });
+
+    let p2_relay = relay.clone();
+    let transaction_lookup = warp::get()
+        .and(warp::path("transaction"))
+        .and(warp::path::param())
+        .and_then(move |hash: String| {
+            let relay3 = p2_relay.clone();
+            async move {
+                let ps = relay3.ds.transaction_store
+                    .query_transaction_hex(hash).await;
+                let res: Result<Json, warp::reject::Rejection> = Ok(ps
+                       .map_err(|e| warp::reply::json(&e))
+                       .map(|r| warp::reply::json(&r))
+                       .combine());
+                res
+            }
+        });
+
+    let address_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("address"))
+        .and(warp::path::param())
+        .and_then(move |hash: String| {
+            let relay3 = address_relay.clone();
+            async move {
+                let ps = relay3.ds.get_address_string_info(hash).await;
+                let res: Result<Json, warp::reject::Rejection> = Ok(ps
+                       .map_err(|e| warp::reply::json(&e))
+                       .map(|r| warp::reply::json(&r))
+                       .combine());
                 res
             }
         });
@@ -411,13 +504,17 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move |request: Request, address: Option<SocketAddr>| {
             let relay3 = bin_relay.clone();
             async move {
+                // TODO: Isn't this supposed to go to peerRX event handler?
                 info!{"Warp request from {:?}", address};
-                let res: Result<Json, warp::reject::Rejection> =
-                    Ok(PeerRxEventHandler::request_response(relay3, request).await
+                let res: Result<Json, warp::reject::Rejection> = {
+                    let response = relay3.receive_message_sync(request, None).await;
+                    //PeerRxEventHandler::request_response(relay3, request, )
+                    Ok(response
                         .map_err(|e| warp::reply::json(&e))
                         .map(|r| warp::reply::json(&r))
                         .combine()
-                    );
+                    )
+                };
                 res
             }
         });

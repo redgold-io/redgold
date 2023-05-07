@@ -1,15 +1,18 @@
 
 Sqlx macro compilation unfortunately requires an environment variable to be set before use.
 
-`DATABASE_URL=sqlite://$HOME/.rg/sqlx/data_store.sqlite`
+`export DATABASE_URL=sqlite://$HOME/.rg/sqlx/data_store.sqlite`
 
 Please set this or the project will not compile. An example is seen in .env in top level directory
+
+Note if changing the database schema, you'll need to explicitly recompile data module to run migrations. 
+A `cargo build` in terminal should fix it.
 
 Start by installing rust with 
 
 `curl https://sh.rustup.rs -sSf | sh -s -- -y`
 
-This project requires rust nightly (locally but not on CI apparently) due to libp2p issues. Enable it with:
+This project (sometimes) requires rust nightly (locally on some machines but not on CI) due to libp2p issues. Enable it with:
 
 `rustup install nightly`
 `rustup override set nightly`
@@ -53,6 +56,16 @@ otherwise pkill -f .vscode-server
 
 # Mac
 
+
+If you get an error with -lgmp during build, make sure to add the following to your .profile or .zshrc
+(This is a requirement from the multiparty threshold ECDSA library)
+
+```shell
+export LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib
+export INCLUDE_PATH=$INCLUDE_PATH:/opt/homebrew/include
+```
+
+
 This may be out of date, but at least some commands here are probably required
 ```shell
 brew update
@@ -67,7 +80,9 @@ brew install grafana
 brew services start grafana
 ```
 
-Cross compiling to [Linux](https://stackoverflow.com/questions/41761485/how-to-cross-compile-from-mac-to-linux) from Mac:
+Note: this section is incomplete.
+
+Cross compiling from mac to [Linux](https://stackoverflow.com/questions/41761485/how-to-cross-compile-from-mac-to-linux) from Mac:
 
 `rustup target add x86_64-unknown-linux-gnu`
 

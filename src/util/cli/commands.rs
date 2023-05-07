@@ -4,10 +4,10 @@ use bitcoin_wallet::mnemonic::Mnemonic;
 use clap::command;
 use serde_json::error::Category::Data;
 use redgold_data::DataStoreContext;
-use redgold_data::servers::Server;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{SafeOption, util};
+use redgold_schema::{json, json_from, json_pretty, SafeOption, util};
+use redgold_schema::servers::Server;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
@@ -15,8 +15,57 @@ use crate::util::cli::arg_parse_config::get_default_data_directory;
 use crate::util::cli::args::{AddServer, Deploy, FaucetCli, GenerateMnemonic, QueryCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 
-pub fn add_server(add_server: AddServer, config: NodeConfig) {
+pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
+    let ds = config.data_store().await;
+    let config = ds.config_store.select_config("servers".to_string()).await?;
+    let mut servers: Vec<Server> = vec![];
+    if let Some(s) = config {
+        servers = json_from::<Vec<Server>>(&*s)?;
+    }
+    let max_index = servers.iter().map(|s| s.index).max().unwrap_or(-1);
+    let this_index = add_server.index.unwrap_or(max_index + 1);
+    servers.push(Server{
+        host: add_server.host.clone(),
+        username: add_server.user.clone(),
+        key_path: add_server.key_path.clone(),
+        index: this_index,
+        peer_id_index: add_server.peer_id_index.unwrap_or(this_index),
+        network_environment: NetworkEnvironment::All,
+    });
+    ds.config_store.insert_update("servers".to_string(), json(&servers)?).await?;
+    Ok(())
+}
 
+pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
+    //let ds = config.data_store().await;
+    let c = config.lb_client();
+    let a = c.about().await?;
+    println!("{}", json_pretty(&a)?);
+
+    let m = c.metrics().await?;
+
+    println!("metrics: {}", m);
+
+    Ok(())
+}
+
+#[ignore]
+#[tokio::test]
+async fn status_debug() {
+    let mut nc = NodeConfig::default();
+    nc.network = NetworkEnvironment::Predev;
+    status(&nc).await.ok();
+
+}
+
+pub async fn list_servers(config: &NodeConfig) -> Result<Vec<Server>, ErrorInfo>  {
+    let ds = config.data_store().await;
+    let config = ds.config_store.select_config("servers".to_string()).await?;
+    let mut servers: Vec<Server> = vec![];
+    if let Some(s) = config {
+        servers = json_from::<Vec<Server>>(&*s)?;
+    }
+    Ok(servers)
 }
 
 pub fn generate_mnemonic(generate_mnemonic: &GenerateMnemonic) {
@@ -64,10 +113,12 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
     let address = Address::parse(p0.to.clone())?;
     let response = p1.lb_client().faucet(&address, false).await?;
-    let tx_hex = response.transaction_hash.safe_get()?.hex();
+    let tx = response.transaction.safe_get()?;
+    let tx_hex = tx.hash.safe_get()?.hex();
     println!("{}", tx_hex);
     Ok(())
 }
+
 
 pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let response = p1.lb_client().query_hash(p0.hash.clone()).await?;
@@ -110,8 +161,11 @@ pub fn add_server_prompt() -> Server {
     std::io::stdin().read_line(&mut key_path).expect("Failed to read line");
     Server{
         host,
-        username,
-        key_path
+        key_path: Some(key_path),
+        index: 0,
+        username: Some(username),
+        peer_id_index: 0,
+        network_environment: NetworkEnvironment::All,
     }
 }
 
@@ -176,7 +230,7 @@ pub async fn deploy(deploy: Deploy, config: NodeConfig) -> Result<(), ErrorInfo>
         };
         println!("Random mnemonic fingerprint: {}", mnemonic_fingerprint(mnemonic.clone()));
 
-        let mut servers: Vec<Server> = ds.server_store.servers().await?;
+        let mut servers: Vec<Server> = vec![]; // ds.server_store.servers().await?;
 
         if servers.is_empty() {
             println!("No deployment server found, please add a new server");

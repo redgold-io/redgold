@@ -31,12 +31,14 @@ impl Trust {
                 continue;
             }
 
-            let latest = self.labels.get(&peer_data.peer_id.unwrap()).unwrap();
+            let id = peer_data.peer_id.unwrap().peer_id.unwrap().value;
+            let latest = self.labels.get(&id).unwrap();
 
             let mut label_updates: HashMap<Vec<u8>, f64> = HashMap::new();
 
             for label in peer_data.labels {
-                label_updates.insert(label.peer_id, label.label);
+                let l = label.trust_data.get(0).expect("data").label;
+                label_updates.insert(label.peer_id, l);
             }
 
             if label_updates != *latest {
@@ -81,7 +83,7 @@ fn datt(
     let mut scores: HashMap<&Vec<u8>, f64> = HashMap::new();
 
     for immediate_peer_label in *self_trust {
-        scores.insert(&immediate_peer_label.peer_id, immediate_peer_label.label);
+        scores.insert(&immediate_peer_label.peer_id, immediate_peer_label.trust_data.get(0).unwrap().label);
     }
 
     // TODO: Weighted neighbor expansion?
@@ -91,12 +93,12 @@ fn datt(
         let mut next_neighbor_expansion: Vec<TrustLabel> = vec![];
         let mut dot_scores: HashMap<&Vec<u8>, Vec<f64>> = HashMap::new();
         for l in current_neighbor_expansion.clone() {
-            if l.label > expansion_threshold {
+            if l.trust_data.get(0).unwrap().label > expansion_threshold {
                 let outer_labels = labels.get(&l.peer_id).unwrap();
                 for l2 in *outer_labels {
                     if !scores.contains_key(&l2.peer_id) {
                         let transitive_current_score = scores.get(&l.peer_id).unwrap();
-                        let outer_transitive_score = transitive_current_score * l2.label;
+                        let outer_transitive_score = transitive_current_score * l2.trust_data.get(0).unwrap().label;
                         match dot_scores.get_mut(&l2.peer_id) {
                             None => {
                                 dot_scores.insert(&l2.peer_id, vec![outer_transitive_score]);

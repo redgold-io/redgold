@@ -15,6 +15,7 @@ use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_schema::{error_info, ProtoHashable};
 use redgold_schema::structs::Response;
+use crate::util::lang_util::SameResult;
 
 pub mod control_api;
 #[cfg(not(target_arch = "wasm32"))]
@@ -24,20 +25,22 @@ pub mod rosetta;
 pub mod faucet;
 pub mod lp2p;
 pub mod hash_query;
+pub mod udp_api;
+
 
 #[derive(Clone)]
-pub struct Client {
+pub struct HTTPClient {
     pub url: String,
     pub port: u16,
     pub timeout: Duration,
 }
 
-impl Client {
+impl HTTPClient {
     pub fn new(url: String, port: u16) -> Self {
         Self {
             url,
             port,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(60),
         }
     }
     #[allow(dead_code)]
@@ -104,7 +107,7 @@ impl Client {
         Req: Serialize + ?Sized,
         Resp: DeserializeOwned
     {
-        let client = Client::new("localhost".into(), port);
+        let client = HTTPClient::new("localhost".into(), port);
         tokio::time::sleep(Duration::from_secs(2)).await;
         client.json_post::<Req, Resp>(&req, endpoint).await
     }
@@ -235,3 +238,13 @@ ErrT: ?Sized + Serialize + Clone {
     r
     })
 }
+
+
+// TODO: implement as trait on result
+pub fn as_warp_json_response<T: Serialize, E: Serialize>(response: Result<T, E>) -> Result<Json, warp::reject::Rejection> {
+    Ok(response.map_err(|e| warp::reply::json(&e))
+    .map(|r| warp::reply::json(&r))
+    .combine()
+    )
+}
+

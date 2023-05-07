@@ -23,7 +23,7 @@ pub struct PeerMessage {
     pub request: Request,
     pub response: Option<flume::Sender<Response>>,
     pub public_key: Option<PublicKey>,
-    pub source: Option<SocketAddr>
+    pub socket_addr: Option<SocketAddr>
 }
 
 impl PeerMessage {
@@ -32,7 +32,7 @@ impl PeerMessage {
             request: Request::empty(),
             response: None,
             public_key: None,
-            source: None
+            socket_addr: None
         }
     }
     // pub async fn send(nc: NodeConfig) -> Result<Response, Error> {
@@ -101,6 +101,9 @@ impl<T> Channel<T> {
         self.sender
             .send(t)
             .map_err(|e| error_message(Error::InternalChannelSendError, e.to_string()))
+    }
+    pub fn new() -> Channel<T> {
+        new_channel()
     }
 }
 

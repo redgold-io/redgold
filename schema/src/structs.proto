@@ -55,13 +55,17 @@ message Input {
   Output output = 5;
 }
 
-message TrustLabel {
-  // TODO: Should this be bytesData?
-  bytes peer_id = 1;
+message TrustData {
   double label = 2;
   optional double confidence = 3;
   optional double hardness = 5;
   optional StandardData data = 6;
+}
+
+message TrustLabel {
+  // TODO: Should this be bytesData?
+  bytes peer_id = 1;
+  repeated TrustData trust_data = 2;
 }
 
 message PartitionInfo {
@@ -74,11 +78,16 @@ message NodeMetadata {
   string external_address = 1;
   bytes multi_hash = 2;
   // May not be to store public key if we merkle the multi_hashes too.
-  bytes public_key = 3;
+  PublicKey public_key = 3;
+  MerkleProof proof = 4;
   optional NodeType node_type = 5;
   optional VersionInfo version_info = 6;
   optional PartitionInfo partition_info = 7;
   optional int64 port_offset = 8;
+  optional string alias = 9;
+  optional string name = 10;
+  PeerId peer_id = 11;
+  optional bool nat_restricted = 12;
 }
 
 message VersionInfo {
@@ -87,8 +96,13 @@ message VersionInfo {
   optional int64 next_upgrade_time = 3;
 }
 
+message PeerId {
+  BytesData peer_id = 1;
+  repeated Proof known_proof = 3;
+}
+
 message PeerData {
-  optional bytes peer_id = 1;
+  optional PeerId peer_id = 1;
   optional MerkleProof merkle_proof = 2;
   optional Proof proof = 3;
   repeated NodeMetadata node_metadata = 4;
@@ -112,8 +126,8 @@ enum BytesDecoder {
 }
 
 message BytesData {
-  bytes bytes_value = 1;
-  BytesDecoder bytes_decoder = 2;
+  bytes value = 1;
+  BytesDecoder decoder = 2;
   int64 version = 3;
 }
 
@@ -126,6 +140,10 @@ enum HashFormatType {
 message Hash {
   BytesData bytes = 1;
   HashFormatType hash_format_type = 2;
+}
+
+message DynamicNodeMetadata {
+  optional int64 udp_port = 1;
 }
 
 // Where to store parquet schema, avro schema, etc. etc.
@@ -148,6 +166,9 @@ message StandardData {
   // matrix typed value
   // Peer metadata field
   optional PeerData peer_data = 8;
+  optional NodeMetadata node_metadata = 9;
+  optional DynamicNodeMetadata dynamic_node_metadata = 10;
+  optional int64 ordinal = 11;
 }
 
 message KeyedTypedValue {
@@ -505,6 +526,50 @@ message GetPeersInfoResponse {
   repeated Transaction peers = 1;
 }
 
+
+message MultipartyBroadcast {
+  string room_id = 1;
+  string message = 2;
+}
+
+message MultipartyIssueUniqueIndex {
+  string room_id = 1;
+}
+
+message MultipartyIssueUniqueIndexResponse {
+  int64 unique_index = 1;
+}
+
+message MultipartySubscribe {
+  string room_id = 1;
+  optional int64 last_event_id = 2;
+  bool shutdown = 3;
+}
+
+message MultipartySubscribeEvent {
+  string room_id = 1;
+  string id = 2;
+  string message = 3;
+}
+
+message MultipartyThresholdRequest {
+  MultipartyBroadcast multiparty_broadcast = 1;
+  MultipartyIssueUniqueIndex multiparty_issue_unique_index = 2;
+  MultipartySubscribe multiparty_subscribe = 3;
+  repeated MultipartySubscribeEvent multiparty_subscribe_events = 4;
+  // TODO ^ all of these are only used by the internal adaptation which hit an error, only below are actually used
+  InitiateMultipartyKeygenRequest initiate_keygen = 5;
+  InitiateMultipartySigningRequest initiate_signing = 6;
+}
+
+message MultipartyThresholdResponse {
+  MultipartyIssueUniqueIndexResponse multiparty_issue_unique_index_response = 1;
+  InitiateMultipartyKeygenResponse initiate_keygen_response = 2;
+  InitiateMultipartySigningResponse initiate_signing_response = 3;
+}
+
+
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -515,6 +580,8 @@ message Request {
   NodeMetadata node_metadata = 8;
   GetPeersInfoRequest get_peers_info_request = 9;
   //  optional DownloadMetadataRequest download_metadata_request = 5;
+  MultipartyThresholdRequest multiparty_threshold_request = 10;
+
 }
 
 message Response {
@@ -526,6 +593,9 @@ message Response {
   GetPeersInfoResponse get_peers_info_response = 5;
   NodeMetadata node_metadata = 6;
   Proof proof = 7;
+
+  MultipartyThresholdResponse multiparty_threshold_response = 8;
+
 }
 
 message QueryTransactionRequest {
@@ -566,6 +636,11 @@ message AboutNodeRequest {
 
 message AboutNodeResponse {
   Transaction latest_metadata = 2;
+  Transaction latest_node_metadata = 3;
+  int64 num_known_peers = 4;
+  int64 num_active_peers = 5;
+  repeated Transaction recent_transactions = 6;
+  int64 pending_transactions = 7;
 }
 
 enum AddressType {
@@ -594,7 +669,7 @@ message FaucetRequest {
 }
 
 message FaucetResponse {
-  Hash transaction_hash = 1;
+  optional Transaction transaction = 1;
 }
 
 message RecentTransactionsRequest {}
@@ -675,8 +750,50 @@ message AddPeerFullRequest {
   bool connect_to_peer = 5;
 }
 
+message MultipartyIdentifier {
+  repeated PublicKey party_keys = 1;
+  int64 threshold = 2;
+  string uuid = 3;
+  int64 num_parties = 4;
+}
+
+message InitiateMultipartyKeygenRequest {
+  MultipartyIdentifier identifier = 1;
+  optional PublicKey host_key = 2;
+  optional string host_address = 3;
+  optional uint32 port = 4;
+  optional int64 index = 6;
+  optional bool return_local_share = 7;
+  optional bool store_local_share = 8;
+  optional int64 timeout_seconds = 9;
+}
+
+message InitiateMultipartyKeygenResponse {
+  optional string local_share = 1;
+  optional InitiateMultipartyKeygenRequest initial_request = 2;
+}
+message InitiateMultipartySigningResponse{
+  Proof proof = 1;
+  optional InitiateMultipartySigningRequest initial_request = 2;
+}
+
+message InitiateMultipartySigningRequest {
+  MultipartyIdentifier identifier = 1;
+  optional PublicKey host_key = 2;
+  optional string host_address = 3;
+  optional uint32 port = 4;
+  repeated int64 party_indexes = 5;
+  BytesData data_to_sign = 6;
+  optional bool store_proof = 8;
+  optional int64 timeout_seconds = 9;
+  InitiateMultipartyKeygenRequest keygen_room = 10;
+}
+
+
 message ControlRequest {
-  optional AddPeerFullRequest add_peer_full_request = 1;
+  AddPeerFullRequest add_peer_full_request = 1;
+  InitiateMultipartyKeygenRequest initiate_multiparty_keygen_request = 2;
+  InitiateMultipartySigningRequest initiate_multiparty_signing_request = 3;
 }
 
 message UpdatePeerTrustRequest {}
@@ -684,6 +801,8 @@ message UpdatePeerTrustRequest {}
 
 message ControlResponse {
   ResponseMetadata response_metadata = 1;
+  InitiateMultipartyKeygenResponse initiate_multiparty_keygen_response = 2;
+  InitiateMultipartySigningResponse initiate_multiparty_signing_response = 3;
 }
 
 enum Error {
@@ -741,3 +860,19 @@ enum KeyType {
   Deposit = 3;
   Reward = 4;
 }
+
+
+message UdpMessage {
+  BytesData bytes = 1;
+  int64 part = 2;
+  int64 parts = 3;
+  string uuid = 4;
+  int64 timestamp = 5;
+}
+//
+//message Server {
+//  string host = 1;
+//  optional string username = 2;
+//  optional string key_path = 3;
+//
+//}

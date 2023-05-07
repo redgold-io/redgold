@@ -57,7 +57,7 @@ where
       F: FnOnce(Resp) -> () {
     tokio::select! {
         _ = server => {}
-        res = crate::api::Client::test_request::<Req, Resp>(relay.node_config.rosetta_port(), &req, endpoint) => {
+        res = crate::api::HTTPClient::test_request::<Req, Resp>(relay.node_config.rosetta_port(), &req, endpoint) => {
             res
             // .map( |r|
             //     log::info!("Test request response: {}", serde_json::to_string(&r.clone()).expect("ser"))

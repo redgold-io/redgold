@@ -21,12 +21,14 @@ use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
 
 pub mod tx_gen;
 pub mod tx_submit;
+pub mod alert;
 
+// i think this is the one currently in use?
 // TODO: Debug why this isn't working as a local request?
 #[allow(dead_code)]
 pub fn run_remote(relay: Relay) {
     let node_config = relay.node_config.clone();
-    info!("Starting canary");
+    info!("Starting canary against local public API");
     let runtime = util::runtimes::build_runtime(4, "canary");
 
     // runtime.spawn(auto_update::from_node_config(node_config.clone()));
@@ -62,17 +64,33 @@ pub fn run_remote(relay: Relay) {
         client.clone(), runtime.clone(), utxos.clone(), 500, 510, node_config.wallet()
     );
 
+    let mut last_failure = util::current_time_millis();
+    let mut failed_once = false;
+    let mut num_success = 0 ;
+
     if utxos.is_empty() {
         // TODO: Faucet here from seed node.
         info!("Unable to start canary, no UTXOs")
     } else {
         loop {
-            sleep(Duration::from_secs(240));
+            info!("Canary submit");
+            sleep(Duration::from_secs(20));
             let response = submit.submit();
             if !response.accepted() {
                 increment_counter!("redgold.canary.failure");
-                error!("Canary failure: {:?}", serde_json::to_string(&response));
+                let failure_msg = serde_json::to_string(&response).unwrap_or("ser failure".to_string());
+                error!("Canary failure: {}", failure_msg.clone());
+                let recovered = (num_success > 10 && util::current_time_millis() - last_failure > 1000 * 60 * 30);
+                if !failed_once || recovered {
+                    alert::email(format!("{} canary failure", relay.node_config.network.to_std_string()), &failure_msg);
+                }
+                let failure_time = util::current_time_millis();
+                num_success = 0;
+                last_failure = failure_time;
+                failed_once = true;
             } else {
+                num_success += 1;
+                info!("Canary success");
                 increment_counter!("redgold.canary.success");
                 if let Some(s) = response.submit_transaction_response {
                     if let Some(q) = s.query_transaction_response {
@@ -134,10 +152,12 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
     // runtime.spawn(auto_update::from_node_config(node_config.clone()));
 
     let mut map: HashMap<Vec<u8>, KeyPair> = HashMap::new();
-    for i in 500..510 {
+    let min_offset = 20;
+    let max_offset = 30;
+    for i in min_offset..max_offset {
         let key = node_config.wallet().key_at(i);
         let address = key.address_typed();
-        map.insert(address.address.unwrap().bytes_value, key);
+        map.insert(address.address.unwrap().value, key);
     }
     let addresses = map.keys().map(|k| Address::from_bytes(k.clone()).unwrap()).collect_vec();
     // let client: PublicClient = PublicClient {
@@ -164,7 +184,7 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
         .collect_vec();
 
     let mut generator = TransactionGenerator::default_adv(
-        utxos.clone(), 500, 510, node_config.wallet()
+        utxos.clone(), min_offset, max_offset, node_config.wallet()
     );
     if utxos.is_empty() {
         // TODO: Faucet here from seed node.

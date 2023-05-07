@@ -183,20 +183,6 @@ impl Transaction {
         return clone.calculate_hash();
     }
 
-    #[allow(dead_code)]
-    fn sign(&self, key: &SecretKey) -> String {
-        let message = Message::from_slice(
-            &*self
-                .signable_hash()
-                .safe_bytes()
-                .expect("propagate error later"),
-        )
-        .unwrap();
-        let signature: Signature = Secp256k1::new().sign(&message, &key);
-        let sig_str = signature.to_string();
-        return sig_str;
-    }
-
     pub fn to_utxo_entries(&self, time: u64) -> Vec<UtxoEntry> {
         return UtxoEntry::from_transaction(self, time as i64);
     }
@@ -360,21 +346,13 @@ impl TransactionAmount {
 
 // TODO: ove into standard data
 pub fn amount_data(amount: u64) -> Option<StandardData> {
-    Some(StandardData {
-        amount: Some(amount as i64),
-        typed_value: None,
-        typed_value_list: vec![],
-        keyed_typed_value: None,
-        keyed_typed_value_list: vec![],
-        matrix_typed_value: None,
-        matrix_typed_value_list: vec![],
-        peer_data: None
-    })
+    StandardData::amount_data(amount)
 }
 
 impl StandardData {
-    pub fn peer_data(pd: PeerData) -> Option<Self> {
-        Some(Self {
+
+    pub fn empty() -> Self {
+        Self {
             amount: None,
             typed_value: None,
             typed_value_list: vec![],
@@ -382,7 +360,20 @@ impl StandardData {
             keyed_typed_value_list: vec![],
             matrix_typed_value: None,
             matrix_typed_value_list: vec![],
-            peer_data: Some(pd)
-        })
+            peer_data: None,
+            node_metadata: None,
+            dynamic_node_metadata: None,
+            ordinal: None,
+        }
+    }
+    pub fn peer_data(pd: PeerData) -> Option<Self> {
+        let mut mt = Self::empty();
+        mt.peer_data = Some(pd);
+        Some(mt)
+    }
+    pub fn amount_data(amount: u64) -> Option<Self> {
+        let mut mt = Self::empty();
+        mt.amount = Some(amount as i64);
+        Some(mt)
     }
 }

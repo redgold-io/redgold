@@ -3,8 +3,10 @@ use std::time::Duration;
 use itertools::Itertools;
 use log::info;
 use redgold_data::DataStoreContext;
-use redgold_schema::{error_info, KeyPair, WithMetadataHashable};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, PublicResponse};
+use redgold_schema::{error_info, KeyPair, ProtoHashable, SafeOption, WithMetadataHashable};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, PublicResponse, TransactionAmount};
+use redgold_schema::transaction::{amount_data, amount_to_raw_amount};
+use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::api::public_api::PublicClient;
 use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator};
 use crate::core::internal_message::{RecvAsyncErrorInfo, TransactionMessage};
@@ -55,14 +57,17 @@ use crate::core::relay::Relay;
 // }
 
 pub async fn faucet_request(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
-    info!("Faucet request {}", address_input);
+    info!("Incoming faucet request on {}", address_input);
     let node_config = relay.node_config.clone();
 
+    let min_offset = 1;
+    let max_offset = 5;
+
     let mut map: HashMap<Vec<u8>, KeyPair> = HashMap::new();
-    for i in 0..100 {
+    for i in min_offset..max_offset {
         let key = node_config.wallet().key_at(i);
         let address = key.address_typed();
-        map.insert(address.address.unwrap().bytes_value, key);
+        map.insert(address.address.unwrap().value, key);
     }
 
     let addresses = map.keys().map(|k| Address::from_bytes(k.clone()).unwrap()).collect_vec();
@@ -79,7 +84,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         .collect_vec();
 
     let mut generator = TransactionGenerator::default_adv(
-        utxos.clone(), 0, 100, node_config.wallet()
+        utxos.clone(), min_offset, max_offset, node_config.wallet()
     );
 
 
@@ -87,10 +92,20 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         Err(error_info("No UTXOs found for faucet"))
     } else {
 
-        let transaction = generator.generate_simple_tx().clone();
+        // TODO: We need to know this address is not currently in use -- i.e. local locker around
+        // utxo in use.
+        let utxo = utxos.get(0).safe_get()?.clone().clone();
+        let addr = Address::parse(&address_input)?;
+        let mut builder = TransactionBuilder::new();
+        builder
+            .with_input(utxo.utxo_entry, utxo.key_pair)
+            .with_output(&addr, TransactionAmount::from_fractional(1 as f64)?)
+            .with_remainder();
+        let transaction = builder.transaction.clone();
+        // let transaction = generator.generate_simple_tx().clone();
         let (sender, receiver) = flume::unbounded::<PublicResponse>();
         let message = TransactionMessage {
-            transaction: transaction.transaction.clone(),
+            transaction: transaction.clone(),
             response_channel: Some(sender)
         };
         relay
@@ -106,7 +121,10 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
             Ok(response) => {
                 if response.clone().accepted() {
                     // generator.completed(transaction.clone());
-                    Ok(FaucetResponse{ transaction_hash: Some(transaction.transaction.hash()) })
+                    let mut tx = transaction.clone();
+                    tx.with_hash();
+                    // info!("Faucet success with response hash: {}", tx.hash.hex());
+                    Ok(FaucetResponse{ transaction: Some(tx.clone()) })
                 } else {
                     let e = format!("Faucet failure: {:?}", serde_json::to_string(&response));
                     info!("Faucet failure: {}", e);

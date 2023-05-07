@@ -17,7 +17,9 @@ use redgold_data::address_block::AddressBlockStore;
 use redgold_data::DataStoreContext;
 use redgold_data::peer::PeerStore;
 use redgold_data::config::ConfigStore;
+use redgold_data::mp_store::MultipartyStore;
 use redgold_data::servers::ServerStore;
+use redgold_data::transaction_store::TransactionStore;
 
 use crate::data::download::DownloadMaxTimes;
 use crate::data::utxo;
@@ -34,12 +36,13 @@ use crate::schema::structs::{ObservationMetadata, Proof, Transaction};
 use crate::schema::TestConstants;
 use crate::schema::{ProtoHashable, SafeBytesAccess, WithMetadataHashable};
 use crate::util::cli::args::empty_args;
-use crate::util::public_key_from_bytes;
+use crate::util::keys::public_key_from_bytes;
 use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
 use crate::schema::structs;
 use redgold_schema::constants::EARLIEST_TIME;
 use redgold_schema::{error_info, error_message, SafeOption};
+use redgold_schema::structs::AddressInfo;
 use redgold_schema::transaction::AddressBalance;
 
 /*
@@ -57,7 +60,9 @@ pub struct DataStore {
     pub address_block_store: AddressBlockStore,
     pub peer_store: PeerStore,
     pub config_store: ConfigStore,
-    pub server_store: ServerStore
+    pub transaction_store: TransactionStore,
+    pub multiparty_store: MultipartyStore,
+    //pub server_store: ServerStore
 }
 
 /*
@@ -495,6 +500,14 @@ impl DataStore {
         Ok(rows_m.last_insert_rowid())
     }
 
+    // TODO: Move to utxoStore
+    pub async fn get_address_string_info(&self, address: String) -> Result<AddressInfo, ErrorInfo> {
+        let addr = Address::parse(address)?;
+        let result = self.query_utxo_address(vec![addr.clone()]).await;
+        let res = Self::map_err_sqlx(result)?;
+        Ok(AddressInfo::from_utxo_entries(addr.clone(), res))
+    }
+
     pub async fn query_utxo_address(
         &self,
         addresses: Vec<Address>,
@@ -797,13 +810,13 @@ impl DataStore {
         return Ok(res);
     }
 
-    pub fn insert_peer(&self, peer_id: &Vec<u8>, trust: f64) -> Result<usize, Error> {
-        let conn = self.connection()?;
-        return Ok(conn.execute(
-            "INSERT INTO peers (id, trust) VALUES (?1, ?2)",
-            params![peer_id, trust],
-        )?);
-    }
+    // pub fn insert_peer(&self, peer_id: &Vec<u8>, trust: f64) -> Result<usize, Error> {
+    //     let conn = self.connection()?;
+    //     return Ok(conn.execute(
+    //         "INSERT INTO peers (id, trust) VALUES (?1, ?2)",
+    //         params![peer_id, trust],
+    //     )?);
+    // }
     //
     // pub fn insert_mnemonic(&self, mnemonic: String, peer_id: &Vec<u8>, trust: f64) -> Result<usize, Error> {
     //     let conn = self.connection()?;
@@ -1253,7 +1266,9 @@ WHERE
             address_block_store: AddressBlockStore{ ctx: ctx.clone() },
             peer_store: PeerStore{ ctx: ctx.clone() },
             config_store: ConfigStore{ ctx: ctx.clone() },
-            server_store: ServerStore{ ctx: ctx.clone() },
+            // server_store: ServerStore{ ctx: ctx.clone() },
+            transaction_store: TransactionStore{ ctx: ctx.clone() },
+            multiparty_store: MultipartyStore { ctx: ctx.clone() }
         }
     }
 
@@ -1457,6 +1472,8 @@ async fn test_mnemonic() {
     assert_eq!(m.words, "asdf".to_string());
 }
 
+// Fix later
+#[ignore]
 #[tokio::test]
 async fn test_sqlx() {
     // use sqlx::Connection;

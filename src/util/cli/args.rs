@@ -14,6 +14,9 @@ pub fn empty_args() -> RgArgs {
         debug_id: None,
         disable_auto_update: false,
         subcmd: None,
+        genesis: false,
+        seed_address: None,
+        seed_port_offset: None
     }
 }
 
@@ -54,6 +57,18 @@ pub struct RgArgs {
     /// Specific subcommands for different functionalities
     #[clap(subcommand)]
     pub subcmd: Option<RgTopLevelSubcommand>,
+    #[clap(long)]
+    /// Used to indicate the node is starting from genesis, only used for manual network
+    /// initialization
+    pub genesis: bool,
+    #[clap(long)]
+    /// Seed network address, only used for local testing and manually connecting to a specific
+    /// network
+    pub seed_address: Option<String>,
+    #[clap(long)]
+    /// Seed network port offset, only used for local testing and manually connecting to a specific
+    /// network
+    pub seed_port_offset: Option<i32>,
 }
 
 impl Default for RgArgs {
@@ -68,10 +83,12 @@ pub enum RgTopLevelSubcommand {
     GUI(GUI),
     Node(NodeCli),
     AddServer(AddServer),
+    SetServersCsv(SetServersCsv),
     RemoveServer(RemoveServer),
     DebugCanary(DebugCanary),
     Deploy(Deploy),
     GenerateWords(GenerateMnemonic),
+    GenerateRandomWords(GenerateRandomWords),
     Send(WalletSend),
     Address(WalletAddress),
     Query(QueryCli),
@@ -95,10 +112,31 @@ pub struct NodeCli {
 pub struct AddServer {
     /// SSH compatible host name, either raw IP or CNAME
     #[clap(short, long)]
-    host: String,
+    pub host: String,
+    /// SSH compatible user name for login, default root
+    #[clap(short, long)]
+    pub user: Option<String>,
     /// Path to key pair used for ssh commands, passphrases not yet supported
     #[clap(short, long)]
-    key_path: Option<String>
+    pub key_path: Option<String>,
+    /// Index used for key distribution, default +1 of last known index.
+    #[clap(short, long)]
+    pub index: Option<i64>,
+    /// Index used for peer_id distribution, default 0.
+    #[clap(short, long)]
+    pub peer_id_index: Option<i64>
+
+}
+
+/// Add a new server by hostname and key used
+#[derive(Args, Debug, Clone)]
+pub struct SetServersCsv {
+    /// Path to csv file containing server information
+    /// Header format should be as follows:
+    /// host, index, peer_id_index, network_environment, username, key_path
+    /// Only host is required as a field.
+    #[clap(short, long)]
+    pub path: String
 }
 
 /// Remove a server reference by host name
@@ -171,6 +209,15 @@ pub struct GenerateMnemonic {
     rounds: i32,
     #[clap(short, long)]
     use_random_seed: bool
+}
+
+
+/// Generate a mnemonic word list from random entropy
+#[derive(Args, Debug, Clone)]
+pub struct GenerateRandomWords {
+    /// Source for hardware randomness, not required unless advanced user
+    #[clap(short, long)]
+    hardware: Option<String>,
 }
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)

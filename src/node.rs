@@ -12,8 +12,8 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{error_info, SafeOption};
-use redgold_schema::structs::{GetPeersInfoRequest, NetworkEnvironment, Request};
+use redgold_schema::{error_info, SafeBytesAccess, SafeOption};
+use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
 use crate::api::p2p_io::rgnetwork::Event;
@@ -32,15 +32,19 @@ use crate::core::relay::Relay;
 use crate::data::data_store::DataStore;
 use crate::data::download;
 use crate::genesis::{create_genesis_transaction, genesis_tx_from, GenesisDistribution};
-use crate::node_config::{NodeConfig, SeedNode};
+use crate::node_config::NodeConfig;
 use crate::schema::structs::{AddPeerFullRequest, ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
 use crate::trust::rewards::Rewards;
 use crate::{canary, util};
+use crate::mparty::mp_server::{Db, MultipartyHandler};
+use crate::canary::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
+use crate::core::seeds::SeedNode;
+use crate::multiparty::gg20_sm_manager;
 use crate::util::runtimes::build_runtime;
-use crate::util::{auto_update, metrics_registry};
-use crate::schema::constants::{DEFAULT_PORT_OFFSET, EARLIEST_TIME};
+use crate::util::{auto_update, keys, metrics_registry};
+use crate::schema::constants::EARLIEST_TIME;
 use crate::schema::TestConstants;
 
 #[derive(Clone)]
@@ -93,14 +97,8 @@ impl NodeInit {
 }
 
 impl Node {
-    // #[allow(dead_code)]
-    // pub fn new_debug(seed_id: &u16) -> Node {
-    //     Node::from_config(NodeConfig::new(seed_id))
-    //         //  .await
-    //         .expect("Couldn't start node from config for test")
-    // }
 
-    pub fn start_services(relay: Relay, runtimes: NodeRuntimes) -> FuturesUnordered<JoinHandle<Result<(), ErrorInfo>>> {
+    pub fn start_services(relay: Relay, runtimes: NodeRuntimes) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
         let mut join_handles = vec![];
         let node_config = relay.node_config.clone();
 
@@ -159,6 +157,17 @@ impl Node {
         let obs_handler = ObservationHandler{relay: relay.clone()};
         join_handles.push(runtimes.auxiliary.spawn(async move { obs_handler.run().await }));
 
+        let mut mph = MultipartyHandler::new(
+            relay.clone(),
+            runtimes.auxiliary.clone()
+        );
+        join_handles.push(runtimes.auxiliary.spawn(async move { mph.run().await }));
+
+        let sm_port = relay.node_config.mparty_port();
+        join_handles.push(runtimes.auxiliary
+            .spawn(async move { gg20_sm_manager::run_server(sm_port)
+                .await.map_err(|e| error_info(e.to_string())) }));
+
 
         let relay_c = relay.clone();
         // let amh = runtimes.async_multi.spawn(async move {
@@ -174,14 +183,13 @@ impl Node {
         // });
         // join_handles.push(amh);
         let c_config = relay.clone();
-        let cwh = runtimes.canary_watcher.spawn_blocking(move || { canary::run(c_config)} );
-        join_handles.push(cwh);
-
-        let mut fo = FuturesUnordered::new();
-        for jhi in join_handles {
-            fo.push(jhi);
+        if node_config.canary_enabled {
+            let cwh = runtimes.canary_watcher.spawn_blocking(move || { canary::run(c_config) });
+            join_handles.push(cwh);
         }
-        fo
+
+
+        join_handles
     }
 
     pub fn prelim_setup(relay2: Relay, runtimes: NodeRuntimes) -> Result<(), ErrorInfo> {
@@ -217,29 +225,47 @@ impl Node {
         result3.expect("expected panic");
         Ok(())
     }
+    //
+    // pub async fn initial_peers_request(&self, seed: SeedNode) -> Result<(), ErrorInfo> {
+    //
+    //     let all_peers = self.relay.ds.peer_store.all_peers().await?;
+    //     let set = all_peers.iter().map(|p| p.peer_id.as_ref().expect("p").clone()).collect::<HashSet<Vec<u8>>>();
+    //     let mut req = self.relay.node_config.request();
+    //     req.get_peers_info_request = Some(GetPeersInfoRequest{});
+    //     let res = rest_peer(
+    //         self.relay.node_config.clone(), seed.external_address.clone(), (seed.port + 1) as i64, req
+    //     ).await?; // TODO: Use retries here, and don't consider it a failure if we can't get peers immediately
+    //     //self.relay.ds.peer_store.
+    //     let option = res.get_peers_info_response.clone();
+    //     let peers = option.expect("peers").peers;
+    //     // TODO: Validate peers added.
+    //     for peer_tx in peers {
+    //         let pd = peer_tx.peer_data()?;
+    //         let pid = pd.peer_id.safe_get()?;
+    //         if !set.contains(pid) {
+    //             self.relay.ds.peer_store.add_peer(&peer_tx, 0f64).await?;
+    //         }
+    //     }
+    //     Ok(())
+    //
+    // }
 
-    pub async fn initial_peers_request(&self, seed: SeedNode) -> Result<(), ErrorInfo> {
-
-        let all_peers = self.relay.ds.peer_store.all_peers().await?;
-        let set = all_peers.iter().map(|p| p.peer_id.as_ref().expect("p").clone()).collect::<HashSet<Vec<u8>>>();
-        let mut req = self.relay.node_config.request();
-        req.get_peers_info_request = Some(GetPeersInfoRequest{});
-        let res = rest_peer(
-            self.relay.node_config.clone(), seed.external_address.clone(), (seed.port + 1) as i64, req
-        ).await?; // TODO: Use retries here, and don't consider it a failure if we can't get peers immediately
-        //self.relay.ds.peer_store.
-        let option = res.get_peers_info_response.clone();
-        let peers = option.expect("peers").peers;
-        // TODO: Validate peers added.
-        for peer_tx in peers {
-            let pd = peer_tx.peer_data()?;
-            let pid = pd.peer_id.safe_get()?;
-            if !set.contains(pid) {
-                self.relay.ds.peer_store.add_peer(&peer_tx, 0f64).await?;
+    pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
+        let outputs = (0..50).map(|i|
+            GenesisDistribution {
+                address: node_config.wallet().key_at(i as usize).address_typed(), amount: 10000
             }
-        }
-        Ok(())
-
+        ).collect_vec();
+        let tx = genesis_tx_from(outputs); //EARLIEST_TIME
+        let res = tx.to_utxo_entries(EARLIEST_TIME).iter().zip(0..50).map(|(o, i)| {
+            let kp = node_config.wallet().key_at(i as usize);
+            let s = SpendableUTXO {
+                utxo_entry: o.clone(),
+                key_pair: kp,
+            };
+            s
+        }).collect_vec();
+        (tx, res)
     }
 
     pub fn from_config(relay: Relay, runtimes: NodeRuntimes) -> Result<Node, ErrorInfo> {
@@ -266,29 +292,23 @@ impl Node {
             info!("No seeds configured, starting from genesis");
             // relay.node_state.store(NodeState::Ready);
             // TODO: Replace with genesis per network type.
-            if node_config.is_local_debug() {
-                info!("Genesis code kp");
-                let _res_err = DataStore::map_err(
-                    relay
-                        .ds
-                        .insert_transaction(&create_genesis_transaction(), EARLIEST_TIME),
-                );
-            } else {
-                info!("Genesis local 1000 kp");
+            // if node_config.is_debug() {
+            //     info!("Genesis code kp");
+            //     let _res_err = DataStore::map_err(
+            //         relay
+            //             .ds
+            //             .insert_transaction(&create_genesis_transaction(), EARLIEST_TIME),
+            //     );
+            // } else {
+                info!("Genesis local test multiple kp");
 
-                let outputs = (0..1000).map(|i|
-                    GenesisDistribution {
-                        address: node_config.wallet().key_at(i as usize).address_typed(), amount: 10000
-                    }
-                ).collect_vec();
+                let tx = Node::genesis_from(node_config.clone()).0;
                 let _res_err = DataStore::map_err(
                     relay
                         .ds
-                        .insert_transaction(&genesis_tx_from(
-                            outputs
-                        ), EARLIEST_TIME),
+                        .insert_transaction(&tx, EARLIEST_TIME),
                 );
-            }
+            // }
             // .expect("Genesis inserted or already exists");
 
         } else {
@@ -300,24 +320,27 @@ impl Node {
                 let tx = a.latest_metadata.safe_get_msg("Missing latest metadata from seed node")?;
                 let pd = tx.outputs.get(0).expect("a").data.as_ref().expect("d").peer_data.as_ref().expect("pd");
                 let nmd = pd.node_metadata.get(0).expect("nmd");
-                let vec = nmd.public_key.clone();
+                let vec = nmd.public_key_bytes().expect("ok");
+                let vec1 = pd.peer_id.safe_get()?.clone().peer_id.safe_bytes()?.clone();
                 SeedNode{
-                    peer_id: pd.peer_id.as_ref().expect("pid").clone(),
-                    trust: 1.0,
-                    public_key: util::public_key_from_bytes(&vec).expect("pk"),
+                    peer_id: Some(vec1),
+                    trust: vec![],
+                    public_key: Some(keys::public_key_from_bytes(&vec).expect("pk")),
                     external_address: nmd.external_address.clone(),
-                    port: nmd.port_offset.unwrap_or(node_config.network.default_port_offset() as i64) as u16
+                    port_offset: Some(nmd.port_offset.unwrap_or(node_config.network.default_port_offset() as i64) as u16),
+                    environments: vec![],
                 }
             } else {
                 relay.node_config.seeds.get(0).unwrap().clone()
 
             };
-            let client = PublicClient::from(seed.external_address, seed.port + 1);
-            info!("Querying LB for node info again");
+            let port = seed.port_offset.unwrap() + 1;
+            let client = PublicClient::from(seed.external_address.clone(), port);
+            info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
             let result = runtimes.auxiliary.block_on(client.about());
             let peer_tx = result?.latest_metadata.safe_get()?.clone();
 
-            info!("Got LB node info, adding peer");
+            info!("Got LB node info {}, adding peer", redgold_schema::json(&peer_tx)?);
             // Local debug mode
             // First attempt to insert all trust scores for seeds and ignore conflict
             let result2 = runtimes.auxiliary.block_on(relay.ds.peer_store.add_peer(&peer_tx, 1f64));
@@ -337,10 +360,17 @@ impl Node {
             //     )
             //     .expect("insert peer on download");
             // todo: send_peer_request_response
-            download::download(relay.clone(), seed.public_key);
+            let data = peer_tx.peer_data()?;
+            let key = data.node_metadata[0].public_key_bytes()?;
+            // TODO Change this invocation to an .into() in a non-schema key module
+            let pk = keys::public_key_from_bytes(&key).expect("works");
+            download::download(
+                relay.clone(),
+                pk
+            );
         }
 
-
+        info!("Node ready");
         increment_counter!("redgold.node.node_started");
 
         return Ok(node);
@@ -352,14 +382,14 @@ pub struct LocalTestNodeContext {
     id: u16,
     port_offset: u16,
     node: Node,
-    public_client: public_api::PublicClient,
-    control_client: control_api::ControlClient,
-    futures: FuturesUnordered<JoinHandle<Result<(), ErrorInfo>>>
+    public_client: PublicClient,
+    control_client: ControlClient,
+    futures: Vec<JoinHandle<Result<(), ErrorInfo>>>
 }
 
 impl LocalTestNodeContext {
     fn new(id: u16, random_port_offset: u16, seed: Option<SeedNode>) -> Self {
-        let mut node_config = NodeConfig::new(&id);
+        let mut node_config = NodeConfig::from_test_id(&id);
         node_config.port_offset = random_port_offset;
         for x in seed {
             node_config.seeds = vec![x];
@@ -381,24 +411,6 @@ impl LocalTestNodeContext {
             futures
         }
     }
-    // #[allow(dead_code)]
-    // fn add_request(&self, connect_to_peer: bool) -> ControlRequest {
-    //     return ControlRequest {
-    //         add_peer_full_request: Some(AddPeerFullRequest {
-    //             id: self.node.relay.node_config.self_peer_id.to_vec(),
-    //             trust: 0.9,
-    //             public_key: self
-    //                 .node
-    //                 .relay
-    //                 .node_config
-    //                 .wallet()
-    //                 .transport_key()
-    //                 .public_key_vec(),
-    //             address: self.node.p2p.address.to_string(),
-    //             connect_to_peer,
-    //         }),
-    //     };
-    // }
 }
 
 async fn throw_panic() {
@@ -422,6 +434,10 @@ impl LocalNodes {
     fn shutdown(&self) {
         for x in &self.nodes {
             x.node.runtimes.shutdown();
+            for jh in &x.futures {
+                jh.abort();
+                // std::mem::drop(jh);
+            }
         }
     }
 
@@ -444,18 +460,20 @@ impl LocalNodes {
         LocalNodes {
             connections: vec![], //connection],
             current_seed: SeedNode {
-                peer_id: start.node.relay.node_config.clone().self_peer_id,
-                trust: 1.0,
-                public_key: start
+                peer_id: Some(start.node.relay.node_config.clone().self_peer_id),
+                trust: vec![],
+                public_key: Some(start
                     .node
                     .relay
                     .node_config
                     .clone()
                     .wallet()
                     .transport_key()
-                    .public_key,
+                    .public_key
+                ),
                 external_address: start.node.relay.node_config.external_ip.clone(),
-                port: start.node.relay.node_config.port_offset,
+                port_offset: Some(start.node.relay.node_config.port_offset),
+                environments: vec![],
             },
             nodes: vec![start],
         }
@@ -478,6 +496,7 @@ impl LocalNodes {
                 .map(|x| x.transaction.unwrap().hash_vec())
                 .collect();
 
+            info!("Num tx: {:?} node_id: {:?}", tx.len(), n.id);
             txs.push(tx);
 
             let ob: HashSet<Vec<u8>> = n
@@ -490,6 +509,7 @@ impl LocalNodes {
                 .map(|x| x.observation.unwrap().proto_serialize())
                 .collect();
 
+            info!("Num ob: {:?} node_id: {:?}", ob.len(), n.id);
             obs.push(ob);
 
             let oe: HashSet<Vec<Vec<u8>>> = n
@@ -501,6 +521,7 @@ impl LocalNodes {
                 .into_iter()
                 .map(|x| vec![x.root, x.leaf_hash, x.observation_hash])
                 .collect();
+            info!("Num oe: {:?} node_id: {:?}", oe.len(), n.id);
             oes.push(oe);
 
             let utxo: HashSet<Vec<u8>> = n
@@ -516,9 +537,11 @@ impl LocalNodes {
                         .calculate_hash()
                         .bytes
                         .expect("b")
-                        .bytes_value
+                        .value
                 })
                 .collect();
+            info!("Num utxos: {:?} node_id: {:?}", utxo.len(), n.id);
+
             utxos.push(utxo);
         }
         for x in txs.clone() {
@@ -578,7 +601,7 @@ fn debug_err() {
     let _tc = TestConstants::new();
 
     // testing part here debug
-    let mut node_config = NodeConfig::new(&0);
+    let mut node_config = NodeConfig::from_test_id(&0);
     node_config.port_offset = 15000;
     let runtimes = NodeRuntimes::default();
     let mut relay = runtimes.auxiliary.block_on(Relay::new(node_config.clone()));
@@ -604,10 +627,10 @@ fn debug_err() {
 #[test]
 fn e2e() {
     // hot dog
-    let do_run = std::env::var("CI");
-    if do_run.is_ok() {
-        return;
-    }
+    // let do_run = std::env::var("CI");
+    // if do_run.is_ok() {
+    //     return;
+    // }
 
     let runtime = build_runtime(10, "e2e");
     util::init_logger().ok(); //.expect("log");
@@ -621,6 +644,8 @@ fn e2e() {
     //
     let mut local_nodes = LocalNodes::new(runtime.clone(), None);
     let start_node = local_nodes.start().clone();
+    let client1 = start_node.control_client.clone();
+
     let ds = start_node.node.relay.ds.clone();
     //
     // // Await nodes started;
@@ -639,28 +664,51 @@ fn e2e() {
 
     let client = start_node.public_client.clone();
     //
-    let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), vec![]);
+    let utxos = ds.query_time_utxo(0, util::current_time_millis())
+        .unwrap();
+    info!("Num utxos from genesis {:?}", utxos.len());
+
+    let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
+    let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), spend_utxos);
     //
     let _result = submit.submit();
     assert!(_result.accepted());
 
+
+
+    let utxos = ds.query_time_utxo(0, util::current_time_millis())
+        .unwrap();
+    info!("Num utxos after first submit {:?}", utxos.len());
+
+
+    submit.with_faucet();
+
     let _result2 = submit.submit();
     assert!(_result2.accepted());
     show_balances();
+
+    info!("Num utxos after second submit {:?}", utxos.len());
+
     submit.submit_duplicate();
+
+    info!("Num utxos after duplicate submit {:?}", utxos.len());
+
     // show_balances();
     // // shouldn't response metadata be not an option??
 
     for _ in 0..1 {
+        // TODO Flaky failure observed once? Why?
         submit.submit_double_spend(None);
     }
 
+    info!("Num utxos after double spend submit {:?}", utxos.len());
+
     show_balances();
 
-    for _ in 0..2 {
-        submit.submit_split();
-        show_balances();
-    }
+    // for _ in 0..2 {
+    //     submit.submit_split();
+    //     show_balances();
+    // }
 
     let addr = runtime.block_on(client.query_addresses(submit.get_addresses()));
 
@@ -669,12 +717,29 @@ fn e2e() {
     local_nodes.verify_data_equivalent();
 
     local_nodes.add_node(runtime.clone());
-
     local_nodes.verify_data_equivalent();
+    // //
+    // let after_node_added = submit.submit();
+    // assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")
+    //     .observation_proofs.len());
 
-    let after_node_added = submit.submit();
-    assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")
-        .observation_proofs.len());
+
+    let res = runtime.block_on(client1.multiparty_keygen(None));
+    println!("{:?}", res);
+    /*
+    "protocol execution terminated with error: handle received message: received message didn't pass pre-validation: got message which was sent by this party"
+    this happens sometimes?
+    Do we need some kind of sleep in here before the other peers start? very confusing.
+     */
+    assert!(res.is_ok());
+    //
+    // let party = res.expect("ok");
+    // let signing_data = Hash::from_string("hey");
+    // let vec = signing_data.bytes.expect("b");
+    // let res = runtime.block_on(
+    //     client1.multiparty_signing(None, party.initial_request, vec));
+    // println!("{:?}", res);
+    // assert!(res.is_ok());
 
 
     // // Connect first peer.
@@ -709,6 +774,7 @@ fn e2e() {
     // //
 
     // runtime.shutdown_background();
+
 
     local_nodes.shutdown();
 

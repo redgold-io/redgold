@@ -4,7 +4,7 @@ use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
 use bitcoin::secp256k1::PublicKey;
 use eframe::egui::TextBuffer;
 use redgold_schema::constants::{
-    DEBUG_FINALIZATION_INTERVAL_MILLIS, DEFAULT_PORT_OFFSET, OBSERVATION_FORMATION_TIME_MILLIS,
+    DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS,
     REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS,
 };
 use redgold_schema::util::wallet::Wallet;
@@ -12,19 +12,12 @@ use std::path::Path;
 use std::time::Duration;
 use itertools::Itertools;
 use log::{debug, info};
-use redgold_schema::structs::{Address, NodeMetadata, NodeType, PeerData, Request, Response, VersionInfo};
+use redgold_schema::structs;
+use redgold_schema::structs::{Address, NodeMetadata, NodeType, PeerData, PeerId, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::dhash_vec;
 use crate::api::public_api::PublicClient;
-
-#[derive(Clone, Debug)]
-pub struct SeedNode {
-    pub peer_id: Vec<u8>,
-    pub trust: f64,
-    pub public_key: PublicKey,
-    pub external_address: String,
-    pub port: u16,
-}
+use crate::core::seeds::SeedNode;
 
 pub struct CanaryConfig {}
 
@@ -75,12 +68,18 @@ pub struct NodeConfig {
     pub block_formation_interval: Duration,
     pub genesis_config: GenesisConfig,
     pub faucet_enabled: bool,
+    pub canary_enabled: bool,
     pub load_balancer_url: String,
     pub external_ip: String
 }
 
 impl NodeConfig {
 
+    pub fn public_key(&self) -> structs::PublicKey {
+        let pair = self.wallet().active_keypair();
+        let pk_vec = pair.public_key_vec();
+        structs::PublicKey::from_bytes(pk_vec)
+    }
 
     pub fn node_metadata(&self) -> NodeMetadata {
         let pair = self.wallet().active_keypair();
@@ -88,7 +87,8 @@ impl NodeConfig {
         NodeMetadata{
             external_address: self.external_ip.clone(),
             multi_hash: util::to_libp2p_peer_id_ser(&pk_vec).to_bytes(),
-            public_key: pk_vec,
+            public_key: Some(self.public_key()),
+            proof: None,
             node_type: Some(NodeType::Static as i32),
             version_info: Some(VersionInfo{
                 checksum_hash: None, // TODO: Add checksum hash
@@ -96,7 +96,11 @@ impl NodeConfig {
                 next_upgrade_time: None
             }),
             partition_info: None,
-            port_offset: Some(self.port_offset as i64)
+            port_offset: Some(self.port_offset as i64),
+            alias: None,
+            name: None,
+            peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
+            nat_restricted: None,
         }
     }
 
@@ -114,7 +118,7 @@ impl NodeConfig {
         let pair = self.wallet().active_keypair();
 
         let pd = PeerData {
-            peer_id: Some(self.self_peer_id.clone()),
+            peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
             merkle_proof: None,
             proof: None,
             node_metadata: vec![self.node_metadata()],
@@ -146,6 +150,10 @@ impl NodeConfig {
 
     pub fn is_local_debug(&self) -> bool {
         self.network == NetworkEnvironment::Local || self.network == NetworkEnvironment::Debug
+    }
+
+    pub fn is_debug(&self) -> bool {
+        self.network == NetworkEnvironment::Debug
     }
 
     pub fn main_stage_network(&self) -> bool {
@@ -190,15 +198,19 @@ impl NodeConfig {
         self.rosetta_port.unwrap_or(self.port_offset + 3)
     }
 
+    pub fn mparty_port(&self) -> u16 {
+        self.port_offset + 4
+    }
+
     pub fn default_debug() -> Self {
-        NodeConfig::new(&(0 as u16))
+        NodeConfig::from_test_id(&(0 as u16))
     }
 
     pub fn default() -> Self {
         Self {
             self_peer_id: vec![],
             mnemonic_words: "".to_string(),
-            port_offset: DEFAULT_PORT_OFFSET,
+            port_offset: NetworkEnvironment::Debug.default_port_offset(),
             p2p_port: None,
             control_port: None,
             public_port: None,
@@ -222,6 +234,7 @@ impl NodeConfig {
             block_formation_interval: Duration::from_secs(10),
             genesis_config: Default::default(),
             faucet_enabled: true,
+            canary_enabled: true,
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string()
         }
@@ -231,18 +244,24 @@ impl NodeConfig {
         "file:memdb1_id".to_owned() + &*seed_id.clone().to_string() + "?mode=memory&cache=shared"
     }
 
-    pub fn new(seed_id: &u16) -> Self {
+    pub fn from_test_id(seed_id: &u16) -> Self {
         let words = redgold_schema::util::mnemonic_builder::from_str_rounds(
             &*seed_id.clone().to_string(),
             0,
         )
         .to_string();
         let self_peer_id = debug_peer_id_from_key(&*words).to_vec();
-        let path = NodeConfig::memdb_path(seed_id);
+        // let path: String = ""
+        let cwd = std::env::current_dir().expect("Current dir");
+        let cwd_target = cwd.join("target");
+        let target = cwd_target.join(format!("test_node_{:?}_data_store.sqlite", seed_id));
+        std::fs::remove_file(&target).ok();
+        let path = target.to_str().expect("path").to_string();
+        // let path = NodeConfig::memdb_path(seed_id);
         let mut node_config = NodeConfig::default();
         node_config.self_peer_id = self_peer_id;
         node_config.mnemonic_words = words;
-        node_config.port_offset = (DEFAULT_PORT_OFFSET + (seed_id.clone() * 100)) as u16;
+        node_config.port_offset = (node_config.port_offset + (seed_id.clone() * 100)) as u16;
         node_config.data_store_path = path;
         node_config.observation_formation_millis = Duration::from_millis(1000 as u64);
         node_config.transaction_finalization_time =
@@ -250,6 +269,7 @@ impl NodeConfig {
         node_config.network = NetworkEnvironment::Debug;
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
+        node_config.canary_enabled = false;
         node_config
     }
     pub fn wallet(&self) -> Wallet {
@@ -259,6 +279,11 @@ impl NodeConfig {
     pub async fn data_store(&self) -> DataStore {
         DataStore::from_config(self).await
     }
+
+    pub async fn loopback_public_client(&self) -> PublicClient {
+        PublicClient::from("127.0.0.1".to_string(), self.public_port())
+    }
+
 }
 
 pub fn debug_peer_id_from_key(mnemonic: &str) -> [u8; 32] {

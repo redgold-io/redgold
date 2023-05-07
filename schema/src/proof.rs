@@ -1,9 +1,9 @@
 use crate::address::multi_address;
-use crate::structs::{Error as RGError, ErrorInfo, Hash, Proof};
+use crate::structs::{Error as RGError, ErrorInfo, Hash, Proof, Signature};
 use crate::util::public_key_ser;
 #[cfg(test)]
 use crate::TestConstants;
-use crate::{error_message, signature_data, util, HashClear, KeyPair};
+use crate::{error_message, signature_data, util, HashClear, KeyPair, structs, SafeBytesAccess, SafeOption};
 use bitcoin::secp256k1::{PublicKey, SecretKey};
 
 impl HashClear for Proof {
@@ -24,7 +24,7 @@ impl Proof {
                 RGError::MissingField,
                 "public_key bytes data",
             ))?
-            .bytes_value
+            .value
             .clone())
     }
 
@@ -37,13 +37,19 @@ impl Proof {
             .bytes
             .as_ref()
             .ok_or(error_message(RGError::MissingField, "signature bytes data"))?
-            .bytes_value
+            .value
             .clone())
     }
 
     pub fn verify(&self, hash: &Vec<u8>) -> Result<(), ErrorInfo> {
         // TODO: Flatten missing options
         return util::verify(hash, &self.signature_bytes()?, &self.public_key_bytes()?);
+    }
+
+    pub fn verify_hash(&self, hash: &Hash) -> Result<(), ErrorInfo> {
+        let hash = hash.safe_bytes()?;
+        // TODO: Flatten missing options
+        return util::verify(&hash, &self.signature_bytes()?, &self.public_key_bytes()?);
     }
 
     pub fn new(hash: &Hash, secret: &SecretKey, public: &PublicKey) -> Proof {
@@ -91,6 +97,16 @@ impl Proof {
         }
         return Ok(());
     }
+
+    pub fn from(public_key: structs::PublicKey, signature: structs::Signature) -> Self {
+        Self {
+            signature: Some(signature),
+            public_key: Some(public_key),
+        }
+    }
+    // pub fn public_key(&self) -> Result<structs::PublicKey, ErrorInfo> {
+    //     self.public_key.safe_get()
+    // }
 }
 
 #[test]

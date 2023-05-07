@@ -1,4 +1,16 @@
 
+
+## Secrets
+
+The required dependencies for ci.yml are: 
+
+`DOCKER_TOKEN` corresponding to dockerhub API key for publishing docker images
+
+`AWS_ACCESS` AWS access key for publishing to S3
+
+`AWS_SECRET` AWS secret key for publishing to S3
+
+
 GUI library fixes for building on linux found here: 
 https://www.reddit.com/r/i3wm/comments/aqq0i0/no_package_xcbshape_found_when_trying_to_install/
 

@@ -1,4 +1,4 @@
-use crate::structs::{Address, AddressType, Error, ErrorInfo};
+use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, UtxoEntry};
 use crate::{bytes_data, SafeBytesAccess};
 use crate::{error_message, structs};
 use bitcoin::secp256k1::{PublicKey};
@@ -12,7 +12,7 @@ impl Into<Address> for structs::PublicKey {
         Address {
             address: self.bytes.map(|b| {
                 let mut b2 = b.clone();
-                b2.bytes_value = address_function_buf(&b.bytes_value);
+                b2.value = address_function_buf(&b.value);
                 b2
             }),
             address_type: Some(AddressType::StandardKeyhash as i32),
@@ -115,4 +115,25 @@ pub fn address_data(address: Vec<u8>) -> Option<Address> {
         address: bytes_data(address),
         address_type: Some(AddressType::StandardKeyhash as i32),
     })
+}
+
+
+impl AddressInfo {
+    pub fn from_utxo_entries(address: Address, entries: Vec<UtxoEntry>) -> Self {
+        let mut bal: i64 = 0;
+        for r in &entries {
+            if let Some(o) = &r.output {
+                if let Some(d) = &o.data {
+                    if let Some(a) = d.amount {
+                        bal += a;
+                    }
+                }
+            }
+        }
+        AddressInfo {
+            address: Some(address.clone()),
+            utxo_entries: entries,
+            balance: bal
+        }
+    }
 }

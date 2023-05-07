@@ -32,6 +32,7 @@ pub fn register_metric_names() {
     register_counter!("redgold.observation.metadata.added");
     register_counter!("redgold.transaction.accepted");
     register_counter!("redgold.transaction.received");
+    register_counter!("redgold.multiparty.received");
     register_gauge!("redgold.transaction.total");
     register_counter!("redgold.datastore.utxo.insert");
     register_counter!("redgold.api.control.num_requests");
@@ -128,11 +129,11 @@ pub fn init_print_logger() {
     let recorder = PrintRecorder::default();
     metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
 }
-pub fn init_prometheus() {
+pub fn init_prometheus(port_offset: u16) {
     let builder = PrometheusBuilder::new();
     use std::net::{Ipv4Addr, SocketAddrV4};
-    let socket = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 16179);
-    let socket_fallback = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 16178);
+    let socket = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port_offset - 1);
+    let socket_fallback = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port_offset - 2);
     // Normally, most users will want to "install" the exporter which sets it as the
     // global recorder for all `metrics` calls, and installs either an HTTP listener
     // when running as a scrape endpoint, or a simple asynchronous task which pushes
@@ -163,11 +164,11 @@ enum MetricType {
     Histogram,
 }
 
-pub fn register_metrics() {
+pub fn register_metrics(port_offset: u16) {
     if std::env::var("REDGOLD_LOCAL_DEBUG").is_ok() {
         init_print_logger();
     } else {
-        init_prometheus();
+        init_prometheus(port_offset);
     }
     register_metric_names();
 }
