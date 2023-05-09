@@ -409,7 +409,8 @@ pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
 pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
-    let stack = slice_vec_eager(stacktrace_abridged, 13, 30).join("\n").to_string();
+    // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
+    let stack = slice_vec_eager(stacktrace_abridged, 14, 30).join("\n").to_string();
     ErrorInfo {
         code: error_code as i32,
         // TODO: From error code map

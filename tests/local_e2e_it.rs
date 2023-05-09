@@ -30,7 +30,7 @@ fn local_e2e_it() {
     let res = tx_sub.submit();
     assert!(res.accepted());
 
-    let cc = ControlClient::local(port_offset + 2)
+    let cc = ControlClient::local(port_offset + 2);
 
     //
     // // TODO: Change the runtime structure to implement the shutdowns directly inside, then pass

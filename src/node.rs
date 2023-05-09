@@ -12,7 +12,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{error_info, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, error_info, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
@@ -670,7 +670,7 @@ fn e2e() {
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
     let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), spend_utxos);
-    //
+
     let _result = submit.submit();
     assert!(_result.accepted());
 
@@ -732,14 +732,16 @@ fn e2e() {
     Do we need some kind of sleep in here before the other peers start? very confusing.
      */
     assert!(res.is_ok());
-    //
-    // let party = res.expect("ok");
-    // let signing_data = Hash::from_string("hey");
-    // let vec = signing_data.bytes.expect("b");
-    // let res = runtime.block_on(
-    //     client1.multiparty_signing(None, party.initial_request, vec));
-    // println!("{:?}", res);
-    // assert!(res.is_ok());
+
+    let party = res.expect("ok");
+    let signing_data = Hash::from_string("hey");
+    let vec1 = signing_data.ecdsa_short_signing_bytes();
+    let vec = bytes_data(vec1.clone()).expect("");
+    let res = runtime.block_on(
+        client1.multiparty_signing(None, party.initial_request, vec));
+    println!("{:?}", res);
+    assert!(res.is_ok());
+    res.expect("ok").proof.expect("prof").verify(&vec1).expect("verified");
 
 
     // // Connect first peer.

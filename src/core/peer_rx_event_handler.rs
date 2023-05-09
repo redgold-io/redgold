@@ -163,6 +163,7 @@ impl PeerRxEventHandler {
                 // oh wait can we remove this spawn entirely?
                 info!("Received MP request on peer rx: {}", json_or(&k));
                 let rel2 = relay.clone();
+                // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
                 arc.spawn(async move {
                     let result1 = initiate_mp_keygen_follower(
                         rel2.clone(), k).await;
@@ -174,8 +175,13 @@ impl PeerRxEventHandler {
             }
             if let Some(k) = r.initiate_signing {
                 let rel2 = relay.clone();
+                info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
+                // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
                 arc.spawn(async move {
-                    initiate_mp_keysign_follower(rel2.clone(), k).await;
+                    let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
+                    let mp_response: String = result1.clone()
+                        .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+                    info!("Multiparty signing response from follower: {}", mp_response);
                 });
             }
 
