@@ -3,14 +3,15 @@ use std::time::Duration;
 use async_std::prelude::FutureExt;
 use log::info;
 
-use redgold_schema::{error_info, ErrorInfoContext, json_pretty, SafeBytesAccess, SafeOption};
-use redgold_schema::structs::{ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyThresholdRequest, Request, Response};
+use redgold_schema::{error_info, ErrorInfoContext, json_pretty, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::structs::{ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, MultipartyThresholdRequest, Request, Response};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{MultipartyRequestResponse, Relay};
 use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
 use ssh2::init;
 use tokio::runtime::Runtime;
+use uuid::Uuid;
 use crate::multiparty::{gg20_keygen, gg20_signing};
 
 #[test]
@@ -137,12 +138,73 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
     ).await.map_err(|_| error_info("Timeout"))??;
 
     let local_share = None;
+    info!("Storing local share on follower for room: {}", room_id.clone());
     relay.ds.multiparty_store.add_keygen(res, room_id.clone(), mp_req.clone()).await?;
+    let query_check = relay.ds.multiparty_store.local_share_and_initiate(room_id.clone()).await?;
+    query_check.safe_get_msg("Unable to query local store for room_id on keygen")?;
+    info!("Local share confirmed on follower ");
+    // relay.ds.multiparty_store.add_keygen(res, room_id.clone(), mp_req.clone()).await?;
     Ok(InitiateMultipartyKeygenResponse{ local_share, initial_request: None })
 }
 
 
-pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigningRequest)
+pub async fn find_multiparty_key_pairs(relay: Relay) -> Result<Vec<structs::PublicKey>, ErrorInfo> {
+
+    let peers = relay.ds.peer_store.all_peers().await?;
+    // TODO: Safer, query all pk
+    let pk =
+        peers.iter().map(|p| p.node_metadata.get(0).clone().unwrap().public_key.clone().unwrap())
+            .collect_vec();
+
+    info!("Mulitparty found {} possible peers", pk.len());
+    let results = relay.broadcast(
+        pk, Request::empty().about(), Some(Duration::from_secs(20))).await;
+    let valid_pks = results.iter()
+        .filter_map(|(pk, r)| if r.is_ok() { Some(pk.clone()) } else { None })
+        .collect_vec();
+    info!("Mulitparty found {} valid_pks peers", valid_pks.len());
+    if valid_pks.len() == 0 {
+        return Err(ErrorInfo::error_info("No valid peers found"));
+    }
+    let mut keys = vec![relay.node_config.public_key()];
+    keys.extend(valid_pks.clone());
+    Ok(keys)
+}
+
+
+pub fn fill_identifier(keys: Vec<structs::PublicKey>, identifier: Option<MultipartyIdentifier>) -> Option<MultipartyIdentifier> {
+    let num_parties = keys.len() as i64;
+    if let Some(ident) = identifier {
+        let mut identifier = ident;
+        identifier.uuid = Uuid::new_v4().to_string();
+        identifier.party_keys = if identifier.party_keys.is_empty() {
+            keys.clone()
+        } else {
+            identifier.party_keys
+        };
+        Some(identifier)
+    } else {
+        let mut threshold: i64 = (num_parties / 2) as i64;
+        if threshold < 1 {
+            threshold = 1;
+        }
+        if threshold > (num_parties - 1) {
+            threshold = num_parties - 1;
+        }
+        Some(
+            MultipartyIdentifier {
+                party_keys: keys.clone(),
+                threshold,
+                uuid: Uuid::new_v4().to_string(),
+                num_parties
+            }
+        )
+    }
+}
+
+
+
+pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigningRequest, rt: Arc<Runtime>)
     -> Result<InitiateMultipartySigningResponse, ErrorInfo> {
 
     let init_keygen_req = mp_req.keygen_room.safe_get()?.clone();
@@ -161,22 +223,39 @@ pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigning
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
 
+
+    let option = mp_req.data_to_sign.clone().safe_bytes()?;
+
+    let rid = room_id.clone();
+    let jh = rt.spawn(async move { tokio::time::timeout(
+        timeout,
+        gg20_signing::signing(
+            address, port, rid, local_share, index, option),
+    ).await.map_err(|e| error_info("Timeout"))});
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
     let self_key = relay.node_config.public_key();
     let mut successful = 0;
     for (i, peer) in ident.party_keys.iter().enumerate() {
         if peer == &self_key {
             continue;
         }
-        let mut req = Request::empty();
-        let mut mpt = MultipartyThresholdRequest::empty();
         let mut mp_req_external = mp_req.clone();
         mp_req_external.host_address = Some(relay.node_config.external_ip.clone());
         mp_req_external.port = Some(relay.node_config.mparty_port() as u32);
 
+
+        let mut req = Request::empty();
+        let mut mpt = MultipartyThresholdRequest::empty();
         mpt.initiate_signing = Some(mp_req_external);
+        req.multiparty_threshold_request = Some(mpt);
         // TODO: Distinguish here between separate server and localhost
+        let reqser = req.clone();
+        info!("Sending initiate keysign request to peer {:?}", crate::schema::json_or(&reqser));
 
         let result = relay.send_message_sync(req, peer.clone(), None).await;
+        info!("Sent initiate keysign request to peer {:?}", result.clone());
         let res = result
             .and_then(|r| r.as_error_info());
         match res {
@@ -191,15 +270,11 @@ pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigning
         }
     }
     if successful < ident.threshold {
+        jh.abort();
         return Err(error_info("Not enough successful peers"));
     }
 
-    let option = mp_req.data_to_sign.clone().safe_bytes()?;
-    let res = tokio::time::timeout(
-        timeout,
-        gg20_signing::signing(
-            address, port, room_id.clone(), local_share, index, option),
-    ).await.map_err(|e| error_info("Timeout"))??;
+    let res = jh.await.error_info("join handle error")???;
 
     if mp_req.store_proof.unwrap_or(true) {
         relay.ds.multiparty_store.add_signing_proof(
@@ -230,10 +305,11 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
     //TODO: This should be returned as immediate failure on the response level instead of going
     // thru process, maybe done as part of health check?
     let (local_share, initiate_keygen) = relay.ds.multiparty_store
-        .local_share_and_initiate(room_id.clone()).await?
+        .local_share_and_initiate(init_keygen_req_room_id.clone()).await?
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
 
+    log::info!("Initiating follower keysign for room {} with parties {:?}", room_id.clone(), index.clone());
     let option = mp_req.data_to_sign.clone().safe_get()?.clone().value;
     let res = tokio::time::timeout(
         timeout,

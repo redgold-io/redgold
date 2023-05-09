@@ -29,4 +29,8 @@ impl Hash {
         Self::calc_bytes(vec)
     }
 
+    pub fn ecdsa_short_signing_bytes(&self) -> Vec<u8> {
+        self.vec()[0..32].to_vec()
+    }
+
 }

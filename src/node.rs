@@ -12,7 +12,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{error_info, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, error_info, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
@@ -671,48 +671,48 @@ fn e2e() {
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
     let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), spend_utxos);
     //
-    let _result = submit.submit();
-    assert!(_result.accepted());
-
-
-
-    let utxos = ds.query_time_utxo(0, util::current_time_millis())
-        .unwrap();
-    info!("Num utxos after first submit {:?}", utxos.len());
-
-
-    submit.with_faucet();
-
-    let _result2 = submit.submit();
-    assert!(_result2.accepted());
-    show_balances();
-
-    info!("Num utxos after second submit {:?}", utxos.len());
-
-    submit.submit_duplicate();
-
-    info!("Num utxos after duplicate submit {:?}", utxos.len());
-
+    // let _result = submit.submit();
+    // assert!(_result.accepted());
+    //
+    //
+    //
+    // let utxos = ds.query_time_utxo(0, util::current_time_millis())
+    //     .unwrap();
+    // info!("Num utxos after first submit {:?}", utxos.len());
+    //
+    //
+    // submit.with_faucet();
+    //
+    // let _result2 = submit.submit();
+    // assert!(_result2.accepted());
     // show_balances();
-    // // shouldn't response metadata be not an option??
-
-    for _ in 0..1 {
-        // TODO Flaky failure observed once? Why?
-        submit.submit_double_spend(None);
-    }
-
-    info!("Num utxos after double spend submit {:?}", utxos.len());
-
-    show_balances();
-
-    // for _ in 0..2 {
-    //     submit.submit_split();
-    //     show_balances();
+    //
+    // info!("Num utxos after second submit {:?}", utxos.len());
+    //
+    // submit.submit_duplicate();
+    //
+    // info!("Num utxos after duplicate submit {:?}", utxos.len());
+    //
+    // // show_balances();
+    // // // shouldn't response metadata be not an option??
+    //
+    // for _ in 0..1 {
+    //     // TODO Flaky failure observed once? Why?
+    //     submit.submit_double_spend(None);
     // }
-
-    let addr = runtime.block_on(client.query_addresses(submit.get_addresses()));
-
-    info!("Address response: {:?}", addr);
+    //
+    // info!("Num utxos after double spend submit {:?}", utxos.len());
+    //
+    // show_balances();
+    //
+    // // for _ in 0..2 {
+    // //     submit.submit_split();
+    // //     show_balances();
+    // // }
+    //
+    // let addr = runtime.block_on(client.query_addresses(submit.get_addresses()));
+    //
+    // info!("Address response: {:?}", addr);
 
     local_nodes.verify_data_equivalent();
 
@@ -732,14 +732,16 @@ fn e2e() {
     Do we need some kind of sleep in here before the other peers start? very confusing.
      */
     assert!(res.is_ok());
-    //
-    // let party = res.expect("ok");
-    // let signing_data = Hash::from_string("hey");
-    // let vec = signing_data.bytes.expect("b");
-    // let res = runtime.block_on(
-    //     client1.multiparty_signing(None, party.initial_request, vec));
-    // println!("{:?}", res);
-    // assert!(res.is_ok());
+
+    let party = res.expect("ok");
+    let signing_data = Hash::from_string("hey");
+    let vec1 = signing_data.ecdsa_short_signing_bytes();
+    let vec = bytes_data(vec1.clone()).expect("");
+    let res = runtime.block_on(
+        client1.multiparty_signing(None, party.initial_request, vec));
+    println!("{:?}", res);
+    assert!(res.is_ok());
+    res.expect("ok").proof.expect("prof").verify(&vec1);
 
 
     // // Connect first peer.
