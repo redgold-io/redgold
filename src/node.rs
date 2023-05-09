@@ -670,49 +670,49 @@ fn e2e() {
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
     let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), spend_utxos);
-    //
-    // let _result = submit.submit();
-    // assert!(_result.accepted());
-    //
-    //
-    //
-    // let utxos = ds.query_time_utxo(0, util::current_time_millis())
-    //     .unwrap();
-    // info!("Num utxos after first submit {:?}", utxos.len());
-    //
-    //
-    // submit.with_faucet();
-    //
-    // let _result2 = submit.submit();
-    // assert!(_result2.accepted());
+
+    let _result = submit.submit();
+    assert!(_result.accepted());
+
+
+
+    let utxos = ds.query_time_utxo(0, util::current_time_millis())
+        .unwrap();
+    info!("Num utxos after first submit {:?}", utxos.len());
+
+
+    submit.with_faucet();
+
+    let _result2 = submit.submit();
+    assert!(_result2.accepted());
+    show_balances();
+
+    info!("Num utxos after second submit {:?}", utxos.len());
+
+    submit.submit_duplicate();
+
+    info!("Num utxos after duplicate submit {:?}", utxos.len());
+
     // show_balances();
-    //
-    // info!("Num utxos after second submit {:?}", utxos.len());
-    //
-    // submit.submit_duplicate();
-    //
-    // info!("Num utxos after duplicate submit {:?}", utxos.len());
-    //
-    // // show_balances();
-    // // // shouldn't response metadata be not an option??
-    //
-    // for _ in 0..1 {
-    //     // TODO Flaky failure observed once? Why?
-    //     submit.submit_double_spend(None);
+    // // shouldn't response metadata be not an option??
+
+    for _ in 0..1 {
+        // TODO Flaky failure observed once? Why?
+        submit.submit_double_spend(None);
+    }
+
+    info!("Num utxos after double spend submit {:?}", utxos.len());
+
+    show_balances();
+
+    // for _ in 0..2 {
+    //     submit.submit_split();
+    //     show_balances();
     // }
-    //
-    // info!("Num utxos after double spend submit {:?}", utxos.len());
-    //
-    // show_balances();
-    //
-    // // for _ in 0..2 {
-    // //     submit.submit_split();
-    // //     show_balances();
-    // // }
-    //
-    // let addr = runtime.block_on(client.query_addresses(submit.get_addresses()));
-    //
-    // info!("Address response: {:?}", addr);
+
+    let addr = runtime.block_on(client.query_addresses(submit.get_addresses()));
+
+    info!("Address response: {:?}", addr);
 
     local_nodes.verify_data_equivalent();
 
@@ -741,7 +741,7 @@ fn e2e() {
         client1.multiparty_signing(None, party.initial_request, vec));
     println!("{:?}", res);
     assert!(res.is_ok());
-    res.expect("ok").proof.expect("prof").verify(&vec1);
+    res.expect("ok").proof.expect("prof").verify(&vec1).expect("verified");
 
 
     // // Connect first peer.
