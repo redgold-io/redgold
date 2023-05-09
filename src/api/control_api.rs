@@ -20,7 +20,7 @@ use crate::api::rosetta::models::Error;
 use crate::util::to_libp2p_peer_id;
 
 use crate::core::relay::Relay;
-use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keysign};
+use crate::multiparty::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
 use crate::schema::structs::{
     AddPeerFullRequest, ControlRequest, ControlResponse, ResponseMetadata,
 };
@@ -91,60 +91,6 @@ pub struct ControlServer {
 
 impl ControlServer {
 
-    async fn find_multiparty_key_pairs(relay: Relay) -> Result<Vec<structs::PublicKey>, ErrorInfo> {
-
-        let peers = relay.ds.peer_store.all_peers().await?;
-        // TODO: Safer, query all pk
-        let pk =
-            peers.iter().map(|p| p.node_metadata.get(0).clone().unwrap().public_key.clone().unwrap())
-                .collect_vec();
-
-        info!("Mulitparty found {} possible peers", pk.len());
-        let results = relay.broadcast(
-            pk, Request::empty().about(), Some(Duration::from_secs(20))).await;
-        let valid_pks = results.iter()
-            .filter_map(|(pk, r)| if r.is_ok() { Some(pk.clone()) } else { None })
-            .collect_vec();
-        info!("Mulitparty found {} valid_pks peers", valid_pks.len());
-        if valid_pks.len() == 0 {
-            return Err(ErrorInfo::error_info("No valid peers found"));
-        }
-        let mut keys = vec![relay.node_config.public_key()];
-        keys.extend(valid_pks.clone());
-        Ok(keys)
-    }
-
-
-    fn fill_identifier(keys: Vec<structs::PublicKey>, identifier: Option<MultipartyIdentifier>) -> Option<MultipartyIdentifier> {
-        let num_parties = keys.len() as i64;
-        if let Some(ident) = identifier {
-            let mut identifier = ident;
-            identifier.uuid = Uuid::new_v4().to_string();
-            identifier.party_keys = if identifier.party_keys.is_empty() {
-                keys.clone()
-            } else {
-                identifier.party_keys
-            };
-            Some(identifier)
-        } else {
-            let mut threshold: i64 = (num_parties / 2) as i64;
-            if threshold < 1 {
-                threshold = 1;
-            }
-            if threshold > (num_parties - 1) {
-                threshold = num_parties - 1;
-            }
-            Some(
-                MultipartyIdentifier {
-                    party_keys: keys.clone(),
-                    threshold,
-                    uuid: Uuid::new_v4().to_string(),
-                    num_parties
-                }
-            )
-        }
-    }
-
     async fn request_response(request: ControlRequest, relay: Relay, rt: Arc<Runtime>)-> Result<ControlResponse, ErrorInfo> {
         metrics::increment_counter!("redgold.api.control.num_requests");
         info!("Control request received");
@@ -154,7 +100,7 @@ impl ControlServer {
         // TODO: Shouldn't both of these really be in the initiate function?
         if let Some(mps) = request.initiate_multiparty_keygen_request {
 
-            let keys = Self::find_multiparty_key_pairs(relay.clone()).await?;
+            let keys = find_multiparty_key_pairs(relay.clone()).await?;
             let num_parties = keys.len() as i64;
 
             let mut req = mps.clone();
@@ -165,15 +111,15 @@ impl ControlServer {
             req.store_local_share = Some(true);
             req.return_local_share = Some(true);
             req.host_key = Some(relay.node_config.public_key().clone());
-            req.identifier = Self::fill_identifier(keys, req.identifier);
+            req.identifier = fill_identifier(keys, req.identifier);
             // let d = mps.clone();
             info!("Initiate multiparty request: {}", json_or(&req));
             let result = initiate_mp_keygen(relay.clone(), req, rt.clone()).await?;
             response.initiate_multiparty_keygen_response = Some(result);
         } else if let Some(mut req) = request.initiate_multiparty_signing_request {
             let keygen = req.keygen_room.safe_get()?;
-            let keys = Self::find_multiparty_key_pairs(relay.clone()).await?;
-            req.identifier = Self::fill_identifier(keys, req.identifier);
+            let keys = find_multiparty_key_pairs(relay.clone()).await?;
+            req.identifier = fill_identifier(keys, req.identifier);
             // TODO: Remove these from schema, enforce node knowing about this
             req.port = Some(relay.node_config.mparty_port().clone() as u32);
             req.host_address = Some(relay.node_config.external_ip.clone()); // Some("127.0.0.1".to_string());
@@ -192,7 +138,7 @@ impl ControlServer {
             }
             req.party_indexes = parties;
 
-            let result = initiate_mp_keysign(relay.clone(), req).await?;
+            let result = initiate_mp_keysign(relay.clone(), req, rt.clone()).await?;
             response.initiate_multiparty_signing_response = Some(result);
         }
         // if add_peer_full_request.is_some() {

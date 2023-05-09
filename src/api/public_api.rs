@@ -527,12 +527,13 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and(warp::body::bytes())
         .and(warp::addr::remote())
         .and_then(move |reqb: Bytes, address: Option<SocketAddr>| {
+            // TODO: verify auth and receive message sync from above
             let relay3 = bin_relay2.clone();
             let vec_b = reqb.to_vec();
             let req = async { Request::deserialize(vec_b).map_err(|e|
                 ErrorInfo::error_info(format!("Request decode error {}", e)))};
             async move {
-                // info!{"Warp request from {:?}", address};
+                info!{"Warp request from {:?}", address};
                 let res: Result<Response<Vec<u8>>, warp::reject::Rejection> = {
                     Ok({
                         let c = new_channel::<RResponse>();
