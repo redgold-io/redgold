@@ -21,12 +21,12 @@ use crate::util::mnemonic_builder;
 
 // use libp2p::identity::{secp256k1, Keypair};
 
-pub const REDGOLD_SLIP_IDX: u32 = 9000;
+// pub const REDGOLD_SLIP_IDX: u32 = 16180;
 pub const STANDARD_TEST_PHRASE: &str = "somelongpasswordwithhighentropygoeshere";
 // pub const PEER_ID_ACCOUNT: u32 = 1;
 
 fn default_cursor() -> StandardHDPath {
-    let cursor = StandardHDPath::new(Purpose::Pubkey, REDGOLD_SLIP_IDX, 0, 0, 0);
+    let cursor = StandardHDPath::new(Purpose::Witness, REDGOLD_KEY_DERIVATION_PATH as u32, 0, 0, 0);
     return cursor;
 }
 
@@ -158,7 +158,7 @@ impl Wallet {
 
     pub fn next_key(&mut self) -> (SecretKey, PublicKey) {
         self.cursor = StandardHDPath::new(
-            Purpose::Pubkey,
+            Purpose::Witness,
             self.cursor.coin_type(),
             self.cursor.account(),
             self.cursor.change(),

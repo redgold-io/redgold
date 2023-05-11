@@ -12,22 +12,7 @@ pub async fn hash_query(relay: Relay, hash_input: String) -> Result<HashSearchRe
     };
     if let Ok(a) = Address::parse(hash_input.clone()) {
         let res = DataStore::map_err_sqlx(relay.ds.query_utxo_address(vec![a.clone()]).await)?;
-        let mut bal = 0;
-        for r in &res {
-            if let Some(o) = &r.output {
-                if let Some(d) = &o.data {
-                    if let Some(a) = d.amount {
-                        bal += a;
-                    }
-                }
-            }
-        }
-        response.address_info = Some(AddressInfo {
-            address: Some(a.clone()),
-            utxo_entries: res,
-            balance: bal
-        });
-
+        response.address_info = Some(AddressInfo::from_utxo_entries(a, res));
         return Ok(response);
     } else {
         let h = from_hex(hash_input)?;
