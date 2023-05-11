@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
@@ -6,13 +7,14 @@ use serde_json::error::Category::Data;
 use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{json, json_from, json_pretty, SafeOption, util};
+use redgold_schema::{json, json_from, json_pretty, KeyPair, SafeOption, util};
 use redgold_schema::servers::Server;
+use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
 use crate::util::cli::arg_parse_config::get_default_data_directory;
-use crate::util::cli::args::{AddServer, Deploy, FaucetCli, GenerateMnemonic, QueryCli, WalletAddress, WalletSend};
+use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -77,7 +79,7 @@ pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfi
     let wallet = node_config.wallet();
     let address = if let Some(path) = generate_address.path {
         wallet.keypair_from_path_str(path).address_typed()
-    } else if let Some(index) = generate_address.address {
+    } else if let Some(index) = generate_address.index {
         wallet.key_at(index as usize).address_typed()
     } else {
         node_config.wallet().active_keypair().address_typed()
@@ -85,17 +87,37 @@ pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfi
     println!("{}", address.render_string().expect("address render failure"));
 }
 
+
+
+
 pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let destination = Address::parse(p0.to.clone())?;
-    let kp = p1.wallet().active_keypair();
+    let mut query_addresses = vec![];
+    let mut hm: HashMap<Vec<u8>, KeyPair> = HashMap::new();
+    // for x in p0.from {
+    //     let address = Address::parse(x)?;
+    //     query_addresses.push(address);
+    // }
+    use redgold_schema::SafeBytesAccess;
+
+    for i in 0..10 {
+        let kp = p1.wallet().key_at(i as usize);
+        let x1 = kp.address_typed();
+        let x: Vec<u8> = x1.address.safe_bytes()?;
+        query_addresses.push(x1);
+        hm.insert(x, kp.clone());
+    }
+
     let client = p1.lb_client();
-    let result = client.query_address(vec![kp.address_typed()]).await?.as_error()?;
+    let result = client.query_address(query_addresses).await?.as_error()?;
     let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response")?
         .utxo_entries.clone();
     // TODO ^ Balance check here
     if utxos.len() == 0 {
         return Err(ErrorInfo::error_info("No UTXOs found for this address"));
     }
+    let option = hm.get(&utxos.get(0).safe_get_msg("first")?.address);
+    let kp = option.safe_get_msg("keypair")?.clone().clone();
 
     let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new()
@@ -119,9 +141,17 @@ pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
     Ok(())
 }
 
+pub async fn balance_lookup(request: &BalanceCli, nc: &NodeConfig) -> Result<(), ErrorInfo> {
+    let response = nc.lb_client().query_hash(request.address.clone()).await?;
+    let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
+    println!("{}", rounded.to_string());
+    Ok(())
+}
+
 
 pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let response = p1.lb_client().query_hash(p0.hash.clone()).await?;
+    println!("{}", json_pretty(&response)?);
     Ok(())
 }
 

@@ -92,7 +92,8 @@ pub enum RgTopLevelSubcommand {
     Send(WalletSend),
     Address(WalletAddress),
     Query(QueryCli),
-    Faucet(FaucetCli)
+    Faucet(FaucetCli),
+    Balance(BalanceCli)
 }
 
 
@@ -168,6 +169,9 @@ pub struct WalletSend {
     pub to: String,
     #[clap(short, long)]
     pub amount: f64,
+    #[clap(short, long)]
+    pub from: Option<String>,
+
 }
 
 /// Generate an address from an existing wallet or key store
@@ -175,7 +179,7 @@ pub struct WalletSend {
 pub struct WalletAddress {
     /// Choose a particular offset for the key from the mnemonic (last field in path)
     #[clap(short, long)]
-    pub address: Option<i64>,
+    pub index: Option<i64>,
     /// BIP-44 path for the key, e.g. m/44'/60'/0'/0/0
     #[clap(short, long)]
     pub path: Option<String>,
@@ -184,7 +188,7 @@ pub struct WalletAddress {
 /// Query the network for information on a particular hash
 #[derive(Args, Debug, Clone)]
 pub struct QueryCli {
-    #[clap(short, long)]
+    #[clap(long)]
     pub hash: String,
 }
 
@@ -197,6 +201,14 @@ pub struct FaucetCli {
     /// Amount of funds to request -- default 5.0
     #[clap(short, long)]
     pub amount: Option<f64>,
+}
+
+/// Check the balance of an address
+#[derive(Args, Debug, Clone)]
+pub struct BalanceCli {
+    /// Address to check balance of
+    #[clap(short, long)]
+    pub address: String
 }
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)

@@ -99,7 +99,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         let mut builder = TransactionBuilder::new();
         builder
             .with_input(utxo.utxo_entry, utxo.key_pair)
-            .with_output(&addr, TransactionAmount::from_fractional(1 as f64)?)
+            .with_output(&addr, TransactionAmount::from_fractional(5 as f64)?)
             .with_remainder();
         let transaction = builder.transaction.clone();
         // let transaction = generator.generate_simple_tx().clone();

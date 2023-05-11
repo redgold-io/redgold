@@ -1,7 +1,7 @@
 
 use multihash::Code;
 
-pub const REDGOLD_KEY_DERIVATION_PATH: i64 = 1_854_715_124;
+pub const REDGOLD_KEY_DERIVATION_PATH: i64 = 16180;
 pub const DECIMAL_MULTIPLIER: i64 = 1e8 as i64;
 pub const DECIMALS: i64 = 8;
 pub const MAX_COIN_SUPPLY: i64 = 1e8 as i64;

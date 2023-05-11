@@ -24,8 +24,17 @@ sleep 7
 cargo test local_e2e_it -- --nocapture
 export TEST_EXIT_CODE=$?
 
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # https://stackoverflow.com/a/246128/1826109
+echo "Script dir: $script_dir"
+
+"$script_dir/cli_test.sh" $REDGOLD_BINARY_PATH local
+second_test_exit_status=$?
+
+# Combine the exit statuses and exit the script with the combined status
+final_exit_status=$((TEST_EXIT_CODE || second_test_exit_status))
+
 kill -KILL $NODE_1_PID
 kill -KILL $NODE_2_PID
 kill -KILL $NODE_3_PID
 
-exit $TEST_EXIT_CODE
+exit $final_exit_status
