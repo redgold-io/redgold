@@ -388,6 +388,7 @@ message ObservationEdge {
     uint64 time = 6;
 }
 
+// TODO: Update types here
 // Derived data structure, not a primary chain data structure
 message UtxoEntry {
   bytes transaction_hash = 1;

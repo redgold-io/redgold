@@ -64,6 +64,7 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
 
     if node_config.network == NetworkEnvironment::Local || node_config.network == NetworkEnvironment::Debug {
         node_config.disable_auto_update = true;
+        node_config.load_balancer_url = "127.0.0.1".to_string();
     }
 
     let ds_path_opt: Option<String> = opts.data_store_path;
@@ -104,6 +105,14 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
         let offset = ((dbg_id * 1000) as u16);
         node_config.port_offset = node_config.network.default_port_offset() + offset;
     }
+
+    std::env::var("REDGOLD_WORDS").map(|words| {
+        node_config.mnemonic_words = words;
+    }).ok();
+
+    opts.words.map(|words| {
+        node_config.mnemonic_words = words;
+    });
 
     node_config.data_store_path = data_store_file_path;
     node_config
@@ -498,14 +507,17 @@ pub fn immediate_commands(opts: &RgArgs, config: &NodeConfig, simple_runtime: Ar
                     res
                 }
                 RgTopLevelSubcommand::Query(a) => {
-                    commands::query(&a, &config);
-                    Ok(())
+                    simple_runtime.block_on(commands::query(&a, &config))
                 }
+                // Move all these block_on in an async match and block on this.
                 RgTopLevelSubcommand::Faucet(a) => {
                     simple_runtime.block_on(commands::faucet(&a, &config))
                 }
                 RgTopLevelSubcommand::AddServer(a) => {
                     simple_runtime.block_on(commands::add_server(a, &config))
+                }
+                RgTopLevelSubcommand::Balance(a) => {
+                    simple_runtime.block_on(commands::balance_lookup(a, &config))
                 }
 
                 _ => {

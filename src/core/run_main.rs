@@ -18,6 +18,8 @@ use crate::node::{Node, NodeRuntimes};
 
 
 pub fn main_from_args(opts: RgArgs) {
+    // std::env::args() and ArgTranslate
+    // ArgTranslate::new(opts).run();
 
     let mut node_config = NodeConfig::default();
 

@@ -11,7 +11,21 @@ pub fn amount_to_raw_amount(redgold: u64) -> u64 {
     return redgold * (DECIMAL_MULTIPLIER as u64);
 }
 
+trait BalanceConversion {
+    fn rounded_float(&self) -> f64;
+}
+
+impl BalanceConversion for i64 {
+    fn rounded_float(&self) -> f64 {
+        rounded_balance_i64(*self)
+    }
+}
+
 pub fn rounded_balance(redgold_amount: u64) -> f64 {
+    (redgold_amount as f64) / (DECIMAL_MULTIPLIER as f64)
+}
+
+pub fn rounded_balance_i64(redgold_amount: i64) -> f64 {
     (redgold_amount as f64) / (DECIMAL_MULTIPLIER as f64)
 }
 
