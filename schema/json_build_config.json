@@ -85,6 +85,7 @@
         "structs.InitiateMultipartySigningResponse",
         "structs.UdpMessage",
         "structs.DynamicNodeMetadata",
+        "structs.Seed",
         "structs.VersionInfo"
       ]
     },
