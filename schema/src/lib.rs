@@ -658,6 +658,15 @@ impl NetworkEnvironment {
         NetworkEnvironment::from_str(&*string2).error_info("error parsing network environment")
     }
 
+    pub fn status_networks() -> Vec<NetworkEnvironment> {
+        vec![
+            NetworkEnvironment::Main,
+            NetworkEnvironment::Test,
+            NetworkEnvironment::Dev,
+            NetworkEnvironment::Predev,
+        ]
+    }
+
     pub fn default_port_offset(&self) -> u16 {
         let port = match self {
             NetworkEnvironment::Main => {16180}

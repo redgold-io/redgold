@@ -14,6 +14,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use itertools::Itertools;
 use tokio::runtime::Runtime;
 use redgold_schema::structs::ErrorInfo;
 use crate::core::seeds::SeedNode;
@@ -127,21 +128,7 @@ pub fn load_node_config(
                 is_canary = true;
             }
             RgTopLevelSubcommand::GUI(_) => {
-                use crate::gui::image_load::Image;
-                let bytes = include_bytes!("../../resources/logo.jpg");
-                let image = Image::decode(bytes).unwrap();
-                let app = gui::ClientApp::from_logo(image);
-                let native_options = eframe::NativeOptions::default();
-                //
-                // icon_data: Some(
-                //     eframe::IconData::try_from_png_bytes(&include_bytes!("../../../media/icon.png")[..])
-                // .unwrap(),
-                // ),
 
-                eframe::run_native(Box::new(app), native_options);
-                // TODO: This is a hack to get the app to exit.
-                // Move this after logging initialized and metrics and data store but before node
-                return Err(node_config);
             }
             RgTopLevelSubcommand::Deploy(_) => {
                 // TODO: Get this from a master config database.
@@ -373,28 +360,43 @@ pub fn load_node_config(
         node_config.external_ip = ip;
     }
 
-    let mut at = ArgTranslate::new(runtime.clone(), &opts2, node_config);
+    // let mut at = ArgTranslate::new(runtime.clone(), &opts2, node_config);
 
     // at.parse_seed();
 
-    Ok(at.node_config)
+    Ok(node_config)
 
 }
 
-struct ArgTranslate {
+pub struct ArgTranslate {
     runtime: Arc<Runtime>,
-    opts: RgArgs,
+    pub opts: RgArgs,
     pub node_config: NodeConfig,
+    pub args: Vec<String>,
 }
 
 impl ArgTranslate {
 
-    pub fn new(runtime: Arc<Runtime>, opts: &RgArgs, mut node_config: NodeConfig) -> Self {
-        Self {
+    pub fn new(runtime: Arc<Runtime>, opts: &RgArgs, node_config: NodeConfig) -> Self {
+        let args = std::env::args().collect_vec();
+        ArgTranslate {
             runtime,
             opts: opts.clone(),
-            node_config
+            node_config,
+            args,
         }
+    }
+
+    pub fn is_gui(&self) -> bool {
+        if let Some(sc) = &self.opts.subcmd {
+            match sc {
+                RgTopLevelSubcommand::GUI(_) => {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
     // pub fn parse_seed(&mut self) {
@@ -478,6 +480,7 @@ fn load_ds_path() {
         .merge(config::Environment::with_prefix("REDGOLD"))
         .unwrap();
 */
+// Pre logger commands
 pub fn immediate_commands(opts: &RgArgs, config: &NodeConfig, simple_runtime: Arc<Runtime>) -> bool {
     let mut abort = false;
     let res: Result<(), ErrorInfo> = match &opts.subcmd {

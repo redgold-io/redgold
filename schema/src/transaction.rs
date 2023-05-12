@@ -363,7 +363,7 @@ impl StandardData {
             peer_data: None,
             node_metadata: None,
             dynamic_node_metadata: None,
-            ordinal: None,
+            height: None,
         }
     }
     pub fn peer_data(pd: PeerData) -> Option<Self> {
