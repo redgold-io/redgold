@@ -153,10 +153,14 @@ pub struct RemoveServer {
 pub struct Deploy {
     /// Purge stored data
     #[clap(short, long)]
-    purge: bool,
+    pub purge: bool,
     /// Go through the deployment wizard process with prompts for configuring all steps
     #[clap(short, long)]
-    pub(crate) wizard: bool,
+    pub wizard: bool,
+    /// Indicates this starts from genesis flow, only used for debugging
+    #[clap(short, long)]
+    pub genesis: bool,
+
 
 }
 

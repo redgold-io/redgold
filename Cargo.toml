@@ -55,10 +55,11 @@ default-args = "1.0.0"
 crossbeam-channel = "0.5.1"
 crossbeam = "0.8.1"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
-eframe = "0.14.0" # Gives us egui, epi and web+native backends
+eframe = "0.21.0" # Gives us egui, epi and web+native backends
+egui_extras = {version = "0.21.0", features = ["default", "image"]}
 strum = "0.21"
 strum_macros = "0.21"
-image = { version = "0.23", default-features = false, features = ["jpeg", "png"] }
+image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
 zxcvbn = '2.1.1'
 rand = '0.8.4'
 clap = { version = "3.1.17", features = ["derive"] }

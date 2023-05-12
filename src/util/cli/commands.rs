@@ -55,8 +55,8 @@ pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
 #[tokio::test]
 async fn status_debug() {
     let mut nc = NodeConfig::default();
-    nc.network = NetworkEnvironment::Predev;
-    status(&nc).await.ok();
+    nc.network = NetworkEnvironment::Dev;
+    status(&nc).await.expect("");
 
 }
 

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 pub struct Resources {
     host_manager_service_script: String,
     full_moon_csv: String,
-    logo_bytes: Vec<u8>,
+    pub logo_bytes: Vec<u8>,
     filebeat_docker_config: String,
     btc_rpc_auth_py: String,
     // Doesn't appear to be possible to generate automatically?
@@ -21,7 +21,7 @@ impl Default for Resources {
             )
             .to_string(),
             full_moon_csv: include_str!("full_moon.csv").into(),
-            logo_bytes: include_bytes!("logo.jpeg").to_vec(),
+            logo_bytes: include_bytes!("logo.jpg").to_vec(),
             filebeat_docker_config: include_str!("infra/filebeat.docker.yml").into(),
             btc_rpc_auth_py: include_str!("infra/rpcauth.py").into(),
             file_lookup: HashMap::new(),

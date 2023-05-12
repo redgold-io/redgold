@@ -1,17 +1,56 @@
 #![allow(dead_code)]
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+use crossbeam::atomic::AtomicCell;
 use eframe::egui::widgets::TextEdit;
-use eframe::egui::{Align, TextStyle};
-use eframe::{egui, epi};
+use eframe::egui::{Align, TextStyle, Ui};
+use eframe::{egui};
+use itertools::Itertools;
+use log::{error, info};
 
 use crate::util::sym_crypt;
 // 0.8
-use crate::gui::image_load::TexMngr;
+// use crate::gui::image_load::TexMngr;
 use crate::gui::ClientApp;
 use crate::util;
 use rand::Rng;
+use rocket::http::ext::IntoCollection;
 use redgold_schema::util::{dhash_vec, mnemonic_builder};
 
+#[derive(Copy, Clone)]
+pub struct NetworkStatusInfo{
+    network_index: usize,
+    network: NetworkEnvironment,
+    reachable: bool
+    // num_peers: usize,
+    // num_transactions: usize,
+    // genesis_hash_short: String,
+}
+
+// impl NetworkStatusInfo {
+//     pub fn default_vec() -> Vec<Self> {
+//         NetworkEnvironment::status_networks().iter().enumerate().map()
+//     }
+// }
+
+pub struct HomeState {
+    network_status_info: Arc<AtomicCell<Vec<NetworkStatusInfo>>>,
+    last_query_started_time: Option<i64>
+}
+
+impl HomeState {
+    pub fn from() -> Self {
+        Self {
+            network_status_info: Arc::new(AtomicCell::new(vec![])),
+            last_query_started_time: None,
+        }
+    }
+}
+
 pub struct LocalState {
+    active_tab: Tab,
     session_salt: [u8; 32],
     session_password_hashed: Option<[u8; 32]>,
     session_locked: bool,
@@ -32,13 +71,18 @@ pub struct LocalState {
     stored_private_key_hexes: Vec<String>,
     iv: [u8; 16],
     wallet_first_load_state: bool,
+    node_config: NodeConfig,
+    runtime: Arc<Runtime>,
+    home_state: HomeState,
+    current_time: i64
 }
 
 #[allow(dead_code)]
 impl LocalState {
-    pub(crate) fn default() -> LocalState {
+    pub fn from(node_config: NodeConfig, runtime: Arc<Runtime>) -> LocalState {
         let iv = sym_crypt::get_iv();
         return LocalState {
+            active_tab: Tab::Home,
             session_salt: random_bytes(),
             session_password_hashed: None,
             session_locked: false,
@@ -55,6 +99,10 @@ impl LocalState {
             stored_private_key_hexes: vec![],
             iv,
             wallet_first_load_state: true,
+            node_config,
+            runtime,
+            home_state: HomeState::from(),
+            current_time: util::current_time_millis_i64(),
         };
     }
 
@@ -91,7 +139,10 @@ fn random_bytes() -> [u8; 32] {
 }
 
 use strum::IntoEnumIterator; // 0.17.1
-use strum_macros::EnumIter; // 0.17.1
+use strum_macros::EnumIter;
+use tokio::runtime::Runtime;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use crate::node_config::NodeConfig; // 0.17.1
 
 
 
@@ -105,7 +156,7 @@ pub enum Tab {
     Settings,
 }
 
-fn update_lock_screen(app: &mut ClientApp, ctx: &egui::CtxRef, _frame: &mut epi::Frame<'_>) {
+fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
     let ClientApp { local_state, .. } = app;
     egui::CentralPanel::default().show(ctx, |ui| {
         let layout = egui::Layout::top_down(egui::Align::Center);
@@ -117,7 +168,7 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::CtxRef, _frame: &mut epi:
                 .password(true)
                 .lock_focus(true);
             ui.add(edit).request_focus();
-            if ctx.input().key_pressed(egui::Key::Enter) {
+            if ctx.input(|i| { i.key_pressed(egui::Key::Enter)}) {
                 if local_state.session_locked {
                     if local_state.session_password_hashed.unwrap() == local_state.hash_password() {
                         local_state.session_locked = false;
@@ -128,19 +179,132 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::CtxRef, _frame: &mut epi:
                     local_state.store_password();
                 }
                 local_state.password_entry = "".to_string();
-            }
-            ();
+                ()
+            };
             //ui.text_edit_singleline(texts);
         });
     });
 }
 
-pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+pub async fn query_network_status(
+    node_config: NodeConfig,
+    result: Arc<AtomicCell<Vec<NetworkStatusInfo>>>
+) -> Result<(), ErrorInfo> {
+
+    let mut results = vec![];
+    for (i, x) in NetworkEnvironment::status_networks().iter().enumerate() {
+        let mut config = node_config.clone();
+        config.network = x.clone();
+        let mut client = config.lb_client();
+        client.timeout = Duration::from_secs(5);
+        let res = client.about().await;
+
+        let reachable = match res {
+            Ok(a) => {
+                info!("Network status query success: {}", crate::schema::json_or(&a));
+                true
+            }
+            Err(e) => {
+                error!("Network status query failed: {}", crate::schema::json_or(&e));
+                false
+            }
+        };
+        let status = NetworkStatusInfo{
+            network_index: i,
+            network: x.clone(),
+            reachable,
+        };
+        results.push(status);
+    }
+    result.store(results.clone());
+    let map2 = result.take();
+    result.store(map2.clone());
+    // info!("Network status: {}", map2.to_string());
+    Ok(())
+}
+
+pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+    ui.heading("Network Status");
+    ui.separator();
+    let home_state = &mut local_state.home_state;
+    let nc2 = local_state.node_config.clone();
+    let arc = home_state.network_status_info.clone();
+    if home_state.last_query_started_time
+        .map(|q| (local_state.current_time - q) > 1000*25)
+        .unwrap_or(true) {
+        home_state.last_query_started_time = Some(local_state.current_time);
+        local_state.runtime.spawn(async move {
+            query_network_status(nc2, arc).await
+        });
+    }
+    let query_status_string = home_state.last_query_started_time.map(|q| {
+        format!("Queried: {:?} seconds ago", (local_state.current_time - q) / 1000)
+    }).unwrap_or("unknown error".to_string());
+    ui.label(query_status_string);
+    ui.separator();
+
+    use egui_extras::{Column, TableBuilder};
+
+    // let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
+    let text_height = 20.0;
+    let num_rows = NetworkEnvironment::status_networks().len();
+    let mut network_index = HashMap::new();
+    let row_network: Vec<String> = NetworkEnvironment::status_networks()
+        .iter().enumerate().map(|(index, x)| {
+        network_index.insert(index, x.clone());
+        x.to_std_string()
+    }).collect_vec();
+
+    let mut table = TableBuilder::new(ui)
+        .striped(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+        .column(Column::auto())
+        .column(Column::auto())
+        // .column(Column::initial(100.0).range(40.0..=300.0))
+        // .column(Column::initial(100.0).at_least(40.0).clip(true))
+        // .column(Column::remainder())
+        .min_scrolled_height(0.0);
+
+    // Well this is ridiculous
+    // can we change from atomic cell or use some copyable type?
+    let status_info = home_state.network_status_info.take();
+    home_state.network_status_info.store(status_info.clone());
+    // info!("Status home loop info: {:?}", status_info.to_string());
+    table
+        .header(20.0, |mut header| {
+            header.col(|ui| {
+                ui.strong("Network");
+            });
+            header.col(|ui| {
+                ui.strong("Status");
+            });
+        }).body(|mut body| {
+        body.rows(text_height, num_rows, |row_index, mut row| {
+            let info = status_info.get(row_index).clone();
+            row.col(|ui| {
+                let option = row_network.get(row_index).clone().expect("row index missing").clone();
+                ui.label(option);
+            });
+            row.col(|ui| {
+                let reachable = info.map(|n| match n.reachable {
+                    true => {"Online"}
+                    false => {"Offline"}
+                }).unwrap_or("querying").to_string();
+                ui.label(reachable);
+            });
+        });
+    });
+
+}
+
+pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, frame: &mut eframe::Frame) {
     let ClientApp {
-        tab,
         logo,
         local_state,
     } = app;
+
+    local_state.current_time = util::current_time_millis_i64();
 
     // let mut style: egui::Style = (*ctx.style()).clone();
     // style.visuals.widgets.
@@ -171,7 +335,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
     // });
 
     let img = logo;
-    let texture_id = TexMngr::default().texture(frame, "asdf", img).unwrap();
+    let texture_id = img.texture_id(ctx);
 
     egui::SidePanel::left("side_panel")
         .resizable(false)
@@ -191,7 +355,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
                 |ui| {
                     let scale = 4;
                     let size =
-                        egui::Vec2::new((img.size.0 / scale) as f32, (img.size.1 / scale) as f32);
+                        egui::Vec2::new((img.size()[0] / scale) as f32, (img.size()[1] / scale) as f32);
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);
                     ui.image(texture_id, size);
@@ -206,7 +370,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
                     for tab_i in Tab::iter() {
                         let tab_str = format!("{:?}", tab_i);
                         if ui.button(tab_str).clicked() {
-                            *tab = tab_i;
+                            local_state.active_tab = tab_i;
                         }
                     }
                     //
@@ -227,15 +391,15 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
             // });
         });
 
-    if ctx.input().key_pressed(egui::Key::Escape) {
-        local_state.session_locked = true;
-    }
+    // if ctx.input().key_pressed(egui::Key::Escape) {
+    //     local_state.session_locked = true;
+    // }
 
     egui::CentralPanel::default().show(ctx, |ui| {
         // The central panel the region left after adding TopPanel's and SidePanel's
-        match tab {
+        match local_state.active_tab {
             Tab::Home => {
-                ui.heading("Network Status: ");
+                home_screen(ui, ctx, local_state);
             }
             Tab::Wallet => {
                 if local_state.active_passphrase.is_none() {
@@ -253,7 +417,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::CtxRef, frame: &mut epi::Fram
                         response.request_focus();
                         local_state.wallet_first_load_state = false;
                     }
-                    if response.lost_focus() && ctx.input().key_pressed(egui::Key::Enter) {
+                    if response.lost_focus() && ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
                         let string = local_state.wallet_passphrase_entry.clone();
                         local_state.active_passphrase = Some(string.clone());
                         local_state.visible_mnemonic = Some(

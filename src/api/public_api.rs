@@ -345,6 +345,8 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
             num_active_peers: 0,
             recent_transactions: vec![],
             pending_transactions: 0,
+            total_accepted_transactions: 0,
+            observation_height: 0,
         });
     }
     if let Some(r) = request.hash_search_request {

@@ -168,7 +168,7 @@ message StandardData {
   optional PeerData peer_data = 8;
   optional NodeMetadata node_metadata = 9;
   optional DynamicNodeMetadata dynamic_node_metadata = 10;
-  optional int64 ordinal = 11;
+  optional int64 height = 11;
 }
 
 message KeyedTypedValue {
@@ -642,6 +642,8 @@ message AboutNodeResponse {
   int64 num_active_peers = 5;
   repeated Transaction recent_transactions = 6;
   int64 pending_transactions = 7;
+  int64 total_accepted_transactions = 8;
+  int64 observation_height = 9;
 }
 
 enum AddressType {

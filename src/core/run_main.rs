@@ -15,16 +15,22 @@ use redgold_schema::structs::ErrorInfo;
 use crate::core::internal_message::FutLoopPoll;
 use crate::core::relay::Relay;
 use crate::node::{Node, NodeRuntimes};
+use crate::util::cli::arg_parse_config::ArgTranslate;
 
 
 pub fn main_from_args(opts: RgArgs) {
     // std::env::args() and ArgTranslate
     // ArgTranslate::new(opts).run();
 
-    let mut node_config = NodeConfig::default();
 
-    node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
+
+    let mut node_config = NodeConfig::default();
     let simple_runtime = build_runtime(1, "main");
+
+    // TODO: Fix, borrowed node config here cannot be used to build the arg translate
+    let arg_translate = ArgTranslate::new( simple_runtime.clone(), &opts, node_config.clone());
+    node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
+
 
     if arg_parse_config::immediate_commands(&opts, &node_config, simple_runtime.clone()) {
         return;
@@ -37,10 +43,16 @@ pub fn main_from_args(opts: RgArgs) {
     increment_counter!("redgold.node.main_started");
 
     let node_config_res = arg_parse_config::load_node_config(simple_runtime.clone(), opts, node_config);
+
+
     // TODO: Here is where we should later init loggers and metrics?
     // and then build out the data store etc. ?
     match node_config_res {
         Ok(node_config) => {
+            if arg_translate.is_gui() {
+                crate::gui::initialize::attempt_start(node_config.clone(), simple_runtime.clone()).expect("GUI to start");
+                return;
+            }
             let runtimes = NodeRuntimes::default();
             let mut relay = simple_runtime.block_on(Relay::new(node_config.clone()));
 
