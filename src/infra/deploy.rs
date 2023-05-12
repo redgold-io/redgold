@@ -96,9 +96,11 @@ fn test_setup_server() {
     // sudo ufw allow proto tcp from any to any port 16181
         // sudo ufw allow proto tcp from any to any port 16180
 
-    let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
-    setup_server_redgold(ssh, NetworkEnvironment::Predev, true, None, true).expect("worx");
-
-    let ssh = SSH::new_ssh("interserver.redgold.io", None);
-    setup_server_redgold(ssh, NetworkEnvironment::Predev, false, None, true).expect("worx");
+    //
+    //
+    // let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
+    // setup_server_redgold(ssh, NetworkEnvironment::Predev, true, None, true).expect("worx");
+    //
+    // let ssh = SSH::new_ssh("interserver.redgold.io", None);
+    // setup_server_redgold(ssh, NetworkEnvironment::Predev, false, None, true).expect("worx");
 }

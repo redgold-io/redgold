@@ -94,6 +94,13 @@ pub fn current_time_millis() -> u64 {
         .as_millis() as u64
 }
 
+pub fn current_time_millis_i64() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
 pub fn current_time_unix() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
