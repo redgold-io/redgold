@@ -11,6 +11,8 @@ use crate::node_config::NodeConfig;
 pub mod app_loop;
 pub mod image_load;
 pub mod initialize;
+pub mod tables;
+pub mod server_tab;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]

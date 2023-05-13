@@ -28,7 +28,9 @@ pub fn main_from_args(opts: RgArgs) {
     let simple_runtime = build_runtime(1, "main");
 
     // TODO: Fix, borrowed node config here cannot be used to build the arg translate
-    let arg_translate = ArgTranslate::new( simple_runtime.clone(), &opts, node_config.clone());
+    let mut arg_translate = ArgTranslate::new(simple_runtime.clone(), &opts, node_config.clone());
+    &arg_translate.run().expect("arg translation");
+    node_config = arg_translate.node_config.clone();
     node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
 
 
