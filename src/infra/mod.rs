@@ -16,6 +16,7 @@ use std::path::Path;
 
 use redgold_schema::util::wallet::Wallet;
 use ssh2::Session;
+use redgold_schema::servers::Server;
 use redgold_schema::structs::ErrorInfo;
 
 /*
@@ -41,10 +42,10 @@ ssh root@redgold.cash '
  */
 
 pub struct SSH {
-    host: String,
-    user: Option<String>,
-    private_key_path: Option<String>,
-    session: Option<Session>
+    pub host: String,
+    pub user: Option<String>,
+    pub private_key_path: Option<String>,
+    pub session: Option<Session>
 }
 
 pub struct SSHResult {
@@ -56,7 +57,7 @@ pub struct SSHResult {
 // https://grafana.com/docs/grafana-cloud/quickstart/docker-compose-linux/
 impl SSH {
 
-    fn allow_tcp(&mut self, port: u16) -> SSHResult {
+    pub fn allow_tcp(&mut self, port: u16) -> SSHResult {
         self.exec(format!("sudo ufw allow proto tcp from any to any port {:?}", port), true)
     }
 
@@ -81,12 +82,12 @@ impl SSH {
         self.session = Some(sess.clone());
         return sess;
     }
-    fn verify(&mut self) -> Result<(), ErrorInfo> {
+    pub fn verify(&mut self) -> Result<(), ErrorInfo> {
         self.run("echo test").contains("test")
             .then(|| Ok(()))
             .unwrap_or(Err(ErrorInfo::error_info("Cannot verify ssh connection")))
     }
-    fn run(&mut self, cmd: &str) -> String {
+    pub fn run(&mut self, cmd: &str) -> String {
         let sess = self.session();
         let mut channel = sess.channel_session().unwrap();
         channel.exec(cmd).unwrap();
@@ -104,7 +105,7 @@ impl SSH {
         // sess.disconnect(None, "Normal Shutdown", None).unwrap();
         return s;
     }
-    fn exec<S: Into<String>>(&mut self, cmd: S, print: bool) -> SSHResult {
+    pub fn exec<S: Into<String>>(&mut self, cmd: S, print: bool) -> SSHResult {
         let sess = self.session();
         let mut channel = sess.channel_session().unwrap();
         let string = cmd.into();
@@ -134,7 +135,7 @@ impl SSH {
         };
     }
 
-    fn copy(&mut self, contents: String, remote_path: String) {
+    pub fn copy(&mut self, contents: String, remote_path: String) {
         let path = "tmpfile";
         fs::remove_file("tmpfile").ok();
         let mut file = File::create(path).expect("create failed");
@@ -143,7 +144,7 @@ impl SSH {
         fs::remove_file("tmpfile").unwrap();
     }
 
-    fn scp(&mut self, file: &str, remote_path: &str) {
+    pub fn scp(&mut self, file: &str, remote_path: &str) {
         use std::io::prelude::*;
 
         // Connect to the local SSH server
@@ -214,6 +215,27 @@ impl SSH {
             user: None,
             private_key_path: x,
             session: None
+        }
+    }
+
+    pub fn new_ssh2<S: Into<String>>(host: S, key_path: Option<S>, user: Option<S>) -> SSH {
+        let x = key_path
+            .map(|x| x.into());
+        let user = user
+            .map(|x| x.into());
+        SSH {
+            host: format!("{}:22", host.into()),
+            user,
+            private_key_path: x,
+            session: None
+        }
+    }
+    pub fn from_server(server: &Server) -> SSH {
+        SSH{
+            host: format!("{}:22", server.host.clone()),
+            user: server.username.clone(),
+            private_key_path: server.key_path.clone(),
+            session: None,
         }
     }
 

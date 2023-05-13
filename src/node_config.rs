@@ -8,10 +8,11 @@ use redgold_schema::constants::{
     REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS,
 };
 use redgold_schema::util::wallet::Wallet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use itertools::Itertools;
 use log::{debug, info};
+use redgold_schema::servers::Server;
 use redgold_schema::structs;
 use redgold_schema::structs::{Address, NodeMetadata, NodeType, PeerData, PeerId, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
@@ -52,6 +53,7 @@ pub struct NodeConfig {
     pub disable_control_api: bool,
     pub disable_public_api: bool,
     pub data_store_path: String,
+    pub data_store_folder: String,
     // Rarely adjusted user suppliable params
     pub seed_hosts: Vec<String>,
     // Custom debug only network params
@@ -70,7 +72,8 @@ pub struct NodeConfig {
     pub faucet_enabled: bool,
     pub canary_enabled: bool,
     pub load_balancer_url: String,
-    pub external_ip: String
+    pub external_ip: String,
+    pub servers: Vec<Server>
 }
 
 impl NodeConfig {
@@ -218,6 +221,7 @@ impl NodeConfig {
             disable_control_api: false,
             disable_public_api: false,
             data_store_path: "".to_string(),
+            data_store_folder: "".to_string(),
             seed_hosts: vec![],
             observation_formation_millis: Duration::from_millis(OBSERVATION_FORMATION_TIME_MILLIS),
             transaction_finalization_time: Duration::from_millis(
@@ -236,7 +240,8 @@ impl NodeConfig {
             faucet_enabled: true,
             canary_enabled: true,
             load_balancer_url: "lb.redgold.io".to_string(),
-            external_ip: "127.0.0.1".to_string()
+            external_ip: "127.0.0.1".to_string(),
+            servers: vec![],
         }
     }
 
@@ -278,6 +283,12 @@ impl NodeConfig {
 
     pub async fn data_store(&self) -> DataStore {
         DataStore::from_config(self).await
+    }
+
+    pub async fn data_store_all(&self) -> DataStore {
+        let p = PathBuf::from(self.data_store_folder.clone());
+        let all = p.join(NetworkEnvironment::All.to_std_string());
+        DataStore::from_file_path(all.to_str().expect("failed to render ds path").to_string()).await
     }
 
     pub async fn loopback_public_client(&self) -> PublicClient {

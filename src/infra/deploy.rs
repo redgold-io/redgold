@@ -20,6 +20,8 @@ pub fn setup_services(
  /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
 They must be manually deployed.
+
+ This whole thing should really have a streaming output for the lines and stuff.
  */
 pub fn setup_server_redgold(
     mut ssh: SSH,

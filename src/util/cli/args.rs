@@ -9,6 +9,7 @@ pub fn empty_args() -> RgArgs {
         peer_id: None,
         peer_id_path: None,
         data_store_path: None,
+        data_store_folder: None,
         wallet_path: None,
         network: Some("local".to_string()),
         debug_id: None,
@@ -39,9 +40,12 @@ pub struct RgArgs {
     /// Path to file containing hex encoded peer id
     #[clap(long)]
     pub peer_id_path: Option<String>,
-    /// Path to internal data store, overrides default home directory path
+    /// Path to internal sqlite data store file, overrides default home directory path
     #[clap(long)]
     pub data_store_path: Option<String>,
+    /// Path to internal data store folder, overrides default home directory path
+    #[clap(long)]
+    pub data_store_folder: Option<String>,
     /// Path to internal wallet / key store, overrides default home directory path
     #[clap(long)]
     pub wallet_path: Option<String>,
