@@ -38,6 +38,7 @@ pub mod signature;
 pub mod udp;
 pub mod control;
 pub mod public_key;
+pub mod seeds;
 
 
 use std::str::FromStr;

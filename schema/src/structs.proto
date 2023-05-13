@@ -58,6 +58,7 @@ message Input {
 message TrustData {
   double label = 2;
   optional double confidence = 3;
+  // Is this variance on confidence?
   optional double hardness = 5;
   optional StandardData data = 6;
 }
@@ -879,3 +880,24 @@ message UdpMessage {
 //  optional string key_path = 3;
 //
 //}
+/*
+
+#[derive(Clone, Debug)]
+pub struct SeedNode {
+    pub peer_id: Option<Vec<u8>>,
+    pub trust: Vec<TrustData>,
+    pub public_key: Option<PublicKey>,
+    pub external_address: String,
+    pub port_offset: Option<u16>,
+    pub environments: Vec<NetworkEnvironment>,
+}
+ */
+
+message Seed {
+  string external_address = 1;
+  repeated NetworkEnvironment environments = 2;
+  optional uint32 port_offset = 3;
+  repeated TrustData trust = 4;
+  PeerId peer_id = 5;
+  optional PublicKey public_key = 6;
+}
