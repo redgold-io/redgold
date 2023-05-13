@@ -1285,6 +1285,11 @@ WHERE
         DataStore::from_path(format!("{}{}", "file:", node_config.data_store_path)).await
     }
 
+    pub async fn from_file_path(path: String) -> DataStore {
+        DataStore::from_path(format!("{}{}", "file:", path)).await
+    }
+
+
     pub fn create_all_err(&self) -> rusqlite::Result<Connection, Error> {
         let c = self.connection()?;
         self.create_debug_table()?;

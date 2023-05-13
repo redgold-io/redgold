@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::{error_info, ErrorInfoContext, json_or, json_pretty};
 use crate::structs::{ErrorInfo, NetworkEnvironment};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
     pub host: String,
     pub index: i64,

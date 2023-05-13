@@ -16,6 +16,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
+use redgold_schema::{ErrorInfoContext, SafeOption};
+use redgold_schema::servers::Server;
 use redgold_schema::structs::ErrorInfo;
 use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
@@ -24,6 +26,14 @@ use crate::util::cli::commands::mnemonic_fingerprint;
 use crate::util::ip_lookup;
 
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
+
+pub fn get_default_data_top_folder() -> PathBuf {
+    let home_or_current = dirs::home_dir()
+        .expect("Unable to find home directory for default data store path as path not specified explicitly")
+        .clone();
+    let redgold_dir = home_or_current.join(".rg");
+    redgold_dir
+}
 
 pub fn get_default_data_directory(network_type: NetworkEnvironment) -> PathBuf {
     let home_or_current = dirs::home_dir()
@@ -69,6 +79,10 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
     }
 
     let ds_path_opt: Option<String> = opts.data_store_path;
+
+    node_config.data_store_folder = opts.data_store_folder.unwrap_or({
+        get_default_data_top_folder().to_str().unwrap().to_string()
+    });
 
     let data_store_file_path = match ds_path_opt {
         None => {
@@ -406,6 +420,35 @@ impl ArgTranslate {
             }
         }
         false
+    }
+
+    pub fn secure_data_path_string() -> Option<String> {
+        std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
+    }
+
+    pub fn secure_data_or_cwd() -> PathBuf {
+        Self::secure_data_path_string().map(|s|
+            std::path::Path::new(&s).to_path_buf()
+        ).unwrap_or(std::env::current_dir().ok().expect("Can't get current dir"))
+    }
+
+    pub fn load_internal_servers(&mut self) -> Result<(), ErrorInfo> {
+        let data_folder = Self::secure_data_or_cwd();
+        let rg = data_folder.join(".rg");
+        let all = rg.join(NetworkEnvironment::All.to_std_string());
+        let servers = all.join("servers");
+        if servers.is_file() {
+            let contents = fs::read_to_string(servers)
+                .error_info("Failed to read servers file")?;
+            let servers = Server::parse(contents)?;
+            self.node_config.servers = servers;
+        }
+        Ok(())
+    }
+
+    pub fn run(&mut self) -> Result<(), ErrorInfo> {
+        self.load_internal_servers()?;
+        Ok(())
     }
 
     // pub fn parse_seed(&mut self) {

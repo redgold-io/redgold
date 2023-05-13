@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use crossbeam::atomic::AtomicCell;
 use eframe::egui::widgets::TextEdit;
@@ -49,6 +49,17 @@ impl HomeState {
     }
 }
 
+#[derive(Clone)]
+pub struct ServerStatus {
+    pub ssh_reachable: bool
+}
+
+pub struct ServersState {
+    needs_update: bool,
+    info: Arc<Mutex<Vec<ServerStatus>>>,
+    deployment_result_info_box: Arc<Mutex<String>>
+}
+
 pub struct LocalState {
     active_tab: Tab,
     session_salt: [u8; 32],
@@ -74,12 +85,15 @@ pub struct LocalState {
     node_config: NodeConfig,
     runtime: Arc<Runtime>,
     home_state: HomeState,
+    server_state: ServersState,
     current_time: i64
 }
 
 #[allow(dead_code)]
 impl LocalState {
     pub fn from(node_config: NodeConfig, runtime: Arc<Runtime>) -> LocalState {
+        let mut node_config = node_config.clone();
+        node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
         return LocalState {
             active_tab: Tab::Home,
@@ -102,6 +116,9 @@ impl LocalState {
             node_config,
             runtime,
             home_state: HomeState::from(),
+            server_state: ServersState { needs_update: true,
+                info: Arc::new(Mutex::new(vec![])),
+                deployment_result_info_box: Arc::new(Mutex::new("".to_string())) },
             current_time: util::current_time_millis_i64(),
         };
     }
@@ -141,7 +158,9 @@ fn random_bytes() -> [u8; 32] {
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
 use tokio::runtime::Runtime;
+use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use crate::infra::{deploy, SSH};
 use crate::node_config::NodeConfig; // 0.17.1
 
 
@@ -152,7 +171,7 @@ pub enum Tab {
     Home,
     Wallet,
     Trust,
-    Node,
+    Servers,
     Settings,
 }
 
@@ -222,6 +241,49 @@ pub async fn query_network_status(
     // info!("Network status: {}", map2.to_string());
     Ok(())
 }
+use egui_extras::{Column, TableBuilder};
+use surf::http::headers::ToHeaderValues;
+
+
+pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
+
+    if data.len() == 0 {
+        return;
+    }
+
+    let headers = data.get(0).expect("").clone();
+    let columns = headers.len();
+
+    let text_height = 25.0;
+    let mut table = TableBuilder::new(ui)
+        .striped(true)
+        .resizable(false)
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+        .min_scrolled_height(0.0);
+
+    for _ in 0..columns {
+        table = table.column(Column::auto());
+    };
+
+    table
+        .header(text_height, |mut header| {
+            for h in headers {
+                header.col(|ui| {
+                    ui.strong(h);
+                });
+            }
+        }).body(|mut body| {
+        body.rows(text_height, data.len() - 1, |row_index, mut row| {
+            let row_data = data.get(row_index + 1).expect("value row missing");
+            for cell in row_data {
+                row.col(|ui| {
+                    ui.label(cell);
+                });
+            }
+        });
+    });
+
+}
 
 pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
     ui.heading("Network Status");
@@ -243,10 +305,8 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
     ui.label(query_status_string);
     ui.separator();
 
-    use egui_extras::{Column, TableBuilder};
 
     // let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
-    let text_height = 20.0;
     let num_rows = NetworkEnvironment::status_networks().len();
     let mut network_index = HashMap::new();
     let row_network: Vec<String> = NetworkEnvironment::status_networks()
@@ -255,6 +315,12 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
         x.to_std_string()
     }).collect_vec();
 
+    // Well this is ridiculous
+    // can we change from atomic cell or use some copyable type?
+    let status_info = home_state.network_status_info.take();
+    home_state.network_status_info.store(status_info.clone());
+
+    let text_height = 20.0;
     let mut table = TableBuilder::new(ui)
         .striped(true)
         .resizable(false)
@@ -266,10 +332,6 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
         // .column(Column::remainder())
         .min_scrolled_height(0.0);
 
-    // Well this is ridiculous
-    // can we change from atomic cell or use some copyable type?
-    let status_info = home_state.network_status_info.take();
-    home_state.network_status_info.store(status_info.clone());
     // info!("Status home loop info: {:?}", status_info.to_string());
     table
         .header(20.0, |mut header| {
@@ -297,6 +359,92 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
     });
 
 }
+
+pub async fn update_server_status(servers: Vec<Server>, mut status: Arc<Mutex<Vec<ServerStatus>>>) {
+    let mut results = vec![];
+
+    for server in servers {
+        let mut ssh = SSH::from_server(&server);
+        let reachable = ssh.verify().is_ok();
+        results.push(ServerStatus{ ssh_reachable: reachable});
+    };
+    let mut guard = status.lock().expect("lock");
+    guard.clear();
+    guard.extend(results);
+}
+
+pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+
+
+    let servers = local_state.node_config.servers.clone();
+
+    if local_state.server_state.needs_update {
+        local_state.server_state.needs_update = false;
+        local_state.runtime.spawn(
+            update_server_status(
+                servers.clone(),
+        local_state.server_state.info.clone()
+            )
+        );
+    }
+    let info = local_state.server_state.info.lock().expect("").to_vec();
+
+    let mut table_rows: Vec<Vec<String>> = vec![];
+    table_rows.push(vec![
+            "Hostname".to_string(),
+            "SSH status".to_string(),
+            "Index".to_string(),
+            "PeerId Index".to_string(),
+        "SSH User".to_string(),
+        "SSH Key Path".to_string(),
+    ]);
+
+    for (i, server) in servers.iter().enumerate() {
+        let status_i = info.get(i);
+        let status = status_i.map(|s| match s.ssh_reachable {
+            true => {"Online"}
+            false => {"Offline"}
+        }).unwrap_or("querying").to_string();
+        table_rows.push(vec![
+            server.host.clone(),
+            status,
+            server.index.to_string(),
+            server.peer_id_index.to_string(),
+            server.username.clone().unwrap_or("".to_string()).clone(),
+            server.key_path.clone().unwrap_or("".to_string()).clone()
+        ]
+        );
+    }
+
+    ui.horizontal(|ui| {
+        ui.heading("Servers");
+        ui.spacing();
+        ui.separator();
+        ui.spacing();
+        if ui.button("Deploy").clicked() {
+            info!("Deploying");
+            local_state.runtime.spawn(async {
+                for server in servers {
+                    let mut ssh = SSH::from_server(&server);
+                    let is_genesis = server.index == 0;
+                    let result = deploy::setup_server_redgold(
+                        ssh,
+                        NetworkEnvironment::Dev,
+                        is_genesis,
+                        None,
+                        true
+                    );
+                    // local_state.server_state.deployment_result_info_box.lock().expect("").push(result);
+                };
+            });
+            ()
+        }
+    });
+    ui.separator();
+    text_table(ui, table_rows);
+
+}
+
 
 pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, frame: &mut eframe::Frame) {
     let ClientApp {
@@ -445,7 +593,9 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, frame: &mut eframe::
             }
             Tab::Settings => {}
             Tab::Trust => {}
-            Tab::Node => {}
+            Tab::Servers => {
+                servers_screen(ui, ctx, local_state);
+            }
         }
         // ui.hyperlink("https://github.com/emilk/egui_template");
         // ui.add(egui::github_link_file!(
