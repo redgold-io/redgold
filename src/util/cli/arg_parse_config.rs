@@ -467,7 +467,12 @@ impl ArgTranslate {
 }
 
 
-
+/**
+This function uses an external program for calculating checksum.
+Tried doing this locally, but for some reason it seemed to have a different output than the shell script.
+There's internal libraries for getting the current exe path and calculating checksum, but they
+seem to produce a different result than the shell script.
+*/
 fn calc_sha_sum(path: String) -> String {
     util::cmd::run_cmd("shasum", vec!["-a", "256", &*path])
         .0

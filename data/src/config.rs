@@ -1,9 +1,10 @@
 use sqlx::Row;
 use sqlx::sqlite::SqliteRow;
 use redgold_schema::structs::{Address, ErrorInfo, Hash};
-use redgold_schema::{SafeBytesAccess, TestConstants};
+use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
+use crate::schema::json;
 
 #[derive(Clone)]
 pub struct ConfigStore {
@@ -24,6 +25,25 @@ impl ConfigStore {
         INSERT OR REPLACE INTO config ( key_name, value_data ) VALUES ( ?1, ?2)
                 "#,
             key, value
+        )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.last_insert_rowid())
+    }
+
+    pub async fn insert_update_json<T: Serialize>(
+        &self,
+        key: String,
+        value: T
+    ) -> Result<i64, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+
+        let rows = sqlx::query!(
+            r#"
+        INSERT OR REPLACE INTO config ( key_name, value_data ) VALUES ( ?1, ?2)
+                "#,
+            key, json(value)?
         )
             .execute(&mut pool)
             .await;

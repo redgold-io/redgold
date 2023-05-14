@@ -1,5 +1,5 @@
 use redgold_schema::structs::{Address, ErrorInfo, Hash, PeerData, Transaction};
-use redgold_schema::{from_hex, ProtoHashable, SafeBytesAccess, TestConstants, WithMetadataHashable};
+use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 

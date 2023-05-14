@@ -9,7 +9,7 @@ use structs::{
     StructMetadata, Transaction,
 };
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType, VersionInfo};
 use crate::util::{dhash_str, dhash_vec};
 use crate::util::wallet::{generate_key, generate_key_i};
 
@@ -191,12 +191,34 @@ fn add_val_val<T: AddAny>(x: T, y: T) -> T { x + y }
 fn add_val_ref<T: AddAny>(x: T, y: &T) -> T { x + y }
  */
 //
+
+pub trait ProtoSerde
+    where Self: Message + Default,
+{
+    fn proto_serialize(&self) -> Vec<u8>;
+    fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
+}
+
+impl<T> ProtoSerde for T
+where T: Message + Default {
+    fn proto_serialize(&self) -> Vec<u8> {
+        self.encode_to_vec()
+    }
+
+    fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
+        T::decode(&*bytes)
+            .map_err(|e|
+                error_message(Error::ProtoDecoderFailure, e.to_string()))
+    }
+}
+
+
 pub trait ProtoHashable
 where
     Self: HashClear + Clone + Message + Default,
 {
-    fn proto_serialize(&self) -> Vec<u8>;
-    fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
+    // fn proto_serialize(&self) -> Vec<u8>;
+    // fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
     fn calculate_hash(&self) -> Hash;
     fn from_hex(hex_value: String) -> Result<Self, ErrorInfo>;
 }
@@ -205,15 +227,15 @@ impl<T> ProtoHashable for T
 where
     T: HashClear + Clone + Message + Default,
 {
-    fn proto_serialize(&self) -> Vec<u8> {
-        self.encode_to_vec()
-    }
-
-    fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
-        // TODO: Automap this error with a generic _.to_string() trait implicit?
-        return T::decode(&*bytes)
-            .map_err(|e| error_message(Error::ProtoDecoderFailure, e.to_string()));
-    }
+    // fn proto_serialize(&self) -> Vec<u8> {
+    //     self.encode_to_vec()
+    // }
+    //
+    // fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
+    //     // TODO: Automap this error with a generic _.to_string() trait implicit?
+    //     return T::decode(&*bytes)
+    //         .map_err(|e| error_message(Error::ProtoDecoderFailure, e.to_string()));
+    // }
 
     fn from_hex(hex_value: String) -> Result<Self, ErrorInfo> {
         Self::proto_deserialize(from_hex(hex_value)?)
@@ -714,6 +736,45 @@ impl PublicResponse {
     pub fn as_error(&self) -> Result<Self, ErrorInfo> {
         self.error_info().map(|o| Err(o)).unwrap_or(Ok(self.clone()))
     }
+}
+
+trait EasyJson {
+    fn json(&self) -> Result<String, ErrorInfo>;
+    fn json_or(&self) -> String;
+    fn json_pretty(&self) -> Result<String, ErrorInfo>;
+
+}
+
+trait EasyJsonDeser {
+    fn json_from<'a, T: serde::Deserialize<'a>>(&'a self) -> Result<T, ErrorInfo>;
+}
+
+impl EasyJsonDeser for String {
+    fn json_from<'a, T: serde::Deserialize<'a>>(&'a self) -> Result<T, ErrorInfo> {
+        json_from(self)
+    }
+}
+
+impl<T> EasyJson for T
+where T: Serialize {
+    fn json(&self) -> Result<String, ErrorInfo> {
+        json(&self)
+    }
+
+    fn json_or(&self) -> String {
+        json_or(&self)
+    }
+
+    fn json_pretty(&self) -> Result<String, ErrorInfo> {
+        json_pretty(&self)
+    }
+}
+
+#[test]
+pub fn json_trait_ser_test() {
+    let mut vers = VersionInfo::default();
+    vers.executable_checksum = "asdf".to_string();
+    println!("{}", vers.json_or());
 }
 
 pub fn json<T: Serialize>(t: &T) -> Result<String, ErrorInfo> {

@@ -41,7 +41,7 @@ use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
 use crate::schema::structs;
 use redgold_schema::constants::EARLIEST_TIME;
-use redgold_schema::{error_info, error_message, SafeOption};
+use redgold_schema::{error_info, error_message, ProtoSerde, SafeOption};
 use redgold_schema::structs::AddressInfo;
 use redgold_schema::transaction::AddressBalance;
 
