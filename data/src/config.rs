@@ -5,6 +5,7 @@ use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use crate::schema::json;
+use serde::Serialize;
 
 #[derive(Clone)]
 pub struct ConfigStore {
@@ -38,12 +39,12 @@ impl ConfigStore {
         value: T
     ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-
+        let val = json(&value)?;
         let rows = sqlx::query!(
             r#"
         INSERT OR REPLACE INTO config ( key_name, value_data ) VALUES ( ?1, ?2)
                 "#,
-            key, json(value)?
+            key, val
         )
             .execute(&mut pool)
             .await;
