@@ -22,7 +22,7 @@ use crate::util::to_libp2p_peer_id;
 use crate::core::relay::Relay;
 use crate::multiparty::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
 use crate::schema::structs::{
-    AddPeerFullRequest, ControlRequest, ControlResponse, ResponseMetadata,
+    ControlRequest, ControlResponse, ResponseMetadata,
 };
 
 // https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
@@ -100,7 +100,7 @@ impl ControlServer {
         // TODO: Shouldn't both of these really be in the initiate function?
         if let Some(mps) = request.initiate_multiparty_keygen_request {
 
-            let keys = find_multiparty_key_pairs(relay.clone()).await?;
+            let keys = find_multiparty_key_pairs(relay.clone(), rt.clone()).await?;
             let num_parties = keys.len() as i64;
 
             let mut req = mps.clone();
@@ -118,7 +118,7 @@ impl ControlServer {
             response.initiate_multiparty_keygen_response = Some(result);
         } else if let Some(mut req) = request.initiate_multiparty_signing_request {
             let keygen = req.keygen_room.safe_get()?;
-            let keys = find_multiparty_key_pairs(relay.clone()).await?;
+            let keys = find_multiparty_key_pairs(relay.clone(), rt.clone()).await?;
             req.identifier = fill_identifier(keys, req.identifier);
             // TODO: Remove these from schema, enforce node knowing about this
             req.port = Some(relay.node_config.mparty_port().clone() as u32);

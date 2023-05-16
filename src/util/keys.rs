@@ -8,6 +8,17 @@ pub trait ToPublicKey {
     fn to_public_key(&self) -> Result<PublicKey, ErrorInfo>;
 }
 
+pub trait ToPublicKeyFromLib {
+    fn to_struct_public_key(&self) -> structs::PublicKey;
+}
+
+
+impl ToPublicKeyFromLib for PublicKey {
+    fn to_struct_public_key(&self) -> structs::PublicKey {
+        structs::PublicKey::from_bytes(self.serialize().to_vec())
+    }
+}
+
 impl ToPublicKey for structs::PublicKey {
     fn to_public_key(&self) -> Result<PublicKey, ErrorInfo> {
         let b = self.bytes.safe_bytes()?;

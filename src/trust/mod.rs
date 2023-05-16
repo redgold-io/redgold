@@ -16,45 +16,45 @@ struct Trust {
 // every 5 minutes.
 #[allow(dead_code)]
 impl Trust {
-    async fn run(&mut self) {
-        loop {
-            let update = self.relay.trust.receiver.recv().unwrap();
-            match update.remove_peer {
-                None => {}
-                Some(remove) => {
-                    self.labels.remove(&remove);
-                    continue;
-                }
-            }
-            let peer_data = update.update;
-            if peer_data.labels.is_empty() {
-                continue;
-            }
-
-            let id = peer_data.peer_id.unwrap().peer_id.unwrap().value;
-            let latest = self.labels.get(&id).unwrap();
-
-            let mut label_updates: HashMap<Vec<u8>, f64> = HashMap::new();
-
-            for label in peer_data.labels {
-                let l = label.trust_data.get(0).expect("data").label;
-                label_updates.insert(label.peer_id, l);
-            }
-
-            if label_updates != *latest {
-                // self.labels.insert(self.pe, label_updates);
-                // self.recalculate_trust()
-            }
-        }
-    }
-    #[allow(dead_code)]
-    pub fn new(relay: Relay) {
-        let mut b = Self {
-            relay,
-            labels: HashMap::new(),
-        };
-        tokio::spawn(async move { b.run().await });
-    }
+    // async fn run(&mut self) {
+    //     loop {
+    //         let update = self.relay.trust.receiver.recv().unwrap();
+    //         match update.remove_peer {
+    //             None => {}
+    //             Some(remove) => {
+    //                 self.labels.remove(&remove);
+    //                 continue;
+    //             }
+    //         }
+    //         let peer_data = update.update;
+    //         if peer_data.labels.is_empty() {
+    //             continue;
+    //         }
+    //
+    //         let id = peer_data.peer_id.unwrap().peer_id.unwrap().value;
+    //         let latest = self.labels.get(&id).unwrap();
+    //
+    //         let mut label_updates: HashMap<Vec<u8>, f64> = HashMap::new();
+    //
+    //         for label in peer_data.labels {
+    //             let l = label.trust_data.get(0).expect("data").label;
+    //             label_updates.insert(label.peer_id, l);
+    //         }
+    //
+    //         if label_updates != *latest {
+    //             // self.labels.insert(self.pe, label_updates);
+    //             // self.recalculate_trust()
+    //         }
+    //     }
+    // }
+    // #[allow(dead_code)]
+    // pub fn new(relay: Relay) {
+    //     let mut b = Self {
+    //         relay,
+    //         labels: HashMap::new(),
+    //     };
+    //     tokio::spawn(async move { b.run().await });
+    // }
 }
 
 // https://texample.net/tikz/examples/neural-network/
@@ -83,7 +83,7 @@ fn datt(
     let mut scores: HashMap<&Vec<u8>, f64> = HashMap::new();
 
     for immediate_peer_label in *self_trust {
-        scores.insert(&immediate_peer_label.peer_id, immediate_peer_label.trust_data.get(0).unwrap().label);
+        scores.insert(&immediate_peer_label.peer_id, immediate_peer_label.trust_data.get(0).unwrap().label());
     }
 
     // TODO: Weighted neighbor expansion?
@@ -93,12 +93,12 @@ fn datt(
         let mut next_neighbor_expansion: Vec<TrustLabel> = vec![];
         let mut dot_scores: HashMap<&Vec<u8>, Vec<f64>> = HashMap::new();
         for l in current_neighbor_expansion.clone() {
-            if l.trust_data.get(0).unwrap().label > expansion_threshold {
+            if l.trust_data.get(0).unwrap().label() > expansion_threshold {
                 let outer_labels = labels.get(&l.peer_id).unwrap();
                 for l2 in *outer_labels {
                     if !scores.contains_key(&l2.peer_id) {
                         let transitive_current_score = scores.get(&l.peer_id).unwrap();
-                        let outer_transitive_score = transitive_current_score * l2.trust_data.get(0).unwrap().label;
+                        let outer_transitive_score = transitive_current_score * l2.trust_data.get(0).unwrap().label();
                         match dot_scores.get_mut(&l2.peer_id) {
                             None => {
                                 dot_scores.insert(&l2.peer_id, vec![outer_transitive_score]);

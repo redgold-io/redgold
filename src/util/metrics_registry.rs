@@ -32,6 +32,8 @@ pub fn register_metric_names() {
     register_counter!("redgold.observation.metadata.added");
     register_counter!("redgold.transaction.accepted");
     register_counter!("redgold.transaction.received");
+    register_counter!("redgold.transaction.resolve.input");
+    register_counter!("redgold.transaction.resolve.input.errors");
     register_counter!("redgold.multiparty.received");
     register_gauge!("redgold.transaction.total");
     register_counter!("redgold.datastore.utxo.insert");

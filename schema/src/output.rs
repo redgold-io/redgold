@@ -1,8 +1,8 @@
 use crate::address::address;
 use crate::address::address_data;
-use crate::structs::{Output, UtxoEntry};
+use crate::structs::{ErrorInfo, Output, UtxoEntry};
 use crate::transaction::amount_data;
-use crate::{Address, HashClear};
+use crate::{Address, HashClear, SafeOption};
 use bitcoin::secp256k1::PublicKey;
 
 pub fn output_data(address: Vec<u8>, amount: u64) -> Output {
@@ -51,6 +51,15 @@ impl Output {
 
     pub fn amount(&self) -> u64 {
         self.data.as_ref().unwrap().amount.unwrap() as u64
+    }
+
+    pub fn safe_ensure_amount(&self) -> Result<&i64, ErrorInfo> {
+        self.data.safe_get_msg("Missing data field on output")?
+            .amount.safe_get_msg("Missing amount field on output")
+    }
+
+    pub fn opt_amount(&self) -> Option<i64> {
+        self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
     }
 
     pub fn rounded_amount(&self) -> f64 {

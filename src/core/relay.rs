@@ -11,8 +11,10 @@ use crate::schema::structs::{
 use dashmap::DashMap;
 use futures::future;
 use futures::stream::FuturesUnordered;
+use futures::task::SpawnExt;
 use itertools::Itertools;
-use redgold_schema::{error_info, structs};
+use tokio::runtime::Runtime;
+use redgold_schema::{error_info, ErrorInfoContext, structs};
 use redgold_schema::structs::{MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, Request, Response};
 
 use crate::core::internal_message::PeerMessage;
@@ -113,6 +115,22 @@ impl Relay {
         Ok(res)
     }
 
+    pub async fn send_message_sync_static(relay: Relay, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
+        let timeout = timeout.unwrap_or(Duration::from_secs(60));
+        let (s, r) = flume::unbounded::<Response>();
+        let key = node.to_public_key()?;
+        let pm = PeerMessage{
+            request,
+            response: Some(s),
+            public_key: Some(key),
+            socket_addr: None,
+        };
+        relay.peer_message_tx.sender.send_err(pm)?;
+        let res = tokio::time::timeout(timeout, r.recv_async_err()).await
+            .map_err(|e| error_info(e.to_string()))??;
+        Ok(res)
+    }
+
     pub async fn receive_message_sync(&self, request: Request, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
         let key = request.verify_auth()?;
         let timeout = timeout.unwrap_or(Duration::from_secs(60));
@@ -129,17 +147,35 @@ impl Relay {
         Ok(res)
     }
 
-    pub async fn broadcast(&self, nodes: Vec<structs::PublicKey>, request: Request, timeout: Option<Duration>) -> Vec<(structs::PublicKey, Result<Response, ErrorInfo>)> {
+    pub async fn broadcast(
+        relay: Relay,
+        nodes: Vec<structs::PublicKey>,
+        request: Request,
+        runtime: Arc<Runtime>,
+        timeout: Option<Duration>
+    ) -> Vec<(structs::PublicKey, Result<Response, ErrorInfo>)> {
         let timeout = timeout.unwrap_or(Duration::from_secs(20));
         // let mut fu = FuturesUnordered::new();
         let mut fu = vec![];
-        for node in nodes {
-            fu.push(async {
-                (node.clone(), self.send_message_sync(request.clone(), node, Some(timeout)).await)
-            });
+        for (i,node) in nodes.iter().enumerate() {
+            let relay2 = relay.clone();
+            let runtime2 = runtime.clone();
+            let request2 = request.clone();
+            let jh = async move {
+                (
+                node.clone(),
+                {
+
+                    runtime2.spawn(
+                        Relay::send_message_sync_static(relay2.clone(),
+                                                        request2.clone(), node.clone(), Some(timeout))
+                    ).await.error_info("join handle failure on broadcast").and_then(|e| e)
+                }
+            )};
+            fu.push(jh);
         }
+
         future::join_all(fu).await
-        // fu.collect_vec::<>().await
     }
 
     pub async fn send_message(&self, request: Request, node: structs::PublicKey) -> Result<(), ErrorInfo> {

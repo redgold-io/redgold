@@ -1,5 +1,6 @@
 use crate::{bytes_data, constants, Hash, HashFormatType, SafeBytesAccess};
 use multihash::{MultihashDigest};
+use crate::structs::HashType;
 
 impl Hash {
     pub fn vec(&self) -> Vec<u8> {
@@ -11,7 +12,8 @@ impl Hash {
     pub fn from_bytes_mh(vec: Vec<u8>) -> Self {
         Self {
             bytes: bytes_data(vec),
-            hash_format_type: HashFormatType::Multihash as i32
+            hash_format_type: HashFormatType::Multihash as i32,
+            hash_type: HashType::Transaction as i32,
         }
     }
     pub fn from_string(s: &str) -> Self {
