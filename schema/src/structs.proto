@@ -102,11 +102,21 @@ message NodeMetadata {
   PeerId peer_id = 11;
   optional bool nat_restricted = 12;
 }
-
+/**
+Used to store the version of the executable and the commit hash of the source code used to build it.
+Security verifications associated with the node software should be done with this message.
+ */
 message VersionInfo {
-  optional BytesData checksum_hash = 1;
-  optional BytesData next_checksum_hash = 2;
-  optional int64 next_upgrade_time = 3;
+  // The value associated with the Sha2-256 hash of the executable calculated with shasum locally
+  // Should match github release page.
+  string executable_checksum = 1;
+  // This is only really useful in the security scenario where the node is building from source
+  // Otherwise, even if filled with a value from git, it's not really verified
+  optional string commit_hash = 2;
+  // Same as prior hash except the intended upgrade hash of a node, not yet used.
+  optional string next_executable_checksum = 3;
+  // Intended time for performing a software update, for coordination of upgrades (not yet used.)
+  optional int64 next_upgrade_time = 4;
 }
 
 message PeerId {

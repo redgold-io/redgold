@@ -35,6 +35,7 @@ use crate::schema::structs::{QueryAddressesResponse, Transaction};
 use crate::schema::{bytes_data, error_info};
 use crate::schema::{response_metadata, SafeBytesAccess, WithMetadataHashable};
 use crate::{schema, util};
+use crate::api::about;
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
@@ -338,16 +339,7 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
         }
     }
     if let Some(r) = request.about_node_request {
-        response1.about_node_response = Some(AboutNodeResponse{
-            latest_metadata: Some(relay.node_config.peer_data_tx()),
-            latest_node_metadata: None,
-            num_known_peers: 0,
-            num_active_peers: 0,
-            recent_transactions: vec![],
-            pending_transactions: 0,
-            total_accepted_transactions: 0,
-            observation_height: 0,
-        });
+        response1.about_node_response = Some(about::handle_about_node_request(r, relay.clone()).await?);
     }
     if let Some(r) = request.hash_search_request {
         match hash_query(relay.clone(), r.search_string).await {
