@@ -3,7 +3,7 @@ use warp::Rejection;
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 
-use redgold_schema::constants;
+use redgold_schema::{constants, ProtoSerde};
 
 use crate::{schema, util};
 use crate::core::relay::Relay;

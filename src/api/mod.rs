@@ -26,6 +26,7 @@ pub mod faucet;
 pub mod lp2p;
 pub mod hash_query;
 pub mod udp_api;
+pub mod about;
 
 
 #[derive(Clone)]

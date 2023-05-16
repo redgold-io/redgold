@@ -28,6 +28,7 @@ use crate::{genesis, util};
 use redgold_schema::constants::{
     DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS,
 };
+use redgold_schema::ProtoSerde;
 use redgold_schema::util::wallet::Wallet;
 use crate::schema::transaction::rounded_balance;
 // use crate::schema::transaction::rounded_amount;

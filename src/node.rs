@@ -12,7 +12,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, error_info, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, error_info, ProtoSerde, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
