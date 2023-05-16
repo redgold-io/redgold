@@ -1,3 +1,4 @@
+use std::time::Duration;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, PeerData, PublicKey, Transaction};
 use redgold_schema::{ProtoHashable, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
 use crate::DataStoreContext;
@@ -144,34 +145,54 @@ impl PeerStore {
     }
 
     pub async fn active_nodes(
-        &self
-    ) -> Result<Vec<PeerData>, ErrorInfo> {
-        self.all_peers_tx().await?.iter().map(|tx| tx.peer_data()).collect()
-    }
-
-    pub async fn peers_by_utxo_distance(
         &self,
-        hash: Hash,
-    ) -> Result<usize, ErrorInfo> {
+        delay: Option<Duration>
+    ) -> Result<Vec<PublicKey>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-        // let rows = sqlx::query!(
-        //     r#"SELECT UNIQUE(peers.peer_data) FROM peer_key INNER JOIN on peer_key.id = peers.id WHERE peer_key.id"#,
-        //     height
-        // )
-        //     .fetch_all(&mut pool)
-        //     .await;
-        // let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        // let mut res = vec![];
-        // for row in rows_m {
-        //     res.push(AddressHistoricalBalance{
-        //         address: Address::from_bytes(row.address.safe_get_msg("Row missing address")?.clone())?,
-        //         balance: row.balance.safe_get_msg("Row missing balance")?.clone(),
-        //         height: height.clone()
-        //     });
-        // }
-        // Ok(res)
-        Ok(0)
+        let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
+        let delay = delay.as_millis() as i64;
+        let cutoff = util::current_time_millis() - delay;
+
+        let rows = sqlx::query!(
+            r#"SELECT id FROM peer_key WHERE last_seen > ?1"#,
+            cutoff
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let deser = PublicKey::from_bytes(
+                row.id.safe_get_msg("Missing public key in database")?.clone()
+            );
+            res.push(deser);
+        }
+        Ok(res)
     }
+    //
+    // pub async fn peers_by_utxo_distance(
+    //     &self,
+    //     hash: Hash,
+    // ) -> Result<usize, ErrorInfo> {
+    //     let mut pool = self.ctx.pool().await?;
+    //     // let rows = sqlx::query!(
+    //     //     r#"SELECT UNIQUE(peers.peer_data) FROM peer_key INNER JOIN on peer_key.id = peers.id WHERE peer_key.id"#,
+    //     //     height
+    //     // )
+    //     //     .fetch_all(&mut pool)
+    //     //     .await;
+    //     // let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+    //     // let mut res = vec![];
+    //     // for row in rows_m {
+    //     //     res.push(AddressHistoricalBalance{
+    //     //         address: Address::from_bytes(row.address.safe_get_msg("Row missing address")?.clone())?,
+    //     //         balance: row.balance.safe_get_msg("Row missing balance")?.clone(),
+    //     //         height: height.clone()
+    //     //     });
+    //     // }
+    //     // Ok(res)
+    //     Ok(0)
+    // }
 
 }
 

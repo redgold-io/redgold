@@ -103,6 +103,16 @@ impl Transaction {
             .collect()
     }
 
+    pub fn total_output_amount(&self) -> i64 {
+        let mut total = 0;
+        for o in &self.outputs {
+            if let Some(a) = o.opt_amount() {
+                total += a
+            }
+        }
+        total
+    }
+
     pub fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
         let input = self
             .inputs

@@ -179,8 +179,8 @@ impl TransactionTestContext {
             .expect("create");
         let g = genesis::create_genesis_transaction();
 
-        ds.insert_transaction(&g, EARLIEST_TIME)
-            .expect("Insert fail");
+        ds.transaction_store.insert_transaction(&g, EARLIEST_TIME, true, None)
+            .await.expect("Insert fail");
         info!(
             "Data store immediate genesis query {:?}",
             ds.query_utxo_all_debug().unwrap()

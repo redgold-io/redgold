@@ -14,16 +14,16 @@ use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct DownloadMaxTimes {
-    pub utxo: u64,
-    pub transaction: u64,
-    pub observation: u64,
-    pub observation_edge: u64,
+    pub utxo: i64,
+    pub transaction: i64,
+    pub observation: i64,
+    pub observation_edge: i64,
 }
 
 pub fn download_msg(
     relay: &Relay,
-    start_time: u64,
-    end_time: u64,
+    start_time: i64,
+    end_time: i64,
     data_type: DownloadDataType,
     key: PublicKey,
 ) -> Result<Response, String> {
@@ -34,8 +34,8 @@ pub fn download_msg(
     let r = c.sender.clone();
     let mut request = Request::empty();
     request.download_request = Some(DownloadRequest {
-            start_time,
-            end_time,
+            start_time: start_time as u64,
+            end_time: end_time as u64,
             data_type: data_type as i32,
             offset: None,
     });
@@ -49,15 +49,18 @@ pub fn download_msg(
         .send(message)
         .map_err(|e| e.to_string())?;
     // info!("Sent peer message for download, awaiting response with timeout 120");
-    Ok(c.receiver
+    let response = c.receiver
         .recv_timeout(Duration::from_secs(120))
-        .map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    use redgold_schema::json_or;
+    // info!("Download response: {}", json_or(&response.clone()));
+    Ok(response)
 }
 
-pub fn download_all(
+pub async fn download_all(
     relay: &Relay,
-    start_time: u64,
-    end_time: u64,
+    start_time: i64,
+    end_time: i64,
     key: PublicKey,
     clean_up_utxo: bool,
 ) {
@@ -72,7 +75,7 @@ pub fn download_all(
     let vec = rr.unwrap().download_response.unwrap().utxo_entries;
     info!("Downloaded: {} utxo entries", vec.len());
     for x in vec.clone() {
-        let err = DataStore::map_err(relay.ds.insert_utxo(&x));
+        let err = relay.ds.transaction_store.insert_utxo(&x).await;
         if err.is_err() {
             error!("{:?}", err);
         }
@@ -89,7 +92,10 @@ pub fn download_all(
     for x in r.unwrap().download_response.unwrap().transactions {
         relay
             .ds
-            .insert_transaction_raw(&x.transaction.as_ref().unwrap(), x.time);
+            .transaction_store
+            .insert_transaction_raw(&x.transaction.as_ref().unwrap(), x.time as i64, true, None)
+            .await;
+        // TODO return this error
         // .expect("fix");
         for (i, j) in x.transaction.as_ref().unwrap().iter_utxo_inputs() {
             // todo probably distinguish between empty or not ?
@@ -131,7 +137,7 @@ pub fn download_all(
 Actual download process should start with getting the current parquet part file
 snapshot through IPFS for all the different data types. The compacted format.
 */
-pub fn download(relay: Relay, key: PublicKey) {
+pub async fn download(relay: Relay, key: PublicKey) {
     // remove genesis entry if it exists.
     // for (x, y) in create_genesis_transaction().iter_utxo_outputs() {
     //     // let err = DataStore::map_err(relay.ds.clone().delete_utxo(&x, y as u32));
@@ -147,7 +153,7 @@ pub fn download(relay: Relay, key: PublicKey) {
 
     let start_dl_time = util::current_time_millis();
 
-    download_all(&relay, EARLIEST_TIME, start_dl_time, key, false);
+    download_all(&relay, EARLIEST_TIME, start_dl_time as i64, key, false).await;
 
     // relay.node_state.store(NodeState::Synchronizing);
     //
