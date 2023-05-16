@@ -1,4 +1,4 @@
-use crate::ErrorInfo;
+use crate::{ErrorInfo, HashClear};
 use crate::structs::ResponseMetadata;
 
 impl ErrorInfo {
@@ -10,5 +10,11 @@ impl ErrorInfo {
             success: false,
             error_info: Some(self),
         }
+    }
+}
+
+impl HashClear for ErrorInfo {
+    fn hash_clear(&mut self) {
+
     }
 }

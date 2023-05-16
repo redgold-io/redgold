@@ -9,7 +9,7 @@ use structs::{
     StructMetadata, Transaction,
 };
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType};
 use crate::util::{dhash_str, dhash_vec};
 use crate::util::wallet::{generate_key, generate_key_i};
 
@@ -39,6 +39,8 @@ pub mod udp;
 pub mod control;
 pub mod public_key;
 pub mod seeds;
+pub mod trust;
+pub mod input;
 
 
 use std::str::FromStr;
@@ -86,6 +88,7 @@ impl Into<Hash> for Multihash {
         Hash {
             bytes: bytes_data(self.to_bytes()),
             hash_format_type: HashFormatType::Multihash as i32,
+            hash_type: HashType::Transaction as i32,
         }
     }
 }
@@ -95,6 +98,7 @@ impl Into<Hash> for Vec<u8> {
         Hash {
             bytes: bytes_data(self),
             hash_format_type: HashFormatType::Legacy as i32,
+            hash_type: HashType::Transaction as i32,
         }
     }
 }
