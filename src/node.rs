@@ -33,7 +33,7 @@ use crate::data::data_store::DataStore;
 use crate::data::download;
 use crate::genesis::{create_genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::node_config::NodeConfig;
-use crate::schema::structs::{AddPeerFullRequest, ControlRequest, ErrorInfo, NodeState};
+use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
 use crate::trust::rewards::Rewards;
 use crate::{canary, util};
@@ -257,7 +257,7 @@ impl Node {
             }
         ).collect_vec();
         let tx = genesis_tx_from(outputs); //EARLIEST_TIME
-        let res = tx.to_utxo_entries(EARLIEST_TIME).iter().zip(0..50).map(|(o, i)| {
+        let res = tx.to_utxo_entries(EARLIEST_TIME as u64).iter().zip(0..50).map(|(o, i)| {
             let kp = node_config.wallet().key_at(i as usize);
             let s = SpendableUTXO {
                 utxo_entry: o.clone(),
@@ -303,10 +303,11 @@ impl Node {
                 info!("Genesis local test multiple kp");
 
                 let tx = Node::genesis_from(node_config.clone()).0;
-                let _res_err = DataStore::map_err(
+                let _res_err = runtimes.auxiliary.block_on(
                     relay
                         .ds
-                        .insert_transaction(&tx, EARLIEST_TIME),
+                        .transaction_store
+                        .insert_transaction(&tx, EARLIEST_TIME, true, None)
                 );
             // }
             // .expect("Genesis inserted or already exists");
@@ -364,10 +365,10 @@ impl Node {
             let key = data.node_metadata[0].public_key_bytes()?;
             // TODO Change this invocation to an .into() in a non-schema key module
             let pk = keys::public_key_from_bytes(&key).expect("works");
-            download::download(
+            runtimes.auxiliary.block_on(download::download(
                 relay.clone(),
                 pk
-            );
+            ));
         }
 
         info!("Node ready");

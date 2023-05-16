@@ -32,7 +32,7 @@ fn get_seeds() -> Vec<Seed> {
         s.external_address = r.external_address.clone();
         s.environments = vec![NetworkEnvironment::parse(r.network_environment.clone()) as i32];
         let mut t = TrustData::default();
-        t.label = r.score;
+        t.with_label(r.score);
         s.trust = vec![t];
         s
     }).collect_vec()
