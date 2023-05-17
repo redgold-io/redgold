@@ -5,7 +5,10 @@ use crate::util::init_logger;
 use crate::util::lang_util::remove_whitespace;
 use log::{error, info};
 use std::time::Duration;
+use reqwest::ClientBuilder;
 use tokio::time;
+use redgold_schema::ErrorInfoContext;
+use redgold_schema::structs::ErrorInfo;
 
 const S3_PREFIX_URL: &str = "https://redgold-public.s3.us-west-1.amazonaws.com/release/";
 // detect OS.
@@ -52,6 +55,25 @@ pub async fn pull_sha256_hash(
         .text()
         .await?;
     Ok(res)
+}
+pub async fn get_s3_sha256_release_hash(
+    network_type: NetworkEnvironment, timeout: Option<Duration>
+) -> Result<String, ErrorInfo> {
+    let client = ClientBuilder::new().timeout(timeout.unwrap_or(Duration::from_secs(2))).build()
+        .error_info("Client build failure")?;
+    let res = client
+        .get(get_s3_sha256_path(network_type))
+        .send()
+        .await.error_info("Send failure")?
+        .text()
+        .await.error_info("text decoding failure")?;
+    Ok(res)
+}
+
+pub async fn get_s3_sha256_release_hash_short_id(
+    network_type: NetworkEnvironment, timeout: Option<Duration>
+) -> Result<String, ErrorInfo> {
+    get_s3_sha256_release_hash(network_type, timeout).await.map(|s| s[..9].to_string())
 }
 
 // TODO: This should really be coming from other peers as well for

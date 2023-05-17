@@ -135,6 +135,15 @@ impl NodeConfig {
         tx
     }
 
+    pub fn peer_node_data_tx(&self) -> Transaction {
+        let pair = self.wallet().active_keypair();
+
+        let tx = TransactionBuilder::new().with_output_node_metadata(
+            &pair.address_typed(), self.node_metadata()
+        ).transaction.clone();
+        tx
+    }
+
     pub fn lb_client(&self) -> PublicClient {
         let vec = self.load_balancer_url.split(":").collect_vec();
         let last = vec.get(vec.len() - 1).unwrap().to_string();
