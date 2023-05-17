@@ -13,6 +13,7 @@ pub mod image_load;
 pub mod initialize;
 pub mod tables;
 pub mod server_tab;
+pub mod home;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]

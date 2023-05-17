@@ -5,6 +5,7 @@ use crate::util::init_logger;
 use crate::util::lang_util::remove_whitespace;
 use log::{error, info};
 use std::time::Duration;
+use reqwest::ClientBuilder;
 use tokio::time;
 use redgold_schema::ErrorInfoContext;
 use redgold_schema::structs::ErrorInfo;
@@ -54,6 +55,31 @@ pub async fn pull_sha256_hash(
         .text()
         .await.error_info("decoding failure of text")?;
     Ok(res)
+}
+pub async fn get_s3_sha256_release_hash(
+    network_type: NetworkEnvironment, timeout: Option<Duration>
+) -> Result<String, ErrorInfo> {
+    let client = ClientBuilder::new().timeout(timeout.unwrap_or(Duration::from_secs(2))).build()
+        .error_info("Client build failure")?;
+    let res = client
+        .get(get_s3_sha256_path(network_type))
+        .send()
+        .await.error_info("Send failure")?
+        .text()
+        .await.error_info("text decoding failure")?;
+    let res = res.replace("\n", "").trim().to_string();
+    Ok(res)
+}
+
+// Move this into a trait
+pub async fn get_s3_sha256_release_hash_short_id(
+    network_type: NetworkEnvironment, timeout: Option<Duration>
+) -> Result<String, ErrorInfo> {
+    get_s3_sha256_release_hash(network_type, timeout).await.map(|s| {
+        let len = s.len();
+        let start = len - 9;
+        s[start..len].to_string()
+    })
 }
 
 #[ignore]

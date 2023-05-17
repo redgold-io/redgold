@@ -12,7 +12,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, error_info, ProtoSerde, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
@@ -303,6 +303,7 @@ impl Node {
                 info!("Genesis local test multiple kp");
 
                 let tx = Node::genesis_from(node_config.clone()).0;
+                runtimes.auxiliary.block_on(relay.ds.config_store.insert_update_json("genesis", tx.json()?))?;
                 let _res_err = runtimes.auxiliary.block_on(
                     relay
                         .ds

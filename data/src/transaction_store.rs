@@ -1,3 +1,6 @@
+use sqlx::query::Map;
+use sqlx::{Error, Sqlite};
+use sqlx::sqlite::{SqliteArguments, SqliteRow};
 use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, PeerData, Transaction, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, WithMetadataHashable};
 use crate::DataStoreContext;
@@ -71,6 +74,63 @@ impl TransactionStore {
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
     }
+
+    pub async fn query_recent_transactions(
+        &self, limit: Option<i64>
+    ) -> Result<Vec<Transaction>, ErrorInfo> {
+        let limit = limit.unwrap_or(10);
+        let mut pool = self.ctx.pool().await?;
+
+        // : Map<Sqlite, fn(SqliteRow) -> Result<Record, Error>, SqliteArguments>
+        let map = sqlx::query!(
+            r#"SELECT raw_transaction FROM transactions WHERE rejection_reason IS NULL AND accepted = 1
+            ORDER BY time DESC LIMIT ?1"#,
+            limit
+        );
+        let rows = map.fetch_all(&mut pool).await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let option1 = row.raw_transaction;
+            if let Some(o) = option1 {
+                let deser = Transaction::proto_deserialize(o)?;
+                res.push(deser);
+            }
+        }
+        Ok(res)
+    }
+
+    pub async fn count_total_accepted_transactions(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM transactions WHERE rejection_reason IS NULL AND accepted = 1"#
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(row.count as i64);
+        }
+        let option = res.get(0).safe_get()?.clone().clone();
+        Ok(option)
+    }
+    //
+    // pub async fn count_total_accepted_transactions(
+    //     &self
+    // ) -> Result<i64, ErrorInfo> {
+    //
+    //     let qry = sqlx::query!(
+    //         r#"SELECT COUNT(*) as count FROM transactions WHERE rejection_reason IS NULL AND accepted = 1"#
+    //     );
+    //     let vec = self.ctx.run_query(
+    //         qry, |r | Ok(r.count)
+    //     ).await?;
+    //     Ok(vec.get(0).safe_get()?.clone())
+    // }
 
     pub async fn query_maybe_transaction(
         &self,

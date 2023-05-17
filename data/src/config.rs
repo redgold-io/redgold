@@ -14,6 +14,10 @@ pub struct ConfigStore {
 
 impl ConfigStore {
 
+    pub async fn store_latest_self_observation() -> Result<(), ErrorInfo> {
+        unimplemented!()
+    }
+
     pub async fn insert_update(
         &self,
         key: String,
@@ -32,12 +36,32 @@ impl ConfigStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
     }
+    //
+    // pub async fn insert_update_bytes(
+    //     &self,
+    //     key: String,
+    //     value: Vec<u8>
+    // ) -> Result<i64, ErrorInfo> {
+    //     let mut pool = self.ctx.pool().await?;
+    //
+    //     let rows = sqlx::query!(
+    //         r#"
+    //     INSERT OR REPLACE INTO config ( key_name, value_bytes ) VALUES ( ?1, ?2)
+    //             "#,
+    //         key, value
+    //     )
+    //         .execute(&mut pool)
+    //         .await;
+    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+    //     Ok(rows_m.last_insert_rowid())
+    // }
 
-    pub async fn insert_update_json<T: Serialize>(
+    pub async fn insert_update_json<T: Serialize, S: Into<String>>(
         &self,
-        key: String,
+        key: S,
         value: T
     ) -> Result<i64, ErrorInfo> {
+        let key: String = key.into();
         let mut pool = self.ctx.pool().await?;
         let val = json(&value)?;
         let rows = sqlx::query!(

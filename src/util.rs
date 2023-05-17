@@ -41,10 +41,15 @@ use log4rs::config::Logger;
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::Handle;
 use rand::rngs::OsRng;
-use rand::RngCore;
+use rand::{Rng, RngCore};
 use redgold_schema::TestConstants;
 use redgold_schema::util::{dhash_str, sign};
 use redgold_schema::util::wallet::{generate_key, generate_key_i};
+
+pub fn random_salt() -> i64 {
+    let mut rng = rand::thread_rng();
+    rng.gen::<i64>()
+}
 
 pub fn sha256(s: &[u8]) -> [u8; 32] {
     let mut hash = [0u8; 32];

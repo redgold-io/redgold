@@ -31,6 +31,8 @@ anyhow = "1"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 csv = "1.1"
 serde = { version = "1.0.130", features = ["default", "derive"] }
+prost-helper = "0.2.0"
+num-traits = "0.2.15"
 
 [dependencies.bitcoin]
 version = "0.21"
@@ -39,5 +41,7 @@ features = ["serde", "bitcoinconsensus"]
 [build-dependencies]
 prost-build = "0.8"
 prost-serde = "0.2.0"
+prost-helper = "0.2.0"
 serde = "1.0.130"
 serde_json = "1.0.59"
+num-traits = "0.2.15"

@@ -742,14 +742,14 @@ impl PublicResponse {
     }
 }
 
-trait EasyJson {
+pub trait EasyJson {
     fn json(&self) -> Result<String, ErrorInfo>;
     fn json_or(&self) -> String;
     fn json_pretty(&self) -> Result<String, ErrorInfo>;
 
 }
 
-trait EasyJsonDeser {
+pub trait EasyJsonDeser {
     fn json_from<'a, T: serde::Deserialize<'a>>(&'a self) -> Result<T, ErrorInfo>;
 }
 
