@@ -2,7 +2,7 @@ use bitcoin::secp256k1::rand;
 use bitcoin::secp256k1::rand::Rng;
 use crate::{Address, constants, ErrorInfo, KeyPair, NetworkEnvironment, PeerData, struct_metadata_new, StructMetadata, Transaction, util};
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Output, Proof, StandardData, TransactionAmount, TransactionOptions, UtxoEntry};
+use crate::structs::{NodeMetadata, Output, Proof, StandardData, TransactionAmount, TransactionOptions, UtxoEntry};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -65,6 +65,21 @@ impl TransactionBuilder {
         let output = Output {
             address: Some(destination.clone()),
             data: StandardData::peer_data(pd),
+            product_id: None,
+            counter_party_proofs: vec![],
+            contract: None,
+        };
+        self.transaction.outputs.push(output);
+        self
+    }
+
+    pub fn with_output_node_metadata(&mut self, destination: &Address, pd: NodeMetadata) -> &mut Self {
+        let mut data = StandardData::default();
+        data.node_metadata = Some(pd);
+        let data = Some(data);
+        let output = Output {
+            address: Some(destination.clone()),
+            data,
             product_id: None,
             counter_party_proofs: vec![],
             contract: None,

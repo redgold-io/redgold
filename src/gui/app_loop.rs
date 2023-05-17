@@ -6,48 +6,24 @@ use std::time::Duration;
 use crossbeam::atomic::AtomicCell;
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, TextStyle, Ui};
-use eframe::{egui};
+use eframe::egui;
 use itertools::Itertools;
 use log::{error, info};
 
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::ClientApp;
+use crate::gui::{ClientApp, home, tables};
 use crate::util;
 use rand::Rng;
 use rocket::http::ext::IntoCollection;
 use redgold_schema::util::{dhash_vec, mnemonic_builder};
-
-#[derive(Copy, Clone)]
-pub struct NetworkStatusInfo{
-    network_index: usize,
-    network: NetworkEnvironment,
-    reachable: bool
-    // num_peers: usize,
-    // num_transactions: usize,
-    // genesis_hash_short: String,
-}
 
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
 //     }
 // }
-
-pub struct HomeState {
-    network_status_info: Arc<AtomicCell<Vec<NetworkStatusInfo>>>,
-    last_query_started_time: Option<i64>
-}
-
-impl HomeState {
-    pub fn from() -> Self {
-        Self {
-            network_status_info: Arc::new(AtomicCell::new(vec![])),
-            last_query_started_time: None,
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct ServerStatus {
@@ -82,11 +58,11 @@ pub struct LocalState {
     stored_private_key_hexes: Vec<String>,
     iv: [u8; 16],
     wallet_first_load_state: bool,
-    node_config: NodeConfig,
-    runtime: Arc<Runtime>,
-    home_state: HomeState,
+    pub node_config: NodeConfig,
+    pub runtime: Arc<Runtime>,
+    pub home_state: HomeState,
     server_state: ServersState,
-    current_time: i64
+    pub current_time: i64
 }
 
 #[allow(dead_code)]
@@ -205,160 +181,13 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
     });
 }
 
-pub async fn query_network_status(
-    node_config: NodeConfig,
-    result: Arc<AtomicCell<Vec<NetworkStatusInfo>>>
-) -> Result<(), ErrorInfo> {
-
-    let mut results = vec![];
-    for (i, x) in NetworkEnvironment::status_networks().iter().enumerate() {
-        let mut config = node_config.clone();
-        config.network = x.clone();
-        let mut client = config.lb_client();
-        client.timeout = Duration::from_secs(5);
-        let res = client.about().await;
-
-        let reachable = match res {
-            Ok(a) => {
-                info!("Network status query success: {}", crate::schema::json_or(&a));
-                true
-            }
-            Err(e) => {
-                error!("Network status query failed: {}", crate::schema::json_or(&e));
-                false
-            }
-        };
-        let status = NetworkStatusInfo{
-            network_index: i,
-            network: x.clone(),
-            reachable,
-        };
-        results.push(status);
-    }
-    result.store(results.clone());
-    let map2 = result.take();
-    result.store(map2.clone());
-    // info!("Network status: {}", map2.to_string());
-    Ok(())
-}
+// #[tokio::test]
+// pub fn debug_about {
+//
+// }
 use egui_extras::{Column, TableBuilder};
 use surf::http::headers::ToHeaderValues;
-
-
-pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
-
-    if data.len() == 0 {
-        return;
-    }
-
-    let headers = data.get(0).expect("").clone();
-    let columns = headers.len();
-
-    let text_height = 25.0;
-    let mut table = TableBuilder::new(ui)
-        .striped(true)
-        .resizable(false)
-        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-        .min_scrolled_height(0.0);
-
-    for _ in 0..columns {
-        table = table.column(Column::auto());
-    };
-
-    table
-        .header(text_height, |mut header| {
-            for h in headers {
-                header.col(|ui| {
-                    ui.strong(h);
-                });
-            }
-        }).body(|mut body| {
-        body.rows(text_height, data.len() - 1, |row_index, mut row| {
-            let row_data = data.get(row_index + 1).expect("value row missing");
-            for cell in row_data {
-                row.col(|ui| {
-                    ui.label(cell);
-                });
-            }
-        });
-    });
-
-}
-
-pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
-    ui.heading("Network Status");
-    ui.separator();
-    let home_state = &mut local_state.home_state;
-    let nc2 = local_state.node_config.clone();
-    let arc = home_state.network_status_info.clone();
-    if home_state.last_query_started_time
-        .map(|q| (local_state.current_time - q) > 1000*25)
-        .unwrap_or(true) {
-        home_state.last_query_started_time = Some(local_state.current_time);
-        local_state.runtime.spawn(async move {
-            query_network_status(nc2, arc).await
-        });
-    }
-    let query_status_string = home_state.last_query_started_time.map(|q| {
-        format!("Queried: {:?} seconds ago", (local_state.current_time - q) / 1000)
-    }).unwrap_or("unknown error".to_string());
-    ui.label(query_status_string);
-    ui.separator();
-
-
-    // let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
-    let num_rows = NetworkEnvironment::status_networks().len();
-    let mut network_index = HashMap::new();
-    let row_network: Vec<String> = NetworkEnvironment::status_networks()
-        .iter().enumerate().map(|(index, x)| {
-        network_index.insert(index, x.clone());
-        x.to_std_string()
-    }).collect_vec();
-
-    // Well this is ridiculous
-    // can we change from atomic cell or use some copyable type?
-    let status_info = home_state.network_status_info.take();
-    home_state.network_status_info.store(status_info.clone());
-
-    let text_height = 20.0;
-    let mut table = TableBuilder::new(ui)
-        .striped(true)
-        .resizable(false)
-        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-        .column(Column::auto())
-        .column(Column::auto())
-        // .column(Column::initial(100.0).range(40.0..=300.0))
-        // .column(Column::initial(100.0).at_least(40.0).clip(true))
-        // .column(Column::remainder())
-        .min_scrolled_height(0.0);
-
-    // info!("Status home loop info: {:?}", status_info.to_string());
-    table
-        .header(20.0, |mut header| {
-            header.col(|ui| {
-                ui.strong("Network");
-            });
-            header.col(|ui| {
-                ui.strong("Status");
-            });
-        }).body(|mut body| {
-        body.rows(text_height, num_rows, |row_index, mut row| {
-            let info = status_info.get(row_index).clone();
-            row.col(|ui| {
-                let option = row_network.get(row_index).clone().expect("row index missing").clone();
-                ui.label(option);
-            });
-            row.col(|ui| {
-                let reachable = info.map(|n| match n.reachable {
-                    true => {"Online"}
-                    false => {"Offline"}
-                }).unwrap_or("querying").to_string();
-                ui.label(reachable);
-            });
-        });
-    });
-
-}
+use crate::gui::home::{gui_status_networks, HomeState, NetworkStatusInfo};
 
 pub async fn update_server_status(servers: Vec<Server>, mut status: Arc<Mutex<Vec<ServerStatus>>>) {
     let mut results = vec![];
@@ -441,7 +270,7 @@ pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalS
         }
     });
     ui.separator();
-    text_table(ui, table_rows);
+    tables::text_table(ui, table_rows);
 
 }
 
@@ -547,7 +376,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, frame: &mut eframe::
         // The central panel the region left after adding TopPanel's and SidePanel's
         match local_state.active_tab {
             Tab::Home => {
-                home_screen(ui, ctx, local_state);
+                home::home_screen(ui, ctx, local_state);
             }
             Tab::Wallet => {
                 if local_state.active_passphrase.is_none() {

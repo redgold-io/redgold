@@ -75,14 +75,15 @@ impl Observation {
 }
 
 impl ObservationMetadata {
-    pub fn default() -> Self {
+    pub fn test_default() -> Self {
         let tc = TestConstants::new();
         Self {
             observed_hash: Some(tc.hash_vec.into()),
             hash: None,
-            hash_type: 0,
             state: None,
+            validation_confidence: None,
             struct_metadata: struct_metadata_new(),
+            observation_type: 0
         }
     }
 }

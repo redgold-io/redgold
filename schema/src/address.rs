@@ -15,7 +15,7 @@ impl Into<Address> for structs::PublicKey {
                 b2.value = address_function_buf(&b.value);
                 b2
             }),
-            address_type: Some(AddressType::StandardKeyhash as i32),
+            address_type: AddressType::StandardKeyhash as i32,
         }
     }
 }
@@ -113,7 +113,7 @@ pub fn multi_address(public_key: &Vec<PublicKey>) -> Vec<u8> {
 pub fn address_data(address: Vec<u8>) -> Option<Address> {
     Some(Address {
         address: bytes_data(address),
-        address_type: Some(AddressType::StandardKeyhash as i32),
+        address_type: AddressType::StandardKeyhash as i32,
     })
 }
 

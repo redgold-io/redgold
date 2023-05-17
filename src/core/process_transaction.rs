@@ -13,7 +13,7 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::struct_metadata_new;
-use redgold_schema::structs::{GossipTransactionRequest, Request};
+use redgold_schema::structs::{GossipTransactionRequest, Hash, Request};
 
 use crate::core::internal_message::{FutLoopPoll, PeerMessage, RecvAsyncErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -420,15 +420,18 @@ impl TransactionProcessContext {
         }
 
         if !conflict_detected {
+            let mut hash: Hash = hash_vec.clone().into();
+            hash.hash_type = HashType::Transaction as i32;
             self.relay
                 .observation_metadata
                 .sender
                 .send(ObservationMetadata {
-                    observed_hash: Some(hash_vec.clone().into()),
+                    observed_hash: Some(hash),
                     hash: None,
-                    hash_type: HashType::Transaction as i32,
                     state: Some(State::Pending as i32),
-                    struct_metadata: redgold_schema::struct_metadata_new()
+                    validation_confidence: None,
+                    struct_metadata: redgold_schema::struct_metadata_new(),
+                    observation_type: 0
                 })
                 .expect("Fail");
         } else {
@@ -598,9 +601,10 @@ impl TransactionProcessContext {
             .send(ObservationMetadata {
                 hash: None, 
                 observed_hash: Some(hash.to_vec().into()),
-                hash_type: HashType::Transaction as i32,
                 state: Some(State::Finalized as i32),
-                struct_metadata: struct_metadata_new()
+                validation_confidence: None,
+                struct_metadata: struct_metadata_new(),
+                observation_type: 0
             })
             .expect("sent");
         info!(

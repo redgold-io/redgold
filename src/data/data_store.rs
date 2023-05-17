@@ -18,6 +18,7 @@ use redgold_data::DataStoreContext;
 use redgold_data::peer::PeerStore;
 use redgold_data::config::ConfigStore;
 use redgold_data::mp_store::MultipartyStore;
+use redgold_data::observation_store::ObservationStore;
 use redgold_data::servers::ServerStore;
 use redgold_data::transaction_store::TransactionStore;
 
@@ -63,6 +64,7 @@ pub struct DataStore {
     pub transaction_store: TransactionStore,
     pub multiparty_store: MultipartyStore,
     //pub server_store: ServerStore
+    pub observation: ObservationStore,
 }
 
 /*
@@ -774,13 +776,15 @@ impl DataStore {
         // Store node state for filter query for pending vs. finalized.
         // Remove all pending as part of cleanup operation.
         let res = conn.execute(
-            "INSERT OR REPLACE INTO observation (root, raw_observation, public_key, proof, time) VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT OR REPLACE INTO observation \
+            (root, raw_observation, public_key, proof, time, height) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 observation.merkle_root.clone().expect("a").vec(),
                 observation.proto_serialize(),
                 observation.proof.as_ref().unwrap().public_key_bytes().unwrap().clone(),
                 observation.proof.as_ref().unwrap().clone().proto_serialize(),
-                time
+                time,
+                observation.height.clone()
             ],
         )?;
 
@@ -1232,7 +1236,8 @@ WHERE
             config_store: ConfigStore{ ctx: ctx.clone() },
             // server_store: ServerStore{ ctx: ctx.clone() },
             transaction_store: TransactionStore{ ctx: ctx.clone() },
-            multiparty_store: MultipartyStore { ctx: ctx.clone() }
+            multiparty_store: MultipartyStore { ctx: ctx.clone() },
+            observation: ObservationStore { ctx: ctx.clone() }
         }
     }
 

@@ -35,7 +35,7 @@ use crate::schema::structs::{QueryAddressesResponse, Transaction};
 use crate::schema::{bytes_data, error_info};
 use crate::schema::{response_metadata, SafeBytesAccess, WithMetadataHashable};
 use crate::{schema, util};
-use crate::api::about;
+use crate::api::{about, as_warp_json_response};
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
@@ -184,7 +184,7 @@ impl PublicClient {
                     .iter()
                     .map(|a| Address {
                         address: bytes_data(a.clone()),
-                        address_type: Some(AddressType::StandardKeyhash as i32),
+                        address_type: AddressType::StandardKeyhash as i32,
                     })
                     .collect_vec(),
             });
@@ -339,7 +339,7 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
         }
     }
     if let Some(r) = request.about_node_request {
-        response1.about_node_response = Some(about::handle_about_node_request(r, relay.clone()).await?);
+        response1.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
     }
     if let Some(r) = request.hash_search_request {
         match hash_query(relay.clone(), r.search_string).await {
@@ -375,6 +375,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         res
     });
 
+    // This is the type PublicRequest
     let trelay = relay.clone();
     let transaction = warp::post()
         .and(warp::path("request"))
@@ -432,12 +433,9 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move || {
             let relay3 = a_relay.clone();
             async move {
-                let mut abr = AboutNodeResponse::empty();
-                abr.latest_metadata = Some(relay3.node_config.peer_data_tx());
-                let res: Result<Json, warp::reject::Rejection> = {
-                    Ok(warp::reply::json(&abr))
-                };
-                res
+                // TODO call about handler
+                let mut abr = about::handle_about_node(AboutNodeRequest::default(), relay3.clone()).await;
+                as_warp_json_response(abr)
             }
         });
 
