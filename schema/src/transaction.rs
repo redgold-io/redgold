@@ -1,6 +1,6 @@
 use crate::address::address_data;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Error as RGError, ErrorInfo, Hash, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Error as RGError, ErrorInfo, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
@@ -350,6 +350,23 @@ impl Transaction {
             return Err(ErrorInfo::error_info("Missing peer data in transaction"));
         }
     }
+
+    pub fn node_metadata(&self) -> Result<NodeMetadata, ErrorInfo> {
+        let mut res = vec![];
+        for o in &self.outputs {
+            if let Some(data) = &o.data {
+                if let Some(d) = &data.node_metadata {
+                    res.push(d.clone());
+                }
+            }
+        }
+        if res.len() == 1 {
+            return Ok(res[0].clone());
+        } else {
+            return Err(ErrorInfo::error_info("Missing peer data in transaction"));
+        }
+    }
+
 }
 
 impl TransactionAmount {
@@ -388,6 +405,8 @@ impl StandardData {
             node_metadata: None,
             dynamic_node_metadata: None,
             height: None,
+            data_hash: None,
+            hash: None,
         }
     }
     pub fn peer_data(pd: PeerData) -> Option<Self> {

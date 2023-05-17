@@ -21,18 +21,20 @@ use crate::schema::structs::Request;
 use crate::schema::structs::{Observation, ObservationMetadata, Proof};
 use crate::schema::structs::ErrorInfo;
 use crate::util;
-use crate::util::current_time_millis;
+use crate::util::{current_time_millis, random_salt};
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::data::data_store::DataStore;
 use crate::schema::json;
 
 pub struct ObservationBuffer {
     data: Vec<ObservationMetadata>,
-    relay: Relay
+    relay: Relay,
+    latest: Option<Observation>
 }
 
 impl ObservationBuffer {
     async fn run(&mut self) -> Result<(), ErrorInfo> {
+
         let mut interval =
             tokio::time::interval(self.relay.node_config.observation_formation_millis);
         // TODO use a select! between these two.
@@ -58,9 +60,14 @@ impl ObservationBuffer {
 
     // https://stackoverflow.com/questions/63347498/tokiospawn-borrowed-value-does-not-live-long-enough-argument-requires-tha
     pub fn new(relay: Relay, arc: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>>{
+
+        let latest = arc.block_on(relay.ds.observation
+            .select_latest_observation(relay.node_config.public_key())).ok().flatten();
+
         let mut o = Self {
             data: vec![],
-            relay
+            relay,
+            latest
         };
         arc.spawn(async move {
             o.run().await
@@ -79,7 +86,9 @@ impl ObservationBuffer {
             .collect_vec();
         let root = util::merkle::build(hashes)?.root;
         let vec = root.safe_bytes()?;
-        let o = Observation {
+        let parent_hash = self.latest.clone().map(|o| o.hash());
+        let height = self.latest.clone().map(|o| o.height + 1).unwrap_or(0);
+        let mut o = Observation {
             merkle_root: Some(vec.clone().into()),
             observations: clone,
             proof: Some(Proof::from_keypair(
@@ -87,10 +96,16 @@ impl ObservationBuffer {
                 self.relay.node_config.wallet().active_keypair(),
             )),
             struct_metadata: struct_metadata_new(),
-            hash: None
+            hash: None,
+            salt: random_salt(),
+            height,
+            parent_hash,
         };
         DataStore::map_err(self.relay.ds.insert_observation(o.clone(),
                                                             o.struct_metadata.safe_get()?.time as u64))?;
+        o.with_hash();
+        self.latest = Some(o.clone());
+        // self.relay.ds.transaction_store
         let mut request = Request::empty();
         request.gossip_observation_request = Some(GossipObservationRequest {
                 observation: Some(o.clone()),

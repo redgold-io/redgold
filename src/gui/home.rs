@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crossbeam::atomic::AtomicCell;
 use eframe::egui::Ui;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Transaction};
 use std::collections::HashMap;
 use eframe::egui;
 use egui_extras::{Column, TableBuilder};
@@ -54,25 +54,39 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
     ui.label(query_status_string);
     ui.separator();
 
-    let mut table_data: Vec<Vec<String>> = vec![];
-    let headers = vec!["Network".to_string(), "Status".to_string()];
-    table_data.push(headers.clone());
-
-
-    // let text_height = egui::TextStyle::Body.resolve(ui.style()).size;
-    // let networks = gui_status_networks();
-    // let num_rows = networks.len();
-    // let mut network_index = HashMap::new();
-    // let row_network: Vec<String> = networks
-    //     .iter().enumerate().map(|(index, x)| {
-    //     network_index.insert(index, x.clone());
-    //     x.to_std_string()
-    // }).collect_vec();
-
     // Well this is ridiculous
     // can we change from atomic cell or use some copyable type?
     let status_info = home_state.network_status_info.take();
     home_state.network_status_info.store(status_info.clone());
+
+    let mut table_data: Vec<Vec<String>> = vec![];
+    let headers = vec![
+        "Network", "Status", "S3 Release", "Checksum",
+        "Known Peers", "Peers", "Total TX", "Pending", "Obs Height", "XOR Distance",
+        // "Node Id", "Peer Id"
+
+    ].iter().map(|x| x.to_string()).collect_vec();
+    table_data.push(headers.clone());
+
+    for s in status_info.clone() {
+        let vec1 = vec![
+            s.network.to_std_string(),
+            match s.reachable {
+                true => { "Online" }
+                false => { "Offline" }
+            }.to_string(),
+            s.s3_release_exe_hash,
+            s.checksum,
+            s.known_peers.unwrap_or(0).to_string(),
+            s.peers.unwrap_or(0).to_string(),
+            s.total_tx.unwrap_or(0).to_string(),
+            s.pending.unwrap_or(0).to_string(),
+            s.obs_height.unwrap_or(0).to_string(),
+            // "".to_string(),
+            // "".to_string()
+        ];
+        table_data.push(vec1);
+    }
 
     if status_info.is_empty() {
         let networks = gui_status_networks();
@@ -81,28 +95,18 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
             v.push(n.to_std_string());
             let num_fill_rows = headers.len() - 1;
             for _ in 0..num_fill_rows {
-                v.push("querying".to_string());
+                v.push("...".to_string());
             }
             v
         }).collect_vec();
         table_data.extend(rows);
     }
 
-    for s in status_info.clone() {
-        let vec1 = vec![
-            s.network.to_std_string(),
-            match s.reachable {
-                true => { "Online" }
-                false => { "Offline" }
-            }.to_string()
-        ];
-        table_data.push(vec1);
-    }
     text_table(ui, table_data);
 
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
 pub struct NetworkStatusInfo{
     pub network_index: usize,
     pub network: NetworkEnvironment,
@@ -111,8 +115,13 @@ pub struct NetworkStatusInfo{
     // num_transactions: usize,
     // genesis_hash_short: String,
     pub s3_release_exe_hash: String,
-    pub peers: i64,
-    pub total_tx: i64,
+    pub peers: Option<i64>,
+    pub total_tx: Option<i64>,
+    pub checksum: String,
+    pub known_peers: Option<i64>,
+    pub recent_tx: Vec<Transaction>,
+    pub obs_height: Option<i64>,
+    pub pending: Option<i64>,
 }
 
 pub async fn query_network_status(
@@ -122,7 +131,7 @@ pub async fn query_network_status(
 
     let mut results = vec![];
     for (i, x) in gui_status_networks().iter().enumerate() {
-        let s3_release_exe_hash = util::auto_update::get_s3_sha256_release_hash(x.clone(), None)
+        let s3_release_exe_hash = util::auto_update::get_s3_sha256_release_hash_short_id(x.clone(), None)
             .await.unwrap_or("".to_string());
         // info!("Release exe hash: {}", release_exe_hash);
         let mut config = node_config.clone();
@@ -130,14 +139,36 @@ pub async fn query_network_status(
         let mut client = config.lb_client();
         client.timeout = Duration::from_secs(2);
         let res = client.about().await;
-        let mut peers = 0;
-        let mut total_tx = 0;
+        let mut peers = None;
+        let mut total_tx = None;
+        let mut checksum = "".to_string();
+        let mut known_peers = None;
+        let mut recent_tx = vec![];
+        let mut obs_height: Option<i64> = None;
+        let mut pending = None;
 
         let reachable = match res {
             Ok(a) => {
-                peers = a.num_active_peers;
-                total_tx = a.total_accepted_transactions;
-                info!("Network status query success: {}", crate::schema::json_or(&a));
+                let a2 = a.clone();
+                peers = Some(a.num_active_peers);
+                total_tx = Some(a.total_accepted_transactions);
+                if let Some(nmd) = a.latest_node_metadata {
+                    if let Some(d) = nmd.node_metadata().ok() {
+                        d.version_info.map(|v| {
+                            let c = v.executable_checksum;
+                            let len = c.len();
+                            let start = len - 9;
+                            if start > 0 {
+                                checksum = c[start..].to_string();
+                            }
+                        });
+                    }
+                }
+                known_peers = Some(a.num_known_peers);
+                recent_tx = a.recent_transactions;
+                obs_height = Some(a.observation_height);
+                pending = Some(a.pending_transactions);
+                // info!("Network status query success: {}", crate::schema::json_pretty(&a2).unwrap_or("".to_string()));
                 true
             }
             Err(e) => {
@@ -151,8 +182,14 @@ pub async fn query_network_status(
             reachable,
             s3_release_exe_hash,
             peers,
-            total_tx
+            total_tx,
+            checksum,
+            known_peers,
+            recent_tx,
+            obs_height,
+            pending
         };
+        info!("Network status: {}", crate::schema::json_pretty(&status.clone()).unwrap_or("".to_string()));
         results.push(status);
     }
     result.store(results.clone());

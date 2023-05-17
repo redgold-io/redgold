@@ -67,13 +67,19 @@ pub async fn get_s3_sha256_release_hash(
         .await.error_info("Send failure")?
         .text()
         .await.error_info("text decoding failure")?;
+    let res = res.replace("\n", "").trim().to_string();
     Ok(res)
 }
 
+// Move this into a trait
 pub async fn get_s3_sha256_release_hash_short_id(
     network_type: NetworkEnvironment, timeout: Option<Duration>
 ) -> Result<String, ErrorInfo> {
-    get_s3_sha256_release_hash(network_type, timeout).await.map(|s| s[..9].to_string())
+    get_s3_sha256_release_hash(network_type, timeout).await.map(|s| {
+        let len = s.len();
+        let start = len - 9;
+        s[start..len].to_string()
+    })
 }
 
 #[ignore]

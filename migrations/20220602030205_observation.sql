@@ -3,5 +3,6 @@ CREATE TABLE IF NOT EXISTS observation (
                                            raw_observation    BLOB,
                                            public_key    BLOB,
                                            proof    BLOB,
-                                           time INTEGER
+                                           time INTEGER,
+                                           height INTEGER
 );

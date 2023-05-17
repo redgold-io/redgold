@@ -193,6 +193,8 @@ message StandardData {
   optional NodeMetadata node_metadata = 9;
   optional DynamicNodeMetadata dynamic_node_metadata = 10;
   optional int64 height = 11;
+  Hash data_hash = 12;
+  Hash hash = 13;
 }
 
 message KeyedTypedValue {
@@ -384,25 +386,41 @@ message ObservationData {
   Observation observation = 2;
 }
 
+enum ValidationType {
+  // Perfect validation with all resolved dependencies
+  FULL = 0;
+  PARTIAL = 1;
+}
+
+
 // Update all these hashes / structmetadata fields.
 message ObservationMetadata {
   Hash observed_hash = 1;
-  HashType hash_type = 2;
+  ValidationType observation_type = 2;
   optional State state = 3;
-  StructMetadata struct_metadata = 4;
-  Hash hash = 5;
+  TrustData validation_confidence = 4;
+  StructMetadata struct_metadata = 5;
+  Hash hash = 6;
+  // Need to include some kind of information here associated with conflict ratio / trust rating.
 }
+
+
 
 // TODO: Salt? Peer identifier? Etc
 message Observation {
   // Merkle root of observations
   Hash merkle_root = 1;
-  // Observations
+  // Individual metadata of observations
   repeated ObservationMetadata observations = 2;
-  // Signature associated with peer
+  // Signature associated with node key
   Proof proof = 3;
   StructMetadata struct_metadata = 4;
+  // Hash of this data structure
   Hash hash = 5;
+  int64 salt = 6;
+  int64 height = 7;
+  // Hash of the preceding observation reference
+  Hash parent_hash = 8;
 }
 
 // Derived data structure, not a primary chain data structure
@@ -682,11 +700,12 @@ enum AddressType {
   BITCOIN_COMPAT_ADDRESS = 2;
   ETHEREUM_COMPAT_ADDRESS = 3;
   PUBLIC_KEY_DIRECT_ADDRESS = 4;
+  UNKNOWN_ADDRESS_TYPE = 5;
 }
 
 message Address {
   BytesData address = 1;
-  optional AddressType address_type = 2;
+  AddressType address_type = 2;
 }
 
 message QueryAddressesRequest {

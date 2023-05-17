@@ -1,4 +1,5 @@
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
+use curv::arithmetic::Zero;
 use itertools::Itertools;
 use log::{debug, info};
 use prost::{DecodeError, Message as msg};
@@ -265,9 +266,13 @@ fn test_decoding() {
 #[test]
 fn test_serialization() {
     let t = genesis::create_genesis_transaction();
-    let j = serde_json::to_string(&t).unwrap();
-    println!("{}", j);
+    let j = serde_json::to_string(&t.clone()).unwrap();
+    let j2 = serde_json::to_string_pretty(&t.clone()).unwrap();
+    println!("{}", j2);
     let t2 = serde_json::from_str::<Transaction>(&j).unwrap();
+    let test: i32 = 5;
+    let test2 = &test;
+    println!("{:?}", i32::is_zero(test2));
     assert_eq!(t, t2);
 }
 
@@ -276,9 +281,10 @@ fn test_serialization_obs() {
     let t = ObservationMetadata {
         observed_hash: Some(crate::schema::util::dhash_str("asdf").to_vec().into()),
         hash: None,
-        hash_type: HashType::Transaction as i32,
         state: None,
-        struct_metadata: None
+        validation_confidence: None,
+        struct_metadata: None,
+        observation_type: 0
     };
     let j = serde_json::to_string(&t).unwrap();
     println!("{}", j);

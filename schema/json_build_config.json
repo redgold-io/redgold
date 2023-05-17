@@ -143,15 +143,61 @@
     },
     {
       "scope": "field",
+      "description": "skip option default values",
+      "attr": "#[serde(skip_serializing_if = \"Option::is_none\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
+      "paths": [
+        "structs.StandardData.typed_value",
+        "structs.StandardData.matrix_typed_value",
+        "structs.StandardData.peer_data",
+        "structs.StandardData.node_metadata",
+        "structs.StandardData.dynamic_node_metadata",
+        "structs.StandardData.height",
+        "structs.StandardData.data_hash",
+        "structs.StandardData.hash",
+        "structs.Output.contract",
+        "structs.Output.product_id",
+        "structs.Transaction.options",
+        "structs.StandardData.keyed_typed_value"
+      ]
+    },
+    {
+      "scope": "field",
+      "description": "skip vec default values",
+      "attr": "#[serde(skip_serializing_if = \"Vec::is_empty\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
+      "paths": [
+        "structs.StandardData.typed_value_list",
+        "structs.Transaction.inputs",
+        "structs.Output.counter_party_proofs",
+        "structs.StandardData.keyed_typed_value_list",
+        "structs.StandardData.matrix_typed_value_list"
+      ]
+    },
+    {
+      "scope": "field",
       "description": "skip null values",
       "attr": "#[serde(deserialize_with = \"prost_helper::deserialize_null_default\")]",
-      "paths": []
+      "paths": [
+      ]
+    },
+    {
+      "scope": "field",
+      "description": "skip null values",
+      "attr": "#[serde(deserialize_with = \"prost_helper::deserialize_null_default\")]",
+      "paths": [
+      ]
     },
     {
       "scope": "field",
       "description": "skip 0 for any num",
-      "attr": "#[serde(skip_serializing_if = \"prost_helper::is_zero\")]",
-      "paths": []
+      "attr": "#[serde(skip_serializing_if = \"num_traits::identities::Zero::is_zero\", default)]",
+      "paths": [
+        "structs.Hash.hash_type",
+        "structs.BytesData.decoder",
+        "structs.BytesData.version",
+        "structs.StructMetadata.version",
+        "structs.Hash.hash_format_type",
+        "structs.Address.address_type"
+      ]
     },
     {
       "scope": "field",
