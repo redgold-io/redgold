@@ -8,6 +8,7 @@ use crate::schema::{bytes_data};
 
 use prost::Message;
 use redgold_schema::HashClear;
+use redgold_schema::structs::HashType;
 use redgold_schema::util::{dhash, dhash_vec, merge_hash};
 
 // this is incredibly inefficient but is a placeholder for now.
@@ -69,6 +70,7 @@ pub fn build_root_simple(leafs: &Vec<Vec<u8>>) -> Hash {
     return Hash {
         bytes: bytes_data(res),
         hash_format_type: HashFormatType::Legacy as i32,
+        hash_type: HashType::ObservationMerkleRoot as i32,
     };
 }
 

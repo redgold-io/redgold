@@ -6,7 +6,7 @@
     {
       "scope": "type",
       "description": "serde support for message",
-      "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize)]",
+      "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
         "structs.Transaction", "structs.Proof",
         "structs.PoWProof", "structs.ProductId",
@@ -16,7 +16,6 @@
         "structs.ResponseMetadata", "structs.ErrorInfo", "structs.ErrorDetails",
         "structs.Request", "structs.Response",
         "structs.ControlRequest", "structs.ControlResponse",
-        "structs.AddPeerFullRequest",
         "structs.PublicRequest", "structs.PublicResponse",
         "structs.SubmitTransactionRequest", "structs.SubmitTransactionResponse",
         "structs.GossipTransactionRequest", "structs.GossipTransactionResponse",
@@ -48,7 +47,6 @@
         "structs.QueryAddressesRequest",
         "structs.QueryAddressesResponse",
         "structs.Address",
-        "structs.StoredPeerData",
         "structs.PartitionInfo",
         "structs.Signature",
         "structs.PublicKey",
@@ -85,6 +83,10 @@
         "structs.InitiateMultipartySigningResponse",
         "structs.UdpMessage",
         "structs.DynamicNodeMetadata",
+        "structs.Seed",
+        "structs.FloatingUtxoId",
+        "structs.FixedUtxoId",
+        "structs.UsedOutputs",
         "structs.VersionInfo"
       ]
     },
@@ -114,8 +116,6 @@
       "paths": [
         "structs.PoWProof.proof",
         "structs.AddPeerFull.id", "structs.AddPeerFull.public_key",
-        "structs.ResolveHashRequest.hash",
-        "structs.ResolveHashResponse.data",
         "structs.ObservationEdge.root",
         "structs.ObservationEdge.leaf_hash",
         "structs.ObservationEdge.observation_hash",

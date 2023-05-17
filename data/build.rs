@@ -24,13 +24,17 @@ async fn init_db() {
 
     // TODO: Remove this when migrating to sqlx as sqlx can't seem to create a table ? as otherwise
     let conn = Connection::open(path.clone()).expect("Open");
-    conn.execute(
+    let res = conn.execute(
         "CREATE TABLE IF NOT EXISTS temp_debug (
                   test INTEGER PRIMARY KEY
                   )",
         [],
     )
     .expect("create temp table");
+
+    // let count = conn.execute("INSERT OR REPLACE INTO temp_debug (test) VALUES (?1)", [1]).expect("insert");
+    // let count = conn.execute("SELECT COUNT(*) FROM temp_debug", []).expect("count");
+    // println!("Count");
 
     let options = SqliteConnectOptions::new()
         .create_if_missing(true) // TODO: Why does this not work in build.rs

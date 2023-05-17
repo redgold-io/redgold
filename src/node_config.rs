@@ -94,9 +94,10 @@ impl NodeConfig {
             proof: None,
             node_type: Some(NodeType::Static as i32),
             version_info: Some(VersionInfo{
-                checksum_hash: None, // TODO: Add checksum hash
-                next_checksum_hash: None,
-                next_upgrade_time: None
+                executable_checksum: self.executable_checksum.clone().unwrap_or("".to_string()),
+                commit_hash: None,
+                next_upgrade_time: None,
+                next_executable_checksum: None,
             }),
             partition_info: None,
             port_offset: Some(self.port_offset as i64),
@@ -315,4 +316,9 @@ pub fn debug_peer_id_from_key(mnemonic: &str) -> [u8; 32] {
         &mut None,
     );
     self_peer_id
+}
+
+#[test]
+fn debug(){
+
 }

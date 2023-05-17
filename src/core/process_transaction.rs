@@ -31,6 +31,7 @@ use crate::schema::structs::ObservationProof;
 use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
+use crate::core::resolver::resolve_transaction;
 
 #[derive(Clone)]
 pub struct Conflict {
@@ -337,13 +338,19 @@ impl TransactionProcessContext {
         // Validate obvious schema related errors
         transaction.prevalidate().map_err(error_from_code)?;
 
+        let transaction1 = transaction.clone();
+        let resolver_data = resolve_transaction(transaction1.clone(),
+            self.relay.clone(), self.tx_process.clone()).await?;
+        resolver_data.validate()?;
+
         let utxo_id_inputs = transaction.utxo_ids_of_inputs()?;
 
         // Resolve transaction inputs & trigger potential downloads for prior data.
 
         // Validate signatures and balances
 
-        let utxo_ids = validate_utxo(transaction, &self.relay.ds)?;
+        let utxo_ids = transaction.iter_utxo_inputs();
+        // let utxo_ids = validate_utxo(transaction, &self.relay.ds)?;
         let utxo_ids2 = utxo_ids.clone();
         let mut i: usize = 0;
 
@@ -398,7 +405,13 @@ impl TransactionProcessContext {
             };
             i += 1;
         }
-        match validate_utxo(transaction, &self.relay.ds) {
+
+        // TODO: Don't remember the purpose of this duplicate validation here?
+        let resolver_data = resolve_transaction(transaction1.clone(),
+                                                self.relay.clone(), self.tx_process.clone()).await?;
+
+        // match validate_utxo(transaction, &self.relay.ds) {
+        match resolver_data.validate() {
             Ok(_) => {}
             Err(err) => {
                 clean_up(i);
@@ -522,7 +535,7 @@ impl TransactionProcessContext {
                     .expect("fail");
             }
             // TODO: Waht is the error here?
-            self.finalize_transaction(&hash_vec, transaction);
+            self.finalize_transaction(&hash_vec, transaction).await?;
             // .expect("Bubble up later");
         } else {
             clean_up(i);
@@ -543,7 +556,7 @@ impl TransactionProcessContext {
         query_self_accepted_transaction_status(self.relay.clone(), hash_vec.clone()).await
     }
 
-    fn finalize_transaction(
+    async fn finalize_transaction(
         &self,
         hash: &Vec<u8>,
         transaction: &Transaction,
@@ -555,11 +568,12 @@ impl TransactionProcessContext {
         // Add loggers, do as a single commit with a rollback.
         // Preserve all old data / inputs while committing new transaction, or do retries?
         // or fail the entire node?
-        DataStore::map_err(
-            self.relay
+        self.relay
                 .ds
-                .insert_transaction(&transaction.clone(), util::current_time_millis()),
-        )?;
+                .transaction_store
+                .insert_transaction(
+                    &transaction.clone(), util::current_time_millis_i64(), true, None
+                ).await?;
 
         for (output_index, input) in transaction.inputs.iter().enumerate() {
             // This should maybe just put the whole node into a corrupted state? Or a retry?
@@ -589,9 +603,8 @@ impl TransactionProcessContext {
                 struct_metadata: struct_metadata_new()
             })
             .expect("sent");
-        debug!(
-            "Finalized transaction complete updated observation metadata {}",
-            hex::encode(hash.clone())
+        info!(
+            "Accepted transaction: {}",hex::encode(hash.clone())
         );
         increment_counter!("redgold.transaction.accepted");
         return Ok(());

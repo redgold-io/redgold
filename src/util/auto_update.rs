@@ -46,14 +46,14 @@ fn get_s3_mac_binary_path(network_type: NetworkEnvironment) -> String {
 // wget https://redgold-public.s3.us-west-1.amazonaws.com/release/testnet-latest/redgold_linux -O redgold_linux
 pub async fn pull_sha256_hash(
     network_type: NetworkEnvironment,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String, ErrorInfo> {
     let client = reqwest::Client::new();
     let res = client
         .get(get_s3_sha256_path(network_type))
         .send()
-        .await?
+        .await.error_info("Send request failure")?
         .text()
-        .await?;
+        .await.error_info("decoding failure of text")?;
     Ok(res)
 }
 pub async fn get_s3_sha256_release_hash(
@@ -74,6 +74,14 @@ pub async fn get_s3_sha256_release_hash_short_id(
     network_type: NetworkEnvironment, timeout: Option<Duration>
 ) -> Result<String, ErrorInfo> {
     get_s3_sha256_release_hash(network_type, timeout).await.map(|s| s[..9].to_string())
+}
+
+#[ignore]
+#[tokio::test]
+async fn checksum_poll() {
+    let hash = pull_sha256_hash(NetworkEnvironment::Dev).await.expect("hash missing");
+    println!("hash: {}", hash);
+
 }
 
 // TODO: This should really be coming from other peers as well for
@@ -147,7 +155,8 @@ pub async fn poll_update(
                 }
             }
             Err(e) => {
-                error!("Error querying s3 for updated checksum check, {}", e)
+                use crate::schema::json_or;
+                error!("Error querying s3 for updated checksum check, {}", json_or(&e))
             }
         }
     }

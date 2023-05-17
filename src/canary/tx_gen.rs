@@ -3,6 +3,7 @@ use crate::genesis::create_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use crate::schema::KeyPair;
 use itertools::Itertools;
+use log::info;
 use redgold_schema::constants::MIN_FEE_RAW;
 use redgold_schema::TestConstants;
 use redgold_schema::util::wallet::Wallet;
@@ -120,7 +121,12 @@ impl TransactionGenerator {
 
     pub fn generate_simple_tx(&mut self) -> TransactionWithKey {
         let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
-        self.all_value_transaction(prev)
+        let key = self.all_value_transaction(prev.clone());
+        use redgold_schema::WithMetadataHashable;
+        info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
+        info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
+        info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
+        key
     }
 
     pub fn generate_split_tx(&mut self) -> Vec<TransactionWithKey> {

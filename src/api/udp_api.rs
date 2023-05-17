@@ -23,6 +23,7 @@ use crate::core::relay::Relay;
 use crate::util;
 use crate::util::keys::public_key_from_bytes;
 use crate::util::random_port;
+use redgold_schema::ProtoSerde;
 
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]

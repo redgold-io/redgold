@@ -17,12 +17,13 @@ use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, MultipartyThresholdResponse, Request};
-use redgold_schema::{json_or, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use redgold_schema::{json_or, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use crate::core::internal_message::{FutLoopPoll, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
 use crate::util::lang_util::SameResult;
 use crate::schema::json;
+use crate::util::keys::ToPublicKeyFromLib;
 
 pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, mut request: Request) -> Result<Response, ErrorInfo> {
     let client = crate::api::HTTPClient::new(ip, port as u16);
@@ -38,11 +39,18 @@ pub struct PeerRxEventHandler {
     rt: Arc<Runtime>
 }
 
+use crate::util::logging::Loggable;
+
 impl PeerRxEventHandler {
 
     pub async fn request_response_rest(
         relay: Relay, pm: PeerMessage, rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
+        // pm.request.verify_auth()?;
+        if let Some(p) = pm.public_key {
+            let struct_pk = structs::PublicKey::from_bytes(p.serialize().to_vec());
+            relay.ds.peer_store.update_last_seen(struct_pk).await;;
+        }
 
         // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
         let response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
@@ -195,6 +203,7 @@ impl PeerRxEventHandler {
 
     async fn run(&mut self) -> Result<(), ErrorInfo> {
 
+        // Wait a minute if we're polling these futures do we even need a spawn here?
         let mut fut = FutLoopPoll::new();
 
         let receiver = self.relay.peer_message_rx.receiver.clone();

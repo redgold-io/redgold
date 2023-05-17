@@ -41,7 +41,7 @@ use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
 use crate::schema::structs;
 use redgold_schema::constants::EARLIEST_TIME;
-use redgold_schema::{error_info, error_message, SafeOption};
+use redgold_schema::{error_info, error_message, ProtoSerde, SafeOption};
 use redgold_schema::structs::AddressInfo;
 use redgold_schema::transaction::AddressBalance;
 
@@ -936,41 +936,6 @@ impl DataStore {
         return Ok(res.get(0).map(|x| x.clone()));
     }
 
-    pub fn insert_utxo(&self, utxo_entry: &UtxoEntry) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| c.execute(
-            "INSERT INTO utxo (transaction_hash, output_index, address, output, time) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-            utxo_entry.transaction_hash, utxo_entry.output_index, utxo_entry.address,
-                utxo_entry.output.as_ref().unwrap().proto_serialize(), utxo_entry.time
-            ]
-        ));
-    }
-
-    pub fn insert_transaction_raw(
-        &self,
-        tx: &Transaction,
-        time: u64,
-    ) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "INSERT INTO transactions (hash, raw_transaction, time) VALUES (?1, ?2, ?3)",
-                params![tx.hash_vec(), tx.proto_serialize(), time],
-            )
-        });
-    }
-
-    pub fn insert_transaction(
-        &self,
-        transaction: &Transaction,
-        time: u64,
-    ) -> rusqlite::Result<(), Error> {
-        self.insert_transaction_raw(transaction, time)?;
-        for entry in UtxoEntry::from_transaction(transaction, time as i64) {
-            self.insert_utxo(&entry)?;
-        }
-        return Ok(());
-    }
-
     pub fn map_err<A>(error: rusqlite::Result<A, rusqlite::Error>) -> result::Result<A, ErrorInfo> {
         error.map_err(|e| error_info(e.to_string()))
     }
@@ -1199,15 +1164,15 @@ WHERE
         return Ok(rows.map(|r| r.unwrap()).collect_vec());
     }
 
-    pub fn get_max_time(&self, table: &str) -> rusqlite::Result<u64, Error> {
+    pub fn get_max_time(&self, table: &str) -> rusqlite::Result<i64, Error> {
         let conn = self.connection()?;
         let query = "SELECT max(time) FROM ".to_owned() + table;
         let mut statement = conn.prepare(&*query)?;
         let mut rows = statement.query_map(params![], |r| {
-            let data: u64 = r.get(0)?;
+            let data: i64 = r.get(0)?;
             Ok(data)
         })?;
-        let row = rows.next().unwrap().unwrap_or(0 as u64);
+        let row = rows.next().unwrap().unwrap_or(0 as i64);
         Ok(row)
     }
 
@@ -1227,8 +1192,7 @@ WHERE
     ) -> rusqlite::Result<usize, Error> {
         let conn = self.connection()?;
         let mut statement = conn.prepare(
-            "DELETE FROM utxo WHERE \
-        transaction_hash = ?1 AND output_index = ?2 LIMIT 1",
+            "DELETE FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2",
         )?;
         let rows = statement.execute(params![transaction_hash, output_index])?;
         return Ok(rows);

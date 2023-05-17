@@ -1,5 +1,5 @@
 use redgold_schema::from_hex;
-use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, HashSearchResponse, TransactionInfo};
+use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, Transaction, TransactionInfo};
 use crate::core::relay::Relay;
 use crate::data::data_store::DataStore;
 
@@ -16,14 +16,29 @@ pub async fn hash_query(relay: Relay, hash_input: String) -> Result<HashSearchRe
         return Ok(response);
     } else {
         let h = from_hex(hash_input)?;
-        let transaction = DataStore::map_err(relay.ds.query_transaction(&h))?;
+        let hash = Hash::from_bytes_mh(h.clone());
+        let maybe_transaction = relay.ds.transaction_store.query_maybe_transaction(&hash).await?;
         let mut observation_proofs = vec![];
-        if let Some(t) = transaction.clone() {
+        let mut transaction = None;
+        let mut rejection_reason = None;
+        if let Some((t, e)) = maybe_transaction.clone() {
             observation_proofs = DataStore::map_err(relay.ds.query_observation_edge(h.clone()))?;
+            transaction = Some(t);
+            rejection_reason = e;
         }
+        // Query UTXO by hash only for all valid outputs.
+        let valid_utxo_output_ids = relay.ds.transaction_store
+            .query_utxo_output_index(&hash)
+            .await?;
+
         response.transaction_info = Some(TransactionInfo{
             transaction,
-            observation_proofs
+            observation_proofs,
+            valid_utxo_index: valid_utxo_output_ids,
+            used_outputs: vec![],
+            accepted: rejection_reason.is_some(),
+            rejection_reason,
+            queried_output_index_valid: None,
         })
     }
     Ok(response)

@@ -148,7 +148,7 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
 }
 
 
-pub async fn find_multiparty_key_pairs(relay: Relay) -> Result<Vec<structs::PublicKey>, ErrorInfo> {
+pub async fn find_multiparty_key_pairs(relay: Relay, runtime: Arc<Runtime>) -> Result<Vec<structs::PublicKey>, ErrorInfo> {
 
     let peers = relay.ds.peer_store.all_peers().await?;
     // TODO: Safer, query all pk
@@ -157,8 +157,8 @@ pub async fn find_multiparty_key_pairs(relay: Relay) -> Result<Vec<structs::Publ
             .collect_vec();
 
     info!("Mulitparty found {} possible peers", pk.len());
-    let results = relay.broadcast(
-        pk, Request::empty().about(), Some(Duration::from_secs(20))).await;
+    let results = Relay::broadcast(relay.clone(),
+        pk, Request::empty().about(), runtime.clone(), Some(Duration::from_secs(20))).await;
     let valid_pks = results.iter()
         .filter_map(|(pk, r)| if r.is_ok() { Some(pk.clone()) } else { None })
         .collect_vec();
