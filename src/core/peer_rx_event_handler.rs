@@ -39,7 +39,7 @@ pub struct PeerRxEventHandler {
     relay: Relay,
     rt: Arc<Runtime>
 }
-
+use redgold_schema::EasyJson;
 use crate::util::logging::Loggable;
 
 impl PeerRxEventHandler {
@@ -90,7 +90,10 @@ impl PeerRxEventHandler {
                                 (nmd.port_or(relay.node_config.network.clone()) as i64) + 1,
                                 request.clone()
                             ).await;
-                            Self::handle_about_peer_response(relay.clone(), response).await
+                            let js = redgold_schema::json_result(&response.clone());
+                            info!("request peer info response: {}", js);
+                            let handle_response = Self::handle_about_peer_response(relay.clone(), response).await;
+                            info!("request peer info handle_respone: {}", redgold_schema::json_result(&handle_response.clone()));
                         });
                     }
 
@@ -109,8 +112,10 @@ impl PeerRxEventHandler {
     async fn handle_about_peer_response(
         relay: Relay, response: Result<Response, ErrorInfo>
     ) -> Result<(), ErrorInfo> {
+        let response1 = response?;
+        info!("Handling about peer response during add peer: {}", response1.clone().json_or());
         // TODO: Discovery of other peers here.
-        let res = response?.about_node_response.safe_get()?.self_peer_info.safe_get()?.clone();
+        let res = response1.about_node_response.safe_get()?.self_peer_info.safe_get()?.clone();
         // TODO: Validate transaction here
         info!("Added new peer: {}", json(&res)?);
         relay.ds.peer_store.add_peer(&res, 0f64).await?;

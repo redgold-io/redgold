@@ -77,7 +77,7 @@ impl NodeRuntimes {
     pub fn default() -> Self {
         Self {
             p2p: build_runtime(4, "p2p"),
-            public_api: build_runtime(4, "public"),
+            public_api: build_runtime(8, "public"),
             control_api: build_runtime(4, "control"),
             transaction_process_context: build_runtime(4, "transaction_process_context"),
             transaction_process: build_runtime(4, "transaction_process"),
@@ -745,38 +745,6 @@ fn e2e() {
     println!("{:?}", res);
     assert!(res.is_ok());
     res.expect("ok").proof.expect("prof").verify(&vec1).expect("verified");
-
-
-    // // Connect first peer.
-    // let add_request = local_nodes.nodes.get(1).unwrap().add_request(false);
-    // let add_response = runtime.block_on(start_node.control_client.request(&add_request));
-    // info!("Add peer response: {:?}", add_response);
-    // let add_request2 = start_node.add_request(true);
-    // let add_response2 =
-    //     runtime.block_on(nodes.get(1).unwrap().control_client.request(&add_request2));
-    // info!("Add peer response2: {:?}", add_response2);
-    //
-    // // // Connect nodes together
-    // // for n_i in 0..node_count {
-    // //     for n_j in 0..node_count {
-    // //         // info!("ni {} nj {}", n_i, n_j);
-    // //         if n_i != n_j {
-    // //             let n = nodes.get(n_i).unwrap();
-    // //             let n2 = nodes.get(n_j).unwrap();
-    // //             let request = n2.add_request();
-    // //             // info!(
-    // //             //     "Add peer request on {} to {} req {}",
-    // //             //     n.id,
-    // //             //     n2.id,
-    // //             //     serde_json::to_string(&request).unwrap()
-    // //             // );
-    // //             let response = n.control_client.request(&request).await.unwrap();
-    // //             // info!("Add peer response: {:?}", response);
-    // //         }
-    // //     }
-    // // }
-    // // info!("What the heck");
-    // //
 
     // runtime.shutdown_background();
 

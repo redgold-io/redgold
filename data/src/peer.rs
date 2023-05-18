@@ -74,21 +74,24 @@ impl PeerStore {
         Ok(rows_m.last_insert_rowid())
     }
 
-    pub async fn insert_node_key(&self, tx: &Transaction) -> Result<i64, ErrorInfo> {
+    pub async fn insert_node_key(&self, pi: &PeerNodeInfo) -> Result<i64, ErrorInfo> {
+        let tx = pi.latest_node_transaction.safe_get()?;
         let time = util::current_time_millis();
         let mut pool = self.ctx.pool().await?;
         let nmd = tx.node_metadata()?;
         let pid = nmd.peer_id.safe_get()?.peer_id.safe_bytes()?;
         let ser = nmd.proto_serialize();
+        let pni = pi.proto_serialize();
         let rows = sqlx::query!(
-            r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
+            r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata, peer_node_info) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
             nmd.public_key.safe_get()?.bytes.safe_get()?.value,
             pid,
             nmd.multi_hash,
             nmd.external_address,
             "",
                 time,
-                ser
+                ser,
+                pni
             )
             .execute(&mut pool)
             .await;
@@ -99,7 +102,7 @@ impl PeerStore {
     pub async fn add_peer(&self, peer_info: &PeerNodeInfo, trust: f64) -> Result<(), ErrorInfo> {
         // return Err(ErrorInfo::error_info("debug error return"));
         self.insert_peer(peer_info.latest_peer_transaction.safe_get()?, trust).await?;
-        self.insert_node_key(peer_info.latest_peer_transaction.safe_get()?).await?;
+        self.insert_node_key(peer_info).await?;
         Ok(())
     }
 
