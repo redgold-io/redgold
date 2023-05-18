@@ -319,7 +319,8 @@ impl Node {
             let seed = if node_config.main_stage_network() {
                 info!("Querying LB for node info");
                 let a = runtimes.auxiliary.block_on(node_config.lb_client().about())?;
-                let tx = a.latest_metadata.safe_get_msg("Missing latest metadata from seed node")?;
+                let tx = a.self_peer_info.safe_get_msg("Missing latest metadata from seed node")?
+                    .latest_peer_transaction.safe_get()?;
                 let pd = tx.outputs.get(0).expect("a").data.as_ref().expect("d").peer_data.as_ref().expect("pd");
                 let nmd = pd.node_metadata.get(0).expect("nmd");
                 let vec = nmd.public_key_bytes().expect("ok");
@@ -340,7 +341,7 @@ impl Node {
             let client = PublicClient::from(seed.external_address.clone(), port);
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
             let result = runtimes.auxiliary.block_on(client.about());
-            let peer_tx = result?.latest_metadata.safe_get()?.clone();
+            let peer_tx = result?.self_peer_info.safe_get()?.clone();
 
             info!("Got LB node info {}, adding peer", redgold_schema::json(&peer_tx)?);
             // Local debug mode
@@ -362,7 +363,7 @@ impl Node {
             //     )
             //     .expect("insert peer on download");
             // todo: send_peer_request_response
-            let data = peer_tx.peer_data()?;
+            let data = peer_tx.latest_peer_transaction.safe_get()?.peer_data()?;
             let key = data.node_metadata[0].public_key_bytes()?;
             // TODO Change this invocation to an .into() in a non-schema key module
             let pk = keys::public_key_from_bytes(&key).expect("works");

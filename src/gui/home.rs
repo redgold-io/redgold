@@ -152,9 +152,9 @@ pub async fn query_network_status(
                 let a2 = a.clone();
                 peers = Some(a.num_active_peers);
                 total_tx = Some(a.total_accepted_transactions);
-                if let Some(nmd) = a.latest_node_metadata {
-                    if let Some(d) = nmd.node_metadata().ok() {
-                        d.version_info.map(|v| {
+                if let Some(nmd) = a.self_peer_info.and_then(|p| p.latest_node_transaction
+                    .and_then(|n| n.node_metadata().ok())) {
+                        nmd.version_info.map(|v| {
                             let c = v.executable_checksum;
                             let len = c.len();
                             let start = len - 9;
@@ -162,7 +162,6 @@ pub async fn query_network_status(
                                 checksum = c[start..].to_string();
                             }
                         });
-                    }
                 }
                 known_peers = Some(a.num_known_peers);
                 recent_tx = a.recent_transactions;

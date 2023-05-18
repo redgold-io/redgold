@@ -3,18 +3,7 @@ use crate::{HashClear, KeyPair, ProtoHashable, Response, response_metadata, Resp
 use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, MultipartyThresholdResponse, NodeMetadata, Proof};
 
 impl AboutNodeResponse {
-    pub fn empty() -> Self {
-        Self {
-            latest_metadata: None,
-            latest_node_metadata: None,
-            num_known_peers: 0,
-            num_active_peers: 0,
-            recent_transactions: vec![],
-            pending_transactions: 0,
-            total_accepted_transactions: 0,
-            observation_height: 0,
-        }
-    }
+
 }
 
 impl HashClear for Response {

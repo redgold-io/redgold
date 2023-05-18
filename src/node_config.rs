@@ -14,7 +14,7 @@ use itertools::Itertools;
 use log::{debug, info};
 use redgold_schema::servers::Server;
 use redgold_schema::structs;
-use redgold_schema::structs::{Address, NodeMetadata, NodeType, PeerData, PeerId, Request, Response, VersionInfo};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, NodeMetadata, NodeType, PeerData, PeerId, PeerNodeInfo, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::dhash_vec;
 use crate::api::public_api::PublicClient;
@@ -116,6 +116,20 @@ impl NodeConfig {
     pub fn response(&self) -> Response {
         let mut req = Response::empty_success();
         req.with_auth(&self.wallet().active_keypair()).with_metadata(self.node_metadata()).clone()
+    }
+
+    pub fn dynamic_node_metadata(&self) -> Option<DynamicNodeMetadata> {
+        // TODO: Load from config
+        // self.data_store()
+        None
+    }
+
+    pub fn self_peer_info(&self) -> PeerNodeInfo {
+        PeerNodeInfo {
+            latest_peer_transaction: Some(self.peer_data_tx()),
+            latest_node_transaction: Some(self.peer_node_data_tx()),
+            dynamic_node_metadata: self.dynamic_node_metadata(),
+        }
     }
 
     pub fn peer_data_tx(&self) -> Transaction {

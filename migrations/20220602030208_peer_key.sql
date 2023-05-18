@@ -6,5 +6,6 @@ CREATE TABLE IF NOT EXISTS peer_key (
                                         status    TEXT,
                                         last_seen    INTEGER DEFAULT 0,
                                         tx BLOB,
-                                        node_metadata BLOB
+                                        node_metadata BLOB,
+                                        peer_node_info BLOB NOT NULL
 );
