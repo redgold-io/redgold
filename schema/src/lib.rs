@@ -785,6 +785,13 @@ pub fn json<T: Serialize>(t: &T) -> Result<String, ErrorInfo> {
     serde_json::to_string(&t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
 }
 
+pub fn json_result<T: Serialize, E: Serialize>(t: &Result<T, E>) -> String {
+    match t {
+        Ok(t) => json_or(t),
+        Err(e) => json_or(e),
+    }
+}
+
 pub fn json_or<T: Serialize>(t: &T) -> String {
     json(t).unwrap_or("json ser failure of error".to_string())
 }

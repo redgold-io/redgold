@@ -1,21 +1,30 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use clap::command;
+use log::info;
+use rocket::form::FromForm;
 use serde_json::error::Category::Data;
+use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{json, json_from, json_pretty, KeyPair, SafeOption, util};
+use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOption, util};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::canary::tx_submit::TransactionSubmitter;
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
 use crate::util::cli::arg_parse_config::get_default_data_directory;
-use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, WalletAddress, WalletSend};
+use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
+use redgold_schema::EasyJson;
+use crate::node::NodeRuntimes;
+use crate::util::init_logger;
+use crate::util::runtimes::build_runtime;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
     let ds = config.data_store().await;
@@ -75,7 +84,7 @@ pub fn generate_mnemonic(generate_mnemonic: &GenerateMnemonic) {
     println!("{}", m.to_string());
 }
 
-pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfig) {
+pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfig) -> Result<String, ErrorInfo> {
     let wallet = node_config.wallet();
     let address = if let Some(path) = generate_address.path {
         wallet.keypair_from_path_str(path).address_typed()
@@ -84,7 +93,9 @@ pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfi
     } else {
         node_config.wallet().active_keypair().address_typed()
     };
-    println!("{}", address.render_string().expect("address render failure"));
+    let string = address.render_string().expect("address render failure");
+    println!("{}", string.clone());
+    Ok(string)
 }
 
 
@@ -307,4 +318,43 @@ pub async fn deploy(deploy: Deploy, config: NodeConfig) -> Result<(), ErrorInfo>
     }
     Ok(())
 
+}
+
+pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runtime>) -> Result<(), ErrorInfo> {
+    if p1.network == NetworkEnvironment::Main {
+        return Err(error_info("Cannot test transaction on mainnet unsupported".to_string()));
+    }
+    let client = p1.lb_client();
+    let mut tx_submit = TransactionSubmitter::default(client.clone(), arc.clone(), vec![]);
+    let faucet_tx = tx_submit.with_faucet();
+    info!("Faucet transaction: {}", faucet_tx.json_or());
+    let _ = {
+        let gen =
+        tx_submit.generator.lock().expect("");
+        assert!(gen.finished_pool.len() > 0);
+    };
+    let source = Proof::proofs_to_address(&faucet_tx.inputs.get(0).expect("").proof)?;
+    let repeat = tx_submit.drain(source);
+    repeat.as_error()?;
+    assert!(repeat.accepted());
+    let s = repeat.submit_transaction_response.expect("submit transaction response");
+    let h2 = s.transaction_hash.expect("hash");
+    let q = s.query_transaction_response.expect("query transaction response");
+    println!("Obs proofs second tx: {}", q.observation_proofs.json_or());
+
+    let result = arc.block_on(client.query_hash(h2.hex())).expect("query hash");
+    info!("Result: {}", result.json_pretty().expect("json pretty"));
+    Ok(())
+
+}
+
+#[test]
+fn test_transaction_dev() {
+    init_logger();
+    let mut nc = NodeConfig::default();
+    nc.network = NetworkEnvironment::Dev;
+    let rt = build_runtime(5, "asdf");
+    let t = TestTransactionCli{};
+    let arc = rt.clone();
+    let res = test_transaction(&&t, &nc, arc).expect("");
 }

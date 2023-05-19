@@ -97,7 +97,8 @@ pub enum RgTopLevelSubcommand {
     Address(WalletAddress),
     Query(QueryCli),
     Faucet(FaucetCli),
-    Balance(BalanceCli)
+    Balance(BalanceCli),
+    TestTransaction(TestTransactionCli),
 }
 
 
@@ -218,6 +219,13 @@ pub struct BalanceCli {
     #[clap(short, long)]
     pub address: String
 }
+
+/// Run a test transaction from faucet (environments below mainnet) and back
+/// If running this on mainnet, you will need to specify a source address / UTXO / wallet
+/// Will make a round trip of transactions from origin and back to preserve funds, using
+/// minimum sizes.
+#[derive(Args, Debug, Clone)]
+pub struct TestTransactionCli {}
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)
 #[derive(Args, Debug, Clone)]

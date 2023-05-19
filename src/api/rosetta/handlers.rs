@@ -294,13 +294,15 @@ pub async fn construction_payloads(
     let mut tx = structs::Transaction {
         inputs: vec![],
         outputs: vec![],
-        struct_metadata: Some(crate::schema::structs::StructMetadata {
+        struct_metadata: Some(StructMetadata {
             time: util::current_time_millis() as i64,
             // TODO: tx version const
             version: 0 as i32,
         }),
         options: None,
         hash: None,
+        sign_hash: None,
+        counter_party_hash: None,
     };
     let mut payloads = vec![];
     let meta = request

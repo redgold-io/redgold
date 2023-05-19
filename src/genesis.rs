@@ -51,6 +51,8 @@ pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>) -> Transaction {
         struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
         options: None,
         hash: None,
+        sign_hash: None,
+        counter_party_hash: None,
     }
         .with_hash()
         .clone()
@@ -64,6 +66,8 @@ pub fn create_genesis_transaction() -> Transaction {
         struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
         options: None,
         hash: None,
+        sign_hash: None,
+        counter_party_hash: None,
     }
     .with_hash()
     .clone()

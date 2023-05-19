@@ -298,6 +298,7 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
                     .hash()
                     .into(),
                 query_transaction_response: None,
+                transaction: None,
             });
         } else {
             // info!("API server awaiting transaction results");
@@ -595,7 +596,8 @@ async fn mock_relay(relay: Relay) {
                     observation_proofs: vec![],
                     block_hash: None,
                 }),
-            });
+            transaction: None,
+        });
         tm.response_channel
             .unwrap()
             .send(response)
@@ -650,8 +652,9 @@ fn test_warp_basic() {
     let mut response = empty_public_response();
     response.submit_transaction_response = Some(SubmitTransactionResponse {
             transaction_hash: create_genesis_transaction().hash().into(),
-            query_transaction_response: None
-        });
+            query_transaction_response: None,
+        transaction: None,
+    });
     assert_eq!(
         response,
         res

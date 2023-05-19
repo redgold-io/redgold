@@ -5,7 +5,9 @@ use crate::schema::KeyPair;
 use itertools::Itertools;
 use log::info;
 use redgold_schema::constants::MIN_FEE_RAW;
+use redgold_schema::structs::{Address, TransactionAmount};
 use redgold_schema::TestConstants;
+use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::wallet::Wallet;
 
 #[derive(Clone)]
@@ -127,6 +129,20 @@ impl TransactionGenerator {
         info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
         info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
         key
+    }
+
+    pub fn drain_tx(&mut self, addr: &Address) -> Transaction {
+        let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
+        let mut txb = TransactionBuilder::new();
+        txb.with_input(prev.utxo_entry.clone(), prev.key_pair);
+        // TODO: Fee
+        txb.with_output(addr, TransactionAmount::from( prev.utxo_entry.amount() as i64));
+        txb.transaction
+        // use redgold_schema::WithMetadataHashable;
+        // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
+        // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
+        // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
+        // key
     }
 
     pub fn generate_split_tx(&mut self) -> Vec<TransactionWithKey> {

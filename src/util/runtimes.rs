@@ -11,7 +11,7 @@ pub fn build_simple_runtime(threads: usize, name: impl Into<String> + Sized) -> 
     Builder::new_multi_thread()
         .worker_threads(threads)
         .thread_name(name)
-        .thread_stack_size(3 * 1024 * 1024)
+        .thread_stack_size(100 * 1024 * 1024)
         .enable_all()
         .enable_time()
         .build()
