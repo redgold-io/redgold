@@ -923,23 +923,6 @@ impl DataStore {
         return Ok(res);
     }
 
-    pub fn select_peer_key_address(
-        &self,
-        public_key: &Vec<u8>,
-    ) -> rusqlite::Result<Option<String>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare("SELECT address FROM peer_key WHERE public_key=?1")?;
-
-        let rows = statement.query_map(params![public_key], |row| {
-            let address: String = row.get(0)?;
-            Ok(address)
-        })?;
-
-        let res = rows.map(|r| r.unwrap()).collect::<Vec<String>>();
-
-        return Ok(res.get(0).map(|x| x.clone()));
-    }
-
     pub fn map_err<A>(error: rusqlite::Result<A, rusqlite::Error>) -> result::Result<A, ErrorInfo> {
         error.map_err(|e| error_info(e.to_string()))
     }

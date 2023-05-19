@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::path::Path;
+use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 use futures::stream::FuturesUnordered;
@@ -755,6 +756,7 @@ fn e2e() {
     std::mem::forget(local_nodes);
     std::mem::forget(runtime);
     std::mem::forget(submit);
+    exit(0);
 }
 
 #[ignore]

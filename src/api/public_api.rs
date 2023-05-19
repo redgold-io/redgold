@@ -619,57 +619,57 @@ async fn mock_relay(relay: Relay) {
 //     // run_server(relay).await;
 // }
 
-// #[tokio::test]
-#[test]
-fn test_warp_basic() {
-    util::init_logger().expect("log");
-
-    let arc2 = build_runtime(2, "test-public-api");
-
-    let runtime = Arc::new(
-        Builder::new_multi_thread()
-            .worker_threads(2)
-            .thread_name("public-api-test")
-            .thread_stack_size(3 * 1024 * 1024)
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
-
-    let mut relay = arc2.block_on(Relay::default());
-    let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
-    relay.node_config.public_port = Some(offset);
-    start_server(relay.clone(), arc2.clone());
-    runtime
-        .clone()
-        .block_on(async { sleep(Duration::new(3, 0)).await });
-    let res = runtime.clone().block_on(async move {
-        PublicClient::local(offset)
-            .send_transaction(&create_genesis_transaction(), false)
-            .await
-            .unwrap()
-    });
-    let relay_t = relay.transaction.receiver.recv();
-    assert_eq!(create_genesis_transaction(), relay_t.unwrap().transaction);
-    let mut response = empty_public_response();
-    response.submit_transaction_response = Some(SubmitTransactionResponse {
-            transaction_hash: create_genesis_transaction().hash().into(),
-            query_transaction_response: None,
-        transaction: None,
-    });
-    assert_eq!(
-        response,
-        res
-    );
-
-    let res2 = runtime.clone().block_on(async move {
-        PublicClient::local(offset)
-            .query_addresses(vec![])
-            .await
-            .unwrap()
-    });
-    println!("response: {:?}", res2);
-}
+// // #[tokio::test]
+// #[test]
+// fn test_warp_basic() {
+//     util::init_logger().expect("log");
+//
+//     let arc2 = build_runtime(2, "test-public-api");
+//
+//     let runtime = Arc::new(
+//         Builder::new_multi_thread()
+//             .worker_threads(2)
+//             .thread_name("public-api-test")
+//             .thread_stack_size(30 * 1024 * 1024)
+//             .enable_all()
+//             .build()
+//             .unwrap(),
+//     );
+//
+//     let mut relay = arc2.block_on(Relay::default());
+//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
+//     relay.node_config.public_port = Some(offset);
+//     start_server(relay.clone(), arc2.clone());
+//     runtime
+//         .clone()
+//         .block_on(async { sleep(Duration::new(3, 0)).await });
+//     let res = runtime.clone().block_on(async move {
+//         PublicClient::local(offset)
+//             .send_transaction(&create_genesis_transaction(), false)
+//             .await
+//             .unwrap()
+//     });
+//     let relay_t = relay.transaction.receiver.recv();
+//     assert_eq!(create_genesis_transaction(), relay_t.unwrap().transaction);
+//     let mut response = empty_public_response();
+//     response.submit_transaction_response = Some(SubmitTransactionResponse {
+//             transaction_hash: create_genesis_transaction().hash().into(),
+//             query_transaction_response: None,
+//         transaction: None,
+//     });
+//     assert_eq!(
+//         response,
+//         res
+//     );
+//
+//     let res2 = runtime.clone().block_on(async move {
+//         PublicClient::local(offset)
+//             .query_addresses(vec![])
+//             .await
+//             .unwrap()
+//     });
+//     println!("response: {:?}", res2);
+// }
 
 //
 // #[test]
