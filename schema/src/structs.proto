@@ -55,6 +55,10 @@ message FloatingUtxoId {
 
 }
 
+message OutputIndex {
+  int64 output_index = 1;
+}
+
 message Input {
   // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
   Hash transaction_hash = 1;
@@ -62,16 +66,21 @@ message Input {
   int64 output_index = 2;
   // The signed proof that this input is a valid reference to the previous output.
   repeated Proof proof = 3;
+  // The identifier associated with the currency or product being used, for multi-currency support.
   ProductId product_id = 4;
   // Hydration purposes only! Not used for hashes
   Output output = 5;
 }
 
 message TrustData {
+  // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
+  // Otherwise equivalent to a rounded float
   int64 label = 2;
+  // Confidence level associated with the label, how certain is this value?
   optional int64 confidence = 3;
-  // Is this variance on confidence?
+  // Variance associated with the confidence estimate, sigma / stddev
   optional int64 hardness = 5;
+  // Additional unstructured or otherwise custom label data
   optional StandardData data = 6;
 }
 
@@ -168,6 +177,8 @@ message Hash {
 
 message DynamicNodeMetadata {
   optional int64 udp_port = 1;
+  Proof proof = 2;
+  PeerId peer_id = 3;
 }
 
 // Where to store parquet schema, avro schema, etc. etc.
@@ -179,6 +190,7 @@ message StandardData {
   // Standard currency style field
   optional int64 amount = 1;
 
+  // Move to separate class instance still stored here?
   // Direct data storage for small values
   optional TypedValue typed_value = 2;
   repeated TypedValue typed_value_list = 3;
@@ -195,6 +207,7 @@ message StandardData {
   optional int64 height = 11;
   Hash data_hash = 12;
   Hash hash = 13;
+  Observation observation = 14;
 }
 
 message KeyedTypedValue {
@@ -317,12 +330,23 @@ enum NetworkEnvironment {
   PREDEV = 9;
 }
 
+message Salt {
+  int64 value = 1;
+}
+
+// For use in providing a secondary, recent, submission time for offline signing process with delayed broadcast.
+message OfflineTimeSponsor {
+  int64 time = 1;
+  Proof proof = 2;
+}
+
 message TransactionOptions {
   optional int64 salt = 1;
   optional NetworkEnvironment network_type = 2;
   repeated KeyValueOption key_value_options = 3;
-  optional TransactionData data = 4;
-  optional TransactionContract contract = 5;
+  TransactionData data = 4;
+  TransactionContract contract = 5;
+  OfflineTimeSponsor offline_time_sponsor = 6;
 }
 
 message Transaction {
@@ -330,7 +354,10 @@ message Transaction {
   repeated Output outputs = 2;
   StructMetadata struct_metadata = 3;
   TransactionOptions options = 4;
+  // TODO: Move these into structMetadata
   Hash hash = 5;
+  Hash sign_hash = 6;
+  Hash counter_party_hash = 7;
 }
 
 message BlockMetadata {
@@ -571,8 +598,15 @@ message GetPeersInfoRequest {
 
 }
 
+message PeerNodeInfo {
+  Transaction latest_peer_transaction = 1;
+  Transaction latest_node_transaction = 2;
+  DynamicNodeMetadata dynamic_node_metadata = 3;
+}
+
 message GetPeersInfoResponse {
   repeated Transaction peers = 1;
+  repeated PeerNodeInfo peer_info = 2;
 }
 
 
@@ -674,9 +708,12 @@ message SubmitTransactionRequest {
   bool sync_query_response = 2;
 }
 
+// TODO: This should just return the entire transaction with it's hash also calculated
+// Also include the signing hash in the response, modify transaction schema for that
 message SubmitTransactionResponse {
   Hash transaction_hash = 1;
   optional QueryTransactionResponse query_transaction_response = 2;
+  Transaction transaction = 3;
 }
 
 message AboutNodeRequest {

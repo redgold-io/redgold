@@ -1,5 +1,5 @@
 use std::time::Duration;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, PeerData, PublicKey, Transaction};
+use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, PeerData, PeerNodeInfo, PublicKey, Transaction};
 use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -7,10 +7,6 @@ use crate::schema::SafeOption;
 #[derive(Clone)]
 pub struct PeerStore {
     pub ctx: DataStoreContext
-}
-
-impl PeerStore {
-
 }
 
 
@@ -98,6 +94,81 @@ impl PeerStore {
         }
         Ok(())
     }
+
+
+    pub async fn insert_peer(&self, tx: &Transaction, trust: f64) -> Result<i64, ErrorInfo> {
+        let pd = tx.peer_data()?;
+        let tx_blob = tx.proto_serialize();
+        let pd_blob = pd.proto_serialize();
+        let tx_hash = tx.hash().vec();
+        let mut pool = self.ctx.pool().await?;
+        let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().value;
+
+        let rows = sqlx::query!(
+            r#"INSERT OR REPLACE INTO peers (id, peer_data, tx, trust, tx_hash) VALUES (?1, ?2, ?3, ?4, ?5)"#,
+            pid,
+            pd_blob,
+            tx_blob,
+            trust,
+            tx_hash
+        )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.last_insert_rowid())
+    }
+
+    pub async fn insert_node_key(&self, pi: &PeerNodeInfo) -> Result<i64, ErrorInfo> {
+        let tx = pi.latest_node_transaction.safe_get()?;
+        let time = util::current_time_millis();
+        let mut pool = self.ctx.pool().await?;
+        let nmd = tx.node_metadata()?;
+        let pid = nmd.peer_id.safe_get()?.peer_id.safe_bytes()?;
+        let ser = nmd.proto_serialize();
+        let pni = pi.proto_serialize();
+        let rows = sqlx::query!(
+            r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata, peer_node_info) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+            nmd.public_key.safe_get()?.bytes.safe_get()?.value,
+            pid,
+            nmd.multi_hash,
+            nmd.external_address,
+            "",
+                time,
+                ser,
+                pni
+            )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.last_insert_rowid())
+    }
+
+    pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, trust: f64) -> Result<(), ErrorInfo> {
+        // return Err(ErrorInfo::error_info("debug error return"));
+        self.insert_peer(peer_info.latest_peer_transaction.safe_get()?, trust).await?;
+        self.insert_node_key(peer_info).await?;
+        Ok(())
+    }
+
+    pub async fn peer_node_info(&self) -> Result<Vec<PeerNodeInfo>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT peer_node_info FROM peer_key"#
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            if let Some(r) = row.peer_node_info {
+                let deser = PeerNodeInfo::proto_deserialize(r)?;
+                res.push(deser);
+            }
+        }
+        Ok(res)
+    }
+
+
     pub async fn multihash_lookup(&self, p0: Vec<u8>) {
         todo!()
     }

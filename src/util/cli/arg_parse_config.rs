@@ -400,6 +400,18 @@ pub struct ArgTranslate {
 
 impl ArgTranslate {
 
+    pub async fn post_logger_commands(&self) -> Result<bool, ErrorInfo> {
+        match &self.opts.subcmd {
+            Some(RgTopLevelSubcommand::TestTransaction(test_transaction_cli)) => {
+                commands::test_transaction(&test_transaction_cli, &self.node_config, self.runtime.clone())?;
+                Ok(true)
+            }
+            _ => {
+                Ok(false)
+            }
+        }
+    }
+
     pub fn new(runtime: Arc<Runtime>, opts: &RgArgs, node_config: NodeConfig) -> Self {
         let args = std::env::args().collect_vec();
         ArgTranslate {

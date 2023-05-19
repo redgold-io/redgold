@@ -9,6 +9,7 @@ use itertools::Itertools;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_schema::{empty_public_response, SafeBytesAccess};
+use redgold_schema::structs::Address;
 use redgold_schema::util::wallet::Wallet;
 
 pub struct TransactionSubmitter {
@@ -114,7 +115,16 @@ impl TransactionSubmitter {
         res
     }
 
-    pub fn with_faucet(&self) {
+    pub fn drain(&self, to: Address) -> PublicResponse {
+        let transaction = self.generator.lock().unwrap().drain_tx(&to).clone();
+        let res = self.block(self.spawn(transaction.clone()));
+        // if res.clone().accepted() {
+        //     self.generator.lock().unwrap().completed(transaction);
+        // }
+        res
+    }
+
+    pub fn with_faucet(&self) -> Transaction {
         let pc = &self.client;
         let w = Wallet::from_phrase("random").key_at(0);
         let a = w.address_typed();
@@ -137,6 +147,7 @@ impl TransactionSubmitter {
                 utxo_entry: utxos,
                 key_pair: w
             });
+        tx
     }
 
     // TODO: make interior here a function

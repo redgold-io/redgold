@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::path::Path;
+use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 use futures::stream::FuturesUnordered;

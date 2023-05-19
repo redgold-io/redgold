@@ -11,8 +11,9 @@ pub async fn handle_about_node(p0: AboutNodeRequest, relay: Relay) -> Result<Abo
     let observation_height = relay.ds.observation.select_latest_observation(
         relay.node_config.public_key()).await?.map(|o| o.height).unwrap_or(0);
 
-
+    // let mut about = AboutNodeResponse::default();
     // relay.
+    //         self_peer_info: Some(relay.node_config.self_peer_info()),
     Ok(AboutNodeResponse{
         // This should be the peer_id value stored in config data store
         latest_metadata: Some(relay.node_config.peer_data_tx()),

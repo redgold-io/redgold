@@ -1,5 +1,5 @@
-use crate::address::multi_address;
-use crate::structs::{Error as RGError, ErrorInfo, Hash, Proof, Signature};
+use crate::address::{address_function_buf, multi_address};
+use crate::structs::{Address, Error as RGError, ErrorInfo, Hash, Proof, Signature};
 use crate::util::public_key_ser;
 #[cfg(test)]
 use crate::TestConstants;
@@ -13,6 +13,7 @@ impl HashClear for Proof {
 
 impl Proof {
     pub fn public_key_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+        // Ok(self.public_key.safe_get_msg("Missing public key")?.bytes()?)
         Ok(self
             .public_key
             .as_ref()
@@ -76,17 +77,23 @@ impl Proof {
         );
     }
 
+    pub fn proofs_to_address(proofs: &Vec<Proof>) -> Result<Address, ErrorInfo> {
+        let mut addresses = Vec::new();
+        for proof in proofs {
+            addresses.extend(proof.public_key_bytes()?);
+        }
+        let vec = address_function_buf(&addresses);
+        let addr = Address::from_bytes(vec)?;
+        return Ok(addr);
+    }
+
     pub fn verify_proofs(
         proofs: &Vec<Proof>,
         hash: &Vec<u8>,
         address: &Vec<u8>,
     ) -> Result<(), ErrorInfo> {
-        let public_keys = proofs
-            .iter()
-            .map(|p| PublicKey::from_slice(&*p.public_key_bytes().unwrap()).unwrap()) // TODO: Bad unwrap
-            .collect();
-
-        if *address != multi_address(&public_keys).to_vec() {
+        let addr = Self::proofs_to_address(proofs)?;
+        if *address != addr.address.safe_get()?.value {
             return Err(error_message(
                 RGError::AddressPublicKeyProofMismatch,
                 "address mismatch in Proof::verify_proofs",
