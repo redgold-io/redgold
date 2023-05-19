@@ -101,6 +101,7 @@ impl PeerRxEventHandler {
             }
 
 
+
         } else {
             info!("No proof on incoming request, unknown peer");
         }
