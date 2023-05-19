@@ -87,6 +87,8 @@
         "structs.FloatingUtxoId",
         "structs.FixedUtxoId",
         "structs.UsedOutputs",
+        "structs.OfflineTimeSponsor",
+        "structs.PeerNodeInfo",
         "structs.VersionInfo"
       ]
     },

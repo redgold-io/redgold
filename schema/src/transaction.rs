@@ -1,6 +1,6 @@
 use crate::address::address_data;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Error as RGError, ErrorInfo, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
@@ -276,6 +276,8 @@ impl Transaction {
             struct_metadata: struct_metadata(0 as i64),
             options: None,
             hash: None,
+            sign_hash: None,
+            counter_party_hash: None,
         };
 
         tx.with_hash();
@@ -367,6 +369,10 @@ impl Transaction {
         }
     }
 
+    pub fn addresses(&self) -> Vec<Address> {
+        self.outputs.iter().filter_map(|o| o.address.clone()).collect_vec()
+    }
+
 }
 
 impl TransactionAmount {
@@ -381,6 +387,11 @@ impl TransactionAmount {
     }
     fn to_fractional(&self) -> f64 {
         (self.amount as f64) / (DECIMAL_MULTIPLIER as f64)
+    }
+    pub fn from(amount: i64) -> Self {
+        Self {
+            amount
+        }
     }
 }
 
@@ -407,6 +418,7 @@ impl StandardData {
             height: None,
             data_hash: None,
             hash: None,
+            observation: None,
         }
     }
     pub fn peer_data(pd: PeerData) -> Option<Self> {

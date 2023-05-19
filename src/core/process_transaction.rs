@@ -280,6 +280,7 @@ impl TransactionProcessContext {
         Ok(SubmitTransactionResponse {
             transaction_hash: transaction_message.transaction.hash().into(),
             query_transaction_response: Some(status),
+            transaction: None,
         })
     }
 

@@ -200,18 +200,21 @@ impl Relay {
         } else {
             None
         };
-        let tx = tx_req
+        let mut tx = tx_req
             .transaction
             .safe_get_msg("Missing transaction field on submit request")?;
+        tx.calculate_hash();
         self.transaction
             .send(TransactionMessage {
                 transaction: tx.clone(),
                 response_channel,
             })
             .await?;
+
         let mut response = SubmitTransactionResponse {
             transaction_hash: tx.clone().hash().into(),
             query_transaction_response: None,
+            transaction: None,
         };
         if tx_req.sync_query_response {
             let res = r.recv_async_err().await?;

@@ -34,6 +34,8 @@ pub fn main_from_args(opts: RgArgs) {
     node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
 
 
+    /// Commands required to run separate from the logging system initialization
+    /// TODO: Consider disabling logging for these commands and instead unifying them?
     if arg_parse_config::immediate_commands(&opts, &node_config, simple_runtime.clone()) {
         return;
     }
@@ -44,7 +46,7 @@ pub fn main_from_args(opts: RgArgs) {
     info!("Starting node main method");
     increment_counter!("redgold.node.main_started");
 
-    let node_config_res = arg_parse_config::load_node_config(simple_runtime.clone(), opts, node_config);
+    let node_config_res = arg_parse_config::load_node_config(simple_runtime.clone(), opts.clone(), node_config);
 
 
     // TODO: Here is where we should later init loggers and metrics?
@@ -55,6 +57,11 @@ pub fn main_from_args(opts: RgArgs) {
                 crate::gui::initialize::attempt_start(node_config.clone(), simple_runtime.clone()).expect("GUI to start");
                 return;
             }
+            let mut arg_translate = ArgTranslate::new(simple_runtime.clone(), &opts, node_config.clone());
+            if simple_runtime.block_on(arg_translate.post_logger_commands()).expect("post logger commands") {
+                return;
+            }
+
             let runtimes = NodeRuntimes::default();
             let mut relay = simple_runtime.block_on(Relay::new(node_config.clone()));
 
