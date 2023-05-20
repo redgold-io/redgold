@@ -13,3 +13,4 @@ pub mod resolver;
 pub mod run_main;
 pub mod status;
 pub mod seeds;
+pub mod transact;
