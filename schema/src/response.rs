@@ -42,6 +42,7 @@ impl Response {
             node_metadata: None,
             proof: None,
             multiparty_threshold_response: None,
+            submit_transaction_response: None,
         }
     }
     pub fn from_error_info(error_info: ErrorInfo) -> Response {

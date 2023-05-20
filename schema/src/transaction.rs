@@ -373,6 +373,18 @@ impl Transaction {
         self.outputs.iter().filter_map(|o| o.address.clone()).collect_vec()
     }
 
+    pub fn input_addresses(&self) -> Vec<Address> {
+        self.inputs.iter().filter_map(|o| o.address().ok()).collect_vec()
+    }
+
+    pub fn first_input_address(&self) -> Option<Address> {
+        self.inputs.first().and_then(|o| o.address().ok())
+    }
+
+    pub fn first_output_address(&self) -> Option<Address> {
+        self.outputs.first().and_then(|o| o.address.clone())
+    }
+
 }
 
 impl TransactionAmount {

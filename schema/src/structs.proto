@@ -664,7 +664,7 @@ message Request {
   GetPeersInfoRequest get_peers_info_request = 9;
   //  optional DownloadMetadataRequest download_metadata_request = 5;
   MultipartyThresholdRequest multiparty_threshold_request = 10;
-
+  SubmitTransactionRequest submit_transaction_request = 11;
 }
 
 message Response {
@@ -678,6 +678,7 @@ message Response {
   Proof proof = 7;
 
   MultipartyThresholdResponse multiparty_threshold_response = 8;
+  SubmitTransactionResponse submit_transaction_response = 9;
 
 }
 
@@ -836,6 +837,7 @@ message ErrorInfo {
   string message = 4;
   repeated ErrorDetails details = 5;
   bool retriable = 6;
+  string stacktrace = 7;
 }
 
 message ResponseMetadata {

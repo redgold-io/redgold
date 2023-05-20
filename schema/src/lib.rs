@@ -382,6 +382,7 @@ pub trait ErrorInfoContext<T, E> {
 }
 
 use anyhow::{anyhow, Context, Result};
+use tokio::task_local;
 
 impl<T, E> ErrorInfoContext<T, E> for Result<T, E>
     where
@@ -399,18 +400,6 @@ impl<T, E> ErrorInfoContext<T, E> for Result<T, E>
 
 pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
     error_message(crate::structs::Error::UnknownError, message.into())
-}
-
-pub fn error_from_code(error_code: structs::Error) -> ErrorInfo {
-    ErrorInfo {
-        code: error_code as i32,
-        // TODO: From error code map
-        description: "".to_string(),
-        description_extended: "".to_string(),
-        message: "".to_string(),
-        details: vec![],
-        retriable: false,
-    }
 }
 
 pub fn slice_vec_eager<T>(vec: Vec<T>, start: usize, end: usize) -> Vec<T>
@@ -433,19 +422,68 @@ pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
     ret
 }
 
+use std::collections::HashMap;
+use std::future::Future;
+use tokio::task::futures::TaskLocalFuture;
+
+// TODO: This feature is only available in tokio RT, need to substitute this for a
+// standard local key implementation depending on the features available for WASM crate.
+task_local! {
+
+    pub static TASK_LOCAL: HashMap<String, String>;
+    // pub static TASK_LOCAL: String;
+    // pub static ONE: u32;
+    //
+    // #[allow(unused)]
+    // static TWO: f32;
+    //
+    // static NUMBER: u32;
+}
+
+pub fn get_task_local() -> HashMap<String, String> {
+    TASK_LOCAL.try_with(|local| { local.clone() })
+        .unwrap_or(HashMap::new())
+}
+
+pub fn task_local<K: Into<String>, V: Into<String>, F>(k: K, v: V, f: F) -> TaskLocalFuture<HashMap<String, String>, F>
+where F : Future{
+    let mut current = get_task_local();
+    current.insert(k.into(), v.into());
+    TASK_LOCAL.scope(current, f)
+}
+
+pub fn task_local_map<F>(kv: HashMap<String, String>, f: F) -> TaskLocalFuture<HashMap<String, String>, F>
+where F : Future{
+    let mut current = get_task_local();
+    for (k, v) in kv {
+        current.insert(k, v);
+    }
+    TASK_LOCAL.scope(current, f)
+}
+
+
 pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
     let stack = slice_vec_eager(stacktrace_abridged, 14, 30).join("\n").to_string();
+
+    let details = get_task_local().iter().map(|(k, v)| {
+        ErrorDetails {
+            detail_name: k.clone(),
+            detail: v.clone(),
+        }
+    }).collect_vec();
+
     ErrorInfo {
         code: error_code as i32,
         // TODO: From error code map
         description: "".to_string(),
         description_extended: "".to_string(),
         message: message.into(),
-        details: vec![ErrorDetails{ detail_name: "stacktrace".into(), detail: stack }],
+        details,
         retriable: false,
+        stacktrace: stack,
     }
 }
 
@@ -604,17 +642,7 @@ impl Request {
     }
 
     pub fn empty() -> Self {
-        Self{
-            gossip_transaction_request: None,
-            gossip_observation_request: None,
-            resolve_hash_request: None,
-            download_request: None,
-            about_node_request: None,
-            proof: None,
-            node_metadata: None,
-            get_peers_info_request: None,
-            multiparty_threshold_request: None,
-        }
+        Request::default()
     }
 
     pub fn about(&mut self) -> Self {
@@ -746,7 +774,7 @@ pub trait EasyJson {
     fn json(&self) -> Result<String, ErrorInfo>;
     fn json_or(&self) -> String;
     fn json_pretty(&self) -> Result<String, ErrorInfo>;
-
+    fn json_pretty_or(&self) -> String;
 }
 
 pub trait EasyJsonDeser {
@@ -771,6 +799,9 @@ where T: Serialize {
 
     fn json_pretty(&self) -> Result<String, ErrorInfo> {
         json_pretty(&self)
+    }
+    fn json_pretty_or(&self) -> String {
+        json_pretty(&self).unwrap_or("json pretty failure".to_string())
     }
 }
 

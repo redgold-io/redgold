@@ -167,6 +167,8 @@ impl FutLoopPoll {
         }
     }
 
+    /// This JoinHandle spawn is (likely) necessary to ensure parallel task execution in the loop
+    /// It should only spawn additional tasks, not threads
     pub async fn run_fut<T, F, Fut, FutBound>(
         &mut self, fut: Fut, func: F
     )-> Result<(), ErrorInfo>

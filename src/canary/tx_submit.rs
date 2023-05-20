@@ -210,10 +210,11 @@ impl TransactionSubmitter {
         let h1 = self.spawn(t1.clone().transaction);
         let h2 = self.spawn_client(t2.clone().transaction, second_client);
         let doubles = self.await_results(vec![(h1, t1.clone()), (h2, t2.clone())]);
-        info!("{}", serde_json::to_string(&doubles.clone()).unwrap());
+        info!("Double spend test response: {}", serde_json::to_string(&doubles.clone()).unwrap());
 
         assert!(doubles.iter().any(|x| x.accepted()));
         let one_rejected = doubles.iter().any(|x| !x.accepted());
+
         // if !one_rejected {
         //     show_balances()
         // }
@@ -222,6 +223,7 @@ impl TransactionSubmitter {
             .error_code() // Change to query response? or submit response?
             .filter(|x| x == &(Error::TransactionRejectedDoubleSpend as i32))
             .is_some()));
+
         doubles
     }
 
