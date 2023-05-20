@@ -402,6 +402,10 @@ pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
     error_message(crate::structs::Error::UnknownError, message.into())
 }
 
+pub fn error_code(code: Error) -> ErrorInfo {
+    error_message(code, "".to_string())
+}
+
 pub fn slice_vec_eager<T>(vec: Vec<T>, start: usize, end: usize) -> Vec<T>
 where T : Clone {
     let mut ret = vec![];

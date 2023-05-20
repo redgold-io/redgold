@@ -652,6 +652,15 @@ message MultipartyThresholdResponse {
 }
 
 
+message UtxoConflictResolveRequest {
+  repeated FixedUtxoId utxo_ids = 1;
+  Hash transaction_hash = 2;
+}
+
+message UtxoConflictResolveResponse {
+  repeated TransactionInfo transactions = 1;
+}
+
 
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
@@ -665,6 +674,7 @@ message Request {
   //  optional DownloadMetadataRequest download_metadata_request = 5;
   MultipartyThresholdRequest multiparty_threshold_request = 10;
   SubmitTransactionRequest submit_transaction_request = 11;
+  UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
 }
 
 message Response {
@@ -679,6 +689,7 @@ message Response {
 
   MultipartyThresholdResponse multiparty_threshold_response = 8;
   SubmitTransactionResponse submit_transaction_response = 9;
+  UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
 
 }
 

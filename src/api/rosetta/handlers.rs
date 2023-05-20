@@ -432,7 +432,7 @@ pub async fn mempool(
     let mut transaction_identifiers = vec![];
     for x in r.relay.transaction_channels.iter() {
         transaction_identifiers.push(TransactionIdentifier{
-            hash: hex::encode(x.key())
+            hash: x.key().hex()
         });
     }
     Ok(
