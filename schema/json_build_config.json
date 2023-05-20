@@ -88,6 +88,8 @@
         "structs.FixedUtxoId",
         "structs.UsedOutputs",
         "structs.OfflineTimeSponsor",
+        "structs.UtxoConflictResolveRequest",
+        "structs.UtxoConflictResolveResponse",
         "structs.PeerNodeInfo",
         "structs.VersionInfo"
       ]
@@ -159,6 +161,8 @@
         "structs.Output.contract",
         "structs.Output.product_id",
         "structs.Transaction.options",
+        "structs.Request.utxo_conflict_resolve_request",
+        "structs.Response.utxo_conflict_resolve_response",
         "structs.StandardData.keyed_typed_value"
       ]
     },

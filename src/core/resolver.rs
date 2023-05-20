@@ -206,7 +206,8 @@ pub struct ResolvedTransaction {
     /// child transaction of the resolved parents.
     transaction: Transaction,
     /// Already undergone localized validation (i.e. proofs, peer queries, etc.)
-    resolutions: Vec<ResolvedInput>
+    resolutions: Vec<ResolvedInput>,
+    pub(crate) resolved_internally: bool,
 }
 
 impl ResolvedTransaction {
@@ -240,22 +241,28 @@ impl ResolvedTransaction {
 //
 // #[async_trait]
 // impl Resolver for Transaction {
-pub async fn resolve_transaction(tx: Transaction, relay: Relay, runtime: Arc<Runtime>) -> Result<ResolvedTransaction, ErrorInfo> {
-        let peers = relay.ds.peer_store.active_nodes(None).await?;
-        let mut vec = vec![];
+// TODO: This should also trigger downloads etc. / acceptance
+pub async fn resolve_transaction(tx: &Transaction, relay: Relay, runtime: Arc<Runtime>) -> Result<ResolvedTransaction, ErrorInfo> {
+    let peers = relay.ds.peer_store.active_nodes(None).await?;
+    let mut resolved_internally = true;
+    let mut vec = vec![];
 
-        for result in future::join_all(tx.inputs.iter().map(|input|
-            runtime.spawn_err(resolve_input(input.clone(), relay.clone(),
-                                            runtime.clone(), peers.clone()))
-        ).collect_vec()).await {
-            let result = result??;
-            vec.push(result)
+    for result in future::join_all(tx.inputs.iter().map(|input|
+        runtime.spawn_err(resolve_input(input.clone(), relay.clone(),
+                                        runtime.clone(), peers.clone()))
+    ).collect_vec()).await {
+        let result = result??;
+        if !result.internal_accepted {
+            resolved_internally = false;
         }
-        let resolved = ResolvedTransaction {
-            transaction: tx.clone(),
-            resolutions: vec,
-        };
-        Ok(resolved)
+        vec.push(result)
+    }
+    let resolved = ResolvedTransaction {
+        transaction: tx.clone(),
+        resolutions: vec,
+        resolved_internally,
+    };
+    Ok(resolved)
     }
 // }
 

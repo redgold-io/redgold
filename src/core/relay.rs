@@ -15,7 +15,7 @@ use futures::task::SpawnExt;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
-use redgold_schema::structs::{MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, Request, Response};
+use redgold_schema::structs::{FixedUtxoId, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, Request, Response};
 
 use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -78,9 +78,8 @@ pub struct Relay {
     pub peer_message_tx: Channel<PeerMessage>,
     pub peer_message_rx: Channel<PeerMessage>,
     pub ds: DataStore,
-    pub transaction_channels: Arc<DashMap<Vec<u8>, RequestProcessor>>,
-    pub utxo_channels: Arc<DashMap<(Vec<u8>, i64), UTXOContentionPool>>,
-    pub transaction_errors: Arc<DashMap<Vec<u8>, TransactionErrorCache>>,
+    pub transaction_channels: Arc<DashMap<Hash, RequestProcessor>>,
+    pub utxo_channels: Arc<DashMap<FixedUtxoId, UTXOContentionPool>>,
     pub trust: Channel<TrustUpdate>,
     pub node_state: Arc<AtomicCell<NodeState>>,
     pub udp_outgoing_messages: Channel<PeerMessage>
@@ -146,6 +145,8 @@ impl Relay {
             .map_err(|e| error_info(e.to_string()))??;
         Ok(res)
     }
+
+
 
     pub async fn broadcast(
         relay: Relay,
@@ -240,7 +241,6 @@ impl Relay {
             ds,
             transaction_channels: Arc::new(DashMap::new()),
             utxo_channels: Arc::new(DashMap::new()),
-            transaction_errors: Arc::new(Default::default()),
             trust: internal_message::new_channel::<TrustUpdate>(),
             node_state: Arc::new(AtomicCell::new(NodeState::Initializing)),
             udp_outgoing_messages: internal_message::new_channel::<PeerMessage>()
