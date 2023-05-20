@@ -76,7 +76,7 @@ async fn some_other_async() {
     println!("some other async number get: {}", NUMBER.get().to_string());
 }
 
-#[tokio::test]
+// #[tokio::test]
 pub async fn debug() {
 
     //
