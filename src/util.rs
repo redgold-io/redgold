@@ -15,6 +15,7 @@ pub mod hashviz;
 pub mod merkle;
 pub mod keys;
 pub mod logging;
+pub mod trace_setup;
 
 use std::io::{Cursor, Write};
 use std::time::{SystemTime, UNIX_EPOCH};

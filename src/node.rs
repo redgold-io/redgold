@@ -47,6 +47,7 @@ use crate::util::runtimes::build_runtime;
 use crate::util::{auto_update, keys, metrics_registry};
 use crate::schema::constants::EARLIEST_TIME;
 use crate::schema::TestConstants;
+use crate::util::trace_setup::init_tracing;
 
 #[derive(Clone)]
 pub struct Node {
@@ -639,6 +640,7 @@ fn e2e() {
     util::init_logger().ok(); //.expect("log");
     metrics_registry::register_metric_names();
     metrics_registry::init_print_logger();
+    // init_tracing();
     let _tc = TestConstants::new();
 
 
@@ -675,6 +677,7 @@ fn e2e() {
     let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), spend_utxos);
 
     let _result = submit.submit();
+    info!("First submit response: {}", _result.json_pretty_or());
     assert!(_result.accepted());
 
 

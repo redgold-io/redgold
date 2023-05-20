@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use dashmap::mapref::entry::Entry;
-use futures::TryStreamExt;
+use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
 use metrics::increment_counter;
@@ -12,10 +12,10 @@ use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::struct_metadata_new;
-use redgold_schema::structs::{GossipTransactionRequest, Hash, Request};
+use redgold_schema::{json_or, ProtoHashable, struct_metadata_new, task_local, task_local_map};
+use redgold_schema::structs::{GossipTransactionRequest, Hash, PublicResponse, Request};
 
-use crate::core::internal_message::{FutLoopPoll, PeerMessage, RecvAsyncErrorInfo, TransactionMessage};
+use crate::core::internal_message::{FutLoopPoll, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::transaction::{TransactionTestContext, validate_utxo};
 use crate::data::data_store::DataStore;
@@ -24,7 +24,6 @@ use crate::schema::structs::{HashType, ObservationMetadata, State, Transaction};
 use crate::schema::structs::{QueryTransactionResponse, SubmitTransactionResponse};
 use crate::schema::{SafeBytesAccess, WithMetadataHashable};
 use crate::util::runtimes::build_runtime;
-use crate::schema::{error_from_code};
 // TODO config
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::ObservationProof;
@@ -178,6 +177,8 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Vec<
 }
 
 impl TransactionProcessContext {
+
+    // Init
     pub fn new(relay: Relay, tx_process_listener: Arc<Runtime>, tx_process: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>> {
         let context = Self {
             relay,
@@ -187,76 +188,104 @@ impl TransactionProcessContext {
         return tx_process_listener.spawn(async move { context.run().await });
     }
 
+    /// Loop to check messages and process them
+    // TODO: Abstract this out
     async fn run(&self) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.node.async_started");
-        info!("TransactionProcessContextRanHere");
-
         let mut fut = FutLoopPoll::new();
-
+        // TODO: Change to queue
         let mut receiver = self.relay.transaction.receiver.clone();
+        // TODO this accomplishes queue, we can also move the spawn function into FutLoopPoll so that
+        // the only function we have here is to call one function
+        // do that later
+        // receiver.stream().try_for_each_concurrent()
+        // We can also use a Context type parameter over it to keep track of some internal context
+        // per request i.e. RequestContext.
         fut.run_fut(&|| receiver.recv_async_err(), |transaction_res: Result<TransactionMessage, ErrorInfo>| {
-            increment_counter!("redgold.transaction.received");
+            // increment_counter!("redgold.transaction.received");
             let x = self.clone();
             let jh = self.tx_process.clone()
             .spawn(async move {
                 match transaction_res {
                     Ok(transaction) => {
-                        x.process_and_respond(transaction).await
+                        x.scoped_process_and_respond(transaction).await
                     }
                     Err(e) => Err(e)
                 }
             });
             jh
         } ).await
-
-        //
-        // fut.run(self.relay.transaction.receiver.clone(), |transaction: TransactionMessage| {
-        //     increment_counter!("redgold.transaction.received");
-        //     let x = self.clone();
-        //     let jh = self.tx_process.clone()
-        //     .spawn(async move { x.process_and_respond(transaction).await });
-        //     jh
-        // } ).await
-        //
-        //
-        //
-        // let mut futures = FuturesUnordered::new();
-        //
-        // loop {
-        //     let loop_sel_res = select! {
-        //         transaction_res = self.relay.transaction.receiver.recv_async_err() => {
-        //             let transaction: TransactionMessage = transaction_res?;
-        //             info!("Futures length: {:?}, Received transaction in process context {}",
-        //                 futures.len(),
-        //                 transaction.clone().transaction.hash_hex_or_missing()
-        //             );
-        //             increment_counter!("redgold.transaction.received");
-        //
-        //             let x = self.clone();
-        //             futures.push(self.tx_process
-        //                 .clone()
-        //                 .spawn(async move { x.process_and_respond(transaction).await }));
-        //             Ok(())
-        //         }
-        //         res = futures.next() => {
-        //             let r: Option<Result<Result<(), ErrorInfo>, JoinError>> = res;
-        //             match r {
-        //                 None => {
-        //                     Ok(())
-        //                 }
-        //                 Some(resres) => {
-        //                     resres.map_err(|je| ErrorInfo::error_info(
-        //                         format!("Panic in transaction thread {}", je.to_string())
-        //                     ))??;
-        //                     Ok(())
-        //                 }
-        //             }
-        //         }
-        //     };
-        //     loop_sel_res?;
-        // }
-        //
     }
+
+    async fn scoped_process_and_respond(&self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
+        let request_uuid = Uuid::new_v4().to_string();
+        let hex = transaction_message.transaction.calculate_hash().hex();
+        let time = transaction_message.transaction.struct_metadata.clone().map(|s| s.time.clone()).unwrap_or(0);
+        let current_time = util::current_time_millis_i64();
+        let input_address = transaction_message.transaction.first_input_address().clone()
+            .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
+        let output_address = transaction_message.transaction.first_output_address()
+            .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
+        let mut hm = HashMap::new();
+        hm.insert("request_uuid".to_string(), request_uuid.clone());
+        hm.insert("transaction_hash".to_string(), hex.clone());
+        hm.insert("transaction_time".to_string(), time.to_string());
+        hm.insert("current_time".to_string(), current_time.to_string());
+        hm.insert("input_address".to_string(), input_address.clone());
+        hm.insert("output_address".to_string(), output_address.clone());
+
+        let res = task_local_map(hm, async move {
+            self.process_and_respond(
+                transaction_message, request_uuid, hex,
+                time, current_time, input_address, output_address
+            ).await
+        }).await;
+        res
+    }
+
+    #[tracing::instrument(skip(self, transaction_message))]
+    async fn process_and_respond(
+        &self,
+        transaction_message: TransactionMessage,
+        request_uuid: String,
+        transaction_hash: String,
+        transaction_time: i64,
+        current_time: i64,
+        input_address: String,
+        output_address: String
+    ) -> Result<(), ErrorInfo> {
+        let result_or_error =
+            self.post_process_query(transaction_message.clone()).await;
+
+        // Use this as whether or not the request was successful
+        let mut metadata = ResponseMetadata::default();
+        // Change these to raw Response instead of public response
+        let mut pr = PublicResponse::default();
+        match result_or_error {
+            Ok(o) => {
+                metadata.success = true;
+                pr.submit_transaction_response = Some(o);
+            }
+            Err(ee) => {
+                metadata.success = false;
+                metadata.error_info = Some(ee);
+            }
+        }
+        pr.response_metadata = Some(metadata);
+
+        match transaction_message.response_channel {
+            None => {
+                increment_counter!("redgold.transaction.missing_response_channel");
+                let details = ErrorInfo::error_info("Missing response channel for transaction");
+                error!("Missing response channel for transaction {:?}", json_or(&details));
+            }
+            Some(r) => if let Some(e) = r.send_err(pr).err() {
+                error!("Error sending transaction response to channel {}", json_or(&e));
+            }
+        };
+        Ok(())
+    }
+
 
     async fn post_process_query(
         &self,
@@ -284,48 +313,6 @@ impl TransactionProcessContext {
         })
     }
 
-    async fn process_and_respond(&self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
-        let result2 = self.post_process_query(transaction_message.clone()).await;
-
-        // Use this instead as whether or not the request was successful,
-        // rather than info about the particular transaction.
-
-        let metadata = ResponseMetadata {
-            success: result2.is_ok(),
-            error_info: match result2.clone() {
-                Ok(_) => None,
-                Err(e) => Some(e),
-            },
-        };
-        let mut pr = empty_public_response();
-        pr.response_metadata = Some(metadata);
-        pr.submit_transaction_response = match result2 {
-            Ok(e) => Some(e),
-            Err(_) => None,
-        };
-
-        match transaction_message.response_channel {
-            None => {
-                // register error metric or log error?
-                // abort process? kill node???
-                // send node command kill signal.
-                error!("Missing transaction message response channel!")
-            }
-            Some(r) => match r.send(pr) {
-                Err(e) => {
-                    error!(
-                        "Error sending transaction response to API {:?}, {:?}, {:?}",
-                        e,
-                        e.to_string(),
-                        e.0
-                    )
-                }
-                Ok(_) => {}
-            },
-        };
-        Ok(())
-    }
-
     // TODO: okay so in this loop below thre's a time which should also check if all
     // available peers have heard about a double spend etc. and potentially terminate quicker?
     // maybe? or not hell not really necessary.
@@ -337,7 +324,7 @@ impl TransactionProcessContext {
         // TODO: Check if we've already rejected this transaction with an error with a LRU cache
         let request_processor = self.create_receiver_or_err(&hash_vec)?;
         // Validate obvious schema related errors
-        transaction.prevalidate().map_err(error_from_code)?;
+        transaction.prevalidate().map_err(|e| error_message(e, "Transaction prevalidation failure"))?;
 
         let transaction1 = transaction.clone();
         let resolver_data = resolve_transaction(transaction1.clone(),
@@ -506,7 +493,7 @@ impl TransactionProcessContext {
                     if conflict.abort {
                         clean_up(i);
                         // translate error codes for db access / etc. into internal server error.
-                        return Err(error_from_code(Error::TransactionRejectedDoubleSpend));
+                        return Err(error_message(Error::TransactionRejectedDoubleSpend, "Double spend detected in live context"));
                     }
                     conflicts.push(conflict);
                 }
@@ -544,7 +531,7 @@ impl TransactionProcessContext {
         } else {
             clean_up(i);
             // translate error codes for db access / etc. into internal server error.
-            return Err(error_from_code(Error::TransactionRejectedDoubleSpend));
+            return Err(error_message(Error::TransactionRejectedDoubleSpend, "Double spend detected in live context"));
         }
         clean_up(i);
 
@@ -656,7 +643,7 @@ impl TransactionProcessContext {
             .transaction_channels
             .entry(transaction_hash.clone());
         let res = match entry {
-            Entry::Occupied(_) => Err(error_from_code(Error::TransactionAlreadyProcessing)),
+            Entry::Occupied(_) => Err(error_message(Error::TransactionAlreadyProcessing, "Duplicate TX hash found in processing queue")),
             Entry::Vacant(entry) => {
                 let req = RequestProcessor::new(transaction_hash.clone());
                 entry.insert(req.clone());
