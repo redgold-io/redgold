@@ -1,4 +1,4 @@
-use crate::core::internal_message::new_channel;
+use crate::core::internal_message::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
 use crate::data::data_store::DataStore;
@@ -11,6 +11,9 @@ use bitcoin::secp256k1::PublicKey;
 use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
+use redgold_schema::SafeOption;
+use redgold_schema::structs::ErrorInfo;
+use redgold_schema::EasyJson;
 
 #[derive(Clone, Debug)]
 pub struct DownloadMaxTimes {
@@ -20,13 +23,13 @@ pub struct DownloadMaxTimes {
     pub observation_edge: i64,
 }
 
-pub fn download_msg(
+pub async fn download_msg(
     relay: &Relay,
     start_time: i64,
     end_time: i64,
     data_type: DownloadDataType,
     key: PublicKey,
-) -> Result<Response, String> {
+) -> Result<Response, ErrorInfo> {
 
     let key_hex = hex::encode(key.serialize().to_vec());
     // info!("Sending download message: start {:?} end: {:?}  type {:?} key_hex: {}", start_time, end_time, data_type, key_hex);
@@ -46,12 +49,12 @@ pub fn download_msg(
     let _err = relay
         .peer_message_tx
         .sender
-        .send(message)
-        .map_err(|e| e.to_string())?;
+        .send_err(message)?;
     // info!("Sent peer message for download, awaiting response with timeout 120");
     let response = c.receiver
-        .recv_timeout(Duration::from_secs(120))
-        .map_err(|e| e.to_string())?;
+        .recv_async_err_timeout(Duration::from_secs(120))
+        .await?;
+    response.as_error_info()?;
     use redgold_schema::json_or;
     // info!("Download response: {}", json_or(&response.clone()));
     Ok(response)
@@ -63,22 +66,19 @@ pub async fn download_all(
     end_time: i64,
     key: PublicKey,
     clean_up_utxo: bool,
-) {
+) -> Result<(), ErrorInfo> {
     let rr = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::UtxoEntry,
         key,
-    );
+    ).await;
 
     let vec = rr.unwrap().download_response.unwrap().utxo_entries;
     info!("Downloaded: {} utxo entries", vec.len());
     for x in vec.clone() {
-        let err = relay.ds.transaction_store.insert_utxo(&x).await;
-        if err.is_err() {
-            error!("{:?}", err);
-        }
+        relay.ds.transaction_store.insert_utxo(&x).await?;
     }
 
     let r = download_msg(
@@ -87,14 +87,17 @@ pub async fn download_all(
         end_time,
         DownloadDataType::TransactionEntry,
         key,
-    );
+    ).await?;
 
-    for x in r.unwrap().download_response.unwrap().transactions {
+    let dr = r.download_response.safe_get()?;
+
+    for x in &dr.transactions {
+        let x1 = x.transaction.safe_get()?;
         relay
             .ds
             .transaction_store
-            .insert_transaction_raw(&x.transaction.as_ref().unwrap(), x.time as i64, true, None)
-            .await;
+            .insert_transaction_raw(x1, x.time as i64, true, None)
+            .await?;
         // TODO return this error
         // .expect("fix");
         for (i, j) in x.transaction.as_ref().unwrap().iter_utxo_inputs() {
@@ -105,18 +108,18 @@ pub async fn download_all(
         }
     }
 
-    let result = download_msg(
+    let r = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::ObservationEntry,
         key,
-    );
-    let option = result.unwrap().download_response;
-
-    for x in option.unwrap().observations {
-        relay.ds.insert_observation(x.observation.unwrap(), x.time);
-        // .expect("fix");
+    ).await?;
+    let dr = r.download_response.safe_get()?;
+    info!("Downloaded: {} observation entries", dr.observations.len());
+    for x in &dr.observations {
+        let x2 = x.observation.safe_get()?;
+        relay.ds.observation.insert_observation_and_edges(x2, x.time as i64).await?;
     }
 
     let result1 = download_msg(
@@ -125,12 +128,12 @@ pub async fn download_all(
         end_time,
         DownloadDataType::ObservationEdgeEntry,
         key,
-    );
-    let option1 = result1.unwrap().download_response;
-    for x in option1.unwrap().observation_edges {
-        relay.ds.insert_observation_edge(&x);
-        // .expect("fix");
+    ).await;
+    let dr = r.download_response.safe_get()?;
+    for x in &dr.observation_edges {
+        relay.ds.observation.insert_observation_edge(&x).await?;
     }
+    Ok(())
 }
 
 /**
@@ -153,7 +156,11 @@ pub async fn download(relay: Relay, key: PublicKey) {
 
     let start_dl_time = util::current_time_millis();
 
-    download_all(&relay, EARLIEST_TIME, start_dl_time as i64, key, false).await;
+    let dl_result = download_all(&relay, EARLIEST_TIME, start_dl_time as i64, key, false).await;
+    if let Some(e) = dl_result.err() {
+        error!("Download result: {}", e.json_or());
+    }
+
 
     // relay.node_state.store(NodeState::Synchronizing);
     //
@@ -218,7 +225,7 @@ pub async fn download(relay: Relay, key: PublicKey) {
 //     }
 //
 
-pub fn process_download_request(
+pub async fn process_download_request(
     relay: &Relay,
     download_request: DownloadRequest,
 ) -> Result<DownloadResponse, rusqlite::Error> {
@@ -246,20 +253,20 @@ pub fn process_download_request(
             if download_request.data_type != DownloadDataType::ObservationEntry as i32 {
                 vec![]
             } else {
-                relay.ds.query_time_observation(
-                    download_request.start_time,
-                    download_request.end_time,
-                )?
+                relay.ds.observation.query_time_observation(
+                    download_request.start_time as i64,
+                    download_request.end_time as i64,
+                ).await.expect("")
             }
         },
         observation_edges: {
             if download_request.data_type != DownloadDataType::ObservationEdgeEntry as i32 {
                 vec![]
             } else {
-                relay.ds.query_time_observation_edge(
-                    download_request.start_time,
-                    download_request.end_time,
-                )?
+                relay.ds.observation.query_time_observation_edge(
+                    download_request.start_time as i64,
+                    download_request.end_time as i64,
+                ).await.expect("")
             }
         },
         // TODO: not this

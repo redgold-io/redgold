@@ -9,6 +9,7 @@ impl ErrorInfo {
         ResponseMetadata {
             success: false,
             error_info: Some(self),
+            task_local_details: vec![],
         }
     }
 }

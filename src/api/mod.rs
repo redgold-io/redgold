@@ -14,7 +14,8 @@ use serde::__private::de::Borrowed;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_schema::{error_info, ProtoHashable};
-use redgold_schema::structs::Response;
+use redgold_schema::structs::{Request, Response};
+use crate::node_config::NodeConfig;
 use crate::util::lang_util::SameResult;
 
 pub mod control_api;
@@ -101,6 +102,15 @@ impl HTTPClient {
         let deser = Response::deserialize(vec).map_err(|e| ErrorInfo::error_info(
             format!("Proto request response decode failure: {}", e.to_string())))?;
         Ok(deser)
+    }
+
+    pub async fn proto_post_request(&self, r: Request, nc: Option<NodeConfig>) -> Result<Response, ErrorInfo> {
+        let mut r = r.clone();
+        if let Some(nc) = nc {
+            r.with_metadata(nc.node_metadata());
+            r.with_auth(&nc.wallet().active_keypair());
+        }
+        self.proto_post(&r, "request_proto".to_string()).await
     }
 
     pub async fn test_request<Req, Resp>(port: u16, req: &Req, endpoint: String) -> Result<Resp, ErrorInfo>

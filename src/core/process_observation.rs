@@ -4,6 +4,7 @@ use redgold_schema::structs::ErrorInfo;
 use redgold_schema::util;
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::relay::Relay;
+use redgold_schema::EasyJson;
 
 #[derive(Clone)]
 pub struct ObservationHandler {
@@ -18,12 +19,13 @@ impl ObservationHandler {
             let o = self.relay.observation.receiver.recv_async_err().await?;
             info!("Received peer observation {}", serde_json::to_string(&o.clone()).unwrap());
             // TODO: Verify merkle root
+            // TODO: Verify time and/or avoid updating time if row already present.
             let option = o.clone().struct_metadata.map(|s| s.time).unwrap_or(util::current_time_millis());
-            let res = self.relay.ds.insert_observation(o, option as u64);
+            let res = self.relay.ds.observation.insert_observation_and_edges(&o, option).await;
             match res {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("Insert observation error from received observation: {}", e.to_string())
+                    log::error!("Insert observation error from received observation: {}", e.json_or())
                 }
             }
         }

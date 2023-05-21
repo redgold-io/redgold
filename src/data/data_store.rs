@@ -702,32 +702,6 @@ impl DataStore {
     //     return Ok(map);
     // }
 
-    pub fn query_observation_edge(
-        &self,
-        transaction_hash: Vec<u8>,
-    ) -> Result<Vec<ObservationProof>, Error> {
-        let conn = self.connection()?;
-        let mut statement =
-            conn.prepare("SELECT observation_metadata, merkle_proof, proof FROM observation_edge \
-            JOIN observation ON observation.root = observation_edge.root WHERE observation_hash = ?1")?;
-        let rows = statement.query_map(params![transaction_hash], |row| {
-            let proof: Vec<u8> = row.get(0)?;
-            let metadata = Some(ObservationMetadata::proto_deserialize(proof).unwrap());
-            let proof: Vec<u8> = row.get(1)?;
-            let merkle_proof = Some(MerkleProof::proto_deserialize(proof).unwrap());
-            let prf = Some(Proof::proto_deserialize(row.get(2)?).unwrap());
-            Ok(ObservationProof {
-                merkle_proof,
-                metadata,
-                proof: prf,
-            })
-        })?;
-        Ok(rows
-            .filter(|x| x.is_ok())
-            .map(|x| x.unwrap())
-            .collect::<Vec<ObservationProof>>())
-    }
-
     pub fn select_peer_id_from_key(&self, public_key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
         let conn = self.connection()?;
         let mut statement =
@@ -740,127 +714,6 @@ impl DataStore {
         res
     }
 
-    pub fn insert_observation_edge(
-        &self,
-        observation_edge: &ObservationEdge,
-    ) -> Result<usize, rusqlite::Error> {
-        let conn = self.connection()?;
-        let res = conn.execute(
-            "INSERT OR REPLACE INTO observation_edge \
-                (root, leaf_hash, observation_hash, observation_metadata, merkle_proof, time) \
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                observation_edge.root,
-                observation_edge.leaf_hash,
-                observation_edge.observation_hash,
-                observation_edge
-                    .observation_metadata
-                    .clone()
-                    .unwrap()
-                    .proto_serialize(),
-                observation_edge
-                    .merkle_proof
-                    .as_ref()
-                    .unwrap()
-                    .proto_serialize(),
-                observation_edge.time
-            ],
-        )?;
-        Ok(res)
-    }
-
-    pub fn insert_observation(&self, observation: Observation, time: u64) -> Result<usize, Error> {
-        increment_counter!("redgold.observation.insert");
-        let conn = self.connection()?;
-
-        // Store node state for filter query for pending vs. finalized.
-        // Remove all pending as part of cleanup operation.
-        let res = conn.execute(
-            "INSERT OR REPLACE INTO observation \
-            (root, raw_observation, public_key, proof, time, height) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                observation.merkle_root.clone().expect("a").vec(),
-                observation.proto_serialize(),
-                observation.proof.as_ref().unwrap().public_key_bytes().unwrap().clone(),
-                observation.proof.as_ref().unwrap().clone().proto_serialize(),
-                time,
-                observation.height.clone()
-            ],
-        )?;
-
-        let leafs = observation.leafs_hash();
-        let proofs = util::merkle::build(leafs.clone()).expect("merkle failure");
-        // info!("Store observation leafs len={:?}", leafs.len());
-        for observation_metadata in &observation.observations {
-            let hash = observation_metadata.hash();
-            let proof = proofs.proof(hash.clone());
-            let leaf = hash.vec();
-            let observed_hash = observation_metadata.observed_hash.clone();
-            // info!(
-            //     "Store observation_edge with observation_hash: {}",
-            //     observed_hash.clone().expect("a").hex()
-            // );
-            self.insert_observation_edge(&ObservationEdge {
-                root: observation.clone().merkle_root.as_ref().expect("wtf").safe_bytes().expect("a"),
-                leaf_hash: leaf,
-                observation_hash: observed_hash.expect("wtf").safe_bytes().expect("a"),
-                observation_metadata: Some(observation_metadata.clone()),
-                merkle_proof: Some(proof.clone()),
-                time,
-            })
-            .expect("insert");
-        }
-
-        return Ok(res);
-    }
-
-    // pub fn insert_peer(&self, peer_id: &Vec<u8>, trust: f64) -> Result<usize, Error> {
-    //     let conn = self.connection()?;
-    //     return Ok(conn.execute(
-    //         "INSERT INTO peers (id, trust) VALUES (?1, ?2)",
-    //         params![peer_id, trust],
-    //     )?);
-    // }
-    //
-    // pub fn insert_mnemonic(&self, mnemonic: String, peer_id: &Vec<u8>, trust: f64) -> Result<usize, Error> {
-    //     let conn = self.connection()?;
-    //     return Ok(conn.execute(
-    //         "INSERT INTO peers (id, trust) VALUES (?1, ?2)",
-    //         params![peer_id, trust],
-    //     )?);
-    // }
-
-    // Don't use this, use this to dial the peer and request their metadata current
-    // transaction storing all their node metadata, then insert that
-    pub fn insert_peer_single(
-        &self,
-        peer_id: &Vec<u8>,
-        trust: f64,
-        public_key: &Vec<u8>,
-        address: String,
-    ) -> Result<usize, Error> {
-        let conn = self.connection()?;
-        let _res = conn.execute(
-            "INSERT INTO peers (id, trust) VALUES (?1, ?2) \
-            ON CONFLICT(id) DO UPDATE SET \
-            trust=excluded.trust",
-            params![peer_id, trust],
-        )?;
-        let res2 = conn.execute(
-            "INSERT INTO peer_key (public_key, multi_hash, id, address) VALUES (?1, ?2, ?3, ?4) \
-            ON CONFLICT(public_key) DO UPDATE SET \
-            address=excluded.address, \
-            id=excluded.id",
-            params![
-                public_key,
-                util::to_libp2p_peer_id_ser(public_key).to_bytes(),
-                peer_id,
-                address
-            ],
-        )?;
-
-        return Ok(res2);
-    }
 
     pub fn check_peer_connect(&self, peer_id: PeerId) -> Result<bool, Error> {
         let conn = self.connection()?;
@@ -1109,41 +962,6 @@ impl DataStore {
                 output: Some(Output::proto_deserialize(row.get(3)?).unwrap()),
                 time: row.get(4)?,
             })
-        })?;
-        return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
-    }
-
-    pub fn query_time_observation_edge(
-        &self,
-        start_time: u64,
-        end_time: u64,
-    ) -> rusqlite::Result<Vec<ObservationEdge>, Error> {
-        let conn = self.connection()?;
-
-        let mut statement = conn.prepare(
-            "SELECT root, leaf_hash, observation_hash, observation_metadata, merkle_proof, time \
-            FROM observation_edge WHERE time >= ?1 AND time < ?2",
-        )?;
-
-        let rows = statement.query_map(params![start_time, end_time], |row| {
-            let root: Vec<u8> = row.get(0)?;
-            let leaf_hash: Vec<u8> = row.get(1)?;
-            let observation_hash: Vec<u8> = row.get(2)?;
-            let observation_metadata: Vec<u8> = row.get(3)?;
-            let merkle_proof: Vec<u8> = row.get(4)?;
-            let time: u64 = row.get(5)?;
-            let oe = ObservationEdge {
-                root,
-                leaf_hash,
-                observation_hash,
-                // TODO Map error to errinfo
-                observation_metadata: Some(
-                    ObservationMetadata::proto_deserialize(observation_metadata).unwrap(),
-                ),
-                merkle_proof: Some(MerkleProof::proto_deserialize(merkle_proof).unwrap()),
-                time,
-            };
-            Ok(oe)
         })?;
         return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
     }

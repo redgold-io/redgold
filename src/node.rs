@@ -483,7 +483,7 @@ impl LocalNodes {
         }
     }
 
-    fn verify_data_equivalent(&self) {
+    async fn verify_data_equivalent(&self) {
         let mut txs: Vec<HashSet<Vec<u8>>> = vec![];
         let mut obs: Vec<HashSet<Vec<u8>>> = vec![];
         let mut oes: Vec<HashSet<Vec<Vec<u8>>>> = vec![];
@@ -520,10 +520,16 @@ impl LocalNodes {
                 .node
                 .relay
                 .ds
-                .query_time_observation_edge(0, end_time)
+                .observation.query_time_observation_edge(0, end_time as i64)
+                .await
                 .unwrap()
                 .into_iter()
-                .map(|x| vec![x.root, x.leaf_hash, x.observation_hash])
+                .map(|x| {
+                    let proof = x.observation_proof.unwrap();
+                    let proof1 = proof.merkle_proof.unwrap();
+                    let x1 = proof.metadata.unwrap().clone();
+                    vec![proof1.root.unwrap().clone().vec(), x1.observed_hash.unwrap().clone().vec(), proof.observation_hash.unwrap().clone().vec()]
+                })
                 .collect();
             info!("Num oe: {:?} node_id: {:?}", oe.len(), n.id);
             oes.push(oe);
@@ -678,7 +684,13 @@ fn e2e() {
 
     let _result = submit.submit();
     info!("First submit response: {}", _result.json_pretty_or());
-    assert!(_result.accepted());
+    assert!(_result.is_ok());
+
+    let x = _result.expect("").query_transaction_response;
+    assert!(&x.is_some());
+    let query = x.expect("qry");
+    assert_eq!(query.observation_proofs.len(), 2);
+    // assert!(response)
 
 
 
@@ -687,10 +699,12 @@ fn e2e() {
     info!("Num utxos after first submit {:?}", utxos.len());
 
 
-    submit.with_faucet();
+    let faucet_res = submit.with_faucet();
+    info!("Faucet response: {}", faucet_res.json_pretty_or());
+    assert!(faucet_res.acceptance_proofs.len() > 0);
 
     let _result2 = submit.submit();
-    assert!(_result2.accepted());
+    assert!(_result2.is_ok());
     show_balances();
 
     info!("Num utxos after second submit {:?}", utxos.len());
@@ -720,10 +734,10 @@ fn e2e() {
 
     info!("Address response: {:?}", addr);
 
-    local_nodes.verify_data_equivalent();
+    runtime.block_on(local_nodes.verify_data_equivalent());
 
     local_nodes.add_node(runtime.clone());
-    local_nodes.verify_data_equivalent();
+    runtime.block_on(local_nodes.verify_data_equivalent());
     // //
     // let after_node_added = submit.submit();
     // assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")

@@ -452,12 +452,8 @@ message Observation {
 
 // Derived data structure, not a primary chain data structure
 message ObservationEdge {
-    bytes root = 1;
-    bytes leaf_hash = 2;
-    bytes observation_hash = 3;
-    ObservationMetadata observation_metadata = 4;
-    MerkleProof merkle_proof = 5;
-    uint64 time = 6;
+    ObservationProof observation_proof = 1;
+    int64 time = 2;
 }
 
 // TODO: Update types here
@@ -523,6 +519,13 @@ message UtxoEntry {
 
 // actually, wrapped bitcoin is fine, that's easily composible actually? maybe
 
+// TODO: unify types here
+message EagerFullGossipPush {
+  repeated Transaction transactions = 1;
+  repeated Observation observations = 2;
+  repeated ObservationEdge observation_edges = 3;
+  repeated PeerData peer_data = 7;
+}
 
 // These should both be broadcasts at some point
 // Consider using a response here if needed.
@@ -661,6 +664,14 @@ message UtxoConflictResolveResponse {
   repeated TransactionInfo transactions = 1;
 }
 
+message QueryObservationProofRequest{
+  Hash hash = 1;
+}
+
+message QueryObservationProofResponse {
+  repeated ObservationProof observation_proof = 1;
+}
+
 
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
@@ -675,6 +686,7 @@ message Request {
   MultipartyThresholdRequest multiparty_threshold_request = 10;
   SubmitTransactionRequest submit_transaction_request = 11;
   UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
+  QueryObservationProofRequest query_observation_proof_request = 13;
 }
 
 message Response {
@@ -690,7 +702,7 @@ message Response {
   MultipartyThresholdResponse multiparty_threshold_response = 8;
   SubmitTransactionResponse submit_transaction_response = 9;
   UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
-
+  QueryObservationProofResponse query_observation_proof_response = 11;
 }
 
 message QueryTransactionRequest {
@@ -705,9 +717,10 @@ message MerkleProof {
 }
 
 message ObservationProof {
-  MerkleProof merkle_proof = 1;
-  ObservationMetadata metadata = 2;
-  Proof proof = 3;
+  Hash observation_hash = 1;
+  MerkleProof merkle_proof = 2;
+  ObservationMetadata metadata = 3;
+  Proof proof = 4;
 }
 
 message QueryTransactionResponse {
@@ -724,7 +737,7 @@ message SubmitTransactionRequest {
 // Also include the signing hash in the response, modify transaction schema for that
 message SubmitTransactionResponse {
   Hash transaction_hash = 1;
-  optional QueryTransactionResponse query_transaction_response = 2;
+  QueryTransactionResponse query_transaction_response = 2;
   Transaction transaction = 3;
 }
 
@@ -768,9 +781,11 @@ message QueryAddressesResponse {
 message FaucetRequest {
   Address address = 1;
 }
-
+// Should this just be transactionInfo?
 message FaucetResponse {
-  optional Transaction transaction = 1;
+  // Todo query_transactionResponse?
+  Transaction transaction = 1;
+  repeated ObservationProof acceptance_proofs = 2;
 }
 
 message RecentTransactionsRequest {}
@@ -797,6 +812,7 @@ message TransactionInfo {
   repeated UsedOutputs used_outputs = 4;
   bool accepted = 5;
   ErrorInfo rejection_reason = 6;
+  // Move this outside to the class / request that requires it for resolving.
   optional bool queried_output_index_valid = 7;
 }
 
@@ -851,9 +867,15 @@ message ErrorInfo {
   string stacktrace = 7;
 }
 
+message TaskLocalDetails {
+  string key = 1;
+  string value = 2;
+}
+
 message ResponseMetadata {
   bool success = 1;
   ErrorInfo error_info = 2;
+  repeated TaskLocalDetails task_local_details = 3;
 }
 //
 //message AddPeerFullRequest {
