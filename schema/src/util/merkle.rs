@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use redgold_schema::structs::{ErrorInfo, Hash, MerkleProof};
+use crate::structs::{ErrorInfo, Hash, MerkleProof};
 
 #[derive(Debug, Clone)]
 pub struct MerkleEntry {
@@ -65,7 +65,7 @@ pub fn pad(mut hashes: &mut Vec<Hash>) {
     }
 }
 
-pub fn build(leafs_original: Vec<Hash>) -> Result<MerkleTree, ErrorInfo> {
+pub fn build_root(leafs_original: Vec<Hash>) -> Result<MerkleTree, ErrorInfo> {
 
     let mut leafs = leafs_original.clone();
 

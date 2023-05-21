@@ -4,12 +4,12 @@ use itertools::Itertools;
 use log::info;
 use redgold_data::DataStoreContext;
 use redgold_schema::{error_info, KeyPair, ProtoHashable, SafeOption, WithMetadataHashable};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, PublicResponse, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, PublicResponse, Response, TransactionAmount};
 use redgold_schema::transaction::{amount_data, amount_to_raw_amount};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::api::public_api::PublicClient;
 use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator};
-use crate::core::internal_message::{RecvAsyncErrorInfo, TransactionMessage};
+use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 //
 // async fn faucet_request_old(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
@@ -103,7 +103,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
             .with_remainder();
         let transaction = builder.transaction.clone();
         // let transaction = generator.generate_simple_tx().clone();
-        let (sender, receiver) = flume::unbounded::<PublicResponse>();
+        let (sender, receiver) = flume::unbounded::<Response>();
         let message = TransactionMessage {
             transaction: transaction.clone(),
             response_channel: Some(sender)
@@ -112,19 +112,25 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
             .clone()
             .transaction
             .sender
-            .send(message)
-            .expect("send");
+            .send_err(message)?;
 
         let r_err = receiver.recv_async_err().await;
 
         match r_err {
             Ok(response) => {
-                if response.clone().accepted() {
+                if response.clone().as_error_info().is_ok() {
                     // generator.completed(transaction.clone());
                     let mut tx = transaction.clone();
                     tx.with_hash();
                     // info!("Faucet success with response hash: {}", tx.hash.hex());
-                    Ok(FaucetResponse{ transaction: Some(tx.clone()) })
+                    let mut faucet_response = FaucetResponse::default();
+                    faucet_response.transaction = Some(tx);
+                    let option = response.submit_transaction_response.clone();
+                    let response1 = option.safe_get()?.clone();
+                    let x = response1.query_transaction_response.safe_get()?;
+                    let proofs = x.observation_proofs.clone();
+                    faucet_response.acceptance_proofs = proofs;
+                    Ok(faucet_response)
                 } else {
                     let e = format!("Faucet failure: {:?}", serde_json::to_string(&response));
                     info!("Faucet failure: {}", e);

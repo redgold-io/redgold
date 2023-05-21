@@ -369,6 +369,7 @@ pub fn response_metadata() -> Option<ResponseMetadata> {
     Some(ResponseMetadata {
         success: true,
         error_info: None,
+        task_local_details: vec![],
     })
 }
 
