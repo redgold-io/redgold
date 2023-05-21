@@ -14,15 +14,15 @@ use async_std::prelude::FutureExt;
 use metrics::{increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
 use redgold_schema::KeyPair;
-use redgold_schema::structs::{Address, ErrorInfo, PublicResponse};
-use crate::core::internal_message::{RecvAsyncErrorInfo, TransactionMessage};
+use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, Response};
+use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
 
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
-
+use redgold_schema::EasyJson;
 // i think this is the one currently in use?
 // TODO: Debug why this isn't working as a local request?
 #[allow(dead_code)]
@@ -76,7 +76,7 @@ pub fn run_remote(relay: Relay) {
             info!("Canary submit");
             sleep(Duration::from_secs(20));
             let response = submit.submit();
-            if !response.accepted() {
+            if !response.is_ok() {
                 increment_counter!("redgold.canary.failure");
                 let failure_msg = serde_json::to_string(&response).unwrap_or("ser failure".to_string());
                 error!("Canary failure: {}", failure_msg.clone());
@@ -92,7 +92,7 @@ pub fn run_remote(relay: Relay) {
                 num_success += 1;
                 info!("Canary success");
                 increment_counter!("redgold.canary.success");
-                if let Some(s) = response.submit_transaction_response {
+                if let Some(s) = response.ok() {
                     if let Some(q) = s.query_transaction_response {
                         increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
                     }
@@ -195,7 +195,7 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
             sleep(Duration::from_secs(60));
 
             let transaction = generator.generate_simple_tx().clone();
-            let (sender, receiver) = flume::unbounded::<PublicResponse>();
+            let (sender, receiver) = flume::unbounded::<Response>();
             let message = TransactionMessage {
                 transaction: transaction.transaction.clone(),
                 response_channel: Some(sender)
@@ -204,22 +204,20 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
                 .clone()
                 .transaction
                 .sender
-                .send(message)
-                .expect("send");
+                .send_err(message)?;
 
             let r_err = runtime.block_on(receiver.recv_async_err());
 
             match r_err {
                 Ok(response) => {
-                    if response.clone().accepted() {
+                    if response.clone().as_error_info().is_ok() {
                         generator.completed(transaction);
-                    }
-                    if !response.accepted() {
-                        info!("Canary failure: {:?}", serde_json::to_string(&response));
+                    } else {
+                        info!("Canary failure: {}", response.json_or());
                     }
                 }
                 Err(e) => {
-                    error!("Canary error {:?}", serde_json::to_string(&e));
+                    error!("Canary error {}", e.json_or());
                 }
             }
 

@@ -91,6 +91,9 @@
         "structs.UtxoConflictResolveRequest",
         "structs.UtxoConflictResolveResponse",
         "structs.PeerNodeInfo",
+        "structs.QueryObservationProofResponse",
+        "structs.QueryObservationProofRequest",
+        "structs.TaskLocalDetails",
         "structs.VersionInfo"
       ]
     },
@@ -119,10 +122,8 @@
       "attr": "#[serde_as(as = \"serde_with::hex::Hex\")]",
       "paths": [
         "structs.PoWProof.proof",
-        "structs.AddPeerFull.id", "structs.AddPeerFull.public_key",
-        "structs.ObservationEdge.root",
-        "structs.ObservationEdge.leaf_hash",
-        "structs.ObservationEdge.observation_hash",
+        "structs.AddPeerFull.id",
+        "structs.AddPeerFull.public_key",
         "structs.UtxoEntry.transaction_hash",
         "structs.UtxoEntry.address",
         "structs.BytesData.value",
@@ -163,6 +164,8 @@
         "structs.Transaction.options",
         "structs.Request.utxo_conflict_resolve_request",
         "structs.Response.utxo_conflict_resolve_response",
+        "structs.Response.query_observation_proof_response",
+        "structs.Request.query_observation_proof_request",
         "structs.StandardData.keyed_typed_value"
       ]
     },
@@ -175,7 +178,8 @@
         "structs.Transaction.inputs",
         "structs.Output.counter_party_proofs",
         "structs.StandardData.keyed_typed_value_list",
-        "structs.StandardData.matrix_typed_value_list"
+        "structs.StandardData.matrix_typed_value_list",
+        "structs.ResponseMetadata.task_local_details"
       ]
     },
     {

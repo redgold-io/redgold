@@ -28,11 +28,7 @@ use crate::util::keys::ToPublicKeyFromLib;
 
 pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, mut request: Request) -> Result<Response, ErrorInfo> {
     let client = crate::api::HTTPClient::new(ip, port as u16);
-    client.proto_post(
-        request
-            .with_auth(&nc.wallet().active_keypair())
-            .with_metadata(nc.node_metadata())
-        , "request_proto".to_string()).await
+    client.proto_post_request(request, Some(nc)).await
 }
 
 pub struct PeerRxEventHandler {
@@ -48,10 +44,6 @@ impl PeerRxEventHandler {
         relay: Relay, pm: PeerMessage, rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
         // pm.request.verify_auth()?;
-        if let Some(p) = pm.public_key {
-            let struct_pk = structs::PublicKey::from_bytes(p.serialize().to_vec());
-            relay.ds.peer_store.update_last_seen(struct_pk).await;;
-        }
 
         // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
         let response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
@@ -102,6 +94,13 @@ impl PeerRxEventHandler {
         } else {
             info!("No proof on incoming request, unknown peer");
         }
+
+        if let Some(p) = pm.public_key {
+            let struct_pk = structs::PublicKey::from_bytes(p.serialize().to_vec());
+            /// Only update last seen if peer already exists
+            relay.ds.peer_store.update_last_seen(struct_pk).await;;
+        }
+
         Ok(())
 
     }
@@ -120,6 +119,11 @@ impl PeerRxEventHandler {
     pub async fn request_response(relay: Relay, request: Request, arc: Arc<Runtime>) -> Result<Response, ErrorInfo> {
 
         let mut response = Response::empty_success();
+
+        if let Some(s) = request.submit_transaction_request {
+            response.submit_transaction_response = Some(relay.submit_transaction(s).await?);
+        }
+
         if let Some(t) = request.gossip_transaction_request {
             // info!("Received gossip transaction request");
             relay
@@ -142,7 +146,7 @@ impl PeerRxEventHandler {
 
         if let Some(download_request) = request.download_request {
             // info!("Received download request");
-            let result = DataStore::map_err(process_download_request(&relay, download_request))?;
+            let result = DataStore::map_err(process_download_request(&relay, download_request).await)?;
             response.download_response = Some(result);
         }
 

@@ -137,8 +137,8 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
         .with_remainder()
         .transaction.clone();
 
-    let response = client.send_transaction(&b, false).await?.as_error()?;
-    let tx_hex = response.submit_transaction_response.expect("response").transaction_hash.expect("hash").hex();
+    let response = client.send_transaction(&b, false).await?;
+    let tx_hex = response.transaction_hash.expect("hash").hex();
     println!("{}", tx_hex);
     Ok(())
 }
@@ -327,17 +327,18 @@ pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runt
     let client = p1.lb_client();
     let mut tx_submit = TransactionSubmitter::default(client.clone(), arc.clone(), vec![]);
     let faucet_tx = tx_submit.with_faucet();
-    info!("Faucet transaction: {}", faucet_tx.json_or());
+    info!("Faucet response: {}", faucet_tx.json_or());
+    let faucet_tx = faucet_tx.transaction.safe_get()?;
     let _ = {
         let gen =
         tx_submit.generator.lock().expect("");
         assert!(gen.finished_pool.len() > 0);
     };
     let source = Proof::proofs_to_address(&faucet_tx.inputs.get(0).expect("").proof)?;
-    let repeat = tx_submit.drain(source);
-    repeat.as_error()?;
-    assert!(repeat.accepted());
-    let s = repeat.submit_transaction_response.expect("submit transaction response");
+    let repeat = tx_submit.drain(source)?;
+    // assert!(repeat.accepted());
+    // assert proofs here
+    let s = repeat;
     let h2 = s.transaction_hash.expect("hash");
     let q = s.query_transaction_response.expect("query transaction response");
     println!("Obs proofs second tx: {}", q.observation_proofs.json_or());

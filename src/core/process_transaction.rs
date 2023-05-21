@@ -13,7 +13,7 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::{json_or, ProtoHashable, SafeOption, struct_metadata_new, structs, task_local, task_local_map};
-use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, Request, ValidationType};
+use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, ValidationType};
 
 use crate::core::internal_message::{FutLoopPoll, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -77,59 +77,60 @@ pub struct TransactionProcessContext {
     utxo_ids: Option<Vec<FixedUtxoId>>
 }
 
-async fn query_self_accepted_transaction_status(
-    relay: Relay,
-    transaction_hash: &Hash,
-) -> Result<QueryTransactionResponse, ErrorInfo> {
-    //relay.ds.select_peer_trust()
-    // TODO: Add hasher interface to relay / node_config
-    // let leaf_hash = util::dhash_vec(&transaction_hash).to_vec();
-
-    // TODO: add fields pct_acceptance network 0.8 for instance fraction of peers / fraction of trust accepted.
-    // TODO: Trust within partition id. partitions should be flexible in size relative to node size.
-    // or rather node size determines minimum -- partition?
-
-    let peer_publics = DataStore::map_err(relay.ds.select_broadcast_peers())?;
-
-    let mut pk = peer_publics
-        .iter()
-        .map(|x| x.public_key.clone())
-        .collect::<HashSet<Vec<u8>>>();
-
-    pk.insert(relay.node_config.wallet().transport_key().public_key_vec());
-
-    if pk.is_empty() {
-        error!("Peer keys empty, unable to validate transaction!")
-    }
-
-    let mut interval =
-        tokio::time::interval(relay.node_config.check_observations_done_poll_interval);
-
-    let mut res: Vec<ObservationProof> = vec![];
-    // what we should do is instead, in the process thing, cause a delay if we don't get any
-    // new information.
-
-    for _ in 0..relay.node_config.check_observations_done_poll_attempts {
-        interval.tick().await;
-        res = relay
-            .ds
-            .query_observation_edge(transaction_hash.vec())
-            .unwrap();
-        info!(
-            "Queried {:?} merkle proofs for transaction_hash {}",
-            res.len(),
-            transaction_hash.hex()
-        );
-        // TODO: Change to trust threshold for acceptance.
-        if res.len() >= 1 {
-            break;
-        }
-    }
-    Ok(QueryTransactionResponse {
-        observation_proofs: res,
-        block_hash: None,
-    })
-}
+// async fn query_self_accepted_transaction_status(
+//     relay: Relay,
+//     transaction_hash: &Hash,
+// ) -> Result<QueryTransactionResponse, ErrorInfo> {
+//     //relay.ds.select_peer_trust()
+//     // TODO: Add hasher interface to relay / node_config
+//     // let leaf_hash = util::dhash_vec(&transaction_hash).to_vec();
+//
+//     // TODO: add fields pct_acceptance network 0.8 for instance fraction of peers / fraction of trust accepted.
+//     // TODO: Trust within partition id. partitions should be flexible in size relative to node size.
+//     // or rather node size determines minimum -- partition?
+//
+//     let peer_publics = DataStore::map_err(relay.ds.select_broadcast_peers())?;
+//
+//     let mut pk = peer_publics
+//         .iter()
+//         .map(|x| x.public_key.clone())
+//         .collect::<HashSet<Vec<u8>>>();
+//
+//     pk.insert(relay.node_config.wallet().transport_key().public_key_vec());
+//
+//     if pk.is_empty() {
+//         error!("Peer keys empty, unable to validate transaction!")
+//     }
+//
+//     let mut interval =
+//         tokio::time::interval(relay.node_config.check_observations_done_poll_interval);
+//
+//     let mut res: Vec<ObservationProof> = vec![];
+//     // what we should do is instead, in the process thing, cause a delay if we don't get any
+//     // new information.
+//
+//     for _ in 0..relay.node_config.check_observations_done_poll_attempts {
+//         interval.tick().await;
+//         res = relay
+//             .ds
+//
+//             .query_observation_edge(transaction_hash.vec())
+//             .unwrap();
+//         info!(
+//             "Queried {:?} merkle proofs for transaction_hash {}",
+//             res.len(),
+//             transaction_hash.hex()
+//         );
+//         // TODO: Change to trust threshold for acceptance.
+//         if res.len() >= 1 {
+//             break;
+//         }
+//     }
+//     Ok(QueryTransactionResponse {
+//         observation_proofs: res,
+//         block_hash: None,
+//     })
+// }
 
 async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash, ErrorInfo> {
     //relay.ds.select_peer_trust()
@@ -146,37 +147,35 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
         map.insert(peer.public_key, peer.trust);
     }
 
-    let mut trust_conflicts = conflicts
-        .iter()
-        .map(|c| {
-            let res = relay
-                .ds
-                .query_observation_edge(c.transaction_hash.vec().clone())
-                .unwrap();
-            // TODO: .toMap trait.
-            // TODO: group by peer id instead, more accurate
-            let sum_trust = res
-                .iter()
-                // TODO: drop functional syntax here or deal with error somehow
-                .into_group_map_by(|x| {
-                    let ret: Vec<u8> = x
-                        .proof
-                        .as_ref()
-                        .map(|p| p.public_key_bytes().as_ref().unwrap().clone())
-                        .ok_or("")
-                        .unwrap();
-                    ret
-                })
-                .iter()
-                .map(|(k, _)| map.get(k).unwrap_or(&(0 as f64)))
-                .sum::<f64>();
-            (
-                (-1 as f64) * sum_trust,
-                c.processing_start_time,
-                c.transaction_hash.clone(),
-            )
-        })
-        .collect_vec();
+    let mut trust_conflicts = vec![];
+    for c in conflicts {
+        let res = relay
+            .ds
+            .observation.select_observation_edge(&c.transaction_hash.clone())
+            .await?;
+        // TODO: .toMap trait.
+        // TODO: group by peer id instead, more accurate
+        let sum_trust = res
+            .iter()
+            // TODO: drop functional syntax here or deal with error somehow
+            .into_group_map_by(|x| {
+                let ret: Vec<u8> = x
+                    .proof
+                    .as_ref()
+                    .map(|p| p.public_key_bytes().as_ref().unwrap().clone())
+                    .ok_or("")
+                    .unwrap();
+                ret
+            })
+            .iter()
+            .map(|(k, _)| map.get(k).unwrap_or(&(0 as f64)))
+            .sum::<f64>();
+        trust_conflicts.push((
+            (-1 as f64) * sum_trust,
+            c.processing_start_time,
+            c.transaction_hash.clone(),
+        ));
+    }
     // TODO: Order hash directly in proto schema generation
     trust_conflicts.sort_by(|(_, _, h1), (_, _, h2)| h1.vec().cmp(&h2.vec()));
     Ok(trust_conflicts.get(0).unwrap().2.clone())
@@ -269,7 +268,7 @@ impl TransactionProcessContext {
         // Use this as whether or not the request was successful
         let mut metadata = ResponseMetadata::default();
         // Change these to raw Response instead of public response
-        let mut pr = PublicResponse::default();
+        let mut pr = structs::Response::default();
         match result_or_error {
             Ok(o) => {
                 metadata.success = true;
@@ -337,20 +336,16 @@ impl TransactionProcessContext {
         Ok(())
     }
 
-    fn sign_pending(&self, validation_type: ValidationType) -> Result<(), ErrorInfo> {
+    async fn observe(&self, validation_type: ValidationType, state: State) -> Result<ObservationProof, ErrorInfo> {
         let mut hash: Hash = self.transaction_hash.safe_get()?.clone();
         hash.hash_type = HashType::Transaction as i32;
         let mut om = structs::ObservationMetadata::default();
         om.observed_hash = Some(hash);
-        om.state = Some(State::Pending as i32);
+        om.state = Some(state as i32);
         om.struct_metadata = struct_metadata_new();
         om.observation_type = validation_type as i32;
         // TODO: It might be nice to grab the proof of a signature here?
-        self.relay
-            .observation_metadata
-            .sender
-            .send_err(om)?;
-        Ok(())
+        self.relay.observe(om).await
     }
 
     // TODO: Add a debug info thing here? to include data about debug calls? Thread local info? something ?
@@ -441,18 +436,24 @@ impl TransactionProcessContext {
         resolver_data.validate()?;
         // Change this to 'revalidate' and only issue some queries again not all of them.
 
-        let resolution_type = if resolver_data.resolved_internally {
+        let validation_type = if resolver_data.resolved_internally {
             ValidationType::Full
         } else {
             ValidationType::Partial
         };
 
+        let mut observation_proofs = HashSet::new();
+
         if !conflict_detected {
-            self.sign_pending(resolution_type)?;
+            tracing::info!("Signing pending transaction");
+            let prf = self.observe(validation_type, State::Pending).await?;
+            observation_proofs.insert(prf);
             // TODO: Await the initial observations here, gossip about them as well?
         } else {
             tracing::info!("Conflict detected on current {}", hash.hex());
         }
+
+        tracing::info!("Pending transaction stage started");
 
         // TODO: Broadcast with no concern about response, or do we check for conflicts here?
         // TODO: we really need here a mechanism to deal with incoming conflict notifications
@@ -469,6 +470,8 @@ impl TransactionProcessContext {
             .peer_message_tx
             .sender
             .send_err(message)?;
+
+        tracing::info!("Gossiped transaction");
 
         let elapsed_time = || {
             current_time_millis_i64() - processing_time_start
@@ -513,6 +516,8 @@ impl TransactionProcessContext {
         // TODO: Return all conflicts if not chosen as part of submit response
         // And/or return all conflicts anyways as part of the response.
 
+        tracing::info!("Conflict resolution stage started with {:?} conflicts", conflicts.len());
+
         if !conflicts.is_empty() {
 
             let this_as_conflict = Conflict {
@@ -539,22 +544,47 @@ impl TransactionProcessContext {
             }
         }
 
-        self.finalize_transaction(&hash, transaction).await?;
+        tracing::info!("Finalizing transaction stage started");
 
-        info!(
-            "Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len()
-        );
+        let prf = self.observe(validation_type, State::Finalized).await?;
+        observation_proofs.insert(prf);
+
+        self.insert_transaction(&hash, transaction).await?;
+        increment_counter!("redgold.transaction.accepted");
+
+        tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());
 
         // Await until it has appeared in an observation and other nodes observations.
 
-        // TODO: periodic process to clean mempool in event of thread processing crash
-        let query = query_self_accepted_transaction_status(self.relay.clone(), &hash).await?;
+        // TODO: periodic process to clean mempool in event of thread processing crash?
+        let peers = self.relay.ds.peer_store.active_nodes(None).await?;
+        let mut obs_proof_req = Request::default();
+        obs_proof_req.query_observation_proof_request = Some(QueryObservationProofRequest {
+            hash: Some(hash.clone())
+        });
+
+        tracing::info!("Collecting observation proofs from {} peers", peers.len());
+        let results = Relay::broadcast(self.relay.clone(),
+                                       peers, obs_proof_req, self.tx_process.clone(), Some(
+                Duration::from_secs(5))).await;
+        for (_, r) in results {
+            if let Some(r) = r.ok() {
+                if let Some(obs_proof) = r.query_observation_proof_response {
+                    observation_proofs.extend(obs_proof.observation_proof);
+                }
+            }
+        }
+
+        observation_proofs.extend(self.relay.ds.observation.select_observation_edge(&hash).await?);
+
         let mut submit_response = SubmitTransactionResponse::default();
-        submit_response.query_transaction_response = Some(query);
+        let mut query_transaction_response = QueryTransactionResponse::default();
+        query_transaction_response.observation_proofs = observation_proofs.iter().map(|o| o.clone()).collect_vec();
+        submit_response.query_transaction_response = Some(query_transaction_response);
         Ok(submit_response)
     }
 
-    async fn finalize_transaction(
+    async fn insert_transaction(
         &self,
         hash: &Hash,
         transaction: &Transaction,
@@ -590,21 +620,6 @@ impl TransactionProcessContext {
             )?;
         }
 
-        self.relay
-            .observation_metadata
-            .sender
-            .send_err(ObservationMetadata {
-                hash: None, 
-                observed_hash: Some(hash.clone()),
-                state: Some(State::Finalized as i32),
-                validation_confidence: None,
-                struct_metadata: struct_metadata_new(),
-                observation_type: 0
-            })?;
-        info!(
-            "Accepted transaction: {}", hash.hex()
-        );
-        increment_counter!("redgold.transaction.accepted");
         return Ok(());
     }
 

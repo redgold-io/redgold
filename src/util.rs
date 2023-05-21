@@ -12,7 +12,6 @@ pub mod sym_crypt;
 pub mod ip_lookup;
 pub mod cli;
 pub mod hashviz;
-pub mod merkle;
 pub mod keys;
 pub mod logging;
 pub mod trace_setup;

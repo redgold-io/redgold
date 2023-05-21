@@ -9,7 +9,6 @@ pub mod data;
 pub mod genesis;
 pub mod gui;
 pub mod infra;
-pub mod mem_pool;
 pub mod node;
 pub mod  node_config;
 pub mod resources;

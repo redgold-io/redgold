@@ -42,7 +42,8 @@ impl Response {
         let mut r = Response::empty_success();
         r.response_metadata = Some(ResponseMetadata {
             success: false,
-            error_info: Some(error_info)
+            error_info: Some(error_info),
+            task_local_details: vec![],
         });
         return r.clone();
     }
