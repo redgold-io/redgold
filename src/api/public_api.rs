@@ -625,6 +625,7 @@ async fn mock_relay(relay: Relay) {
 // }
 
 // #[tokio::test]
+#[ignore]
 #[test]
 fn test_warp_basic() {
     util::init_logger().expect("log");

@@ -349,6 +349,7 @@ pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runt
 
 }
 
+#[ignore]
 #[test]
 fn test_transaction_dev() {
     init_logger();

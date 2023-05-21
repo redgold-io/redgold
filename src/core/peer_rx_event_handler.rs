@@ -122,7 +122,8 @@ impl PeerRxEventHandler {
 
         if let Some(s) = request.submit_transaction_request {
             response.submit_transaction_response = Some(relay.submit_transaction(s).await?);
-        }
+        } // else
+        // if let some(f) = request.fau
 
         if let Some(t) = request.gossip_transaction_request {
             // info!("Received gossip transaction request");
