@@ -1,4 +1,3 @@
-# TODO: Delete this if no longer needed.
 version: "3.7"
 volumes:
   prometheus_data: {}
@@ -88,37 +87,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD_FILE=/var/lib/grafana/grafana_secret
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/etc/grafana/grafana_secret
     volumes:
-      - ~/.rg/all/grafana_secret:/var/lib/grafana/grafana_secret
+      - ~/.rg/all/grafana_password:/etc/grafana/grafana_secret
       - ~/.rg/all/data/grafana:/var/lib/grafana
+      - ~/.rg/all/prometheus-datasource.yaml:/etc/grafana/provisioning/datasources/prometheus.yaml
+      - ~/.rg/all/dashboards:/etc/grafana/provisioning/dashboards
     network_mode: host
-  redgold:
-    user: root
-    image: redgoldio/redgold:${REDGOLD_NETWORK:-dev}
-    container_name: redgold-${REDGOLD_NETWORK:-dev}
-    restart: unless-stopped
-    ports:
-      - ${REDGOLD_METRICS_PORT:-16179}:16179
-      - ${REDGOLD_P2P_PORT:-16180}:16180
-      - ${REDGOLD_PUBLIC_PORT:-16181}:16181
-      - ${REDGOLD_CONTROL_PORT:-16182}:16182
-    volumes:
-      - ~/.rg:/root/.rg
-      - /var/lib/docker/containers:/var/lib/docker/containers
-      - /var/run/docker.sock:/var/run/docker.sock
-    network_mode: host
-    command: ["--network", "${REDGOLD_NETWORK:-dev}"]
-    labels:
-      - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower-${REDGOLD_NETWORK:-dev}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 120 --scope redgold-${REDGOLD_NETWORK:-dev}
-    labels:
-      - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"
-
-# add new data source in grafana, browser mode until grafana in compose.
-# docker-compose -f docker-compose-prometheus.yml up -d

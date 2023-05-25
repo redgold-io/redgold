@@ -1,5 +1,6 @@
  use std::collections::HashMap;
-use std::fs::File;
+ use std::env::VarError;
+ use std::fs::File;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use std::io::{Write, Read, Seek, SeekFrom};
 use std::thread::sleep;
@@ -8,14 +9,6 @@ use crate::infra::SSH;
 use crate::resources::Resources;
 use filepath::FilePath;
 use itertools::Itertools;
-
-
-pub fn setup_services(
-    mut ssh: SSH
-) -> Result<(), ErrorInfo> {
-    ssh.verify()?;
-    Ok(())
-}
 
  /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
@@ -67,9 +60,12 @@ pub fn setup_server_redgold(
         }
     }
 
+     // TODO: Lol not this
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port), true);
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port - 1), true);
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 1), true);
+    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 4), true);
+    ssh.exec(format!("sudo ufw allow proto udp from any to any port {}", port + 5), true);
 
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
@@ -91,16 +87,97 @@ pub fn setup_server_redgold(
     Ok(())
 }
 
+pub async fn setup_ops_services(
+    mut ssh: SSH,
+    additional_env: Option<HashMap<String, String>>,
+    remote_path_prefix: Option<String>,
+    grafana_pass: Option<String>,
+) -> Result<(), ErrorInfo> {
+    let remote_path = remote_path_prefix.unwrap_or("/root/.rg/all".to_string());
+    ssh.verify()?;
+
+    let p = |s: String| {
+        println!("Partial output: {}", s);
+        Ok(())
+    };
+
+    ssh.stream_partial("docker ps", false, p).await?;
+    ssh.copy(
+        include_str!("../resources/infra/ops_services/services-all.yml"),
+        format!("{}/services-all.yml", remote_path)
+    );
+    ssh.copy(
+        include_str!("../resources/infra/ops_services/filebeat.docker.yml"),
+        format!("{}/filebeat.docker.yml", remote_path)
+    );
+    let mut promtheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
+//     match std::env::var("GRAFANA_CLOUD_USER") {
+//         Ok(u) => {
+//             promtheus_yml += &*format!("remote_write:
+// - url: {}
+//   basic_auth:
+//     username: {}
+//     password: {}",
+//                                        u,
+//                                        std::env::var("GRAFANA_CLOUD_URL").expect(""),
+//                                        std::env::var("GRAFANA_CLOUD_API").expect("")
+//             );
+//         }
+//         Err(_) => {}
+//     }
+    ssh.copy(
+        promtheus_yml,
+        format!("{}/prometheus.yml", remote_path)
+    );
+    ssh.copy(
+        include_str!("../resources/infra/ops_services/prometheus-datasource.yaml"),
+        format!("{}/prometheus-datasource.yaml", remote_path)
+    );
+
+    ssh.copy(
+        grafana_pass.unwrap_or("debug".to_string()),
+        format!("{}/grafana_password", remote_path)
+    );
+
+    ssh.stream_partial(format!("rm -r {}/dashboards", remote_path), false, p).await?;
+    ssh.stream_partial(format!("mkdir {}/dashboards", remote_path), false, p).await?;
+
+    let x = include_str!("../resources/infra/ops_services/dashboards/node-exporter-full_rev31.json");
+    ssh.copy(
+        x.clone(),
+        format!("{}/dashboards/node-exporter.json", remote_path)
+    );
+
+    // println!("Copying node exporter dashboard: {}", x);
+
+    ssh.copy(
+        include_str!("../resources/infra/ops_services/dashboards/dashboard_config.yaml"),
+        format!("{}/dashboards/dashboard_config.yaml", remote_path)
+    );
+
+    ssh.stream_partial(format!("cd {}; docker-compose -f services-all.yml down", remote_path), false, p).await?;
+
+    for s in vec!["grafana", "prometheus", "esdata"] {
+        ssh.stream_partial(format!("rm -r {}/data/{}", remote_path, s), false, p).await?;
+        ssh.stream_partial(format!("mkdir {}/data/{}", remote_path, s), false, p).await?;
+    };
+
+    ssh.stream_partial(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), false, p).await?;
+
+    Ok(())
+}
+
 
 #[ignore]
-#[test]
-fn test_setup_server() {
+#[tokio::test]
+async fn test_setup_server() {
     // sudo ufw allow proto tcp from any to any port 16181
         // sudo ufw allow proto tcp from any to any port 16180
 
     //
     //
-    // let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
+    let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
+    setup_ops_services(ssh, None, None, None).await.expect("");
     // setup_server_redgold(ssh, NetworkEnvironment::Predev, true, None, true).expect("worx");
     //
     // let ssh = SSH::new_ssh("interserver.redgold.io", None);

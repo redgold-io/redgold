@@ -1,5 +1,5 @@
 global:
-  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  scrape_interval:     5s # By default, scrape targets every 15 seconds.
 
   # Attach these labels to any time series or alerts when communicating with
   # external systems (federation, remote storage, Alertmanager).
@@ -11,36 +11,20 @@ global:
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'prometheus'
-
-    # Override the global default and scrape targets from this job every 5 seconds.
-    scrape_interval: 5s
-
     static_configs:
       - targets: ['localhost:9090']
-
   - job_name: 'node'
-
-    # metrics_path defaults to '/metrics'
-    # scheme defaults to 'http'.
-    scrape_interval: 5s
-
     static_configs:
       - targets: ['localhost:9100']
-
-  - job_name: 'redgold'
-
-    # metrics_path defaults to '/metrics'
-    # scheme defaults to 'http'.
-    scrape_interval: 5s
-
+  - job_name: 'redgold-dev'
+    static_configs:
+      - targets: ['localhost:16479']
+  - job_name: 'redgold-test'
+    static_configs:
+      - targets: ['localhost:16279']
+  - job_name: 'redgold-main'
     static_configs:
       - targets: ['localhost:16179']
-
-  - job_name: 'redgold-canary'
-
-    # metrics_path defaults to '/metrics'
-    # scheme defaults to 'http'.
-    scrape_interval: 5s
-
+  - job_name: 'redgold-predev'
     static_configs:
-      - targets: ['localhost:16178']
+      - targets: ['localhost:16579']
