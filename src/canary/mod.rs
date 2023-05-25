@@ -14,10 +14,8 @@ use async_std::prelude::FutureExt;
 use metrics::{increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
 use redgold_schema::KeyPair;
-use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, Response};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest};
-use crate::core::internal_message::{RecvAsyncErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
 
