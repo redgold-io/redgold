@@ -3,7 +3,7 @@ use crate::util;
 use crate::util::cmd::run_cmd;
 
 pub mod trezor;
-pub mod trezor_unchecked;
+// pub mod trezor_unchecked;
 
 
 trait HardwareWallet {
