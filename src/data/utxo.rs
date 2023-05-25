@@ -1,10 +1,10 @@
+use redgold_schema::structs::Address;
 use crate::schema::utxo_id::UtxoId;
-use crate::schema::address::{address, address_data};
 use crate::schema::structs::{Input, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;
 use crate::schema::{SafeBytesAccess, WithMetadataHashable};
 use crate::util;
-use redgold_schema::util::wallet::generate_key;
+use redgold_schema::util::mnemonic_words::generate_key;
 
 //
 // #[test]
@@ -33,12 +33,12 @@ use redgold_schema::util::wallet::generate_key;
 // }
 
 pub fn get_example_utxo_entry() -> UtxoEntry {
-    let vec1 = address(&generate_key().1).to_vec();
+    let vec1 = Address::address(&generate_key().1).to_vec();
     return UtxoEntry {
         transaction_hash: util::sha256_str("asdf").to_vec(),
         address: vec1.clone(),
         output: Some(Output {
-            address: address_data(vec1.clone()),
+            address: Address::address_data(vec1.clone()),
             product_id: None,
             counter_party_proofs: vec![],
             data: amount_data(100),

@@ -8,7 +8,7 @@ use tokio::select;
 use tokio::task::JoinHandle;
 use redgold_schema::SafeOption;
 use redgold_schema::structs::{ErrorInfo, PeerData};
-use crate::api::HTTPClient;
+use crate::api::RgHttpClient;
 use crate::core::internal_message::{FutLoopPoll, PeerMessage, SendErrorInfo};
 use crate::core::peer_rx_event_handler::rest_peer;
 

@@ -25,21 +25,21 @@ fn image_from_bytes(hash_vec: Vec<u8>) -> RgbImage {
     return generate_image(20, 20, &all_bytes)
 }
 
-#[test]
-fn debug_img_gen() {
-    let mut all_bytes: Vec<u8> = Vec::new();
-    let mut h = Hash::from_string("test");
-    for i in 0..20 {
-        all_bytes.extend(h.vec());
-        // h = Hash::calc_bytes(h.vec());
-    }
-    let i1 = all_bytes.len();
-    println!("{:?}", i1);
-    // println!("{:?}", i1);
-    let buffer = generate_image(20, 20, &all_bytes);
-    // buffer.as_raw()
-    buffer.save("test01.png").unwrap();
-}
+// #[test]
+// fn debug_img_gen() {
+//     let mut all_bytes: Vec<u8> = Vec::new();
+//     let mut h = Hash::from_string("test");
+//     for i in 0..20 {
+//         all_bytes.extend(h.vec());
+//         // h = Hash::calc_bytes(h.vec());
+//     }
+//     let i1 = all_bytes.len();
+//     println!("{:?}", i1);
+//     // println!("{:?}", i1);
+//     let buffer = generate_image(20, 20, &all_bytes);
+//     // buffer.as_raw()
+//     buffer.save("test01.png").unwrap();
+// }
 
 
 use svg::node::element;

@@ -65,7 +65,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
 
     let mut map: HashMap<Vec<u8>, KeyPair> = HashMap::new();
     for i in min_offset..max_offset {
-        let key = node_config.wallet().key_at(i);
+        let key = node_config.internal_mnemonic().key_at(i);
         let address = key.address_typed();
         map.insert(address.address.unwrap().value, key);
     }
@@ -84,7 +84,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         .collect_vec();
 
     let mut generator = TransactionGenerator::default_adv(
-        utxos.clone(), min_offset, max_offset, node_config.wallet()
+        utxos.clone(), min_offset, max_offset, node_config.internal_mnemonic()
     );
 
 

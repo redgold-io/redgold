@@ -1,4 +1,3 @@
-use crate::address::address_data;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
@@ -134,8 +133,8 @@ impl Transaction {
             ))?;
         Ok(Proof::verify_proofs(
             &input.proof,
-            &utxo_entry.transaction_hash,
-            &utxo_entry.address,
+            &Hash::from_bytes(utxo_entry.transaction_hash.clone()),
+            &Address::from_bytes(utxo_entry.address.clone())?,
         )?)
     }
 
@@ -243,7 +242,7 @@ impl Transaction {
 
     // This function seems to halt with a bad amoubnt calll
 
-    // TODO: TransactionBuilder
+    // TODO: Move all of this to TransactionBuilder
     pub fn new(
         source: &UtxoEntry,
         destination: &Vec<u8>,
@@ -265,7 +264,7 @@ impl Transaction {
         let fee = 0 as u64; //MIN_FEE_RAW;
         amount_actual -= fee;
         let output = Output {
-            address: address_data(destination.clone()),
+            address: Address::address_data(destination.clone()),
             data: amount_data(amount_actual),
             product_id: None,
             counter_party_proofs: vec![],

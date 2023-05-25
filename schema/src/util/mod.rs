@@ -54,6 +54,7 @@ fn test_sign() {
 
 pub fn verify(hash: &Vec<u8>, signature: &Vec<u8>, public_key: &Vec<u8>) -> Result<(), ErrorInfo> {
     let mut ret = [0u8; 32];
+
     ret[..].copy_from_slice(&hash[0..32]);
     let message = Message::from_slice(&ret).map_err(|e| {
         error_message(
@@ -78,7 +79,7 @@ pub fn verify(hash: &Vec<u8>, signature: &Vec<u8>, public_key: &Vec<u8>) -> Resu
         .map_err(|e| {
             error_message(
                 structs::Error::IncorrectSignature,
-                "Signature verification failure",
+                format!("Signature verification failure: {}", e.to_string()),
             )
         })?;
     return Ok(());
@@ -116,8 +117,9 @@ pub fn public_key_ser(public_key: &PublicKey) -> Option<crate::structs::PublicKe
 }
 
 pub mod mnemonic_builder;
-pub mod wallet;
+pub mod mnemonic_words;
 pub mod merkle;
+pub mod bitcoin_message_signer;
 
 pub fn sha256(s: &[u8]) -> [u8; 32] {
     let mut hash = [0u8; 32];

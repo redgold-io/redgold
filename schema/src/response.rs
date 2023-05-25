@@ -60,6 +60,7 @@ impl Response {
         self
     }
 
+
     pub fn as_error_info(&self) -> Result<(), ErrorInfo> {
         let res = self.response_metadata.safe_get()?;
         if let Some(e) = &res.error_info {

@@ -5,11 +5,11 @@ use tokio::runtime::Runtime;
 
 use crate::core::relay::Relay;
 use crate::data::data_store::RewardQueryResult;
-use crate::schema::address::address_data;
 use crate::schema::structs::{Input, Output, Transaction};
 use crate::schema::transaction::amount_data;
 use crate::util::current_time_unix;
 use redgold_schema::constants::{MIN_FEE_RAW, REWARD_AMOUNT_RAW};
+use redgold_schema::structs::Address;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -65,7 +65,7 @@ impl Rewards {
                 let amount =
                     ((x.deterministic_trust.clone() / sum2) * (REWARD_AMOUNT_RAW as f64)) as u64;
                 Output {
-                    address: address_data(x.reward_address.clone()),
+                    address: Address::address_data(x.reward_address.clone()),
                     product_id: None,
                     counter_party_proofs: vec![],
                     data: amount_data(amount + (delta as u64)),

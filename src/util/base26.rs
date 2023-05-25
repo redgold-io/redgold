@@ -1,5 +1,6 @@
 use bitcoin::util::base58::Error;
 use std::{fmt, iter, slice, str};
+use bitcoin::util::base58;
 
 static BASE26_CHARS: &'static [u8] = b"abcdefghijklmnopqrstuvwxyz";
 // use num_traits::cast::ToPrimitive;
@@ -268,10 +269,12 @@ pub fn encode_slice(data: &[u8]) -> String {
 fn test() {
     let data = crate::util::sha256_str("asdf").to_vec();
     println!("{}", hex::encode(data.clone()));
+    println!("{}", base58::check_encode_slice(&data));
     let res = encode_slice(&data.clone());
     println!("{}", res);
+    println!("{}", res.to_uppercase());
     let res2 = from(&res.clone()).expect("decoded");
-    println!("{}", hex::encode(res2.clone()));
+    // println!("{}", hex::encode(res2.clone()));
     assert_eq!(data, res2.clone());
 
     let res3 = encode_slice(&res2.clone());
