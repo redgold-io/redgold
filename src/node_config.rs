@@ -215,6 +215,10 @@ impl NodeConfig {
         self.port_offset + 4
     }
 
+    pub fn udp_port(&self) -> u16 {
+        self.port_offset + 5
+    }
+
     pub fn default_debug() -> Self {
         NodeConfig::from_test_id(&(0 as u16))
     }
