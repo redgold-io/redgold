@@ -18,6 +18,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, MultipartyThresholdResponse, Request};
 use redgold_schema::{json_or, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use crate::api::about;
 use crate::core::internal_message::{FutLoopPoll, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
@@ -27,18 +28,14 @@ use crate::util::keys::ToPublicKeyFromLib;
 
 pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, mut request: Request) -> Result<Response, ErrorInfo> {
     let client = crate::api::HTTPClient::new(ip, port as u16);
-    client.proto_post(
-        request
-            .with_auth(&nc.wallet().active_keypair())
-            .with_metadata(nc.node_metadata())
-        , "request_proto".to_string()).await
+    client.proto_post_request(request, Some(nc)).await
 }
 
 pub struct PeerRxEventHandler {
     relay: Relay,
     rt: Arc<Runtime>
 }
-
+use redgold_schema::EasyJson;
 use crate::util::logging::Loggable;
 
 impl PeerRxEventHandler {
@@ -47,10 +44,6 @@ impl PeerRxEventHandler {
         relay: Relay, pm: PeerMessage, rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
         // pm.request.verify_auth()?;
-        if let Some(p) = pm.public_key {
-            let struct_pk = structs::PublicKey::from_bytes(p.serialize().to_vec());
-            relay.ds.peer_store.update_last_seen(struct_pk).await;;
-        }
 
         // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
         let response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
@@ -97,9 +90,17 @@ impl PeerRxEventHandler {
             }
 
 
+
         } else {
             info!("No proof on incoming request, unknown peer");
         }
+
+        if let Some(p) = pm.public_key {
+            let struct_pk = structs::PublicKey::from_bytes(p.serialize().to_vec());
+            /// Only update last seen if peer already exists
+            relay.ds.peer_store.update_last_seen(struct_pk).await;;
+        }
+
         Ok(())
 
     }
@@ -118,6 +119,12 @@ impl PeerRxEventHandler {
     pub async fn request_response(relay: Relay, request: Request, arc: Arc<Runtime>) -> Result<Response, ErrorInfo> {
 
         let mut response = Response::empty_success();
+
+        if let Some(s) = request.submit_transaction_request {
+            response.submit_transaction_response = Some(relay.submit_transaction(s).await?);
+        } // else
+        // if let some(f) = request.fau
+
         if let Some(t) = request.gossip_transaction_request {
             // info!("Received gossip transaction request");
             relay
@@ -140,7 +147,7 @@ impl PeerRxEventHandler {
 
         if let Some(download_request) = request.download_request {
             // info!("Received download request");
-            let result = DataStore::map_err(process_download_request(&relay, download_request))?;
+            let result = DataStore::map_err(process_download_request(&relay, download_request).await)?;
             response.download_response = Some(result);
         }
 
@@ -248,62 +255,62 @@ pub async fn libp2p_handle_inbound2(
 
     let response = PeerRxEventHandler::request_response(
         relay.clone(), request.clone(), rt.clone()).await?;
-
-    if known_peer.is_none() {
-        let client = p2p_client.clone();
-        let relay = relay.clone();
-        // info!("Requesting peer info on runtime");
-        rt.spawn(async move {
-            libp2p_request_peer_info(client, peer, remote_address, relay).await;
-        });
-    }
+    //
+    // if known_peer.is_none() {
+    //     let client = p2p_client.clone();
+    //     let relay = relay.clone();
+    //     // info!("Requesting peer info on runtime");
+    //     rt.spawn(async move {
+    //         libp2p_request_peer_info(client, peer, remote_address, relay).await;
+    //     });
+    // }
     Ok(response)
 
 }
 
 
 
-
-async fn libp2p_handle_about_response(
-    response: Result<Response, ErrorInfo>, peer_id: PeerId, addr: Multiaddr, relay: Relay
-) -> Result<(), ErrorInfo> {
-    let res = response?.about_node_response.safe_get()?.latest_metadata.safe_get()?.clone();
-    // TODO: Validate transaction here
-    // relay.ds.peer_store.add_peer(&res, 0f64).await?;
-    Ok(())
-}
-
-async fn libp2p_request_peer_info(mut p2p_client: Client, peer_id: PeerId, addr: Multiaddr, relay: Relay) {
-    increment_counter!("redgold.p2p.request_peer_info");
-    info!("Requesting peer info for {:?} on addr {:?}", peer_id, addr.clone());
-    let mut r = Request::default();
-    r.about_node_request = Some(AboutNodeRequest{
-        verbose: false
-    });
-    let res = libp2p_handle_about_response(
-        p2p_client.dial_and_send(peer_id, addr.clone(), r).await, peer_id, addr.clone(), relay
-    ).await;
-    match res {
-        Ok(o) => {
-        }
-        Err(e) => {
-            error!("Error requesting peer info {}", serde_json::to_string(&e).unwrap());
-        }
-    }
-
-}
-
-pub async fn libp2phandle_inbound(relay: Relay, e: Event, mut p2p_client: Client, rt: Arc<Runtime>) -> Result<(), ErrorInfo> {
-    let Event::InboundRequest {
-        request,
-        peer,
-        channel,
-        remote_address,
-    } = e;
-    let response = libp2p_handle_inbound2(
-        relay, request.clone(), peer.clone(), remote_address.clone(), rt.clone(), p2p_client.clone()
-    ).await.map_err(|e| Response::from_error_info(e)).combine();
-    p2p_client.respond(response.clone(), channel).await;
-    Ok(())
-
-}
+//
+// async fn libp2p_handle_about_response(
+//     response: Result<Response, ErrorInfo>, peer_id: PeerId, addr: Multiaddr, relay: Relay
+// ) -> Result<(), ErrorInfo> {
+//     let res = response?.about_node_response.safe_get()?.latest_metadata.safe_get()?.clone();
+//     // TODO: Validate transaction here
+//     // relay.ds.peer_store.add_peer(&res, 0f64).await?;
+//     Ok(())
+// }
+//
+// async fn libp2p_request_peer_info(mut p2p_client: Client, peer_id: PeerId, addr: Multiaddr, relay: Relay) {
+//     increment_counter!("redgold.p2p.request_peer_info");
+//     info!("Requesting peer info for {:?} on addr {:?}", peer_id, addr.clone());
+//     let mut r = Request::default();
+//     r.about_node_request = Some(AboutNodeRequest{
+//         verbose: false
+//     });
+//     let res = libp2p_handle_about_response(
+//         p2p_client.dial_and_send(peer_id, addr.clone(), r).await, peer_id, addr.clone(), relay
+//     ).await;
+//     match res {
+//         Ok(o) => {
+//         }
+//         Err(e) => {
+//             error!("Error requesting peer info {}", serde_json::to_string(&e).unwrap());
+//         }
+//     }
+//
+// }
+//
+// pub async fn libp2phandle_inbound(relay: Relay, e: Event, mut p2p_client: Client, rt: Arc<Runtime>) -> Result<(), ErrorInfo> {
+//     let Event::InboundRequest {
+//         request,
+//         peer,
+//         channel,
+//         remote_address,
+//     } = e;
+//     let response = libp2p_handle_inbound2(
+//         relay, request.clone(), peer.clone(), remote_address.clone(), rt.clone(), p2p_client.clone()
+//     ).await.map_err(|e| Response::from_error_info(e)).combine();
+//     p2p_client.respond(response.clone(), channel).await;
+//     Ok(())
+//
+// }

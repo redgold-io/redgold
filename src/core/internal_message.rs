@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::net::SocketAddr;
+use std::time::Duration;
 use crate::schema::structs::{Error, ErrorInfo, PublicResponse, Request, Response, Transaction};
 use crate::schema::error_message;
 use bitcoin::secp256k1::PublicKey;
@@ -45,21 +46,24 @@ impl PeerMessage {
     // }
 }
 
+// Some other field was needed here but I can't remember what it was
 #[derive(Clone)]
 pub struct TransactionMessage {
     pub transaction: Transaction,
-    pub response_channel: Option<flume::Sender<PublicResponse>>,
+    pub response_channel: Option<flume::Sender<Response>>,
 }
 use async_trait::async_trait;
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::select;
 use tokio::task::JoinHandle;
+use redgold_schema::ErrorInfoContext;
 use crate::api::rosetta::models::Peer;
 use crate::node_config::NodeConfig;
 
 #[async_trait]
 pub trait RecvAsyncErrorInfo<T> {
     async fn recv_async_err(&self) -> Result<T, ErrorInfo>;
+    async fn recv_async_err_timeout(&self, timeout: Duration) -> Result<T, ErrorInfo>;
 }
 
 #[async_trait]
@@ -72,6 +76,12 @@ where
             .await
             .map_err(|e| error_message(Error::InternalChannelReceiveError, e.to_string()))
     }
+    async fn recv_async_err_timeout(&self, duration: Duration) -> Result<T, ErrorInfo> {
+        tokio::time::timeout(duration, self.recv_async_err())
+            .await
+            .error_info("Timeout recv async error")?
+    }
+
 }
 
 #[async_trait]
@@ -167,6 +177,8 @@ impl FutLoopPoll {
         }
     }
 
+    /// This JoinHandle spawn is (likely) necessary to ensure parallel task execution in the loop
+    /// It should only spawn additional tasks, not threads
     pub async fn run_fut<T, F, Fut, FutBound>(
         &mut self, fut: Fut, func: F
     )-> Result<(), ErrorInfo>

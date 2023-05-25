@@ -14,6 +14,8 @@ use async_std::prelude::FutureExt;
 use metrics::{increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
 use redgold_schema::KeyPair;
+use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, Response};
+use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest};
 use crate::core::internal_message::{RecvAsyncErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -22,6 +24,8 @@ use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
+use redgold_schema::EasyJson;
+// i think this is the one currently in use?
 
 // This one is NOT being used due to malfunctioning, thats why metrics weren't being picked up
 // TODO: Debug why this isn't working as a local request?
@@ -76,7 +80,7 @@ pub fn run_remote(relay: Relay) {
             info!("Canary submit");
             sleep(Duration::from_secs(20));
             let response = submit.submit();
-            if !response.accepted() {
+            if !response.is_ok() {
                 increment_counter!("redgold.canary.failure");
                 let failure_msg = serde_json::to_string(&response).unwrap_or("ser failure".to_string());
                 error!("Canary failure: {}", failure_msg.clone());
@@ -92,7 +96,7 @@ pub fn run_remote(relay: Relay) {
                 num_success += 1;
                 info!("Canary success");
                 increment_counter!("redgold.canary.success");
-                if let Some(s) = response.submit_transaction_response {
+                if let Some(s) = response.ok() {
                     if let Some(q) = s.query_transaction_response {
                         increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
                     }

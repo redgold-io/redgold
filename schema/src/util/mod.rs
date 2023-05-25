@@ -117,6 +117,7 @@ pub fn public_key_ser(public_key: &PublicKey) -> Option<crate::structs::PublicKe
 
 pub mod mnemonic_builder;
 pub mod wallet;
+pub mod merkle;
 
 pub fn sha256(s: &[u8]) -> [u8; 32] {
     let mut hash = [0u8; 32];

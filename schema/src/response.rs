@@ -33,22 +33,17 @@ impl Response {
     }
 
     pub fn empty_success() -> Response {
-        Response {
-            response_metadata: crate::response_metadata(),
-            resolve_hash_response: None,
-            download_response: None,
-            about_node_response: None,
-            get_peers_info_response: None,
-            node_metadata: None,
-            proof: None,
-            multiparty_threshold_response: None,
-        }
+        let mut response = Response::default();
+        response.response_metadata = response_metadata();
+        response
     }
+
     pub fn from_error_info(error_info: ErrorInfo) -> Response {
         let mut r = Response::empty_success();
         r.response_metadata = Some(ResponseMetadata {
             success: false,
-            error_info: Some(error_info)
+            error_info: Some(error_info),
+            task_local_details: vec![],
         });
         return r.clone();
     }

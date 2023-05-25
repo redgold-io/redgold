@@ -22,7 +22,7 @@ pub async fn hash_query(relay: Relay, hash_input: String) -> Result<HashSearchRe
         let mut transaction = None;
         let mut rejection_reason = None;
         if let Some((t, e)) = maybe_transaction.clone() {
-            observation_proofs = DataStore::map_err(relay.ds.query_observation_edge(h.clone()))?;
+            observation_proofs = relay.ds.observation.select_observation_edge(&hash.clone()).await?;
             transaction = Some(t);
             rejection_reason = e;
         }

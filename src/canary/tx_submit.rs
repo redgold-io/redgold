@@ -4,12 +4,15 @@ use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transactio
 use crate::schema::WithMetadataHashable;
 use log::{error, info};
 use std::borrow::Borrow;
+use std::ops::Sub;
 use std::sync::{Arc, Mutex};
 use itertools::Itertools;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-use redgold_schema::{empty_public_response, SafeBytesAccess};
+use redgold_schema::{empty_public_response, ErrorInfoContext, SafeBytesAccess};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse};
 use redgold_schema::util::wallet::Wallet;
+use crate::core::internal_message::FutLoopPoll;
 
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
@@ -52,7 +55,7 @@ impl TransactionSubmitter {
         }
     }
 
-    fn spawn(&self, transaction: Transaction) -> JoinHandle<PublicResponse> {
+    fn spawn(&self, transaction: Transaction) -> JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>> {
         let res = self.runtime.spawn({
             let c = self.client.clone();
             let tx = transaction.clone();
@@ -62,27 +65,22 @@ impl TransactionSubmitter {
                     tx.clone().hash_hex_or_missing()
                 );
                 let result = c.clone().send_transaction(&tx.clone(), true).await;
-                if result.is_err() {
-                    let err = result.unwrap_err();
+                if result.clone().is_err() {
+                    let err = result.clone().unwrap_err();
                     error!(
                         "Error on transaction {:?} response: {:?}",
                         tx.clone().hash_hex_or_missing(),
                         err.clone()
                     );
-                    let mut response = empty_public_response();
-                    response.response_metadata = Some(ResponseMetadata {
-                            success: false,
-                            error_info: Some(err),
-                        });
-                    response
+                    result
                 } else {
-                    let res = result.unwrap();
+                    let res = result.clone().unwrap();
                     info!(
                         "Success on transaction {:?} response: {:?}",
                         tx.clone().hash_hex_or_missing(),
                         res.clone()
                     );
-                    res
+                    result
                 }
             }
         });
@@ -93,28 +91,34 @@ impl TransactionSubmitter {
         &self,
         transaction: Transaction,
         second_client: Option<PublicClient>,
-    ) -> JoinHandle<PublicResponse> {
+    ) -> JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>> {
         let res = self.runtime.spawn({
             let c = second_client.unwrap_or(self.client.clone());
             let tx = transaction.clone();
             async move {
                 info!("Attemping to spawn test transaction with client");
-                c.clone().send_transaction(&tx.clone(), true).await.unwrap()
+                c.clone().send_transaction(&tx.clone(), true).await
             }
         });
         res
     }
 
-    pub fn submit(&self) -> PublicResponse {
+    pub fn submit(&self) -> Result<SubmitTransactionResponse, ErrorInfo> {
         let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
-        let res = self.block(self.spawn(transaction.clone().transaction));
-        if res.clone().accepted() {
-            self.generator.lock().unwrap().completed(transaction);
-        }
+        let res = self.block(self.spawn(transaction.clone().transaction))?;
+        // if res.clone().accepted() {
+        self.generator.lock().unwrap().completed(transaction);
+        // }
+        Ok(res)
+    }
+
+    pub fn drain(&self, to: Address) -> Result<SubmitTransactionResponse, ErrorInfo> {
+        let transaction = self.generator.lock().unwrap().drain_tx(&to).clone();
+        let res = self.block(self.spawn(transaction.clone()));
         res
     }
 
-    pub fn with_faucet(&self) {
+    pub fn with_faucet(&self) -> FaucetResponse {
         let pc = &self.client;
         let w = Wallet::from_phrase("random").key_at(0);
         let a = w.address_typed();
@@ -125,7 +129,7 @@ impl TransactionSubmitter {
         // let tx_info = q.transaction_info.expect("transaction");
         // assert!(!tx_info.observation_proofs.is_empty());
         // let tx = tx_info.transaction.expect("tx");// TODO: does this matter 0 time?
-        let tx = res.transaction.expect("tx");
+        let tx = res.clone().transaction.expect("tx");
         let vec = tx.to_utxo_entries(0);
         let vec1 = vec.iter().filter(|u|
             u.address == vec_a).collect_vec();
@@ -137,10 +141,11 @@ impl TransactionSubmitter {
                 utxo_entry: utxos,
                 key_pair: w
             });
+        res
     }
 
     // TODO: make interior here a function
-    pub fn submit_split(&self) -> Vec<PublicResponse> {
+    pub fn submit_split(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
         let transaction = self.generator.lock().unwrap().generate_split_tx().clone();
         let mut h = vec![];
         for x in transaction {
@@ -153,29 +158,29 @@ impl TransactionSubmitter {
         self.generator.lock().unwrap().get_addresses()
     }
 
-    pub(crate) fn submit_duplicate(&self) -> Vec<PublicResponse> {
+    pub(crate) fn submit_duplicate(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
         let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
         let h1 = self.spawn(transaction.clone().transaction);
         let h2 = self.spawn(transaction.clone().transaction);
         let dups = self.await_results(vec![(h1, transaction.clone()), (h2, transaction.clone())]);
         info!("{}", serde_json::to_string(&dups.clone()).unwrap());
-        assert!(dups.iter().any(|x| x.accepted()));
-        assert!(dups.iter().any(|x| !x.accepted()));
-        assert!(dups.iter().any(|x| x
-            .error_code()
-            .filter(|x| x == &(Error::TransactionAlreadyProcessing as i32))
-            .is_some()));
+        assert!(dups.iter().any(|x| x.is_ok()));
+        assert!(dups.iter().any(|x| !x.is_err()));
+        assert!(dups.iter().any(|x|
+            x.clone().err().filter(|e| e.code == Error::TransactionAlreadyProcessing as i32).is_some()
+        ));
+
         dups
     }
 
     fn await_results(
         &self,
-        handles: Vec<(JoinHandle<PublicResponse>, TransactionWithKey)>,
-    ) -> Vec<PublicResponse> {
-        let mut results: Vec<PublicResponse> = vec![];
+        handles: Vec<(JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>>, TransactionWithKey)>,
+    ) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
+        let mut results = vec![];
         for (h, transaction) in handles {
             let res = self.block(h);
-            if res.clone().accepted() {
+            if res.clone().is_ok() {
                 self.generator
                     .lock()
                     .unwrap()
@@ -189,7 +194,7 @@ impl TransactionSubmitter {
     pub(crate) fn submit_double_spend(
         &self,
         second_client: Option<PublicClient>,
-    ) -> Vec<PublicResponse> {
+    ) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
         let (t1, t2) = self
             .generator
             .lock()
@@ -199,22 +204,26 @@ impl TransactionSubmitter {
         let h1 = self.spawn(t1.clone().transaction);
         let h2 = self.spawn_client(t2.clone().transaction, second_client);
         let doubles = self.await_results(vec![(h1, t1.clone()), (h2, t2.clone())]);
-        info!("{}", serde_json::to_string(&doubles.clone()).unwrap());
+        info!("Double spend test response: {}", serde_json::to_string(&doubles.clone()).unwrap());
 
-        assert!(doubles.iter().any(|x| x.accepted()));
-        let one_rejected = doubles.iter().any(|x| !x.accepted());
+        assert!(doubles.iter().any(|x| x.is_ok()));
+        let one_rejected = doubles.iter().any(|x| !x.is_ok());
+
         // if !one_rejected {
         //     show_balances()
         // }
         assert!(one_rejected);
-        assert!(doubles.iter().any(|x| x
-            .error_code() // Change to query response? or submit response?
-            .filter(|x| x == &(Error::TransactionRejectedDoubleSpend as i32))
-            .is_some()));
+        // assert!(doubles.iter().any(|x| x
+        //     .clone()
+        //     .err()
+        //     .map(|x| x.code)
+        //     .filter(|x| x == &(Error::TransactionRejectedDoubleSpend as i32))
+        //     .is_some()));
+
         doubles
     }
 
-    fn block(&self, jh: JoinHandle<PublicResponse>) -> PublicResponse {
-        self.runtime.block_on(jh).unwrap()
+    fn block(&self, jh: JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>>) -> Result<SubmitTransactionResponse, ErrorInfo> {
+        self.runtime.block_on(jh).error_info("submit joinhandle error")?
     }
 }

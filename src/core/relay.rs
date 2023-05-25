@@ -15,7 +15,7 @@ use futures::task::SpawnExt;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
-use redgold_schema::structs::{MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, Request, Response};
+use redgold_schema::structs::{FixedUtxoId, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response};
 
 use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -69,18 +69,23 @@ pub struct MultipartyRoomInternalSubscribe {
 }
 
 #[derive(Clone)]
+pub struct ObservationMetadataInternalSigning {
+    pub observation_metadata: ObservationMetadata,
+    pub sender: flume::Sender<ObservationProof>
+}
+
+#[derive(Clone)]
 pub struct Relay {
     pub node_config: NodeConfig,
     pub transaction: Channel<TransactionMessage>,
     pub observation: Channel<Observation>,
     pub multiparty: Channel<MultipartyRequestResponse>,
-    pub observation_metadata: Channel<ObservationMetadata>,
+    pub observation_metadata: Channel<ObservationMetadataInternalSigning>,
     pub peer_message_tx: Channel<PeerMessage>,
     pub peer_message_rx: Channel<PeerMessage>,
     pub ds: DataStore,
-    pub transaction_channels: Arc<DashMap<Vec<u8>, RequestProcessor>>,
-    pub utxo_channels: Arc<DashMap<(Vec<u8>, i64), UTXOContentionPool>>,
-    pub transaction_errors: Arc<DashMap<Vec<u8>, TransactionErrorCache>>,
+    pub transaction_channels: Arc<DashMap<Hash, RequestProcessor>>,
+    pub utxo_channels: Arc<DashMap<FixedUtxoId, UTXOContentionPool>>,
     pub trust: Channel<TrustUpdate>,
     pub node_state: Arc<AtomicCell<NodeState>>,
     pub udp_outgoing_messages: Channel<PeerMessage>
@@ -97,6 +102,21 @@ pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
 // as the other 'half' here.
 impl Relay {
+
+    pub async fn observe(&self, mut om: ObservationMetadata) -> Result<ObservationProof, ErrorInfo> {
+        om.with_hash();
+        let (sender, r) = flume::unbounded::<ObservationProof>();
+        let omi = ObservationMetadataInternalSigning {
+            observation_metadata: om,
+            sender,
+        };
+        self.observation_metadata.sender.send_err(omi)?;
+        let res = tokio::time::timeout(
+            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 1),
+            r.recv_async_err()
+        ).await.error_info("Timeout waiting for internal observation formation")??;
+        Ok(res)
+    }
 
     // TODO: add timeout
     pub async fn send_message_sync(&self, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
@@ -147,12 +167,15 @@ impl Relay {
         Ok(res)
     }
 
+
+
     pub async fn broadcast(
         relay: Relay,
         nodes: Vec<structs::PublicKey>,
         request: Request,
         runtime: Arc<Runtime>,
         timeout: Option<Duration>
+        // TODO: remove the publickey here not necessary
     ) -> Vec<(structs::PublicKey, Result<Response, ErrorInfo>)> {
         let timeout = timeout.unwrap_or(Duration::from_secs(20));
         // let mut fu = FuturesUnordered::new();
@@ -200,22 +223,27 @@ impl Relay {
         } else {
             None
         };
-        let tx = tx_req
+        let mut tx = tx_req
             .transaction
             .safe_get_msg("Missing transaction field on submit request")?;
+        tx.calculate_hash();
         self.transaction
             .send(TransactionMessage {
                 transaction: tx.clone(),
                 response_channel,
             })
             .await?;
+
         let mut response = SubmitTransactionResponse {
             transaction_hash: tx.clone().hash().into(),
             query_transaction_response: None,
+            transaction: Some(tx.clone()),
         };
         if tx_req.sync_query_response {
-            let res = r.recv_async_err().await?;
-            response.query_transaction_response = res.query_transaction_response;
+            let response1 = r.recv_async_err().await?;
+            response1.as_error_info()?;
+            response = response1.submit_transaction_response.safe_get()?.clone();
+            return Ok(response);
         }
         Ok(response)
     }
@@ -231,13 +259,12 @@ impl Relay {
             transaction: internal_message::new_channel::<TransactionMessage>(),
             observation: internal_message::new_channel::<Observation>(),
             multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
-            observation_metadata: internal_message::new_channel::<ObservationMetadata>(),
+            observation_metadata: internal_message::new_channel::<ObservationMetadataInternalSigning>(),
             peer_message_tx: internal_message::new_channel::<PeerMessage>(),
             peer_message_rx: internal_message::new_channel::<PeerMessage>(),
             ds,
             transaction_channels: Arc::new(DashMap::new()),
             utxo_channels: Arc::new(DashMap::new()),
-            transaction_errors: Arc::new(Default::default()),
             trust: internal_message::new_channel::<TrustUpdate>(),
             node_state: Arc::new(AtomicCell::new(NodeState::Initializing)),
             udp_outgoing_messages: internal_message::new_channel::<PeerMessage>()

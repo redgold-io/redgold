@@ -19,7 +19,7 @@ use crate::schema::structs::{PeerData, ResponseMetadata, StandardData, UtxoEntry
 use crate::schema::util::{dhash_str, public_key_ser};
 use crate::schema::{error_message};
 use crate::schema::TestConstants;
-use crate::schema::{error_from_code, KeyPair};
+use crate::schema::{KeyPair};
 use crate::schema::{response_metadata, SafeOption};
 use crate::schema::{
     struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable,
@@ -147,10 +147,10 @@ pub fn validate_currency_utxo(
         total
     );
     if total > balance {
-        return Err(error_from_code(RGError::InsufficientBalance));
+        return Err(error_message(RGError::InsufficientBalance, "total greater than balance"));
     }
     if total != balance {
-        return Err(error_from_code(RGError::BalanceMismatch));
+        return Err(error_message(RGError::BalanceMismatch, "Unused funds"));
     }
     return Ok(vec);
 }

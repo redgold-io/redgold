@@ -55,6 +55,10 @@ message FloatingUtxoId {
 
 }
 
+message OutputIndex {
+  int64 output_index = 1;
+}
+
 message Input {
   // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
   Hash transaction_hash = 1;
@@ -62,16 +66,21 @@ message Input {
   int64 output_index = 2;
   // The signed proof that this input is a valid reference to the previous output.
   repeated Proof proof = 3;
+  // The identifier associated with the currency or product being used, for multi-currency support.
   ProductId product_id = 4;
   // Hydration purposes only! Not used for hashes
   Output output = 5;
 }
 
 message TrustData {
+  // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
+  // Otherwise equivalent to a rounded float
   int64 label = 2;
+  // Confidence level associated with the label, how certain is this value?
   optional int64 confidence = 3;
-  // Is this variance on confidence?
+  // Variance associated with the confidence estimate, sigma / stddev
   optional int64 hardness = 5;
+  // Additional unstructured or otherwise custom label data
   optional StandardData data = 6;
 }
 
@@ -168,6 +177,8 @@ message Hash {
 
 message DynamicNodeMetadata {
   optional int64 udp_port = 1;
+  Proof proof = 2;
+  PeerId peer_id = 3;
 }
 
 // Where to store parquet schema, avro schema, etc. etc.
@@ -179,6 +190,7 @@ message StandardData {
   // Standard currency style field
   optional int64 amount = 1;
 
+  // Move to separate class instance still stored here?
   // Direct data storage for small values
   optional TypedValue typed_value = 2;
   repeated TypedValue typed_value_list = 3;
@@ -195,6 +207,7 @@ message StandardData {
   optional int64 height = 11;
   Hash data_hash = 12;
   Hash hash = 13;
+  Observation observation = 14;
 }
 
 message KeyedTypedValue {
@@ -317,12 +330,23 @@ enum NetworkEnvironment {
   PREDEV = 9;
 }
 
+message Salt {
+  int64 value = 1;
+}
+
+// For use in providing a secondary, recent, submission time for offline signing process with delayed broadcast.
+message OfflineTimeSponsor {
+  int64 time = 1;
+  Proof proof = 2;
+}
+
 message TransactionOptions {
   optional int64 salt = 1;
   optional NetworkEnvironment network_type = 2;
   repeated KeyValueOption key_value_options = 3;
-  optional TransactionData data = 4;
-  optional TransactionContract contract = 5;
+  TransactionData data = 4;
+  TransactionContract contract = 5;
+  OfflineTimeSponsor offline_time_sponsor = 6;
 }
 
 message Transaction {
@@ -330,7 +354,10 @@ message Transaction {
   repeated Output outputs = 2;
   StructMetadata struct_metadata = 3;
   TransactionOptions options = 4;
+  // TODO: Move these into structMetadata
   Hash hash = 5;
+  Hash sign_hash = 6;
+  Hash counter_party_hash = 7;
 }
 
 message BlockMetadata {
@@ -425,12 +452,8 @@ message Observation {
 
 // Derived data structure, not a primary chain data structure
 message ObservationEdge {
-    bytes root = 1;
-    bytes leaf_hash = 2;
-    bytes observation_hash = 3;
-    ObservationMetadata observation_metadata = 4;
-    MerkleProof merkle_proof = 5;
-    uint64 time = 6;
+    ObservationProof observation_proof = 1;
+    int64 time = 2;
 }
 
 // TODO: Update types here
@@ -496,6 +519,13 @@ message UtxoEntry {
 
 // actually, wrapped bitcoin is fine, that's easily composible actually? maybe
 
+// TODO: unify types here
+message EagerFullGossipPush {
+  repeated Transaction transactions = 1;
+  repeated Observation observations = 2;
+  repeated ObservationEdge observation_edges = 3;
+  repeated PeerData peer_data = 7;
+}
 
 // These should both be broadcasts at some point
 // Consider using a response here if needed.
@@ -571,8 +601,15 @@ message GetPeersInfoRequest {
 
 }
 
+message PeerNodeInfo {
+  Transaction latest_peer_transaction = 1;
+  Transaction latest_node_transaction = 2;
+  DynamicNodeMetadata dynamic_node_metadata = 3;
+}
+
 message GetPeersInfoResponse {
   repeated Transaction peers = 1;
+  repeated PeerNodeInfo peer_info = 2;
 }
 
 
@@ -618,6 +655,23 @@ message MultipartyThresholdResponse {
 }
 
 
+message UtxoConflictResolveRequest {
+  repeated FixedUtxoId utxo_ids = 1;
+  Hash transaction_hash = 2;
+}
+
+message UtxoConflictResolveResponse {
+  repeated TransactionInfo transactions = 1;
+}
+
+message QueryObservationProofRequest{
+  Hash hash = 1;
+}
+
+message QueryObservationProofResponse {
+  repeated ObservationProof observation_proof = 1;
+}
+
 
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
@@ -630,7 +684,9 @@ message Request {
   GetPeersInfoRequest get_peers_info_request = 9;
   //  optional DownloadMetadataRequest download_metadata_request = 5;
   MultipartyThresholdRequest multiparty_threshold_request = 10;
-
+  SubmitTransactionRequest submit_transaction_request = 11;
+  UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
+  QueryObservationProofRequest query_observation_proof_request = 13;
 }
 
 message Response {
@@ -644,7 +700,9 @@ message Response {
   Proof proof = 7;
 
   MultipartyThresholdResponse multiparty_threshold_response = 8;
-
+  SubmitTransactionResponse submit_transaction_response = 9;
+  UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
+  QueryObservationProofResponse query_observation_proof_response = 11;
 }
 
 message QueryTransactionRequest {
@@ -659,9 +717,10 @@ message MerkleProof {
 }
 
 message ObservationProof {
-  MerkleProof merkle_proof = 1;
-  ObservationMetadata metadata = 2;
-  Proof proof = 3;
+  Hash observation_hash = 1;
+  MerkleProof merkle_proof = 2;
+  ObservationMetadata metadata = 3;
+  Proof proof = 4;
 }
 
 message QueryTransactionResponse {
@@ -674,9 +733,12 @@ message SubmitTransactionRequest {
   bool sync_query_response = 2;
 }
 
+// TODO: This should just return the entire transaction with it's hash also calculated
+// Also include the signing hash in the response, modify transaction schema for that
 message SubmitTransactionResponse {
   Hash transaction_hash = 1;
-  optional QueryTransactionResponse query_transaction_response = 2;
+  QueryTransactionResponse query_transaction_response = 2;
+  Transaction transaction = 3;
 }
 
 message AboutNodeRequest {
@@ -719,9 +781,11 @@ message QueryAddressesResponse {
 message FaucetRequest {
   Address address = 1;
 }
-
+// Should this just be transactionInfo?
 message FaucetResponse {
-  optional Transaction transaction = 1;
+  // Todo query_transactionResponse?
+  Transaction transaction = 1;
+  repeated ObservationProof acceptance_proofs = 2;
 }
 
 message RecentTransactionsRequest {}
@@ -748,6 +812,7 @@ message TransactionInfo {
   repeated UsedOutputs used_outputs = 4;
   bool accepted = 5;
   ErrorInfo rejection_reason = 6;
+  // Move this outside to the class / request that requires it for resolving.
   optional bool queried_output_index_valid = 7;
 }
 
@@ -799,11 +864,18 @@ message ErrorInfo {
   string message = 4;
   repeated ErrorDetails details = 5;
   bool retriable = 6;
+  string stacktrace = 7;
+}
+
+message TaskLocalDetails {
+  string key = 1;
+  string value = 2;
 }
 
 message ResponseMetadata {
   bool success = 1;
   ErrorInfo error_info = 2;
+  repeated TaskLocalDetails task_local_details = 3;
 }
 //
 //message AddPeerFullRequest {

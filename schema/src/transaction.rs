@@ -1,8 +1,8 @@
 use crate::address::address_data;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Error as RGError, ErrorInfo, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error};
+use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use itertools::Itertools;
 
@@ -92,6 +92,17 @@ impl Transaction {
         Ok(utxo_ids)
     }
 
+    pub fn fixed_utxo_ids_of_inputs(&self) -> Result<Vec<FixedUtxoId>, ErrorInfo> {
+        let mut utxo_ids = Vec::new();
+        for input in &self.inputs {
+            utxo_ids.push(FixedUtxoId {
+                transaction_hash: input.transaction_hash.clone(),
+                output_index: input.output_index as i64,
+            });
+        }
+        Ok(utxo_ids)
+    }
+
     pub fn output_amounts(&self) -> Vec<AddressBalance> {
         self.outputs
             .iter()
@@ -128,26 +139,26 @@ impl Transaction {
         )?)
     }
 
-    pub fn prevalidate(&self) -> Result<(), RGError> {
+    pub fn prevalidate(&self) -> Result<(), ErrorInfo> {
         if self.inputs.is_empty() {
-            return Err(RGError::MissingInputs);
+            Err(error_code(RGError::MissingInputs))?;
         }
         if self.outputs.is_empty() {
-            return Err(RGError::MissingOutputs);
+            Err(error_code(RGError::MissingOutputs))?;
         }
         // if self.fee < MIN_FEE_RAW {
         //     return Err(RGError::InsufficientFee);
         // }
         for input in self.inputs.iter() {
             if input.output_index > (MAX_INPUTS_OUTPUTS as i64) {
-                return Err(RGError::InvalidAddressInputIndex);
+                Err(error_code(RGError::InvalidAddressInputIndex))?;
             }
             // if input.transaction_hash.len() != 32 {
             //     // println!("transaction id len : {:?}", input.id.len());
-            //     return Err(RGError::InvalidHashLength);
+            //     error_code(RGError::InvalidHashLength);
             // }
             if input.proof.is_empty() {
-                return Err(RGError::MissingProof);
+                Err(error_code(RGError::MissingProof))?;
             }
         }
 
@@ -276,6 +287,8 @@ impl Transaction {
             struct_metadata: struct_metadata(0 as i64),
             options: None,
             hash: None,
+            sign_hash: None,
+            counter_party_hash: None,
         };
 
         tx.with_hash();
@@ -367,6 +380,22 @@ impl Transaction {
         }
     }
 
+    pub fn addresses(&self) -> Vec<Address> {
+        self.outputs.iter().filter_map(|o| o.address.clone()).collect_vec()
+    }
+
+    pub fn input_addresses(&self) -> Vec<Address> {
+        self.inputs.iter().filter_map(|o| o.address().ok()).collect_vec()
+    }
+
+    pub fn first_input_address(&self) -> Option<Address> {
+        self.inputs.first().and_then(|o| o.address().ok())
+    }
+
+    pub fn first_output_address(&self) -> Option<Address> {
+        self.outputs.first().and_then(|o| o.address.clone())
+    }
+
 }
 
 impl TransactionAmount {
@@ -381,6 +410,11 @@ impl TransactionAmount {
     }
     fn to_fractional(&self) -> f64 {
         (self.amount as f64) / (DECIMAL_MULTIPLIER as f64)
+    }
+    pub fn from(amount: i64) -> Self {
+        Self {
+            amount
+        }
     }
 }
 
@@ -407,6 +441,7 @@ impl StandardData {
             height: None,
             data_hash: None,
             hash: None,
+            observation: None,
         }
     }
     pub fn peer_data(pd: PeerData) -> Option<Self> {

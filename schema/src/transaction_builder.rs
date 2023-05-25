@@ -23,9 +23,12 @@ impl TransactionBuilder {
                     network_type: Some(NetworkEnvironment::Debug as i32),
                     key_value_options: vec![],
                     data: None,
-                    contract: None
+                    contract: None,
+                    offline_time_sponsor: None,
                 }),
-                hash: None
+                hash: None,
+                sign_hash: None,
+                counter_party_hash: None,
             },
             balance: 0
         }

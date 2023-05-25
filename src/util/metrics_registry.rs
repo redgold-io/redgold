@@ -23,20 +23,32 @@ use std::sync::Arc;
 
 pub fn register_metric_names() {
     register_counter!("redgold.p2p.request_peer_info");
+
     register_counter!("redgold.node.main_started");
     register_counter!("redgold.node.node_started");
     register_counter!("redgold.node.async_started");
+
     register_counter!("redgold.observation.created");
     register_counter!("redgold.observation.received");
     register_counter!("redgold.observation.insert");
     register_counter!("redgold.observation.metadata.added");
+    register_counter!("redgold.observation.attempt");
+    register_counter!("redgold.observation.metadata.total");
+    register_counter!("redgold.observation.buffer.added");
+    register_gauge!("redgold.observation.height");
+    register_gauge!("redgold.observation.last.size");
+
     register_counter!("redgold.transaction.accepted");
     register_counter!("redgold.transaction.received");
+    register_counter!("redgold.transaction.missing_response_channel");
     register_counter!("redgold.transaction.resolve.input");
     register_counter!("redgold.transaction.resolve.input.errors");
-    register_counter!("redgold.multiparty.received");
     register_gauge!("redgold.transaction.total");
+
+    register_counter!("redgold.multiparty.received");
+
     register_counter!("redgold.datastore.utxo.insert");
+
     register_counter!("redgold.api.control.num_requests");
     register_counter!("redgold.libp2p.total_established_connections");
     register_counter!("redgold.libp2p.inbound_request");
@@ -44,6 +56,7 @@ pub fn register_metric_names() {
     register_counter!("redgold.api.rosetta.account_balance");
     register_counter!("redgold.api.rosetta.account_coins");
     register_gauge!("redgold.libp2p.active_connections");
+
     register_gauge!("redgold.canary.num_peers");
     register_counter!("redgold.canary.failure");
     register_counter!("redgold.canary.success");
