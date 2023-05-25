@@ -15,7 +15,8 @@ use std::net::TcpStream;
 use std::path::Path;
 
 use redgold_schema::util::wallet::Wallet;
-use ssh2::Session;
+use ssh2::{Channel, Session};
+use redgold_schema::ErrorInfoContext;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::ErrorInfo;
 
@@ -135,7 +136,103 @@ impl SSH {
         };
     }
 
-    pub fn copy(&mut self, contents: String, remote_path: String) {
+    pub fn read_channel(channel: &mut Channel) -> Result<String, ErrorInfo>  {
+        let mut result = String::new();
+        loop {
+            // If you plan to use this, be aware that reading 1 byte at a time is terribly
+            // inefficient and should be optimized for your usecase. This is just an example.
+            let available = channel.read_window().available;
+
+            let mut zero_vec = vec![1u8; available as usize];
+            // let mut buffer = [1u8; 1000];
+            let mut buffer = &mut *zero_vec;
+            let bytes_read = channel.read(&mut buffer[..]).expect("works");
+            let s = String::from_utf8_lossy(&buffer[..bytes_read]);
+            let x = &s;
+            let partial_read = x.clone().to_string();
+            result.push_str(x);
+            println!("Finished partial: {partial_read}");
+
+            // if result.ends_with("]]>]]>") {
+            //     println!("Found netconf 1.0 terminator, breaking read loop");
+            //     break;
+            // }
+            // if result.ends_with("##") {
+            //     println!("Found netconf 1.1 terminator, breaking read loop");
+            //     break;
+            // }
+            if channel.eof() { //bytes_read == 0 ||
+                println!("Buffer is empty, SSH channel read terminated");
+                println!("Finished read: {result}");
+                break;
+            }
+        }
+        Ok(result)
+    }
+
+    pub async fn read_channel_partial(channel: &mut Channel, partial: fn(String) -> Result<(), ErrorInfo>) -> Result<String, ErrorInfo>  {
+        let mut result = String::new();
+        loop {
+            let available = channel.read_window().available;
+            if available > 0 {
+                let mut zero_vec = vec![1u8; available as usize];
+                let mut buffer = &mut *zero_vec;
+                let bytes_read = channel.read(&mut buffer[..]).expect("works");
+                let s = String::from_utf8_lossy(&buffer[..bytes_read]);
+                let x = &s;
+                let partial_read = x.clone().to_string();
+                result.push_str(x);
+                partial(partial_read)?;
+            } else {
+                let mut stderr = channel.stderr();
+                let mut buffer = [0u8; 1024];
+                let bytes_read = stderr.read(&mut buffer[..]).expect("works");
+                let s = String::from_utf8_lossy(&buffer[..bytes_read]);
+                let x = &s;
+                let partial_read = x.clone().to_string();
+                result.push_str(x);
+                partial(partial_read)?;
+            }
+            if channel.eof() {
+                break;
+            }
+        }
+        Ok(result)
+    }
+
+    pub fn streaming_exec_channel<S: Into<String>>(&mut self, cmd: S, print: bool) -> Channel {
+        let sess = self.session();
+        let mut channel = sess.channel_session().unwrap();
+        let string = cmd.into();
+        if print {
+            println!("Running command: {}", string.clone());
+        }
+        channel.exec(&*string).unwrap();
+        channel
+    }
+
+    pub async fn stream_partial<S: Into<String>>(&mut self, cmd: S, print: bool, partial: fn(String)
+                                                                                       -> Result<(), ErrorInfo>) -> Result<String, ErrorInfo> {
+        let sess = self.session();
+        let mut channel = sess.channel_session().unwrap();
+        let string = cmd.into();
+        let cmd_format: String = format!("Running command: {}", string.clone());
+        if print {
+            println!("{}", cmd_format.clone());
+        }
+        channel.exec(&*string).unwrap();
+        // channel.stderr()
+        partial(cmd_format.clone())?;
+        let mut result = String::new();
+        result.push_str(&*cmd_format);
+        let exact_result = SSH::read_channel_partial(&mut channel, partial).await?;
+        result.push_str(&*exact_result);
+        Ok(result)
+    }
+
+    pub fn copy<S: Into<String>>(&mut self, contents: S, remote_path: String) {
+        println!("Copying to: {}", remote_path);
+        let contents = contents.into();
         let path = "tmpfile";
         fs::remove_file("tmpfile").ok();
         let mut file = File::create(path).expect("create failed");
@@ -150,12 +247,19 @@ impl SSH {
         // Connect to the local SSH server
         let sess = self.session();
 
+        // TODO: Can we just write the contents instead of tmpfile thing?
         // Write the file
         let path1 = Path::new(file);
         let path2 = Path::new(remote_path);
         let x = fs::metadata(path1).unwrap().len();
         let mut remote_file = sess.scp_send(path2, 0o644, x, None).unwrap();
-        remote_file.write(&*fs::read(path1).unwrap()).unwrap();
+        let vec = fs::read(path1).unwrap();
+        // let x1 = &*vec;
+        // println!("SCP copy local size + bytes sent: {} + {}", x, x1.len());
+        // remote_file.write(x1).unwrap();
+        for iter in vec.chunks(1024) {
+            remote_file.write(iter).unwrap();
+        }
         // Close the channel and wait for the whole content to be tranferred
         remote_file.send_eof().unwrap();
         remote_file.wait_eof().unwrap();
@@ -289,7 +393,7 @@ fn debug_ssh() {
         volumes:
           - ./conf/kibana.yml:/usr/share/kibana/config/kibana.yml
 
-    docker run -p 9090:9090 -v ~/.rg/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus");
+    docker run -p 9090:9090 -v ~/.rg/prometheus-datasource.yaml:/etc/prometheus/prometheus-datasource.yaml prom/prometheus");
 
          */
     // ssh.redeploy_grafana()
@@ -304,14 +408,14 @@ fn debug_ssh() {
     // ssh.run("apt install docker-compose -y");
     // ssh.run("docker kill grafana");
     // ssh.run("docker run -d -p 3000:3000 --name grafana grafana/grafana-oss");
-    // ssh.run("docker run -p 9090:9090 -v ~/.rg/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus");
-    // ssh.run("docker-compose -f /root/.rg/docker-compose-prometheus.yml up -d");
+    // ssh.run("docker run -p 9090:9090 -v ~/.rg/prometheus-datasource.yaml:/etc/prometheus/prometheus-datasource.yaml prom/prometheus");
+    // ssh.run("docker-compose -f /root/.rg/docker-compose-prometheus-datasource.yaml up -d");
     //
     //     ssh.scp(
-    //         "./docker-compose-prometheus.yml",
-    //         "/root/.rg/docker-compose-prometheus.yml",
+    //         "./docker-compose-prometheus-datasource.yaml",
+    //         "/root/.rg/docker-compose-prometheus-datasource.yaml",
     //     );
-    //     ssh.scp("./prometheus.yml", "/root/.rg/prometheus.yml");
+    //     ssh.scp("./prometheus-datasource.yaml", "/root/.rg/prometheus-datasource.yaml");
 
     // ssh.run("docker exec --user bitcoin optimistic_bassi bitcoin-cli -testnet getmininginfo");
 }
