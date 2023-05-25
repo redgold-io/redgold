@@ -130,3 +130,6 @@ features = ["serde", "bitcoinconsensus"]
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
+
+[profile.release]
+debug = true
