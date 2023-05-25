@@ -8,7 +8,7 @@ use redgold_schema::constants::MIN_FEE_RAW;
 use redgold_schema::structs::{Address, TransactionAmount};
 use redgold_schema::TestConstants;
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::wallet::Wallet;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 
 #[derive(Clone)]
 pub struct SpendableUTXO {
@@ -31,7 +31,7 @@ pub struct TransactionGenerator {
     offset: usize,
     min_offset: usize,
     max_offset: usize,
-    pub wallet: Wallet, // default_client: Option<PublicClient>
+    pub wallet: MnemonicWords, // default_client: Option<PublicClient>
 }
 
 impl TransactionGenerator {
@@ -48,7 +48,7 @@ impl TransactionGenerator {
         }
         self.clone()
     }
-    pub fn default_adv(utxos: Vec<SpendableUTXO>, min_offset: usize, max_offset: usize, wallet: Wallet) -> Self {
+    pub fn default_adv(utxos: Vec<SpendableUTXO>, min_offset: usize, max_offset: usize, wallet: MnemonicWords) -> Self {
         Self {
             finished_pool: utxos,
             pending_pool: vec![],
@@ -65,11 +65,11 @@ impl TransactionGenerator {
             offset: 1,
             min_offset: 1,
             max_offset: 49,
-            wallet: Wallet::default()
+            wallet: MnemonicWords::test_default()
         }
     }
 
-    pub fn set_wallet(&mut self, wallet: Wallet) {
+    pub fn set_wallet(&mut self, wallet: MnemonicWords) {
         self.wallet = wallet;
     }
 

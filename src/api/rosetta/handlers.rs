@@ -565,7 +565,7 @@ pub async fn search_transactions(
 
     for ti in request.transaction_identifier {
         let b = from_hex(ti.hash)?;
-        transaction_hash = Some(Hash::from_bytes_mh(b));
+        transaction_hash = Some(Hash::from_bytes(b));
     }
 
     for a in request.address {

@@ -17,6 +17,7 @@ pub mod util;
 pub mod mparty;
 pub mod multiparty;
 pub mod hardware;
+pub mod wallet;
 
 pub use redgold_schema as schema;
 pub use redgold_data as datas;

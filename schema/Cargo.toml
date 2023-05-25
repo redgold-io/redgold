@@ -15,7 +15,7 @@ categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slu
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-multihash = "*"
+sha3 = "0.10.8"
 prost = "0.8"
 serde_json = "1.0.59"
 serde_with = { version = "1.10.0", features = ["hex"] }
@@ -33,6 +33,7 @@ csv = "1.1"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 prost-helper = "0.2.0"
 num-traits = "0.2.15"
+# TODO: Change to feature only for not including in WASM
 tokio = { version = "1.0.0", features = ["rt"] }
 
 

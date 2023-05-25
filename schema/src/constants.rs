@@ -1,5 +1,4 @@
 
-use multihash::Code;
 
 pub const REDGOLD_KEY_DERIVATION_PATH: i64 = 16180;
 pub const DECIMAL_MULTIPLIER: i64 = 1e8 as i64;
@@ -20,8 +19,9 @@ pub const OBSERVATION_FORMATION_TIME_MILLIS: u64 = 3_000;
 pub const REWARD_POLL_INTERVAL: u64 = 60_000;
 
 pub const EARLIEST_TIME: i64 = 1650866635183;
-
-pub const HASHER: Code = multihash::Code::Sha3_512;
+//
+// pub const HASHER: Code = multihash::Code::Sha3_256;
+// pub const ADDRESS_HASHER: Code = multihash::Code::Sha3_224;
 
 pub const VERSION: i32 = 0;
 

@@ -14,7 +14,7 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 use std::path::Path;
 
-use redgold_schema::util::wallet::Wallet;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 use ssh2::{Channel, Session};
 use redgold_schema::ErrorInfoContext;
 use redgold_schema::servers::Server;
@@ -393,7 +393,7 @@ fn debug_ssh() {
         volumes:
           - ./conf/kibana.yml:/usr/share/kibana/config/kibana.yml
 
-    docker run -p 9090:9090 -v ~/.rg/prometheus-datasource.yaml:/etc/prometheus/prometheus-datasource.yaml prom/prometheus");
+    docker run -p 9090:9090 -v ~/.rg/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus");
 
          */
     // ssh.redeploy_grafana()
@@ -408,14 +408,14 @@ fn debug_ssh() {
     // ssh.run("apt install docker-compose -y");
     // ssh.run("docker kill grafana");
     // ssh.run("docker run -d -p 3000:3000 --name grafana grafana/grafana-oss");
-    // ssh.run("docker run -p 9090:9090 -v ~/.rg/prometheus-datasource.yaml:/etc/prometheus/prometheus-datasource.yaml prom/prometheus");
-    // ssh.run("docker-compose -f /root/.rg/docker-compose-prometheus-datasource.yaml up -d");
+    // ssh.run("docker run -p 9090:9090 -v ~/.rg/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus");
+    // ssh.run("docker-compose -f /root/.rg/docker-compose-prometheus.yml up -d");
     //
     //     ssh.scp(
-    //         "./docker-compose-prometheus-datasource.yaml",
-    //         "/root/.rg/docker-compose-prometheus-datasource.yaml",
+    //         "./docker-compose-prometheus.yml",
+    //         "/root/.rg/docker-compose-prometheus.yml",
     //     );
-    //     ssh.scp("./prometheus-datasource.yaml", "/root/.rg/prometheus-datasource.yaml");
+    //     ssh.scp("./prometheus.yml", "/root/.rg/prometheus.yml");
 
     // ssh.run("docker exec --user bitcoin optimistic_bassi bitcoin-cli -testnet getmininginfo");
 }

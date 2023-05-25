@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_schema::{empty_public_response, ErrorInfoContext, SafeBytesAccess};
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse};
-use redgold_schema::util::wallet::Wallet;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 use crate::core::internal_message::FutLoopPoll;
 
 pub struct TransactionSubmitter {
@@ -42,7 +42,7 @@ impl TransactionSubmitter {
         utxos: Vec<SpendableUTXO>,
         min_offset: usize,
         max_offset: usize,
-        wallet: Wallet
+        wallet: MnemonicWords
     ) -> Self {
         let mut generator = TransactionGenerator::default_adv(utxos.clone(), min_offset, max_offset, wallet);
         // if utxos.is_empty() {
@@ -120,7 +120,7 @@ impl TransactionSubmitter {
 
     pub fn with_faucet(&self) -> FaucetResponse {
         let pc = &self.client;
-        let w = Wallet::from_phrase("random").key_at(0);
+        let w = MnemonicWords::from_phrase("random").key_at(0);
         let a = w.address_typed();
         let vec_a = a.address.safe_bytes().expect("a");
         let res = self.runtime.block_on(pc.faucet(&a, true)).expect("faucet");

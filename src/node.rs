@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
@@ -13,13 +13,13 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
 use crate::api::p2p_io::rgnetwork::Event;
 use crate::api::p2p_io::P2P;
-use crate::api::public_api;
+use crate::api::{RgHttpClient, public_api};
 use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
 use crate::canary::tx_submit::TransactionSubmitter;
@@ -255,12 +255,12 @@ impl Node {
     pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
         let outputs = (0..50).map(|i|
             GenesisDistribution {
-                address: node_config.wallet().key_at(i as usize).address_typed(), amount: 10000
+                address: node_config.internal_mnemonic().key_at(i as usize).address_typed(), amount: 10000
             }
         ).collect_vec();
         let tx = genesis_tx_from(outputs); //EARLIEST_TIME
         let res = tx.to_utxo_entries(EARLIEST_TIME as u64).iter().zip(0..50).map(|(o, i)| {
-            let kp = node_config.wallet().key_at(i as usize);
+            let kp = node_config.internal_mnemonic().key_at(i as usize);
             let s = SpendableUTXO {
                 utxo_entry: o.clone(),
                 key_pair: kp,
@@ -471,9 +471,8 @@ impl LocalNodes {
                     .relay
                     .node_config
                     .clone()
-                    .wallet()
-                    .transport_key()
-                    .public_key
+                    .internal_mnemonic()
+                    .active_keypair().public_key.clone()
                 ),
                 external_address: start.node.relay.node_config.external_ip.clone(),
                 port_offset: Some(start.node.relay.node_config.port_offset),
@@ -481,6 +480,21 @@ impl LocalNodes {
             },
             nodes: vec![start],
         }
+    }
+
+    pub fn clients(&self) -> Vec<RgHttpClient> {
+        self.nodes.iter().map(|x| x.public_client.client_wrapper().clone()).collect_vec()
+    }
+
+    async fn verify_peers(clients: Vec<RgHttpClient>) -> Result<(), ErrorInfo> {
+        let mut map: HashMap<structs::PublicKey, Vec<structs::PeerNodeInfo>> = HashMap::new();
+        for x in &clients {
+            let response = x.get_peers().await?;
+            let pk = response.proof.safe_get()?.public_key.safe_get()?.clone();
+            let peers = response.get_peers_info_response.safe_get()?.peer_info.clone();
+            map.insert(pk, peers);
+        }
+        Ok(())
     }
 
     async fn verify_data_equivalent(&self) {
@@ -755,13 +769,16 @@ fn e2e() {
 
     let party = res.expect("ok");
     let signing_data = Hash::from_string("hey");
-    let vec1 = signing_data.ecdsa_short_signing_bytes();
+    let vec1 = signing_data.vec();
     let vec = bytes_data(vec1.clone()).expect("");
     let res = runtime.block_on(
         client1.multiparty_signing(None, party.initial_request, vec));
     println!("{:?}", res);
     assert!(res.is_ok());
-    res.expect("ok").proof.expect("prof").verify(&vec1).expect("verified");
+    res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
+
+
+
 
 
     // // Connect first peer.

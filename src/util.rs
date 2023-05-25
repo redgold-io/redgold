@@ -20,7 +20,6 @@ use std::io::{Cursor, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::node_config::NodeConfig;
-use crate::schema::address::address;
 use crate::schema::structs;
 use crate::schema::structs::{
     BytesData, BytesDecoder, ErrorInfo, KeyType, PublicKeyType, PublicResponse, SignatureType,
@@ -44,7 +43,7 @@ use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
 use redgold_schema::TestConstants;
 use redgold_schema::util::{dhash_str, sign};
-use redgold_schema::util::wallet::{generate_key, generate_key_i};
+use redgold_schema::util::mnemonic_words::{generate_key, generate_key_i};
 
 pub fn random_salt() -> i64 {
     let mut rng = rand::thread_rng();

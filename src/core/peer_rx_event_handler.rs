@@ -16,7 +16,7 @@ use metrics::increment_counter;
 use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, MultipartyThresholdResponse, Request};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoResponse, MultipartyThresholdResponse, Request};
 use redgold_schema::{json_or, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use crate::api::about;
 use crate::core::internal_message::{FutLoopPoll, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -27,7 +27,7 @@ use crate::schema::json;
 use crate::util::keys::ToPublicKeyFromLib;
 
 pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, mut request: Request) -> Result<Response, ErrorInfo> {
-    let client = crate::api::HTTPClient::new(ip, port as u16);
+    let client = crate::api::RgHttpClient::new(ip, port as u16);
     client.proto_post_request(request, Some(nc)).await
 }
 
@@ -46,8 +46,10 @@ impl PeerRxEventHandler {
         // pm.request.verify_auth()?;
 
         // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
+        let mut response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine();
+        response.with_metadata(relay.node_config.node_metadata());
+        response.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
         if let Some(c) = pm.response {
             // info!("Sending response to channel");
             c.send_err(response)?;
@@ -124,6 +126,13 @@ impl PeerRxEventHandler {
             response.submit_transaction_response = Some(relay.submit_transaction(s).await?);
         } // else
         // if let some(f) = request.fau
+        if let Some(r) = request.get_peers_info_request {
+            let mut get_peers_info_response = GetPeersInfoResponse::default();
+            let vec = relay.ds.peer_store.peer_node_info().await?;
+            get_peers_info_response.peer_info = vec;
+            response.get_peers_info_response = Some(get_peers_info_response);
+            // response.get_peers_info_response = Some(relay.get_peers_info(r).await?);
+        }
 
         if let Some(t) = request.gossip_transaction_request {
             // info!("Received gossip transaction request");

@@ -128,7 +128,7 @@ impl ObservationBuffer {
             observations: clone,
             proof: Some(Proof::from_keypair(
                 &vec,
-                self.relay.node_config.wallet().active_keypair(),
+                self.relay.node_config.internal_mnemonic().active_keypair(),
             )),
             struct_metadata: struct_metadata.clone(),
             hash: None,

@@ -13,8 +13,8 @@ use prost::Message;
 use serde::__private::de::Borrowed;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
-use redgold_schema::{error_info, ProtoHashable};
-use redgold_schema::structs::{Request, Response};
+use redgold_schema::{error_info, ProtoHashable, SafeOption};
+use redgold_schema::structs::{GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
 use crate::node_config::NodeConfig;
 use crate::util::lang_util::SameResult;
 
@@ -31,13 +31,13 @@ pub mod about;
 
 
 #[derive(Clone)]
-pub struct HTTPClient {
+pub struct RgHttpClient {
     pub url: String,
     pub port: u16,
     pub timeout: Duration,
 }
 
-impl HTTPClient {
+impl RgHttpClient {
     pub fn new(url: String, port: u16) -> Self {
         Self {
             url,
@@ -108,9 +108,11 @@ impl HTTPClient {
         let mut r = r.clone();
         if let Some(nc) = nc {
             r.with_metadata(nc.node_metadata());
-            r.with_auth(&nc.wallet().active_keypair());
+            r.with_auth(&nc.internal_mnemonic().active_keypair());
         }
-        self.proto_post(&r, "request_proto".to_string()).await
+        let result = self.proto_post(&r, "request_proto".to_string()).await?;
+        result.as_error_info()?;
+        Ok(result)
     }
 
     pub async fn test_request<Req, Resp>(port: u16, req: &Req, endpoint: String) -> Result<Resp, ErrorInfo>
@@ -118,9 +120,15 @@ impl HTTPClient {
         Req: Serialize + ?Sized,
         Resp: DeserializeOwned
     {
-        let client = HTTPClient::new("localhost".into(), port);
+        let client = RgHttpClient::new("localhost".into(), port);
         tokio::time::sleep(Duration::from_secs(2)).await;
         client.json_post::<Req, Resp>(&req, endpoint).await
+    }
+
+    pub async fn get_peers(&self) -> Result<Response, ErrorInfo> {
+        let mut req = Request::default();
+        req.get_peers_info_request = Some(GetPeersInfoRequest::default());
+        Ok(self.proto_post_request(req, None).await?)
     }
 
 }

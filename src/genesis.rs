@@ -1,6 +1,5 @@
 use itertools::Itertools;
 use crate::core::transaction;
-use crate::schema::address::address_data;
 use crate::schema::output::output_data;
 use crate::schema::structs::{Block, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;

@@ -9,7 +9,6 @@ use serde_json;
 use crate::canary::tx_gen::TransactionGenerator;
 use crate::core::relay::Relay;
 use crate::data::data_store::DataStore;
-use crate::schema::address::{address, address_data, multi_address};
 use crate::schema::structs::{Error as RGError, Hash};
 use crate::schema::structs::{ErrorInfo, StructMetadata};
 use crate::schema::structs::{
@@ -30,7 +29,7 @@ use redgold_schema::constants::{
     DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS,
 };
 use redgold_schema::ProtoSerde;
-use redgold_schema::util::wallet::Wallet;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 use crate::schema::transaction::rounded_balance;
 // use crate::schema::transaction::rounded_amount;
 
@@ -120,8 +119,8 @@ pub fn validate_currency_utxo(
                 // let input = option.safe_get_msg("Transaction input get output_id empty")?;
                 Proof::verify_proofs(
                     &input.proof,
-                    &utxo_entry.transaction_hash,
-                    &utxo_entry.address,
+                    &utxo_entry.transaction_hash.into(),
+                    &utxo_entry.address.into(),
                 )?;
             }
         }
