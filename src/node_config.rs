@@ -7,7 +7,7 @@ use redgold_schema::constants::{
     DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS,
     REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS,
 };
-use redgold_schema::util::wallet::Wallet;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use itertools::Itertools;
@@ -79,13 +79,13 @@ pub struct NodeConfig {
 impl NodeConfig {
 
     pub fn public_key(&self) -> structs::PublicKey {
-        let pair = self.wallet().active_keypair();
+        let pair = self.internal_mnemonic().active_keypair();
         let pk_vec = pair.public_key_vec();
         structs::PublicKey::from_bytes(pk_vec)
     }
 
     pub fn node_metadata(&self) -> NodeMetadata {
-        let pair = self.wallet().active_keypair();
+        let pair = self.internal_mnemonic().active_keypair();
         let pk_vec = pair.public_key_vec();
         NodeMetadata{
             external_address: self.external_ip.clone(),
@@ -110,12 +110,12 @@ impl NodeConfig {
 
     pub fn request(&self) -> Request {
         let mut req = Request::empty();
-        req.with_auth(&self.wallet().active_keypair()).with_metadata(self.node_metadata()).clone()
+        req.with_auth(&self.internal_mnemonic().active_keypair()).with_metadata(self.node_metadata()).clone()
     }
 
     pub fn response(&self) -> Response {
         let mut req = Response::empty_success();
-        req.with_auth(&self.wallet().active_keypair()).with_metadata(self.node_metadata()).clone()
+        req.with_auth(&self.internal_mnemonic().active_keypair()).with_metadata(self.node_metadata()).clone()
     }
 
     pub fn dynamic_node_metadata(&self) -> Option<DynamicNodeMetadata> {
@@ -133,7 +133,7 @@ impl NodeConfig {
     }
 
     pub fn peer_data_tx(&self) -> Transaction {
-        let pair = self.wallet().active_keypair();
+        let pair = self.internal_mnemonic().active_keypair();
 
         let pd = PeerData {
             peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
@@ -151,7 +151,7 @@ impl NodeConfig {
     }
 
     pub fn peer_node_data_tx(&self) -> Transaction {
-        let pair = self.wallet().active_keypair();
+        let pair = self.internal_mnemonic().active_keypair();
 
         let tx = TransactionBuilder::new().with_output_node_metadata(
             &pair.address_typed(), self.node_metadata()
@@ -192,7 +192,7 @@ impl NodeConfig {
     }
 
     pub fn address(&self) -> Address {
-        Address::from_public(&self.wallet().active_keypair().public_key).expect("address")
+        Address::from_public(&self.internal_mnemonic().active_keypair().public_key).expect("address")
     }
 
     pub fn genesis_transaction(&self) -> Transaction {
@@ -301,8 +301,8 @@ impl NodeConfig {
         node_config.canary_enabled = false;
         node_config
     }
-    pub fn wallet(&self) -> Wallet {
-        Wallet::from_mnemonic(&*self.mnemonic_words, None)
+    pub fn internal_mnemonic(&self) -> MnemonicWords {
+        MnemonicWords::from_mnemonic(&*self.mnemonic_words, None)
     }
 
     pub async fn data_store(&self) -> DataStore {
@@ -322,7 +322,7 @@ impl NodeConfig {
 }
 
 pub fn debug_peer_id_from_key(mnemonic: &str) -> [u8; 32] {
-    let wallet = Wallet::from_phrase(mnemonic);
+    let wallet = MnemonicWords::from_phrase(mnemonic);
     let (_, pk) = wallet.active_key();
     let self_peer_id = crate::util::rg_merkle::build_root(
         &vec![dhash_vec(&pk.serialize().to_vec())],

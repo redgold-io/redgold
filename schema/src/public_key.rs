@@ -23,7 +23,9 @@ impl structs::PublicKey {
 
     pub fn from_hex<S: Into<String>>(hex: S) -> Result<structs::PublicKey, ErrorInfo> {
         let bytes = from_hex(hex.into())?;
-        Ok(Self::from_bytes(bytes))
+        let key = Self::from_bytes(bytes);
+        key.validate()?;
+        Ok(key)
     }
 
     pub fn validate(&self) -> Result<&Self, ErrorInfo> {

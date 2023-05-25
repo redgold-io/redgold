@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use bitcoin_wallet::account::MasterKeyEntropy;
@@ -9,7 +9,7 @@ use rocket::form::FromForm;
 use serde_json::error::Category::Data;
 use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
 use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOption, util};
 use redgold_schema::servers::Server;
@@ -85,13 +85,13 @@ pub fn generate_mnemonic(generate_mnemonic: &GenerateMnemonic) {
 }
 
 pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfig) -> Result<String, ErrorInfo> {
-    let wallet = node_config.wallet();
+    let wallet = node_config.internal_mnemonic();
     let address = if let Some(path) = generate_address.path {
         wallet.keypair_from_path_str(path).address_typed()
     } else if let Some(index) = generate_address.index {
         wallet.key_at(index as usize).address_typed()
     } else {
-        node_config.wallet().active_keypair().address_typed()
+        node_config.internal_mnemonic().active_keypair().address_typed()
     };
     let string = address.render_string().expect("address render failure");
     println!("{}", string.clone());
@@ -112,7 +112,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     use redgold_schema::SafeBytesAccess;
 
     for i in 0..10 {
-        let kp = p1.wallet().key_at(i as usize);
+        let kp = p1.internal_mnemonic().key_at(i as usize);
         let x1 = kp.address_typed();
         let x: Vec<u8> = x1.address.safe_bytes()?;
         query_addresses.push(x1);
@@ -327,7 +327,7 @@ pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runt
     let client = p1.lb_client();
     let mut tx_submit = TransactionSubmitter::default(client.clone(), arc.clone(), vec![]);
     let faucet_tx = tx_submit.with_faucet();
-    info!("Faucet response: {}", faucet_tx.json_or());
+    // info!("Faucet response: {}", faucet_tx.json_or());
     let faucet_tx = faucet_tx.transaction.safe_get()?;
     let _ = {
         let gen =
@@ -339,17 +339,33 @@ pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runt
     // assert!(repeat.accepted());
     // assert proofs here
     let s = repeat;
-    let h2 = s.transaction_hash.expect("hash");
+    // info!("Repeat response: {}", s.json_or());
+    // let h2 = s.transaction_hash.expect("hash");
     let q = s.query_transaction_response.expect("query transaction response");
-    println!("Obs proofs second tx: {}", q.observation_proofs.json_or());
+    // println!("Obs proofs second tx: {}", q.observation_proofs.json_or());
+    let i = q.observation_proofs.len();
+    println!("Obs proofs number length: {:?}", i);
+    assert!(i > 0);
+    let mut peer_keys: HashSet<PublicKey> = HashSet::new();
 
-    let result = arc.block_on(client.query_hash(h2.hex())).expect("query hash");
-    info!("Result: {}", result.json_pretty().expect("json pretty"));
+    for o in q.observation_proofs {
+        let key = o.proof.expect("p").public_key.expect("");
+        peer_keys.insert(key);
+    }
+
+    println!("Number of unique peer observations {}", peer_keys.len());
+
+    // client.client_wrapper()
+
+
+
+    // let result = arc.block_on(client.query_hash(h2.hex())).expect("query hash");
+    // info!("Result: {}", result.json_pretty().expect("json pretty"));
     Ok(())
 
 }
 
-#[ignore]
+// #[ignore]
 #[test]
 fn test_transaction_dev() {
     init_logger();

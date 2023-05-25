@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use backtrace::Backtrace;
 use itertools::Itertools;
-use multihash::{Multihash, MultihashDigest};
 use prost::{DecodeError, Message};
 
 use structs::{
@@ -11,7 +10,7 @@ use structs::{
 
 use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType, VersionInfo};
 use crate::util::{dhash_str, dhash_vec};
-use crate::util::wallet::{generate_key, generate_key_i};
+use crate::util::mnemonic_words::{generate_key, generate_key_i};
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -82,32 +81,6 @@ pub fn from_hex(hex_value: String) -> Result<Vec<u8>, ErrorInfo> {
 //
 //     }
 // }
-
-impl Into<Hash> for Multihash {
-    fn into(self) -> Hash {
-        Hash {
-            bytes: bytes_data(self.to_bytes()),
-            hash_format_type: HashFormatType::Multihash as i32,
-            hash_type: HashType::Transaction as i32,
-        }
-    }
-}
-
-impl Into<Hash> for Vec<u8> {
-    fn into(self) -> Hash {
-        Hash {
-            bytes: bytes_data(self),
-            hash_format_type: HashFormatType::Legacy as i32,
-            hash_type: HashType::Transaction as i32,
-        }
-    }
-}
-
-impl Into<Address> for Vec<u8> {
-    fn into(self) -> Address {
-        address::address_data(self).expect("some")
-    }
-}
 
 pub fn struct_metadata(time: i64) -> Option<StructMetadata> {
     Some(StructMetadata {
@@ -249,8 +222,7 @@ where
         let mut clone = self.clone();
         clone.hash_clear();
         let input = clone.proto_serialize();
-        let multihash = constants::HASHER.digest(&input);
-        return multihash.into();
+        Hash::calc_bytes(input)
     }
 }
 
@@ -333,6 +305,8 @@ where
 pub trait SafeOption<T> {
     fn safe_get(&self) -> Result<&T, ErrorInfo>;
     fn safe_get_msg<S: Into<String>>(&self, msg: S) -> Result<&T, ErrorInfo>;
+    // TODO: put in another trait with a clone bound
+    // fn safe_get_clone(&self) -> Result<T, ErrorInfo>;
 }
 
 //
@@ -543,12 +517,12 @@ impl TestConstants {
         }
     }
     pub fn new() -> TestConstants {
-        let (secret, public) = crate::util::wallet::generate_key();
+        let (secret, public) = crate::util::mnemonic_words::generate_key();
         let (secret2, public2) = generate_key_i(1);
         let hash = crate::util::dhash_str("asdf");
         let hash_vec = hash.to_vec();
-        let addr = crate::address::address(&public);
-        let addr2 = crate::address::address(&public2);
+        let addr = Address::address(&public);
+        let addr2 = Address::address(&public2);
         let mut peer_ids: Vec<Vec<u8>> = Vec::new();
         let mut peer_trusts: Vec<f64> = Vec::new();
 
@@ -607,7 +581,7 @@ impl KeyPair {
     }
 
     pub fn address(&self) -> Vec<u8> {
-        crate::address::address(&self.public_key)
+        Address::address(&self.public_key)
     }
 
     pub fn address_typed(&self) -> Address {
@@ -659,7 +633,7 @@ impl Request {
         let hash = self.calculate_hash();
         // println!("with_auth hash: {:?}", hash.hex());
         let proof = Proof::from_keypair_hash(&hash, &key_pair);
-        proof.verify_hash(&hash).expect("immediate verify");
+        proof.verify(&hash).expect("immediate verify");
         self.proof = Some(proof);
         self
     }
@@ -672,7 +646,7 @@ impl Request {
     pub fn verify_auth(&self) -> Result<PublicKey, ErrorInfo> {
         let hash = self.calculate_hash();
         // println!("verify_auth hash: {:?}", hash.hex());
-        self.proof.safe_get()?.verify_hash(&hash)?;
+        self.proof.safe_get()?.verify(&hash)?;
         let proof = self.proof.safe_get()?;
         let pk = proof.public_key.safe_get()?;
         Ok(pk.clone())

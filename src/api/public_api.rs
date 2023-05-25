@@ -57,8 +57,8 @@ impl PublicClient {
     //     PublicClient::local(3030)
     // }
 
-    pub fn client_wrapper(&self) -> api::HTTPClient {
-        api::HTTPClient::new(self.url.clone(), (self.port as u16))
+    pub fn client_wrapper(&self) -> api::RgHttpClient {
+        api::RgHttpClient::new(self.url.clone(), (self.port as u16))
     }
 
     pub fn local(port: u16) -> Self {
@@ -187,7 +187,7 @@ impl PublicClient {
                     .iter()
                     .map(|a| Address {
                         address: bytes_data(a.clone()),
-                        address_type: AddressType::StandardKeyhash as i32,
+                        address_type: AddressType::Sha3224ChecksumPublic as i32,
                     })
                     .collect_vec(),
             });

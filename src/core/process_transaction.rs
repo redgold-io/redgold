@@ -581,6 +581,8 @@ impl TransactionProcessContext {
         let mut query_transaction_response = QueryTransactionResponse::default();
         query_transaction_response.observation_proofs = observation_proofs.iter().map(|o| o.clone()).collect_vec();
         submit_response.query_transaction_response = Some(query_transaction_response);
+        submit_response.transaction = Some(transaction.clone());
+        submit_response.transaction_hash = Some(hash.clone());
         Ok(submit_response)
     }
 

@@ -51,6 +51,18 @@ impl TransactionBuilder {
         self
     }
 
+    // For external hardware signing
+    pub fn with_input_proof(&mut self, utxo: UtxoEntry, proof: Proof) -> &mut Self {
+        let mut input = utxo.to_input();
+        let data = utxo.output.expect("a").data.expect("b");
+        if let Some(a) = data.amount {
+            self.balance += a;
+        }
+        input.proof.push(proof);
+        self.transaction.inputs.push(input);
+        self
+    }
+
     pub fn with_output(&mut self, destination: &Address, amount: TransactionAmount) -> &mut Self {
         self.balance -= amount.amount;
         let output = Output {

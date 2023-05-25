@@ -12,7 +12,7 @@ use redgold::util::cli::args::RgArgs;
 use redgold::util::runtimes::{build_runtime, build_simple_runtime};
 use redgold_schema::SafeBytesAccess;
 use redgold_schema::structs::NetworkEnvironment;
-use redgold_schema::util::wallet::Wallet;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 
 #[test]
 fn local_e2e_it() {

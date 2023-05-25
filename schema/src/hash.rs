@@ -1,7 +1,18 @@
+use std::fmt::{Display, Formatter};
 use crate::{bytes_data, constants, Hash, HashFormatType, SafeBytesAccess};
-use multihash::{Code, Multihash, MultihashDigest};
-use crate::util::sha512;
 use crate::structs::HashType;
+
+use sha3::{Digest, Sha3_256};
+
+
+
+/// Please note this is the direct constructor and does not perform an actual hash
+impl Into<Hash> for Vec<u8> {
+    fn into(self) -> Hash {
+        Hash::from_bytes(self)
+    }
+}
+
 
 impl Hash {
     pub fn vec(&self) -> Vec<u8> {
@@ -10,20 +21,20 @@ impl Hash {
     pub fn hex(&self) -> String {
         hex::encode(self.vec())
     }
-    pub fn from_bytes_mh(vec: Vec<u8>) -> Self {
+    // TODO: From other types as well
+    pub fn from_bytes(vec: Vec<u8>) -> Self {
         Self {
             bytes: bytes_data(vec),
-            hash_format_type: HashFormatType::Multihash as i32,
+            hash_format_type: HashFormatType::Sha3256 as i32,
             hash_type: HashType::Transaction as i32,
         }
     }
     pub fn from_string(s: &str) -> Self {
-        let mh = constants::HASHER.digest(s.as_bytes());
-        mh.into()
+        Self::calc_bytes(s.as_bytes().to_vec())
     }
+
     pub fn calc_bytes(s: Vec<u8>) -> Self {
-        let mh = constants::HASHER.digest(&s);
-        mh.into()
+        Self::from_bytes(Sha3_256::digest(&s).to_vec())
     }
 
     pub fn merkle_combine(&self, right: Hash) -> Self {
@@ -32,26 +43,21 @@ impl Hash {
         Self::calc_bytes(vec)
     }
 
-    pub fn ecdsa_short_signing_bytes(&self) -> Vec<u8> {
-        self.vec()[0..32].to_vec()
-    }
-
-    pub fn multihash(&self) -> Multihash {
-        Multihash::from_bytes(&self.vec()).expect("multihash")
-    }
-
 }
 
 #[test]
 fn hash_rendering() {
-    let mh = constants::HASHER.digest("test".as_bytes());
-    let mhb = hex::encode(mh.to_bytes());
-    let digestb = hex::encode(mh.digest());
-    let mh2 = Multihash::from_bytes(&*mh.to_bytes()).expect("multihash");
-    println!("mhb: {}", mhb);
-    println!("digest: {}", digestb);
-    println!("mh2: {}", hex::encode(mh2.to_bytes()));
 
+    let h = Hash::from_string("test");
+    println!("hash: {}", h.hex());
+    // let mh = constants::HASHER.digest("test".as_bytes());
+    // let mhb = hex::encode(mh.to_bytes());
+    // let digestb = hex::encode(mh.digest());
+    // let mh2 = Multihash::from_bytes(&*mh.to_bytes()).expect("multihash");
+    // println!("mhb: {}", mhb);
+    // println!("digest: {}", digestb);
+    // println!("mh2: {}", hex::encode(mh2.to_bytes()));
+    //
 
     // TODO: Parse versionInfo as a hash instead of a string.
     // let mut mhh = Multihash::default();

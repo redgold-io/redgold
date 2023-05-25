@@ -16,7 +16,8 @@ use bitcoin_wallet::mnemonic::Mnemonic;
 use hdpath::{Purpose, StandardHDPath};
 
 use crate::constants::REDGOLD_KEY_DERIVATION_PATH;
-use crate::KeyPair;
+use crate::{error_info, ErrorInfoContext, KeyPair};
+use crate::structs::{Address, ErrorInfo};
 use crate::util::mnemonic_builder;
 
 // use libp2p::identity::{secp256k1, Keypair};
@@ -25,10 +26,85 @@ use crate::util::mnemonic_builder;
 pub const STANDARD_TEST_PHRASE: &str = "somelongpasswordwithhighentropygoeshere";
 // pub const PEER_ID_ACCOUNT: u32 = 1;
 
-fn default_cursor() -> StandardHDPath {
-    let cursor = StandardHDPath::new(Purpose::Witness, REDGOLD_KEY_DERIVATION_PATH as u32, 0, 0, 0);
-    return cursor;
+
+#[test]
+fn string_path_format() {
+    let hd_path = StandardHDPath::from_str("m/44'/0'/0'/0/0").unwrap();
+    hd_path.index();
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct HDPathCursor {
+    pub cursor: StandardHDPath
+}
+
+impl TryFrom<String> for HDPathCursor {
+
+    type Error = ErrorInfo;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let hd_path = StandardHDPath::from_str(&value)
+            .map_err(|e| error_info(format!("{:?}", e)))?;
+        Ok(Self::new(hd_path))
+    }
+}
+
+impl HDPathCursor {
+
+    pub fn new(path: StandardHDPath) -> Self {
+        Self {
+            cursor: path,
+        }
+    }
+
+    pub fn from(coin_type: u32, account: u32, change: u32, index: u32) -> Self {
+        Self {
+            cursor: StandardHDPath::new(
+                Purpose::Pubkey,
+                coin_type,
+                account,
+                change,
+                index
+            )
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        self.cursor.to_string()
+    }
+
+    pub fn next(&self) -> HDPathCursor {
+        Self{ cursor: StandardHDPath::new(
+            self.cursor.purpose().clone(),
+            self.cursor.coin_type(),
+            self.cursor.account(),
+            self.cursor.change(),
+            self.cursor.index() + 1,
+        )}
+    }
+
+    pub fn next_change(&self) -> HDPathCursor {
+        Self{ cursor: StandardHDPath::new(
+            self.cursor.purpose().clone(),
+            self.cursor.coin_type(),
+            self.cursor.account(),
+            self.cursor.change() + 1,
+            0
+        )}
+    }
+
+    pub fn next_account(&self) -> HDPathCursor {
+        Self{ cursor: StandardHDPath::new(
+            self.cursor.purpose().clone(),
+            self.cursor.coin_type(),
+            self.cursor.account() + 1,
+            0,
+            0
+        )}
+    }
+
+}
+
 
 // why must CI hate this
 fn from_cn(value: &StandardHDPath) -> Vec<ChildNumber> {
@@ -70,18 +146,29 @@ pub fn get_pk(seed: &[u8], hd_path: &StandardHDPath) -> ExtendedPrivKey {
 // }
 
 #[derive(Clone)]
-pub struct Wallet {
+pub struct MnemonicWords {
+    pub words: String,
     pub seed: Seed,
     cursor: StandardHDPath,
+    pub passphrase: Option<String>
 }
 
-impl Wallet {
+impl MnemonicWords {
+
+    /// Note, ledger and trezor won't support keys loaded from a non-standard coin type
+    fn default_cursor() -> StandardHDPath {
+        let cursor = StandardHDPath::new(Purpose::Witness, REDGOLD_KEY_DERIVATION_PATH as u32, 0, 0, 0);
+        return cursor;
+    }
+
     pub fn from_phrase(s: &str) -> Self {
         let m = mnemonic_builder::from_str(s);
 
-        return Wallet {
+        return MnemonicWords {
+            words: s.to_string(),
             seed: m.to_seed(None),
-            cursor: default_cursor(),
+            cursor: Self::default_cursor(),
+            passphrase: None,
         };
     } // let hd_path = StandardHDPath::from_str("m/44'/0'/0'/0/0").unwrap();
     #[allow(dead_code, unused_assignments)]
@@ -97,20 +184,36 @@ impl Wallet {
             }
             None => {}
         }
-        return Wallet {
+        return MnemonicWords {
+            words: s.to_string(),
             seed: m.to_seed(option.clone()),
-            cursor: default_cursor(),
+            cursor: Self::default_cursor(),
+            passphrase,
         };
-    } // let hd_path = StandardHDPath::from_str("m/44'/0'/0'/0/0").unwrap();
+    }
 
-    pub fn default() -> Self {
-        return Wallet::from_phrase(STANDARD_TEST_PHRASE);
+    pub fn active_key(&self) -> (SecretKey, PublicKey) {
+        return self.key(&self.cursor);
+    }
+
+    pub fn active_keypair(&self) -> KeyPair {
+        let x = self.active_key();
+        return KeyPair::new(&x.0, &x.1);
+    }
+
+    pub fn address(&self) -> Address {
+        let x = self.active_keypair();
+        return x.address_typed();
+    }
+
+    pub fn test_default() -> Self {
+        return MnemonicWords::from_phrase(STANDARD_TEST_PHRASE);
     }
 
     pub fn key(&self, hd_path: &StandardHDPath) -> (SecretKey, PublicKey) {
         let key = get_pk(&self.seed.0, hd_path);
         let pk = key.private_key.key;
-        let pub_key = Wallet::get_public_key(&key);
+        let pub_key = MnemonicWords::get_public_key(&key);
         return (pk, pub_key);
     }
 
@@ -123,7 +226,7 @@ impl Wallet {
         let hd_path = StandardHDPath::from_str(&*hd_path).unwrap();
         let key = get_pk(&self.seed.0, &hd_path);
         let pk = key.private_key.key;
-        let pub_key = Wallet::get_public_key(&key);
+        let pub_key = MnemonicWords::get_public_key(&key);
         return (pk, pub_key);
     }
 
@@ -131,7 +234,7 @@ impl Wallet {
         let hd_path = StandardHDPath::from_str(&*hd_path).unwrap();
         let key = get_pk(&self.seed.0, &hd_path);
         let pk = key.private_key.key;
-        let pub_key = Wallet::get_public_key(&key);
+        let pub_key = MnemonicWords::get_public_key(&key);
         return KeyPair::new(&pk, &pub_key);
     }
 
@@ -139,21 +242,6 @@ impl Wallet {
         let secp = Secp256k1::new();
         let pub_key = ExtendedPubKey::from_private(&secp, &key).public_key.key;
         pub_key
-    }
-
-    pub fn active_key(&self) -> (SecretKey, PublicKey) {
-        return self.key(&self.cursor);
-    }
-
-    pub fn active_keypair(&self) -> KeyPair {
-        let x = self.active_key();
-        return KeyPair::new(&x.0, &x.1);
-    }
-
-
-    pub fn transport_key(&self) -> KeyPair {
-        let x = self.active_key();
-        return KeyPair::new(&x.0, &x.1);
     }
 
     pub fn next_key(&mut self) -> (SecretKey, PublicKey) {
@@ -202,7 +290,7 @@ impl Wallet {
 // }
 
 pub fn generate_keys(range: u16) -> Vec<(SecretKey, PublicKey)> {
-    let mut wallet = Wallet::default();
+    let mut wallet = MnemonicWords::test_default();
     let mut keys: Vec<(SecretKey, PublicKey)> = Vec::new();
     for _ in 0..range {
         keys.push(wallet.next_key());
@@ -220,7 +308,7 @@ pub fn generate_key_i(offset: usize) -> (SecretKey, PublicKey) {
 
 #[test]
 fn test_next_key() {
-    let mut wallet = Wallet::default();
+    let mut wallet = MnemonicWords::test_default();
     let key1 = wallet.next_key();
     let key2 = wallet.next_key();
     println!("key1: {:?}", key1);
@@ -230,7 +318,7 @@ fn test_next_key() {
 
 #[test]
 fn test_hex_ser() {
-    let mut wallet = Wallet::default();
+    let mut wallet = MnemonicWords::test_default();
     let (secret, pubkey) = wallet.next_key();
     // println!("secret: {:?} pubkey: {:?}", secret, pubkey);
     let hex = secret.to_hex();

@@ -1,5 +1,3 @@
-use crate::address::address;
-use crate::address::address_data;
 use crate::structs::{ErrorInfo, Output, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, SafeOption};
@@ -7,7 +5,7 @@ use bitcoin::secp256k1::PublicKey;
 
 pub fn output_data(address: Vec<u8>, amount: u64) -> Output {
     Output {
-        address: address_data(address),
+        address: Address::address_data(address),
         product_id: None,
         counter_party_proofs: vec![],
         data: amount_data(crate::transaction::amount_to_raw_amount(amount)),
@@ -32,7 +30,7 @@ impl HashClear for Output {
 impl Output {
     pub fn from_public_amount(public: &PublicKey, amount: u64) -> Output {
         Output {
-            address: address_data(address(public).to_vec()),
+            address: Address::address_data(Address::address(public).to_vec()),
             data: amount_data(amount),
             product_id: None,
             counter_party_proofs: vec![],

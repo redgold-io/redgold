@@ -35,7 +35,7 @@ pub fn run_remote(relay: Relay) {
 
     let mut map: HashMap<Vec<u8>, KeyPair> = HashMap::new();
     for i in 500..510 {
-        let key = node_config.wallet().key_at(i);
+        let key = node_config.internal_mnemonic().key_at(i);
         let address = key.address();
         map.insert(address, key);
     }
@@ -61,7 +61,7 @@ pub fn run_remote(relay: Relay) {
         .collect_vec();
 
     let submit = TransactionSubmitter::default_adv(
-        client.clone(), runtime.clone(), utxos.clone(), 500, 510, node_config.wallet()
+        client.clone(), runtime.clone(), utxos.clone(), 500, 510, node_config.internal_mnemonic()
     );
 
     let mut last_failure = util::current_time_millis();
@@ -155,7 +155,7 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
     let min_offset = 20;
     let max_offset = 30;
     for i in min_offset..max_offset {
-        let key = node_config.wallet().key_at(i);
+        let key = node_config.internal_mnemonic().key_at(i);
         let address = key.address_typed();
         map.insert(address.address.unwrap().value, key);
     }
@@ -184,7 +184,7 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
         .collect_vec();
 
     let mut generator = TransactionGenerator::default_adv(
-        utxos.clone(), min_offset, max_offset, node_config.wallet()
+        utxos.clone(), min_offset, max_offset, node_config.internal_mnemonic()
     );
     if utxos.is_empty() {
         // TODO: Faucet here from seed node.

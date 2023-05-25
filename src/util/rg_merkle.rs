@@ -57,6 +57,8 @@ fn round(
     return (parent_hashes, remainder);
 }
 
+// TODO: Update this function to use the new Hash struct
+// i think this might not even be used, just delete after changing the reference.
 pub fn build_root_simple(leafs: &Vec<Vec<u8>>) -> Hash {
     let res = leafs
         .iter()
@@ -69,7 +71,8 @@ pub fn build_root_simple(leafs: &Vec<Vec<u8>>) -> Hash {
     let res = build_root(&res, None, &mut None).to_vec();
     return Hash {
         bytes: bytes_data(res),
-        hash_format_type: HashFormatType::Legacy as i32,
+        // TODO: This is not correct but nothing is using it afaik?
+        hash_format_type: HashFormatType::Sha3256 as i32,
         hash_type: HashType::ObservationMerkleRoot as i32,
     };
 }

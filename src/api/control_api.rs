@@ -14,7 +14,7 @@ use warp::{Filter, Rejection};
 use warp::reply::Json;
 use redgold_schema::{json_or, response_metadata, SafeOption, structs};
 use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, Request};
-use crate::api::{as_warp_json_response, HTTPClient};
+use crate::api::{as_warp_json_response, RgHttpClient};
 use crate::api::rosetta::models::Error;
 
 use crate::util::to_libp2p_peer_id;
@@ -29,7 +29,7 @@ use crate::schema::structs::{
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct ControlClient {
-    client: HTTPClient
+    client: RgHttpClient
 }
 
 impl ControlClient {
@@ -69,11 +69,11 @@ impl ControlClient {
 
     pub fn local(port: u16) -> Self {
         Self {
-            client: HTTPClient::new("localhost".to_string(), port)
+            client: RgHttpClient::new("localhost".to_string(), port)
         }
     }
 
-    pub fn new(client: HTTPClient) -> Self {
+    pub fn new(client: RgHttpClient) -> Self {
         Self {
             client
         }

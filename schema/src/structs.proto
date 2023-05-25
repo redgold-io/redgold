@@ -6,6 +6,7 @@ package structs;
 
 enum SignatureType {
   ECDSA = 0;
+  EcdsaBitcoinSignMessageHardware = 1;
 }
 
 message Signature {
@@ -164,9 +165,7 @@ message BytesData {
 }
 
 enum HashFormatType {
-  Multihash = 0;
-  // Remove after adapting to multihash
-  Legacy = 1;
+  Sha3_256 = 0;
 }
 
 message Hash {
@@ -363,6 +362,7 @@ message Transaction {
 message BlockMetadata {
 }
 
+// Move hash into here?
 message StructMetadata {
   int64 time = 1;
   int32 version = 2;
@@ -608,7 +608,6 @@ message PeerNodeInfo {
 }
 
 message GetPeersInfoResponse {
-  repeated Transaction peers = 1;
   repeated PeerNodeInfo peer_info = 2;
 }
 
@@ -757,7 +756,7 @@ message AboutNodeResponse {
 }
 
 enum AddressType {
-  STANDARD_KEYHASH = 0;
+  Sha3_224_Checksum_Public = 0;
   MULTIHASH_KEYHASH = 1;
   BITCOIN_COMPAT_ADDRESS = 2;
   ETHEREUM_COMPAT_ADDRESS = 3;

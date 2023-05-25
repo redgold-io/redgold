@@ -11,7 +11,7 @@ use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use warp::path::FullPath;
 use redgold_schema::{error_message, structs};
-use crate::api::{HTTPClient, easy_post, rosetta, with_response_logger, with_response_logger_error};
+use crate::api::{RgHttpClient, easy_post, rosetta, with_response_logger, with_response_logger_error};
 use crate::api::rosetta::models::{AccountBalanceRequest, AccountBalanceResponse, AccountCoinsRequest, AccountIdentifier, Error};
 use crate::api::rosetta::spec::Rosetta;
 use crate::core::relay::Relay;
