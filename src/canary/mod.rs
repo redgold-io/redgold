@@ -14,8 +14,8 @@ use async_std::prelude::FutureExt;
 use metrics::{increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
 use redgold_schema::KeyPair;
-use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, Response};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest};
 use crate::core::relay::Relay;
 use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
 
@@ -24,6 +24,8 @@ pub mod tx_submit;
 pub mod alert;
 use redgold_schema::EasyJson;
 // i think this is the one currently in use?
+
+// This one is NOT being used due to malfunctioning, thats why metrics weren't being picked up
 // TODO: Debug why this isn't working as a local request?
 #[allow(dead_code)]
 pub fn run_remote(relay: Relay) {
@@ -186,6 +188,12 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
     let mut generator = TransactionGenerator::default_adv(
         utxos.clone(), min_offset, max_offset, node_config.wallet()
     );
+
+
+    let mut last_failure = util::current_time_millis();
+    let mut failed_once = false;
+    let mut num_success = 0 ;
+
     if utxos.is_empty() {
         // TODO: Faucet here from seed node.
         info!("Unable to start canary, no UTXOs");
@@ -194,30 +202,33 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
         loop {
             sleep(Duration::from_secs(60));
 
+            // TODO: Update this whole function.
+
             let transaction = generator.generate_simple_tx().clone();
-            let (sender, receiver) = flume::unbounded::<Response>();
-            let message = TransactionMessage {
-                transaction: transaction.transaction.clone(),
-                response_channel: Some(sender)
-            };
-            relay
-                .clone()
-                .transaction
-                .sender
-                .send_err(message)?;
+            let res = runtime.block_on(relay.submit_transaction(SubmitTransactionRequest{ transaction:
+                Some(transaction.transaction.clone()), sync_query_response: true }));
 
-            let r_err = runtime.block_on(receiver.recv_async_err());
-
-            match r_err {
+            match res {
                 Ok(response) => {
-                    if response.clone().as_error_info().is_ok() {
-                        generator.completed(transaction);
-                    } else {
-                        info!("Canary failure: {}", response.json_or());
+                    num_success += 1;
+                    info!("Canary success");
+                    increment_counter!("redgold.canary.success");
+                    if let Some(q) = response.query_transaction_response {
+                        increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
                     }
                 }
                 Err(e) => {
-                    error!("Canary error {}", e.json_or());
+                    increment_counter!("redgold.canary.failure");
+                    let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
+                    error!("Canary failure: {}", failure_msg.clone());
+                    let recovered = (num_success > 10 && util::current_time_millis() - last_failure > 1000 * 60 * 30);
+                    if !failed_once || recovered {
+                        alert::email(format!("{} canary failure", relay.node_config.network.to_std_string()), &failure_msg);
+                    }
+                    let failure_time = util::current_time_millis();
+                    num_success = 0;
+                    last_failure = failure_time;
+                    failed_once = true;
                 }
             }
 
