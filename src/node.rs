@@ -689,10 +689,11 @@ impl LocalNodes {
 
 
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-#[test]
-fn e2e() {
-    let runtime = build_runtime(8, "e2e");
-    runtime.block_on(e2e_async()).expect("e2e");
+#[tokio::test]
+async fn e2e() {
+    e2e_async().await.expect("");
+    // let runtime = build_runtime(8, "e2e");
+    // runtime.block_on(e2e_async()).expect("e2e");
 }
 
 
