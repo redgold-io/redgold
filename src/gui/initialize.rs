@@ -7,14 +7,18 @@ use crate::gui;
 use crate::gui::ClientApp;
 use crate::node_config::NodeConfig;
 
-pub fn attempt_start(nc: NodeConfig, rt: Arc<Runtime>) -> Result<(), ErrorInfo> {
+pub async fn attempt_start(nc: NodeConfig
+                           // , rt: Arc<Runtime>
+) -> Result<(), ErrorInfo> {
     // TODO: Start GUI
     // use crate::gui::image_load::Image;
     let resources = crate::resources::Resources::default();
     let bytes = resources.logo_bytes;
     // let image = Image::decode(&*bytes).unwrap();
     let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
-    let app = gui::ClientApp::from(ri, nc, rt);
+    let app = gui::ClientApp::from(ri, nc
+                                   // , rt
+    );
     let native_options = eframe::NativeOptions::default();
     //
     // icon_data: Some(

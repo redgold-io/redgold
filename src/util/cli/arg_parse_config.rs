@@ -133,8 +133,8 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
     node_config
 }
 
-pub fn load_node_config(
-    runtime: Arc<Runtime>,
+pub async fn load_node_config(
+    // runtime: Arc<Runtime>,
     opts: RgArgs,
     mut node_config: NodeConfig,
 ) -> Result<NodeConfig, NodeConfig> {
@@ -170,7 +170,10 @@ pub fn load_node_config(
         node_config.data_store_path
     );
 
-    let store = runtime.block_on(node_config.data_store());
+    let store =
+        // runtime.block_on(
+            node_config.data_store().await;
+        // );
     // runtime.block_on(
     // store
     //     .create_all_err_info()
@@ -378,7 +381,11 @@ pub fn load_node_config(
 
     // TODO: Also set from HOSTNAME maybe? With nslookup for confirmation of IP?
     if !node_config.is_local_debug() && node_config.external_ip == "127.0.0.1".to_string() {
-        let ip = runtime.block_on(ip_lookup::get_self_ip()).expect("Ip lookup failed");
+        let ip =
+            // runtime.block_on(
+            ip_lookup::get_self_ip()
+        .await
+        .expect("Ip lookup failed");
         info!("Assigning external IP from ip lookup: {}", ip);
         node_config.external_ip = ip;
     }
@@ -392,7 +399,7 @@ pub fn load_node_config(
 }
 
 pub struct ArgTranslate {
-    runtime: Arc<Runtime>,
+    // runtime: Arc<Runtime>,
     pub opts: RgArgs,
     pub node_config: NodeConfig,
     pub args: Vec<String>,
@@ -403,7 +410,9 @@ impl ArgTranslate {
     pub async fn post_logger_commands(&self) -> Result<bool, ErrorInfo> {
         match &self.opts.subcmd {
             Some(RgTopLevelSubcommand::TestTransaction(test_transaction_cli)) => {
-                commands::test_transaction(&test_transaction_cli, &self.node_config, self.runtime.clone())?;
+                commands::test_transaction(&test_transaction_cli, &self.node_config,
+                                           // self.runtime.clone()
+                ).await?;
                 Ok(true)
             }
             _ => {
@@ -412,10 +421,12 @@ impl ArgTranslate {
         }
     }
 
-    pub fn new(runtime: Arc<Runtime>, opts: &RgArgs, node_config: NodeConfig) -> Self {
+    pub fn new(
+        // runtime: Arc<Runtime>,
+        opts: &RgArgs, node_config: NodeConfig) -> Self {
         let args = std::env::args().collect_vec();
         ArgTranslate {
-            runtime,
+            // runtime,
             opts: opts.clone(),
             node_config,
             args,
@@ -550,7 +561,9 @@ fn load_ds_path() {
         .unwrap();
 */
 // Pre logger commands
-pub fn immediate_commands(opts: &RgArgs, config: &NodeConfig, simple_runtime: Arc<Runtime>) -> bool {
+pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
+                          // , simple_runtime: Arc<Runtime>
+) -> bool {
     let mut abort = false;
     let res: Result<(), ErrorInfo> = match &opts.subcmd {
         None => {Ok(())}
@@ -566,21 +579,31 @@ pub fn immediate_commands(opts: &RgArgs, config: &NodeConfig, simple_runtime: Ar
                     Ok(())
                 }
                 RgTopLevelSubcommand::Send(a) => {
-                    let res = simple_runtime.block_on(commands::send(&a, &config));
-                    res
+                    // let res = simple_runtime.block_on(
+                        commands::send(&a, &config).await
+                        // ));
+                    // res
                 }
                 RgTopLevelSubcommand::Query(a) => {
-                    simple_runtime.block_on(commands::query(&a, &config))
+                    // simple_runtime.block_on(
+                        commands::query(&a, &config).await
+                    // )
                 }
                 // Move all these block_on in an async match and block on this.
                 RgTopLevelSubcommand::Faucet(a) => {
-                    simple_runtime.block_on(commands::faucet(&a, &config))
+                    // simple_runtime.block_on(
+                        commands::faucet(&a, &config).await
+                    // )
                 }
                 RgTopLevelSubcommand::AddServer(a) => {
-                    simple_runtime.block_on(commands::add_server(a, &config))
+                    // simple_runtime.block_on(
+                        commands::add_server(a, &config).await
+                    // )
                 }
                 RgTopLevelSubcommand::Balance(a) => {
-                    simple_runtime.block_on(commands::balance_lookup(a, &config))
+                    // simple_runtime.block_on(
+                        commands::balance_lookup(a, &config).await
+                    // )
                 }
 
                 _ => {

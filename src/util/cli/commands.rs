@@ -320,13 +320,18 @@ pub async fn deploy(deploy: Deploy, config: NodeConfig) -> Result<(), ErrorInfo>
 
 }
 
-pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runtime>) -> Result<(), ErrorInfo> {
+pub async fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig
+                        // , arc: Arc<Runtime>
+) -> Result<(), ErrorInfo> {
     if p1.network == NetworkEnvironment::Main {
         return Err(error_info("Cannot test transaction on mainnet unsupported".to_string()));
     }
     let client = p1.lb_client();
-    let mut tx_submit = TransactionSubmitter::default(client.clone(), arc.clone(), vec![]);
-    let faucet_tx = tx_submit.with_faucet();
+    let mut tx_submit = TransactionSubmitter::default(client.clone(),
+                                                      // arc.clone(),
+                                                      vec![]
+    );
+    let faucet_tx = tx_submit.with_faucet().await?;
     // info!("Faucet response: {}", faucet_tx.json_or());
     let faucet_tx = faucet_tx.transaction.safe_get()?;
     let _ = {
@@ -335,7 +340,7 @@ pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runt
         assert!(gen.finished_pool.len() > 0);
     };
     let source = Proof::proofs_to_address(&faucet_tx.inputs.get(0).expect("").proof)?;
-    let repeat = tx_submit.drain(source)?;
+    let repeat = tx_submit.drain(source).await?;
     // assert!(repeat.accepted());
     // assert proofs here
     let s = repeat;
@@ -366,13 +371,15 @@ pub fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig, arc: Arc<Runt
 }
 
 #[ignore]
-#[test]
-fn test_transaction_dev() {
+#[tokio::test]
+async fn test_transaction_dev() {
     init_logger();
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
-    let rt = build_runtime(5, "asdf");
+    // let rt = build_runtime(5, "asdf");
     let t = TestTransactionCli{};
-    let arc = rt.clone();
-    let res = test_transaction(&&t, &nc, arc).expect("");
+    // let arc = rt.clone();
+    let res = test_transaction(&&t, &nc
+                               // , arc
+    ).await.expect("");
 }

@@ -18,17 +18,17 @@ use crate::node::{Node, NodeRuntimes};
 use crate::util::cli::arg_parse_config::ArgTranslate;
 
 
-pub fn main_from_args(opts: RgArgs) {
+pub async fn main_from_args(opts: RgArgs) {
     // std::env::args() and ArgTranslate
     // ArgTranslate::new(opts).run();
 
-
-
     let mut node_config = NodeConfig::default();
-    let simple_runtime = build_runtime(1, "main");
+    // let simple_runtime = build_runtime(1, "main");
 
     // TODO: Fix, borrowed node config here cannot be used to build the arg translate
-    let mut arg_translate = ArgTranslate::new(simple_runtime.clone(), &opts, node_config.clone());
+    let mut arg_translate = ArgTranslate::new(
+        // simple_runtime.clone(),
+        &opts, node_config.clone());
     &arg_translate.run().expect("arg translation");
     node_config = arg_translate.node_config.clone();
     node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
@@ -36,7 +36,9 @@ pub fn main_from_args(opts: RgArgs) {
 
     /// Commands required to run separate from the logging system initialization
     /// TODO: Consider disabling logging for these commands and instead unifying them?
-    if arg_parse_config::immediate_commands(&opts, &node_config, simple_runtime.clone()) {
+    if arg_parse_config::immediate_commands(&opts, &node_config,
+                                            // simple_runtime.clone()
+    ).await {
         return;
     }
     // TODO: Change the port here by first parsing args associated with metrics / logs
@@ -46,7 +48,10 @@ pub fn main_from_args(opts: RgArgs) {
     info!("Starting node main method");
     increment_counter!("redgold.node.main_started");
 
-    let node_config_res = arg_parse_config::load_node_config(simple_runtime.clone(), opts.clone(), node_config);
+    let node_config_res = arg_parse_config::load_node_config(
+        // simple_runtime.clone(),
+        opts.clone(), node_config
+    ).await;
 
 
     // TODO: Here is where we should later init loggers and metrics?
@@ -54,29 +59,43 @@ pub fn main_from_args(opts: RgArgs) {
     match node_config_res {
         Ok(node_config) => {
             if arg_translate.is_gui() {
-                crate::gui::initialize::attempt_start(node_config.clone(), simple_runtime.clone()).expect("GUI to start");
+                crate::gui::initialize::attempt_start(node_config.clone()
+                                                      // , simple_runtime.clone()
+                )
+                    .await
+                    .expect("GUI to start");
                 return;
             }
-            let mut arg_translate = ArgTranslate::new(simple_runtime.clone(), &opts, node_config.clone());
-            if simple_runtime.block_on(arg_translate.post_logger_commands()).expect("post logger commands") {
+            let mut arg_translate = ArgTranslate::new(
+                // simple_runtime.clone(),
+                &opts, node_config.clone()
+            );
+            //simple_runtime.block_on(
+            if arg_translate.post_logger_commands().await.expect("post logger commands") {
                 return;
             }
 
-            let runtimes = NodeRuntimes::default();
-            let mut relay = simple_runtime.block_on(Relay::new(node_config.clone()));
+            // let runtimes = NodeRuntimes::default(); simple_runtime.block_on(
+            let mut relay = Relay::new(node_config.clone()).await;
 
-            Node::prelim_setup(relay.clone(), runtimes.clone()).expect("prelim");
-            let mut join_handles = Node::start_services(relay.clone(), runtimes.clone());
+            Node::prelim_setup(relay.clone(),
+                               // runtimes.clone()
+            ).await.expect("prelim");
+            let mut join_handles = Node::start_services(relay.clone()
+                                                        // , runtimes.clone()
+            ).await;
             let mut futures = FuturesUnordered::new();
             for jhi in join_handles {
                 futures.push(jhi);
             }
-            let res = Node::from_config(relay, runtimes);
+            let res = Node::from_config(relay
+                                        // , runtimes
+            ).await;
             match res {
                 Ok(_) => {
                     info!("Node startup successful");
-                    loop {
-                        match FutLoopPoll::map_fut(simple_runtime.block_on(futures.next())) {
+                    // loop {
+                        match FutLoopPoll::map_fut(futures.next().await) {
                             Ok(_) => {
                                 error!("Some sub-service has terminated cleanly");
                             }
@@ -85,7 +104,7 @@ pub fn main_from_args(opts: RgArgs) {
                                 panic!("Error in sub-service in main thread");
                             }
                         }
-                    }
+                    // }
                 }
                 Err(e) => {
                     error!("Node startup failure: {}", crate::schema::json(&e).expect("json render of error failed?"));
@@ -99,7 +118,7 @@ pub fn main_from_args(opts: RgArgs) {
     }
 }
 
-pub fn main() {
+pub async fn main() {
     let opts = RgArgs::parse();
-    main_from_args(opts);
+    main_from_args(opts).await;
 }

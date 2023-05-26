@@ -59,7 +59,7 @@ pub struct LocalState {
     iv: [u8; 16],
     wallet_first_load_state: bool,
     pub node_config: NodeConfig,
-    pub runtime: Arc<Runtime>,
+    // pub runtime: Arc<Runtime>,
     pub home_state: HomeState,
     server_state: ServersState,
     pub current_time: i64
@@ -67,7 +67,9 @@ pub struct LocalState {
 
 #[allow(dead_code)]
 impl LocalState {
-    pub fn from(node_config: NodeConfig, runtime: Arc<Runtime>) -> LocalState {
+    pub fn from(node_config: NodeConfig
+                // , runtime: Arc<Runtime>
+    ) -> LocalState {
         let mut node_config = node_config.clone();
         node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
@@ -90,7 +92,7 @@ impl LocalState {
             iv,
             wallet_first_load_state: true,
             node_config,
-            runtime,
+            // runtime,
             home_state: HomeState::from(),
             server_state: ServersState { needs_update: true,
                 info: Arc::new(Mutex::new(vec![])),
@@ -209,7 +211,7 @@ pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalS
 
     if local_state.server_state.needs_update {
         local_state.server_state.needs_update = false;
-        local_state.runtime.spawn(
+        tokio::spawn(
             update_server_status(
                 servers.clone(),
         local_state.server_state.info.clone()
@@ -252,7 +254,7 @@ pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalS
         ui.spacing();
         if ui.button("Deploy").clicked() {
             info!("Deploying");
-            local_state.runtime.spawn(async {
+            tokio::spawn(async {
                 for server in servers {
                     let mut ssh = SSH::from_server(&server);
                     let is_genesis = server.index == 0;

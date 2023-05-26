@@ -13,6 +13,7 @@ use futures::future;
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
 use itertools::Itertools;
+use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
 use redgold_schema::structs::{FixedUtxoId, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response};
@@ -173,7 +174,7 @@ impl Relay {
         relay: Relay,
         nodes: Vec<structs::PublicKey>,
         request: Request,
-        runtime: Arc<Runtime>,
+        // runtime: Arc<Runtime>,
         timeout: Option<Duration>
         // TODO: remove the publickey here not necessary
     ) -> Vec<(structs::PublicKey, Result<Response, ErrorInfo>)> {
@@ -182,14 +183,14 @@ impl Relay {
         let mut fu = vec![];
         for (i,node) in nodes.iter().enumerate() {
             let relay2 = relay.clone();
-            let runtime2 = runtime.clone();
+            // let runtime2 = runtime.clone();
             let request2 = request.clone();
             let jh = async move {
                 (
                 node.clone(),
                 {
 
-                    runtime2.spawn(
+                    tokio::spawn(
                         Relay::send_message_sync_static(relay2.clone(),
                                                         request2.clone(), node.clone(), Some(timeout))
                     ).await.error_info("join handle failure on broadcast").and_then(|e| e)
@@ -217,7 +218,7 @@ impl Relay {
         &self,
         tx_req: SubmitTransactionRequest,
     ) -> Result<SubmitTransactionResponse, ErrorInfo> {
-        let (s, r) = flume::unbounded();
+        let (s, r) = flume::bounded(1);
         let response_channel = if tx_req.sync_query_response {
             Some(s)
         } else {
@@ -227,6 +228,7 @@ impl Relay {
             .transaction
             .safe_get_msg("Missing transaction field on submit request")?;
         tx.calculate_hash();
+        info!("Relay submitting transaction");
         self.transaction
             .send(TransactionMessage {
                 transaction: tx.clone(),
