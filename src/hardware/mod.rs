@@ -2,7 +2,7 @@ use redgold_schema::structs::{Address, ErrorInfo};
 use crate::util;
 use crate::util::cmd::run_cmd;
 
-// pub mod trezor;
+pub mod trezor;
 // pub mod trezor_unchecked;
 
 
