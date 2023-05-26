@@ -86,12 +86,14 @@ pub struct ControlServer {
     pub relay: Relay,
     //control_channel: Channel<ControlRequest>
     // pub p2p_client: crate::api::p2p_io::rgnetwork::Client,
-    pub runtime: Arc<Runtime>,
+    // pub runtime: Arc<Runtime>,
 }
 
 impl ControlServer {
 
-    async fn request_response(request: ControlRequest, relay: Relay, rt: Arc<Runtime>)-> Result<ControlResponse, ErrorInfo> {
+    async fn request_response(request: ControlRequest, relay: Relay
+                              // , rt: Arc<Runtime>
+    )-> Result<ControlResponse, ErrorInfo> {
         metrics::increment_counter!("redgold.api.control.num_requests");
         info!("Control request received");
 
@@ -100,7 +102,9 @@ impl ControlServer {
         // TODO: Shouldn't both of these really be in the initiate function?
         if let Some(mps) = request.initiate_multiparty_keygen_request {
 
-            let keys = find_multiparty_key_pairs(relay.clone(), rt.clone()).await?;
+            let keys = find_multiparty_key_pairs(relay.clone()
+                                                 // , rt.clone()
+            ).await?;
             let num_parties = keys.len() as i64;
 
             let mut req = mps.clone();
@@ -114,11 +118,15 @@ impl ControlServer {
             req.identifier = fill_identifier(keys, req.identifier);
             // let d = mps.clone();
             info!("Initiate multiparty request: {}", json_or(&req));
-            let result = initiate_mp_keygen(relay.clone(), req, rt.clone()).await?;
+            let result = initiate_mp_keygen(relay.clone(), req,
+                                            // rt.clone()
+            ).await?;
             response.initiate_multiparty_keygen_response = Some(result);
         } else if let Some(mut req) = request.initiate_multiparty_signing_request {
             let keygen = req.keygen_room.safe_get()?;
-            let keys = find_multiparty_key_pairs(relay.clone(), rt.clone()).await?;
+            let keys = find_multiparty_key_pairs(relay.clone()
+                                                 // , rt.clone()
+            ).await?;
             req.identifier = fill_identifier(keys, req.identifier);
             // TODO: Remove these from schema, enforce node knowing about this
             req.port = Some(relay.node_config.mparty_port().clone() as u32);
@@ -138,7 +146,10 @@ impl ControlServer {
             }
             req.party_indexes = parties;
 
-            let result = initiate_mp_keysign(relay.clone(), req, rt.clone()).await?;
+            let result = initiate_mp_keysign(
+                relay.clone(), req,
+                // rt.clone()
+            ).await?;
             response.initiate_multiparty_signing_response = Some(result);
         }
         // if add_peer_full_request.is_some() {
@@ -172,14 +183,14 @@ impl ControlServer {
         let Self {
             relay,
             // p2p_client,
-            runtime,
+            // runtime,
         } = self;
         let relay2 = relay.clone();
         info!(
             "Starting control server on port: {:?}",
             relay.node_config.control_port()
         );
-        let rt2 = runtime.clone();
+        // let rt2 = runtime.clone();
         let control_relay = relay.clone();
         let control_single_json = warp::post()
             .and(warp::path("control"))
@@ -187,11 +198,13 @@ impl ControlServer {
             .and(warp::body::content_length_limit(1024 * 16))
             .and(warp::body::json::<ControlRequest>())
             .and_then(move |req: ControlRequest| {
-                let rt3 = rt2.clone();
+                // let rt3 = rt2.clone();
                 let rl2 = control_relay.clone();
                 async move {
                     let relay_int = rl2.clone();
-                    Self::handle_control(req, relay_int, rt3).await
+                    Self::handle_control(req, relay_int,
+                                         // rt3
+                    ).await
                 }
             });
 
@@ -201,9 +214,13 @@ impl ControlServer {
         Ok(())
     }
 
-    async fn handle_control(req: ControlRequest, relay_int: Relay, rt: Arc<Runtime>) -> Result<Json, Rejection> {
+    async fn handle_control(req: ControlRequest, relay_int: Relay
+                            // , rt: Arc<Runtime>
+    ) -> Result<Json, Rejection> {
         let mut response =
-            Self::request_response(req, relay_int.clone(), rt.clone()).await;
+            Self::request_response(req, relay_int.clone()
+                                   // , rt.clone()
+            ).await;
         let res = response.map_err(|e| {
             let mut r = ControlResponse::empty();
             r.response_metadata = Some(e.response_metadata());
@@ -212,7 +229,7 @@ impl ControlServer {
         as_warp_json_response(res)
     }
     pub fn start(self) -> JoinHandle<Result<(), ErrorInfo>> {
-        return self.runtime.clone().spawn(self.run_control_server());
+        return tokio::spawn(self.run_control_server());
     }
 }
 //

@@ -26,10 +26,14 @@ pub struct ClientApp {
 }
 
 impl ClientApp {
-    pub fn from(logo: RetainedImage, nc: NodeConfig, rt: Arc<Runtime>) -> Self {
+    pub fn from(logo: RetainedImage, nc: NodeConfig
+                // , rt: Arc<Runtime>
+    ) -> Self {
         Self {
             logo: logo,
-            local_state: LocalState::from(nc, rt),
+            local_state: LocalState::from(nc,
+                                          // rt
+            ),
         }
     }
 }

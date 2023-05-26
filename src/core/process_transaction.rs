@@ -71,7 +71,7 @@ impl RequestProcessor {
 #[derive(Clone)]
 pub struct TransactionProcessContext {
     relay: Relay,
-    tx_process: Arc<Runtime>,
+    // tx_process: Arc<Runtime>,
     request_processor: Option<RequestProcessor>,
     transaction_hash: Option<Hash>,
     utxo_ids: Option<Vec<FixedUtxoId>>
@@ -184,23 +184,26 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
 impl TransactionProcessContext {
 
     // Init
-    pub fn new(relay: Relay, tx_process_listener: Arc<Runtime>, tx_process: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>> {
+    pub fn new(relay: Relay
+               // , tx_process_listener: Arc<Runtime>
+               // , tx_process: Arc<Runtime>
+    ) -> JoinHandle<Result<(), ErrorInfo>> {
         let context = Self {
             relay,
-            tx_process: tx_process.clone(),
+            // tx_process: tx_process.clone(),
             request_processor: None,
             transaction_hash: None,
             utxo_ids: None,
         };
 
-        return tx_process_listener.spawn(async move { context.run().await });
+        return tokio::spawn(async move { context.run().await });
     }
 
     /// Loop to check messages and process them
     // TODO: Abstract this out
     async fn run(&self) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.node.async_started");
-        let mut fut = FutLoopPoll::new();
+        // let mut fut = FutLoopPoll::new();
         // TODO: Change to queue
         let mut receiver = self.relay.transaction.receiver.clone();
         // TODO this accomplishes queue, we can also move the spawn function into FutLoopPoll so that
@@ -209,20 +212,45 @@ impl TransactionProcessContext {
         // receiver.stream().try_for_each_concurrent()
         // We can also use a Context type parameter over it to keep track of some internal context
         // per request i.e. RequestContext.
-        fut.run_fut(&|| receiver.recv_async_err(), |transaction_res: Result<TransactionMessage, ErrorInfo>| {
+        receiver.into_stream().map(|x| {
+            info!("Transaction receiver map stream");
+            Ok(x)
+        })
+            .try_for_each_concurrent(100, |transaction| {
+            info!("Transaction receiver try for each stream");
             let mut x = self.clone();
-            let jh = self.tx_process.clone()
-            .spawn(async move {
-                match transaction_res {
-                    Ok(transaction) => {
-                        x.scoped_process_and_respond(transaction).await
-                    }
-                    Err(e) => Err(e)
-                }
-            });
-            jh
-        } ).await
+            async move {
+                x.scoped_process_and_respond(transaction).await
+            }
+        }).await
     }
+    //
+    // /// Loop to check messages and process them
+    // // TODO: Abstract this out
+    // async fn run(&self) -> Result<(), ErrorInfo> {
+    //     increment_counter!("redgold.node.async_started");
+    //     let mut fut = FutLoopPoll::new();
+    //     // TODO: Change to queue
+    //     let mut receiver = self.relay.transaction.receiver.clone();
+    //     // TODO this accomplishes queue, we can also move the spawn function into FutLoopPoll so that
+    //     // the only function we have here is to call one function
+    //     // do that later
+    //     // receiver.stream().try_for_each_concurrent()
+    //     // We can also use a Context type parameter over it to keep track of some internal context
+    //     // per request i.e. RequestContext.
+    //     fut.run_fut(&|| receiver.recv_async_err(), |transaction_res: Result<TransactionMessage, ErrorInfo>| {
+    //         let mut x = self.clone();
+    //         let jh = tokio::spawn(async move {
+    //             match transaction_res {
+    //                 Ok(transaction) => {
+    //                     x.scoped_process_and_respond(transaction).await
+    //                 }
+    //                 Err(e) => Err(e)
+    //             }
+    //         });
+    //         jh
+    //     } ).await
+    // }
 
     async fn scoped_process_and_respond(&mut self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
         let request_uuid = Uuid::new_v4().to_string();
@@ -370,7 +398,9 @@ impl TransactionProcessContext {
         /// Attempt to resolve all the transaction inputs and outputs for context-aware validation
         /// This is the place where balances checks and signature verifications are performed.
         let resolver_data = resolve_transaction(&transaction,
-                                                self.relay.clone(), self.tx_process.clone()).await?;
+                                                self.relay.clone(),
+                                                // self.tx_process.clone()
+        ).await?;
         resolver_data.validate()?;
 
         let fixed_utxo_ids = transaction.fixed_utxo_ids_of_inputs()?;
@@ -432,7 +462,9 @@ impl TransactionProcessContext {
         // TODO: Don't remember the purpose of this duplicate validation here, we should really
         // seed this with existing data to reduce request size and just verify it's still valid
         let resolver_data = resolve_transaction(&transaction,
-                                                self.relay.clone(), self.tx_process.clone()).await?;
+                                                self.relay.clone(),
+                                                // self.tx_process.clone()
+        ).await?;
         resolver_data.validate()?;
         // Change this to 'revalidate' and only issue some queries again not all of them.
 
@@ -565,7 +597,9 @@ impl TransactionProcessContext {
 
         tracing::info!("Collecting observation proofs from {} peers", peers.len());
         let results = Relay::broadcast(self.relay.clone(),
-                                       peers, obs_proof_req, self.tx_process.clone(), Some(
+                                       peers, obs_proof_req,
+                                       // self.tx_process.clone(),
+                                       Some(
                 Duration::from_secs(5))).await;
         for (_, r) in results {
             if let Some(r) = r.ok() {

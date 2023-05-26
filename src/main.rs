@@ -1,5 +1,6 @@
 use redgold::core;
 
-fn main() {
-    core::run_main::main();
+#[tokio::main]
+async fn main() {
+    core::run_main::main().await;
 }

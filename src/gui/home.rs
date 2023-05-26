@@ -44,7 +44,7 @@ pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
         .map(|q| (local_state.current_time - q) > 1000*25)
         .unwrap_or(true) {
         home_state.last_query_started_time = Some(local_state.current_time);
-        local_state.runtime.spawn(async move {
+        tokio::spawn(async move {
             query_network_status(nc2, arc).await
         });
     }

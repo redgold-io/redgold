@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use async_std::prelude::FutureExt;
 use eframe::epaint::ahash::HashMap;
 use itertools::Itertools;
 
@@ -29,55 +30,109 @@ use crate::data::data_store::DataStore;
 use crate::schema::json;
 use crate::schema::json_or;
 use redgold_schema::EasyJson;
+use futures::TryStreamExt;
+// use futures::stream::StreamExt;
+use tokio::time::Interval;
+use tokio_stream::wrappers::IntervalStream;
+use tokio_util::either::Either;  // Make sure to import StreamExt
+use tokio_stream::StreamExt;
 
 pub struct ObservationBuffer {
     data: Vec<ObservationMetadata>,
     relay: Relay,
     latest: Option<Observation>,
     subscribers: HashMap<Hash, flume::Sender<ObservationProof>>,
+    interval: Interval
 }
 
 impl ObservationBuffer {
+
+    async fn handle_message(&mut self, o: Either<ObservationMetadataInternalSigning, ()>) -> Result<&mut Self, ErrorInfo> {
+        match o {
+            Either::Left(o) => {
+                self.process_incoming(o).await?;
+            }
+            Either::Right(_) => {
+                self.form_and_respond().await?;
+            }
+        }
+        Ok(self)
+    }
+
     async fn run(&mut self) -> Result<(), ErrorInfo> {
 
         let mut interval =
             tokio::time::interval(self.relay.node_config.observation_formation_millis);
         // TODO use a select! between these two.
 
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    match self.form_and_respond().await {
-                        Ok(_) => {},
-                        Err(e) => {
-                            log::error!("Error forming observation: {}", e.json_or());
-                        }
+        let interval_stream = IntervalStream::new(interval).map(|_| Ok(Either::Right(())));
+
+
+        let recv = self.relay.observation_metadata.receiver.clone();
+        let stream = recv
+            .into_stream()
+            .map(|x| Ok(Either::Left(x)));
+
+        stream.merge(interval_stream).try_fold(
+            Ok(self), |mut ob, o| async {
+                let ress = match ob {
+                    Ok(ooo) => {
+                        let res = ooo.handle_message(o).await.map(|x| Ok(x));
+                        res
                     }
-                },
-                // TODO use fut loop thing.
-                res = self.relay.observation_metadata.receiver.recv_async_err() => {
-                    let o: ObservationMetadataInternalSigning = res?;
-                    self.process_incoming(o).await;
-                }
+                    Err(e) => {
+                        let res: Result<Result<&mut Self, _>, ErrorInfo> = Err(e);
+                        res
+                    }
+                };
+                ress
             }
-        }
+        ).await??;
+
+    // }
+        //
+        // loop {
+        //     tokio::select! {
+        //         _ = interval.tick() => {
+        //             match self.form_and_respond().await {
+        //                 Ok(_) => {},
+        //                 Err(e) => {
+        //                     log::error!("Error forming observation: {}", e.json_or());
+        //                 }
+        //             }
+        //         },
+        //         // TODO use fut loop thing.
+        //         res = self.relay.observation_metadata.receiver.recv_async_err() => {
+        //             let o: ObservationMetadataInternalSigning = res?;
+        //             self.process_incoming(o).await;
+        //         }
+        //     }
+        // }
+        Ok(())
     }
 
     // https://stackoverflow.com/questions/63347498/tokiospawn-borrowed-value-does-not-live-long-enough-argument-requires-tha
-    pub fn new(relay: Relay, arc: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>>{
+    pub async fn new(relay: Relay,
+               // arc: Arc<Runtime>
+    ) -> JoinHandle<Result<(), ErrorInfo>>{
 
-        let latest = arc.block_on(relay.ds.observation
-            .select_latest_observation(relay.node_config.public_key())).ok().flatten();
+        let latest =
+            // arc.block_on(
+            relay.ds.observation
+            .select_latest_observation(relay.node_config.public_key())
+                .await.ok().flatten();
 
         info!("Starting observation buffer with latest observation: {}", latest.json_or());
 
+        let interval1 = tokio::time::interval(relay.node_config.observation_formation_millis.clone());
         let mut o = Self {
             data: vec![],
             relay,
             latest,
             subscribers: Default::default(),
+            interval: interval1
         };
-        arc.spawn(async move {
+        tokio::spawn(async move {
             o.run().await
         })
     }
@@ -95,13 +150,14 @@ impl ObservationBuffer {
         Ok(())
     }
 
-    pub async fn process_incoming(&mut self, o: ObservationMetadataInternalSigning) {
+    pub async fn process_incoming(&mut self, o: ObservationMetadataInternalSigning) -> Result<(), ErrorInfo> {
         if let Some(h) = o.observation_metadata.observed_hash.clone() {
             increment_counter!("redgold.observation.buffer.added");
             log::info!("Pushing observation metadata to buffer {}", json_or(&o.observation_metadata.clone()));
             self.subscribers.insert(h.clone(), o.sender.clone());
             self.data.push(o.observation_metadata);
         };
+        Ok(())
     }
 
     pub async fn form_observation(&mut self) -> Result<Vec<ObservationProof>, ErrorInfo> {

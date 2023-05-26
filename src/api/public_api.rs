@@ -17,7 +17,7 @@ use tokio::time::sleep;
 use warp::reply::Json;
 use warp::Filter;
 use warp::http::Response;
-use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, SafeOption, structs};
+use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, ProtoSerde, SafeOption, structs};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -373,6 +373,27 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
     // info!("Public API response: {}", serde_json::to_string(&response1.clone()).unwrap());
 }
 
+pub async fn as_warp_proto_bytes<T: ProtoSerde>(response: Result<T, ErrorInfo>) -> Response<Vec<u8>> {
+    let vec = response
+        .map(|r| r.proto_serialize())
+        .map_err(|e| e.proto_serialize())
+        .combine();
+    Response::builder().body(vec).expect("a")
+}
+
+pub async fn handle_proto_post(reqb: Bytes, address: Option<SocketAddr>, relay: Relay) -> Result<RResponse, ErrorInfo> {
+    let vec_b = reqb.to_vec();
+    let request = Request::proto_deserialize(vec_b)?;
+    info!{"Warp request from {:?}", address};
+    // TODO: increment metric?
+    let c = new_channel::<RResponse>();
+    let mut msg = PeerMessage::empty();
+    msg.request = request;
+    msg.response = Some(c.sender.clone());
+    relay.peer_message_rx.send(msg).await?;
+    c.receiver.recv_async_err_timeout(Duration::from_secs(40)).await
+}
+
 pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     let relay2 = relay.clone();
 
@@ -528,48 +549,12 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move |reqb: Bytes, address: Option<SocketAddr>| {
             // TODO: verify auth and receive message sync from above
             let relay3 = bin_relay2.clone();
-            let vec_b = reqb.to_vec();
-            let req = async { Request::deserialize(vec_b).map_err(|e|
-                ErrorInfo::error_info(format!("Request decode error {}", e)))};
-            async move {
-                info!{"Warp request from {:?}", address};
-                let res: Result<Response<Vec<u8>>, warp::reject::Rejection> = {
-                    Ok({
-                        let c = new_channel::<RResponse>();
-
-                        let response: Result<RResponse, ErrorInfo> = req.and_then(|request| {
-                            let mut msg = PeerMessage::empty();
-                            msg.request = request;
-                            msg.response = Some(c.sender.clone());
-                            relay3.peer_message_rx.send(msg)
-                            // PeerRxEventHandler::request_response(relay3, request)
-                        }).and_then(|()| {
-                            async {
-                                // TODO: recv_async_error and tokio timeout.
-                                c.receiver.recv_timeout(Duration::from_secs(40)).map_err(|e| {
-                                    ErrorInfo::error_info(format!("Request timeout {}", e))
-                                })
-                            }
-                        })
-                            .await;
-                        // info!("request_proto response: {:?}", response.clone());
-                        response
-                            .map_err(|e| {
-                                let rr = RResponse::from_error_info(e);
-                                let r = rr.encode_to_vec();
-                                let res = Response::builder().body(r).expect("a");
-                                res
-                            })
-                            .map(|r| {
-                                let rr = r.encode_to_vec();
-                                let res = Response::builder().body(rr).expect("a");
-                                res
-                            })
-                            .combine()
-                    })
-                };
+            let result = async move {
+                let res: Result<Response<Vec<u8>>, warp::Rejection> =
+                    Ok(as_warp_proto_bytes(handle_proto_post(reqb, address, relay3.clone()).await).await);
                 res
-            }
+            };
+            result
         });
 
     let port = relay2.node_config.public_port();
@@ -579,12 +564,14 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .await)
 }
 
-pub fn start_server(relay: Relay, runtime: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>> {
+pub fn start_server(relay: Relay
+                    // , runtime: Arc<Runtime>
+) -> JoinHandle<Result<(), ErrorInfo>> {
     info!(
         "Starting PublicAPI server on port {:?}",
         relay.clone().node_config.public_port()
     );
-    let handle = runtime.spawn(run_server(relay.clone()));
+    let handle = tokio::spawn(run_server(relay.clone()));
     info!(
         "Started PublicAPI server on port {:?}",
         relay.clone().node_config.public_port()
@@ -625,57 +612,57 @@ async fn mock_relay(relay: Relay) {
 // }
 
 // #[tokio::test]
-#[ignore]
-#[test]
-fn test_warp_basic() {
-    util::init_logger().expect("log");
-
-    let arc2 = build_runtime(2, "test-public-api");
-
-    let runtime = Arc::new(
-        Builder::new_multi_thread()
-            .worker_threads(2)
-            .thread_name("public-api-test")
-            .thread_stack_size(3 * 1024 * 1024)
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
-
-    let mut relay = arc2.block_on(Relay::default());
-    let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
-    relay.node_config.public_port = Some(offset);
-    start_server(relay.clone(), arc2.clone());
-    runtime
-        .clone()
-        .block_on(async { sleep(Duration::new(3, 0)).await });
-    let res = runtime.clone().block_on(async move {
-        PublicClient::local(offset)
-            .send_transaction(&create_genesis_transaction(), false)
-            .await
-            .unwrap()
-    });
-    let relay_t = relay.transaction.receiver.recv();
-    assert_eq!(create_genesis_transaction(), relay_t.unwrap().transaction);
-    let mut response = empty_public_response();
-    response.submit_transaction_response = Some(SubmitTransactionResponse {
-            transaction_hash: create_genesis_transaction().hash().into(),
-            query_transaction_response: None,
-        transaction: None,
-    });
-    // assert_eq!(
-    //     response,
-    //     res
-    // );
-
-    let res2 = runtime.clone().block_on(async move {
-        PublicClient::local(offset)
-            .query_addresses(vec![])
-            .await
-            .unwrap()
-    });
-    println!("response: {:?}", res2);
-}
+// #[ignore]
+// #[test]
+// fn test_warp_basic() {
+//     util::init_logger().expect("log");
+//
+//     let arc2 = build_runtime(2, "test-public-api");
+//
+//     let runtime = Arc::new(
+//         Builder::new_multi_thread()
+//             .worker_threads(2)
+//             .thread_name("public-api-test")
+//             .thread_stack_size(3 * 1024 * 1024)
+//             .enable_all()
+//             .build()
+//             .unwrap(),
+//     );
+//
+//     let mut relay = arc2.block_on(Relay::default());
+//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
+//     relay.node_config.public_port = Some(offset);
+//     start_server(relay.clone(), arc2.clone());
+//     runtime
+//         .clone()
+//         .block_on(async { sleep(Duration::new(3, 0)).await });
+//     let res = runtime.clone().block_on(async move {
+//         PublicClient::local(offset)
+//             .send_transaction(&create_genesis_transaction(), false)
+//             .await
+//             .unwrap()
+//     });
+//     let relay_t = relay.transaction.receiver.recv();
+//     assert_eq!(create_genesis_transaction(), relay_t.unwrap().transaction);
+//     let mut response = empty_public_response();
+//     response.submit_transaction_response = Some(SubmitTransactionResponse {
+//             transaction_hash: create_genesis_transaction().hash().into(),
+//             query_transaction_response: None,
+//         transaction: None,
+//     });
+//     // assert_eq!(
+//     //     response,
+//     //     res
+//     // );
+//
+//     let res2 = runtime.clone().block_on(async move {
+//         PublicClient::local(offset)
+//             .query_addresses(vec![])
+//             .await
+//             .unwrap()
+//     });
+//     println!("response: {:?}", res2);
+// }
 
 //
 // #[test]

@@ -33,7 +33,7 @@ pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, mut request: Reque
 
 pub struct PeerRxEventHandler {
     relay: Relay,
-    rt: Arc<Runtime>
+    // rt: Arc<Runtime>
 }
 use redgold_schema::EasyJson;
 use crate::util::logging::Loggable;
@@ -41,12 +41,17 @@ use crate::util::logging::Loggable;
 impl PeerRxEventHandler {
 
     pub async fn request_response_rest(
-        relay: Relay, pm: PeerMessage, rt: Arc<Runtime>
+        relay: Relay, pm: PeerMessage
+        // , rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
+        increment_counter!("redgold.peer.message.received");
+
         // pm.request.verify_auth()?;
 
         // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let mut response = Self::request_response(relay.clone(), pm.request.clone(), rt.clone()).await
+        let mut response = Self::request_response(relay.clone(), pm.request.clone(),
+                                                  // rt.clone()
+        ).await
             .map_err(|e| Response::from_error_info(e)).combine();
         response.with_metadata(relay.node_config.node_metadata());
         response.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
@@ -78,7 +83,7 @@ impl PeerRxEventHandler {
 
                         let relay = relay.clone();
                         info!("Requesting peer info on runtime");
-                        rt.spawn(async move {
+                        tokio::spawn(async move {
                             let response = rest_peer(
                                 relay.node_config.clone(), nmd.external_address.clone(),
                                 (nmd.port_or(relay.node_config.network.clone()) as i64) + 1,
@@ -118,11 +123,14 @@ impl PeerRxEventHandler {
         Ok(())
     }
 
-    pub async fn request_response(relay: Relay, request: Request, arc: Arc<Runtime>) -> Result<Response, ErrorInfo> {
+    pub async fn request_response(relay: Relay, request: Request
+                                  // , arc: Arc<Runtime>
+    ) -> Result<Response, ErrorInfo> {
 
         let mut response = Response::empty_success();
 
         if let Some(s) = request.submit_transaction_request {
+            info!("Received submit transaction request, sending to relay");
             response.submit_transaction_response = Some(relay.submit_transaction(s).await?);
         } // else
         // if let some(f) = request.fau
@@ -188,7 +196,7 @@ impl PeerRxEventHandler {
                 info!("Received MP request on peer rx: {}", json_or(&k));
                 let rel2 = relay.clone();
                 // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                arc.spawn(async move {
+                tokio::spawn(async move {
                     let result1 = initiate_mp_keygen_follower(
                         rel2.clone(), k).await;
                     let mp_response: String = result1.clone()
@@ -201,7 +209,7 @@ impl PeerRxEventHandler {
                 let rel2 = relay.clone();
                 info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
                 // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                arc.spawn(async move {
+                tokio::spawn(async move {
                     let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
                     let mp_response: String = result1.clone()
                         .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
@@ -216,28 +224,44 @@ impl PeerRxEventHandler {
         //             );
         Ok(response)
     }
+    //
+    // async fn run(&mut self) -> Result<(), ErrorInfo> {
+    //
+    //     // Wait a minute if we're polling these futures do we even need a spawn here?
+    //     let mut fut = FutLoopPoll::new();
+    //
+    //     let receiver = self.relay.peer_message_rx.receiver.clone();
+    //     fut.run(receiver, |pm| {
+    //         increment_counter!("redgold.peer.message.received");
+    //         // info!("Peer rx event handler received message");
+    //         tokio::spawn({
+    //             Self::request_response_rest(self.relay.clone(), pm.clone(),
+    //                                         // self.rt.clone()
+    //             )
+    //         })
+    //     }).await
+    // }
+    //
 
     async fn run(&mut self) -> Result<(), ErrorInfo> {
-
-        // Wait a minute if we're polling these futures do we even need a spawn here?
-        let mut fut = FutLoopPoll::new();
-
         let receiver = self.relay.peer_message_rx.receiver.clone();
-        fut.run(receiver, |pm| {
-            increment_counter!("redgold.peer.message.received");
-            // info!("Peer rx event handler received message");
-            self.rt.spawn({
-                Self::request_response_rest(self.relay.clone(), pm.clone(), self.rt.clone())
-            })
+        let relay = self.relay.clone();
+        receiver.into_stream().map(|r| Ok(r)).try_for_each_concurrent(10, |pm| {
+            info!("Received peer message");
+            Self::request_response_rest(relay.clone(), pm)
         }).await
     }
+
+
     // https://stackoverflow.com/questions/63347498/tokiospawn-borrowed-value-does-not-live-long-enough-argument-requires-tha
-    pub fn new(relay: Relay, arc: Arc<Runtime>) -> JoinHandle<Result<(), ErrorInfo>> {
+    pub fn new(relay: Relay,
+               // arc: Arc<Runtime>
+    ) -> JoinHandle<Result<(), ErrorInfo>> {
         let mut b = Self {
             relay,
-            rt: arc.clone()
+            // rt: arc.clone()
         };
-        arc.spawn(async move { b.run().await })
+        tokio::spawn(async move { b.run().await })
     }
 }
 
@@ -263,7 +287,9 @@ pub async fn libp2p_handle_inbound2(
     info!("Is peer known?: {:?}", serde_json::to_string(&known_peer.clone()).unwrap());
 
     let response = PeerRxEventHandler::request_response(
-        relay.clone(), request.clone(), rt.clone()).await?;
+        relay.clone(), request.clone(),
+        // rt.clone()
+    ).await?;
     //
     // if known_peer.is_none() {
     //     let client = p2p_client.clone();
