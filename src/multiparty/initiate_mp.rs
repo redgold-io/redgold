@@ -19,7 +19,9 @@ fn debug() {
 
 }
 
-pub async fn initiate_mp_keygen(relay: Relay, mp_req: InitiateMultipartyKeygenRequest, rt: Arc<Runtime>)
+pub async fn initiate_mp_keygen(relay: Relay, mp_req: InitiateMultipartyKeygenRequest
+                                // , rt: Arc<Runtime>
+)
                                 -> Result<InitiateMultipartyKeygenResponse, ErrorInfo> {
 
     let ident = mp_req.identifier.safe_get()?;
@@ -42,7 +44,7 @@ pub async fn initiate_mp_keygen(relay: Relay, mp_req: InitiateMultipartyKeygenRe
     info!("Initiating mp keygen starter for room: {} with index: {} num_parties: {}, threshold: {}, port: {}",
         room_id, index.to_string(), number_of_parties.to_string(), threshold.to_string(), port.to_string());
     let ridc = room_id.clone();
-    let res = rt.spawn(async move {
+    let res = tokio::spawn(async move {
         tokio::time::timeout(
             timeout,
             gg20_keygen::keygen(address, port, ridc, index, threshold, number_of_parties),
@@ -148,7 +150,9 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
 }
 
 
-pub async fn find_multiparty_key_pairs(relay: Relay, runtime: Arc<Runtime>) -> Result<Vec<structs::PublicKey>, ErrorInfo> {
+pub async fn find_multiparty_key_pairs(relay: Relay
+                                       // , runtime: Arc<Runtime>
+) -> Result<Vec<structs::PublicKey>, ErrorInfo> {
 
     let peers = relay.ds.peer_store.all_peers().await?;
     // TODO: Safer, query all pk
@@ -158,7 +162,10 @@ pub async fn find_multiparty_key_pairs(relay: Relay, runtime: Arc<Runtime>) -> R
 
     info!("Mulitparty found {} possible peers", pk.len());
     let results = Relay::broadcast(relay.clone(),
-        pk, Request::empty().about(), runtime.clone(), Some(Duration::from_secs(20))).await;
+        pk, Request::empty().about(),
+                                   // runtime.clone(),
+                                   Some(Duration::from_secs(20))
+    ).await;
     let valid_pks = results.iter()
         .filter_map(|(pk, r)| if r.is_ok() { Some(pk.clone()) } else { None })
         .collect_vec();
@@ -204,7 +211,9 @@ pub fn fill_identifier(keys: Vec<structs::PublicKey>, identifier: Option<Multipa
 
 
 
-pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigningRequest, rt: Arc<Runtime>)
+pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigningRequest, 
+                                 // rt: Arc<Runtime>
+)
     -> Result<InitiateMultipartySigningResponse, ErrorInfo> {
 
     let init_keygen_req = mp_req.keygen_room.safe_get()?.clone();
@@ -227,7 +236,7 @@ pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigning
     let option = mp_req.data_to_sign.clone().safe_bytes()?;
 
     let rid = room_id.clone();
-    let jh = rt.spawn(async move { tokio::time::timeout(
+    let jh = tokio::spawn(async move { tokio::time::timeout(
         timeout,
         gg20_signing::signing(
             address, port, rid, local_share, index, option),

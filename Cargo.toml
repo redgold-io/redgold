@@ -41,7 +41,7 @@ backtrace = "0.3.65"
 #btc-transaction-utils = "0.9.0" # build conflict, out of date anyways
 # todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
 #swagger = "2.2" # breaks openssl?
-flume = "0.10.12"
+flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
 multihash = "*"
 dotenv = "0.15.0"
 futures = "0.3.1"

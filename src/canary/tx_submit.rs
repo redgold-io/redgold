@@ -16,14 +16,14 @@ use crate::core::internal_message::FutLoopPoll;
 
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
-    runtime: Arc<Runtime>,
+    // runtime: Arc<Runtime>,
     client: PublicClient,
 }
 
 impl TransactionSubmitter {
     pub fn default(
         client: PublicClient,
-        runtime: Arc<Runtime>,
+        // runtime: Arc<Runtime>,
         utxos: Vec<SpendableUTXO>,
     ) -> Self {
         let mut generator = TransactionGenerator::default(utxos.clone());
@@ -32,7 +32,7 @@ impl TransactionSubmitter {
         // }
         Self {
             generator: Arc::new(Mutex::new(generator)),
-            runtime,
+            // runtime,
             client,
         }
     }
@@ -50,13 +50,13 @@ impl TransactionSubmitter {
         // }
         Self {
             generator: Arc::new(Mutex::new(generator)),
-            runtime,
+            // runtime,
             client,
         }
     }
 
     fn spawn(&self, transaction: Transaction) -> JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>> {
-        let res = self.runtime.spawn({
+        let res = tokio::spawn({
             let c = self.client.clone();
             let tx = transaction.clone();
             async move {
@@ -92,7 +92,7 @@ impl TransactionSubmitter {
         transaction: Transaction,
         second_client: Option<PublicClient>,
     ) -> JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>> {
-        let res = self.runtime.spawn({
+        let res = tokio::spawn({
             let c = second_client.unwrap_or(self.client.clone());
             let tx = transaction.clone();
             async move {
@@ -103,27 +103,29 @@ impl TransactionSubmitter {
         res
     }
 
-    pub fn submit(&self) -> Result<SubmitTransactionResponse, ErrorInfo> {
+    pub async fn submit(&self) -> Result<SubmitTransactionResponse, ErrorInfo> {
         let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
-        let res = self.block(self.spawn(transaction.clone().transaction))?;
+        let res = self.client.clone().send_transaction(&transaction.clone().transaction, true).await?;
+        // let res = self.block(self.spawn(transaction.clone().transaction)).await?;
         // if res.clone().accepted() {
         self.generator.lock().unwrap().completed(transaction);
         // }
         Ok(res)
     }
 
-    pub fn drain(&self, to: Address) -> Result<SubmitTransactionResponse, ErrorInfo> {
+    pub async fn drain(&self, to: Address) -> Result<SubmitTransactionResponse, ErrorInfo> {
         let transaction = self.generator.lock().unwrap().drain_tx(&to).clone();
-        let res = self.block(self.spawn(transaction.clone()));
+        let res = self.block(self.spawn(transaction.clone())).await;
         res
     }
 
-    pub fn with_faucet(&self) -> FaucetResponse {
+    pub async fn with_faucet(&self) -> Result<FaucetResponse, ErrorInfo> {
         let pc = &self.client;
         let w = MnemonicWords::from_phrase("random").key_at(0);
         let a = w.address_typed();
-        let vec_a = a.address.safe_bytes().expect("a");
-        let res = self.runtime.block_on(pc.faucet(&a, true)).expect("faucet");
+        let vec_a = a.address.safe_bytes()?;
+        let res = //self.runtime.block_on(
+            pc.faucet(&a, true).await?;
         // let h = res.transaction_hash.expect("tx hash");
         // let q = self.runtime.block_on(pc.query_hash(h.hex())).expect("query hash");
         // let tx_info = q.transaction_info.expect("transaction");
@@ -141,28 +143,28 @@ impl TransactionSubmitter {
                 utxo_entry: utxos,
                 key_pair: w
             });
-        res
+        Ok(res)
     }
 
     // TODO: make interior here a function
-    pub fn submit_split(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
+    pub async fn submit_split(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
         let transaction = self.generator.lock().unwrap().generate_split_tx().clone();
         let mut h = vec![];
         for x in transaction {
             h.push((self.spawn(x.clone().transaction), x));
         }
-        self.await_results(h)
+        self.await_results(h).await
     }
 
     pub fn get_addresses(&self) -> Vec<Vec<u8>> {
         self.generator.lock().unwrap().get_addresses()
     }
 
-    pub(crate) fn submit_duplicate(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
+    pub async fn submit_duplicate(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
         let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
         let h1 = self.spawn(transaction.clone().transaction);
         let h2 = self.spawn(transaction.clone().transaction);
-        let dups = self.await_results(vec![(h1, transaction.clone()), (h2, transaction.clone())]);
+        let dups = self.await_results(vec![(h1, transaction.clone()), (h2, transaction.clone())]).await;
         info!("{}", serde_json::to_string(&dups.clone()).unwrap());
         assert!(dups.iter().any(|x| x.is_ok()));
         assert!(dups.iter().any(|x| !x.is_err()));
@@ -173,13 +175,13 @@ impl TransactionSubmitter {
         dups
     }
 
-    fn await_results(
+    async fn await_results(
         &self,
         handles: Vec<(JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>>, TransactionWithKey)>,
     ) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
         let mut results = vec![];
         for (h, transaction) in handles {
-            let res = self.block(h);
+            let res = self.block(h).await;
             if res.clone().is_ok() {
                 self.generator
                     .lock()
@@ -191,7 +193,7 @@ impl TransactionSubmitter {
         results
     }
 
-    pub(crate) fn submit_double_spend(
+    pub(crate) async fn submit_double_spend(
         &self,
         second_client: Option<PublicClient>,
     ) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
@@ -203,7 +205,7 @@ impl TransactionSubmitter {
             .clone();
         let h1 = self.spawn(t1.clone().transaction);
         let h2 = self.spawn_client(t2.clone().transaction, second_client);
-        let doubles = self.await_results(vec![(h1, t1.clone()), (h2, t2.clone())]);
+        let doubles = self.await_results(vec![(h1, t1.clone()), (h2, t2.clone())]).await;
         info!("Double spend test response: {}", serde_json::to_string(&doubles.clone()).unwrap());
 
         assert!(doubles.iter().any(|x| x.is_ok()));
@@ -223,7 +225,7 @@ impl TransactionSubmitter {
         doubles
     }
 
-    fn block(&self, jh: JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>>) -> Result<SubmitTransactionResponse, ErrorInfo> {
-        self.runtime.block_on(jh).error_info("submit joinhandle error")?
+    async fn block(&self, jh: JoinHandle<Result<SubmitTransactionResponse, ErrorInfo>>) -> Result<SubmitTransactionResponse, ErrorInfo> {
+        jh.await.error_info("submit joinhandle error")?
     }
 }

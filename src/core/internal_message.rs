@@ -126,6 +126,15 @@ pub fn new_channel<T>() -> Channel<T> {
 }
 
 
+pub fn new_bounded_channel<T>(cap: usize) -> Channel<T> {
+    let (s, r) = flume::bounded::<T>(cap);
+    return Channel {
+        sender: s,
+        receiver: r,
+    };
+}
+
+
 pub struct FutLoopPoll {
     pub futures: FuturesUnordered<JoinHandle<Result<(), ErrorInfo>>>
 }

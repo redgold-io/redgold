@@ -7,12 +7,12 @@ use redgold_schema::utxo_id::UtxoId;
 use crate::core::relay::Relay;
 
 use async_trait::async_trait;
-use futures::future;
+use futures::{future, TryFutureExt};
 use itertools::Itertools;
 use rocket::http::ext::IntoCollection;
 use tokio::join;
 use tokio::runtime::Runtime;
-use redgold_schema::{ErrorInfoContext, ProtoHashable, SafeOption, structs, TestConstants, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, structs, TestConstants, WithMetadataHashable};
 use crate::canary::run;
 use crate::genesis::create_genesis_transaction;
 
@@ -79,7 +79,9 @@ pub fn validate_single_result(hash: &Hash, response: Result<Response, ErrorInfo>
 }
 
 
-pub async fn resolve_input(input: Input, relay: Relay, runtime: Arc<Runtime>, peers: Vec<PublicKey>)
+pub async fn resolve_input(input: Input, relay: Relay,
+                           // , runtime: Arc<Runtime>,
+                           peers: Vec<PublicKey>)
         -> Result<ResolvedInput, ErrorInfo> {
     metrics::increment_counter!("redgold.transaction.resolve.input");
     let hash = input.transaction_hash.safe_get_msg("Missing transaction hash on input")?;
@@ -130,7 +132,9 @@ pub async fn resolve_input(input: Input, relay: Relay, runtime: Arc<Runtime>, pe
         resolve_request.output_index = Some(input.output_index);
         request.resolve_hash_request = Some(resolve_request);
         let results = Relay::broadcast(relay,
-            sorted_peers, request, runtime.clone(), Some(Duration::from_secs(10))
+            sorted_peers, request,
+                                       // runtime.clone(),
+                                       Some(Duration::from_secs(10))
         ).await;
         for (pk, result) in results {
             match validate_single_result(hash, result) {
@@ -242,14 +246,18 @@ impl ResolvedTransaction {
 // #[async_trait]
 // impl Resolver for Transaction {
 // TODO: This should also trigger downloads etc. / acceptance
-pub async fn resolve_transaction(tx: &Transaction, relay: Relay, runtime: Arc<Runtime>) -> Result<ResolvedTransaction, ErrorInfo> {
+pub async fn resolve_transaction(tx: &Transaction, relay: Relay
+                                 // , runtime: Arc<Runtime>
+) -> Result<ResolvedTransaction, ErrorInfo> {
     let peers = relay.ds.peer_store.active_nodes(None).await?;
     let mut resolved_internally = true;
     let mut vec = vec![];
 
     for result in future::join_all(tx.inputs.iter().map(|input|
-        runtime.spawn_err(resolve_input(input.clone(), relay.clone(),
-                                        runtime.clone(), peers.clone()))
+        async{tokio::spawn(resolve_input(input.clone(), relay.clone(),
+                                        // runtime.clone(),
+                                         peers.clone()))
+            .await.map_err(|e| error_info(e.to_string()))}
     ).collect_vec()).await {
         let result = result??;
         if !result.internal_accepted {

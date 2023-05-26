@@ -38,7 +38,7 @@ use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
 use crate::trust::rewards::Rewards;
 use crate::{canary, util};
-use crate::mparty::mp_server::{Db, MultipartyHandler};
+// use crate::mparty::mp_server::{Db, MultipartyHandler};
 use crate::canary::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
 use crate::core::seeds::SeedNode;
@@ -48,11 +48,12 @@ use crate::util::{auto_update, keys, metrics_registry};
 use crate::schema::constants::EARLIEST_TIME;
 use crate::schema::TestConstants;
 use crate::util::trace_setup::init_tracing;
+use tokio::task::spawn_blocking;
 
 #[derive(Clone)]
 pub struct Node {
     pub relay: Relay,
-    pub runtimes: NodeRuntimes,
+    // pub runtimes: NodeRuntimes,
 }
 
 #[derive(Clone)]
@@ -100,7 +101,9 @@ impl NodeInit {
 
 impl Node {
 
-    pub fn start_services(relay: Relay, runtimes: NodeRuntimes) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
+    pub async fn start_services(relay: Relay
+                                // , runtimes: NodeRuntimes
+    ) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
         let mut join_handles = vec![];
         let node_config = relay.node_config.clone();
 
@@ -112,27 +115,25 @@ impl Node {
 
         let jh_ctrl = control_api::ControlServer {
             relay: relay.clone(),
-            // p2p_client: p2p.client.clone(),
-            runtime: runtimes.control_api.clone(),
         }
             .start();
 
         join_handles.push(jh_ctrl);
 
-        let peer_tx_jh = PeerOutgoingEventHandler::new(relay.clone(), runtimes.p2p.clone());
+        let peer_tx_jh = PeerOutgoingEventHandler::new(
+            relay.clone(),
+        );
         join_handles.push(peer_tx_jh);
 
         let tx_p_jh = TransactionProcessContext::new(
             relay.clone(),
-            runtimes.transaction_process_context.clone(),
-            runtimes.transaction_process.clone(),
         );
         join_handles.push(tx_p_jh);
 
-        // TODO: Replace with readiness probe.
-        runtimes
-            .auxiliary
-            .block_on(async { sleep(Duration::new(3, 1)).await });
+        info!("Before sleep");
+        let dur = tokio::time::Duration::from_secs(3);
+        tokio::time::sleep(dur).await;
+        info!("After sleep");
 
 
         // TODO: Monitor this join handle for errors.
@@ -145,33 +146,34 @@ impl Node {
         // relay.clone().node_state.store(NodeState::Downloading);
 
 
-        let ojh = ObservationBuffer::new(relay.clone(), runtimes.auxiliary.clone());
+        let ojh = ObservationBuffer::new(relay.clone()).await;
         join_handles.push(ojh);
 
         // Rewards::new(relay.clone(), runtimes.auxiliary.clone());
 
         join_handles.push(PeerRxEventHandler::new(
             relay.clone(),
-            runtimes.auxiliary.clone(),
+            // runtimes.auxiliary.clone(),
         ));
 
-        join_handles.push(public_api::start_server(relay.clone(), runtimes.public_api.clone()));
+        join_handles.push(public_api::start_server(relay.clone(),
+                                                   // runtimes.public_api.clone()
+        ));
         let obs_handler = ObservationHandler{relay: relay.clone()};
-        join_handles.push(runtimes.auxiliary.spawn(async move { obs_handler.run().await }));
-
-        let mut mph = MultipartyHandler::new(
-            relay.clone(),
-            runtimes.auxiliary.clone()
-        );
-        join_handles.push(runtimes.auxiliary.spawn(async move { mph.run().await }));
+        join_handles.push(tokio::spawn(async move { obs_handler.run().await }));
+        //
+        // let mut mph = MultipartyHandler::new(
+        //     relay.clone(),
+        //     // runtimes.auxiliary.clone()
+        // );
+        // join_handles.push(tokio::spawn(async move { mph.run().await }));
 
         let sm_port = relay.node_config.mparty_port();
-        join_handles.push(runtimes.auxiliary
-            .spawn(async move { gg20_sm_manager::run_server(sm_port)
+        join_handles.push(tokio::spawn(async move { gg20_sm_manager::run_server(sm_port)
                 .await.map_err(|e| error_info(e.to_string())) }));
 
 
-        let relay_c = relay.clone();
+        // let relay_c = relay.clone();
         // let amh = runtimes.async_multi.spawn(async move {
         //     let r = relay_c.clone();
         //     let blocks = BlockFormationProcess::default(r.clone()).await?;
@@ -186,7 +188,7 @@ impl Node {
         // join_handles.push(amh);
         let c_config = relay.clone();
         if node_config.canary_enabled {
-            let cwh = runtimes.canary_watcher.spawn_blocking(move || { canary::run(c_config) });
+            let cwh = spawn_blocking(move || { canary::run(c_config) });
             join_handles.push(cwh);
         }
 
@@ -194,11 +196,17 @@ impl Node {
         join_handles
     }
 
-    pub fn prelim_setup(relay2: Relay, runtimes: NodeRuntimes) -> Result<(), ErrorInfo> {
+    pub async fn prelim_setup(
+        relay2: Relay,
+        // runtimes: NodeRuntimes
+    ) -> Result<(), ErrorInfo> {
         let mut relay = relay2.clone();
         let node_config = relay.node_config.clone();
 
-        let migration_result = runtimes.auxiliary.block_on(relay.ds.run_migrations());
+        let migration_result =
+            // runtimes.auxiliary.block_on(
+                relay.ds.run_migrations().await;
+            // );
         if let Err(e) = migration_result {
             log::error!("Migration related failure, attempting to handle");
             if e.message.contains("was previously applied") &&
@@ -270,12 +278,14 @@ impl Node {
         (tx, res)
     }
 
-    pub fn from_config(relay: Relay, runtimes: NodeRuntimes) -> Result<Node, ErrorInfo> {
+    pub async fn from_config(relay: Relay
+                       // , runtimes: NodeRuntimes
+    ) -> Result<Node, ErrorInfo> {
         // Inter thread communication
 
         let mut node = Self {
             relay: relay.clone(),
-            runtimes: runtimes.clone(),
+            // runtimes: runtimes.clone(),
         };
 
         let node_config = relay.node_config.clone();
@@ -305,13 +315,17 @@ impl Node {
                 info!("Genesis local test multiple kp");
 
                 let tx = Node::genesis_from(node_config.clone()).0;
-                runtimes.auxiliary.block_on(relay.ds.config_store.insert_update_json("genesis", tx.json()?))?;
-                let _res_err = runtimes.auxiliary.block_on(
+
+
+                // runtimes.auxiliary.block_on(
+                relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
+                let _res_err =
+                    // runtimes.auxiliary.block_on(
                     relay
                         .ds
                         .transaction_store
-                        .insert_transaction(&tx, EARLIEST_TIME, true, None)
-                );
+                        .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None)
+                .await?;
             // }
             // .expect("Genesis inserted or already exists");
 
@@ -320,7 +334,10 @@ impl Node {
             info!("Starting from seed nodes");
             let seed = if node_config.main_stage_network() {
                 info!("Querying LB for node info");
-                let a = runtimes.auxiliary.block_on(node_config.lb_client().about())?;
+                let a =
+                    // runtimes.auxiliary.block_on(
+                    node_config.lb_client().about().await?;
+                    // )?;
                 let tx = a.latest_metadata.safe_get_msg("Missing latest metadata from seed node")?;
                 let pd = tx.outputs.get(0).expect("a").data.as_ref().expect("d").peer_data.as_ref().expect("pd");
                 let nmd = pd.node_metadata.get(0).expect("nmd");
@@ -341,13 +358,18 @@ impl Node {
             let port = seed.port_offset.unwrap() + 1;
             let client = PublicClient::from(seed.external_address.clone(), port);
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
-            let result = runtimes.auxiliary.block_on(client.about());
+            let result =
+                // runtimes.auxiliary.block_on(
+                    client.about().await;
+                // );
             let peer_tx = result?.latest_metadata.safe_get()?.clone();
 
             info!("Got LB node info {}, adding peer", redgold_schema::json(&peer_tx)?);
             // Local debug mode
             // First attempt to insert all trust scores for seeds and ignore conflict
-            let result2 = runtimes.auxiliary.block_on(relay.ds.peer_store.add_peer(&peer_tx, 1f64));
+            let result2 =
+                // runtimes.auxiliary.block_on(
+                    relay.ds.peer_store.add_peer(&peer_tx, 1f64).await; //);
             info!("Peer add result: {:?}", result2);
             result2?;
 
@@ -368,10 +390,10 @@ impl Node {
             let key = data.node_metadata[0].public_key_bytes()?;
             // TODO Change this invocation to an .into() in a non-schema key module
             let pk = keys::public_key_from_bytes(&key).expect("works");
-            runtimes.auxiliary.block_on(download::download(
+            download::download(
                 relay.clone(),
                 pk
-            ));
+            ).await;
         }
 
         info!("Node ready");
@@ -388,21 +410,32 @@ pub struct LocalTestNodeContext {
     node: Node,
     public_client: PublicClient,
     control_client: ControlClient,
-    futures: Vec<JoinHandle<Result<(), ErrorInfo>>>
+    // futures: Vec<JoinHandle<Result<(), ErrorInfo>>>
 }
 
 impl LocalTestNodeContext {
-    fn new(id: u16, random_port_offset: u16, seed: Option<SeedNode>) -> Self {
+    async fn new(id: u16, random_port_offset: u16, seed: Option<SeedNode>) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.port_offset = random_port_offset;
         for x in seed {
             node_config.seeds = vec![x];
         }
-        let runtimes = NodeRuntimes::default();
-        let mut relay = runtimes.auxiliary.block_on(Relay::new(node_config.clone()));
-        Node::prelim_setup(relay.clone(), runtimes.clone()).expect("prelim");
-        let futures = Node::start_services(relay.clone(), runtimes.clone());
-        let result = Node::from_config(relay.clone(), runtimes);
+        // let runtimes = NodeRuntimes::default();
+        let mut relay = Relay::new(node_config.clone()).await;
+        Node::prelim_setup(relay.clone()
+                           // , runtimes.clone()
+        ).await.expect("prelim");
+        info!("Test starting node services");
+        let futures = Node::start_services(relay.clone()).await;
+        tokio::spawn(async move {
+            let (res, _, _) = futures::future::select_all(futures).await;
+            panic!("Node service failed in test: {:?}", res);
+        });
+        info!("Test completed starting node services");
+
+        let result = Node::from_config(relay.clone()).await;
+                                       // , runtimes
+        // ).await;
         let node = result
             // .await
             .expect("Node start fail");
@@ -412,7 +445,7 @@ impl LocalTestNodeContext {
             node: node.clone(),
             public_client: PublicClient::local(node.relay.node_config.public_port()),
             control_client: ControlClient::local(node.relay.node_config.control_port()),
-            futures
+            // futures
         }
     }
 }
@@ -435,15 +468,15 @@ struct LocalNodes {
 }
 
 impl LocalNodes {
-    fn shutdown(&self) {
-        for x in &self.nodes {
-            x.node.runtimes.shutdown();
-            for jh in &x.futures {
-                jh.abort();
-                // std::mem::drop(jh);
-            }
-        }
-    }
+    // fn shutdown(&self) {
+    //     for x in &self.nodes {
+    //         x.node.runtimes.shutdown();
+    //         for jh in &x.futures {
+    //             jh.abort();
+    //             // std::mem::drop(jh);
+    //         }
+    //     }
+    // }
 
     fn start(&self) -> &LocalTestNodeContext {
         self.nodes.get(0).unwrap()
@@ -451,16 +484,21 @@ impl LocalNodes {
     fn current_seed_id(&self) -> u16 {
         self.nodes.len() as u16
     }
-    fn new(runtime: Arc<Runtime>, offset: Option<u16>) -> LocalNodes {
+    async fn new(
+        // runtime: Arc<Runtime>,
+        offset: Option<u16>) -> LocalNodes {
         let port_offset = offset.unwrap_or(util::random_port());
-        let path = NodeConfig::memdb_path(&(0 as u16));
-        let store = runtime.block_on(DataStore::from_path(path));
+        // TODO: Lets avoid this and write them out to disk, or is that done already and this can be removed?
+        // let path = NodeConfig::memdb_path(&(0 as u16));
+        // let store =
+        //     // runtime.block_on(
+        //         DataStore::from_path(path).await;//);
         // let connection =
         //     // runtime.block_on(
         //         store.create_all_err_info()
         //     // )
         //     .expect("test failure create tables");
-        let start = LocalTestNodeContext::new(0, port_offset, None); //.await;
+        let start = LocalTestNodeContext::new(0, port_offset, None).await;
         LocalNodes {
             connections: vec![], //connection],
             current_seed: SeedNode {
@@ -582,10 +620,10 @@ impl LocalNodes {
         }
     }
 
-    fn add_node(&mut self, runtime: Arc<Runtime>) {
+    async fn add_node(&mut self) {
         let port_offset = util::random_port();
         let path = NodeConfig::memdb_path(&self.current_seed_id());
-        let store = runtime.block_on(DataStore::from_path(path));
+        let store = DataStore::from_path(path).await;
         let connection =
             // runtime.block_on(
             store.create_all_err_info()
@@ -595,8 +633,7 @@ impl LocalNodes {
             self.current_seed_id(),
             port_offset,
             Some(self.current_seed.clone()),
-        );
-        // .await;
+        ).await;
 
         info!(
             "Number of transactions after localnodetestcontext {}",
@@ -613,50 +650,60 @@ impl LocalNodes {
         self.connections.push(connection);
     }
 }
+//
+// #[ignore]
+// #[test]
+// fn debug_err() {
+//
+//     let runtime = build_runtime(10, "e2e");
+//     util::init_logger().ok(); //.expect("log");
+//     metrics_registry::register_metric_names();
+//     metrics_registry::init_print_logger();
+//     let _tc = TestConstants::new();
+//
+//     // testing part here debug
+//     let mut node_config = NodeConfig::from_test_id(&0);
+//     node_config.port_offset = 15000;
+//     let runtimes = NodeRuntimes::default();
+//     let mut relay = runtimes.auxiliary.block_on(Relay::new(node_config.clone()));
+//     Node::prelim_setup(relay.clone()
+//                        // , runtimes.clone()
+//     ).expect("prelim");
+//     // Node::start_services(relay.clone(), runtimes.clone());
+//     let result = Node::from_config(relay.clone(), runtimes);
+//     info!("wtf");
+//     let node = result;
+//         // .expect("Node start fail");
+//
+//     match node {
+//         Ok(_) => {
+//             info!("Success");
+//         }
+//         Err(e) => {
+//             info!("Node result: {:?}", e);
+//         }
+//     }
+//
+//
+// }
 
-#[ignore]
-#[test]
-fn debug_err() {
 
-    let runtime = build_runtime(10, "e2e");
-    util::init_logger().ok(); //.expect("log");
-    metrics_registry::register_metric_names();
-    metrics_registry::init_print_logger();
-    let _tc = TestConstants::new();
-
-    // testing part here debug
-    let mut node_config = NodeConfig::from_test_id(&0);
-    node_config.port_offset = 15000;
-    let runtimes = NodeRuntimes::default();
-    let mut relay = runtimes.auxiliary.block_on(Relay::new(node_config.clone()));
-    Node::prelim_setup(relay.clone(), runtimes.clone()).expect("prelim");
-    // Node::start_services(relay.clone(), runtimes.clone());
-    let result = Node::from_config(relay.clone(), runtimes);
-    info!("wtf");
-    let node = result;
-        // .expect("Node start fail");
-
-    match node {
-        Ok(_) => {
-            info!("Success");
-        }
-        Err(e) => {
-            info!("Node result: {:?}", e);
-        }
-    }
-
-
-}
-
+// #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[test]
 fn e2e() {
+    let runtime = build_runtime(8, "e2e");
+    runtime.block_on(e2e_async()).expect("e2e");
+}
+
+
+async fn e2e_async() -> Result<(), ErrorInfo> {
     // hot dog
     // let do_run = std::env::var("CI");
     // if do_run.is_ok() {
     //     return;
     // }
 
-    let runtime = build_runtime(10, "e2e");
+    // let runtime = build_runtime(10, "e2e");
     util::init_logger().ok(); //.expect("log");
     metrics_registry::register_metric_names();
     metrics_registry::init_print_logger();
@@ -667,8 +714,11 @@ fn e2e() {
     // runtime.block_on(async { sleep(Duration::new(3, 1)).await });
 
     //
-    let mut local_nodes = LocalNodes::new(runtime.clone(), None);
+    let mut local_nodes = LocalNodes::new(
+        // runtime.clone(),
+        None).await;
     let start_node = local_nodes.start().clone();
+    info!("Started initial node");
     let client1 = start_node.control_client.clone();
 
     let ds = start_node.node.relay.ds.clone();
@@ -694,9 +744,12 @@ fn e2e() {
     info!("Num utxos from genesis {:?}", utxos.len());
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
-    let submit = TransactionSubmitter::default(client.clone(), runtime.clone(), spend_utxos);
+    let submit = TransactionSubmitter::default(client.clone(),
+                                               // runtime.clone(),
+                                               spend_utxos
+    );
 
-    let _result = submit.submit();
+    let _result = submit.submit().await;
     info!("First submit response: {}", _result.json_pretty_or());
     assert!(_result.is_ok());
 
@@ -713,11 +766,12 @@ fn e2e() {
     info!("Num utxos after first submit {:?}", utxos.len());
 
 
-    let faucet_res = submit.with_faucet();
+    // Exception bad access on this on the json decoding? wtf?
+    let faucet_res = submit.with_faucet().await?;
     info!("Faucet response: {}", faucet_res.json_pretty_or());
     assert!(faucet_res.acceptance_proofs.len() > 0);
 
-    let _result2 = submit.submit();
+    let _result2 = submit.submit().await;
     assert!(_result2.is_ok());
     show_balances();
 
@@ -744,21 +798,25 @@ fn e2e() {
     //     show_balances();
     // }
 
-    let addr = runtime.block_on(client.query_addresses(submit.get_addresses()));
+    let addr =
+        // runtime.block_on(
+            client.query_addresses(submit.get_addresses()).await;
 
     info!("Address response: {:?}", addr);
 
-    runtime.block_on(local_nodes.verify_data_equivalent());
+    local_nodes.verify_data_equivalent().await;
 
-    local_nodes.add_node(runtime.clone());
-    runtime.block_on(local_nodes.verify_data_equivalent());
+    local_nodes.add_node(
+        // runtime.clone()
+    ).await;
+    local_nodes.verify_data_equivalent().await;
     // //
     // let after_node_added = submit.submit();
     // assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")
     //     .observation_proofs.len());
 
 
-    let res = runtime.block_on(client1.multiparty_keygen(None));
+    let res = client1.multiparty_keygen(None).await;
     println!("{:?}", res);
     /*
     "protocol execution terminated with error: handle received message: received message didn't pass pre-validation: got message which was sent by this party"
@@ -771,8 +829,8 @@ fn e2e() {
     let signing_data = Hash::from_string("hey");
     let vec1 = signing_data.vec();
     let vec = bytes_data(vec1.clone()).expect("");
-    let res = runtime.block_on(
-        client1.multiparty_signing(None, party.initial_request, vec));
+    let res =
+        client1.multiparty_signing(None, party.initial_request, vec).await;
     println!("{:?}", res);
     assert!(res.is_ok());
     res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
@@ -815,12 +873,13 @@ fn e2e() {
     // runtime.shutdown_background();
 
 
-    local_nodes.shutdown();
+    // local_nodes.shutdown();
 
     // std::mem::forget(nodes);
     std::mem::forget(local_nodes);
-    std::mem::forget(runtime);
+    // std::mem::forget(runtime);
     std::mem::forget(submit);
+    Ok(())
 }
 
 #[ignore]
