@@ -37,7 +37,7 @@ jobs:
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
-      - run: ./bin/test.sh
+      - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
   build-linux:
 #    needs: [test]
     if:
@@ -73,7 +73,7 @@ jobs:
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
-      - run: ./bin/test.sh
+      - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
       - run: cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux
 
@@ -245,7 +245,7 @@ jobs:
         with:
           files: |
             redgold_linux
-            redgold_mac
+#            redgold_mac
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           body: "
