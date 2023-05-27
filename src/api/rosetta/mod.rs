@@ -83,6 +83,8 @@ async fn rosetta_relay() -> Relay {
 async fn test() {
 
     let relay = rosetta_relay().await;
+    let tc = TestConstants::new();
+
     let mut req = AccountBalanceRequest {
         network_identifier: NetworkIdentifier {
             blockchain: "".to_string(),
@@ -110,10 +112,9 @@ async fn test() {
 
     req.network_identifier.blockchain = Rosetta::redgold_blockchain();
     run_test_request(req.clone(), |resp: Error| {
-        assert_eq!(resp.code, 21)
+        assert_eq!(resp.code, 14)
     }, relay.clone(), "account/balance".to_string(), srv.clone()).await;
 
-    let tc = TestConstants::new();
     req.account_identifier.address = tc.address_1.render_string().expect("addr");
 
     relay.ds.run_migrations().await.expect("migrate");

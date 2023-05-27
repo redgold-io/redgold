@@ -50,6 +50,7 @@ impl Address {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
         let addr = Self::new(bytes);
         addr.verify_checksum()?;
+
         Ok(addr)
     }
 
@@ -74,7 +75,16 @@ impl Address {
         Self::with_checksum(bytes)
     }
 
+    pub fn verify_length(&self) -> Result<(), ErrorInfo> {
+        let i = self.address.safe_bytes()?.len();
+        if i != 32 {
+            Err(error_info(format!("Invalid address length: {:?}", i)))?;
+        }
+        Ok(())
+    }
+
     pub fn verify_checksum(&self) -> Result<(), ErrorInfo> {
+        self.verify_length()?;
         let bytes = self.address.safe_bytes()?;
         if Self::with_checksum(bytes[0..28].to_vec()) != bytes {
             Err(error_info("Invalid address checksum bytes"))?;
