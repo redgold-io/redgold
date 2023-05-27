@@ -27,7 +27,7 @@ impl ServiceInfo {
                 None::<Option<String>>.expect("true");
             }
         }
-        Err(ErrorInfo::error_info("service 1 error"))
+        // Err(ErrorInfo::error_info("service 1 error"))
     }
 }
 
@@ -49,17 +49,17 @@ fn start_func() {
 #[ignore]
 #[test]
 fn start() {
-    util::init_logger();
+    util::init_logger().ok();
 
     let rt = build_runtime(5, "test");
-    let mut jh = rt.spawn(async {
+    let jh = rt.spawn(async {
         let mut info = ServiceInfo {
             count: 0,
             break_count: 2
         };
         info.service_one().await
     });
-    let mut jh2 = rt.spawn(async {
+    let jh2 = rt.spawn(async {
         let mut info = ServiceInfo {
             count: 10,
             break_count: 15

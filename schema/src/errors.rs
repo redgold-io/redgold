@@ -10,6 +10,8 @@ impl ErrorInfo {
             success: false,
             error_info: Some(self),
             task_local_details: vec![],
+            request_uuid: None,
+            response_uuid: None,
         }
     }
 }

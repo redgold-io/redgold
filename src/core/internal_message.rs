@@ -135,84 +135,16 @@ pub fn new_bounded_channel<T>(cap: usize) -> Channel<T> {
 }
 
 
-pub struct FutLoopPoll {
-    pub futures: FuturesUnordered<JoinHandle<Result<(), ErrorInfo>>>
-}
-
-impl FutLoopPoll {
-
-    pub fn new() -> FutLoopPoll {
-        FutLoopPoll {
-            futures: FuturesUnordered::new()
+pub fn map_fut(r: Option<Result<Result<(), ErrorInfo>, JoinError>>) -> Result<(), ErrorInfo> {
+    match r {
+        None => {
+            Ok(())
+        }
+        Some(resres) => {
+            resres.map_err(|je| ErrorInfo::error_info(
+                format!("Panic in loop runner thread {}", je.to_string())
+            ))??;
+            Ok(())
         }
     }
-
-    pub async fn run<T, F>(
-        &mut self, receiver: flume::Receiver<T>, func: F
-    )-> Result<(), ErrorInfo>
-        where T: Sized + Send,
-    F: FnOnce(T) -> JoinHandle<Result<(), ErrorInfo>> + Copy
-    {
-
-        let mut futures = &mut self.futures;
-
-        loop {
-            let loop_sel_res = select! {
-                msg = receiver.recv_async_err() => {
-                    let msg_actual: T = msg?;
-                    futures.push(func(msg_actual));
-                    Ok(())
-                }
-                res = futures.next() => {
-                    Self::map_fut(res)?;
-                    Ok(())
-                }
-            };
-            loop_sel_res?;
-        }
-    }
-
-    pub fn map_fut(r: Option<Result<Result<(), ErrorInfo>, JoinError>>) -> Result<(), ErrorInfo> {
-        match r {
-            None => {
-                Ok(())
-            }
-            Some(resres) => {
-                resres.map_err(|je| ErrorInfo::error_info(
-                    format!("Panic in loop runner thread {}", je.to_string())
-                ))??;
-                Ok(())
-            }
-        }
-    }
-
-    /// This JoinHandle spawn is (likely) necessary to ensure parallel task execution in the loop
-    /// It should only spawn additional tasks, not threads
-    pub async fn run_fut<T, F, Fut, FutBound>(
-        &mut self, fut: Fut, func: F
-    )-> Result<(), ErrorInfo>
-        where
-        FutBound: Future<Output=T> + Sized,
-    Fut: (FnOnce() -> FutBound) + Copy,
-    F: FnOnce(T) -> JoinHandle<Result<(), ErrorInfo>> + Copy
-    {
-
-        let mut futures = &mut self.futures;
-
-        loop {
-            let loop_sel_res = select! {
-                msg = fut() => {
-                    futures.push(func(msg));
-                    Ok(())
-                }
-                res = futures.next() => {
-                    Self::map_fut(res)?;
-                    Ok(())
-                }
-            };
-            loop_sel_res?;
-        }
-    }
-
-
 }

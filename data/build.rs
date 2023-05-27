@@ -24,7 +24,7 @@ async fn init_db() {
 
     // TODO: Remove this when migrating to sqlx as sqlx can't seem to create a table ? as otherwise
     let conn = Connection::open(path.clone()).expect("Open");
-    let res = conn.execute(
+    let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS temp_debug (
                   test INTEGER PRIMARY KEY
                   )",

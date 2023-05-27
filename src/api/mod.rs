@@ -104,13 +104,12 @@ impl RgHttpClient {
         Ok(deser)
     }
 
-    pub async fn proto_post_request(&self, r: Request, nc: Option<NodeConfig>) -> Result<Response, ErrorInfo> {
-        let mut r = r.clone();
+    pub async fn proto_post_request(&self, r: &mut Request, nc: Option<NodeConfig>) -> Result<Response, ErrorInfo> {
         if let Some(nc) = nc {
             r.with_metadata(nc.node_metadata());
             r.with_auth(&nc.internal_mnemonic().active_keypair());
         }
-        let result = self.proto_post(&r, "request_proto".to_string()).await?;
+        let result = self.proto_post(r, "request_proto".to_string()).await?;
         result.as_error_info()?;
         Ok(result)
     }
@@ -128,7 +127,7 @@ impl RgHttpClient {
     pub async fn get_peers(&self) -> Result<Response, ErrorInfo> {
         let mut req = Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-        Ok(self.proto_post_request(req, None).await?)
+        Ok(self.proto_post_request(&mut req, None).await?)
     }
 
 }

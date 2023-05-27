@@ -1,5 +1,5 @@
 use crate::structs::{Block, Error, ErrorInfo, Hash, StructMetadata};
-use crate::{error_message};
+use crate::{error_message, SafeOption};
 use crate::{HashClear, SafeBytesAccess};
 use crate::{ProtoHashable, WithMetadataHashableFields};
 
@@ -11,16 +11,12 @@ impl HashClear for Block {
 }
 
 impl WithMetadataHashableFields for Block {
-    fn set_hash(&mut self, hash: Hash) {
-        self.hash = Some(hash);
+    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata> {
+        self.struct_metadata.as_mut()
     }
 
-    fn stored_hash_opt(&self) -> Option<Hash> {
-        self.hash.clone()
-    }
-
-    fn struct_metadata_opt(&self) -> Option<StructMetadata> {
-        self.struct_metadata.clone()
+    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata> {
+        self.struct_metadata.as_ref()
     }
 }
 
@@ -63,9 +59,11 @@ impl Block {
     pub fn time(&self) -> Result<i64, ErrorInfo> {
         Ok(self
             .struct_metadata
-            .as_ref()
-            .ok_or(error_message(Error::MissingField, "struct_metadata"))?
-            .time)
+            .safe_get()?
+            .time
+            .safe_get()?
+            .clone()
+        )
     }
 
     pub fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {

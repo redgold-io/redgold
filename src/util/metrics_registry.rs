@@ -50,17 +50,19 @@ pub fn register_metric_names() {
     register_counter!("redgold.datastore.utxo.insert");
 
     register_counter!("redgold.api.control.num_requests");
-    register_counter!("redgold.libp2p.total_established_connections");
-    register_counter!("redgold.libp2p.inbound_request");
     register_counter!("redgold.blocks.created");
     register_counter!("redgold.api.rosetta.account_balance");
     register_counter!("redgold.api.rosetta.account_coins");
-    register_gauge!("redgold.libp2p.active_connections");
 
     register_gauge!("redgold.canary.num_peers");
     register_counter!("redgold.canary.failure");
     register_counter!("redgold.canary.success");
     register_counter!("redgold.peer.message.received");
+
+    // register_gauge!("redgold.libp2p.active_connections");
+    // register_counter!("redgold.libp2p.total_established_connections");
+    // register_counter!("redgold.libp2p.inbound_request");
+
 
 }
 

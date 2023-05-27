@@ -145,7 +145,7 @@ impl SSH {
 
             let mut zero_vec = vec![1u8; available as usize];
             // let mut buffer = [1u8; 1000];
-            let mut buffer = &mut *zero_vec;
+            let buffer = &mut *zero_vec;
             let bytes_read = channel.read(&mut buffer[..]).expect("works");
             let s = String::from_utf8_lossy(&buffer[..bytes_read]);
             let x = &s;
@@ -176,7 +176,7 @@ impl SSH {
             let available = channel.read_window().available;
             if available > 0 {
                 let mut zero_vec = vec![1u8; available as usize];
-                let mut buffer = &mut *zero_vec;
+                let buffer = &mut *zero_vec;
                 let bytes_read = channel.read(&mut buffer[..]).expect("works");
                 let s = String::from_utf8_lossy(&buffer[..bytes_read]);
                 let x = &s;

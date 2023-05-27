@@ -353,19 +353,31 @@ message Transaction {
   repeated Output outputs = 2;
   StructMetadata struct_metadata = 3;
   TransactionOptions options = 4;
-  // TODO: Move these into structMetadata
-  Hash hash = 5;
-  Hash sign_hash = 6;
-  Hash counter_party_hash = 7;
+
 }
 
 message BlockMetadata {
 }
 
-// Move hash into here?
+// Information about the data type itself, such as time produced and hash representations of it
 message StructMetadata {
-  int64 time = 1;
+  // If present, represents some time related information that should be signed, typically transaction origination time
+  optional int64 time = 1;
+  // The version of the object, used for backwards / forward compatability and to determine which fields are present
   int32 version = 2;
+  // The hash of the object data, excluding any witness information, object should be cleared of other fields
+  // or hydration related fields before signing.
+  // This is equivalent to the SegWit hash.
+  Hash hash = 5;
+  // The hash of the object after being signed once, this is the hash that includes the witness data / signature data.
+  // This is equivalent to the hash of a transaction containing witness data ala standard ETH transaction.
+  Hash sign_hash = 6;
+  // The hash of the object after being signed twice, includes witness data from a counter-signature from an
+  // accepting party. Used for transaction contracts that require counter party acceptance
+  Hash counter_party_hash = 7;
+  // The hash of the object after being signed three times, includes witness data from original signer,
+  // counter-signer accepting party, and a final signature from the original of the counter party hashed object.
+  Hash confirmation_hash = 8;
 }
 
 message AddressBlock {
@@ -420,15 +432,19 @@ enum ValidationType {
 }
 
 
-// Update all these hashes / structmetadata fields.
+// Metadata associated with some node observing and validating data associated with some hash
 message ObservationMetadata {
+  // The data under consideration which has had some validation performed for it.
   Hash observed_hash = 1;
+  // Whether or not we have fully resolved all prior dependencies associated with the data internally
   ValidationType observation_type = 2;
+  // How much we have accepted this data, whether or not sufficient time has passed to consider it confirmed
   optional State state = 3;
+  // The degree of certainty associated with our validation, based on trustworthiness of information received from
+  // other peers
   TrustData validation_confidence = 4;
+  // Information about this object itself, such as time produced and hash representations of it
   StructMetadata struct_metadata = 5;
-  Hash hash = 6;
-  // Need to include some kind of information here associated with conflict ratio / trust rating.
 }
 
 
@@ -442,8 +458,7 @@ message Observation {
   // Signature associated with node key
   Proof proof = 3;
   StructMetadata struct_metadata = 4;
-  // Hash of this data structure
-  Hash hash = 5;
+  // TODO: These can be removed after unifying to transaction ?
   int64 salt = 6;
   int64 height = 7;
   // Hash of the preceding observation reference
@@ -686,6 +701,8 @@ message Request {
   SubmitTransactionRequest submit_transaction_request = 11;
   UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
   QueryObservationProofRequest query_observation_proof_request = 13;
+  HashSearchRequest hash_search_request = 14;
+  optional string uuid = 15;
 }
 
 message Response {
@@ -702,6 +719,7 @@ message Response {
   SubmitTransactionResponse submit_transaction_response = 9;
   UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
   QueryObservationProofResponse query_observation_proof_response = 11;
+  HashSearchResponse hash_search_response = 12;
 }
 
 message QueryTransactionRequest {
@@ -782,9 +800,7 @@ message FaucetRequest {
 }
 // Should this just be transactionInfo?
 message FaucetResponse {
-  // Todo query_transactionResponse?
-  Transaction transaction = 1;
-  repeated ObservationProof acceptance_proofs = 2;
+  SubmitTransactionResponse submit_transaction_response = 1;
 }
 
 message RecentTransactionsRequest {}
@@ -864,6 +880,7 @@ message ErrorInfo {
   repeated ErrorDetails details = 5;
   bool retriable = 6;
   string stacktrace = 7;
+  string lib_message = 8;
 }
 
 message TaskLocalDetails {
@@ -875,6 +892,8 @@ message ResponseMetadata {
   bool success = 1;
   ErrorInfo error_info = 2;
   repeated TaskLocalDetails task_local_details = 3;
+  optional string request_uuid = 4;
+  optional string response_uuid = 5;
 }
 //
 //message AddPeerFullRequest {

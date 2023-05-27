@@ -12,7 +12,7 @@ use std::time::Duration;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use redgold_schema::structs::ErrorInfo;
-use crate::core::internal_message::FutLoopPoll;
+use crate::core::internal_message;
 use crate::core::relay::Relay;
 use crate::node::{Node, NodeRuntimes};
 use crate::util::cli::arg_parse_config::ArgTranslate;
@@ -29,13 +29,13 @@ pub async fn main_from_args(opts: RgArgs) {
     let mut arg_translate = ArgTranslate::new(
         // simple_runtime.clone(),
         &opts, node_config.clone());
-    &arg_translate.run().expect("arg translation");
+    let _ = &arg_translate.run().expect("arg translation");
     node_config = arg_translate.node_config.clone();
     node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
 
 
-    /// Commands required to run separate from the logging system initialization
-    /// TODO: Consider disabling logging for these commands and instead unifying them?
+    // Commands required to run separate from the logging system initialization
+    // TODO: Consider disabling logging for these commands and instead unifying them?
     if arg_parse_config::immediate_commands(&opts, &node_config,
                                             // simple_runtime.clone()
     ).await {
@@ -66,7 +66,7 @@ pub async fn main_from_args(opts: RgArgs) {
                     .expect("GUI to start");
                 return;
             }
-            let mut arg_translate = ArgTranslate::new(
+            let arg_translate = ArgTranslate::new(
                 // simple_runtime.clone(),
                 &opts, node_config.clone()
             );
@@ -76,12 +76,12 @@ pub async fn main_from_args(opts: RgArgs) {
             }
 
             // let runtimes = NodeRuntimes::default(); simple_runtime.block_on(
-            let mut relay = Relay::new(node_config.clone()).await;
+            let relay = Relay::new(node_config.clone()).await;
 
             Node::prelim_setup(relay.clone(),
                                // runtimes.clone()
             ).await.expect("prelim");
-            let mut join_handles = Node::start_services(relay.clone()
+            let join_handles = Node::start_services(relay.clone()
                                                         // , runtimes.clone()
             ).await;
             let mut futures = FuturesUnordered::new();
@@ -95,7 +95,7 @@ pub async fn main_from_args(opts: RgArgs) {
                 Ok(_) => {
                     info!("Node startup successful");
                     // loop {
-                        match FutLoopPoll::map_fut(futures.next().await) {
+                        match internal_message::map_fut(futures.next().await) {
                             Ok(_) => {
                                 error!("Some sub-service has terminated cleanly");
                             }

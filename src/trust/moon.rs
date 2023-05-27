@@ -31,7 +31,7 @@ pub fn load_moons() -> Vec<u64> {
         )
         .unwrap();
 
-        let local = Local::today().timezone();
+        let local = Local::now().timezone();
         let dt2 = dt.with_timezone(&local);
         let timestamp = dt2.timestamp();
         if timestamp > 0 {
@@ -49,8 +49,8 @@ pub fn load_moons() -> Vec<u64> {
 }
 
 fn unix_to_local_date(unix: u64) -> DateTime<Local> {
-    let local = Local::today().offset().clone();
-    let dt = DateTime::<Local>::from_utc(NaiveDateTime::from_timestamp(unix as i64, 0), local);
+    let local = Local::now().offset().clone();
+    let dt = DateTime::<Local>::from_utc(NaiveDateTime::from_timestamp_opt(unix as i64, 0).unwrap(), local);
     return dt;
 }
 

@@ -194,7 +194,7 @@ pub(crate) async fn run_server(port: u16) -> Result<(), Box<dyn std::error::Erro
     config.address = IpAddr::V4("0.0.0.0".parse().unwrap());
     config.port = port;
     config.limits = config.limits.limit("string", 100.megabytes());
-    ;
+
     rocket::custom(config)
         .mount("/", rocket::routes![subscribe, issue_idx, broadcast])
         .manage(Db::empty())

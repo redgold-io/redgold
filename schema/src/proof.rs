@@ -133,7 +133,7 @@ impl Proof {
 fn verify_single_signature_proof() {
     let tc = TestConstants::new();
     let proof = Proof::new(&tc.hash_vec.clone().into(), &tc.secret, &tc.public);
-    assert!(proof.verify(&Hash::from_bytes(tc.hash_vec)).is_ok());
+    assert!(proof.verify(&Hash::new(tc.hash_vec)).is_ok());
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn verify_invalid_single_signature_proof() {
     let tc = TestConstants::new();
     let mut proof = Proof::new(&tc.hash_vec.clone().into(), &tc.secret, &tc.public);
     proof.signature = signature_data(tc.hash_vec.clone());
-    assert!(proof.verify( &Hash::from_bytes(tc.hash_vec)).is_err());
+    assert!(proof.verify( &Hash::new(tc.hash_vec)).is_err());
 }
 
 #[test]
@@ -149,5 +149,5 @@ fn verify_invalid_key_single_signature_proof() {
     let tc = TestConstants::new();
     let mut proof = Proof::new(&tc.hash_vec.clone().into(), &tc.secret, &tc.public);
     proof.public_key = public_key_ser(&tc.public2);
-    assert!(proof.verify(&Hash::from_bytes(tc.hash_vec)).is_err());
+    assert!(proof.verify(&Hash::new(tc.hash_vec)).is_err());
 }

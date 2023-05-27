@@ -183,7 +183,7 @@ signature: <some_signature>
  */
 pub fn sign_message(path: String, input_message: String) -> Result<SignMessageResponse, ErrorInfo> {
     let res = trezor_cmd(vec!["sign-message", "-n", &path, &input_message])?;
-    let (hm, vec) = parse_output(res);
+    let (_, vec) = parse_output(res);
 
     let message = vec.get(0).safe_get_msg("no message")?.1.clone();
     let address = vec.get(1).safe_get_msg("no address")?.1.clone();
@@ -272,7 +272,7 @@ pub fn trezor_test() {
     println!("Got public key {}", res.hex().expect(""));
     let msg = "ahoy";
     let signature = sign_message(cursor.to_string(), msg.to_string()).unwrap();
-    let sig = Signature::ecdsa(signature.signature_vec());
+    let _sig = Signature::ecdsa(signature.signature_vec());
     // let proof = Proof::from(res, sig);
     // proof.verify(&vec).unwrap();
     // println!("Verified proof");

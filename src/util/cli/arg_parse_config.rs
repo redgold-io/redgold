@@ -117,7 +117,7 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
     let dbg_id: Option<i32> = opts.debug_id;
     if dbg_id.is_some() {
         let dbg_id = dbg_id.unwrap();
-        let offset = ((dbg_id * 1000) as u16);
+        let offset = (dbg_id * 1000) as u16;
         node_config.port_offset = node_config.network.default_port_offset() + offset;
     }
 
@@ -139,16 +139,16 @@ pub async fn load_node_config(
     mut node_config: NodeConfig,
 ) -> Result<NodeConfig, NodeConfig> {
     // let mut node_config = NodeConfig::default();
-    let opts2 = opts.clone();
+    // let opts2 = opts.clone();
 
     let subcmd: Option<RgTopLevelSubcommand> = opts.subcmd;
-    let mut is_canary = false;
+    let mut _is_canary = false;
     match subcmd.clone() {
         None => {}
         Some(c) => match c {
             RgTopLevelSubcommand::GenerateWords(_) => {}
             RgTopLevelSubcommand::DebugCanary(_) => {
-                is_canary = true;
+                // _is_canary = true;
             }
             RgTopLevelSubcommand::GUI(_) => {
 
@@ -170,9 +170,9 @@ pub async fn load_node_config(
         node_config.data_store_path
     );
 
-    let store =
-        // runtime.block_on(
-            node_config.data_store().await;
+    // let store =
+    //     runtime.block_on(
+            // node_config.data_store().await;
         // );
     // runtime.block_on(
     // store
@@ -201,7 +201,7 @@ pub async fn load_node_config(
     if dbg_id.is_some() {
         let dbg_id = dbg_id.unwrap();
         default_data_dir = default_data_dir.join(format!("{}", dbg_id));
-        let offset = ((dbg_id * 1000) as u16);
+        let offset = (dbg_id * 1000) as u16;
         node_config.port_offset = node_config.network.default_port_offset() + offset;
     }
 
@@ -543,7 +543,7 @@ fn test_shasum() {
 
 #[test]
 fn load_ds_path() {
-    let mut config = NodeConfig::default();
+    let config = NodeConfig::default();
     let res = load_node_config_initial(args::empty_args(), config);
     println!("{}", res.data_store_folder());
 }
@@ -575,8 +575,7 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
                     Ok(())
                 },
                 RgTopLevelSubcommand::Address(a) => {
-                    commands::generate_address(a.clone(), &config);
-                    Ok(())
+                    commands::generate_address(a.clone(), &config).map(|_| ())
                 }
                 RgTopLevelSubcommand::Send(a) => {
                     // let res = simple_runtime.block_on(

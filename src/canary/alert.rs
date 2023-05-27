@@ -91,7 +91,7 @@ async fn send_message(
 #[ignore]
 #[tokio::test]
 async fn debug()  {
-  email("Yo", "whats up").await;
+  email("Yo", "whats up").await.expect("Failed to send email");
 }
 
 pub async fn email<S: Into<String>, Y: Into<String>>(subject: S, body: Y) -> Result<(), ErrorInfo> {

@@ -89,7 +89,7 @@ pub fn setup_server_redgold(
 
 pub async fn setup_ops_services(
     mut ssh: SSH,
-    additional_env: Option<HashMap<String, String>>,
+    _additional_env: Option<HashMap<String, String>>,
     remote_path_prefix: Option<String>,
     grafana_pass: Option<String>,
 ) -> Result<(), ErrorInfo> {
@@ -110,7 +110,7 @@ pub async fn setup_ops_services(
         include_str!("../resources/infra/ops_services/filebeat.docker.yml"),
         format!("{}/filebeat.docker.yml", remote_path)
     );
-    let mut promtheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
+    let promtheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
 //     match std::env::var("GRAFANA_CLOUD_USER") {
 //         Ok(u) => {
 //             promtheus_yml += &*format!("remote_write:

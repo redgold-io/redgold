@@ -4,38 +4,40 @@
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+
 use async_std::prelude::FutureExt;
 use eframe::epaint::ahash::HashMap;
+use futures::TryStreamExt;
 use itertools::Itertools;
-
 use log::info;
 use metrics::{gauge, increment_counter, increment_gauge};
 use prost::{DecodeError, Message as msg};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-use redgold_schema::{SafeBytesAccess, SafeOption, struct_metadata_new, WithMetadataHashable};
-use redgold_schema::structs::{Hash, ObservationProof};
-use crate::api::rosetta::models::Error;
+// use futures::stream::StreamExt;
+use tokio::time::Interval;
+// Make sure to import StreamExt
+use tokio_stream::StreamExt;
+use tokio_stream::wrappers::IntervalStream;
+use tokio_util::either::Either;
 
-use crate::core::internal_message::{FutLoopPoll, PeerMessage, SendErrorInfo};
-use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
-use crate::schema::structs::GossipObservationRequest;
-use crate::schema::structs::Request;
-use crate::schema::structs::{Observation, ObservationMetadata, Proof};
-use crate::schema::structs::ErrorInfo;
-use crate::util;
-use crate::util::{current_time_millis, random_salt};
+use redgold_schema::{SafeBytesAccess, SafeOption, struct_metadata_new, WithMetadataHashable};
+use redgold_schema::EasyJson;
+use redgold_schema::structs::{Hash, ObservationProof};
+
+use crate::api::rosetta::models::Error;
+use crate::core::internal_message::{PeerMessage, SendErrorInfo};
 use crate::core::internal_message::RecvAsyncErrorInfo;
+use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use crate::data::data_store::DataStore;
 use crate::schema::json;
 use crate::schema::json_or;
-use redgold_schema::EasyJson;
-use futures::TryStreamExt;
-// use futures::stream::StreamExt;
-use tokio::time::Interval;
-use tokio_stream::wrappers::IntervalStream;
-use tokio_util::either::Either;  // Make sure to import StreamExt
-use tokio_stream::StreamExt;
+use crate::schema::structs::{Observation, ObservationMetadata, Proof};
+use crate::schema::structs::ErrorInfo;
+use crate::schema::structs::GossipObservationRequest;
+use crate::schema::structs::Request;
+use crate::util;
+use crate::util::{current_time_millis, random_salt};
 
 pub struct ObservationBuffer {
     data: Vec<ObservationMetadata>,
@@ -61,9 +63,8 @@ impl ObservationBuffer {
 
     async fn run(&mut self) -> Result<(), ErrorInfo> {
 
-        let mut interval =
+        let interval =
             tokio::time::interval(self.relay.node_config.observation_formation_millis);
-        // TODO use a select! between these two.
 
         let interval_stream = IntervalStream::new(interval).map(|_| Ok(Either::Right(())));
 
@@ -74,7 +75,7 @@ impl ObservationBuffer {
             .map(|x| Ok(Either::Left(x)));
 
         stream.merge(interval_stream).try_fold(
-            Ok(self), |mut ob, o| async {
+            Ok(self), |ob, o| async {
                 let ress = match ob {
                     Ok(ooo) => {
                         let res = ooo.handle_message(o).await.map(|x| Ok(x));
@@ -187,14 +188,13 @@ impl ObservationBuffer {
                 self.relay.node_config.internal_mnemonic().active_keypair(),
             )),
             struct_metadata: struct_metadata.clone(),
-            hash: None,
             salt: random_salt(),
             height,
             parent_hash,
         };
         o.with_hash();
         let proofs = o.build_observation_proofs();
-        self.relay.ds.observation.insert_observation_and_edges(&o, struct_metadata.safe_get()?.time).await?;
+        self.relay.ds.observation.insert_observation_and_edges(&o, struct_metadata.safe_get()?.time.expect("time")).await?;
 
         self.latest = Some(o.clone());
         // self.relay.ds.transaction_store

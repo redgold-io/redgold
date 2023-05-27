@@ -278,8 +278,7 @@ fn test_serialization() {
 #[test]
 fn test_serialization_obs() {
     let t = ObservationMetadata {
-        observed_hash: Some(crate::schema::util::dhash_str("asdf").to_vec().into()),
-        hash: None,
+        observed_hash: Some(dhash_str("asdf").to_vec().into()),
         state: None,
         validation_confidence: None,
         struct_metadata: None,

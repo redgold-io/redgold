@@ -10,15 +10,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
-use async_std::prelude::FutureExt;
+
 use metrics::{increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
+use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::KeyPair;
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest};
 use crate::core::relay::Relay;
 use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
-
+use tokio_stream::{StreamExt};
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
@@ -143,9 +144,17 @@ async fn debug_local_test() {
 }
 
 
+struct Canary {
+    relay: Relay,
+    utxos: Vec<SpendableUTXO>,
+    last_failure: i64,
+    failed_once: bool,
+    num_success: u64,
+    generator: TransactionGenerator,
+}
 
 #[allow(dead_code)]
-pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
+pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
     let node_config = relay.node_config.clone();
     sleep(Duration::from_secs(60));
     info!("Starting canary");
@@ -185,71 +194,68 @@ pub fn run(relay: Relay) -> Result<(), ErrorInfo> {
         })
         .collect_vec();
 
-    let mut generator = TransactionGenerator::default_adv(
+    let generator = TransactionGenerator::default_adv(
         utxos.clone(), min_offset, max_offset, node_config.internal_mnemonic()
     );
 
-
-    let mut last_failure = util::current_time_millis();
-    let mut failed_once = false;
-    let mut num_success = 0 ;
 
     if utxos.is_empty() {
         // TODO: Faucet here from seed node.
         info!("Unable to start canary, no UTXOs");
         Ok(())
     } else {
-        loop {
-            sleep(Duration::from_secs(60));
+        // TODO Change to tokio
+        let c = Canary {
+            relay,
+            utxos,
+            generator,
+            last_failure: util::current_time_millis_i64(),
+            failed_once: false,
+            num_success: 0
+        };
+        let interval1 = tokio::time::interval(Duration::from_secs(60));
+        use futures::TryStreamExt;
+        IntervalStream::new(interval1)
+            .map(|x| Ok(x))
+            .try_fold(c, |mut c, _| async {
+                canary_tick(&mut c).await?;
+                Ok(c)
 
-            // TODO: Update this whole function.
+        }).await?;
+        Ok(())
+    }
+}
 
-            let transaction = generator.generate_simple_tx().clone();
-            let res = runtime.block_on(relay.submit_transaction(SubmitTransactionRequest{ transaction:
-                Some(transaction.transaction.clone()), sync_query_response: true }));
+async fn canary_tick(c: &mut Canary) -> Result<(), ErrorInfo> {
+    let transaction = c.generator.generate_simple_tx().clone();
+    let res = c.relay.submit_transaction(SubmitTransactionRequest {
+        transaction:
+        Some(transaction.transaction.clone()),
+        sync_query_response: true
+    }).await;
 
-            match res {
-                Ok(response) => {
-                    num_success += 1;
-                    info!("Canary success");
-                    increment_counter!("redgold.canary.success");
-                    if let Some(q) = response.query_transaction_response {
-                        increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
-                    }
-                }
-                Err(e) => {
-                    increment_counter!("redgold.canary.failure");
-                    let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
-                    error!("Canary failure: {}", failure_msg.clone());
-                    let recovered = (num_success > 10 && util::current_time_millis() - last_failure > 1000 * 60 * 30);
-                    if !failed_once || recovered {
-                        alert::email(format!("{} canary failure", relay.node_config.network.to_std_string()), &failure_msg);
-                    }
-                    let failure_time = util::current_time_millis();
-                    num_success = 0;
-                    last_failure = failure_time;
-                    failed_once = true;
-                }
+    match res {
+        Ok(response) => {
+            c.num_success += 1;
+            info!("Canary success");
+            increment_counter!("redgold.canary.success");
+            if let Some(q) = response.query_transaction_response {
+                increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
             }
-
-
+        }
+        Err(e) => {
+            increment_counter!("redgold.canary.failure");
+            let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
+            error!("Canary failure: {}", failure_msg.clone());
+            let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
+            if !c.failed_once || recovered {
+                alert::email(format!("{} canary failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
+            }
+            let failure_time = util::current_time_millis_i64();
+            c.num_success = 0;
+            c.last_failure = failure_time;
+            c.failed_once = true;
         }
     }
-    //
-    // let submit = TransactionSubmitter::default_adv(
-    //     client.clone(), runtime.clone(), utxos.clone(), 500, 510, node_config.wallet()
-    // );
-    //
-    // if utxos.is_empty() {
-    //     // TODO: Faucet here from seed node.
-    //     info!("Unable to start canary, no UTXOs")
-    // } else {
-    //     loop {
-    //         sleep(Duration::from_secs(60));
-    //         let response = submit.submit();
-    //         if !response.accepted() {
-    //             info!("Canary failure: {:?}", serde_json::to_string(&response));
-    //         }
-    //     }
-    // }
+    Ok(())
 }

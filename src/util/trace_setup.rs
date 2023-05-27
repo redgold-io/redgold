@@ -123,7 +123,7 @@ pub async fn debug() {
 
     let mut hm = HashMap::new();
     hm.insert("asdf".to_string(), "asdf".to_string());
-    shave(0, hm);
+    shave(0, hm).expect("shaving yaks, really?");
 
 
 }

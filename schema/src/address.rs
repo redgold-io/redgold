@@ -1,5 +1,5 @@
 use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, UtxoEntry};
-use crate::{bytes_data, error_info, SafeBytesAccess};
+use crate::{bytes_data, error_info, from_hex, SafeBytesAccess};
 use crate::{error_message, structs};
 use bitcoin::secp256k1::{PublicKey};
 use bitcoin::util::base58;
@@ -25,29 +25,32 @@ impl Into<Address> for Vec<u8> {
 impl Address {
     pub fn parse<S: Into<String>>(addr: S) -> Result<Address, ErrorInfo> {
         let s = addr.into();
-        // TODO: Address validation function here honestly
-        if s.len() < 5 {
-            return Err(error_message(
-                Error::AddressDecodeFailure,
-                format!("Address minimum string length failure on address: {}", s.clone()),
-            ));
-        }
-        // this slice 3 is unsafe.
-        let address_vec = base58::from_check(&s.clone()[3..]).map_err(|e| {
-            error_message(
-                Error::AddressDecodeFailure,
-                format!("Base58 checked address decoding failure on {} {}", s.clone(), e.to_string()),
-            )
-        })?;
-        Ok(address_vec.into())
+
+        Self::from_hex(s)
+        // // TODO: Address validation function here honestly
+        // if s.len() < 5 {
+        //     return Err(error_message(
+        //         Error::AddressDecodeFailure,
+        //         format!("Address minimum string length failure on address: {}", s.clone()),
+        //     ));
+        // }
+        // // this slice 3 is unsafe.
+        // let address_vec = base58::from_check(&s.clone()[3..]).map_err(|e| {
+        //     error_message(
+        //         Error::AddressDecodeFailure,
+        //         format!("Base58 checked address decoding failure on {} {}", s.clone(), e.to_string()),
+        //     )
+        // })?;
+        // Ok(address_vec.into())
     }
     pub fn render_string(&self) -> Result<String, ErrorInfo> {
         let result = self.address.safe_bytes()?;
         Ok(Self::address_to_str(&result))
     }
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
-        Ok(Self::address_data(bytes).expect("works"))
-        // TODO: move that func here and leave alias there
+        let addr = Self::new(bytes);
+        addr.verify_checksum()?;
+        Ok(addr)
     }
 
     pub fn from_public(pk: &PublicKey) -> Result<Address, ErrorInfo> {
@@ -67,12 +70,12 @@ impl Address {
     }
 
     pub fn hash(buf: &[u8]) -> Vec<u8> {
-        let mut bytes = Sha3_224::digest(buf).to_vec();
+        let bytes = Sha3_224::digest(buf).to_vec();
         Self::with_checksum(bytes)
     }
 
     pub fn verify_checksum(&self) -> Result<(), ErrorInfo> {
-        let mut bytes = self.address.safe_bytes()?;
+        let bytes = self.address.safe_bytes()?;
         if Self::with_checksum(bytes[0..28].to_vec()) != bytes {
             Err(error_info("Invalid address checksum bytes"))?;
         }
@@ -92,13 +95,15 @@ impl Address {
     }
 
     pub fn str_to_address(s: String) -> Vec<u8> {
-        return base58::from_check(&s[3..]).unwrap();
+        hex::decode(s).expect("hex")
+        // return base58::from_check(&s[3..]).unwrap();
     }
 
     pub fn address_to_str(a: &Vec<u8>) -> String {
-        let mut b = base58::check_encode_slice(&*a);
-        b.insert_str(0, "rg1");
-        return b;
+        // let mut b = base58::check_encode_slice(&*a);
+        // b.insert_str(0, "rg1");
+        // return b;
+        hex::encode(a)
     }
 
     pub fn address(pk: &PublicKey) -> Vec<u8> {
@@ -110,13 +115,21 @@ impl Address {
     }
 
     pub fn address_data(address: Vec<u8>) -> Option<Address> {
-        Some(Address {
+        Some(Self::new(address))
+    }
+
+    pub fn new(address: Vec<u8>) -> Address {
+        Address {
             address: bytes_data(address),
-            address_type: 0 //AddressType::StandardKeyhash as i32,
-        })
+            address_type: AddressType::Sha3224ChecksumPublic as i32,
+        }
     }
 
 
+    fn from_hex(p0: String) -> Result<Address, ErrorInfo> {
+        let bytes = from_hex(p0)?;
+        Address::from_bytes(bytes)
+    }
 }
 
 

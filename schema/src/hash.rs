@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
-use crate::{bytes_data, constants, Hash, HashFormatType, SafeBytesAccess};
-use crate::structs::HashType;
+use crate::{bytes_data, constants, from_hex, Hash, HashFormatType, SafeBytesAccess};
+use crate::structs::{ErrorInfo, HashType};
 
 use sha3::{Digest, Sha3_256};
 
@@ -9,7 +9,7 @@ use sha3::{Digest, Sha3_256};
 /// Please note this is the direct constructor and does not perform an actual hash
 impl Into<Hash> for Vec<u8> {
     fn into(self) -> Hash {
-        Hash::from_bytes(self)
+        Hash::new(self)
     }
 }
 
@@ -22,19 +22,35 @@ impl Hash {
         hex::encode(self.vec())
     }
     // TODO: From other types as well
-    pub fn from_bytes(vec: Vec<u8>) -> Self {
+    pub fn new(vec: Vec<u8>) -> Self {
         Self {
             bytes: bytes_data(vec),
             hash_format_type: HashFormatType::Sha3256 as i32,
             hash_type: HashType::Transaction as i32,
         }
     }
+
+    pub fn validate_size(&self) -> Result<&Self, ErrorInfo> {
+        if self.safe_bytes()?.len() == 32 {
+            Ok(self)
+        } else {
+            Err(ErrorInfo::error_info("Invalid hash size"))
+        }
+    }
+
+    pub fn from_hex<S: Into<String>>(s: S) -> Result<Self, ErrorInfo> {
+        // TODO: Validate size
+        let hash = Self::new(from_hex(s.into())?);
+        hash.validate_size()?;
+        Ok(hash)
+    }
+
     pub fn from_string(s: &str) -> Self {
         Self::calc_bytes(s.as_bytes().to_vec())
     }
 
     pub fn calc_bytes(s: Vec<u8>) -> Self {
-        Self::from_bytes(Sha3_256::digest(&s).to_vec())
+        Self::new(Sha3_256::digest(&s).to_vec())
     }
 
     pub fn merkle_combine(&self, right: Hash) -> Self {

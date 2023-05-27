@@ -26,9 +26,6 @@ impl TransactionBuilder {
                     contract: None,
                     offline_time_sponsor: None,
                 }),
-                hash: None,
-                sign_hash: None,
-                counter_party_hash: None,
             },
             balance: 0
         }

@@ -16,7 +16,7 @@ use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
-use redgold_schema::structs::{FixedUtxoId, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response};
+use redgold_schema::structs::{FixedUtxoId, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response, Transaction};
 
 use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -181,7 +181,7 @@ impl Relay {
         let timeout = timeout.unwrap_or(Duration::from_secs(20));
         // let mut fu = FuturesUnordered::new();
         let mut fu = vec![];
-        for (i,node) in nodes.iter().enumerate() {
+        for (_,node) in nodes.iter().enumerate() {
             let relay2 = relay.clone();
             // let runtime2 = runtime.clone();
             let request2 = request.clone();
@@ -214,6 +214,17 @@ impl Relay {
         Ok(())
     }
 
+
+    pub async fn submit_transaction_sync(
+        &self,
+        tx: &Transaction,
+    ) -> Result<SubmitTransactionResponse, ErrorInfo> {
+        self.submit_transaction(SubmitTransactionRequest{
+            transaction: Some(tx.clone()),
+            sync_query_response: true,
+        }).await
+    }
+
     pub async fn submit_transaction(
         &self,
         tx_req: SubmitTransactionRequest,
@@ -224,7 +235,7 @@ impl Relay {
         } else {
             None
         };
-        let mut tx = tx_req
+        let tx = tx_req
             .transaction
             .safe_get_msg("Missing transaction field on submit request")?;
         tx.calculate_hash();

@@ -58,7 +58,7 @@ impl PublicClient {
     // }
 
     pub fn client_wrapper(&self) -> api::RgHttpClient {
-        api::RgHttpClient::new(self.url.clone(), (self.port as u16))
+        api::RgHttpClient::new(self.url.clone(), self.port as u16)
     }
 
     pub fn local(port: u16) -> Self {
@@ -84,15 +84,6 @@ impl PublicClient {
             timeout: Duration::from_secs(30),
         }
     }
-
-    //
-    // pub fn local_timeout(port: u16, timeout: Duration) -> Self {
-    //     Self {
-    //         url: "localhost".to_string(),
-    //         port,
-    //         timeout,
-    //     }
-    // }
 
     fn formatted_url(&self) -> String {
         return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();
@@ -154,7 +145,7 @@ impl PublicClient {
                 sync_query_response: sync,
         });
         debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
-        let response = c.proto_post_request(request, None).await?;
+        let response = c.proto_post_request(&mut request, None).await?;
         response.as_error_info()?;
         Ok(response.submit_transaction_response.safe_get()?.clone())
     }
@@ -162,13 +153,12 @@ impl PublicClient {
 
     pub async fn faucet(
         &self,
-        t: &Address,
-        sync: bool,
+        t: &Address
     ) -> Result<FaucetResponse, ErrorInfo> {
         let mut request = empty_public_request();
         request.faucet_request = Some(FaucetRequest {
             address: Some(t.clone()),
-            });
+        });
         info!("Sending faucet request: {}", t.clone().render_string().expect("r"));
         let response = self.request(&request).await?.as_error()?;
         let res = json(&response)?;
@@ -211,11 +201,11 @@ impl PublicClient {
         &self,
         input: String,
     ) -> Result<HashSearchResponse, ErrorInfo> {
-        let mut request = empty_public_request();
+        let mut request = Request::default();
         request.hash_search_request = Some(HashSearchRequest {
             search_string: input
         });
-        Ok(self.request(&request).await?.as_error()?.hash_search_response.safe_get()?.clone())
+        Ok(self.client_wrapper().proto_post_request(&mut request, None).await?.hash_search_response.safe_get()?.clone())
     }
 
     pub async fn about(&self) -> Result<AboutNodeResponse, ErrorInfo> {
@@ -253,11 +243,7 @@ impl PublicClient {
 async fn process_request(request: PublicRequest, relay: Relay) -> Json {
     let response = process_request_inner(request, relay).await.map_err(|e| {
         let mut response1 = empty_public_response();
-        response1.response_metadata = Some(ResponseMetadata {
-            success: false,
-            error_info: Some(e),
-            task_local_details: vec![],
-        });
+        response1.response_metadata = Some(e.response_metadata());
         response1
     }).combine();
     warp::reply::json(&response)
@@ -331,35 +317,15 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
     }
     if let Some(r) = request.query_addresses_request {
         // TODO: make this thing async and map errors to rejections
-        match DataStore::map_err_sqlx(relay.clone().ds.query_utxo_address(r.addresses).await) {
-            Err(e) => {
-                response1.response_metadata = Some(ResponseMetadata {
-                    success: false,
-                    error_info: Some(e),
-                    task_local_details: vec![],
-                });
-            }
-            Ok(k) => {
-                response1.query_addresses_response = Some(QueryAddressesResponse { utxo_entries: k });
-            }
-        }
+        let k = DataStore::map_err_sqlx(relay.clone().ds.query_utxo_address(r.addresses).await)?;
+        response1.query_addresses_response = Some(QueryAddressesResponse { utxo_entries: k });
     }
     if let Some(r) = request.about_node_request {
         response1.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
     }
     if let Some(r) = request.hash_search_request {
-        match hash_query(relay.clone(), r.search_string).await {
-            Ok(res) => {
-                response1.hash_search_response = Some(res);
-            },
-            Err(e) => {
-                response1.response_metadata = Some(ResponseMetadata {
-                    success: false,
-                    error_info: Some(e),
-                    task_local_details: vec![],
-                });
-            }
-        };
+        let res = hash_query(relay.clone(), r.search_string).await?;
+        response1.hash_search_response = Some(res);
     }
 
     if let Some(f) = request.faucet_request {
@@ -399,6 +365,12 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 
     let hello = warp::get()
         .and(warp::path("hello")).and_then(|| async move {
+        let res: Result<&str, warp::reject::Rejection> = Ok("hello");
+        res
+    });
+
+    let home = warp::get()
+        .and_then(|| async move {
         let res: Result<&str, warp::reject::Rejection> = Ok("hello");
         res
     });
@@ -462,7 +434,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             let relay3 = a_relay.clone();
             async move {
                 // TODO call about handler
-                let mut abr = about::handle_about_node(AboutNodeRequest::default(), relay3.clone()).await;
+                // TODO: Should this be hitting the peer message channel?
+                let abr = about::handle_about_node(AboutNodeRequest::default(), relay3.clone()).await;
                 as_warp_json_response(abr)
             }
         });
@@ -473,11 +446,9 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move || {
             let relay3 = p_relay.clone();
             async move {
+                // TODO: Make this a standard request way easier
                 let ps = relay3.ds.peer_store.all_peers_nodes().await;
-                let res: Result<Json, warp::reject::Rejection> = Ok(ps
-                       .map_err(|e| warp::reply::json(&e))
-                       .map(|r| warp::reply::json(&r))
-                       .combine());
+                let res: Result<Json, warp::reject::Rejection> = as_warp_json_response(ps);
                 res
             }
         });
@@ -559,9 +530,23 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 
     let port = relay2.node_config.public_port();
     info!("Running public API on port: {:?}", port.clone());
-    Ok(warp::serve(hello.or(transaction).or(faucet).or(query_hash).or(about).or(request_normal).or(request_bin))
+    Ok(
+        warp::serve(
+            hello
+                .or(transaction)
+                .or(faucet)
+                .or(query_hash)
+                .or(about)
+                .or(request_normal)
+                .or(request_bin)
+                .or(peers)
+                .or(transaction_lookup)
+                .or(address_lookup)
+                .or(home)
+    )
         .run(([0, 0, 0, 0], port))
-        .await)
+        .await
+    )
 }
 
 pub fn start_server(relay: Relay
@@ -760,7 +745,7 @@ async fn mock_relay(relay: Relay) {
 #[test]
 fn test_public_api_lb() {
     let mut config = NodeConfig::default();
-    config.network == NetworkEnvironment::Dev;
+    config.network = NetworkEnvironment::Dev;
     let c = config.lb_client();
     let rt = build_runtime(1, "test");
     println!("{:?}", rt.block_on(c.about()));

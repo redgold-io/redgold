@@ -45,10 +45,10 @@ impl PeerStore {
             r#"UPDATE peer_key SET last_seen = ?1 WHERE public_key = ?2"#,
             time,
             bytes
-        )
+        ) // Execute instead of fetch
             .fetch_all(&mut pool)
             .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let _ = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
     }
 
@@ -72,7 +72,7 @@ impl PeerStore {
         )
             .fetch_all(&mut pool)
             .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let _ = DataStoreContext::map_err_sqlx(rows)?;
         let time = util::current_time_millis();
 
         for nmd in pd.node_metadata {
@@ -89,7 +89,7 @@ impl PeerStore {
             )
                 .fetch_all(&mut pool)
                 .await;
-            let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+            let _ = DataStoreContext::map_err_sqlx(rows)?;
 
         }
         Ok(())
@@ -166,11 +166,6 @@ impl PeerStore {
             }
         }
         Ok(res)
-    }
-
-
-    pub async fn multihash_lookup(&self, p0: Vec<u8>) {
-        todo!()
     }
 
     pub async fn all_peers_tx(

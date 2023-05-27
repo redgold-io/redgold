@@ -25,7 +25,7 @@ pub async fn initiate_mp_keygen(relay: Relay, mp_req: InitiateMultipartyKeygenRe
                                 -> Result<InitiateMultipartyKeygenResponse, ErrorInfo> {
 
     let ident = mp_req.identifier.safe_get()?;
-    let key = mp_req.host_key.clone().unwrap_or(relay.node_config.public_key());
+    // let key = mp_req.host_key.clone().unwrap_or(relay.node_config.public_key());
     let index = mp_req.index.unwrap_or(1) as u16;
     let number_of_parties = ident.num_parties as u16;
     let threshold = ident.threshold as u16;
@@ -79,7 +79,7 @@ pub async fn initiate_mp_keygen(relay: Relay, mp_req: InitiateMultipartyKeygenRe
         let res = res0.clone()
             .and_then(|r| r.as_error_info());
         match res {
-            Ok(response) => {
+            Ok(_) => {
                 successful += 1
             }
             Err(e) => {
@@ -123,7 +123,7 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
 
     let ident = mp_req.identifier.safe_get()?;
     // TODO: Verify address matches host key
-    let key = mp_req.host_key.safe_get()?.clone();
+    // let key = mp_req.host_key.safe_get()?.clone();
     let index = mp_req.index.safe_get()?.clone() as u16;
     let number_of_parties = ident.num_parties as u16;
     let threshold = ident.threshold as u16;
@@ -219,15 +219,15 @@ pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigning
     let init_keygen_req = mp_req.keygen_room.safe_get()?.clone();
     let init_keygen_req_room_id = init_keygen_req.identifier.safe_get()?.uuid.clone();
     let ident = mp_req.identifier.safe_get()?;
-    let key = mp_req.host_key.clone().unwrap_or(relay.node_config.public_key());
+    // let key = mp_req.host_key.clone().unwrap_or(relay.node_config.public_key());
     let index: Vec<u16> = mp_req.party_indexes.iter().map(|p| p.clone() as u16).collect_vec();
-    let number_of_parties = ident.num_parties as u16;
+    // let number_of_parties = ident.num_parties as u16;
     let room_id = ident.uuid.clone();
     let address = mp_req.host_address.clone().unwrap_or("127.0.0.1".to_string());
     let port = mp_req.port.map(|x| x as u16).unwrap_or(relay.node_config.mparty_port());
     let timeout = Duration::from_secs(mp_req.timeout_seconds.unwrap_or(100) as u64);
 
-    let (local_share, initiate_keygen) = relay.ds.multiparty_store
+    let (local_share, _) = relay.ds.multiparty_store
         .local_share_and_initiate(init_keygen_req_room_id.clone()).await?
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
@@ -240,13 +240,13 @@ pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigning
         timeout,
         gg20_signing::signing(
             address, port, rid, local_share, index, option),
-    ).await.map_err(|e| error_info("Timeout"))});
+    ).await.error_info("Timeout")});
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let self_key = relay.node_config.public_key();
     let mut successful = 0;
-    for (i, peer) in ident.party_keys.iter().enumerate() {
+    for (_, peer) in ident.party_keys.iter().enumerate() {
         if peer == &self_key {
             continue;
         }
@@ -268,7 +268,7 @@ pub async fn initiate_mp_keysign(relay: Relay, mp_req: InitiateMultipartySigning
         let res = result
             .and_then(|r| r.as_error_info());
         match res {
-            Ok(response) => {
+            Ok(_) => {
                 successful += 1
             }
             Err(e) => {
@@ -303,9 +303,9 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
     let init_keygen_req_room_id = init_keygen_req.identifier.safe_get()?.uuid.clone();
     let ident = mp_req.identifier.safe_get()?;
     // TODO: Verify host key matches address
-    let key = mp_req.host_key.safe_get()?.clone();
+    // let key = mp_req.host_key.safe_get()?.clone();
     let index: Vec<u16> = mp_req.party_indexes.iter().map(|p| p.clone() as u16).collect_vec();
-    let number_of_parties = ident.num_parties as u16;
+    // let number_of_parties = ident.num_parties as u16;
     let room_id = ident.uuid.clone();
     let address = mp_req.host_address.safe_get()?.clone();
     let port = mp_req.port.map(|x| x as u16).safe_get()?.clone();
@@ -313,7 +313,7 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
 
     //TODO: This should be returned as immediate failure on the response level instead of going
     // thru process, maybe done as part of health check?
-    let (local_share, initiate_keygen) = relay.ds.multiparty_store
+    let (local_share, _) = relay.ds.multiparty_store
         .local_share_and_initiate(init_keygen_req_room_id.clone()).await?
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
@@ -324,7 +324,7 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
         timeout,
         gg20_signing::signing(
             address, port, room_id.clone(), local_share, index, option),
-    ).await.map_err(|e| error_info("Timeout"))??;
+    ).await.error_info("Timeout")??;
 
     relay.ds.multiparty_store.add_signing_proof(
         init_keygen_req_room_id, room_id.clone(), res.clone(), mp_req.clone()

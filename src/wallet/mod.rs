@@ -12,7 +12,7 @@ struct Wallet {
 impl Wallet {
 
     pub fn scan_initial(&self) {
-        let mut words = self.mnemonic_words.clone();
+        let words = self.mnemonic_words.clone();
         words.address();
     }
 }
