@@ -1,6 +1,6 @@
 use prost::{DecodeError, Message};
-use crate::{HashClear, KeyPair, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
-use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, MultipartyThresholdResponse, NodeMetadata, Proof};
+use crate::{error_info, HashClear, KeyPair, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
+use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, MultipartyThresholdResponse, NodeMetadata, Proof, QueryTransactionResponse, State};
 
 impl AboutNodeResponse {
     pub fn empty() -> Self {
@@ -44,6 +44,8 @@ impl Response {
             success: false,
             error_info: Some(error_info),
             task_local_details: vec![],
+            request_uuid: None,
+            response_uuid: None,
         });
         return r.clone();
     }
@@ -108,4 +110,19 @@ impl MultipartyThresholdResponse {
             initiate_signing_response: None,
         }
     }
+}
+
+impl QueryTransactionResponse {
+    pub fn accepted(&self, expected_count: usize) -> Result<(), ErrorInfo> {
+        let accepted_count = self.observation_proofs.iter().filter_map(|p| p.metadata.as_ref())
+            .filter_map(|m| m.state)
+            .filter(|m| m == &(State::Finalized as i32))
+            .count();
+        if accepted_count >= expected_count {
+            Ok(())
+        } else {
+            Err(error_info(format!("not enough accepted observations, expected {}, got {}", expected_count, accepted_count)))
+        }
+    }
+
 }

@@ -15,6 +15,7 @@ pub mod hashviz;
 pub mod keys;
 pub mod logging;
 pub mod trace_setup;
+pub mod test_util;
 
 use std::io::{Cursor, Write};
 use std::time::{SystemTime, UNIX_EPOCH};

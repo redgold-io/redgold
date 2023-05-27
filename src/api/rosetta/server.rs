@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use warp::path::FullPath;
-use redgold_schema::{error_message, structs};
+use redgold_schema::{error_message, error_msg, ErrorInfoContext, structs};
 use crate::api::{RgHttpClient, easy_post, rosetta, with_response_logger, with_response_logger_error};
 use crate::api::rosetta::models::{AccountBalanceRequest, AccountBalanceResponse, AccountCoinsRequest, AccountIdentifier, Error};
 use crate::api::rosetta::spec::Rosetta;
@@ -63,15 +63,13 @@ fn format_response<T>(
 
 async fn deser<'a, T : Deserialize<'a>>(s: &'a str) -> Result<T, ErrorInfo> {
     serde_json::from_str::<T>(s)
-        .map_err(|e|
-            error_message(structs::Error::DeserializationFailure, "error deserializing string input as type")
-        )
+        .error_msg(structs::Error::DeserializationFailure, "error deserializing string input as type")
 }
 
 fn ser<T>(t: Result<T, ErrorInfo>, e: String) -> WithStatus<Json>
     where
         T: Serialize + Clone,{
-    with_response_logger_error(t.clone(), e);
+    with_response_logger_error(t.clone(), e).ok();
     let result = format_error(t);
     format_response(result)
 }
@@ -85,7 +83,7 @@ pub async fn handle_warp_request(path: String, r: Rosetta, b: Bytes) -> Result<W
         Err(er) => {
             return Ok(
                 ser(Err::<AccountBalanceResponse, ErrorInfo>(
-                    error_message(structs::Error::UnknownError, "Error deserializing bytes to utf8 string")
+                    error_msg(structs::Error::UnknownError, "Error deserializing bytes to utf8 string", er.to_string())
                 ), e.clone())
             );
         },

@@ -191,7 +191,7 @@ use egui_extras::{Column, TableBuilder};
 use surf::http::headers::ToHeaderValues;
 use crate::gui::home::{gui_status_networks, HomeState, NetworkStatusInfo};
 
-pub async fn update_server_status(servers: Vec<Server>, mut status: Arc<Mutex<Vec<ServerStatus>>>) {
+pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
     let mut results = vec![];
 
     for server in servers {
@@ -204,7 +204,7 @@ pub async fn update_server_status(servers: Vec<Server>, mut status: Arc<Mutex<Ve
     guard.extend(results);
 }
 
-pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
 
 
     let servers = local_state.node_config.servers.clone();
@@ -256,9 +256,9 @@ pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalS
             info!("Deploying");
             tokio::spawn(async {
                 for server in servers {
-                    let mut ssh = SSH::from_server(&server);
+                    let ssh = SSH::from_server(&server);
                     let is_genesis = server.index == 0;
-                    let result = deploy::setup_server_redgold(
+                    let _result = deploy::setup_server_redgold(
                         ssh,
                         NetworkEnvironment::Dev,
                         is_genesis,
@@ -277,7 +277,7 @@ pub fn servers_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalS
 }
 
 
-pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, frame: &mut eframe::Frame) {
+pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     let ClientApp {
         logo,
         local_state,

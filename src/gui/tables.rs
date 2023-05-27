@@ -29,7 +29,7 @@ pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
                     ui.strong(h);
                 });
             }
-        }).body(|mut body| {
+        }).body(|body| {
         body.rows(text_height, data.len() - 1, |row_index, mut row| {
             let row_data = data.get(row_index + 1).expect("value row missing");
             for cell in row_data {

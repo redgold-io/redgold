@@ -105,7 +105,7 @@ impl ControlServer {
             let keys = find_multiparty_key_pairs(relay.clone()
                                                  // , rt.clone()
             ).await?;
-            let num_parties = keys.len() as i64;
+            // let num_parties = keys.len() as i64;
 
             let mut req = mps.clone();
             // TODO: Separate request types so we don't have to do this
@@ -217,7 +217,7 @@ impl ControlServer {
     async fn handle_control(req: ControlRequest, relay_int: Relay
                             // , rt: Arc<Runtime>
     ) -> Result<Json, Rejection> {
-        let mut response =
+        let response =
             Self::request_response(req, relay_int.clone()
                                    // , rt.clone()
             ).await;

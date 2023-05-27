@@ -8,7 +8,7 @@ use bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 
-use crate::{bytes_data, error_message, ErrorInfo, SafeBytesAccess, structs, TestConstants};
+use crate::{bytes_data, error_message, ErrorInfo, ErrorInfoContext, SafeBytesAccess, structs, TestConstants};
 use crate::structs::{Error as RGError, PublicKeyType};
 
 // TODO: Should we just switch to truncated SHA512?
@@ -28,7 +28,7 @@ pub fn sign(hash: &Vec<u8>, key: &SecretKey) -> Result<Vec<u8>, ErrorInfo> {
     let message = Message::from_slice(&ret).map_err(|e| {
         error_message(
             structs::Error::IncorrectSignature,
-            "Signature message construction failure",
+            format!("Signature message construction failure {}", e.to_string()),
         )
     })?;
     let signature: Signature = Secp256k1::new().sign(&message, &key);
@@ -56,32 +56,24 @@ pub fn verify(hash: &Vec<u8>, signature: &Vec<u8>, public_key: &Vec<u8>) -> Resu
     let mut ret = [0u8; 32];
 
     ret[..].copy_from_slice(&hash[0..32]);
-    let message = Message::from_slice(&ret).map_err(|e| {
-        error_message(
+    let message = Message::from_slice(&ret).error_msg(
             structs::Error::IncorrectSignature,
             "Signature message construction failure",
-        )
-    })?;
-    let decoded_signature = Signature::from_compact(signature).map_err(|e| {
-        error_message(
+    )?;
+    let decoded_signature = Signature::from_compact(signature).error_msg(
             structs::Error::IncorrectSignature,
-            "Decoded signature message construction failure",
-        )
-    })?;
-    let result = PublicKey::from_slice(public_key).map_err(|e| {
-        error_message(
+            "Decoded signature construction failure",
+        )?;
+    let result = PublicKey::from_slice(public_key).error_msg(
             structs::Error::IncorrectSignature,
-            "Public key message construction failure",
-        )
-    })?;
+            "Public key construction failure",
+    )?;
     Secp256k1::new()
         .verify(&message, &decoded_signature, &result)
-        .map_err(|e| {
-            error_message(
+        .error_msg(
                 structs::Error::IncorrectSignature,
-                format!("Signature verification failure: {}", e.to_string()),
-            )
-        })?;
+                "Signature verification failure"
+        )?;
     return Ok(());
 }
 

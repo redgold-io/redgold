@@ -3,7 +3,7 @@ use warp::Rejection;
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 
-use redgold_schema::{constants, ProtoSerde};
+use redgold_schema::{constants, ProtoSerde, struct_metadata_new};
 
 use crate::{schema, util};
 use crate::core::relay::Relay;
@@ -189,14 +189,14 @@ pub async fn construction_combine(
         let proof = Rosetta::signature_to_proof(signature.clone())?;
         let pay = signature.signing_payload;
         let pay_b = from_hex(pay.hex_bytes)?;
-        for mut i in tx.inputs.iter_mut() {
+        for i in tx.inputs.iter_mut() {
             if i.transaction_hash.safe_bytes()? == pay_b {
                 i.proof.push(proof.clone());
             }
         }
     }
     use std::cmp::Ordering;
-    for mut i in tx.inputs.iter_mut() {
+    for i in tx.inputs.iter_mut() {
         i.proof.sort_by(|x, y| {
             let vec = x.clone().proto_serialize();
             let vec1 = y.clone().proto_serialize();
@@ -294,15 +294,8 @@ pub async fn construction_payloads(
     let mut tx = structs::Transaction {
         inputs: vec![],
         outputs: vec![],
-        struct_metadata: Some(StructMetadata {
-            time: util::current_time_millis() as i64,
-            // TODO: tx version const
-            version: 0 as i32,
-        }),
+        struct_metadata: struct_metadata_new(), // TODO: Edit time here??
         options: None,
-        hash: None,
-        sign_hash: None,
-        counter_party_hash: None,
     };
     let mut payloads = vec![];
     let meta = request
@@ -310,7 +303,7 @@ pub async fn construction_payloads(
         .ok_or(error_message(RGError::MissingField, "Missing metadata"))?;
     let mut input_address_utxo_map: HashMap<Vec<u8>, Vec<UtxoEntry>> = HashMap::new();
     for x in meta.utxos {
-        let mut entry = input_address_utxo_map.get_mut(&x.address.clone());
+        let entry = input_address_utxo_map.get_mut(&x.address.clone());
         match entry {
             Some(e) => {
                 e.push(x.clone());
@@ -447,22 +440,19 @@ pub async fn mempool_transaction(
     request: MempoolTransactionRequest,
 ) -> Result<MempoolTransactionResponse, ErrorInfo> {
     r.validate_network(request.network_identifier).await?;
-    let bytes = from_hex(request.transaction_identifier.hash)?;
-    let tx: Result<structs::Transaction, ErrorInfo> = Err(error_message(RGError::UnknownTransaction, ""));
-    // TODO: Need mempool storage
-    // for x in r.relay.transaction_channels.iter() {
-    //     // TODO: optimize?
-    //     if x.key().clone() == bytes {
-    //     }
-    //     transaction_identifiers.push(TransactionIdentifier{
-    //         hash: hex::encode(x.key())
-    //     });
-    // }
-    let transaction = r.translate_transaction(tx?, State::Pending)?;
-    Ok({MempoolTransactionResponse{
-        transaction: transaction,
-        metadata: None
-    }})
+    let hash = Hash::from_hex(request.transaction_identifier.hash)?;
+    // let tx: Result<structs::Transaction, ErrorInfo> = ;
+    let result = r.relay.transaction_channels.get(&hash);
+    if let Some(rr) = result {
+        let tx = rr.value().transaction.clone();
+        let transaction = r.translate_transaction(tx, State::Pending)?;
+        Ok({MempoolTransactionResponse{
+            transaction,
+            metadata: None
+        }})
+    } else {
+        Err(error_message(RGError::UnknownTransaction, ""))
+    }
 }
 
 pub async fn network_list(
@@ -533,7 +523,7 @@ pub async fn network_status(
     })
 }
 
-
+#[allow(unused_variables, unused_assignments, unused_mut, dead_code)]
 pub async fn search_transactions(
     r: Rosetta,
     request: SearchTransactionsRequest,
@@ -545,48 +535,48 @@ pub async fn search_transactions(
     if let Some(s) = request._type {
         r.validate_type(s).await?;
     }
-    if let Some(s) = request.coin_identifier {
-        // todo validate
-        //r.validate_type(s)?;
-    }
-    if let Some(s) = request.status {
-        // todo validate
-        //r.validate_type(s)?;
-    }
+    // if let Some(s) = request.coin_identifier {
+    //     // todo validate
+    //     //r.validate_type(s)?;
+    // }
+    // if let Some(s) = request.status {
+    //     // todo validate
+    //     //r.validate_type(s)?;
+    // }
 
-    let mut transaction_hash: Option<Hash> = None;
-    let mut addr: Option<Address> = None;
-    let mut success: bool = false;
-    let mut is_and: bool = false;
-    let mut is_or: bool = false;
-    let limit = request.limit;
-    let offset = request.offset;
-    let max_block = request.max_block;
+    let mut _transaction_hash: Option<Hash> = None;
+    let mut _addr: Option<Address> = None;
+    let mut _success: bool = false;
+    let mut _is_and: bool = false;
+    let mut _is_or: bool = false;
+    // let limit = request.limit;
+    // let offset = request.offset;
+    // let max_block = request.max_block;
 
     for ti in request.transaction_identifier {
         let b = from_hex(ti.hash)?;
-        transaction_hash = Some(Hash::from_bytes(b));
+        _transaction_hash = Some(Hash::new(b));
     }
 
     for a in request.address {
-        addr = Some(Address::parse(a)?);
+        _addr = Some(Address::parse(a)?);
     }
     if let Some(s) = request.account_identifier {
         // TODO: Abstract this, validate no subaccount present or throw error.
-        addr = Some(Address::parse(s.address)?);
+        _addr = Some(Address::parse(s.address)?);
     }
 
     if let Some(s) = request.success {
-        success = s;
+        _success = s;
     }
 
     if let Some(s) = request.operator {
         match s {
             Operator::OR => {
-                is_or = true;
+                _is_or = true;
             }
             Operator::AND => {
-                is_and = true;
+                _is_and = true;
             }
         }
     }

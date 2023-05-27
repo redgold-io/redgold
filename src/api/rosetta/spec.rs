@@ -265,7 +265,7 @@ impl Rosetta {
                 index: parent_height,
                 hash: parent_hash,
             },
-            timestamp: block.struct_metadata.expect("struct").time,
+            timestamp: block.struct_metadata.expect("struct").time.expect("time"),
             transactions: translated,
             metadata: None,
         })

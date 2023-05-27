@@ -16,7 +16,7 @@ pub async fn hash_query(relay: Relay, hash_input: String) -> Result<HashSearchRe
         return Ok(response);
     } else {
         let h = from_hex(hash_input)?;
-        let hash = Hash::from_bytes(h.clone());
+        let hash = Hash::new(h.clone());
         let maybe_transaction = relay.ds.transaction_store.query_maybe_transaction(&hash).await?;
         let mut observation_proofs = vec![];
         let mut transaction = None;

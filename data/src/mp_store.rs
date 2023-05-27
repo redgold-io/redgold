@@ -42,7 +42,7 @@ impl MultipartyStore {
      */
     pub async fn add_keygen(&self, local_share: String, room_id: String,
                             initiate_keygen: InitiateMultipartyKeygenRequest
-    ) -> Result<(), ErrorInfo> {
+    ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
         let time = util::current_time_millis();
@@ -54,10 +54,10 @@ impl MultipartyStore {
             time,
             init
         )
-            .fetch_all(&mut pool)
+            .execute(&mut pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        Ok(())
+        Ok(rows_m.last_insert_rowid())
     }
 
     pub async fn add_signing_proof(&self, keygen_room_id: String, room_id: String, proof: Proof, initiate_signing: InitiateMultipartySigningRequest) -> Result<(), ErrorInfo> {
@@ -76,7 +76,7 @@ impl MultipartyStore {
         )
             .fetch_all(&mut pool)
             .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let _ = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
     }
 

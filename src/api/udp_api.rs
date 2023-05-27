@@ -1,4 +1,3 @@
-#![warn(rust_2018_idioms)]
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support UDP
 
 use std::collections::HashMap;
@@ -16,6 +15,11 @@ use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
+use futures::{Stream, TryStreamExt};
+use futures::stream::{BoxStream, SplitSink, SplitStream};
+use itertools::Itertools;
+use tokio_stream::wrappers::IntervalStream;
+use tokio_util::either::Either;
 use redgold_schema::{ErrorInfoContext, json, ProtoHashable, SafeBytesAccess};
 use redgold_schema::structs::{ErrorInfo, Request, UdpMessage};
 use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo};
@@ -24,6 +28,8 @@ use crate::util;
 use crate::util::keys::public_key_from_bytes;
 use crate::util::random_port;
 use redgold_schema::ProtoSerde;
+use crate::api::udp_api::UdpOperation::Outgoing;
+use redgold_schema::EasyJson;
 
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]
@@ -182,10 +188,10 @@ impl Encoder<UdpMessage> for UdpMessageCodec {
 
 struct UdpServer {
     // socket: UdpSocket,
-    framed: UdpFramed<UdpMessageCodec>,
     relay: Relay,
     // TODO: optimize reassembly with parts array?
-    messages: HashMap<String, (Vec<UdpMessage>, SocketAddr)>
+    messages: HashMap<String, (Vec<UdpMessage>, SocketAddr)>,
+    sink: SplitSink<UdpFramed<UdpMessageCodec>, (UdpMessage, SocketAddr)>,
 }
 
 const UDP_CHUNK_SIZE : usize = 1024;
@@ -198,16 +204,44 @@ impl UdpServer {
             UdpSocket::bind(addr)
                 .await
                 .error_info("Failed to bind UDP socket")?;
-        let mut framed = UdpFramed::new(socket, UdpMessageCodec{});
+        let framed = UdpFramed::new(socket, UdpMessageCodec{});
+        let (sink, stream) = futures::StreamExt::split(framed);
         let mut server = Self {
             // socket,
-            framed,
+            sink,
             relay,
             messages: Default::default(),
         };
-        server.run().await
+        server.run(stream).await
     }
 
+    // TODO: metrics for bad messages
+    async fn run(&mut self, stream: SplitStream<UdpFramed<UdpMessageCodec>>) -> Result<(), ErrorInfo> {
+
+        // Change to stream
+
+        let interval = tokio::time::interval(std::time::Duration::from_secs(100));
+        let interval_stream = IntervalStream::new(interval).map(|_| UdpOperation::Interval);
+        let incoming_stream = stream
+            .map(|m| UdpOperation::Incoming(m.error_info("Failed to receive UDP message")));
+        let r = self.relay.udp_outgoing_messages.receiver.clone();
+        let outgoing_stream = r.into_stream().map(|m| UdpOperation::Outgoing(m));
+
+        let interval_stream = futures::StreamExt::boxed(interval_stream);
+        let incoming_stream = futures::StreamExt::boxed(incoming_stream);
+        let outgoing_stream = futures::StreamExt::boxed(outgoing_stream);
+
+        futures::stream::select_all(vec![incoming_stream, interval_stream, outgoing_stream])
+            .map(|x| {
+                let res: Result<UdpOperation, ErrorInfo> = Ok(x);
+                res
+            })
+            .try_fold(self, |server, o| async move {
+                server.handle_udp_operation(o).await.and_then(|_| Ok(server))
+            })
+            .await?;
+        Ok(())
+    }
 
     async fn send_rx_incoming_log(&mut self, data: Vec<u8>, addr: SocketAddr) -> Result<(), ErrorInfo> {
         self.send_rx_incoming(data, addr.clone()).await.map_err(|e| {
@@ -230,78 +264,76 @@ impl UdpServer {
         Ok(())
     }
 
-    async fn process_typed(&mut self, typed: Option<Result<(UdpMessage, SocketAddr), io::Error>>) -> Result<(), ErrorInfo> {
-        if let Some(o) = typed {
-            // log::info!("UDP message received");
-            match o {
-                Err(e) => {
-                    log::error!("UDP error: {}", e.to_string());
-                }
-                Ok((wrapper, addr)) => {
-                    let w = wrapper.clone();
-                    let json_msg = json(&w).expect("json");
-                    log::info!("UDP message received from: {} - contents - {}", addr.clone(), json_msg);
+    async fn process_typed(&mut self, typed: Result<(UdpMessage, SocketAddr), ErrorInfo>) -> Result<(), ErrorInfo> {
+        match typed {
+            Err(e) => {
+                log::error!("UDP error: {}", e.json_or());
+            }
+            Ok((wrapper, addr)) => {
+                let w = wrapper.clone();
+                let json_msg = json(&w).expect("json");
+                log::info!("UDP message received from: {} - contents - {}", addr.clone(), json_msg);
 
-                    let mut message = wrapper.clone();
-                    message.timestamp = util::current_time_millis() as i64;
-                    if message.parts == 1 {
-                        if let Some(data) = message.bytes.map(|b| b.value) {
-                            self.send_rx_incoming_log(data, addr.clone()).await.ok();
-                        }
-                    } else {
-                        match self.messages.get_mut(&message.uuid.clone()) {
-                            Some((parts, stored_addr)) => {
-                                parts.push(message.clone());
-                                if parts.len() == (message.parts as usize) {
-                                    let mut data: Vec<u8> = Vec::new();
-                                    parts.sort_by(|a, b| a.part.cmp(&b.part));
-                                    for part in parts {
-                                        if let Some(b) = &part.bytes {
-                                            data.extend_from_slice(&*b.value);
-                                        }
+                let mut message = wrapper.clone();
+                message.timestamp = util::current_time_millis() as i64;
+                if message.parts == 1 {
+                    if let Some(data) = message.bytes.map(|b| b.value) {
+                        self.send_rx_incoming_log(data, addr.clone()).await.ok();
+                    }
+                } else {
+                    match self.messages.get_mut(&message.uuid.clone()) {
+                        Some((parts, _stored_addr)) => {
+                            parts.push(message.clone());
+                            if parts.len() == (message.parts as usize) {
+                                let mut data: Vec<u8> = Vec::new();
+                                parts.sort_by(|a, b| a.part.cmp(&b.part));
+                                for part in parts {
+                                    if let Some(b) = &part.bytes {
+                                        data.extend_from_slice(&*b.value);
                                     }
-                                    // Message is complete, send it to the relay
-                                    self.send_rx_incoming_log(data, addr.clone()).await.ok();
-                                    self.messages.remove(&wrapper.uuid.clone());
                                 }
-                            },
-                            None => {
-                                let mut parts = Vec::new();
-                                parts.push(message.clone());
-                                self.messages.insert(message.uuid, (parts, addr));
+                                // Message is complete, send it to the relay
+                                self.send_rx_incoming_log(data, addr.clone()).await.ok();
+                                self.messages.remove(&wrapper.uuid.clone());
                             }
+                        },
+                        None => {
+                            let mut parts = Vec::new();
+                            parts.push(message.clone());
+                            self.messages.insert(message.uuid, (parts, addr));
                         }
                     }
-                },
-            }
+                }
+            },
         }
-    Ok(())
+        Ok(())
     }
 
-    // TODO: metrics for bad messages
-    async fn run(&mut self) -> Result<(), ErrorInfo> {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(100));
-        loop { tokio::select! {
-            outgoing = self.relay.udp_outgoing_messages.receiver.recv_async_err() => {
-                let pm: PeerMessage = outgoing?;
+    async fn handle_udp_operation(&mut self, udp_operation: UdpOperation) -> Result<(), ErrorInfo> {
+        match udp_operation {
+            Outgoing(pm) => {
                 if let Some(b_addr) = pm.socket_addr {
                     let ser = pm.request.proto_serialize();
                     let chunks = ser.chunks(UDP_CHUNK_SIZE);
                     let parts = chunks.len();
                     for (i, chunk) in chunks.enumerate() {
                         let msg = UdpMessage::new(chunk.to_vec(), i as i64, parts as i64);
-                        // TODO: return send error to sender
                         log::debug!("Sending UDP message to {}", b_addr);
-                        self.framed.send((msg, b_addr)).await;
+                        self.sink.send((msg, b_addr)).await.error_info("Failed to send UDP message")?;
                     }
                 }
+                Ok(())
+            },
+            UdpOperation::Incoming(i) => {
+                self.process_typed(i).await?;
+                Ok(())
             }
-            _ = interval.tick() => {
+            UdpOperation::Interval => {
                 let mut stale_messages = vec![];
                 for (i, (m, _)) in &mut self.messages.iter() {
                     let stale = m.iter()
-                    .find(|m| ((m.timestamp + 1000*100) as u64) < util::current_time_millis())
-                    .is_some();
+                        .find(|m| ((m.timestamp + 1000*100) as u64) < util::current_time_millis())
+                        .is_some();
                     if stale {
                         // self.messages.remove(i);
                         stale_messages.push(i.clone());
@@ -310,16 +342,18 @@ impl UdpServer {
                 for i in stale_messages {
                     self.messages.remove(&i);
                 }
+                Ok(())
             }
-            msg = self.framed.next() => {
-               let typed: Option<Result<(UdpMessage, SocketAddr), io::Error>> = msg;
-                self.process_typed(typed).await?;
-            }
-        }
         }
     }
+
 }
 
+enum UdpOperation {
+    Outgoing(PeerMessage),
+    Incoming(Result<(UdpMessage, SocketAddr), ErrorInfo>),
+    Interval,
+}
 
 #[ignore]
 #[tokio::test]
@@ -327,7 +361,7 @@ async fn send_request_internal() -> std::io::Result<()> {
     let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
     let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
 
-    let a_addr = a_soc.local_addr()?;
+    // let a_addr = a_soc.local_addr()?;
     let b_addr = b_soc.local_addr()?;
 
     let mut a = UdpFramed::new(a_soc, UdpMessageCodec{});
@@ -350,7 +384,7 @@ async fn send_request_internal() -> std::io::Result<()> {
 #[tokio::test]
 async fn servers_multiple() -> std::io::Result<()> {
 
-    util::init_logger();
+    util::init_logger().ok();
     let port1 = random_port();
     let port2 = random_port();
     println!("port 1: {}, port 2: {}", port1.to_string(), port2.to_string());
@@ -359,7 +393,7 @@ async fn servers_multiple() -> std::io::Result<()> {
     tokio::spawn(UdpServer::new(relay1.clone(), Some(port1)));
     tokio::spawn(UdpServer::new(relay2.clone(), Some(port2)));
 
-    let socket_addr1 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port1);
+    // let socket_addr1 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port1);
     let socket_addr2 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port2);
 
     let mut pm = PeerMessage::empty();

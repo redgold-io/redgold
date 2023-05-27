@@ -59,7 +59,7 @@ impl MerkleTree {
     }
 }
 
-pub fn pad(mut hashes: &mut Vec<Hash>) {
+pub fn pad(hashes: &mut Vec<Hash>) {
     if hashes.len() % 2 == 1 {
         hashes.push(hashes.last().unwrap().clone());
     }

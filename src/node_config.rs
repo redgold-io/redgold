@@ -204,7 +204,7 @@ impl NodeConfig {
             .clone()
     }
     pub fn data_store_folder(&self) -> String {
-        let mut s = self.data_store_path.clone();
+        let s = self.data_store_path.clone();
         let path = Path::new(&s).parent().expect("data store folder no parent");
         path.to_str().expect("path").to_string()
     }

@@ -11,26 +11,26 @@ use redgold::util;
 use redgold::util::cli::args::RgArgs;
 use redgold::util::runtimes::{build_runtime, build_simple_runtime};
 use redgold_schema::SafeBytesAccess;
-use redgold_schema::structs::NetworkEnvironment;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 
-#[test]
-fn local_e2e_it() {
+#[tokio::test]
+async fn local_e2e_it() -> Result<(), ErrorInfo> {
 
     util::init_logger().expect("log");
-    let rt = build_runtime(1, "test");
     println!("Local E2E IT from inside test");
 
     let port_offset = NetworkEnvironment::Local.default_port_offset();
     let pc = PublicClient::from("127.0.0.1".to_string(), port_offset + 1);
 
-    let mut tx_sub = TransactionSubmitter::default(pc, rt, vec![]);
-    tx_sub.with_faucet();
+    let mut tx_sub = TransactionSubmitter::default(pc, vec![]);
+    tx_sub.with_faucet().await?;
 
-    let res = tx_sub.submit();
-    assert!(res.accepted());
+    let res = tx_sub.submit().await?;
+    assert!(res.query_transaction_response.is_some());
 
-    let cc = ControlClient::local(port_offset + 2);
+    Ok(())
+
 
     //
     // // TODO: Change the runtime structure to implement the shutdowns directly inside, then pass

@@ -127,7 +127,7 @@ pub async fn signing(
     let rec_id = RecoveryId::from_i32(recovery_id as i32).map_err(|e| error_info(e.to_string()))?;
     let rec_sig = RecoverableSignature::from_compact(&*comp, rec_id).map_err(|e| error_info(e.to_string()))?;
 
-    let mut s = Secp256k1::new();
+    let s = Secp256k1::new();
     let data_bytes = data_to_sign.clone();
     let msg = Message::from_slice(&data_bytes).map_err(|e| error_info(e.to_string()))?;
     let recovered_pk = s.recover(&msg, &rec_sig).map_err(|e| error_info(e.to_string()))?;

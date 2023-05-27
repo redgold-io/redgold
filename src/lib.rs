@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(dead_code)]
 pub mod api;
 pub mod async_functionality_loop;
 pub mod debug_err_handle;

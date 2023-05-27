@@ -34,7 +34,7 @@ impl HomeState {
     }
 }
 
-pub fn home_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn home_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
     ui.heading("Home");
     ui.separator();
     let home_state = &mut local_state.home_state;
@@ -149,7 +149,7 @@ pub async fn query_network_status(
 
         let reachable = match res {
             Ok(a) => {
-                let a2 = a.clone();
+                // let a2 = a.clone();
                 peers = Some(a.num_active_peers);
                 total_tx = Some(a.total_accepted_transactions);
                 if let Some(nmd) = a.latest_node_metadata {

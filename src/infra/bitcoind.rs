@@ -11,7 +11,7 @@ pub struct BitcoindRpcAuth {
 pub fn generate_username_rpc_auth<S: Into<String>>(username: S) -> Result<BitcoindRpcAuth, Error> {
     // let command = format!("curl -sSL https://raw.githubusercontent.com/bitcoin/bitcoin/master/share/rpcauth/rpcauth.py | python - {}",
     //                       username.into());
-    let (stdout, stderr) = util::cmd::run_cmd(
+    let (stdout, _) = util::cmd::run_cmd(
         "python3",
         vec!["./src/resources/infra/rpcauth.py", &*username.into()],
     );

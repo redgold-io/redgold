@@ -1,14 +1,25 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
+use std::collections::HashMap;
 use std::fmt::Display;
+use std::future::Future;
+use std::str::FromStr;
+
+use anyhow::{anyhow, Context, Result};
 use backtrace::Backtrace;
+use bitcoin::util::psbt::serialize::Deserialize;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
+use serde::Serialize;
+use tokio::task::futures::TaskLocalFuture;
+use tokio::task_local;
 
 use structs::{
-    Address, AddressType, BytesData, Error, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
+    Address, BytesData, Error, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
     StructMetadata, Transaction,
 };
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicKeyType, PublicRequest, PublicResponse, Request, Response, SignatureType, VersionInfo};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, VersionInfo};
 use crate::util::{dhash_str, dhash_vec};
 use crate::util::mnemonic_words::{generate_key, generate_key_i};
 
@@ -42,10 +53,6 @@ pub mod trust;
 pub mod input;
 
 
-use std::str::FromStr;
-use bitcoin::util::psbt::serialize::Deserialize;
-use serde::Serialize;
-
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {
     Some(BytesData {
         value: data,
@@ -57,7 +64,7 @@ pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {
 pub const VERSION: u32 = 0;
 
 pub fn i64_from_string(value: String) -> Result<i64, ErrorInfo> {
-    value.parse::<i64>().map_err(|e| {
+    value.parse::<i64>().map_err(|_| {
         error_message(
             Error::ParseFailure,
             "unable to parse i64 value from string amount",
@@ -84,16 +91,17 @@ pub fn from_hex(hex_value: String) -> Result<Vec<u8>, ErrorInfo> {
 
 pub fn struct_metadata(time: i64) -> Option<StructMetadata> {
     Some(StructMetadata {
-        time,
+        time: Some(time),
         version: VERSION as i32,
+        hash: None,
+        sign_hash: None,
+        counter_party_hash: None,
+        confirmation_hash: None,
     })
 }
 
 pub fn struct_metadata_new() -> Option<StructMetadata> {
-    Some(StructMetadata {
-        time: util::current_time_millis(),
-        version: constants::VERSION as i32,
-    })
+    struct_metadata(util::current_time_millis())
 }
 
 pub trait SafeBytesAccess {
@@ -227,44 +235,50 @@ where
 }
 
 pub trait WithMetadataHashableFields {
-    fn set_hash(&mut self, hash: Hash);
-    fn stored_hash_opt(&self) -> Option<Hash>;
-    fn struct_metadata_opt(&self) -> Option<StructMetadata>;
+    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata>;
+    // fn struct_metadata(&self) -> Option<&StructMetadata>;
+    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata>;
 }
 
 pub trait WithMetadataHashable {
-    fn struct_metadata(&self) -> Result<StructMetadata, ErrorInfo>;
+    fn struct_metadata(&mut self) -> Result<&mut StructMetadata, ErrorInfo>;
+    fn struct_metadata_err(&self) -> Result<&StructMetadata, ErrorInfo>;
     fn version(&self) -> Result<i32, ErrorInfo>;
-    fn time(&self) -> Result<i64, ErrorInfo>;
+    fn time(&self) -> Result<&i64, ErrorInfo>;
     fn hash(&self) -> Hash;
     fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo>;
     fn hash_vec(&self) -> Vec<u8>;
     fn hash_hex(&self) -> Result<String, ErrorInfo>;
     fn hash_hex_or_missing(&self) -> String;
     fn with_hash(&mut self) -> &mut Self;
+    fn set_hash(&mut self, hash: Hash) -> Result<(), ErrorInfo>;
 }
 
 impl<T> WithMetadataHashable for T
 where
     Self: WithMetadataHashableFields + HashClear + Clone + Message + std::default::Default,
 {
-    fn struct_metadata(&self) -> Result<StructMetadata, ErrorInfo> {
-        Ok(self
-            .struct_metadata_opt()
-            .ok_or(error_message(Error::MissingField, "struct_metadata"))?
-            .clone())
+    fn struct_metadata(&mut self) -> Result<&mut StructMetadata, ErrorInfo> {
+        let option = self.struct_metadata_opt();
+        option.ok_or(error_message(Error::MissingField, "struct_metadata"))
+    }
+
+    fn struct_metadata_err(&self) -> Result<&StructMetadata, ErrorInfo> {
+        self.struct_metadata_opt_ref().ok_or(error_message(Error::MissingField, "struct_metadata"))
     }
 
     fn version(&self) -> Result<i32, ErrorInfo> {
-        Ok(self.struct_metadata()?.version)
+        Ok(self.struct_metadata_err()?.version)
     }
 
-    fn time(&self) -> Result<i64, ErrorInfo> {
-        Ok(self.struct_metadata()?.time)
+    fn time(&self) -> Result<&i64, ErrorInfo> {
+        Ok(self.struct_metadata_opt_ref().safe_get()?.time.safe_get()?)
     }
 
     fn hash(&self) -> Hash {
-        self.stored_hash_opt().unwrap_or(self.calculate_hash())
+        self.struct_metadata_opt_ref()
+            .and_then(|s| s.hash.clone()) // TODO: Change to as_ref() to prevent clone?
+            .unwrap_or(self.calculate_hash())
     }
 
     fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
@@ -285,8 +299,14 @@ where
 
     fn with_hash(&mut self) -> &mut T {
         let hash = self.calculate_hash();
-        self.set_hash(hash);
+        self.set_hash(hash).expect("set");
         self
+    }
+
+    fn set_hash(&mut self, hash: Hash) -> Result<(), ErrorInfo> {
+        let met = self.struct_metadata()?;
+        met.hash = Some(hash);
+        Ok(())
     }
 }
 
@@ -340,13 +360,17 @@ impl<T> SafeOption<T> for Option<T> {
 }
 
 pub fn response_metadata() -> Option<ResponseMetadata> {
-    Some(ResponseMetadata {
-        success: true,
-        error_info: None,
-        task_local_details: vec![],
-    })
+    let mut response_metadata = ResponseMetadata::default();
+    response_metadata.success = true;
+    Some(response_metadata)
 }
 
+#[test]
+fn bool_defaults() {
+    let metadata = ResponseMetadata::default();
+    println!("metadata: {:?}", metadata);
+    assert_eq!(false, metadata.success);
+}
 
 
 pub trait ErrorInfoContext<T, E> {
@@ -354,10 +378,11 @@ pub trait ErrorInfoContext<T, E> {
     fn error_info<C: Into<String>>(self, context: C) -> Result<T, ErrorInfo>
         where
             C: Display + Send + Sync + 'static;
-}
+    fn error_msg<C: Into<String>>(self, code: Error, context: C) -> Result<T, ErrorInfo>
+        where
+            C: Display + Send + Sync + 'static;
 
-use anyhow::{anyhow, Context, Result};
-use tokio::task_local;
+}
 
 impl<T, E> ErrorInfoContext<T, E> for Result<T, E>
     where
@@ -368,7 +393,12 @@ impl<T, E> ErrorInfoContext<T, E> for Result<T, E>
             C: Display + Send + Sync + 'static {
         // Not using map_err to save 2 useless frames off the captured backtrace
         // in ext_context.
-        self.context(context).map_err(|e| error_info(e.to_string()))
+        // self.context(context)
+        self.map_err(|e| error_msg(Error::UnknownError, context.into(), e.to_string()))
+    }
+
+    fn error_msg<C: Into<String>>(self, code: Error, context: C) -> Result<T, ErrorInfo> where C: Display + Send + Sync + 'static {
+        self.map_err(|e| error_msg(code, context.into(), e.to_string()))
     }
 }
 
@@ -384,7 +414,7 @@ pub fn error_code(code: Error) -> ErrorInfo {
 pub fn slice_vec_eager<T>(vec: Vec<T>, start: usize, end: usize) -> Vec<T>
 where T : Clone {
     let mut ret = vec![];
-    let l = vec.len();
+    // let l = vec.len();
     for (i, v) in vec.iter().enumerate() {
         if i >= start && i <= end {
             ret.push(v.clone());
@@ -395,15 +425,11 @@ where T : Clone {
 
 pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
     let mut ret = vec![];
-    for seg in vec.split("\n") {
+    for seg in vec.split(splitter) {
         ret.push(seg.to_string());
     }
     ret
 }
-
-use std::collections::HashMap;
-use std::future::Future;
-use tokio::task::futures::TaskLocalFuture;
 
 // TODO: This feature is only available in tokio RT, need to substitute this for a
 // standard local key implementation depending on the features available for WASM crate.
@@ -441,7 +467,7 @@ where F : Future{
 }
 
 
-pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) -> ErrorInfo {
+pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_message: P) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
@@ -455,7 +481,7 @@ pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) ->
     }).collect_vec();
 
     ErrorInfo {
-        code: error_code as i32,
+        code: code as i32,
         // TODO: From error code map
         description: "".to_string(),
         description_extended: "".to_string(),
@@ -463,7 +489,12 @@ pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) ->
         details,
         retriable: false,
         stacktrace: stack,
+        lib_message: lib_message.into(),
     }
+}
+
+pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) -> ErrorInfo {
+    error_msg(error_code, message, "".to_string())
 }
 
 pub fn empty_public_response() -> PublicResponse {
@@ -661,7 +692,7 @@ fn verify_request_auth() {
     req.about();
     req.with_auth(&tc.key_pair());
     // println!("after with auth assign proof {}", req.calculate_hash().hex());
-    let pk = req.verify_auth().unwrap();
+    req.verify_auth().unwrap();
 
 }
 
@@ -821,4 +852,17 @@ impl PeerId {
             known_proof: vec![],
         }
     }
+}
+
+impl HashClear for StructMetadata {
+    fn hash_clear(&mut self) {
+        self.hash = None;
+        self.sign_hash = None;
+        self.counter_party_hash = None;
+        self.confirmation_hash = None;
+    }
+}
+
+impl StructMetadata {
+
 }

@@ -22,7 +22,7 @@ pub struct Rewards {
 impl Rewards {
     fn generate_reward_transaction(&self) {
         let _latest = self.relay.ds.select_latest_reward_hash().unwrap();
-        let input = Input {
+        let _input = Input {
             transaction_hash: None,
             output_index: 0,
             proof: vec![],
@@ -53,7 +53,7 @@ impl Rewards {
             .sum::<u64>() as i64;
         let delta = REWARD_AMOUNT_RAW - rounded;
 
-        let outputs = filtered
+        let _outputs = filtered
             .clone()
             .iter()
             .enumerate()

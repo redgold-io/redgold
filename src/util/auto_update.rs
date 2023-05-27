@@ -184,8 +184,6 @@ fn verify_auto_update_start() {
 
 // TODO: This should really poll peers to see if they have a newly updated version.
 pub async fn from_node_config(node_config: NodeConfig) {
-    let disable_auto_update_types: Vec<NetworkEnvironment> =
-        vec![NetworkEnvironment::Debug, NetworkEnvironment::Local];
     if let Some(hash) = node_config.executable_checksum {
         if auto_update_enabled(node_config.network, node_config.disable_auto_update)
         {

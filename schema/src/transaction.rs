@@ -29,16 +29,12 @@ pub fn rounded_balance_i64(redgold_amount: i64) -> f64 {
 }
 
 impl WithMetadataHashableFields for Transaction {
-    fn set_hash(&mut self, hash: Hash) {
-        self.hash = Some(hash);
+    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata> {
+        self.struct_metadata.as_mut()
     }
 
-    fn stored_hash_opt(&self) -> Option<Hash> {
-        self.hash.clone()
-    }
-
-    fn struct_metadata_opt(&self) -> Option<StructMetadata> {
-        self.struct_metadata.clone()
+    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata> {
+        self.struct_metadata.as_ref()
     }
 }
 
@@ -48,7 +44,9 @@ impl HashClear for Transaction {
         for mut x in self.inputs.iter_mut() {
             x.output = None;
         }
-        self.hash = None;
+        if let Some(s) = self.struct_metadata_opt() {
+            s.hash_clear();
+        }
     }
 }
 
@@ -133,7 +131,7 @@ impl Transaction {
             ))?;
         Ok(Proof::verify_proofs(
             &input.proof,
-            &Hash::from_bytes(utxo_entry.transaction_hash.clone()),
+            &Hash::new(utxo_entry.transaction_hash.clone()),
             &Address::from_bytes(utxo_entry.address.clone())?,
         )?)
     }
@@ -284,10 +282,7 @@ impl Transaction {
             outputs,
             // TODO: Fix genesis cause this causes an issue
             struct_metadata: struct_metadata(0 as i64),
-            options: None,
-            hash: None,
-            sign_hash: None,
-            counter_party_hash: None,
+            options: None
         };
 
         tx.with_hash();

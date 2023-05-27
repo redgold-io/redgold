@@ -19,7 +19,7 @@ fn generate_image(height: u32, width: u32, data: &Vec<u8>) -> image::RgbImage {
 
 fn image_from_bytes(hash_vec: Vec<u8>) -> RgbImage {
     let mut all_bytes: Vec<u8> = Vec::new();
-    for i in 0..20 {
+    for _ in 0..20 {
         all_bytes.extend(&hash_vec.clone());
     }
     return generate_image(20, 20, &all_bytes)
@@ -163,7 +163,7 @@ fn debug_rart() {
     //     .take(8)
     //     .collect();
 
-    svg::save("debug.svg", &document);
+    svg::save("debug.svg", &document).expect("");
 
     // return save_string;
 }

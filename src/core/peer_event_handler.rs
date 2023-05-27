@@ -1,24 +1,26 @@
 use std::sync::Arc;
+
 use bitcoin::secp256k1::PublicKey;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-
+use futures::FutureExt;
 use libp2p::Multiaddr;
 use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
+
 use redgold_schema::SafeOption;
 use redgold_schema::structs::{ErrorInfo, PeerData};
-use crate::api::RgHttpClient;
-use crate::core::internal_message::{FutLoopPoll, PeerMessage, SendErrorInfo};
-use crate::core::peer_rx_event_handler::rest_peer;
 
+use crate::api::RgHttpClient;
+use crate::core::internal_message::{PeerMessage, SendErrorInfo};
+use crate::core::peer_rx_event_handler::rest_peer;
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
+use crate::schema::json;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util;
 use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
-use crate::schema::json;
 
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {
@@ -26,17 +28,16 @@ pub struct PeerOutgoingEventHandler {
     relay: Relay,
     // rt: Arc<Runtime>
 }
-use futures::FutureExt;
 
 impl PeerOutgoingEventHandler {
 
     //async fn send_message(&mut self) ->
 
     async fn handle_peer_message(relay: Relay, message: PeerMessage) -> Result<(), ErrorInfo> {
-        let ser_msg = json(&message.request.clone())?;
+        // let ser_msg = json(&message.request.clone())?;
         // info!("PeerOutgoingEventHandler received message {}", ser_msg);
         let peers = relay.ds.peer_store.all_peers().await?;
-        let ser_msgp = json(&peers.clone())?;
+        // let ser_msgp = json(&peers.clone())?;
         // info!("PeerOutgoingEventHandler query all peers {}", ser_msgp);
 
         if let Some(pk) = message.public_key {
@@ -77,13 +78,14 @@ impl PeerOutgoingEventHandler {
 
         let receiver = self.relay.peer_message_tx.receiver.clone();
         let relay = self.relay.clone();
-        let err = receiver.into_stream().for_each_concurrent(200, |message| {
+        let err = receiver.into_stream()
+            .map(|x| Ok(x))
+            .try_for_each_concurrent(200, |message| {
             async {
-                Self::handle_peer_message(relay.clone(), message).await;
+                Self::handle_peer_message(relay.clone(), message).await
             }
         });
-        err.await;
-        Ok(())
+        err.await
     }
 
     //
@@ -136,11 +138,11 @@ impl PeerOutgoingEventHandler {
     // }
     //
 
-    pub async fn send_message_rest(message: PeerMessage, pd: PeerData, nc: NodeConfig) -> Result<(), ErrorInfo> {
+    pub async fn send_message_rest(mut message: PeerMessage, pd: PeerData, nc: NodeConfig) -> Result<(), ErrorInfo> {
 
         let nmd = pd.node_metadata[0].clone();
         let res = rest_peer(
-            nc, nmd.external_address.clone(), (nmd.port_offset.safe_get()? + 1), message.request.clone()
+            nc, nmd.external_address.clone(), nmd.port_offset.safe_get()? + 1, &mut message.request
         ).await;
         match res {
             Ok(r) => {

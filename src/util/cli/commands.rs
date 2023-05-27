@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOption, util};
+use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOption, util, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
@@ -79,7 +79,7 @@ pub async fn list_servers(config: &NodeConfig) -> Result<Vec<Server>, ErrorInfo>
     Ok(servers)
 }
 
-pub fn generate_mnemonic(generate_mnemonic: &GenerateMnemonic) {
+pub fn generate_mnemonic(_generate_mnemonic: &GenerateMnemonic) {
     let m = generate_random_mnemonic();
     println!("{}", m.to_string());
 }
@@ -145,9 +145,9 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 
 pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
     let address = Address::parse(p0.to.clone())?;
-    let response = p1.lb_client().faucet(&address, false).await?;
-    let tx = response.transaction.safe_get()?;
-    let tx_hex = tx.hash.safe_get()?.hex();
+    let response = p1.lb_client().faucet(&address).await?;
+    let tx = response.submit_transaction_response.safe_get()?.transaction.safe_get()?;
+    let tx_hex = tx.hash_hex()?;
     println!("{}", tx_hex);
     Ok(())
 }
@@ -210,7 +210,7 @@ pub fn add_server_prompt() -> Server {
     }
 }
 
-pub async fn deploy(deploy: Deploy, config: NodeConfig) -> Result<(), ErrorInfo> {
+pub async fn deploy(deploy: Deploy, _config: NodeConfig) -> Result<(), ErrorInfo> {
 
     if deploy.wizard {
         println!("Welcome to the Redgold deployment wizard!");
@@ -296,23 +296,23 @@ pub async fn deploy(deploy: Deploy, config: NodeConfig) -> Result<(), ErrorInfo>
          'all' for all environments on same machine no quotes -- empty for default of 'all'");
         let mut answer = String::new();
         std::io::stdin().read_line(&mut answer).expect("Failed to read line");
-        let network_env = if answer.is_empty(){
+        let _network_env = if answer.is_empty(){
             NetworkEnvironment::All
         } else { NetworkEnvironment::parse(answer.trim().to_lowercase())};
 
         println!("Enter mnemonic passphrase, leave empty for none");
-        let mut passphrase_input = String::new();
+        let passphrase_input = String::new();
         std::io::stdin().read_line(&mut answer).expect("Failed to read line");
         let passphrase: Option<&str> = if passphrase_input.is_empty() {
             None
         } else {
             Some(&*passphrase_input)
         };
-        let seed_bytes = mnemonic.to_seed(passphrase).0;
-
-        for server in servers {
-
-        }
+        let _seed_bytes = mnemonic.to_seed(passphrase).0;
+        //
+        // for server in servers {
+        //
+        // }
 
 
     }
@@ -320,20 +320,20 @@ pub async fn deploy(deploy: Deploy, config: NodeConfig) -> Result<(), ErrorInfo>
 
 }
 
-pub async fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig
+pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
                         // , arc: Arc<Runtime>
 ) -> Result<(), ErrorInfo> {
     if p1.network == NetworkEnvironment::Main {
         return Err(error_info("Cannot test transaction on mainnet unsupported".to_string()));
     }
     let client = p1.lb_client();
-    let mut tx_submit = TransactionSubmitter::default(client.clone(),
+    let tx_submit = TransactionSubmitter::default(client.clone(),
                                                       // arc.clone(),
                                                       vec![]
     );
     let faucet_tx = tx_submit.with_faucet().await?;
-    // info!("Faucet response: {}", faucet_tx.json_or());
-    let faucet_tx = faucet_tx.transaction.safe_get()?;
+    info!("Faucet response: {}", faucet_tx.json_or());
+    let faucet_tx = faucet_tx.submit_transaction_response.safe_get()?.transaction.safe_get()?;
     let _ = {
         let gen =
         tx_submit.generator.lock().expect("");
@@ -373,13 +373,13 @@ pub async fn test_transaction(p0: &&TestTransactionCli, p1: &NodeConfig
 #[ignore]
 #[tokio::test]
 async fn test_transaction_dev() {
-    init_logger();
+    init_logger().ok();
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
     // let rt = build_runtime(5, "asdf");
     let t = TestTransactionCli{};
     // let arc = rt.clone();
-    let res = test_transaction(&&t, &nc
+    let _ = test_transaction(&&t, &nc
                                // , arc
     ).await.expect("");
 }

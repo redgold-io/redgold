@@ -82,10 +82,10 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
             key_pair: map.get(&*u.address).expect("Map missing entry").clone(),
         })
         .collect_vec();
-
-    let mut generator = TransactionGenerator::default_adv(
-        utxos.clone(), min_offset, max_offset, node_config.internal_mnemonic()
-    );
+    //
+    // let generator = TransactionGenerator::default_adv(
+    //     utxos.clone(), min_offset, max_offset, node_config.internal_mnemonic()
+    // );
 
 
     if utxos.is_empty() {
@@ -102,42 +102,11 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
             .with_output(&addr, TransactionAmount::from_fractional(5 as f64)?)
             .with_remainder();
         let transaction = builder.transaction.clone();
-        // let transaction = generator.generate_simple_tx().clone();
-        let (sender, receiver) = flume::unbounded::<Response>();
-        let message = TransactionMessage {
-            transaction: transaction.clone(),
-            response_channel: Some(sender)
-        };
-        relay
-            .clone()
-            .transaction
-            .sender
-            .send_err(message)?;
 
-        let r_err = receiver.recv_async_err().await;
+        let r_err = relay.submit_transaction_sync(&transaction).await?;
 
-        match r_err {
-            Ok(response) => {
-                if response.clone().as_error_info().is_ok() {
-                    // generator.completed(transaction.clone());
-                    let mut tx = transaction.clone();
-                    tx.with_hash();
-                    // info!("Faucet success with response hash: {}", tx.hash.hex());
-                    let mut faucet_response = FaucetResponse::default();
-                    faucet_response.transaction = Some(tx);
-                    let option = response.submit_transaction_response.clone();
-                    let response1 = option.safe_get()?.clone();
-                    let x = response1.query_transaction_response.safe_get()?;
-                    let proofs = x.observation_proofs.clone();
-                    faucet_response.acceptance_proofs = proofs;
-                    Ok(faucet_response)
-                } else {
-                    let e = format!("Faucet failure: {:?}", serde_json::to_string(&response));
-                    info!("Faucet failure: {}", e);
-                    Err(error_info(e))
-                }
-            }
-            Err(e) => Err(e)
-        }
+        let mut faucet_response = FaucetResponse::default();
+        faucet_response.submit_transaction_response = Some(r_err);
+        Ok(faucet_response)
     }
 }

@@ -5,41 +5,37 @@ use crate::{struct_metadata_new, Hash, HashClear, StructMetadata, TestConstants,
 
 impl HashClear for Observation {
     fn hash_clear(&mut self) {
-        self.hash = None;
+        for x in self.struct_metadata_opt() {
+            x.hash_clear();
+        }
     }
 }
 
 impl WithMetadataHashableFields for Observation {
-    fn set_hash(&mut self, hash: Hash) {
-        self.hash = Some(hash);
+    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata> {
+        self.struct_metadata.as_mut()
     }
 
-    fn stored_hash_opt(&self) -> Option<Hash> {
-        self.hash.clone()
-    }
-
-    fn struct_metadata_opt(&self) -> Option<StructMetadata> {
-        self.struct_metadata.clone()
+    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata> {
+        self.struct_metadata.as_ref()
     }
 }
 
 impl HashClear for ObservationMetadata {
     fn hash_clear(&mut self) {
-        self.hash = None;
+        if let Some(s) = self.struct_metadata.as_mut() {
+            s.hash_clear();
+        }
     }
 }
 
 impl WithMetadataHashableFields for ObservationMetadata {
-    fn set_hash(&mut self, hash: Hash) {
-        self.hash = Some(hash);
+    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata> {
+        self.struct_metadata.as_mut()
     }
 
-    fn stored_hash_opt(&self) -> Option<Hash> {
-        self.hash.clone()
-    }
-
-    fn struct_metadata_opt(&self) -> Option<StructMetadata> {
-        self.struct_metadata.clone()
+    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata> {
+        self.struct_metadata.as_ref()
     }
 }
 
@@ -47,7 +43,7 @@ impl Observation {
     pub fn leafs(&self) -> Vec<Vec<u8>> {
         self.observations
             .iter()
-            .map(|r| r.hash_vec())
+            .map(| r| r.clone().hash_vec())
             /*
                    old code
             pub fn metadata_hash(&self) -> [u8; 32] {
@@ -97,7 +93,6 @@ impl ObservationMetadata {
         let tc = TestConstants::new();
         Self {
             observed_hash: Some(tc.hash_vec.into()),
-            hash: None,
             state: None,
             validation_confidence: None,
             struct_metadata: struct_metadata_new(),

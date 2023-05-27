@@ -12,10 +12,10 @@ use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::{json_or, ProtoHashable, SafeOption, struct_metadata_new, structs, task_local, task_local_map};
+use redgold_schema::{json_or, ProtoHashable, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
 use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, ValidationType};
 
-use crate::core::internal_message::{FutLoopPoll, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::transaction::{TransactionTestContext, validate_utxo};
 use crate::data::data_store::DataStore;
@@ -30,6 +30,7 @@ use crate::schema::structs::ObservationProof;
 use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
+use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
@@ -49,6 +50,7 @@ pub struct RequestProcessor {
     receiver: flume::Receiver<Conflict>,
     request_id: String,
     pub transaction_hash: Hash,
+    pub transaction: Transaction
 }
 
 #[derive(Clone)]
@@ -57,13 +59,14 @@ pub struct UTXOContentionPool {
 }
 
 impl RequestProcessor {
-    fn new(transaction_hash: &Hash, request_id: String) -> RequestProcessor {
+    fn new(transaction_hash: &Hash, request_id: String, transaction: Transaction) -> RequestProcessor {
         let (s, r) = flume::unbounded::<Conflict>();
         return RequestProcessor {
             sender: s,
             receiver: r,
             request_id,
             transaction_hash: transaction_hash.clone(),
+            transaction,
         };
     }
 }
@@ -205,7 +208,7 @@ impl TransactionProcessContext {
         increment_counter!("redgold.node.async_started");
         // let mut fut = FutLoopPoll::new();
         // TODO: Change to queue
-        let mut receiver = self.relay.transaction.receiver.clone();
+        let receiver = self.relay.transaction.receiver.clone();
         // TODO this accomplishes queue, we can also move the spawn function into FutLoopPoll so that
         // the only function we have here is to call one function
         // do that later
@@ -255,7 +258,7 @@ impl TransactionProcessContext {
     async fn scoped_process_and_respond(&mut self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
         let request_uuid = Uuid::new_v4().to_string();
         let hex = transaction_message.transaction.calculate_hash().hex();
-        let time = transaction_message.transaction.struct_metadata.clone().map(|s| s.time.clone()).unwrap_or(0);
+        let time = transaction_message.transaction.time().map(|x| x.clone()).unwrap_or(0);
         let current_time = util::current_time_millis_i64();
         let input_address = transaction_message.transaction.first_input_address().clone()
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
@@ -382,21 +385,21 @@ impl TransactionProcessContext {
         let hash = transaction.hash();
         self.transaction_hash = Some(hash.clone());
 
-        /// Check if we already have a rejection reason for this transaction and abort if so
-        /// returning the previous rejection reason.
+        // Check if we already have a rejection reason for this transaction and abort if so
+        // returning the previous rejection reason.
         let ds = self.relay.ds.clone();
         if let Some((_, Some(pre_rejection))) = ds.transaction_store.query_maybe_transaction(&hash).await? {
             return Err(pre_rejection);
         }
 
-        /// Establish channels for other transaction threads to communicate conflicts with this one.
-        let request_processor = self.create_receiver_or_err(&hash, request_uuid)?;
+        // Establish channels for other transaction threads to communicate conflicts with this one.
+        let request_processor = self.create_receiver_or_err(&hash, request_uuid, &transaction)?;
 
-        /// Validate obvious schema related errors / local errors requiring no other context information
+        // Validate obvious schema related errors / local errors requiring no other context information
         transaction.prevalidate()?;
 
-        /// Attempt to resolve all the transaction inputs and outputs for context-aware validation
-        /// This is the place where balances checks and signature verifications are performed.
+        // Attempt to resolve all the transaction inputs and outputs for context-aware validation
+        // This is the place where balances checks and signature verifications are performed.
         let resolver_data = resolve_transaction(&transaction,
                                                 self.relay.clone(),
                                                 // self.tx_process.clone()
@@ -407,14 +410,6 @@ impl TransactionProcessContext {
         self.utxo_ids = Some(fixed_utxo_ids.clone());
         // TODO: Check for conflicts via peer query -- currently unimplemented
         check_utxo_conflicts(self.relay.clone(), &fixed_utxo_ids, &hash).await?;
-
-        let utxo_id_inputs = transaction.utxo_ids_of_inputs()?;
-
-        let utxo_ids = transaction.iter_utxo_inputs();
-        // let utxo_ids = validate_utxo(transaction, &self.relay.ds)?;
-        let utxo_ids2 = utxo_ids.clone();
-        let mut i: usize = 0;
-
 
         let mut conflict_detected = false;
         let self_conflict = Conflict {
@@ -456,7 +451,6 @@ impl TransactionProcessContext {
                     // TODO: remove this clone
                 }
             };
-            i += 1;
         }
 
         // TODO: Don't remember the purpose of this duplicate validation here, we should really
@@ -581,7 +575,7 @@ impl TransactionProcessContext {
         let prf = self.observe(validation_type, State::Finalized).await?;
         observation_proofs.insert(prf);
 
-        self.insert_transaction(&hash, transaction).await?;
+        self.insert_transaction(&transaction).await?;
         increment_counter!("redgold.transaction.accepted");
 
         tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());
@@ -622,7 +616,6 @@ impl TransactionProcessContext {
 
     async fn insert_transaction(
         &self,
-        hash: &Hash,
         transaction: &Transaction,
     ) -> Result<(), ErrorInfo> {
         // self.observation_buffer.push();
@@ -636,7 +629,7 @@ impl TransactionProcessContext {
                 .ds
                 .transaction_store
                 .insert_transaction(
-                    &transaction.clone(), util::current_time_millis_i64(), true, None
+                    &transaction, util::current_time_millis_i64(), true, None
                 ).await?;
 
         for (output_index, input) in transaction.inputs.iter().enumerate() {
@@ -696,6 +689,7 @@ impl TransactionProcessContext {
         &self,
         transaction_hash: &Hash,
         request_uuid: String,
+        transaction: &Transaction
     ) -> Result<RequestProcessor, ErrorInfo> {
         let entry = self
             .relay
@@ -704,7 +698,7 @@ impl TransactionProcessContext {
         let res = match entry {
             Entry::Occupied(_) => Err(error_message(Error::TransactionAlreadyProcessing, "Duplicate TX hash found in processing queue")),
             Entry::Vacant(entry) => {
-                let req = RequestProcessor::new(&transaction_hash, request_uuid);
+                let req = RequestProcessor::new(&transaction_hash, request_uuid, transaction.clone());
                 entry.insert(req.clone());
                 Ok(req)
             }

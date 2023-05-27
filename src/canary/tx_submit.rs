@@ -1,18 +1,20 @@
-use crate::api::public_api::{PublicClient};
-use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
-use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transaction};
-use crate::schema::WithMetadataHashable;
-use log::{error, info};
 use std::borrow::Borrow;
 use std::ops::Sub;
 use std::sync::{Arc, Mutex};
+
 use itertools::Itertools;
+use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-use redgold_schema::{empty_public_response, ErrorInfoContext, SafeBytesAccess};
+
+use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse};
 use redgold_schema::util::mnemonic_words::MnemonicWords;
-use crate::core::internal_message::FutLoopPoll;
+
+use crate::api::public_api::PublicClient;
+use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
+use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transaction};
+use crate::schema::WithMetadataHashable;
 
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
@@ -26,7 +28,7 @@ impl TransactionSubmitter {
         // runtime: Arc<Runtime>,
         utxos: Vec<SpendableUTXO>,
     ) -> Self {
-        let mut generator = TransactionGenerator::default(utxos.clone());
+        let generator = TransactionGenerator::default(utxos.clone());
         // if utxos.is_empty() {
         //     generator = generator.with_genesis().clone();
         // }
@@ -38,13 +40,12 @@ impl TransactionSubmitter {
     }
     pub fn default_adv(
         client: PublicClient,
-        runtime: Arc<Runtime>,
         utxos: Vec<SpendableUTXO>,
         min_offset: usize,
         max_offset: usize,
         wallet: MnemonicWords
     ) -> Self {
-        let mut generator = TransactionGenerator::default_adv(utxos.clone(), min_offset, max_offset, wallet);
+        let generator = TransactionGenerator::default_adv(utxos.clone(), min_offset, max_offset, wallet);
         // if utxos.is_empty() {
         //     generator = generator.with_genesis().clone();
         // }
@@ -125,13 +126,19 @@ impl TransactionSubmitter {
         let a = w.address_typed();
         let vec_a = a.address.safe_bytes()?;
         let res = //self.runtime.block_on(
-            pc.faucet(&a, true).await?;
+            pc.faucet(&a).await?;
+        let submit_r = res.submit_transaction_response.safe_get()?;
+        let qry = submit_r.query_transaction_response.safe_get()?;
+        let len_proofs = qry.observation_proofs.len();
+        if len_proofs < 2 {
+            return Err(error_info("Insufficient observation proofs"));
+        }
         // let h = res.transaction_hash.expect("tx hash");
         // let q = self.runtime.block_on(pc.query_hash(h.hex())).expect("query hash");
         // let tx_info = q.transaction_info.expect("transaction");
         // assert!(!tx_info.observation_proofs.is_empty());
         // let tx = tx_info.transaction.expect("tx");// TODO: does this matter 0 time?
-        let tx = res.clone().transaction.expect("tx");
+        let tx = submit_r.transaction.as_ref().expect("tx");
         let vec = tx.to_utxo_entries(0);
         let vec1 = vec.iter().filter(|u|
             u.address == vec_a).collect_vec();

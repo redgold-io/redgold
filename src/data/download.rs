@@ -31,7 +31,7 @@ pub async fn download_msg(
     key: PublicKey,
 ) -> Result<Response, ErrorInfo> {
 
-    let key_hex = hex::encode(key.serialize().to_vec());
+    // let key_hex = hex::encode(key.serialize().to_vec());
     // info!("Sending download message: start {:?} end: {:?}  type {:?} key_hex: {}", start_time, end_time, data_type, key_hex);
     let c = new_channel::<Response>();
     let r = c.sender.clone();
@@ -122,13 +122,13 @@ pub async fn download_all(
         relay.ds.observation.insert_observation_and_edges(x2, x.time as i64).await?;
     }
 
-    let result1 = download_msg(
+    let _ = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::ObservationEdgeEntry,
         key,
-    ).await;
+    ).await?;
     let dr = r.download_response.safe_get()?;
     for x in &dr.observation_edges {
         relay.ds.observation.insert_observation_edge(&x).await?;

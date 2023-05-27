@@ -17,8 +17,8 @@ use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAcce
 use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
 
 use crate::api::control_api::ControlClient;
-use crate::api::p2p_io::rgnetwork::Event;
-use crate::api::p2p_io::P2P;
+// use crate::api::p2p_io::rgnetwork::Event;
+// use crate::api::p2p_io::P2P;
 use crate::api::{RgHttpClient, public_api};
 use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
@@ -188,7 +188,7 @@ impl Node {
         // join_handles.push(amh);
         let c_config = relay.clone();
         if node_config.canary_enabled {
-            let cwh = spawn_blocking(move || { canary::run(c_config) });
+            let cwh = tokio::spawn(canary::run(c_config));
             join_handles.push(cwh);
         }
 
@@ -200,7 +200,7 @@ impl Node {
         relay2: Relay,
         // runtimes: NodeRuntimes
     ) -> Result<(), ErrorInfo> {
-        let mut relay = relay2.clone();
+        let relay = relay2.clone();
         let node_config = relay.node_config.clone();
 
         let migration_result =
@@ -283,9 +283,8 @@ impl Node {
     ) -> Result<Node, ErrorInfo> {
         // Inter thread communication
 
-        let mut node = Self {
-            relay: relay.clone(),
-            // runtimes: runtimes.clone(),
+        let node = Self {
+            relay: relay.clone()
         };
 
         let node_config = relay.node_config.clone();
@@ -421,7 +420,7 @@ impl LocalTestNodeContext {
             node_config.seeds = vec![x];
         }
         // let runtimes = NodeRuntimes::default();
-        let mut relay = Relay::new(node_config.clone()).await;
+        let relay = Relay::new(node_config.clone()).await;
         Node::prelim_setup(relay.clone()
                            // , runtimes.clone()
         ).await.expect("prelim");
@@ -688,6 +687,7 @@ impl LocalNodes {
 // }
 
 
+/// Main entry point for end to end testing.
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[tokio::test]
 async fn e2e() {
@@ -698,39 +698,19 @@ async fn e2e() {
 
 
 async fn e2e_async() -> Result<(), ErrorInfo> {
-    // hot dog
-    // let do_run = std::env::var("CI");
-    // if do_run.is_ok() {
-    //     return;
-    // }
-
-    // let runtime = build_runtime(10, "e2e");
-    util::init_logger().ok(); //.expect("log");
+    util::init_logger().ok();
     metrics_registry::register_metric_names();
     metrics_registry::init_print_logger();
     // init_tracing();
     let _tc = TestConstants::new();
 
-
-    // runtime.block_on(async { sleep(Duration::new(3, 1)).await });
-
-    //
-    let mut local_nodes = LocalNodes::new(
-        // runtime.clone(),
-        None).await;
+    let mut local_nodes = LocalNodes::new(None).await;
     let start_node = local_nodes.start().clone();
     info!("Started initial node");
     let client1 = start_node.control_client.clone();
-
     let ds = start_node.node.relay.ds.clone();
-    //
-    // // Await nodes started;
-    //
     let show_balances = || {
         let res = &ds.query_all_balance();
-        // if res.is_err() {
-        //     error!("wtf: {:?}", res);
-        // }
         let res2 = res.as_ref().unwrap();
         let str = serde_json::to_string(&res2).unwrap();
         info!("Balances: {}", str);
@@ -770,7 +750,9 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     // Exception bad access on this on the json decoding? wtf?
     let faucet_res = submit.with_faucet().await?;
     info!("Faucet response: {}", faucet_res.json_pretty_or());
-    assert!(faucet_res.acceptance_proofs.len() > 0);
+    let faucet_qry = faucet_res.submit_transaction_response.expect("").query_transaction_response.expect("");
+    faucet_qry.accepted(1).expect("accepted");
+    assert_eq!(faucet_qry.observation_proofs.len(), 2);
 
     let _result2 = submit.submit().await;
     assert!(_result2.is_ok());
@@ -778,7 +760,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     info!("Num utxos after second submit {:?}", utxos.len());
 
-    submit.submit_duplicate();
+    submit.submit_duplicate().await;
 
     info!("Num utxos after duplicate submit {:?}", utxos.len());
 
@@ -787,7 +769,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     for _ in 0..1 {
         // TODO Flaky failure observed once? Why?
-        submit.submit_double_spend(None);
+        submit.submit_double_spend(None).await;
     }
 
     info!("Num utxos after double spend submit {:?}", utxos.len());

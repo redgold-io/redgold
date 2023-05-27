@@ -75,18 +75,22 @@ impl BlockFormationProcess {
     }
 
     pub async fn default(relay: Relay) -> Result<Self, ErrorInfo> {
-        let last_block = relay
+        let last_block_opt = relay
             .ds
             .query_last_block()
-            .await?
+            .await?;
             // .expect("Datastore failure on last block query")
             // .ok_or(error_message(Error::UnknownError, "Missing last block"))
-            .unwrap_or_else(|| {
+        //
+        let last_block = match last_block_opt {
+            None => {
                 let block = create_genesis_block();
                 // TODO: only if historical balance tracking enabled
-                relay.ds.insert_block_update_historicals(&block);
+                relay.ds.insert_block_update_historicals(&block).await?;
                 block
-            });
+            }
+            Some(b) => {b}
+        };
         Ok(Self { relay, last_block })
     }
 }

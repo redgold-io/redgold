@@ -1,3 +1,6 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
+
 use std::result;
 use std::sync::Arc;
 use sqlx::pool::PoolConnection;
