@@ -14,7 +14,7 @@ use futures::StreamExt;
 use redgold_schema::structs::ErrorInfo;
 use crate::core::internal_message;
 use crate::core::relay::Relay;
-use crate::node::{Node, NodeRuntimes};
+use crate::node::{Node};
 use crate::util::cli::arg_parse_config::ArgTranslate;
 
 
@@ -42,7 +42,7 @@ pub async fn main_from_args(opts: RgArgs) {
         return;
     }
     // TODO: Change the port here by first parsing args associated with metrics / logs
-    crate::util::init_logger_with_config(node_config.clone()).expect("Logger to start properly");
+    crate::util::init_logger_with_config(&node_config);
     metrics_registry::register_metrics(node_config.port_offset);
 
     info!("Starting node main method");
@@ -50,10 +50,11 @@ pub async fn main_from_args(opts: RgArgs) {
 
     let node_config_res = arg_parse_config::load_node_config(
         // simple_runtime.clone(),
-        opts.clone(), node_config
+        opts.clone(), node_config.clone()
     ).await;
 
 
+    tracing::info!("Starting network environment: {}", node_config.clone().network.to_std_string());
     // TODO: Here is where we should later init loggers and metrics?
     // and then build out the data store etc. ?
     match node_config_res {

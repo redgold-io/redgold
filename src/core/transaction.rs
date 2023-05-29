@@ -6,7 +6,7 @@ use prost::{DecodeError, Message as msg};
 use rusqlite::Connection;
 use serde_json;
 
-use crate::canary::tx_gen::TransactionGenerator;
+use crate::e2e::tx_gen::TransactionGenerator;
 use crate::core::relay::Relay;
 use crate::data::data_store::DataStore;
 use crate::schema::structs::{Error as RGError, Hash};

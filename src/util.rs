@@ -33,6 +33,7 @@ use bitcoin::util::base58;
 use bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
+use eframe::egui::accesskit::Node;
 use libp2p::core::identity::{Keypair, secp256k1};
 use libp2p::core::PublicKey as LPublicKey;
 use libp2p::PeerId;
@@ -45,6 +46,7 @@ use rand::{Rng, RngCore};
 use redgold_schema::TestConstants;
 use redgold_schema::util::{dhash_str, sign};
 use redgold_schema::util::mnemonic_words::{generate_key, generate_key_i};
+use crate::util::trace_setup::init_tracing;
 
 pub fn random_salt() -> i64 {
     let mut rng = rand::thread_rng();
@@ -113,77 +115,96 @@ pub fn current_time_unix() -> u64 {
         .unwrap()
         .as_secs()
 }
+//
+// pub fn init_logger_with_config(node_config: NodeConfig) -> Result<Handle, SetLoggerError> {
+//     use log::LevelFilter;
+//     use log4rs::append::console::ConsoleAppender;
+//     use log4rs::append::file::FileAppender;
+//     use log4rs::config::{Appender, Config, Root};
+//
+//     let stdout = ConsoleAppender::builder().build();
+//
+//     let log_path = format!("{}/{}", node_config.data_store_folder(), "log/redgold.log");
+//     println!("Starting log config with log path {}", log_path);
+//
+//     let root_redgold = FileAppender::builder()
+//         // .encoder(Box::new(PatternEncoder::new("{d} {l} {t} - {m}{n}")))
+//         .build(log_path)
+//         .expect("log path no bueno");
+//
+//     let config = Config::builder()
+//         .appender(Appender::builder().build("stdout", Box::new(stdout)))
+//         .appender(Appender::builder().build("redgold", Box::new(root_redgold)))
+//         .logger(Logger::builder().build("sqlx", LevelFilter::Warn))
+//         // .logger(Logger::builder().build("app::backend::db", LevelFilter::Info))
+//         // .logger(
+//         //     Logger::builder()
+//         //         .appender("requests")
+//         //         .additive(false)
+//         //         .build("app::requests", LevelFilter::Info),
+//         // )
+//         .build(
+//             Root::builder()
+//                 .appenders(vec!["stdout", "redgold"])
+//                 .build(LevelFilter::Info), //.appender("redgold").build(LevelFilter::Warn)
+//         )
+//         .unwrap();
+//
+//     log4rs::init_config(config)
+// }
 
-pub fn init_logger_with_config(node_config: NodeConfig) -> Result<Handle, SetLoggerError> {
-    use log::LevelFilter;
-    use log4rs::append::console::ConsoleAppender;
-    use log4rs::append::file::FileAppender;
-    use log4rs::config::{Appender, Config, Root};
-
-    let stdout = ConsoleAppender::builder().build();
-
-    let log_path = format!("{}/{}", node_config.data_store_folder(), "log/redgold.log");
-    println!("Starting log config with log path {}", log_path);
-
-    let root_redgold = FileAppender::builder()
-        // .encoder(Box::new(PatternEncoder::new("{d} {l} {t} - {m}{n}")))
-        .build(log_path)
-        .expect("log path no bueno");
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .appender(Appender::builder().build("redgold", Box::new(root_redgold)))
-        .logger(Logger::builder().build("sqlx", LevelFilter::Warn))
-        // .logger(Logger::builder().build("app::backend::db", LevelFilter::Info))
-        // .logger(
-        //     Logger::builder()
-        //         .appender("requests")
-        //         .additive(false)
-        //         .build("app::requests", LevelFilter::Info),
-        // )
-        .build(
-            Root::builder()
-                .appenders(vec!["stdout", "redgold"])
-                .build(LevelFilter::Info), //.appender("redgold").build(LevelFilter::Warn)
-        )
-        .unwrap();
-
-    log4rs::init_config(config)
+pub fn init_logger_with_config(node_config: &NodeConfig) {
+    // TODO: Log level from config
+    init_tracing(&node_config.log_level);
 }
 
-pub fn init_logger() -> Result<Handle, SetLoggerError> {
-    use log::LevelFilter;
-    use log4rs::append::console::ConsoleAppender;
-    use log4rs::append::file::FileAppender;
-    use log4rs::config::{Appender, Config, Root};
+use std::sync::Once;
 
-    let stdout = ConsoleAppender::builder().build();
+static INIT: Once = Once::new();
 
-    let root_redgold = FileAppender::builder()
-        //.encoder(Box::new(PatternEncoder::new("{d} {l} {t} - {m}{n}")))
-        .build("../../log/redgold.log")
-        .unwrap();
+/// Setup function that is only run once, even if called multiple times.
+pub fn init_logger_once() {
+    INIT.call_once(|| {
+        init_logger();
+    });
+}
 
-    let config = Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .appender(Appender::builder().build("redgold", Box::new(root_redgold)))
-        .logger(Logger::builder().build("sqlx", LevelFilter::Warn))
-        .logger(Logger::builder().build("redgold", LevelFilter::Debug))
-        // .logger(Logger::builder().build("app::backend::db", LevelFilter::Info))
-        // .logger(
-        //     Logger::builder()
-        //         .appender("requests")
-        //         .additive(false)
-        //         .build("app::requests", LevelFilter::Info),
-        // )
-        .build(
-            Root::builder()
-                .appenders(vec!["stdout", "redgold"])
-                .build(LevelFilter::Info), //.appender("redgold").build(LevelFilter::Warn)
-        )
-        .unwrap();
-
-    log4rs::init_config(config)
+pub fn init_logger() {
+    // use log::LevelFilter;
+    // use log4rs::append::console::ConsoleAppender;
+    // use log4rs::append::file::FileAppender;
+    // use log4rs::config::{Appender, Config, Root};
+    //
+    // let stdout = ConsoleAppender::builder().build();
+    //
+    // let root_redgold = FileAppender::builder()
+    //     //.encoder(Box::new(PatternEncoder::new("{d} {l} {t} - {m}{n}")))
+    //     .build("../../log/redgold.log")
+    //     .unwrap();
+    //
+    // let config = Config::builder()
+    //     .appender(Appender::builder().build("stdout", Box::new(stdout)))
+    //     .appender(Appender::builder().build("redgold", Box::new(root_redgold)))
+    //     .logger(Logger::builder().build("sqlx", LevelFilter::Warn))
+    //     .logger(Logger::builder().build("warp", LevelFilter::Warn))
+    //     .logger(Logger::builder().build("rocket", LevelFilter::Warn))
+    //     .logger(Logger::builder().build("redgold", LevelFilter::Debug))
+    //     // .logger(Logger::builder().build("app::backend::db", LevelFilter::Info))
+    //     // .logger(
+    //     //     Logger::builder()
+    //     //         .appender("requests")
+    //     //         .additive(false)
+    //     //         .build("app::requests", LevelFilter::Info),
+    //     // )
+    //     .build(
+    //         Root::builder()
+    //             .appenders(vec!["stdout", "redgold"])
+    //             .build(LevelFilter::Info), //.appender("redgold").build(LevelFilter::Warn)
+    //     )
+    //     .unwrap();
+    //
+    // log4rs::init_config(config)
+    init_tracing("DEBUG");
 }
 
 pub trait Short {

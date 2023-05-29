@@ -57,11 +57,12 @@ impl PeerOutgoingEventHandler {
                 }
             }
 
-        } else {
+        } else if peers.len() > 0 {
             // let peers2 = peers.iter().map(|pd| pd.)
             // Relay::broadcast(relay.clone(), )
             // Change this to the same broadcast function as above^
-            info!("Attempting broadcast to {}", &peers.len());
+
+            // info!("Attempting broadcast to {}", &peers.len());
             for pd in &peers {
                 // TODO: Deal with this guy too
                 tokio::spawn(Self::send_message_rest(message.clone(), pd.clone(), relay.node_config.clone()));
@@ -71,7 +72,6 @@ impl PeerOutgoingEventHandler {
     }
 
     async fn run(&mut self) -> Result<(), ErrorInfo> {
-        // let mut futs = crate::core::internal_message::FutLoopPoll::new();
 
         use futures::StreamExt;
         use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -88,56 +88,6 @@ impl PeerOutgoingEventHandler {
         err.await
     }
 
-    //
-    // async fn run(&mut self) -> Result<(), ErrorInfo> {
-    //     let mut futs = crate::core::internal_message::FutLoopPoll::new();
-    //
-    //     use futures::StreamExt;
-    //     use crate::core::internal_message::RecvAsyncErrorInfo;
-    //     loop {
-    //         // replace with mpsc
-    //         select! {
-    //             res = futs.futures.next() => {
-    //                 crate::core::internal_message::FutLoopPoll::map_fut(res)?;
-    //             }
-    //             m = self.relay.peer_message_tx.receiver.recv_async_err() => {
-    //                 let message: PeerMessage = m?;
-    //                 let ser_msg = json(&message.request.clone())?;
-    //                 // info!("PeerOutgoingEventHandler received message {}", ser_msg);
-    //                 let peers = self.relay.ds.peer_store.all_peers().await?;
-    //                 let ser_msgp = json(&peers.clone())?;
-    //                 // info!("PeerOutgoingEventHandler query all peers {}", ser_msgp);
-    //
-    //                 if let Some(pk) = message.public_key {
-    //
-    //                     let vec = pk.serialize().to_vec();
-    //                     let peer = peers.iter()
-    //                         .find(|p| p.node_metadata.iter().find(|nmd|
-    //                         nmd.public_key_bytes().map(|v| v == vec).unwrap_or(false)
-    //                     ).is_some());
-    //                     match peer {
-    //                         None => {
-    //                             error!("Peer public key not found to send message to {}", hex::encode(vec));
-    //                         }
-    //                         Some(pd) => {
-    //                             futs.futures.push(
-    //                                 tokio::spawn(Self::send_message_rest(message.clone(), pd.clone(), self.relay.node_config.clone()))
-    //                             );
-    //                         }
-    //                     }
-    //
-    //                     } else {
-    //                     info!("Attempting broadcast to {}", &peers.len());
-    //                     for pd in &peers {
-    //                         futs.futures.push(tokio::spawn(Self::send_message_rest(message.clone(), pd.clone(), self.relay.node_config.clone())));
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-    //
-
     pub async fn send_message_rest(mut message: PeerMessage, pd: PeerData, nc: NodeConfig) -> Result<(), ErrorInfo> {
 
         let nmd = pd.node_metadata[0].clone();
@@ -150,7 +100,7 @@ impl PeerOutgoingEventHandler {
                 if let Some(response_channel) = &message.response {
                     response_channel.send_err(r)?;
                 } else {
-                    info!("No response channel to respond with");
+                    // info!("No response channel to respond with");
                 }
             }
             Err(e)=> {

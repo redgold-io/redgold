@@ -4,8 +4,8 @@ use std::time::Duration;
 use itertools::Itertools;
 use redgold::api::control_api::ControlClient;
 use redgold::api::public_api::PublicClient;
-use redgold::canary::tx_gen::{SpendableUTXO, TransactionGenerator};
-use redgold::canary::tx_submit::TransactionSubmitter;
+use redgold::e2e::tx_gen::{SpendableUTXO, TransactionGenerator};
+use redgold::e2e::tx_submit::TransactionSubmitter;
 use redgold::core::run_main::main_from_args;
 use redgold::util;
 use redgold::util::cli::args::RgArgs;
@@ -17,7 +17,7 @@ use redgold_schema::util::mnemonic_words::MnemonicWords;
 #[tokio::test]
 async fn local_e2e_it() -> Result<(), ErrorInfo> {
 
-    util::init_logger().expect("log");
+    // util::init_logger();;
     println!("Local E2E IT from inside test");
 
     let port_offset = NetworkEnvironment::Local.default_port_offset();

@@ -75,7 +75,7 @@ pub async fn initiate_mp_keygen(relay: Relay, mp_req: InitiateMultipartyKeygenRe
         req.multiparty_threshold_request = Some(mpt);
         info!("Sending initiate keygen request to peer: {}", peer.hex()?);
         let res0 = relay.send_message_sync(req, peer.clone(), None).await;
-        info!("Received initiate keygen response from peer: {:?}", res0.clone());
+        // info!("Received initiate keygen response from peer: {:?}", res0.clone());
         let res = res0.clone()
             .and_then(|r| r.as_error_info());
         match res {
@@ -160,7 +160,7 @@ pub async fn find_multiparty_key_pairs(relay: Relay
         peers.iter().map(|p| p.node_metadata.get(0).clone().unwrap().public_key.clone().unwrap())
             .collect_vec();
 
-    info!("Mulitparty found {} possible peers", pk.len());
+    info!("Multiparty found {} possible peers", pk.len());
     let results = Relay::broadcast(relay.clone(),
         pk, Request::empty().about(),
                                    // runtime.clone(),
@@ -169,7 +169,7 @@ pub async fn find_multiparty_key_pairs(relay: Relay
     let valid_pks = results.iter()
         .filter_map(|(pk, r)| if r.is_ok() { Some(pk.clone()) } else { None })
         .collect_vec();
-    info!("Mulitparty found {} valid_pks peers", valid_pks.len());
+    info!("Multiparty found {} valid_pks peers", valid_pks.len());
     if valid_pks.len() == 0 {
         return Err(ErrorInfo::error_info("No valid peers found"));
     }

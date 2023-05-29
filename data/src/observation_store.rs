@@ -120,11 +120,11 @@ impl ObservationStore {
         Ok(res)
     }
 
-    pub async fn select_observation_edge(&self, leaf_hash: &Hash) -> Result<Vec<ObservationProof>, ErrorInfo> {
+    pub async fn select_observation_edge(&self, observed_hash: &Hash) -> Result<Vec<ObservationProof>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-        let bytes = leaf_hash.safe_bytes()?;
+        let bytes = observed_hash.safe_bytes()?;
         let rows = sqlx::query!(
-            r#"SELECT edge FROM observation_edge WHERE leaf_hash = ?1"#,
+            r#"SELECT edge FROM observation_edge WHERE observed_hash = ?1"#,
             bytes
         )
             .fetch_all(&mut pool)
@@ -141,18 +141,21 @@ impl ObservationStore {
     pub async fn insert_observation_edge(&self, observation_edge: &ObservationEdge) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
         let proof = observation_edge.observation_proof.safe_get()?;
-        let root =  proof.merkle_proof.clone().and_then(|m| m.root).safe_get()?.safe_bytes()?;
+        let merkle = proof.merkle_proof.clone();
+        let root =  merkle.clone().and_then(|m| m.root.clone()).safe_get()?.safe_bytes()?;
         let edge = proof.proto_serialize();
-        let leaf_hash = proof.merkle_proof.clone().and_then(|m| m.leaf).safe_bytes()?;
+        let leaf_hash = merkle.and_then(|m| m.leaf.clone()).safe_bytes()?;
         let obs_hash = proof.observation_hash.safe_bytes()?;
+        let observed_hash = proof.metadata.safe_get()?.observed_hash.safe_bytes()?;
         let time = util::current_time_millis();
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO observation_edge
-            (root, leaf_hash, observation_hash, edge, time) VALUES
-            (?1, ?2, ?3, ?4, ?5)"#,
+            (root, leaf_hash, observation_hash, observed_hash, edge, time) VALUES
+            (?1, ?2, ?3, ?4, ?5, ?6)"#,
             root,
             leaf_hash,
             obs_hash,
+            observed_hash,
             edge,
             time
         )

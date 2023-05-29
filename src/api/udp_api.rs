@@ -384,7 +384,7 @@ async fn send_request_internal() -> std::io::Result<()> {
 #[tokio::test]
 async fn servers_multiple() -> std::io::Result<()> {
 
-    util::init_logger().ok();
+    // util::init_logger();
     let port1 = random_port();
     let port2 = random_port();
     println!("port 1: {}, port 2: {}", port1.to_string(), port2.to_string());

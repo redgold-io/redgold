@@ -22,7 +22,7 @@ use crate::api::control_api::ControlClient;
 use crate::api::{RgHttpClient, public_api};
 use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
-use crate::canary::tx_submit::TransactionSubmitter;
+use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::core::block_formation;
 use crate::core::block_formation::BlockFormationProcess;
 use crate::core::observation::ObservationBuffer;
@@ -37,9 +37,9 @@ use crate::node_config::NodeConfig;
 use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
 use crate::trust::rewards::Rewards;
-use crate::{canary, util};
+use crate::{e2e, util};
 // use crate::mparty::mp_server::{Db, MultipartyHandler};
-use crate::canary::tx_gen::SpendableUTXO;
+use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
 use crate::core::seeds::SeedNode;
 use crate::multiparty::gg20_sm_manager;
@@ -49,61 +49,18 @@ use crate::schema::constants::EARLIEST_TIME;
 use crate::schema::TestConstants;
 use crate::util::trace_setup::init_tracing;
 use tokio::task::spawn_blocking;
+use tracing::Span;
 
 #[derive(Clone)]
 pub struct Node {
     pub relay: Relay,
-    // pub runtimes: NodeRuntimes,
-}
-
-#[derive(Clone)]
-pub struct NodeRuntimes {
-    p2p: Arc<Runtime>,
-    pub(crate) public_api: Arc<Runtime>,
-    control_api: Arc<Runtime>,
-    transaction_process_context: Arc<Runtime>,
-    transaction_process: Arc<Runtime>,
-    pub(crate) auxiliary: Arc<Runtime>,
-    pub canary_watcher: Arc<Runtime>,
-    pub async_multi: Arc<Runtime>
-}
-
-impl NodeRuntimes {
-    pub fn shutdown(&self) {
-        // self.p2p.deref().shutdown_background();
-        // self.public_api.shutdown_background();
-        // self.control_api.shutdown_background();
-        // self.transaction_process_context.shutdown_background();
-        // self.transaction_process.shutdown_background();
-        // self.auxiliary.shutdown_background();
-    }
-    pub fn default() -> Self {
-        Self {
-            p2p: build_runtime(4, "p2p"),
-            public_api: build_runtime(4, "public"),
-            control_api: build_runtime(4, "control"),
-            transaction_process_context: build_runtime(4, "transaction_process_context"),
-            transaction_process: build_runtime(4, "transaction_process"),
-            auxiliary: build_runtime(8, "aux"),
-            canary_watcher: build_runtime(1, "canary_watcher"),
-            async_multi: build_runtime(5, "async_multi"),
-        }
-    }
-}
-
-struct NodeInit {
-    relay: Relay
-}
-
-impl NodeInit {
-
 }
 
 impl Node {
 
-    pub async fn start_services(relay: Relay
-                                // , runtimes: NodeRuntimes
-    ) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
+    #[tracing::instrument(skip(relay))]
+    pub async fn start_services(relay: Relay) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
+        Span::current().record("node_id", &relay.node_config.public_key().short_id());
         let mut join_handles = vec![];
         let node_config = relay.node_config.clone();
 
@@ -130,10 +87,10 @@ impl Node {
         );
         join_handles.push(tx_p_jh);
 
-        info!("Before sleep");
-        let dur = tokio::time::Duration::from_secs(3);
-        tokio::time::sleep(dur).await;
-        info!("After sleep");
+        // info!("Before sleep");
+        // let dur = tokio::time::Duration::from_secs(3);
+        // tokio::time::sleep(dur).await;
+        // info!("After sleep");
 
 
         // TODO: Monitor this join handle for errors.
@@ -187,8 +144,8 @@ impl Node {
         // });
         // join_handles.push(amh);
         let c_config = relay.clone();
-        if node_config.canary_enabled {
-            let cwh = tokio::spawn(canary::run(c_config));
+        if node_config.e2e_enabled {
+            let cwh = tokio::spawn(e2e::run(c_config));
             join_handles.push(cwh);
         }
 
@@ -235,30 +192,6 @@ impl Node {
         result3.expect("expected panic");
         Ok(())
     }
-    //
-    // pub async fn initial_peers_request(&self, seed: SeedNode) -> Result<(), ErrorInfo> {
-    //
-    //     let all_peers = self.relay.ds.peer_store.all_peers().await?;
-    //     let set = all_peers.iter().map(|p| p.peer_id.as_ref().expect("p").clone()).collect::<HashSet<Vec<u8>>>();
-    //     let mut req = self.relay.node_config.request();
-    //     req.get_peers_info_request = Some(GetPeersInfoRequest{});
-    //     let res = rest_peer(
-    //         self.relay.node_config.clone(), seed.external_address.clone(), (seed.port + 1) as i64, req
-    //     ).await?; // TODO: Use retries here, and don't consider it a failure if we can't get peers immediately
-    //     //self.relay.ds.peer_store.
-    //     let option = res.get_peers_info_response.clone();
-    //     let peers = option.expect("peers").peers;
-    //     // TODO: Validate peers added.
-    //     for peer_tx in peers {
-    //         let pd = peer_tx.peer_data()?;
-    //         let pid = pd.peer_id.safe_get()?;
-    //         if !set.contains(pid) {
-    //             self.relay.ds.peer_store.add_peer(&peer_tx, 0f64).await?;
-    //         }
-    //     }
-    //     Ok(())
-    //
-    // }
 
     pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
         let outputs = (0..50).map(|i|
@@ -289,10 +222,10 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
-        log::debug!("Select all DS tables: {:?}", relay.ds.select_all_tables());
+        // log::debug!("Select all DS tables: {:?}", relay.ds.select_all_tables());
 
         let result1 = std::env::var("REDGOLD_GENESIS");
-        log::debug!("REDGOLD_GENESIS environment variable: {:?}", result1);
+        // log::debug!("REDGOLD_GENESIS environment variable: {:?}", result1);
 
         let flag_genesis = result1
             .map(|g| g.replace("\"", "").trim().to_string() == "true".to_string())
@@ -300,7 +233,7 @@ impl Node {
         let debug_genesis = !node_config.main_stage_network() && relay.node_config.seeds.is_empty();
 
         if flag_genesis || debug_genesis {
-            info!("No seeds configured, starting from genesis");
+            info!("Starting from genesis");
             // relay.node_state.store(NodeState::Ready);
             // TODO: Replace with genesis per network type.
             // if node_config.is_debug() {
@@ -311,7 +244,7 @@ impl Node {
             //             .insert_transaction(&create_genesis_transaction(), EARLIEST_TIME),
             //     );
             // } else {
-                info!("Genesis local test multiple kp");
+            //     info!("Genesis local test multiple kp");
 
                 let tx = Node::genesis_from(node_config.clone()).0;
 
@@ -357,18 +290,19 @@ impl Node {
             let port = seed.port_offset.unwrap() + 1;
             let client = PublicClient::from(seed.external_address.clone(), port);
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
+            let response = client.about().await?;
             let result =
                 // runtimes.auxiliary.block_on(
-                    client.about().await;
+                    response.peer_node_info.safe_get()?;
                 // );
-            let peer_tx = result?.latest_metadata.safe_get()?.clone();
 
-            info!("Got LB node info {}, adding peer", redgold_schema::json(&peer_tx)?);
+            info!("Got LB node info {}, adding peer", result.json_or());
             // Local debug mode
             // First attempt to insert all trust scores for seeds and ignore conflict
             let result2 =
+                    relay.ds.peer_store.add_peer_new(result, 1f64).await;
                 // runtimes.auxiliary.block_on(
-                    relay.ds.peer_store.add_peer(&peer_tx, 1f64).await; //);
+                //     relay.ds.peer_store.add_peer(&peer_tx, 1f64).await; //);
             info!("Peer add result: {:?}", result2);
             result2?;
 
@@ -385,8 +319,8 @@ impl Node {
             //     )
             //     .expect("insert peer on download");
             // todo: send_peer_request_response
-            let data = peer_tx.peer_data()?;
-            let key = data.node_metadata[0].public_key_bytes()?;
+            let key = result.latest_node_transaction.safe_get()?.node_metadata()?.public_key_bytes()?;
+
             // TODO Change this invocation to an .into() in a non-schema key module
             let pk = keys::public_key_from_bytes(&key).expect("works");
             download::download(
@@ -424,13 +358,13 @@ impl LocalTestNodeContext {
         Node::prelim_setup(relay.clone()
                            // , runtimes.clone()
         ).await.expect("prelim");
-        info!("Test starting node services");
+        // info!("Test starting node services");
         let futures = Node::start_services(relay.clone()).await;
         tokio::spawn(async move {
             let (res, _, _) = futures::future::select_all(futures).await;
             panic!("Node service failed in test: {:?}", res);
         });
-        info!("Test completed starting node services");
+        // info!("Test completed starting node services");
 
         let result = Node::from_config(relay.clone()).await;
                                        // , runtimes
@@ -698,7 +632,7 @@ async fn e2e() {
 
 
 async fn e2e_async() -> Result<(), ErrorInfo> {
-    util::init_logger().ok();
+    util::init_logger_once();
     metrics_registry::register_metric_names();
     metrics_registry::init_print_logger();
     // init_tracing();
@@ -706,23 +640,23 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     let mut local_nodes = LocalNodes::new(None).await;
     let start_node = local_nodes.start().clone();
-    info!("Started initial node");
+    // info!("Started initial node");
     let client1 = start_node.control_client.clone();
-    let ds = start_node.node.relay.ds.clone();
-    let show_balances = || {
-        let res = &ds.query_all_balance();
-        let res2 = res.as_ref().unwrap();
-        let str = serde_json::to_string(&res2).unwrap();
-        info!("Balances: {}", str);
-    };
+    // let ds = start_node.node.relay.ds.clone();
+    // let show_balances = || {
+    //     let res = &ds.query_all_balance();
+    //     let res2 = res.as_ref().unwrap();
+    //     let str = serde_json::to_string(&res2).unwrap();
+    //     info!("Balances: {}", str);
+    // };
 
-    show_balances();
+    // show_balances();
 
     let client = start_node.public_client.clone();
     //
-    let utxos = ds.query_time_utxo(0, util::current_time_millis())
-        .unwrap();
-    info!("Num utxos from genesis {:?}", utxos.len());
+    // let utxos = ds.query_time_utxo(0, util::current_time_millis())
+    //     .unwrap();
+    // info!("Num utxos from genesis {:?}", utxos.len());
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
     let submit = TransactionSubmitter::default(client.clone(),
@@ -730,39 +664,26 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
                                                spend_utxos
     );
 
-    let _result = submit.submit().await;
-    info!("First submit response: {}", _result.json_pretty_or());
-    assert!(_result.is_ok());
-
-    let x = _result.expect("").query_transaction_response;
-    assert!(&x.is_some());
-    let query = x.expect("qry");
-    assert_eq!(query.observation_proofs.len(), 2);
-    // assert!(response)
+    submit.submit().await.expect("submit");
 
 
 
-    let utxos = ds.query_time_utxo(0, util::current_time_millis())
-        .unwrap();
-    info!("Num utxos after first submit {:?}", utxos.len());
+    // let utxos = ds.query_time_utxo(0, util::current_time_millis())
+    //     .unwrap();
+    // info!("Num utxos after first submit {:?}", utxos.len());
 
 
     // Exception bad access on this on the json decoding? wtf?
-    let faucet_res = submit.with_faucet().await?;
-    info!("Faucet response: {}", faucet_res.json_pretty_or());
-    let faucet_qry = faucet_res.submit_transaction_response.expect("").query_transaction_response.expect("");
-    faucet_qry.accepted(1).expect("accepted");
-    assert_eq!(faucet_qry.observation_proofs.len(), 2);
+    let _ = submit.with_faucet().await?;
+    // info!("Faucet response: {}", faucet_res.json_pretty_or());
 
-    let _result2 = submit.submit().await;
-    assert!(_result2.is_ok());
-    show_balances();
+    submit.submit().await.expect("submit 2");
 
-    info!("Num utxos after second submit {:?}", utxos.len());
+    // info!("Num utxos after second submit {:?}", utxos.len());
 
     submit.submit_duplicate().await;
 
-    info!("Num utxos after duplicate submit {:?}", utxos.len());
+    // info!("Num utxos after duplicate submit {:?}", utxos.len());
 
     // show_balances();
     // // shouldn't response metadata be not an option??
@@ -772,20 +693,26 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
         submit.submit_double_spend(None).await;
     }
 
-    info!("Num utxos after double spend submit {:?}", utxos.len());
+    // info!("Num utxos after double spend submit {:?}", utxos.len());
 
-    show_balances();
+    // show_balances();
 
     // for _ in 0..2 {
     //     submit.submit_split();
     //     show_balances();
     // }
 
-    let addr =
-        // runtime.block_on(
-            client.query_addresses(submit.get_addresses()).await;
+    // let addr =
+    //     runtime.block_on(
+            // client.query_addresses(submit.get_addresses()).await;
 
-    info!("Address response: {:?}", addr);
+    // info!("Address response: {:?}", addr);
+
+    // //
+    // let after_node_added = submit.submit();
+    // assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")
+    //     .observation_proofs.len());
+
 
     local_nodes.verify_data_equivalent().await;
 
@@ -793,14 +720,20 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
         // runtime.clone()
     ).await;
     local_nodes.verify_data_equivalent().await;
-    // //
-    // let after_node_added = submit.submit();
-    // assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")
-    //     .observation_proofs.len());
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let after_2_nodes = submit.submit().await.expect("submit");
+
+    // tracing::info!("After two nodes started first submit: {}", after_2_nodes.json_pretty_or());
+
+    // Debug for purpose of viewing 2nd node operations
+    // tokio::time::sleep(Duration::from_secs(15)).await;
+    after_2_nodes.at_least_n(2).unwrap();
 
 
     let res = client1.multiparty_keygen(None).await;
-    println!("{:?}", res);
+    // println!("{:?}", res);
     /*
     "protocol execution terminated with error: handle received message: received message didn't pass pre-validation: got message which was sent by this party"
     this happens sometimes?
@@ -814,53 +747,18 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     let vec = bytes_data(vec1.clone()).expect("");
     let res =
         client1.multiparty_signing(None, party.initial_request, vec).await;
-    println!("{:?}", res);
+    // println!("{:?}", res);
     assert!(res.is_ok());
     res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
 
+    tracing::info!("After MP test");
 
 
+    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
 
+    local_nodes.verify_data_equivalent().await;
 
-    // // Connect first peer.
-    // let add_request = local_nodes.nodes.get(1).unwrap().add_request(false);
-    // let add_response = runtime.block_on(start_node.control_client.request(&add_request));
-    // info!("Add peer response: {:?}", add_response);
-    // let add_request2 = start_node.add_request(true);
-    // let add_response2 =
-    //     runtime.block_on(nodes.get(1).unwrap().control_client.request(&add_request2));
-    // info!("Add peer response2: {:?}", add_response2);
-    //
-    // // // Connect nodes together
-    // // for n_i in 0..node_count {
-    // //     for n_j in 0..node_count {
-    // //         // info!("ni {} nj {}", n_i, n_j);
-    // //         if n_i != n_j {
-    // //             let n = nodes.get(n_i).unwrap();
-    // //             let n2 = nodes.get(n_j).unwrap();
-    // //             let request = n2.add_request();
-    // //             // info!(
-    // //             //     "Add peer request on {} to {} req {}",
-    // //             //     n.id,
-    // //             //     n2.id,
-    // //             //     serde_json::to_string(&request).unwrap()
-    // //             // );
-    // //             let response = n.control_client.request(&request).await.unwrap();
-    // //             // info!("Add peer response: {:?}", response);
-    // //         }
-    // //     }
-    // // }
-    // // info!("What the heck");
-    // //
-
-    // runtime.shutdown_background();
-
-
-    // local_nodes.shutdown();
-
-    // std::mem::forget(nodes);
     std::mem::forget(local_nodes);
-    // std::mem::forget(runtime);
     std::mem::forget(submit);
     Ok(())
 }

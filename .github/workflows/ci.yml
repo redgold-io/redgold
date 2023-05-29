@@ -38,6 +38,7 @@ jobs:
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
       - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
+      - run: ./bin/local_test.sh
   build-linux:
 #    needs: [test]
     if:
@@ -74,6 +75,7 @@ jobs:
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
       - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
+      - run: ./bin/local_test.sh
       - run: cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux
 

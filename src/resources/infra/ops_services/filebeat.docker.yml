@@ -16,7 +16,7 @@ filebeat.autodiscover:
     # Paths that should be crawled and fetched. Glob based paths.
 #    paths:
 #      - /root/.rg/test/log/*.log
-#      - /root/.rg/test/canary/log/*.log
+#      - /root/.rg/test/e2e/log/*.log
       # Todo: update this path to logs
       #- c:\programdata\elasticsearch\logs\*
   # - type: journald

@@ -1,23 +1,35 @@
 use crate::util;
 
 use std::{error::Error, io};
+use async_std::prelude::FutureExt;
 use eframe::epaint::ahash::{HashMap, HashMapExt};
 use tokio::task_local;
 use tracing::{debug, error, info, span, warn, Level};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use redgold_schema::{EasyJson, error_info, error_message, task_local};
 use redgold_schema::structs::ErrorInfo;
+use crate::api::public_api::run_server;
+use crate::core::relay::Relay;
+
+
+#[tracing::instrument]
+pub fn nested_shave(hello: String) {
+    info!("Hello from nested shave omg");
+}
 
 // the `#[tracing::instrument]` attribute creates and enters a span
 // every time the instrumented function is called. The span is named after the
 // the function or method. Parameters passed to the function are recorded as fields.
 #[tracing::instrument]
-pub fn shave(yak: usize, details: HashMap<String, String>) -> Result<(), Box<dyn Error + 'static>> {
+pub fn shave(yak: usize) -> Result<(), Box<dyn Error + 'static>> {
     // this creates an event at the DEBUG level with two fields:
     // - `excitement`, with the key "excitement" and the value "yay!"
     // - `message`, with the key "message" and the value "hello! I'm gonna shave a yak."
     //
     // unlike other fields, `message`'s shorthand initialization is just the string itself.
     info!("hello! I'm gonna shave a yak from within the instrument tracing function.");
+    info!("yak message 2");
     debug!(excitement = "yay!", "hello! I'm gonna shave a yak.");
     if yak == 3 {
         warn!("could not locate yak!");
@@ -28,6 +40,7 @@ pub fn shave(yak: usize, details: HashMap<String, String>) -> Result<(), Box<dyn
     } else {
         debug!("yak shaved successfully");
     }
+    nested_shave("yo yo yo".to_string());
     Ok(())
 }
 //
@@ -76,7 +89,8 @@ async fn some_other_async() {
     println!("some other async number get: {}", NUMBER.get().to_string());
 }
 
-// #[tokio::test]
+#[ignore]
+#[tokio::test]
 pub async fn debug() {
 
     //
@@ -108,9 +122,44 @@ pub async fn debug() {
     // log::info!("This is log crate");
     // install global subscriber configured based on RUST_LOG envvar.
 
+    use tracing_subscriber::EnvFilter;
 
-    tracing_subscriber::fmt::init();
 
+    let fmt_layer = tracing_subscriber::fmt::Layer::default();
+    let filter_layer = EnvFilter::new("sqlx=WARN,warp=WARN,rocket=WARN,redgold=DEBUG");
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
+    // let jh = tokio::spawn(run_server(Relay::default().await));
+
+    // util::init_logger().unwrap();
+    // let fmt = tracing_subscriber::fmt().with_env_filter()
+        // .with_env_filter("sqlx=WARN,warp=WARN,rocket=WARN,redgold=DEBUG").finish();
+
+    /*
+    use tracing_subscriber::EnvFilter;
+
+let fmt_layer = tracing_subscriber::fmt::Layer::default();
+let filter_layer = EnvFilter::new("sqlx=WARN,warp=WARN,rocket=WARN,redgold=DEBUG");
+
+tracing_subscriber::registry()
+    .with(filter_layer)
+    .with(fmt_layer)
+    .init();
+
+     */
+    //
+    //     .with_writer(warp.with_max_level(Level::INFO)))));
+    // // .with(fmt::Layer::new().with_writer(std::io::stdout.with_max_level(Level::INFO)).pretty())
+    //
+    // // let subscriber = tracing_subscriber::registry()
+    //     .with(fmt::Layer::new().with_writer(std::io::stdout.with_max_level(Level::INFO)).pretty())
+    //     .with(fmt::Layer::new().with_writer(non_blocking.with_max_level(Level::INFO)).json());
+
+    // fmt.init();
+    //
     // let number_of_yaks = 3;
     // // this creates a new event, outside of any spans.
     // info!(number_of_yaks, "preparing to shave yaks");
@@ -120,17 +169,32 @@ pub async fn debug() {
     //     all_yaks_shaved = number_shaved == number_of_yaks,
     //     "yak shaving completed."
     // );
+    //
+    // let mut hm = HashMap::new();
+    // hm.insert("asdf".to_string(), "asdf".to_string());
+    shave(0).expect("shaving yaks, really?");
 
-    let mut hm = HashMap::new();
-    hm.insert("asdf".to_string(), "asdf".to_string());
-    shave(0, hm).expect("shaving yaks, really?");
+    log::info!("Log crate");
 
+    // jh.await;
+
+    // TODO: This is enough to demonstrate nested stuff
+    // also need to deal with request ID across streams now.
 
 }
 
-pub fn init_tracing() {
-    // TODO By environment and log level etc.
-    tracing_subscriber::fmt::init();
+pub fn init_tracing(log_level: &str) {
+
+    use tracing_subscriber::EnvFilter;
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default();
+    let filter_layer = EnvFilter::new(format!(
+        "sqlx=WARN,warp=WARN,rocket=WARN,redgold={}", log_level));
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
 }
 
 async fn debug_task() -> ErrorInfo {

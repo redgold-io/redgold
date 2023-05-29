@@ -32,6 +32,8 @@ $REDGOLD_BINARY_PATH send --to "$(cat address2)" --amount 2.0 > send_tx_hash
 
 echo "Send tx hash: $(cat send_tx_hash)"
 
+sleep 20
+
 $REDGOLD_BINARY_PATH query --hash "$(cat send_tx_hash)"
 
 echo "Done query"
@@ -42,7 +44,7 @@ echo "Final balance of address2: $float_value"
 
 # TODO: Re-enable test after fixing bug:
 
-float_value="2.0"
+#float_value="2.0"
 
 # Check if the output is a valid float
 if [[ ! $float_value =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then

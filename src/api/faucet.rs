@@ -8,7 +8,7 @@ use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, PublicResponse
 use redgold_schema::transaction::{amount_data, amount_to_raw_amount};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::api::public_api::PublicClient;
-use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator};
+use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 //
@@ -74,7 +74,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
 
     let store = relay.clone().ds;
     let result = DataStoreContext::map_err_sqlx(store.query_utxo_address(addresses).await)?;
-    info!("Result here: {:?}", result);
+    // info!("Result here: {:?}", result);
     let utxos = result
         .iter()
         .map(|u| SpendableUTXO {

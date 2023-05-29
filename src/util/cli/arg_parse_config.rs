@@ -1,7 +1,7 @@
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::NetworkEnvironment;
-use crate::{canary, gui, util};
+use crate::{e2e, gui, util};
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use clap::{Args, Parser, Subcommand};
@@ -88,7 +88,7 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
         None => {
             let mut net_dir = get_default_data_directory(node_config.network);
             if is_canary {
-                net_dir = net_dir.join("canary");
+                net_dir = net_dir.join("e2e");
             }
             let dbg_id: Option<i32> = opts.debug_id ;
             if dbg_id.is_some() {
@@ -346,7 +346,7 @@ pub async fn load_node_config(
     info!("Sha256 checksum from shell script: {}", shasum);
     //
     // if is_canary {
-    //     canary::run(node_config.clone());
+    //     e2e::run(node_config.clone());
     //     return Err(node_config.clone());
     // }
 

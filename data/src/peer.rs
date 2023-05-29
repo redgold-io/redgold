@@ -36,7 +36,34 @@ impl PeerStore {
 
     // pub async fn public_key_trust(&self) -> Result<>
 
+    pub async fn query_public_key_node(
+        &self,
+        public: PublicKey,
+    ) -> Result<Option<PeerNodeInfo>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+
+        let vec = public.validate()?.bytes()?;
+
+        let rows = sqlx::query!(
+            r#"SELECT peer_node_info FROM peer_key WHERE id = ?1"#,
+            vec
+        )
+            .fetch_optional(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        if let Some(rows) = rows_m {
+            let pni = rows.peer_node_info.safe_get_msg("Missing peer node info in database")?.clone();
+            return Ok(Some(PeerNodeInfo::proto_deserialize(pni)?));
+        }
+        Ok(None)
+    }
     pub async fn update_last_seen(&self, node: PublicKey) -> Result<(), ErrorInfo> {
+
+        let res = self.query_public_key_node(node.clone()).await?;
+        if res.is_none() {
+            return Err(ErrorInfo::error_info("Missing node in database"));
+        }
+
         let mut pool = self.ctx.pool().await?;
 
         let bytes = node.bytes.safe_bytes()?;
@@ -53,47 +80,47 @@ impl PeerStore {
     }
 
     // TODO: Add node transaction as well
-    pub async fn add_peer(&self, tx: &Transaction, trust: f64) -> Result<(), ErrorInfo> {
-        // return Err(ErrorInfo::error_info("debug error return"));
-        let pd = tx.peer_data()?;
-        let tx_blob = tx.proto_serialize();
-        let pd_blob = pd.proto_serialize();
-        let tx_hash = tx.hash().vec();
-        let mut pool = self.ctx.pool().await?;
-        let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().value;
-
-        let rows = sqlx::query!(
-            r#"INSERT OR REPLACE INTO peers (id, peer_data, tx, trust, tx_hash) VALUES (?1, ?2, ?3, ?4, ?5)"#,
-            pid,
-            pd_blob,
-            tx_blob,
-            trust,
-            tx_hash
-        )
-            .fetch_all(&mut pool)
-            .await;
-        let _ = DataStoreContext::map_err_sqlx(rows)?;
-        let time = util::current_time_millis();
-
-        for nmd in pd.node_metadata {
-            let ser = nmd.proto_serialize();
-            let rows = sqlx::query!(
-            r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
-            nmd.public_key.safe_get()?.bytes.safe_get()?.value,
-            pid,
-            nmd.multi_hash,
-            nmd.external_address,
-            "",
-                time,
-                ser
-            )
-                .fetch_all(&mut pool)
-                .await;
-            let _ = DataStoreContext::map_err_sqlx(rows)?;
-
-        }
-        Ok(())
-    }
+    // pub async fn add_peer(&self, tx: &Transaction, trust: f64) -> Result<(), ErrorInfo> {
+    //     // return Err(ErrorInfo::error_info("debug error return"));
+    //     let pd = tx.peer_data()?;
+    //     let tx_blob = tx.proto_serialize();
+    //     let pd_blob = pd.proto_serialize();
+    //     let tx_hash = tx.hash().vec();
+    //     let mut pool = self.ctx.pool().await?;
+    //     let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().value;
+    //
+    //     let rows = sqlx::query!(
+    //         r#"INSERT OR REPLACE INTO peers (id, peer_data, tx, trust, tx_hash) VALUES (?1, ?2, ?3, ?4, ?5)"#,
+    //         pid,
+    //         pd_blob,
+    //         tx_blob,
+    //         trust,
+    //         tx_hash
+    //     )
+    //         .fetch_all(&mut pool)
+    //         .await;
+    //     let _ = DataStoreContext::map_err_sqlx(rows)?;
+    //     let time = util::current_time_millis();
+    //
+    //     for nmd in pd.node_metadata {
+    //         let ser = nmd.proto_serialize();
+    //         let rows = sqlx::query!(
+    //         r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
+    //         nmd.public_key.safe_get()?.bytes.safe_get()?.value,
+    //         pid,
+    //         nmd.multi_hash,
+    //         nmd.external_address,
+    //         "",
+    //             time,
+    //             ser
+    //         )
+    //             .fetch_all(&mut pool)
+    //             .await;
+    //         let _ = DataStoreContext::map_err_sqlx(rows)?;
+    //
+    //     }
+    //     Ok(())
+    // }
 
 
     pub async fn insert_peer(&self, tx: &Transaction, trust: f64) -> Result<i64, ErrorInfo> {
@@ -123,12 +150,15 @@ impl PeerStore {
         let time = util::current_time_millis();
         let mut pool = self.ctx.pool().await?;
         let nmd = tx.node_metadata()?;
+        let public_key = nmd.public_key.safe_get()?;
+        public_key.validate()?;
+        let pk_bytes = public_key.bytes()?;
         let pid = nmd.peer_id.safe_get()?.peer_id.safe_bytes()?;
         let ser = nmd.proto_serialize();
         let pni = pi.proto_serialize();
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata, peer_node_info) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
-            nmd.public_key.safe_get()?.bytes.safe_get()?.value,
+            pk_bytes,
             pid,
             nmd.multi_hash,
             nmd.external_address,
@@ -220,7 +250,7 @@ impl PeerStore {
         let cutoff = util::current_time_millis() - delay;
 
         let rows = sqlx::query!(
-            r#"SELECT id FROM peer_key WHERE last_seen > ?1"#,
+            r#"SELECT public_key FROM peer_key WHERE last_seen > ?1"#,
             cutoff
         )
             .fetch_all(&mut pool)
@@ -229,8 +259,9 @@ impl PeerStore {
         let mut res = vec![];
         for row in rows_m {
             let deser = PublicKey::from_bytes(
-                row.id.safe_get_msg("Missing public key in database")?.clone()
+                row.public_key.safe_get_msg("Missing public key in database")?.clone()
             );
+            deser.validate()?;
             res.push(deser);
         }
         Ok(res)

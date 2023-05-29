@@ -144,7 +144,7 @@ impl PublicClient {
                 transaction: Some(t.clone()),
                 sync_query_response: sync,
         });
-        debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
+        // debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
         let response = c.proto_post_request(&mut request, None).await?;
         response.as_error_info()?;
         Ok(response.submit_transaction_response.safe_get()?.clone())
@@ -552,15 +552,9 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 pub fn start_server(relay: Relay
                     // , runtime: Arc<Runtime>
 ) -> JoinHandle<Result<(), ErrorInfo>> {
-    info!(
-        "Starting PublicAPI server on port {:?}",
-        relay.clone().node_config.public_port()
-    );
+
     let handle = tokio::spawn(run_server(relay.clone()));
-    info!(
-        "Started PublicAPI server on port {:?}",
-        relay.clone().node_config.public_port()
-    );
+    info!("Started PublicAPI server on port {:?}", relay.clone().node_config.public_port());
     return handle;
 }
 

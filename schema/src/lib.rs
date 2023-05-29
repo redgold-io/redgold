@@ -866,3 +866,20 @@ impl HashClear for StructMetadata {
 impl StructMetadata {
 
 }
+
+pub trait ShortString {
+    fn short_string(&self) -> Result<String, ErrorInfo>;
+}
+
+impl ShortString for String {
+    fn short_string(&self) -> Result<String, ErrorInfo> {
+        let len = self.len();
+        let start = (len as i32) - 6;
+        if start < 0 {
+            return Err(error_info("string too short to short_string"));
+        }
+        let start = start as usize;
+        let x = &self[start..len];
+        Ok(x.to_string())
+    }
+}

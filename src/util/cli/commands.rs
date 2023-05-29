@@ -15,15 +15,14 @@ use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOpti
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
-use crate::canary::tx_submit::TransactionSubmitter;
+use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
 use crate::util::cli::arg_parse_config::get_default_data_directory;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
-use crate::node::NodeRuntimes;
-use crate::util::init_logger;
+// use crate::util::init_logger;
 use crate::util::runtimes::build_runtime;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -332,7 +331,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
                                                       vec![]
     );
     let faucet_tx = tx_submit.with_faucet().await?;
-    info!("Faucet response: {}", faucet_tx.json_or());
+    // info!("Faucet response: {}", faucet_tx.json_or());
     let faucet_tx = faucet_tx.submit_transaction_response.safe_get()?.transaction.safe_get()?;
     let _ = {
         let gen =
@@ -373,7 +372,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
 #[ignore]
 #[tokio::test]
 async fn test_transaction_dev() {
-    init_logger().ok();
+    // init_logger(); //.ok();
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
     // let rt = build_runtime(5, "asdf");

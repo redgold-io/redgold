@@ -12,9 +12,11 @@ use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransact
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 
 use crate::api::public_api::PublicClient;
-use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
+use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
 use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transaction};
 use crate::schema::WithMetadataHashable;
+use redgold_schema::EasyJson;
+
 
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
@@ -61,26 +63,26 @@ impl TransactionSubmitter {
             let c = self.client.clone();
             let tx = transaction.clone();
             async move {
-                info!(
-                    "Attemping to spawn test transaction {:?} with client",
-                    tx.clone().hash_hex_or_missing()
-                );
+                // info!(
+                //     "Attemping to spawn test transaction {} with client",
+                //     tx.clone().hash_hex_or_missing()
+                // );
                 let result = c.clone().send_transaction(&tx.clone(), true).await;
                 if result.clone().is_err() {
                     let err = result.clone().unwrap_err();
                     error!(
-                        "Error on transaction {:?} response: {:?}",
+                        "Error on transaction {} response: {}",
                         tx.clone().hash_hex_or_missing(),
-                        err.clone()
+                        err.clone().json_or()
                     );
                     result
                 } else {
-                    let res = result.clone().unwrap();
-                    info!(
-                        "Success on transaction {:?} response: {:?}",
-                        tx.clone().hash_hex_or_missing(),
-                        res.clone()
-                    );
+                    let _ = result.clone().unwrap();
+                    // info!(
+                    //     "Success on transaction {:?} response: {:?}",
+                    //     tx.clone().hash_hex_or_missing(),
+                    //     res.clone()
+                    // );
                     result
                 }
             }
@@ -111,6 +113,8 @@ impl TransactionSubmitter {
         // if res.clone().accepted() {
         self.generator.lock().unwrap().completed(transaction);
         // }
+        // info!("Submit response: {}", res.json_or());
+        res.at_least_1()?;
         Ok(res)
     }
 
@@ -129,6 +133,7 @@ impl TransactionSubmitter {
             pc.faucet(&a).await?;
         let submit_r = res.submit_transaction_response.safe_get()?;
         let qry = submit_r.query_transaction_response.safe_get()?;
+        submit_r.at_least_1()?;
         let len_proofs = qry.observation_proofs.len();
         if len_proofs < 2 {
             return Err(error_info("Insufficient observation proofs"));
@@ -178,6 +183,10 @@ impl TransactionSubmitter {
         assert!(dups.iter().any(|x|
             x.clone().err().filter(|e| e.code == Error::TransactionAlreadyProcessing as i32).is_some()
         ));
+        assert!(dups.iter().any(|x|
+            x.as_ref().map(|q| q.at_least_1().is_ok()
+            ).unwrap_or(false)
+        ));
 
         dups
     }
@@ -213,9 +222,11 @@ impl TransactionSubmitter {
         let h1 = self.spawn(t1.clone().transaction);
         let h2 = self.spawn_client(t2.clone().transaction, second_client);
         let doubles = self.await_results(vec![(h1, t1.clone()), (h2, t2.clone())]).await;
-        info!("Double spend test response: {}", serde_json::to_string(&doubles.clone()).unwrap());
+        // info!("Double spend test response: {}", serde_json::to_string(&doubles.clone()).unwrap());
 
         assert!(doubles.iter().any(|x| x.is_ok()));
+        assert!(doubles.iter().any(|x|
+            x.as_ref().map(|q| q.accepted(1).is_ok()).unwrap_or(false)));
         let one_rejected = doubles.iter().any(|x| !x.is_ok());
 
         // if !one_rejected {

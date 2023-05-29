@@ -125,9 +125,9 @@ impl TransactionGenerator {
         let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
         let key = self.all_value_transaction(prev.clone());
         use redgold_schema::WithMetadataHashable;
-        info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
-        info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
-        info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
+        // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
+        // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
+        // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
         key
     }
 
