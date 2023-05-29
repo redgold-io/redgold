@@ -131,7 +131,7 @@ async fn debug_local_test() {
     if !util::local_debug_mode() {
         return;
     }
-    init_logger();
+    // init_logger();
 
     // let rt = util::runtimes::build_runtime(1, "test");
     let mut args = cli::args::empty_args();

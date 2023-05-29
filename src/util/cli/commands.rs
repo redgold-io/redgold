@@ -22,7 +22,7 @@ use crate::util::cli::arg_parse_config::get_default_data_directory;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
-use crate::util::init_logger;
+// use crate::util::init_logger;
 use crate::util::runtimes::build_runtime;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -372,7 +372,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
 #[ignore]
 #[tokio::test]
 async fn test_transaction_dev() {
-    init_logger(); //.ok();
+    // init_logger(); //.ok();
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
     // let rt = build_runtime(5, "asdf");

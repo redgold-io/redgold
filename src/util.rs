@@ -158,6 +158,17 @@ pub fn init_logger_with_config(node_config: &NodeConfig) {
     init_tracing(&node_config.log_level);
 }
 
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+/// Setup function that is only run once, even if called multiple times.
+pub fn init_logger_once() {
+    INIT.call_once(|| {
+        init_logger();
+    });
+}
+
 pub fn init_logger() {
     // use log::LevelFilter;
     // use log4rs::append::console::ConsoleAppender;

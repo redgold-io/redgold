@@ -72,7 +72,7 @@ where
 
 
 async fn rosetta_relay() -> Relay {
-    util::init_logger();
+    // util::init_logger();
     let mut relay = Relay::default().await;
     let port = random_port();
     relay.node_config.rosetta_port = Some(port);

@@ -49,7 +49,7 @@ fn start_func() {
 #[ignore]
 #[test]
 fn start() {
-    util::init_logger();
+    // util::init_logger();
 
     let rt = build_runtime(5, "test");
     let jh = rt.spawn(async {

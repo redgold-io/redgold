@@ -1261,7 +1261,7 @@ struct Todo {
 async fn test_sqlx_migrations() {
     // TODO: Delete file at beginning.
     dotenv::dotenv().ok().expect("worked");
-    util::init_logger();
+    // util::init_logger();
     println!("{:?}", std::env::var("DATABASE_URL"));
     let mut node_config = NodeConfig::default();
     let mut args = empty_args();

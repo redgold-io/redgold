@@ -17,7 +17,7 @@ use redgold_schema::util::mnemonic_words::MnemonicWords;
 #[tokio::test]
 async fn local_e2e_it() -> Result<(), ErrorInfo> {
 
-    util::init_logger();;
+    // util::init_logger();;
     println!("Local E2E IT from inside test");
 
     let port_offset = NetworkEnvironment::Local.default_port_offset();
