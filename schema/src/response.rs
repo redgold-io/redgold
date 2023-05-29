@@ -1,19 +1,13 @@
+use std::collections::{HashMap, HashSet};
+use std::ptr::hash;
+use itertools::Itertools;
 use prost::{DecodeError, Message};
-use crate::{error_info, HashClear, KeyPair, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
-use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, MultipartyThresholdResponse, NodeMetadata, Proof, QueryTransactionResponse, State};
+use crate::{EasyJson, error_info, HashClear, KeyPair, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
+use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, MultipartyThresholdResponse, NodeMetadata, Proof, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse};
 
 impl AboutNodeResponse {
     pub fn empty() -> Self {
-        Self {
-            latest_metadata: None,
-            latest_node_metadata: None,
-            num_known_peers: 0,
-            num_active_peers: 0,
-            recent_transactions: vec![],
-            pending_transactions: 0,
-            total_accepted_transactions: 0,
-            observation_height: 0,
-        }
+        AboutNodeResponse::default()
     }
 }
 
@@ -40,13 +34,10 @@ impl Response {
 
     pub fn from_error_info(error_info: ErrorInfo) -> Response {
         let mut r = Response::empty_success();
-        r.response_metadata = Some(ResponseMetadata {
-            success: false,
-            error_info: Some(error_info),
-            task_local_details: vec![],
-            request_uuid: None,
-            response_uuid: None,
-        });
+        let mut rm = response_metadata().expect("m");
+        rm.success = false;
+        rm.error_info = Some(error_info);
+        r.response_metadata = Some(rm);
         return r.clone();
     }
 
@@ -113,16 +104,49 @@ impl MultipartyThresholdResponse {
 }
 
 impl QueryTransactionResponse {
+
+}
+
+impl SubmitTransactionResponse {
     pub fn accepted(&self, expected_count: usize) -> Result<(), ErrorInfo> {
-        let accepted_count = self.observation_proofs.iter().filter_map(|p| p.metadata.as_ref())
-            .filter_map(|m| m.state)
-            .filter(|m| m == &(State::Finalized as i32))
-            .count();
+        self.check_by_state(expected_count, State::Finalized)
+    }
+    pub fn pending(&self, expected_count: usize) -> Result<(), ErrorInfo> {
+        self.check_by_state(expected_count, State::Pending)
+    }
+    pub fn check_by_state(&self, expected_count: usize, state: State) -> Result<(), ErrorInfo> {
+        let accepted_count = self.unique_by_state()?.iter().filter(|(_, s)| **s == state as i32).count();
         if accepted_count >= expected_count {
             Ok(())
         } else {
-            Err(error_info(format!("not enough accepted observations, expected {}, got {}", expected_count, accepted_count)))
+            Err(error_info(format!("not enough {} observations, expected {}, got {}",
+                                   state.json_or(), expected_count, accepted_count)))
         }
     }
+    pub fn unique_by_state(&self) -> Result<HashSet<(&PublicKey, &i32)>, ErrorInfo> {
+        let mut results = HashSet::new();
+        for p in &self.query_transaction_response
+            .safe_get()?
+            .observation_proofs {
+            let state = p.metadata.safe_get()?.state.safe_get()?;
+            let pk = p.proof.safe_get()?.public_key.safe_get()?;
+            results.insert((pk, state));
+        }
+        Ok(results)
+    }
 
+    pub fn count_unique_by_state(&self) -> Result<HashMap<i32, usize>, ErrorInfo> {
+        let map: HashMap<i32, usize> = self.unique_by_state()?.iter().map(|(_, y)| *y.clone()).counts();
+        Ok(map)
+    }
+
+
+    pub fn at_least_1(&self) -> Result<(), ErrorInfo> {
+        self.at_least_n(1)
+    }
+
+    pub fn at_least_n(&self, n: usize) -> Result<(), ErrorInfo> {
+        self.accepted(n)?;
+        self.pending(n)
+    }
 }

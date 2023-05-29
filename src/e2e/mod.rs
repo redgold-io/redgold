@@ -1,6 +1,6 @@
 use crate::api::public_api::PublicClient;
-use crate::canary::tx_gen::{SpendableUTXO, TransactionGenerator};
-use crate::canary::tx_submit::TransactionSubmitter;
+use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator};
+use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::node_config::NodeConfig;
 use crate::util::{cli, init_logger};
 use crate::util::{self, auto_update};
@@ -31,8 +31,8 @@ use redgold_schema::EasyJson;
 // #[allow(dead_code)]
 // pub fn run_remote(relay: Relay) {
 //     let node_config = relay.node_config.clone();
-//     info!("Starting canary against local public API");
-//     let runtime = util::runtimes::build_runtime(4, "canary");
+//     info!("Starting e2e against local public API");
+//     let runtime = util::runtimes::build_runtime(4, "e2e");
 //
 //     // runtime.spawn(auto_update::from_node_config(node_config.clone()));
 //
@@ -51,7 +51,7 @@ use redgold_schema::EasyJson;
 //
 //     let result = runtime.block_on(client.query_addresses(addresses));
 //     info!("Result here: {:?}", result);
-//     let res = result.expect("Failed to query addresses on canary startup");
+//     let res = result.expect("Failed to query addresses on e2e startup");
 //     let utxos = res
 //         .query_addresses_response
 //         .expect("No data on query address")
@@ -73,19 +73,19 @@ use redgold_schema::EasyJson;
 //
 //     if utxos.is_empty() {
 //         // TODO: Faucet here from seed node.
-//         info!("Unable to start canary, no UTXOs")
+//         info!("Unable to start e2e, no UTXOs")
 //     } else {
 //         loop {
 //             info!("Canary submit");
 //             sleep(Duration::from_secs(20));
 //             let response = submit.submit().await;
 //             if !response.is_ok() {
-//                 increment_counter!("redgold.canary.failure");
+//                 increment_counter!("redgold.e2e.failure");
 //                 let failure_msg = serde_json::to_string(&response).unwrap_or("ser failure".to_string());
 //                 error!("Canary failure: {}", failure_msg.clone());
 //                 let recovered = (num_success > 10 && util::current_time_millis() - last_failure > 1000 * 60 * 30);
 //                 if !failed_once || recovered {
-//                     alert::email(format!("{} canary failure", relay.node_config.network.to_std_string()), &failure_msg);
+//                     alert::email(format!("{} e2e failure", relay.node_config.network.to_std_string()), &failure_msg);
 //                 }
 //                 let failure_time = util::current_time_millis();
 //                 num_success = 0;
@@ -94,10 +94,10 @@ use redgold_schema::EasyJson;
 //             } else {
 //                 num_success += 1;
 //                 info!("Canary success");
-//                 increment_counter!("redgold.canary.success");
+//                 increment_counter!("redgold.e2e.success");
 //                 if let Some(s) = response.ok() {
 //                     if let Some(q) = s.query_transaction_response {
-//                         increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
+//                         increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
 //                     }
 //                 }
 //             }
@@ -131,7 +131,7 @@ async fn debug_local_test() {
     if !util::local_debug_mode() {
         return;
     }
-    init_logger().expect("log");
+    init_logger();
 
     // let rt = util::runtimes::build_runtime(1, "test");
     let mut args = cli::args::empty_args();
@@ -144,7 +144,7 @@ async fn debug_local_test() {
 }
 
 
-struct Canary {
+struct LiveE2E {
     relay: Relay,
     utxos: Vec<SpendableUTXO>,
     last_failure: i64,
@@ -157,8 +157,7 @@ struct Canary {
 pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
     let node_config = relay.node_config.clone();
     sleep(Duration::from_secs(60));
-    info!("Starting canary");
-    let runtime = util::runtimes::build_runtime(4, "canary");
+    info!("Starting e2e");
 
     // runtime.spawn(auto_update::from_node_config(node_config.clone()));
 
@@ -180,7 +179,7 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
     //
 
     // let result = runtime.block_on(client.query_addresses(addresses));
-    let result = runtime.block_on(relay.clone().ds.query_utxo_address(addresses));
+    let result = relay.clone().ds.query_utxo_address(addresses).await;
     if let Err(e) = &result {
         error!("Canary query utxo failure {}", e.to_string());
     }
@@ -201,11 +200,11 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
 
     if utxos.is_empty() {
         // TODO: Faucet here from seed node.
-        info!("Unable to start canary, no UTXOs");
+        info!("Unable to start e2e, no UTXOs");
         Ok(())
     } else {
         // TODO Change to tokio
-        let c = Canary {
+        let c = LiveE2E {
             relay,
             utxos,
             generator,
@@ -218,7 +217,7 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
         IntervalStream::new(interval1)
             .map(|x| Ok(x))
             .try_fold(c, |mut c, _| async {
-                canary_tick(&mut c).await?;
+                e2e_tick(&mut c).await?;
                 Ok(c)
 
         }).await?;
@@ -226,7 +225,7 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
     }
 }
 
-async fn canary_tick(c: &mut Canary) -> Result<(), ErrorInfo> {
+async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
     let transaction = c.generator.generate_simple_tx().clone();
     let res = c.relay.submit_transaction(SubmitTransactionRequest {
         transaction:
@@ -238,18 +237,18 @@ async fn canary_tick(c: &mut Canary) -> Result<(), ErrorInfo> {
         Ok(response) => {
             c.num_success += 1;
             info!("Canary success");
-            increment_counter!("redgold.canary.success");
+            increment_counter!("redgold.e2e.success");
             if let Some(q) = response.query_transaction_response {
-                increment_gauge!("redgold.canary.num_peers", q.observation_proofs.len() as f64);
+                increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
             }
         }
         Err(e) => {
-            increment_counter!("redgold.canary.failure");
+            increment_counter!("redgold.e2e.failure");
             let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
             error!("Canary failure: {}", failure_msg.clone());
             let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
             if !c.failed_once || recovered {
-                alert::email(format!("{} canary failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
+                alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
             }
             let failure_time = util::current_time_millis_i64();
             c.num_success = 0;

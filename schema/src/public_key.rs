@@ -1,5 +1,5 @@
 use bitcoin::secp256k1::PublicKey;
-use crate::{bytes_data, error_info, from_hex, SafeBytesAccess, structs};
+use crate::{bytes_data, error_info, from_hex, SafeBytesAccess, ShortString, structs};
 use crate::structs::{ErrorInfo, PublicKeyType};
 
 pub trait ToPublicKey {
@@ -39,5 +39,9 @@ impl structs::PublicKey {
     }
     pub fn bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
         self.bytes.safe_bytes()
+    }
+
+    pub fn short_id(&self) -> String {
+        self.hex().expect("hex").short_string().expect("worked")
     }
 }

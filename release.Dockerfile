@@ -26,5 +26,7 @@ RUN apt install -y docker-ce-cli
 COPY ./redgold /redgold
 RUN chmod +x /redgold
 ENV REDGOLD_DOCKER=true
+ENV RUST_MIN_STACK=10485760
+
 EXPOSE 16179 16180 16181 16182 16183
 ENTRYPOINT ["/redgold"]

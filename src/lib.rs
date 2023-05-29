@@ -3,7 +3,7 @@
 pub mod api;
 pub mod async_functionality_loop;
 pub mod debug_err_handle;
-pub mod canary;
+pub mod e2e;
 pub mod core;
 pub mod custodial;
 pub mod data;

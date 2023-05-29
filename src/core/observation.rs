@@ -143,7 +143,7 @@ impl ObservationBuffer {
         for o in proofs {
             if let Some(oh) = o.metadata.clone().and_then(|m| m.observed_hash) {
                 if let Some(s) = self.subscribers.get(&oh) {
-                    info!("Responding to sender with observation proof");
+                    // info!("Responding to sender with observation proof");
                     s.send_err(o.clone())?;
                 }
             }
@@ -154,7 +154,7 @@ impl ObservationBuffer {
     pub async fn process_incoming(&mut self, o: ObservationMetadataInternalSigning) -> Result<(), ErrorInfo> {
         if let Some(h) = o.observation_metadata.observed_hash.clone() {
             increment_counter!("redgold.observation.buffer.added");
-            log::info!("Pushing observation metadata to buffer {}", json_or(&o.observation_metadata.clone()));
+            // log::info!("Pushing observation metadata to buffer {}", json_or(&o.observation_metadata.clone()));
             self.subscribers.insert(h.clone(), o.sender.clone());
             self.data.push(o.observation_metadata);
         };
@@ -165,7 +165,7 @@ impl ObservationBuffer {
         if self.data.is_empty() {
             return Ok(vec![]);
         }
-        info!("Forming observation");
+        // info!("Forming observation");
         increment_counter!("redgold.observation.attempt");
 
         let clone = self.data.clone();
@@ -214,7 +214,8 @@ impl ObservationBuffer {
         for _ in 0..num_observations {
             increment_counter!("redgold.observation.metadata.total");
         }
-        info!("Formed observation {}", json(&o.clone())?);
+        let node_id = self.relay.node_config.short_id()?;
+        info!("node_id={} Formed observation {}", node_id, json(&o.clone())?);
         Ok(proofs)
     }
 }

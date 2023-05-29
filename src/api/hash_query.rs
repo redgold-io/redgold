@@ -36,7 +36,7 @@ pub async fn hash_query(relay: Relay, hash_input: String) -> Result<HashSearchRe
             observation_proofs,
             valid_utxo_index: valid_utxo_output_ids,
             used_outputs: vec![],
-            accepted: rejection_reason.is_some(),
+            accepted: rejection_reason.is_none(),
             rejection_reason,
             queried_output_index_valid: None,
         })

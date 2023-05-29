@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 
 use redgold_schema::{json_or, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoResponse, MultipartyThresholdResponse, Request};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoResponse, MultipartyThresholdResponse, QueryObservationProofResponse, Request, SubmitTransactionRequest};
 
 use crate::api::about;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
@@ -85,11 +85,15 @@ impl PeerRxEventHandler {
                         let mut request = relay.node_config.request().about();
 
                         let relay = relay.clone();
-                        info!("Requesting peer info on runtime");
+                        let address = nmd.external_address.clone();
+                        let port = (nmd.port_or(relay.node_config.network.clone()) as i64) + 1;
+                        info!("Requesting peer info on runtime address: {}:{}",
+                              address, port);
                         tokio::spawn(async move {
+
                             let response = rest_peer(
-                                relay.node_config.clone(), nmd.external_address.clone(),
-                                (nmd.port_or(relay.node_config.network.clone()) as i64) + 1,
+                                relay.node_config.clone(), address,
+                                port,
                                 &mut request
                             ).await;
                             Self::handle_about_peer_response(relay.clone(), response).await
@@ -102,7 +106,7 @@ impl PeerRxEventHandler {
 
 
         } else {
-            info!("No proof on incoming request, unknown peer");
+            // info!("No proof on incoming request, unknown peer");
         }
 
         if let Some(p) = pm.public_key {
@@ -120,10 +124,16 @@ impl PeerRxEventHandler {
     async fn handle_about_peer_response(
         relay: Relay, response: Result<Response, ErrorInfo>
     ) -> Result<(), ErrorInfo> {
-        let res = response?.about_node_response.safe_get()?.latest_metadata.safe_get()?.clone();
+        if let Some(e) = response.clone().err() {
+            tracing::error!("Error getting peer info: {}", e.json_or());
+        }
+        let result1 = response?;
+        let result = result1.about_node_response.safe_get();
+        let res = result?.peer_node_info.safe_get()?;
         // TODO: Validate transaction here
         info!("Added new peer: {}", json(&res)?);
-        relay.ds.peer_store.add_peer(&res, 0f64).await?;
+        // TODO: Change to optional trust
+        relay.ds.peer_store.add_peer_new(res, 0f64).await?;
         Ok(())
     }
 
@@ -141,6 +151,14 @@ impl PeerRxEventHandler {
             response.hash_search_response =
                 Some(crate::api::hash_query::hash_query(relay.clone(), r.search_string).await?);
         }
+        // TODO: implement this, but first question is why isn't the observation handler accepting them properly?
+        if let Some(r) = request.query_observation_proof_request {
+            let h = r.hash.safe_get()?;
+            let proofs = relay.ds.observation.select_observation_edge(h).await?;
+            let mut query_observation_proof_response = QueryObservationProofResponse::default();
+            query_observation_proof_response.observation_proof = proofs;
+            response.query_observation_proof_response = Some(query_observation_proof_response);
+        }
 
         if let Some(s) = request.submit_transaction_request {
             // debug!("Received submit transaction request, sending to relay");
@@ -156,15 +174,13 @@ impl PeerRxEventHandler {
         }
 
         if let Some(t) = request.gossip_transaction_request {
-            // info!("Received gossip transaction request");
-            relay
-                .transaction
-                .sender
-                .send(TransactionMessage {
-                    transaction: t.transaction.unwrap(),
-                    response_channel: None,
-                })
-                .expect("Transaction send failure");
+            if let Some(t) = t.transaction {
+                info!("Received gossip transaction request for {}", &t.hash().hex());
+                relay.submit_transaction(SubmitTransactionRequest {
+                    transaction: Some(t),
+                    sync_query_response: false,
+                }).await?;
+            }
         }
         if let Some(o) = request.gossip_observation_request {
             // info!("Received gossip observation request");
@@ -181,11 +197,9 @@ impl PeerRxEventHandler {
             response.download_response = Some(result);
         }
 
-        if let Some(_) = request.about_node_request {
-            // info!("Received about request");
-            let mut abr = AboutNodeResponse::empty();
-            abr.latest_metadata = Some(relay.node_config.peer_data_tx());
-            response.about_node_response = Some(abr);
+        if let Some(r) = request.about_node_request {
+            info!("Received about request");
+            response.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
         }
 
         if let Some(r) = request.multiparty_threshold_request {
@@ -260,7 +274,7 @@ impl PeerRxEventHandler {
         let receiver = self.relay.peer_message_rx.receiver.clone();
         let relay = self.relay.clone();
         receiver.into_stream().map(|r| Ok(r)).try_for_each_concurrent(10, |pm| {
-            info!("Received peer message");
+            // info!("Received peer message");
             Self::request_response_rest(relay.clone(), pm)
         }).await
     }

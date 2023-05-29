@@ -13,7 +13,7 @@ pub async fn handle_about_node(_p0: AboutNodeRequest, relay: Relay) -> Result<Ab
 
     // let mut about = AboutNodeResponse::default();
     // relay.
-    //         self_peer_info: Some(relay.node_config.self_peer_info()),
+   let peer_node_info = Some(relay.node_config.self_peer_info());
     Ok(AboutNodeResponse{
         // This should be the peer_id value stored in config data store
         latest_metadata: Some(relay.node_config.peer_data_tx()),
@@ -26,5 +26,6 @@ pub async fn handle_about_node(_p0: AboutNodeRequest, relay: Relay) -> Result<Ab
         pending_transactions,
         total_accepted_transactions,
         observation_height,
+        peer_node_info,
     })
 }

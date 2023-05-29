@@ -144,20 +144,6 @@ impl DataStore {
         });
     }
 
-    fn create_peer_keys(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS peer_key (
-                  public_key    BLOB PRIMARY KEY,
-                  id    BLOB,
-                  multi_hash    BLOB,
-                  address    TEXT,
-                  status    TEXT
-                  )",
-                [],
-            )
-        });
-    }
 
     fn create_observation(&self) -> rusqlite::Result<usize, Error> {
         return self.connection().and_then(|c| {
@@ -520,7 +506,7 @@ impl DataStore {
         // let vec1 = addresses.iter().map(|a| a.address).collect_vec();
         for address in addresses {
             // TODO:
-            // If this sql query has a syntax error, it breaks the canary but NOT the e2e? wtf
+            // If this sql query has a syntax error, it breaks the e2e but NOT the e2e? wtf
             let rows = sqlx::query(
                 "SELECT transaction_hash, output_index, address, output, time FROM utxo WHERE address = ?"
             ).bind(address.address.clone().safe_bytes().expect("bytes"))
@@ -702,60 +688,6 @@ impl DataStore {
     //     return Ok(map);
     // }
 
-    pub fn select_peer_id_from_key(&self, public_key: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
-        let conn = self.connection()?;
-        let mut statement =
-            conn.prepare("SELECT id FROM peer_key WHERE public_key = ?1 LIMIT 1")?;
-        let rows = statement.query_map(params![public_key], |row| {
-            let id: Vec<u8> = row.get(0)?;
-            Ok(id)
-        })?;
-        let res = Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).next());
-        res
-    }
-
-
-    pub fn check_peer_connect(&self, peer_id: PeerId) -> Result<bool, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare(
-            "SELECT COUNT(*) FROM peer_key JOIN peers ON peer_key.id = peers.id \
-            WHERE peer_key.multi_hash = ?1 AND peers.trust > 0",
-        )?;
-        let mut rows = statement.query_map(params![peer_id.to_bytes()], |row| {
-            let count: i64 = row.get(0)?;
-            Ok(count > 0)
-        })?;
-        Ok(rows.next().unwrap().unwrap())
-    }
-
-    // Really neeed to figure out this parameter IN array binding stuff later.
-    // for now just issuing multiple select statements for simplicity.
-    pub fn select_peer_trust(
-        &self,
-        peer_ids: &Vec<Vec<u8>>,
-    ) -> Result<HashMap<Vec<u8>, f64>, Error> {
-        let conn = self.connection()?;
-        let mut map: HashMap<Vec<u8>, f64> = HashMap::new();
-
-        for peer_id in peer_ids {
-            let mut statement = conn.prepare("SELECT id, trust FROM peers WHERE id = ?1")?;
-            //.raw_bind_parameter();
-            // Try this ^ for iterating over peer ids.
-            let rows = statement.query_map(params![peer_id], |row| {
-                Ok(PeerTrustQueryResult {
-                    peer_id: row.get(0)?,
-                    trust: row.get(1)?,
-                })
-            })?;
-            // // TODO error handling for multiple rows
-
-            for row in rows {
-                let row_q = row?;
-                map.insert(row_q.peer_id, row_q.trust);
-            }
-        }
-        return Ok(map);
-    }
 
     pub fn select_broadcast_peers(&self) -> rusqlite::Result<Vec<PeerQueryResult>, Error> {
         let conn = self.connection()?;
@@ -774,23 +706,6 @@ impl DataStore {
         let res = rows.map(|r| r.unwrap()).collect::<Vec<PeerQueryResult>>();
 
         return Ok(res);
-    }
-
-    pub fn select_peer_key_address(
-        &self,
-        public_key: &Vec<u8>,
-    ) -> rusqlite::Result<Option<String>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare("SELECT address FROM peer_key WHERE public_key=?1")?;
-
-        let rows = statement.query_map(params![public_key], |row| {
-            let address: String = row.get(0)?;
-            Ok(address)
-        })?;
-
-        let res = rows.map(|r| r.unwrap()).collect::<Vec<String>>();
-
-        return Ok(res.get(0).map(|x| x.clone()));
     }
 
     pub fn map_err<A>(error: rusqlite::Result<A, rusqlite::Error>) -> result::Result<A, ErrorInfo> {
@@ -1346,7 +1261,7 @@ struct Todo {
 async fn test_sqlx_migrations() {
     // TODO: Delete file at beginning.
     dotenv::dotenv().ok().expect("worked");
-    util::init_logger().ok(); //expect("log");
+    util::init_logger();
     println!("{:?}", std::env::var("DATABASE_URL"));
     let mut node_config = NodeConfig::default();
     let mut args = empty_args();

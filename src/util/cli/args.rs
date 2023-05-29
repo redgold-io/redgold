@@ -11,13 +11,16 @@ pub fn empty_args() -> RgArgs {
         data_store_path: None,
         data_store_folder: None,
         wallet_path: None,
+        // Is this the right thing to do here? Good question
         network: Some("local".to_string()),
         debug_id: None,
         disable_auto_update: false,
         subcmd: None,
         genesis: false,
         seed_address: None,
-        seed_port_offset: None
+        seed_port_offset: None,
+        enable_e2e: None,
+        log_level: None,
     }
 }
 
@@ -73,6 +76,14 @@ pub struct RgArgs {
     /// Seed network port offset, only used for local testing and manually connecting to a specific
     /// network
     pub seed_port_offset: Option<i32>,
+    #[clap(long)]
+    /// Debug only option to enable an internal continuous E2E test sending transactions
+    pub enable_e2e: Option<i32>,
+    #[clap(long)]
+    /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
+    pub log_level: Option<String>,
+    // TODO: File logger path
+
 }
 
 impl Default for RgArgs {

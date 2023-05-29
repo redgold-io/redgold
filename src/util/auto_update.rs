@@ -206,7 +206,7 @@ pub async fn from_node_config(node_config: NodeConfig) {
 
 #[tokio::test]
 async fn try_query() {
-    init_logger().ok(); //expect("log");
+    init_logger();
                         // poll_update(
                         //     NetworkEnvironment::Test,
                         //     "Asdf".to_string(),

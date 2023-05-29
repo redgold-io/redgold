@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use crate::data::data_store::DataStore;
 use crate::{genesis, util};
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
@@ -13,8 +14,8 @@ use std::time::Duration;
 use itertools::Itertools;
 use log::{debug, info};
 use redgold_schema::servers::Server;
-use redgold_schema::structs;
-use redgold_schema::structs::{Address, DynamicNodeMetadata, NodeMetadata, NodeType, PeerData, PeerId, PeerNodeInfo, Request, Response, VersionInfo};
+use redgold_schema::{ShortString, structs};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerNodeInfo, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::dhash_vec;
 use crate::api::public_api::PublicClient;
@@ -70,18 +71,24 @@ pub struct NodeConfig {
     pub block_formation_interval: Duration,
     pub genesis_config: GenesisConfig,
     pub faucet_enabled: bool,
-    pub canary_enabled: bool,
+    pub e2e_enabled: bool,
     pub load_balancer_url: String,
     pub external_ip: String,
-    pub servers: Vec<Server>
+    pub servers: Vec<Server>,
+    pub log_level: String,
 }
 
 impl NodeConfig {
 
+    // TODO: this can be fixed at arg parse time
     pub fn public_key(&self) -> structs::PublicKey {
         let pair = self.internal_mnemonic().active_keypair();
         let pk_vec = pair.public_key_vec();
         structs::PublicKey::from_bytes(pk_vec)
+    }
+
+    pub fn short_id(&self) -> Result<String, ErrorInfo> {
+        self.public_key().hex()?.short_string()
     }
 
     pub fn node_metadata(&self) -> NodeMetadata {
@@ -266,10 +273,11 @@ impl NodeConfig {
             block_formation_interval: Duration::from_secs(10),
             genesis_config: Default::default(),
             faucet_enabled: true,
-            canary_enabled: true,
+            e2e_enabled: true,
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string(),
             servers: vec![],
+            log_level: "DEBUG".to_string(),
         }
     }
 
@@ -302,7 +310,7 @@ impl NodeConfig {
         node_config.network = NetworkEnvironment::Debug;
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
-        node_config.canary_enabled = false;
+        node_config.e2e_enabled = false;
         node_config
     }
     pub fn internal_mnemonic(&self) -> MnemonicWords {

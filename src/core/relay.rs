@@ -138,7 +138,7 @@ impl Relay {
 
     pub async fn send_message_sync_static(relay: Relay, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
         let timeout = timeout.unwrap_or(Duration::from_secs(60));
-        let (s, r) = flume::unbounded::<Response>();
+        let (s, r) = flume::bounded::<Response>(1);
         let key = node.to_public_key()?;
         let pm = PeerMessage{
             request,
@@ -149,6 +149,7 @@ impl Relay {
         relay.peer_message_tx.sender.send_err(pm)?;
         let res = tokio::time::timeout(timeout, r.recv_async_err()).await
             .map_err(|e| error_info(e.to_string()))??;
+        res.as_error_info()?;
         Ok(res)
     }
 
@@ -239,7 +240,7 @@ impl Relay {
             .transaction
             .safe_get_msg("Missing transaction field on submit request")?;
         tx.calculate_hash();
-        info!("Relay submitting transaction");
+        // info!("Relay submitting transaction");
         self.transaction
             .send(TransactionMessage {
                 transaction: tx.clone(),

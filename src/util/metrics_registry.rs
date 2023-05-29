@@ -35,6 +35,7 @@ pub fn register_metric_names() {
     register_counter!("redgold.observation.attempt");
     register_counter!("redgold.observation.metadata.total");
     register_counter!("redgold.observation.buffer.added");
+    register_counter!("redgold.observation.failed_to_send_to_transaction_processor");
     register_gauge!("redgold.observation.height");
     register_gauge!("redgold.observation.last.size");
 
@@ -54,9 +55,9 @@ pub fn register_metric_names() {
     register_counter!("redgold.api.rosetta.account_balance");
     register_counter!("redgold.api.rosetta.account_coins");
 
-    register_gauge!("redgold.canary.num_peers");
-    register_counter!("redgold.canary.failure");
-    register_counter!("redgold.canary.success");
+    register_gauge!("redgold.e2e.num_peers");
+    register_counter!("redgold.e2e.failure");
+    register_counter!("redgold.e2e.success");
     register_counter!("redgold.peer.message.received");
 
     // register_gauge!("redgold.libp2p.active_connections");

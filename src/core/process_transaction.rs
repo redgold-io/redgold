@@ -4,6 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use dashmap::mapref::entry::Entry;
+use flume::TryRecvError;
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
@@ -13,9 +14,9 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::{json_or, ProtoHashable, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, ValidationType};
+use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
-use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::transaction::{TransactionTestContext, validate_utxo};
 use crate::data::data_store::DataStore;
@@ -34,7 +35,7 @@ use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
-
+use redgold_schema::EasyJson;
 #[derive(Clone)]
 pub struct Conflict {
     //  Not really necessary but put other info here.
@@ -45,12 +46,19 @@ pub struct Conflict {
 }
 
 #[derive(Clone)]
+pub enum ProcessTransactionMessage {
+    ProofReceived(ObservationProof),
+    // TODO: Do we need a type here for representing an immediate pending signature? probably not
+}
+
+#[derive(Clone)]
 pub struct RequestProcessor {
     sender: flume::Sender<Conflict>,
     receiver: flume::Receiver<Conflict>,
     request_id: String,
     pub transaction_hash: Hash,
-    pub transaction: Transaction
+    pub transaction: Transaction,
+    pub internal_channel: Channel<ProcessTransactionMessage>
 }
 
 #[derive(Clone)]
@@ -67,6 +75,7 @@ impl RequestProcessor {
             request_id,
             transaction_hash: transaction_hash.clone(),
             transaction,
+            internal_channel: new_bounded_channel(200),
         };
     }
 }
@@ -74,67 +83,13 @@ impl RequestProcessor {
 #[derive(Clone)]
 pub struct TransactionProcessContext {
     relay: Relay,
-    // tx_process: Arc<Runtime>,
     request_processor: Option<RequestProcessor>,
     transaction_hash: Option<Hash>,
     utxo_ids: Option<Vec<FixedUtxoId>>
 }
 
-// async fn query_self_accepted_transaction_status(
-//     relay: Relay,
-//     transaction_hash: &Hash,
-// ) -> Result<QueryTransactionResponse, ErrorInfo> {
-//     //relay.ds.select_peer_trust()
-//     // TODO: Add hasher interface to relay / node_config
-//     // let leaf_hash = util::dhash_vec(&transaction_hash).to_vec();
-//
-//     // TODO: add fields pct_acceptance network 0.8 for instance fraction of peers / fraction of trust accepted.
-//     // TODO: Trust within partition id. partitions should be flexible in size relative to node size.
-//     // or rather node size determines minimum -- partition?
-//
-//     let peer_publics = DataStore::map_err(relay.ds.select_broadcast_peers())?;
-//
-//     let mut pk = peer_publics
-//         .iter()
-//         .map(|x| x.public_key.clone())
-//         .collect::<HashSet<Vec<u8>>>();
-//
-//     pk.insert(relay.node_config.wallet().transport_key().public_key_vec());
-//
-//     if pk.is_empty() {
-//         error!("Peer keys empty, unable to validate transaction!")
-//     }
-//
-//     let mut interval =
-//         tokio::time::interval(relay.node_config.check_observations_done_poll_interval);
-//
-//     let mut res: Vec<ObservationProof> = vec![];
-//     // what we should do is instead, in the process thing, cause a delay if we don't get any
-//     // new information.
-//
-//     for _ in 0..relay.node_config.check_observations_done_poll_attempts {
-//         interval.tick().await;
-//         res = relay
-//             .ds
-//
-//             .query_observation_edge(transaction_hash.vec())
-//             .unwrap();
-//         info!(
-//             "Queried {:?} merkle proofs for transaction_hash {}",
-//             res.len(),
-//             transaction_hash.hex()
-//         );
-//         // TODO: Change to trust threshold for acceptance.
-//         if res.len() >= 1 {
-//             break;
-//         }
-//     }
-//     Ok(QueryTransactionResponse {
-//         observation_proofs: res,
-//         block_hash: None,
-//     })
-// }
 
+// TODO: Refactor
 async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash, ErrorInfo> {
     //relay.ds.select_peer_trust()
     // TODO: Add hasher interface to relay / node_config
@@ -144,6 +99,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     // TODO: Trust within partition id. partitions should be flexible in size relative to node size.
     // or rather node size determines minimum -- partition?
 
+    // TODO: replace this func
     let peer_publics = relay.ds.select_broadcast_peers().unwrap();
     let mut map = HashMap::<Vec<u8>, f64>::new();
     for peer in peer_publics {
@@ -216,44 +172,17 @@ impl TransactionProcessContext {
         // We can also use a Context type parameter over it to keep track of some internal context
         // per request i.e. RequestContext.
         receiver.into_stream().map(|x| {
-            info!("Transaction receiver map stream");
+            // info!("Transaction receiver map stream");
             Ok(x)
         })
             .try_for_each_concurrent(100, |transaction| {
-            info!("Transaction receiver try for each stream");
+            // info!("Transaction receiver try for each stream");
             let mut x = self.clone();
             async move {
                 x.scoped_process_and_respond(transaction).await
             }
         }).await
     }
-    //
-    // /// Loop to check messages and process them
-    // // TODO: Abstract this out
-    // async fn run(&self) -> Result<(), ErrorInfo> {
-    //     increment_counter!("redgold.node.async_started");
-    //     let mut fut = FutLoopPoll::new();
-    //     // TODO: Change to queue
-    //     let mut receiver = self.relay.transaction.receiver.clone();
-    //     // TODO this accomplishes queue, we can also move the spawn function into FutLoopPoll so that
-    //     // the only function we have here is to call one function
-    //     // do that later
-    //     // receiver.stream().try_for_each_concurrent()
-    //     // We can also use a Context type parameter over it to keep track of some internal context
-    //     // per request i.e. RequestContext.
-    //     fut.run_fut(&|| receiver.recv_async_err(), |transaction_res: Result<TransactionMessage, ErrorInfo>| {
-    //         let mut x = self.clone();
-    //         let jh = tokio::spawn(async move {
-    //             match transaction_res {
-    //                 Ok(transaction) => {
-    //                     x.scoped_process_and_respond(transaction).await
-    //                 }
-    //                 Err(e) => Err(e)
-    //             }
-    //         });
-    //         jh
-    //     } ).await
-    // }
 
     async fn scoped_process_and_respond(&mut self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
         let request_uuid = Uuid::new_v4().to_string();
@@ -264,6 +193,7 @@ impl TransactionProcessContext {
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
         let output_address = transaction_message.transaction.first_output_address()
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
+        let node_id = self.relay.node_config.short_id()?;
         let mut hm = HashMap::new();
         hm.insert("request_uuid".to_string(), request_uuid.clone());
         hm.insert("transaction_hash".to_string(), hex.clone());
@@ -271,18 +201,26 @@ impl TransactionProcessContext {
         hm.insert("current_time".to_string(), current_time.to_string());
         hm.insert("input_address".to_string(), input_address.clone());
         hm.insert("output_address".to_string(), output_address.clone());
+        hm.insert("node_id".to_string(), node_id.clone());
 
         let res = task_local_map(hm, async move {
-            self.process_and_respond(
+            self.transaction(
                 transaction_message, request_uuid, hex,
-                time, current_time, input_address, output_address
+                time, current_time, input_address, output_address,
+                node_id
             ).await
         }).await;
         res
     }
 
-    #[tracing::instrument(skip(self, transaction_message))]
-    async fn process_and_respond(
+    /*
+    let span = Span::current();
+    span.record("extra_field", &"extra_value");
+     */
+
+    #[allow(unused_variables)]
+    #[tracing::instrument(skip(self, transaction_message, transaction_time, current_time, input_address, output_address))]
+    async fn transaction(
         &mut self,
         transaction_message: TransactionMessage,
         request_uuid: String,
@@ -290,7 +228,8 @@ impl TransactionProcessContext {
         transaction_time: i64,
         current_time: i64,
         input_address: String,
-        output_address: String
+        output_address: String,
+        node_id: String
     ) -> Result<(), ErrorInfo> {
         let result_or_error =
             self.process(&transaction_message.transaction.clone(), current_time, request_uuid).await;
@@ -315,8 +254,8 @@ impl TransactionProcessContext {
         match transaction_message.response_channel {
             None => {
                 increment_counter!("redgold.transaction.missing_response_channel");
-                let details = ErrorInfo::error_info("Missing response channel for transaction");
-                error!("Missing response channel for transaction {:?}", json_or(&details));
+                // let details = ErrorInfo::error_info("Missing response channel for transaction");
+                // error!("Missing response channel for transaction {:?}", json_or(&details));
             }
             Some(r) => if let Some(e) = r.send_err(pr).err() {
                 error!("Error sending transaction response to channel {}", json_or(&e));
@@ -324,34 +263,6 @@ impl TransactionProcessContext {
         };
         Ok(())
     }
-
-
-    // async fn post_process_query(
-    //     &self,
-    //     transaction_message: Transaction,
-    //     current_time: i64,
-    // ) -> Result<SubmitTransactionResponse, ErrorInfo> {
-    //     let result1 = tokio::time::timeout(
-    //         Duration::from_secs(30),
-    //         self.process(transaction.clone()),
-    //     )
-    //     .await
-    //     .map_err(|e| error_info("timeout on transaction process"))?
-    //     //.map_err(|e| error_message(e, "transaction process"))?;
-    //     ?;
-    //     let vec1 = transaction_message.transaction.hash_bytes()?;
-    //     let status = tokio::time::timeout(
-    //         Duration::from_secs(15),
-    //         query_self_accepted_transaction_status(self.relay.clone(), vec1.clone()),
-    //     )
-    //     .await
-    //     .map_err(|e| error_info("timeout on query transaction accepted status"))??;
-    //     Ok(SubmitTransactionResponse {
-    //         transaction_hash: transaction_message.transaction.hash().into(),
-    //         query_transaction_response: Some(status),
-    //         transaction: None,
-    //     })
-    // }
 
     // TODO: okay so in this loop below thre's a time which should also check if all
     // available peers have heard about a double spend etc. and potentially terminate quicker?
@@ -420,6 +331,7 @@ impl TransactionProcessContext {
         };
         let mut conflicts: Vec<Conflict> = vec![];
 
+        // Change to UTXO stream processor sink message?
         // TODO: Change this so the UTXO pool is responsible for this, remove the request processor from here
         // And create a spawned thread for each UTXO pool to handle this that returns any conflicts back here.
         for utxo_id in fixed_utxo_ids {
@@ -469,22 +381,26 @@ impl TransactionProcessContext {
         };
 
         let mut observation_proofs = HashSet::new();
+        let mut self_signed_pending = false;
 
         if !conflict_detected {
             tracing::info!("Signing pending transaction");
             let prf = self.observe(validation_type, State::Pending).await?;
+            self_signed_pending = true;
             observation_proofs.insert(prf);
             // TODO: Await the initial observations here, gossip about them as well?
         } else {
             tracing::info!("Conflict detected on current {}", hash.hex());
         }
 
-        tracing::info!("Pending transaction stage started");
+        // tracing::info!("Pending transaction stage started");
 
+        // We need to distinguish between a pending and a conflict detected here.
         // TODO: Broadcast with no concern about response, or do we check for conflicts here?
         // TODO: we really need here a mechanism to deal with incoming conflict notifications
         // A request type to handle that that'll alert this thread? OR should that just be the same
         // As transaction request? We might benefit from including additional information.
+        // TODO: Replace all this with a relay method.
         let mut request = Request::default();
         let mut gossip_transaction_request = GossipTransactionRequest::default();
         gossip_transaction_request.transaction = Some(transaction.clone());
@@ -497,11 +413,15 @@ impl TransactionProcessContext {
             .sender
             .send_err(message)?;
 
-        tracing::info!("Gossiped transaction");
+        // tracing::info!("Gossiped transaction");
 
         let elapsed_time = || {
             current_time_millis_i64() - processing_time_start
         };
+
+        // This thread should listen for any incoming messages that alert to conflicts
+        // And or any messages that are related to proofs for this transaction.
+
 
         // conflicts.push(watch2.unwrap());
         // let mut conflicts = vec![watch2.unwrap()];
@@ -542,6 +462,13 @@ impl TransactionProcessContext {
         // TODO: Return all conflicts if not chosen as part of submit response
         // And/or return all conflicts anyways as part of the response.
 
+        // TODO: Move to own function
+        // if let Some(value) = Self::poll_internal_proof_messages(&request_processor, &mut observation_proofs) {
+        //     value?;
+        // }
+
+        // Completion stage
+
         tracing::info!("Conflict resolution stage started with {:?} conflicts", conflicts.len());
 
         if !conflicts.is_empty() {
@@ -570,17 +497,27 @@ impl TransactionProcessContext {
             }
         }
 
-        tracing::info!("Finalizing transaction stage started");
+        // tracing::info!("Finalizing transaction stage started");
 
         let prf = self.observe(validation_type, State::Finalized).await?;
         observation_proofs.insert(prf);
-
         self.insert_transaction(&transaction).await?;
         increment_counter!("redgold.transaction.accepted");
+        tracing::info!("Accepted transaction");
 
-        tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());
+        // tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());
 
         // Await until it has appeared in an observation and other nodes observations.
+
+
+        tokio::time::sleep(Duration::from_secs(6)).await;
+
+        let stored_proofs = self.relay.ds.observation.select_observation_edge(&hash).await?;
+
+        tracing::info!("Found {:?} stored proofs in ds", stored_proofs.len());
+
+        observation_proofs.extend(stored_proofs);
+        // TODO: Query our internal datastore for all obs proofs, and extend based on that
 
         // TODO: periodic process to clean mempool in event of thread processing crash?
         let peers = self.relay.ds.peer_store.active_nodes(None).await?;
@@ -589,18 +526,29 @@ impl TransactionProcessContext {
             hash: Some(hash.clone())
         });
 
-        tracing::info!("Collecting observation proofs from {} peers", peers.len());
-        let results = Relay::broadcast(self.relay.clone(),
-                                       peers, obs_proof_req,
-                                       // self.tx_process.clone(),
-                                       Some(
-                Duration::from_secs(5))).await;
-        for (_, r) in results {
-            if let Some(r) = r.ok() {
-                if let Some(obs_proof) = r.query_observation_proof_response {
-                    observation_proofs.extend(obs_proof.observation_proof);
+        if !peers.is_empty() {
+            tracing::info!("Collecting observation proofs from {} peers", peers.len());
+            let results = Relay::broadcast(self.relay.clone(),
+                                           peers, obs_proof_req,
+                                           // self.tx_process.clone(),
+                                           Some(
+                                               Duration::from_secs(5))).await;
+            for (pk, r) in results {
+                match r {
+                    Ok(r) => {
+                        let num_proofs = r.clone().query_observation_proof_response.map(|o| o.observation_proof.len()).unwrap_or(0);
+                        tracing::info!("Received {:?} observation proofs from peer: {}", num_proofs,  pk.short_id());
+                        if let Some(obs_proof) = r.query_observation_proof_response {
+                            observation_proofs.extend(obs_proof.observation_proof);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Error collecting observation proofs from peer: {} error: {}", pk.short_id(), e.json_or())
+                    }
                 }
             }
+        } else {
+            tracing::info!("No peers to collect observation proofs from");
         }
 
         observation_proofs.extend(self.relay.ds.observation.select_observation_edge(&hash).await?);
@@ -611,7 +559,48 @@ impl TransactionProcessContext {
         submit_response.query_transaction_response = Some(query_transaction_response);
         submit_response.transaction = Some(transaction.clone());
         submit_response.transaction_hash = Some(hash.clone());
+
+        // TODO: Task local metrics update here
+        // let hm: HashMap<String, String> = HashMap::new();
+        // hm
+        let counts = submit_response.count_unique_by_state()?;
+
+        tracing::info!("Finished processing transaction \
+        num_observation_proofs {} self_signed_pending {:?} num_pending: {:?} num_accepted: {:?}",
+            observation_proofs.len(), self_signed_pending, counts.get(&(State::Pending as i32)).unwrap_or(&0),
+            counts.get(&(State::Finalized as i32)).unwrap_or(&0),
+        );
+        // TODO: Rename Finalized to Accepted
+
         Ok(submit_response)
+    }
+
+    fn poll_internal_proof_messages(request_processor: &RequestProcessor, observation_proofs: &mut HashSet<ObservationProof>) -> Option<Result<SubmitTransactionResponse, ErrorInfo>> {
+        while {
+            let err = request_processor.internal_channel.receiver.try_recv();
+            let mut done = true;
+            match err {
+                Ok(o) => {
+                    match o {
+                        ProcessTransactionMessage::ProofReceived(o) => {
+                            observation_proofs.insert(o);
+                        }
+                    }
+                }
+                Err(e) => {
+                    match e {
+                        TryRecvError::Empty => {
+                            done = true;
+                        }
+                        TryRecvError::Disconnected => {
+                            return Some(Err(error_info("request processor channel closed unexpectedly")));
+                        }
+                    }
+                }
+            }
+            done
+        } {}
+        None
     }
 
     async fn insert_transaction(

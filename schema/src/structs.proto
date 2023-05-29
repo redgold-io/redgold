@@ -542,6 +542,8 @@ message EagerFullGossipPush {
   repeated PeerData peer_data = 7;
 }
 
+
+
 // These should both be broadcasts at some point
 // Consider using a response here if needed.
 message GossipTransactionRequest {
@@ -702,7 +704,8 @@ message Request {
   UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
   QueryObservationProofRequest query_observation_proof_request = 13;
   HashSearchRequest hash_search_request = 14;
-  optional string uuid = 15;
+  optional string trace_id = 15;
+  optional bool trace = 16;
 }
 
 message Response {
@@ -771,6 +774,7 @@ message AboutNodeResponse {
   int64 pending_transactions = 7;
   int64 total_accepted_transactions = 8;
   int64 observation_height = 9;
+  PeerNodeInfo peer_node_info = 10;
 }
 
 enum AddressType {
@@ -892,8 +896,8 @@ message ResponseMetadata {
   bool success = 1;
   ErrorInfo error_info = 2;
   repeated TaskLocalDetails task_local_details = 3;
-  optional string request_uuid = 4;
-  optional string response_uuid = 5;
+  optional string request_id = 4;
+  optional string trace_id = 5;
 }
 //
 //message AddPeerFullRequest {
