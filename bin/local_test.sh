@@ -35,6 +35,8 @@ second_test_exit_status=$?
 # Combine the exit statuses and exit the script with the combined status
 final_exit_status=$((TEST_EXIT_CODE || second_test_exit_status))
 
+cat log0; cat log1; cat log2
+
 kill -KILL $NODE_1_PID
 kill -KILL $NODE_2_PID
 kill -KILL $NODE_3_PID
