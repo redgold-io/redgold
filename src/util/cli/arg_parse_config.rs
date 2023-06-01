@@ -23,6 +23,7 @@ use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{RgArgs, RgTopLevelSubcommand};
 use crate::util::cli::commands::mnemonic_fingerprint;
+use crate::util::cli::data_folder::DataFolder;
 use crate::util::ip_lookup;
 
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
@@ -78,41 +79,20 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
         node_config.load_balancer_url = "127.0.0.1".to_string();
     }
 
-    let ds_path_opt: Option<String> = opts.data_store_path;
+    let mut data_folder_path =  opts.data_folder
+        .map(|p| PathBuf::from(p))
+        .unwrap_or(get_default_data_top_folder());
+    if let Some(id) = opts.debug_id {
+        data_folder_path = data_folder_path.join("local_test");
+        data_folder_path = data_folder_path.join(format!("id_{}", id));
+    }
 
-    node_config.data_store_folder = opts.data_store_folder.unwrap_or({
-        get_default_data_top_folder().to_str().unwrap().to_string()
-    });
+    node_config.data_folder = DataFolder { path: data_folder_path };
 
-    let data_store_file_path = match ds_path_opt {
-        None => {
-            let mut net_dir = get_default_data_directory(node_config.network);
-            if is_canary {
-                net_dir = net_dir.join("e2e");
-            }
-            let dbg_id: Option<i32> = opts.debug_id ;
-            if dbg_id.is_some() {
-                net_dir = net_dir.join(format!("{}", dbg_id.unwrap()));
-            }
-            let ds_path = net_dir.as_path().clone();
+    let ds_path = node_config.env_data_folder().path.to_str().expect("path").to_string();
+    // tracing::info!("Ensuring make directory for datastore in: {}", ds_path);
+    fs::create_dir_all(ds_path).expect("Directory unable to be created.");
 
-            // let result = fs::try_exists(ds_path.clone()).unwrap_or(false);
-            // if !result {
-                info!(
-                    "Ensuring make directory for datastore in: {:?}",
-                    ds_path.clone().to_str()
-                );
-                fs::create_dir_all(ds_path).expect("Directory unable to be created.");
-            // }
-            ds_path
-                .join("data_store.sqlite")
-                .as_path()
-                .to_str()
-                .expect("Path format error")
-                .to_string()
-        }
-        Some(p) => p,
-    };
 
     let dbg_id: Option<i32> = opts.debug_id;
     if dbg_id.is_some() {
@@ -129,7 +109,6 @@ pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> No
         node_config.mnemonic_words = words;
     });
 
-    node_config.data_store_path = data_store_file_path;
     node_config
 }
 
@@ -167,7 +146,7 @@ pub async fn load_node_config(
 
     info!(
         "Starting node with data store path: {}",
-        node_config.data_store_path
+        node_config.data_store_path()
     );
 
     // let store =
@@ -545,7 +524,7 @@ fn test_shasum() {
 fn load_ds_path() {
     let config = NodeConfig::default();
     let res = load_node_config_initial(args::empty_args(), config);
-    println!("{}", res.data_store_folder());
+    println!("{}", res.data_store_path());
 }
 
 // TODO: Settings from config if necessary

@@ -7,17 +7,22 @@
 [Whitepaper](docs/whitepaper.md) | [Run A Node](docs/run_a_node.md) | 
 [Security Procedures](docs/security_procedures.md)
 
+Redgold is the ideological opposite of BlackRock. It is a decentralized, open-source, and peer-to-peer platform 
+designed to act as a financial data and computation layer for the cryptocurrency ecosystem. The primary product 
+intention is focused around ETFs & Portfolio target models, and finance, but the platform is designed to be general purpose 
+as a decentralized data lake and SQL compute engine. 
 
-Redgold is a peer-to-peer database and SQL compute engine bringing Spark and pandas like data transformation & 
-conventional database usage patterns & functionality to crypto. WASM executors are used to chain together transforms
-operating on SQL-like data loading functions. Protobuf is used for relational 
-algebra descriptors and for raw signature operations, and Arrow is used as a cross-memory format for WASM 
-invocations, with sqlite tables for frequent access and parquet tables for long-lived data indexes. All operations 
-are translated to work with Kademlia 
-distances. [ACCEPT](https://arxiv.org/pdf/2108.05236.pdf) consensus protocol is the most similar to the demonstrated 
-primary optimization technique. For a full technical description and motivation of this project please refer 
-above to the [whitepaper](docs/whitepaper.md). The main product focus is on ETFs & portfolio target models, with 
-redeemable assets from other cryptocurrencies connected tightly with financial (oracle) data stores.
+It is inspired heavily by Spark and pandas like data transformations on conventional 
+parquet data lakes, with the key distinguishing factor being the ability to support multi-tenant compute with 
+arbitrary secure UDFs compiled by anyone. WASM executors are used to for secure remote code execution to chain together
+transforms operating on SQL-like data loading functions as inputs. Protobuf is used for relational algebra descriptors 
+and for raw signature operations. Arrow is used as a cross-memory format for WASM invocations, with sqlite 
+tables for frequent access and parquet tables for long-lived data indexes. All operations are translated to work 
+with Kademlia distances. [ACCEPT](https://arxiv.org/pdf/2108.05236.pdf) consensus protocol is the most similar 
+to the demonstrated primary optimization technique. For a full technical description and motivation of this project 
+please refer above to the [whitepaper](docs/whitepaper.md).
+
+## Getting Started
 
 
 

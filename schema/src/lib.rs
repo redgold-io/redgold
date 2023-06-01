@@ -51,6 +51,7 @@ pub mod public_key;
 pub mod seeds;
 pub mod trust;
 pub mod input;
+pub mod debug_version;
 
 
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {

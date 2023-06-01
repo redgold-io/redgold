@@ -1055,3 +1055,14 @@ message Seed {
   PeerId peer_id = 5;
   optional PublicKey public_key = 6;
 }
+
+
+message DebugVersionChange {
+  optional string field1 = 1;
+}
+
+message DebugVersionChange2 {
+  optional string field1 = 1;
+  optional string field2 = 2;
+}
+

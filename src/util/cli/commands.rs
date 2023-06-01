@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOption, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, SafeOption, util, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
@@ -175,8 +175,26 @@ pub fn mnemonic_fingerprint(m: Mnemonic) -> String {
 }
 
 pub fn generate_random_mnemonic() -> Mnemonic {
-    Mnemonic::new_random(MasterKeyEntropy::Paranoid)
+    Mnemonic::new_random(MasterKeyEntropy::Double)
         .expect("New mnemonic generation failure")
+}
+
+pub fn generate_random_mnemonic_words(num_words: usize) -> Result<Mnemonic, ErrorInfo> {
+    let entropy = match num_words {
+        48 => {MasterKeyEntropy::Paranoid}
+        24 => MasterKeyEntropy::Double,
+        12 => MasterKeyEntropy::Sufficient,
+        _ => {
+            return Err(error_info("Unsupported num words for mnemonic generation"))
+        }
+    };
+    Mnemonic::new_random(entropy)
+        .error_info("New mnemonic generation failure")
+}
+
+#[test]
+pub fn mnemonic_generate_test() {
+    assert_eq!(generate_random_mnemonic().to_string().split(" ").count(), 24);
 }
 
 pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_DATA_PATH";
@@ -333,6 +351,10 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
     let faucet_tx = tx_submit.with_faucet().await?;
     // info!("Faucet response: {}", faucet_tx.json_or());
     let faucet_tx = faucet_tx.submit_transaction_response.safe_get()?.transaction.safe_get()?;
+    let address = faucet_tx.first_output_address().expect("a");
+    let response = client.query_hash(address.render_string().expect("")).await?;
+    let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
+    assert!(rounded > 0.);
     let _ = {
         let gen =
         tx_submit.generator.lock().expect("");

@@ -1,3 +1,4 @@
+use std::fs;
 use std::hash::Hash;
 use crate::data::data_store::DataStore;
 use crate::{genesis, util};
@@ -14,12 +15,14 @@ use std::time::Duration;
 use itertools::Itertools;
 use log::{debug, info};
 use redgold_schema::servers::Server;
-use redgold_schema::{ShortString, structs};
+use redgold_schema::{ErrorInfoContext, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerNodeInfo, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::dhash_vec;
 use crate::api::public_api::PublicClient;
 use crate::core::seeds::SeedNode;
+use crate::util::cli::commands;
+use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 
 pub struct CanaryConfig {}
 
@@ -53,8 +56,6 @@ pub struct NodeConfig {
     pub rosetta_port: Option<u16>,
     pub disable_control_api: bool,
     pub disable_public_api: bool,
-    pub data_store_path: String,
-    pub data_store_folder: String,
     // Rarely adjusted user suppliable params
     pub seed_hosts: Vec<String>,
     // Custom debug only network params
@@ -76,9 +77,19 @@ pub struct NodeConfig {
     pub external_ip: String,
     pub servers: Vec<Server>,
     pub log_level: String,
+    pub data_folder: DataFolder,
+    pub secure_data_folder: Option<DataFolder>
 }
 
 impl NodeConfig {
+
+    pub fn env_data_folder(&self) -> EnvDataFolder {
+        self.data_folder.by_env(self.network)
+    }
+
+    pub fn data_store_path(&self) -> String {
+        self.env_data_folder().data_store_path().to_str().unwrap().to_string()
+    }
 
     // TODO: this can be fixed at arg parse time
     pub fn public_key(&self) -> structs::PublicKey {
@@ -210,11 +221,6 @@ impl NodeConfig {
             .expect("filled")
             .clone()
     }
-    pub fn data_store_folder(&self) -> String {
-        let s = self.data_store_path.clone();
-        let path = Path::new(&s).parent().expect("data store folder no parent");
-        path.to_str().expect("path").to_string()
-    }
 
     pub fn p2p_port(&self) -> u16 {
         self.p2p_port.unwrap_or(self.port_offset + 0)
@@ -255,8 +261,6 @@ impl NodeConfig {
             rosetta_port: None,
             disable_control_api: false,
             disable_public_api: false,
-            data_store_path: "".to_string(),
-            data_store_folder: "".to_string(),
             seed_hosts: vec![],
             observation_formation_millis: Duration::from_millis(OBSERVATION_FORMATION_TIME_MILLIS),
             transaction_finalization_time: Duration::from_millis(
@@ -278,6 +282,8 @@ impl NodeConfig {
             external_ip: "127.0.0.1".to_string(),
             servers: vec![],
             log_level: "DEBUG".to_string(),
+            data_folder: DataFolder::target(0),
+            secure_data_folder: None,
         }
     }
 
@@ -293,17 +299,13 @@ impl NodeConfig {
         .to_string();
         let self_peer_id = debug_peer_id_from_key(&*words).to_vec();
         // let path: String = ""
-        let cwd = std::env::current_dir().expect("Current dir");
-        let cwd_target = cwd.join("target");
-        let target = cwd_target.join(format!("test_node_{:?}_data_store.sqlite", seed_id));
-        std::fs::remove_file(&target).ok();
-        let path = target.to_str().expect("path").to_string();
-        // let path = NodeConfig::memdb_path(seed_id);
+        let folder = DataFolder::target(seed_id.clone() as u32);
+        folder.delete().ensure_exists();
         let mut node_config = NodeConfig::default();
         node_config.self_peer_id = self_peer_id;
         node_config.mnemonic_words = words;
         node_config.port_offset = (node_config.port_offset + (seed_id.clone() * 100)) as u16;
-        node_config.data_store_path = path;
+        node_config.data_folder = folder;
         node_config.observation_formation_millis = Duration::from_millis(1000 as u64);
         node_config.transaction_finalization_time =
             Duration::from_millis(DEBUG_FINALIZATION_INTERVAL_MILLIS);
@@ -322,9 +324,42 @@ impl NodeConfig {
     }
 
     pub async fn data_store_all(&self) -> DataStore {
-        let p = PathBuf::from(self.data_store_folder.clone());
+        let all = self.data_folder.all().data_store_path();
+        DataStore::from_file_path(all.to_str().expect("failed to render ds path").to_string()).await
+    }
+
+    pub async fn data_store_all_from(top_level_folder: String) -> DataStore {
+        let p = PathBuf::from(top_level_folder.clone());
         let all = p.join(NetworkEnvironment::All.to_std_string());
         DataStore::from_file_path(all.to_str().expect("failed to render ds path").to_string()).await
+    }
+
+    pub async fn data_store_all_secure(&self) -> Option<DataStore> {
+        // TODO: Move to arg translate
+        if let Some(sd) = std::env::var(commands::REDGOLD_SECURE_DATA_PATH).ok() {
+            Some(Self::data_store_all_from(sd).await)
+        } else {
+            None
+        }
+    }
+
+    pub fn secure_path(&self) -> Option<String> {
+        // TODO: Move to arg translate
+        std::env::var(commands::REDGOLD_SECURE_DATA_PATH).ok()
+    }
+
+    pub fn secure_all_path(&self) -> Option<String> {
+        // TODO: Move to arg translate
+        std::env::var(commands::REDGOLD_SECURE_DATA_PATH).ok().map(|p| {
+            let buf = PathBuf::from(p);
+            buf.join(NetworkEnvironment::All.to_std_string())
+        }).map(|p| p.to_str().expect("failed to render ds path").to_string())
+    }
+
+    pub fn secure_mnemonic(&self) -> Option<String> {
+        self.secure_all_path().and_then(|p| {
+            fs::read_to_string(p).ok()
+        })
     }
 
     pub async fn loopback_public_client(&self) -> PublicClient {

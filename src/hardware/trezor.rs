@@ -20,21 +20,28 @@ const MISSING_DEVICE: &str = "Failed to find a Trezor device";
 const TREZORCTL: &str = "trezorctl";
 
 pub fn trezor_cmd(args: Vec<&str>) -> Result<String, ErrorInfo> {
-    println!("Running trezor cmd with args {:?}", args.clone());
+    // println!("Running trezor cmd with args {:?}", args.clone());
     let res = run_cmd(TREZORCTL, args);
-    println!("Trezor command raw output: {:?}", res.clone());
+    // println!("Trezor command raw output: {:?}", res.clone());
     if res.0.contains(MISSING_DEVICE) {
         Err(error_info("Failed to find a Trezor device".to_string()))?;
     }
     Ok(res.0)
 }
 
+// Failed to read details
 pub fn trezor_list_devices() -> Result<Option<String>, ErrorInfo> {
     let res = trezor_cmd(vec!["list"])?;
     let res = if res.is_empty() {
         None
     } else {
-        Some(res)
+        let strr = res.split("\n")
+            .filter(|l| {
+                !(l.contains("Failed to read details") || l.trim().is_empty())
+            })
+            .next()
+            .map(|l| l.to_string());
+        strr
     };
     Ok(res)
 }
@@ -210,8 +217,18 @@ pub fn sign_message(path: String, input_message: String) -> Result<SignMessageRe
 }
 
 
+const DEFAULT_ACCOUNT_NUM: u32 = 1000;
+
+pub fn default_pubkey_path() -> String {
+    format!("m/44'/0'/{}'/0/0", DEFAULT_ACCOUNT_NUM)
+}
+
+pub fn default_pubkey() -> Result<structs::PublicKey, ErrorInfo> {
+    get_public_node(default_pubkey_path())?.public_key()
+}
+
 /// This returns a hardened xpub so it doesn't expose other accounts
-pub fn standard_path(account_num: u32, non_standard_coin_type: Option<String>) -> String {
+pub fn standard_xpub_path(account_num: u32, non_standard_coin_type: Option<String>) -> String {
     let coin_type = non_standard_coin_type.unwrap_or("0".to_string()).to_string();
     return format!("m/44'/{}'/{}'", coin_type, account_num.to_string()).to_string();
 }
@@ -222,7 +239,7 @@ pub fn standard_path(account_num: u32, non_standard_coin_type: Option<String>) -
 /// This is one of two dependencies on the trezor device and the primary interface for external
 /// usage
 pub fn get_standard_xpub(account_num: u32, non_standard_coin_type: Option<String>) -> Result<String, ErrorInfo> {
-    Ok(get_public_node(standard_path(account_num, non_standard_coin_type))?.xpub)
+    Ok(get_public_node(standard_xpub_path(account_num, non_standard_coin_type))?.xpub)
 }
 
 pub fn get_standard_public_key(
@@ -232,7 +249,7 @@ pub fn get_standard_public_key(
     index: u32
 ) -> Result<structs::PublicKey, ErrorInfo> {
     let path = format!("{}/{}/{}",
-                       standard_path(account_num, non_standard_coin_type),
+                       standard_xpub_path(account_num, non_standard_coin_type),
                        change.to_string(),
                        index.to_string()
     );

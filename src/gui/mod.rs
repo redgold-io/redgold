@@ -2,6 +2,7 @@ use std::sync::Arc;
 use eframe::{egui, Frame};
 use egui_extras::RetainedImage;
 use tokio::runtime::Runtime;
+use redgold_schema::structs::ErrorInfo;
 // 0.17.1
 // 0.8
 use crate::gui::app_loop::{LocalState, Tab};
@@ -14,6 +15,8 @@ pub mod initialize;
 pub mod tables;
 pub mod server_tab;
 pub mod home;
+pub mod wallet_tab;
+pub mod keys_tab;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -26,15 +29,13 @@ pub struct ClientApp {
 }
 
 impl ClientApp {
-    pub fn from(logo: RetainedImage, nc: NodeConfig
+    pub async fn from(logo: RetainedImage, nc: NodeConfig
                 // , rt: Arc<Runtime>
-    ) -> Self {
-        Self {
-            logo: logo,
-            local_state: LocalState::from(nc,
-                                          // rt
-            ),
-        }
+    ) -> Result<Self, ErrorInfo> {
+        Ok(Self {
+            logo,
+            local_state: LocalState::from(nc).await?,
+        })
     }
 }
 

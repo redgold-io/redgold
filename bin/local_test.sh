@@ -1,7 +1,7 @@
 cargo build
 
 pkill -f redgold
-rm -rf ~/.rg/local
+rm -rf ~/.rg/local_test
 sleep 1
 export REDGOLD_BINARY_PATH="./target/debug/redgold"
 export RUST_BACKTRACE=1

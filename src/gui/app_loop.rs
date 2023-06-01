@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
 use std::time::Duration;
 use crossbeam::atomic::AtomicCell;
 use eframe::egui::widgets::TextEdit;
@@ -13,7 +13,7 @@ use log::{error, info};
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::{ClientApp, home, tables};
+use crate::gui::{ClientApp, home, keys_tab, tables};
 use crate::util;
 use rand::Rng;
 use rocket::http::ext::IntoCollection;
@@ -36,6 +36,7 @@ pub struct ServersState {
     deployment_result_info_box: Arc<Mutex<String>>
 }
 
+// #[derive(Clone)]
 pub struct LocalState {
     active_tab: Tab,
     session_salt: [u8; 32],
@@ -62,18 +63,22 @@ pub struct LocalState {
     // pub runtime: Arc<Runtime>,
     pub home_state: HomeState,
     server_state: ServersState,
-    pub current_time: i64
+    pub current_time: i64,
+    pub keygen_state: KeygenState,
+    pub wallet_state: WalletState,
+    pub ds_all_default: DataStore,
+    pub ds_secure: Option<DataStore>,
 }
 
 #[allow(dead_code)]
 impl LocalState {
-    pub fn from(node_config: NodeConfig
-                // , runtime: Arc<Runtime>
-    ) -> LocalState {
+    pub async fn from(node_config: NodeConfig) -> Result<LocalState, ErrorInfo> {
         let mut node_config = node_config.clone();
         node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
-        return LocalState {
+        let ds_all_default = node_config.data_store_all().await;
+        let ds_secure = node_config.data_store_all_secure().await;
+        let ls = LocalState {
             active_tab: Tab::Home,
             session_salt: random_bytes(),
             session_password_hashed: None,
@@ -98,7 +103,12 @@ impl LocalState {
                 info: Arc::new(Mutex::new(vec![])),
                 deployment_result_info_box: Arc::new(Mutex::new("".to_string())) },
             current_time: util::current_time_millis_i64(),
+            keygen_state: KeygenState::new(),
+            wallet_state: WalletState::new(),
+            ds_all_default,
+            ds_secure
         };
+        Ok(ls)
     }
 
     fn encrypt(&self, str: String) -> Vec<u8> {
@@ -143,13 +153,18 @@ use crate::node_config::NodeConfig; // 0.17.1
 
 
 
-#[derive(Debug, EnumIter)]
+#[derive(Debug, EnumIter, Clone)]
 #[repr(i32)]
 pub enum Tab {
     Home,
+    Keys,
     Wallet,
-    Trust,
+    Portfolio,
+    Identity,
+    Friends,
+    Address,
     Servers,
+    Trust,
     Settings,
 }
 
@@ -189,7 +204,10 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 // }
 use egui_extras::{Column, TableBuilder};
 use surf::http::headers::ToHeaderValues;
+use crate::data::data_store::DataStore;
 use crate::gui::home::{gui_status_networks, HomeState, NetworkStatusInfo};
+use crate::gui::keys_tab::KeygenState;
+use crate::gui::wallet_tab::{wallet_screen, WalletState};
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
     let mut results = vec![];
@@ -276,6 +294,14 @@ pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut Local
 
 }
 
+static INIT: Once = Once::new();
+
+// /// Setup function that is only run once, even if called multiple times.
+// pub fn init_logger_once() {
+//     INIT.call_once(|| {
+//         init_logger();
+//     });
+// }
 
 pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     let ClientApp {
@@ -283,7 +309,14 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
         local_state,
     } = app;
 
+    // TODO: Replace with config query and check.
+    INIT.call_once(|| {
+        ctx.set_pixels_per_point(2.5);
+    });
+
     local_state.current_time = util::current_time_millis_i64();
+    // Continuous mode
+    ctx.request_repaint();
 
     // let mut style: egui::Style = (*ctx.style()).clone();
     // style.visuals.widgets.
@@ -300,18 +333,36 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     //     return;
     // }
 
-    // egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-    //     // The top panel is often a good place for a menu bar:
-    //     egui::menu::bar(ui, |ui| {
-    //         ui.style_mut().override_text_style = Some(TextStyle::Heading);
-    //         egui::menu::menu(ui, "File", |ui| {
-    //             ui.style_mut().override_text_style = Some(TextStyle::Heading);
-    //             if ui.button("Quit").clicked() {
-    //                 frame.quit();
-    //             }
-    //         });
-    //     });
-    // });
+    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+
+        ui.horizontal( |ui| {
+            let cur = ctx.pixels_per_point();
+            let string = format!("Pixels per point: {}", cur);
+            // ui.text_style_height(&TextStyle::Small);
+            // TODO: Make button smaller
+            if ui.small_button("+Text")
+                .on_hover_text(string.clone()).clicked() {
+            ctx.set_pixels_per_point(cur + 0.25);
+            }
+
+            if ui.small_button("-Text")
+                .on_hover_text(string).clicked() {
+                ctx.set_pixels_per_point(cur - 0.25);
+            }
+
+            });
+
+        // The top panel is often a good place for a menu bar:
+        // egui::menu::bar(ui, |ui| {
+        //     ui.style_mut().override_text_style = Some(TextStyle::Heading);
+        //     egui::menu::menu(ui, "File", |ui| {
+        //         ui.style_mut().override_text_style = Some(TextStyle::Heading);
+        //         if ui.button("Quit").clicked() {
+        //             frame.quit();
+        //         }
+        //     });
+        // });
+    });
 
     let img = logo;
     let texture_id = img.texture_id(ctx);
@@ -327,14 +378,15 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
 
             //https://github.com/emilk/egui/blob/master/egui_demo_lib/src/apps/http_app.rs
             // ui.image(TextureId::default())
-            ui.set_max_width(104f32);
+            ui.set_max_width(84f32);
+            // ui.set_max_width(104f32);
 
             ui.with_layout(
                 egui::Layout::top_down_justified(egui::Align::default()),
                 |ui| {
-                    let scale = 4;
+                    let scale = 3.4;
                     let size =
-                        egui::Vec2::new((img.size()[0] / scale) as f32, (img.size()[1] / scale) as f32);
+                        egui::Vec2::new((img.size()[0] as f32 / scale) as f32, (img.size()[1] as f32 / scale) as f32);
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);
                     ui.image(texture_id, size);
@@ -380,53 +432,18 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             Tab::Home => {
                 home::home_screen(ui, ctx, local_state);
             }
-            Tab::Wallet => {
-                if local_state.active_passphrase.is_none() {
-                    ui.heading("No wallet loaded.");
-                    ui.add_space(20f32);
-
-                    ui.heading("Enter mnemonic generation phrase:");
-                    let edit = TextEdit::singleline(&mut local_state.wallet_passphrase_entry)
-                        .password(!local_state.password_visible)
-                        .lock_focus(true)
-                        .desired_width(300f32);
-                    let response = ui.add(edit);
-
-                    if local_state.wallet_first_load_state {
-                        response.request_focus();
-                        local_state.wallet_first_load_state = false;
-                    }
-                    if response.lost_focus() && ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        let string = local_state.wallet_passphrase_entry.clone();
-                        local_state.active_passphrase = Some(string.clone());
-                        local_state.visible_mnemonic = Some(
-                            mnemonic_builder::from_str_rounds(&*string.clone(), 0).to_string(),
-                        );
-                        local_state.wallet_passphrase_entry = "".to_string();
-                        //local_state.
-                        // mnemonic_builder::from_str
-                    }
-                    if ui.button("Show password text").clicked() {
-                        local_state.password_visible = !local_state.password_visible;
-                    };
-                } else {
-                    ui.heading("Wallet loaded");
-
-                    if ui.button("Show mnemonic").clicked() {
-                        local_state.show_mnemonic = !local_state.show_mnemonic;
-                    }
-                    if local_state.show_mnemonic {
-                        let mut option = local_state.visible_mnemonic.as_ref().unwrap().clone();
-                        let edit = TextEdit::multiline(&mut option);
-                        ui.add(edit);
-                    }
-                }
+            Tab::Keys => {
+                keys_tab::keys_screen(ui, ctx, local_state);
             }
             Tab::Settings => {}
             Tab::Trust => {}
             Tab::Servers => {
                 servers_screen(ui, ctx, local_state);
             }
+            Tab::Wallet => {
+                wallet_screen(ui, ctx, local_state);
+            }
+            _ => {}
         }
         // ui.hyperlink("https://github.com/emilk/egui_template");
         // ui.add(egui::github_link_file!(

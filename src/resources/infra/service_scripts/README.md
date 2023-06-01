@@ -7,3 +7,6 @@ systemctl status redgold-testnet-canary.service
 systemctl status redgold-testnet.service
 
 systemctl restart redgold-testnet.service
+
+
+These scripts are outdated, maybe useful as an example for a future script
