@@ -24,3 +24,5 @@ jobs:
           PROMPT: "Please code review this pull request. The repository is written in rust and the project is focused on cryptocurrency."
           top_p: 1
           temperature: 1
+          review_per_file: true
+          comment_per_file: true
