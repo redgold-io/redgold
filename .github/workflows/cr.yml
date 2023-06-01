@@ -24,18 +24,18 @@ jobs:
           PROMPT: "Please code review this pull request. The repository is written in rust and the project is focused on cryptocurrency."
           top_p: 1
           temperature: 1
-  name: ChatGPT Review 2
-  runs-on: ubuntu-latest
-  steps:
-    - uses: feiskyer/ChatGPT-Reviewer@v0
-      name: ChatGPT Review 2
-      env:
-        GITHUB_TOKEN: ${{ secrets.CR_GPT_GITHUB_TOKEN }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        # OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
-      # Optional configurations:
-      with:
-        model: "gpt4"
-        temperature: 0.2
-        review_per_file: true
-        comment_per_file: true
+  review2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: feiskyer/ChatGPT-Reviewer@v0
+        name: ChatGPT Review 2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CR_GPT_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+        # Optional configurations:
+        with:
+          model: "gpt4"
+          temperature: 0.2
+          review_per_file: true
+          comment_per_file: true
