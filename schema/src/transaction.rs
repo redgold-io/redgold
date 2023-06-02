@@ -153,7 +153,7 @@ impl Transaction {
             ))?;
         Ok(Proof::verify_proofs(
             &input.proof,
-            &Hash::new(utxo_entry.transaction_hash.clone()),
+            &self.signable_hash(),
             &Address::from_bytes(utxo_entry.address.clone())?,
         )?)
     }
