@@ -133,11 +133,13 @@ impl TransactionGenerator {
 
     pub fn drain_tx(&mut self, addr: &Address) -> Transaction {
         let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
-        let mut txb = TransactionBuilder::new();
-        txb.with_input(prev.utxo_entry.clone(), prev.key_pair);
-        // TODO: Fee
-        txb.with_output(addr, TransactionAmount::from( prev.utxo_entry.amount() as i64));
-        txb.transaction
+        // TODO: Fee?
+        let mut txb = TransactionBuilder::new()
+            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
+            .with_output(addr, &TransactionAmount::from( prev.utxo_entry.amount() as i64))
+            .build().expect("Failed to build transaction")
+            .sign(&prev.key_pair).expect("signed");
+        txb
         // use redgold_schema::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
         // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());

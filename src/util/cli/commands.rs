@@ -131,10 +131,10 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 
     let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new()
-        .with_input(utxo, kp)
-        .with_output(&destination, TransactionAmount::from_fractional(p0.amount)?)
-        .with_remainder()
-        .transaction.clone();
+        .with_utxo(&utxo)?
+        .with_output(&destination, &TransactionAmount::from_fractional(p0.amount)?)
+        .build()?
+        .sign(&kp)?;
 
     let response = client.send_transaction(&b, false).await?;
     let tx_hex = response.transaction_hash.expect("hash").hex();

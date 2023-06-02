@@ -18,7 +18,7 @@ use warp::reply::Json;
 use warp::Filter;
 use warp::http::Response;
 use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, ProtoSerde, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
 use redgold_schema::transaction::rounded_balance_i64;
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -215,6 +215,15 @@ impl PublicClient {
         let response = self.query_hash(address.render_string().expect("")).await?;
         let ai = response.address_info.safe_get_msg("missing address_info")?;
         Ok(rounded_balance_i64(ai.balance))
+    }
+
+    pub async fn address_info(
+        &self,
+        address: Address,
+    ) -> Result<AddressInfo, ErrorInfo> {
+        let response = self.query_hash(address.render_string().expect("")).await?;
+        let ai = response.address_info.safe_get_msg("missing address_info")?;
+        Ok(ai.clone())
     }
 
     pub async fn about(&self) -> Result<AboutNodeResponse, ErrorInfo> {

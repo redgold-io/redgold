@@ -659,7 +659,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
 
     // Exception bad access on this on the json decoding? wtf?
-    let _ = submit.with_faucet().await?;
+    let _ = submit.with_faucet().await.expect("faucet");
     // info!("Faucet response: {}", faucet_res.json_pretty_or());
 
     submit.submit().await.expect("submit 2");
