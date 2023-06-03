@@ -14,16 +14,21 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use bitcoin::bech32::ToBase32;
+use crypto::sha2::Sha256;
 use itertools::Itertools;
+use multihash::Code::Sha3_256;
 use tokio::runtime::Runtime;
-use redgold_schema::{ErrorInfoContext, SafeOption};
+use redgold_schema::{ErrorInfoContext, from_hex, SafeOption};
 use redgold_schema::servers::Server;
-use redgold_schema::structs::ErrorInfo;
+use redgold_schema::structs::{ErrorInfo, Hash, PeerId};
 use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{RgArgs, RgTopLevelSubcommand};
 use crate::util::cli::commands::mnemonic_fingerprint;
-use crate::util::ip_lookup;
+use crate::util::cli::data_folder::DataFolder;
+use crate::util::{init_logger, init_logger_main, ip_lookup, metrics_registry, not_local_debug_mode, sha256_vec};
+use crate::util::trace_setup::init_tracing;
 
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
 
@@ -35,401 +40,27 @@ pub fn get_default_data_top_folder() -> PathBuf {
     redgold_dir
 }
 
-pub fn get_default_data_directory(network_type: NetworkEnvironment) -> PathBuf {
-    let home_or_current = dirs::home_dir()
-        .expect("Unable to find home directory for default data store path as path not specified explicitly")
-        .clone();
-    let redgold_dir = home_or_current.join(".rg");
-    let net_dir = redgold_dir.clone().join(network_type.to_std_string());
-    net_dir
-}
-
-pub fn load_node_config_initial(opts: RgArgs, mut node_config: NodeConfig) -> NodeConfig {
-
-    let subcmd: Option<RgTopLevelSubcommand> = opts.subcmd;
-    let mut is_canary = false;
-    match subcmd {
-        Some(c) => match c {
-            RgTopLevelSubcommand::DebugCanary(_) => {
-                is_canary = true;
-            }
-            _ => {}
-        },
-        _ => {}
-    }
-
-    node_config.network = match opts.network {
-        None => {
-            if util::local_debug_mode() {
-                NetworkEnvironment::Debug
-            } else {
-                NetworkEnvironment::Local
-            }
-        }
-        Some(mut n) => {
-            let string2 = util::make_ascii_titlecase(&mut *n);
-            NetworkEnvironment::from_str(&*string2).expect("error parsing network environment")
-        }
-    };
-    node_config.port_offset = node_config.network.default_port_offset();
-
-    if node_config.network == NetworkEnvironment::Local || node_config.network == NetworkEnvironment::Debug {
-        node_config.disable_auto_update = true;
-        node_config.load_balancer_url = "127.0.0.1".to_string();
-    }
-
-    let ds_path_opt: Option<String> = opts.data_store_path;
-
-    node_config.data_store_folder = opts.data_store_folder.unwrap_or({
-        get_default_data_top_folder().to_str().unwrap().to_string()
-    });
-
-    let data_store_file_path = match ds_path_opt {
-        None => {
-            let mut net_dir = get_default_data_directory(node_config.network);
-            if is_canary {
-                net_dir = net_dir.join("e2e");
-            }
-            let dbg_id: Option<i32> = opts.debug_id ;
-            if dbg_id.is_some() {
-                net_dir = net_dir.join(format!("{}", dbg_id.unwrap()));
-            }
-            let ds_path = net_dir.as_path().clone();
-
-            // let result = fs::try_exists(ds_path.clone()).unwrap_or(false);
-            // if !result {
-                info!(
-                    "Ensuring make directory for datastore in: {:?}",
-                    ds_path.clone().to_str()
-                );
-                fs::create_dir_all(ds_path).expect("Directory unable to be created.");
-            // }
-            ds_path
-                .join("data_store.sqlite")
-                .as_path()
-                .to_str()
-                .expect("Path format error")
-                .to_string()
-        }
-        Some(p) => p,
-    };
-
-    let dbg_id: Option<i32> = opts.debug_id;
-    if dbg_id.is_some() {
-        let dbg_id = dbg_id.unwrap();
-        let offset = (dbg_id * 1000) as u16;
-        node_config.port_offset = node_config.network.default_port_offset() + offset;
-    }
-
-    std::env::var("REDGOLD_WORDS").map(|words| {
-        node_config.mnemonic_words = words;
-    }).ok();
-
-    opts.words.map(|words| {
-        node_config.mnemonic_words = words;
-    });
-
-    node_config.data_store_path = data_store_file_path;
-    node_config
-}
-
-pub async fn load_node_config(
-    // runtime: Arc<Runtime>,
-    opts: RgArgs,
-    mut node_config: NodeConfig,
-) -> Result<NodeConfig, NodeConfig> {
-    // let mut node_config = NodeConfig::default();
-    // let opts2 = opts.clone();
-
-    let subcmd: Option<RgTopLevelSubcommand> = opts.subcmd;
-    let mut _is_canary = false;
-    match subcmd.clone() {
-        None => {}
-        Some(c) => match c {
-            RgTopLevelSubcommand::GenerateWords(_) => {}
-            RgTopLevelSubcommand::DebugCanary(_) => {
-                // _is_canary = true;
-            }
-            RgTopLevelSubcommand::GUI(_) => {
-
-            }
-            RgTopLevelSubcommand::Deploy(_) => {
-                // TODO: Get this from a master config database.
-
-                // actually let's just not introduce this yet as it should really be something
-                // based on commit hashes etc. for proper CI so we have a built commit that
-                // matches properly.
-                // infra::
-            }
-            _ => {}
-        },
-    }
-
-    info!(
-        "Starting node with data store path: {}",
-        node_config.data_store_path
-    );
-
-    // let store =
-    //     runtime.block_on(
-            // node_config.data_store().await;
-        // );
-    // runtime.block_on(
-    // store
-    //     .create_all_err_info()
-    //     // )
-    //     .expect("Unable to create initial tables");
-    //
-    // runtime
-    //     .block_on(store.create_mnemonic())
-    //     .expect("Create mnemonic");
-    //
-    // let mnemonic_store = runtime
-    //     .block_on(store.query_all_mnemonic())
-    //     .expect("query success");
-    let mnemonic_from_store: Option<String> = None; //mnemonic_store.get(0).map(|x| x.words.clone());
-    // TODO: Use this
-    let _peer_id_from_store: Option<String> = None; // mnemonic_store.get(0).map(|x| x.peer_id.clone());
-
-    let opt_mnemonic: Option<String> = opts.words;
-    let path_mnemonic: Option<String> = opts
-        .mnemonic_path
-        .map(fs::read_to_string)
-        .map(|x| x.expect("Something went wrong reading the mnemonic_path file"));
-    let mut default_data_dir = get_default_data_directory(node_config.network);
-    let dbg_id: Option<i32> = opts.debug_id;
-    if dbg_id.is_some() {
-        let dbg_id = dbg_id.unwrap();
-        default_data_dir = default_data_dir.join(format!("{}", dbg_id));
-        let offset = (dbg_id * 1000) as u16;
-        node_config.port_offset = node_config.network.default_port_offset() + offset;
-    }
-
-    let default_path_mnemonic_path = &default_data_dir.join("mnemonic");
-    let default_path_peer_id_path = &default_data_dir.join("peer_id");
-    let default_path_mnemonic: Option<String> = {
-        if default_path_mnemonic_path.clone().exists() {
-            Some(fs::read_to_string(default_path_mnemonic_path.clone()).expect("Something went wrong reading the default mnemonic_path file"))
-        } else {
-            None
-        }
-    };
-    let default_path_peer_id_hex: Option<String> = {
-        if default_path_peer_id_path.clone().exists() {
-            Some(fs::read_to_string(default_path_peer_id_path.clone()).expect("Something went wrong reading the default mnemonic_path file"))
-        } else {
-            None
-        }
-    };
-
-    // let ds_mnemonic = ;
-    let mnemonic_load_order = vec![opt_mnemonic, path_mnemonic, default_path_mnemonic.clone(), mnemonic_from_store.clone()];
-    let chosen = mnemonic_load_order
-        .iter()
-        .filter(|m| m.is_some())
-        .map(|m| m.clone())
-        .collect::<Vec<Option<String>>>()
-        .get(0)
-        .map(|x| x.clone())
-        .flatten();
-
-    let mnemonic = match chosen {
-        None => {
-            // Move this to separate operation to fill in missing configs after the fact?
-            log::info!(
-                "Unable to load mnemonic for wallet / node keys, attempting to generate new one"
-            );
-            log::info!(
-                "Generating with MasterKeyEntropy::Paranoid -- \
-        process may halt if insufficient entropy on system"
-            );
-            let mnem = Mnemonic::new_random(MasterKeyEntropy::Paranoid)
-                .expect("New mnemonic generation failure");
-            log::info!("Successfully generated new mnemonic");
-            // store to ds.
-            mnem
-        }
-        Some(c) => {
-            let mnemonic1 = Mnemonic::from_str(&c).expect("Mnemonic is incorrectly formatted");
-            info!("Loaded existing mnemonic with fingerprint: {}", mnemonic_fingerprint(mnemonic1.clone()));
-            mnemonic1
-        },
-    };
-
-    // TODO: Make this the actual class, way easier now
-    node_config.mnemonic_words = mnemonic.to_string();
-
-    let peer_id_opt: Option<String> = opts.peer_id.clone();
-    let peer_id_path_opt: Option<String> = opts.peer_id_path.clone();
-    let peer_id_from_opt: Option<Vec<u8>> = (peer_id_opt)
-        .or_else(|| {
-            peer_id_path_opt.map(|p| {
-                fs::read_to_string(p).expect("Something went wrong reading the peer_id_path file")
-            })
-        })
-        .or_else(|| {
-            default_path_peer_id_hex
-        })
-        .map(|p| hex::decode(p).expect("Hex decode failure on peer id"));
-
-    node_config.self_peer_id = match peer_id_from_opt {
-        None => {
-            info!("No peer_id found, attempting to generate a single key peer_id from mnemonic");
-            let string = mnemonic.to_string();
-            crate::node_config::debug_peer_id_from_key(&*string).to_vec()
-        }
-        Some(r) => r,
-    };
-
-    if mnemonic_from_store.is_none() || default_path_mnemonic.is_none() {
-        // let insert = store.insert_mnemonic(MnemonicEntry {
-        //     words: node_config.mnemonic_words.clone(),
-        //     time: util::current_time_millis() as i64,
-        //     peer_id: node_config.self_peer_id.clone(),
-        // });
-        std::fs::write(default_path_mnemonic_path.clone(), &node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
-        std::fs::write(default_path_peer_id_path.clone(), hex::encode(&node_config.self_peer_id.clone())).expect("Unable to write peer id to file");
-        // let err = runtime.block_on(insert);
-        // DataStore::map_err_sqlx(err);
-    }
-
-    let path_exec = std::env::current_exe().expect("Can't find the current exe");
-
-    let buf1 = path_exec.clone();
-    let path_str = buf1.to_str().expect("Path exec format failure");
-    info!("Path of current executable: {:?}", path_str);
-    let exec_name = path_exec.file_name().expect("filename access failure").to_str()
-        .expect("Filename missing").to_string();
-    info!("Filename of current executable: {:?}", exec_name.clone());
-    let mut file = fs::File::open(path_exec.clone())
-        .expect("Can't open self file executable for calculating md5");
-
-    let mut buf: Vec<u8> = vec![];
-    file.read(&mut *buf).expect("works");
-    let mut md5f = crypto::md5::Md5::new();
-    md5f.input(&*buf);
-
-    info!(
-        "Md5 of currently running executable with read byte {}",
-        md5f.result_str()
-    );
-
-    // breaks locally
-    // let mut strr = "".to_string();
-    // file.read_to_string(&mut strr).expect("read");
-    // let mut md5 = crypto::md5::Md5::new();
-    // md5.input_str(&*strr);
-    //
-    // let res = md5.result_str();
-    //
-    // info!("Md5 of currently running executable with read str {}", res);
-
-    use std::process::Command;
-
-    // let mut echo_hello = Command::new("md5sum");
-    // echo_hello.arg(path_str.clone());
-    // let hello_1 = echo_hello.output().expect("Ouput from command failure");
-    // let string1 = String::from_utf8(hello_1.stdout).expect("String decode failure");
-    // let md5stdout: String = string1
-    //     .split_whitespace()
-    //     .next()
-    //     .expect("first output")
-    //     .clone()
-    //     .to_string();
-
-    // info!("Md5sum stdout from shell script: {}", md5stdout);
-
-    let shasum = calc_sha_sum(path_str.clone().to_string());
-
-    // let exec = dirs::executable_dir().expect("Can't find self-executable dir");
-    node_config.executable_checksum = Some(shasum.clone());
-    info!("Sha256 checksum from shell script: {}", shasum);
-    //
-    // if is_canary {
-    //     e2e::run(node_config.clone());
-    //     return Err(node_config.clone());
-    // }
-
-    // let external_ip = ip_lookup::get_self_ip().await?;
-    // node_config.
-    let mut abort = true;
-    match subcmd {
-        None => {abort = false}
-        Some(c) => match c {
-            RgTopLevelSubcommand::GenerateWords(m) => {
-                commands::generate_mnemonic(&m);
-            }
-            // RgTopLevelSubcommand::AddServer(a) => {
-            //     commands::add_server(&a, &node_config);
-            // }
-            _ => {
-                abort = false;
-            }
-        }
-    }
-    if abort {
-        return Err(node_config);
-    }
-
-    // Only enable on main if CLI flag
-    if node_config.network == NetworkEnvironment::Main {
-        node_config.faucet_enabled = false;
-        //match subcmd
-    }
-
-    // TODO: Check ports open in separate thing
-
-    // TODO: Also set from HOSTNAME maybe? With nslookup for confirmation of IP?
-    if !node_config.is_local_debug() && node_config.external_ip == "127.0.0.1".to_string() {
-        let ip =
-            // runtime.block_on(
-            ip_lookup::get_self_ip()
-        .await
-        .expect("Ip lookup failed");
-        info!("Assigning external IP from ip lookup: {}", ip);
-        node_config.external_ip = ip;
-    }
-
-    // let mut at = ArgTranslate::new(runtime.clone(), &opts2, node_config);
-
-    // at.parse_seed();
-
-    Ok(node_config)
-
-}
 
 pub struct ArgTranslate {
     // runtime: Arc<Runtime>,
     pub opts: RgArgs,
     pub node_config: NodeConfig,
     pub args: Vec<String>,
+    pub abort: bool,
 }
 
 impl ArgTranslate {
 
-    pub async fn post_logger_commands(&self) -> Result<bool, ErrorInfo> {
-        match &self.opts.subcmd {
-            Some(RgTopLevelSubcommand::TestTransaction(test_transaction_cli)) => {
-                commands::test_transaction(&test_transaction_cli, &self.node_config,
-                                           // self.runtime.clone()
-                ).await?;
-                Ok(true)
-            }
-            _ => {
-                Ok(false)
-            }
-        }
-    }
-
     pub fn new(
         // runtime: Arc<Runtime>,
-        opts: &RgArgs, node_config: NodeConfig) -> Self {
+        opts: &RgArgs, node_config: &NodeConfig) -> Self {
         let args = std::env::args().collect_vec();
         ArgTranslate {
             // runtime,
             opts: opts.clone(),
-            node_config,
+            node_config: node_config.clone(),
             args,
+            abort: false
         }
     }
 
@@ -469,9 +100,207 @@ impl ArgTranslate {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), ErrorInfo> {
+    pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
+        self.check_load_logger()?;
+        self.determine_network()?;
+        self.ports();
+        metrics_registry::register_metrics(self.node_config.port_offset);
+        self.data_folder()?;
+        self.load_mnemonic()?;
+        self.load_peer_id()?;
         self.load_internal_servers()?;
+        self.exe_hash();
+        // No logger for CLI commands to allow direct output read.
+        self.abort = immediate_commands(&self.opts, &self.node_config).await;
+
+        self.guard_faucet();
+        self.lookup_ip().await;
+
+        self.e2e_enable();
+
+        tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
+
         Ok(())
+    }
+
+    fn guard_faucet(&mut self) {
+        // Only enable on main if CLI flag with additional precautions
+        if self.node_config.network == NetworkEnvironment::Main {
+            self.node_config.faucet_enabled = false;
+        }
+    }
+
+    async fn lookup_ip(&mut self) {
+        // TODO: We can use the lb or another node to check if port is reciprocal open
+        // TODO: Check ports open in separate thing
+        // TODO: Also set from HOSTNAME maybe? With nslookup for confirmation of IP?
+        if !self.node_config.is_local_debug() && self.node_config.external_ip == "127.0.0.1".to_string() {
+            let ip =
+                // runtime.block_on(
+                ip_lookup::get_self_ip()
+                    .await
+                    .expect("Ip lookup failed");
+            info!("Assigning external IP from ip lookup: {}", ip);
+            self.node_config.external_ip = ip;
+        }
+    }
+
+    fn exe_hash(&mut self) {
+
+        let path_exec = std::env::current_exe().expect("Can't find the current exe");
+
+        let buf1 = path_exec.clone();
+        let path_str = buf1.to_str().expect("Path exec format failure");
+        info!("Path of current executable: {:?}", path_str);
+        let exec_name = path_exec.file_name().expect("filename access failure").to_str()
+            .expect("Filename missing").to_string();
+        info!("Filename of current executable: {:?}", exec_name.clone());
+
+        let self_exe_bytes = fs::read(path_exec.clone()).expect("Read bytes of current exe");
+        let mut md5f = crypto::md5::Md5::new();
+        md5f.input(&*self_exe_bytes);
+
+        info!("Md5 of currently running executable with read byte {}", md5f.result_str());
+        let sha256 = sha256_vec(&self_exe_bytes);
+        info!("Sha256 of currently running executable with read byte {}", hex::encode(sha256.to_vec()));
+
+        // let sha3_256 = Hash::calc_bytes(self_exe_bytes);
+        // info!("Sha3-256 of current exe {}", sha3_256.hex());
+
+        use std::process::Command;
+
+        let shasum = calc_sha_sum(path_str.clone().to_string());
+
+        self.node_config.executable_checksum = Some(shasum.clone());
+        info!("Sha256 checksum from shell script: {}", shasum);
+    }
+
+    fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
+
+        // Remove any defaults; we want to be explicit
+        self.node_config.mnemonic_words = "".to_string();
+
+        // First load from environment
+        if let Some(words) = std::env::var("REDGOLD_WORDS").ok() {
+            self.node_config.mnemonic_words = words;
+        };
+
+        // Then override with optional found file
+        // TODO: Should we just change this to an ALL folder?
+        let mnemonic_disk_path = self.node_config.env_data_folder().mnemonic_path();
+        if let Some(words) = fs::read_to_string(mnemonic_disk_path.clone()).ok() {
+            self.node_config.mnemonic_words = words;
+        };
+
+        // Then override with command line
+        if let Some(words) = &self.opts.words {
+            self.node_config.mnemonic_words = words.clone();
+        }
+
+        // Then override with a file from the command line (more secure than passing directly)
+        if let Some(words) = &self.opts
+            .mnemonic_path
+            .clone()
+            .map(fs::read_to_string)
+            .map(|x| x.expect("Something went wrong reading the mnemonic_path file")) {
+            self.node_config.mnemonic_words = words.clone();
+        };
+
+
+        // If empty, generate a new mnemonic;
+        if self.node_config.mnemonic_words.is_empty() {
+            tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
+            tracing::info!("Generating with entropy for 24 words, process may halt if insufficient entropy on system");
+            let mnem = Mnemonic::new_random(MasterKeyEntropy::Double).expect("New mnemonic generation failure");
+            tracing::info!("Successfully generated new mnemonic");
+            self.node_config.mnemonic_words = mnem.to_string();
+        };
+
+        // Validate that this is loadable
+        let mnemonic = Mnemonic::from_str(&self.node_config.mnemonic_words)
+            .error_info("Failed to parse mnemonic")?;
+
+        // Re-assign as words to avoid coupling class to node config.
+        self.node_config.mnemonic_words = mnemonic.to_string();
+
+
+        // Attempt to write mnemonic to disk for persistence
+            // let insert = store.insert_mnemonic(MnemonicEntry {
+            //     words: node_config.mnemonic_words.clone(),
+            //     time: util::current_time_millis() as i64,
+            //     peer_id: node_config.self_peer_id.clone(),
+        //     // });
+        //     std::fs::create_dir_all(mnemonic_disk_path.clone()).expect("Unable to create data dir");
+        fs::write(mnemonic_disk_path.clone(), self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
+
+
+        Ok(())
+    }
+
+    // TODO: Load merkle tree of this
+    fn load_peer_id(&mut self) -> Result<(), ErrorInfo> {
+        // // TODO: Use this
+        // let _peer_id_from_store: Option<String> = None; // mnemonic_store.get(0).map(|x| x.peer_id.clone());
+
+        // TODO: From environment variable too?
+        // TODO: write merkle tree to disk
+
+        if let Some(path) = &self.opts.peer_id_path {
+            let p = fs::read_to_string(path)
+                .error_info("Failed to read peer_id_path file")?;
+            self.node_config.self_peer_id = from_hex(p)?;
+        }
+
+        // TODO: This will have to change to read the whole merkle tree really, lets just remove this maybe?
+        if let Some(p) = &self.opts.peer_id {
+            self.node_config.self_peer_id = from_hex(p.clone())?;
+        }
+
+        if let Some(p) = fs::read_to_string(self.node_config.env_data_folder().peer_id_path()).ok() {
+            self.node_config.self_peer_id = from_hex(p.clone())?;
+        }
+
+        if self.node_config.self_peer_id.is_empty() {
+            tracing::info!("No peer_id found, attempting to generate a single key peer_id from existing mnemonic");
+            let string = self.node_config.mnemonic_words.clone();
+            // TODO: we need to persist the merkle tree here as json or something
+            let tree = crate::node_config::peer_id_from_single_mnemonic(string)?;
+            self.node_config.self_peer_id = tree.root.vec();
+        }
+
+        Ok(())
+
+    }
+
+    fn data_folder(&mut self) -> Result<(), ErrorInfo> {
+
+        let mut data_folder_path =  self.opts.data_folder.clone()
+            .map(|p| PathBuf::from(p))
+            .unwrap_or(get_default_data_top_folder());
+
+        // Testing only modification, could potentially do this in a separate function to
+        // unify this with other debug mods.
+        if let Some(id) = self.opts.debug_id {
+            data_folder_path = data_folder_path.join("local_test");
+            data_folder_path = data_folder_path.join(format!("id_{}", id));
+        }
+
+        self.node_config.data_folder = DataFolder { path: data_folder_path };
+        self.node_config.data_folder.ensure_exists();
+        self.node_config.env_data_folder().ensure_exists();
+
+        Ok(())
+    }
+
+    fn ports(&mut self) {
+        self.node_config.port_offset = self.node_config.network.default_port_offset();
+
+        // Unify with other debug id stuff?
+        if let Some(dbg_id) = self.opts.debug_id {
+            let offset = (dbg_id * 1000) as u16;
+            self.node_config.port_offset = self.node_config.network.default_port_offset() + offset;
+        }
+
     }
 
     // pub fn parse_seed(&mut self) {
@@ -487,6 +316,66 @@ impl ArgTranslate {
     //         });
     //     }
     // }
+    fn check_load_logger(&mut self) -> Result<(), ErrorInfo> {
+        let log_level = &self.opts.log_level
+            .clone()
+            .and(std::env::var("REDGOLD_LOG_LEVEL").ok())
+            .unwrap_or("DEBUG".to_string());
+        let mut enable_logger = false;
+
+        if let Some(sc) = &self.opts.subcmd {
+            enable_logger = match sc {
+                RgTopLevelSubcommand::GUI(_) => { true }
+                RgTopLevelSubcommand::Node(_) => { true }
+                RgTopLevelSubcommand::TestTransaction(_) => {true}
+                _ => { false }
+            }
+        }
+        if enable_logger {
+            init_logger_main(log_level.clone());
+        }
+        self.node_config.enable_logging = enable_logger;
+        self.node_config.log_level = log_level.clone();
+
+
+        Ok(())
+    }
+    fn determine_network(&mut self) -> Result<(), ErrorInfo> {
+        if let Some(n) = std::env::var("REDGOLD_NETWORK").ok() {
+            NetworkEnvironment::parse_safe(n)?;
+        }
+        self.node_config.network = match &self.opts.network {
+            None => {
+                if util::local_debug_mode() {
+                    NetworkEnvironment::Debug
+                } else {
+                    NetworkEnvironment::Local
+                }
+            }
+            Some(n) => {
+                NetworkEnvironment::parse_safe(n.clone())?
+            }
+        };
+
+        if self.node_config.network == NetworkEnvironment::Local || self.node_config.network == NetworkEnvironment::Debug {
+            self.node_config.disable_auto_update = true;
+            self.node_config.load_balancer_url = "127.0.0.1".to_string();
+        }
+        Ok(())
+    }
+
+    fn e2e_enable(&mut self) {
+
+        if self.opts.disable_e2e {
+            self.node_config.e2e_enabled = false;
+        }
+        // std::env::var("REDGOLD_ENABLE_E2E").ok().map(|b| {
+        //     self.node_config.e2e_enable = true;
+        // }
+        // self.opts.enable_e2e.map(|_| {
+        //     self.node_config.e2e_enable = true;
+        // });
+    }
 }
 
 
@@ -544,8 +433,8 @@ fn test_shasum() {
 #[test]
 fn load_ds_path() {
     let config = NodeConfig::default();
-    let res = load_node_config_initial(args::empty_args(), config);
-    println!("{}", res.data_store_folder());
+    // let res = load_node_config_initial(args::empty_args(), config);
+    // println!("{}", res.data_store_path());
 }
 
 // TODO: Settings from config if necessary
@@ -578,33 +467,23 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
                     commands::generate_address(a.clone(), &config).map(|_| ())
                 }
                 RgTopLevelSubcommand::Send(a) => {
-                    // let res = simple_runtime.block_on(
-                        commands::send(&a, &config).await
-                        // ));
-                    // res
+                    commands::send(&a, &config).await
                 }
                 RgTopLevelSubcommand::Query(a) => {
-                    // simple_runtime.block_on(
-                        commands::query(&a, &config).await
-                    // )
+                    commands::query(&a, &config).await
                 }
-                // Move all these block_on in an async match and block on this.
                 RgTopLevelSubcommand::Faucet(a) => {
-                    // simple_runtime.block_on(
-                        commands::faucet(&a, &config).await
-                    // )
+                    commands::faucet(&a, &config).await
                 }
                 RgTopLevelSubcommand::AddServer(a) => {
-                    // simple_runtime.block_on(
-                        commands::add_server(a, &config).await
-                    // )
+                    commands::add_server(a, &config).await
                 }
                 RgTopLevelSubcommand::Balance(a) => {
-                    // simple_runtime.block_on(
-                        commands::balance_lookup(a, &config).await
-                    // )
+                    commands::balance_lookup(a, &config).await
                 }
-
+                RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
+                    commands::test_transaction(&test_transaction_cli, &config).await
+                }
                 _ => {
                     abort = false;
                     Ok(())

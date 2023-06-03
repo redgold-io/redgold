@@ -11,6 +11,8 @@ use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
+use redgold_schema::EasyJson;
+
 //
 // async fn faucet_request_old(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
 //     info!("Faucet request {}", address_input);
@@ -97,11 +99,13 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         let utxo = utxos.get(0).safe_get()?.clone().clone();
         let addr = Address::parse(&address_input)?;
         let mut builder = TransactionBuilder::new();
-        builder
-            .with_input(utxo.utxo_entry, utxo.key_pair)
-            .with_output(&addr, TransactionAmount::from_fractional(5 as f64)?)
-            .with_remainder();
-        let transaction = builder.transaction.clone();
+        let transaction = builder
+            .with_utxo(&utxo.utxo_entry)?
+            .with_output(&addr, &TransactionAmount::from_fractional(5 as f64)?)
+            .build()?
+            .sign(&utxo.key_pair)?;
+
+        info!("Faucet TX {}", transaction.json_or());
 
         let r_err = relay.submit_transaction_sync(&transaction).await?;
 

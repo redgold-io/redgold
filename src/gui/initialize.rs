@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use eframe::{egui, IconData};
 use egui_extras::RetainedImage;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext};
@@ -7,26 +8,39 @@ use crate::gui;
 use crate::gui::ClientApp;
 use crate::node_config::NodeConfig;
 
+pub(crate) fn load_icon() -> eframe::IconData {
+    let (icon_rgba, icon_width, icon_height) = {
+        let icon = include_bytes!("../resources/svg_rg_2_resized_220_2.png");
+        let image = image::load_from_memory(icon)
+            .expect("Failed to open icon path")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        println!("Loaded icon image with width {} height {}", width, height);
+        (rgba, width, height)
+    };
+
+    eframe::IconData {
+        rgba: icon_rgba,
+        width: icon_width,
+        height: icon_height,
+    }
+}
+
 pub async fn attempt_start(nc: NodeConfig
                            // , rt: Arc<Runtime>
 ) -> Result<(), ErrorInfo> {
-    // TODO: Start GUI
-    // use crate::gui::image_load::Image;
     let resources = crate::resources::Resources::default();
     let bytes = resources.logo_bytes;
-    // let image = Image::decode(&*bytes).unwrap();
     let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
-    let app = gui::ClientApp::from(ri, nc
-                                   // , rt
-    );
-    let native_options = eframe::NativeOptions::default();
-    //
-    // icon_data: Some(
-    //     eframe::IconData::try_from_png_bytes(&include_bytes!("../../../media/icon.png")[..])
-    // .unwrap(),
+    let app = gui::ClientApp::from(ri, nc).await?;
+    let mut native_options = eframe::NativeOptions::default();
+    native_options.initial_window_size = Some(egui::Vec2::new(1024., 632.));
+    
 
-    // ),
-    //        Box::new(|_cc| Box::<MyApp>::default()),
+    // Doesn't seem to work?
+    native_options.icon_data = Some(load_icon());
+
     eframe::run_native(
         "Redgold",
         native_options,

@@ -3,6 +3,7 @@ use crate::util;
 use crate::util::cmd::run_cmd;
 
 pub mod trezor;
+// pub mod debug;
 // pub mod trezor_unchecked;
 
 

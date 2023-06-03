@@ -53,10 +53,11 @@ pub struct TransactionMessage {
     pub response_channel: Option<flume::Sender<Response>>,
 }
 use async_trait::async_trait;
+use flume::TryRecvError;
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::select;
 use tokio::task::JoinHandle;
-use redgold_schema::ErrorInfoContext;
+use redgold_schema::{error_info, ErrorInfoContext};
 use crate::api::rosetta::models::Peer;
 use crate::node_config::NodeConfig;
 
@@ -114,6 +115,31 @@ impl<T> Channel<T> {
     }
     pub fn new() -> Channel<T> {
         new_channel()
+    }
+
+    pub fn recv_while(&self) -> Result<Vec<T>, ErrorInfo> {
+        let mut results = vec![];
+        while {
+            let err = self.receiver.try_recv();
+            let mut continue_loop = true;
+            match err {
+                Ok(o) => {
+                    results.push(o);
+                }
+                Err(e) => {
+                    match e {
+                        TryRecvError::Empty => {
+                            continue_loop = false;
+                        }
+                        TryRecvError::Disconnected => {
+                            return Err(error_info("request processor channel closed unexpectedly"));
+                        }
+                    }
+                }
+            }
+            continue_loop
+        } {}
+        Ok(results)
     }
 }
 

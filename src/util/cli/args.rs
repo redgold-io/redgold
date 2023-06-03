@@ -8,9 +8,7 @@ pub fn empty_args() -> RgArgs {
         mnemonic_path: None,
         peer_id: None,
         peer_id_path: None,
-        data_store_path: None,
-        data_store_folder: None,
-        wallet_path: None,
+        data_folder: None,
         // Is this the right thing to do here? Good question
         network: Some("local".to_string()),
         debug_id: None,
@@ -19,7 +17,8 @@ pub fn empty_args() -> RgArgs {
         genesis: false,
         seed_address: None,
         seed_port_offset: None,
-        enable_e2e: None,
+        enable_e2e: true,
+        disable_e2e: false,
         log_level: None,
     }
 }
@@ -43,22 +42,16 @@ pub struct RgArgs {
     /// Path to file containing hex encoded peer id
     #[clap(long)]
     pub peer_id_path: Option<String>,
-    /// Path to internal sqlite data store file, overrides default home directory path
+    /// Path to internal top level data directory
     #[clap(long)]
-    pub data_store_path: Option<String>,
-    /// Path to internal data store folder, overrides default home directory path
-    #[clap(long)]
-    pub data_store_folder: Option<String>,
-    /// Path to internal wallet / key store, overrides default home directory path
-    #[clap(long)]
-    pub wallet_path: Option<String>,
+    pub data_folder: Option<String>,
     /// Network environment to connect to, e.g. main or test
     #[clap(long)]
     pub network: Option<String>,
     /// DEBUG ONLY PARAMETER for local testing, automatically generates keys based on index
     #[clap(long)]
     pub debug_id: Option<i32>,
-    /// Enable node automatic updates based on release channel
+    /// Disable automatic node updates based on standard release channel
     #[clap(long)]
     pub disable_auto_update: bool,
     /// Specific subcommands for different functionalities
@@ -78,7 +71,10 @@ pub struct RgArgs {
     pub seed_port_offset: Option<i32>,
     #[clap(long)]
     /// Debug only option to enable an internal continuous E2E test sending transactions
-    pub enable_e2e: Option<i32>,
+    pub enable_e2e: bool,
+    #[clap(long)]
+    /// Debug only option to enable an internal continuous E2E test sending transactions
+    pub disable_e2e: bool,
     #[clap(long)]
     /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
     pub log_level: Option<String>,

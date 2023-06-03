@@ -575,6 +575,7 @@ impl TransactionProcessContext {
         Ok(submit_response)
     }
 
+    // TODO: WArning this is actually wrong and will break everything, fix the done condition
     fn poll_internal_proof_messages(request_processor: &RequestProcessor, observation_proofs: &mut HashSet<ObservationProof>) -> Option<Result<SubmitTransactionResponse, ErrorInfo>> {
         while {
             let err = request_processor.internal_channel.receiver.try_recv();

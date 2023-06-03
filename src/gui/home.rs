@@ -20,6 +20,7 @@ pub fn gui_status_networks() -> Vec<NetworkEnvironment> {
     // vec
 }
 
+#[derive(Clone)]
 pub struct HomeState {
     pub network_status_info: Arc<AtomicCell<Vec<NetworkStatusInfo>>>,
     pub last_query_started_time: Option<i64>
@@ -189,7 +190,7 @@ pub async fn query_network_status(
             obs_height,
             pending
         };
-        info!("Network status: {}", crate::schema::json_pretty(&status.clone()).unwrap_or("".to_string()));
+        // info!("Network status: {}", crate::schema::json_pretty(&status.clone()).unwrap_or("".to_string()));
         results.push(status);
     }
     result.store(results.clone());

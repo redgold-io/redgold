@@ -37,7 +37,8 @@ pub struct ResolvedInput {
     internal_valid_index: bool,
     observation_proofs: HashSet<ObservationProof>,
     peer_valid_index: HashSet<PublicKey>,
-    peer_invalid_index: HashSet<PublicKey>
+    peer_invalid_index: HashSet<PublicKey>,
+    pub signable_hash: Hash,
 }
 
 impl ResolvedInput {
@@ -52,7 +53,9 @@ impl ResolvedInput {
     pub fn verify_proof(&self) -> Result<(), ErrorInfo> {
 
         let prior_output = self.prior_output()?;
-        self.input.verify_proof(prior_output, &self.parent_transaction.hash())?;
+        // TODO: Actually verify parent transaction hash matches input here right ?
+        // Or is this done already?
+        self.input.verify_proof(prior_output.address.safe_get()?, &self.signable_hash)?;
 
         Ok(())
     }
@@ -79,10 +82,8 @@ pub fn validate_single_result(hash: &Hash, response: Result<Response, ErrorInfo>
 }
 
 
-pub async fn resolve_input(input: Input, relay: Relay,
-                           // , runtime: Arc<Runtime>,
-                           peers: Vec<PublicKey>)
-        -> Result<ResolvedInput, ErrorInfo> {
+pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, signable_hash: Hash)
+                           -> Result<ResolvedInput, ErrorInfo> {
     metrics::increment_counter!("redgold.transaction.resolve.input");
     let hash = input.transaction_hash.safe_get_msg("Missing transaction hash on input")?;
 
@@ -176,6 +177,7 @@ pub async fn resolve_input(input: Input, relay: Relay,
         observation_proofs,
         peer_valid_index,
         peer_invalid_index,
+        signable_hash
     };
     resolved.verify_proof()?;
     Ok(resolved)
@@ -253,10 +255,11 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     let mut resolved_internally = true;
     let mut vec = vec![];
 
+    // TODO: Have we verified this input contains all the signatures?
     for result in future::join_all(tx.inputs.iter().map(|input|
         async{tokio::spawn(resolve_input(input.clone(), relay.clone(),
                                         // runtime.clone(),
-                                         peers.clone()))
+                                         peers.clone(), tx.signable_hash().clone()))
             .await.map_err(|e| error_info(e.to_string()))}
     ).collect_vec()).await {
         let result = result??;

@@ -19,102 +19,52 @@ use crate::util::cli::arg_parse_config::ArgTranslate;
 
 
 pub async fn main_from_args(opts: RgArgs) {
-    // std::env::args() and ArgTranslate
-    // ArgTranslate::new(opts).run();
-
-    let mut node_config = NodeConfig::default();
-    // let simple_runtime = build_runtime(1, "main");
-
-    // TODO: Fix, borrowed node config here cannot be used to build the arg translate
-    let mut arg_translate = ArgTranslate::new(
-        // simple_runtime.clone(),
-        &opts, node_config.clone());
-    let _ = &arg_translate.run().expect("arg translation");
-    node_config = arg_translate.node_config.clone();
-    node_config = arg_parse_config::load_node_config_initial(opts.clone(), node_config);
-
-
-    // Commands required to run separate from the logging system initialization
-    // TODO: Consider disabling logging for these commands and instead unifying them?
-    if arg_parse_config::immediate_commands(&opts, &node_config,
-                                            // simple_runtime.clone()
-    ).await {
-        return;
-    }
-    // TODO: Change the port here by first parsing args associated with metrics / logs
-    crate::util::init_logger_with_config(&node_config);
-    metrics_registry::register_metrics(node_config.port_offset);
 
     info!("Starting node main method");
     increment_counter!("redgold.node.main_started");
 
-    let node_config_res = arg_parse_config::load_node_config(
-        // simple_runtime.clone(),
-        opts.clone(), node_config.clone()
-    ).await;
+    let mut node_config = NodeConfig::default();
 
+    let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
+    let _ = &arg_translate.translate_args().await.expect("arg translation");
+    node_config = arg_translate.node_config.clone();
 
     tracing::info!("Starting network environment: {}", node_config.clone().network.to_std_string());
-    // TODO: Here is where we should later init loggers and metrics?
-    // and then build out the data store etc. ?
-    match node_config_res {
-        Ok(node_config) => {
-            if arg_translate.is_gui() {
-                crate::gui::initialize::attempt_start(node_config.clone()
-                                                      // , simple_runtime.clone()
-                )
-                    .await
-                    .expect("GUI to start");
-                return;
-            }
-            let arg_translate = ArgTranslate::new(
-                // simple_runtime.clone(),
-                &opts, node_config.clone()
-            );
-            //simple_runtime.block_on(
-            if arg_translate.post_logger_commands().await.expect("post logger commands") {
-                return;
-            }
 
-            // let runtimes = NodeRuntimes::default(); simple_runtime.block_on(
-            let relay = Relay::new(node_config.clone()).await;
+    if arg_translate.abort {
+        return;
+    }
 
-            Node::prelim_setup(relay.clone(),
-                               // runtimes.clone()
-            ).await.expect("prelim");
-            let join_handles = Node::start_services(relay.clone()
-                                                        // , runtimes.clone()
-            ).await;
-            let mut futures = FuturesUnordered::new();
-            for jhi in join_handles {
-                futures.push(jhi);
-            }
-            let res = Node::from_config(relay
-                                        // , runtimes
-            ).await;
-            match res {
+    if arg_translate.is_gui() {
+        crate::gui::initialize::attempt_start(node_config.clone()).await.expect("GUI to start");
+        return;
+    }
+
+    let relay = Relay::new(node_config.clone()).await;
+
+    Node::prelim_setup(relay.clone()).await.expect("prelim");
+
+    // TODO: Tokio select better?
+    let join_handles = Node::start_services(relay.clone()).await;
+    let mut futures = FuturesUnordered::new();
+    for jhi in join_handles {
+        futures.push(jhi);
+    }
+    match Node::from_config(relay).await {
+        Ok(_) => {
+            info!("Node startup successful");
+            match internal_message::map_fut(futures.next().await) {
                 Ok(_) => {
-                    info!("Node startup successful");
-                    // loop {
-                        match internal_message::map_fut(futures.next().await) {
-                            Ok(_) => {
-                                error!("Some sub-service has terminated cleanly");
-                            }
-                            Err(e) => {
-                                error!("Main service error: {}", crate::schema::json(&e).expect("json render of error failed?"));
-                                panic!("Error in sub-service in main thread");
-                            }
-                        }
-                    // }
+                    error!("Some sub-service has terminated cleanly");
                 }
                 Err(e) => {
-                    error!("Node startup failure: {}", crate::schema::json(&e).expect("json render of error failed?"));
+                    error!("Main service error: {}", crate::schema::json(&e).expect("json render of error failed?"));
+                    panic!("Error in sub-service in main thread");
                 }
             }
-            ();
         }
-        Err(_) => {
-            info!("Not starting node");
+        Err(e) => {
+            error!("Node startup failure: {}", crate::schema::json(&e).expect("json render of error failed?"));
         }
     }
 }

@@ -160,25 +160,10 @@ impl Node {
         let relay = relay2.clone();
         let node_config = relay.node_config.clone();
 
-        let migration_result =
-            // runtimes.auxiliary.block_on(
-                relay.ds.run_migrations().await;
-            // );
-        if let Err(e) = migration_result {
-            log::error!("Migration related failure, attempting to handle");
-            if e.message.contains("was previously applied") &&
-                node_config.clone().network != NetworkEnvironment::Main {
-                log::error!("Found prior conflicting schema -- but test environment, removing existing datastore and exiting");
-
-                std::fs::remove_file(Path::new(&node_config.data_store_path))
-                    .map_err(|e| error_info(format!("Couldn't remove existing datastore: {}", e.to_string())))?;
-                panic!("Exiting due to ds removal, should work on retry");
-                // relay = runtimes.auxiliary.block_on(Relay::new(node_config.clone()));
-                // runtimes.auxiliary.block_on(relay.ds.run_migrations())?;
-            } else {
-                return Err(e);
-            }
-        }
+        relay.ds.run_migrations_fallback_delete(
+            node_config.clone().network != NetworkEnvironment::Main,
+            node_config.env_data_folder().data_store_path()
+        ).await?;
         Ok(())
     }
 
@@ -634,7 +619,7 @@ async fn e2e() {
 async fn e2e_async() -> Result<(), ErrorInfo> {
     util::init_logger_once();
     metrics_registry::register_metric_names();
-    metrics_registry::init_print_logger();
+    // metrics_registry::init_print_logger();
     // init_tracing();
     let _tc = TestConstants::new();
 
@@ -674,7 +659,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
 
     // Exception bad access on this on the json decoding? wtf?
-    let _ = submit.with_faucet().await?;
+    let _ = submit.with_faucet().await.expect("faucet");
     // info!("Faucet response: {}", faucet_res.json_pretty_or());
 
     submit.submit().await.expect("submit 2");

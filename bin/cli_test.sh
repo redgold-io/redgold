@@ -22,7 +22,7 @@ echo "Faucet tx hash: $(cat faucet_tx_hash)"
 
 $REDGOLD_BINARY_PATH query --hash "$(cat faucet_tx_hash)"
 
-echo "Done query"
+echo "Done query for faucet_tx_hash"
 
 $REDGOLD_BINARY_PATH address --index 1 > address2
 
@@ -36,11 +36,13 @@ sleep 20
 
 $REDGOLD_BINARY_PATH query --hash "$(cat send_tx_hash)"
 
-echo "Done query"
+echo "Done query for send_tx_hash"
 
 float_value=$($REDGOLD_BINARY_PATH balance --address "$(cat address2)")
 
 echo "Final balance of address2: $float_value"
+
+# TODO: Drain transaction back to faucet
 
 # TODO: Re-enable test after fixing bug:
 
