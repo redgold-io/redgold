@@ -11,17 +11,17 @@ export RUST_BACKTRACE=1
 export RUST_MIN_STACK=10485760
 
 
-$REDGOLD_BINARY_PATH --network local --debug-id 0 --genesis node >log0 2>&1 &
+$REDGOLD_BINARY_PATH --network local --debug-id 0 --genesis --disable-e2e node >log0 2>&1 &
 export NODE_1_PID=$!
 
 sleep 7
 
-$REDGOLD_BINARY_PATH --network local --debug-id 1 --seed-address 127.0.0.1 node >log1 2>&1 &
+$REDGOLD_BINARY_PATH --network local --debug-id 1 --seed-address 127.0.0.1 --disable-e2e node >log1 2>&1 &
 export NODE_2_PID=$!
 
 sleep 7
 
-$REDGOLD_BINARY_PATH --network local --debug-id 2 --seed-address 127.0.0.1 node >log2 2>&1 &
+$REDGOLD_BINARY_PATH --network local --debug-id 2 --seed-address 127.0.0.1 --disable-e2e node >log2 2>&1 &
 export NODE_3_PID=$!
 
 sleep 7

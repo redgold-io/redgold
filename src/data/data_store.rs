@@ -1284,7 +1284,7 @@ async fn test_sqlx_migrations() {
     let mut args = empty_args();
     args.network = Some("debug".to_string());
     let mut at = ArgTranslate::new(&args, &node_config);
-    let _ = at.run().await.expect("");
+    let _ = at.translate_args().await.expect("");
 
     println!(
         "{:?}",

@@ -100,7 +100,7 @@ impl ArgTranslate {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<(), ErrorInfo> {
+    pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
         self.check_load_logger()?;
         self.determine_network()?;
         self.ports();
@@ -115,6 +115,8 @@ impl ArgTranslate {
 
         self.guard_faucet();
         self.lookup_ip().await;
+
+        self.e2e_enable();
 
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
 
@@ -362,6 +364,18 @@ impl ArgTranslate {
         Ok(())
     }
 
+    fn e2e_enable(&mut self) {
+
+        if self.opts.disable_e2e {
+            self.node_config.e2e_enabled = false;
+        }
+        // std::env::var("REDGOLD_ENABLE_E2E").ok().map(|b| {
+        //     self.node_config.e2e_enable = true;
+        // }
+        // self.opts.enable_e2e.map(|_| {
+        //     self.node_config.e2e_enable = true;
+        // });
+    }
 }
 
 

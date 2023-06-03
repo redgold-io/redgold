@@ -107,7 +107,7 @@ impl TransactionSubmitter {
     }
 
     pub async fn submit(&self) -> Result<SubmitTransactionResponse, ErrorInfo> {
-        let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
+        let transaction = self.generator.lock().unwrap().generate_simple_tx()?.clone();
         let res = self.client.clone().send_transaction(&transaction.clone().transaction, true).await?;
         // let res = self.block(self.spawn(transaction.clone().transaction)).await?;
         // if res.clone().accepted() {
@@ -173,7 +173,7 @@ impl TransactionSubmitter {
     }
 
     pub async fn submit_duplicate(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {
-        let transaction = self.generator.lock().unwrap().generate_simple_tx().clone();
+        let transaction = self.generator.lock().unwrap().generate_simple_tx().clone().expect("tx");
         let h1 = self.spawn(transaction.clone().transaction);
         let h2 = self.spawn(transaction.clone().transaction);
         let dups = self.await_results(vec![(h1, transaction.clone()), (h2, transaction.clone())]).await;

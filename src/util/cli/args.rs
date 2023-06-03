@@ -17,7 +17,8 @@ pub fn empty_args() -> RgArgs {
         genesis: false,
         seed_address: None,
         seed_port_offset: None,
-        enable_e2e: None,
+        enable_e2e: true,
+        disable_e2e: false,
         log_level: None,
     }
 }
@@ -70,7 +71,10 @@ pub struct RgArgs {
     pub seed_port_offset: Option<i32>,
     #[clap(long)]
     /// Debug only option to enable an internal continuous E2E test sending transactions
-    pub enable_e2e: Option<i32>,
+    pub enable_e2e: bool,
+    #[clap(long)]
+    /// Debug only option to enable an internal continuous E2E test sending transactions
+    pub disable_e2e: bool,
     #[clap(long)]
     /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
     pub log_level: Option<String>,

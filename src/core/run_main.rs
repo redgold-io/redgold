@@ -26,7 +26,7 @@ pub async fn main_from_args(opts: RgArgs) {
     let mut node_config = NodeConfig::default();
 
     let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
-    let _ = &arg_translate.run().await.expect("arg translation");
+    let _ = &arg_translate.translate_args().await.expect("arg translation");
     node_config = arg_translate.node_config.clone();
 
     tracing::info!("Starting network environment: {}", node_config.clone().network.to_std_string());
