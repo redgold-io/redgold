@@ -126,23 +126,6 @@ use redgold_schema::EasyJson;
 //     println!("res {:?}", res);
 // }
 
-#[tokio::test]
-async fn debug_local_test() {
-    if !util::local_debug_mode() {
-        return;
-    }
-    // init_logger();
-
-    // let rt = util::runtimes::build_runtime(1, "test");
-    let mut args = cli::args::empty_args();
-    args.subcmd = Some(RgTopLevelSubcommand::DebugCanary(DebugCanary { host: None }));
-    cli::arg_parse_config::load_node_config(args, NodeConfig::default()).await.expect("works");
-    // let mut config = NodeConfig::default();
-    // info!("Node config: {:?}", config.clone());
-    // config.network_type = NetworkEnvironment::Local;
-    // run(config)
-}
-
 
 struct LiveE2E {
     relay: Relay,
@@ -236,7 +219,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
     match res {
         Ok(response) => {
             c.num_success += 1;
-            info!("Canary success");
+            info!("Live E2E request success");
             increment_counter!("redgold.e2e.success");
             if let Some(q) = response.query_transaction_response {
                 increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);

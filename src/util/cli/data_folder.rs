@@ -10,12 +10,18 @@ pub struct EnvDataFolder {
 }
 
 impl EnvDataFolder {
+
     pub fn data_store_path(&self) -> PathBuf {
         self.path.join("data_store.sqlite")
     }
+
     pub fn mnemonic_path(&self) -> PathBuf {
         self.path.join("mnemonic")
     }
+    pub fn peer_id_path(&self) -> PathBuf {
+        self.path.join("peer_id")
+    }
+
     pub fn servers_path(&self) -> PathBuf {
         self.path.join("servers")
     }

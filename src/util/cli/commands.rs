@@ -18,7 +18,6 @@ use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
-use crate::util::cli::arg_parse_config::get_default_data_directory;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
@@ -231,7 +230,7 @@ pub async fn deploy(deploy: Deploy, _config: NodeConfig) -> Result<(), ErrorInfo
 
     if deploy.wizard {
         println!("Welcome to the Redgold deployment wizard!");
-        let mut data_dir = get_default_data_directory(NetworkEnvironment::All);
+        let mut data_dir = _config.data_folder.all().path;
         let path = std::env::var(REDGOLD_SECURE_DATA_PATH);
         match path {
             Ok(p) => {

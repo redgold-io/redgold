@@ -18,7 +18,8 @@ use redgold_schema::servers::Server;
 use redgold_schema::{ErrorInfoContext, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerNodeInfo, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::dhash_vec;
+use redgold_schema::util::{dhash_vec, merkle};
+use redgold_schema::util::merkle::MerkleTree;
 use crate::api::public_api::PublicClient;
 use crate::core::seeds::SeedNode;
 use crate::util::cli::commands;
@@ -78,7 +79,8 @@ pub struct NodeConfig {
     pub servers: Vec<Server>,
     pub log_level: String,
     pub data_folder: DataFolder,
-    pub secure_data_folder: Option<DataFolder>
+    pub secure_data_folder: Option<DataFolder>,
+    pub enable_logging: bool,
 }
 
 impl NodeConfig {
@@ -284,6 +286,7 @@ impl NodeConfig {
             log_level: "DEBUG".to_string(),
             data_folder: DataFolder::target(0),
             secure_data_folder: None,
+            enable_logging: true,
         }
     }
 
@@ -297,7 +300,10 @@ impl NodeConfig {
             0,
         )
         .to_string();
-        let self_peer_id = debug_peer_id_from_key(&*words).to_vec();
+        let self_peer_id = peer_id_from_single_mnemonic(words.clone())
+            .expect("")
+            .root
+            .vec();
         // let path: String = ""
         let folder = DataFolder::target(seed_id.clone() as u32);
         folder.delete().ensure_exists();
@@ -368,15 +374,12 @@ impl NodeConfig {
 
 }
 
-pub fn debug_peer_id_from_key(mnemonic: &str) -> [u8; 32] {
-    let wallet = MnemonicWords::from_phrase(mnemonic);
+// TODO: Update function!
+pub fn peer_id_from_single_mnemonic(mnemonic_words: String) -> Result<MerkleTree, ErrorInfo> {
+    let wallet = MnemonicWords::from_mnemonic(&*mnemonic_words, None);
     let (_, pk) = wallet.active_key();
-    let self_peer_id = crate::util::rg_merkle::build_root(
-        &vec![dhash_vec(&pk.serialize().to_vec())],
-        None,
-        &mut None,
-    );
-    self_peer_id
+    let h = structs::Hash::calc_bytes(pk.serialize().to_vec());
+    merkle::build_root(vec![h])
 }
 
 #[test]

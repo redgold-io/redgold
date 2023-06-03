@@ -619,7 +619,7 @@ async fn e2e() {
 async fn e2e_async() -> Result<(), ErrorInfo> {
     util::init_logger_once();
     metrics_registry::register_metric_names();
-    metrics_registry::init_print_logger();
+    // metrics_registry::init_print_logger();
     // init_tracing();
     let _tc = TestConstants::new();
 

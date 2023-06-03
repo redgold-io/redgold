@@ -36,7 +36,7 @@ use crate::schema::structs::{Observation, UtxoEntry};
 use crate::schema::structs::{ObservationMetadata, Proof, Transaction};
 use crate::schema::TestConstants;
 use crate::schema::{ProtoHashable, SafeBytesAccess, WithMetadataHashable};
-use crate::util::cli::args::empty_args;
+use crate::util::cli::args::{empty_args, RgArgs};
 use crate::util::keys::public_key_from_bytes;
 use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
@@ -45,6 +45,7 @@ use redgold_schema::constants::EARLIEST_TIME;
 use redgold_schema::{error_info, error_message, ProtoSerde, SafeOption};
 use redgold_schema::structs::{AddressInfo, NetworkEnvironment};
 use redgold_schema::transaction::AddressBalance;
+use crate::util::cli::arg_parse_config::ArgTranslate;
 
 /*
 
@@ -1282,7 +1283,8 @@ async fn test_sqlx_migrations() {
     let mut node_config = NodeConfig::default();
     let mut args = empty_args();
     args.network = Some("debug".to_string());
-    node_config = crate::util::cli::arg_parse_config::load_node_config_initial(args, node_config);
+    let mut at = ArgTranslate::new(&args, &node_config);
+    let _ = at.run().await.expect("");
 
     println!(
         "{:?}",
