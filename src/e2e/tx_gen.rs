@@ -5,8 +5,8 @@ use crate::schema::KeyPair;
 use itertools::Itertools;
 use log::info;
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, TransactionAmount};
-use redgold_schema::TestConstants;
+use redgold_schema::structs::{Address, ErrorInfo, TransactionAmount};
+use redgold_schema::{SafeOption, TestConstants};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 
@@ -121,23 +121,26 @@ impl TransactionGenerator {
         }
     }
 
-    pub fn generate_simple_tx(&mut self) -> TransactionWithKey {
-        let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
+    pub fn generate_simple_tx(&mut self) -> Result<TransactionWithKey, ErrorInfo> {
+        // TODO: This can cause a panic
+        let prev = self.finished_pool.pop().safe_get()?.clone();
         let key = self.all_value_transaction(prev.clone());
         use redgold_schema::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
         // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
         // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
-        key
+        Ok(key)
     }
 
     pub fn drain_tx(&mut self, addr: &Address) -> Transaction {
         let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
-        let mut txb = TransactionBuilder::new();
-        txb.with_input(prev.utxo_entry.clone(), prev.key_pair);
-        // TODO: Fee
-        txb.with_output(addr, TransactionAmount::from( prev.utxo_entry.amount() as i64));
-        txb.transaction
+        // TODO: Fee?
+        let mut txb = TransactionBuilder::new()
+            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
+            .with_output(addr, &TransactionAmount::from( prev.utxo_entry.amount() as i64))
+            .build().expect("Failed to build transaction")
+            .sign(&prev.key_pair).expect("signed");
+        txb
         // use redgold_schema::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
         // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
@@ -177,7 +180,7 @@ impl TransactionGenerator {
 fn verify_signature() {
     let _tc = TestConstants::new();
     let mut tx_gen = TransactionGenerator::default(vec![]).with_genesis();
-    let tx = tx_gen.generate_simple_tx();
+    let tx = tx_gen.generate_simple_tx().expect("");
     let transaction = create_genesis_transaction();
     let vec1 = transaction.to_utxo_entries(0);
     let entry = vec1.get(0).expect("entry");

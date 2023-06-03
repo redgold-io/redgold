@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::result;
 use std::sync::Arc;
 
@@ -36,15 +36,16 @@ use crate::schema::structs::{Observation, UtxoEntry};
 use crate::schema::structs::{ObservationMetadata, Proof, Transaction};
 use crate::schema::TestConstants;
 use crate::schema::{ProtoHashable, SafeBytesAccess, WithMetadataHashable};
-use crate::util::cli::args::empty_args;
+use crate::util::cli::args::{empty_args, RgArgs};
 use crate::util::keys::public_key_from_bytes;
 use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
 use crate::schema::structs;
 use redgold_schema::constants::EARLIEST_TIME;
 use redgold_schema::{error_info, error_message, ProtoSerde, SafeOption};
-use redgold_schema::structs::AddressInfo;
+use redgold_schema::structs::{AddressInfo, NetworkEnvironment};
 use redgold_schema::transaction::AddressBalance;
+use crate::util::cli::arg_parse_config::ArgTranslate;
 
 /*
 
@@ -984,7 +985,7 @@ WHERE
     }
 
     pub async fn from_config(node_config: &NodeConfig) -> DataStore {
-        DataStore::from_path(format!("{}{}", "file:", node_config.data_store_path)).await
+        DataStore::from_path(format!("{}{}", "file:", node_config.env_data_folder().data_store_path().to_str().expect("").to_string())).await
     }
 
     pub async fn from_file_path(path: String) -> DataStore {
@@ -1014,6 +1015,22 @@ WHERE
             .run(&*self.pool)
             .await
             .map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
+    }
+
+    pub async fn run_migrations_fallback_delete(&self, allow_delete: bool, data_store_file_path: PathBuf) -> result::Result<(), ErrorInfo> {
+        let migration_result = self.run_migrations().await;
+        if let Err(e) = migration_result {
+            tracing::error!("Migration related failure, attempting to handle");
+            if e.message.contains("was previously applied") && allow_delete {
+                tracing::error!("Found prior conflicting schema -- but ok to remove; removing existing datastore and exiting");
+                std::fs::remove_file(data_store_file_path.clone())
+                    .map_err(|e| error_info(format!("Couldn't remove existing datastore: {}", e.to_string())))?;
+                // panic!("Exiting due to ds removal, should work on retry");
+            } // else {
+            return Err(e);
+            //}
+        }
+        Ok(())
     }
 
     pub fn create_all_err_info(&self) -> Result<Connection, ErrorInfo> {
@@ -1266,15 +1283,16 @@ async fn test_sqlx_migrations() {
     let mut node_config = NodeConfig::default();
     let mut args = empty_args();
     args.network = Some("debug".to_string());
-    node_config = crate::util::cli::arg_parse_config::load_node_config_initial(args, node_config);
+    let mut at = ArgTranslate::new(&args, &node_config);
+    let _ = at.translate_args().await.expect("");
 
     println!(
         "{:?}",
-        std::fs::remove_file(Path::new(&node_config.data_store_path)).is_ok()
+        std::fs::remove_file(Path::new(&node_config.data_store_path())).is_ok()
     );
 
     // node_config = NodeConfig::new(&(0 as u16));
-    println!("{:?}", node_config.data_store_path);
+    println!("{:?}", node_config.data_store_path());
 
     let ds = // "sqlite:///Users//.rg/debug/data_store.sqlite".to_string()
         // DataStore::from_path(&node_config).await;

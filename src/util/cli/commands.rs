@@ -11,14 +11,13 @@ use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{error_info, json, json_from, json_pretty, KeyPair, SafeOption, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, SafeOption, util, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::data::data_store::{DataStore, MnemonicEntry};
 use crate::node_config::NodeConfig;
-use crate::util::cli::arg_parse_config::get_default_data_directory;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
@@ -131,10 +130,10 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 
     let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new()
-        .with_input(utxo, kp)
-        .with_output(&destination, TransactionAmount::from_fractional(p0.amount)?)
-        .with_remainder()
-        .transaction.clone();
+        .with_utxo(&utxo)?
+        .with_output(&destination, &TransactionAmount::from_fractional(p0.amount)?)
+        .build()?
+        .sign(&kp)?;
 
     let response = client.send_transaction(&b, false).await?;
     let tx_hex = response.transaction_hash.safe_get()?.hex();
@@ -175,8 +174,26 @@ pub fn mnemonic_fingerprint(m: Mnemonic) -> String {
 }
 
 pub fn generate_random_mnemonic() -> Mnemonic {
-    Mnemonic::new_random(MasterKeyEntropy::Paranoid)
+    Mnemonic::new_random(MasterKeyEntropy::Double)
         .expect("New mnemonic generation failure")
+}
+
+pub fn generate_random_mnemonic_words(num_words: usize) -> Result<Mnemonic, ErrorInfo> {
+    let entropy = match num_words {
+        48 => {MasterKeyEntropy::Paranoid}
+        24 => MasterKeyEntropy::Double,
+        12 => MasterKeyEntropy::Sufficient,
+        _ => {
+            return Err(error_info("Unsupported num words for mnemonic generation"))
+        }
+    };
+    Mnemonic::new_random(entropy)
+        .error_info("New mnemonic generation failure")
+}
+
+#[test]
+pub fn mnemonic_generate_test() {
+    assert_eq!(generate_random_mnemonic().to_string().split(" ").count(), 24);
 }
 
 pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_DATA_PATH";
@@ -213,7 +230,7 @@ pub async fn deploy(deploy: Deploy, _config: NodeConfig) -> Result<(), ErrorInfo
 
     if deploy.wizard {
         println!("Welcome to the Redgold deployment wizard!");
-        let mut data_dir = get_default_data_directory(NetworkEnvironment::All);
+        let mut data_dir = _config.data_folder.all().path;
         let path = std::env::var(REDGOLD_SECURE_DATA_PATH);
         match path {
             Ok(p) => {
@@ -333,6 +350,10 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
     let faucet_tx = tx_submit.with_faucet().await?;
     // info!("Faucet response: {}", faucet_tx.json_or());
     let faucet_tx = faucet_tx.submit_transaction_response.safe_get()?.transaction.safe_get()?;
+    let address = faucet_tx.first_output_address().expect("a");
+    let response = client.query_hash(address.render_string().expect("")).await?;
+    let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
+    assert!(rounded > 0.);
     let _ = {
         let gen =
         tx_submit.generator.lock().expect("");

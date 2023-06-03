@@ -24,9 +24,9 @@ async fn local_e2e_it() -> Result<(), ErrorInfo> {
     let pc = PublicClient::from("127.0.0.1".to_string(), port_offset + 1);
 
     let mut tx_sub = TransactionSubmitter::default(pc, vec![]);
-    tx_sub.with_faucet().await?;
+    tx_sub.with_faucet().await.expect("");
 
-    let res = tx_sub.submit().await?;
+    let res = tx_sub.submit().await.expect("");
     assert!(res.query_transaction_response.is_some());
 
     Ok(())

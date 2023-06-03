@@ -94,6 +94,8 @@
         "structs.QueryObservationProofResponse",
         "structs.QueryObservationProofRequest",
         "structs.TaskLocalDetails",
+        "structs.DebugVersionChange",
+        "structs.DebugVersionChange2",
         "structs.VersionInfo"
       ]
     },

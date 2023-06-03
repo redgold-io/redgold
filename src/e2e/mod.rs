@@ -1,5 +1,5 @@
 use crate::api::public_api::PublicClient;
-use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator};
+use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::node_config::NodeConfig;
 use crate::util::{cli, init_logger};
@@ -24,6 +24,7 @@ pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
 use redgold_schema::EasyJson;
+use crate::util::logging::Loggable;
 // i think this is the one currently in use?
 
 // This one is NOT being used due to malfunctioning, thats why metrics weren't being picked up
@@ -126,23 +127,6 @@ use redgold_schema::EasyJson;
 //     println!("res {:?}", res);
 // }
 
-#[tokio::test]
-async fn debug_local_test() {
-    if !util::local_debug_mode() {
-        return;
-    }
-    // init_logger();
-
-    // let rt = util::runtimes::build_runtime(1, "test");
-    let mut args = cli::args::empty_args();
-    args.subcmd = Some(RgTopLevelSubcommand::DebugCanary(DebugCanary { host: None }));
-    cli::arg_parse_config::load_node_config(args, NodeConfig::default()).await.expect("works");
-    // let mut config = NodeConfig::default();
-    // info!("Node config: {:?}", config.clone());
-    // config.network_type = NetworkEnvironment::Local;
-    // run(config)
-}
-
 
 struct LiveE2E {
     relay: Relay,
@@ -226,34 +210,40 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
 }
 
 async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
-    let transaction = c.generator.generate_simple_tx().clone();
-    let res = c.relay.submit_transaction(SubmitTransactionRequest {
-        transaction:
-        Some(transaction.transaction.clone()),
-        sync_query_response: true
-    }).await;
+    let result1 = c.generator.generate_simple_tx();
+    let result = result1.log_error().clone();
+    match result {
+        Err(e) => {}
+        Ok(transaction) => {
+            let transaction = transaction.clone();
+            let res = c.relay.submit_transaction(SubmitTransactionRequest {
+                transaction: Some(transaction.transaction.clone()),
+                sync_query_response: true
+            }).await;
 
-    match res {
-        Ok(response) => {
-            c.num_success += 1;
-            info!("Canary success");
-            increment_counter!("redgold.e2e.success");
-            if let Some(q) = response.query_transaction_response {
-                increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
+            match res {
+                Ok(response) => {
+                    c.num_success += 1;
+                    info!("Live E2E request success");
+                    increment_counter!("redgold.e2e.success");
+                    if let Some(q) = response.query_transaction_response {
+                        increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
+                    }
+                }
+                Err(e) => {
+                    increment_counter!("redgold.e2e.failure");
+                    let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
+                    error!("Canary failure: {}", failure_msg.clone());
+                    let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
+                    if !c.failed_once || recovered {
+                        alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
+                    }
+                    let failure_time = util::current_time_millis_i64();
+                    c.num_success = 0;
+                    c.last_failure = failure_time;
+                    c.failed_once = true;
+                }
             }
-        }
-        Err(e) => {
-            increment_counter!("redgold.e2e.failure");
-            let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
-            error!("Canary failure: {}", failure_msg.clone());
-            let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
-            if !c.failed_once || recovered {
-                alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
-            }
-            let failure_time = util::current_time_millis_i64();
-            c.num_success = 0;
-            c.last_failure = failure_time;
-            c.failed_once = true;
         }
     }
     Ok(())

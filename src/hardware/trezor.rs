@@ -8,33 +8,43 @@ use bitcoin::util::bip32::{ChildNumber, DerivationPath, ExtendedPubKey};
 use bitcoin::util::psbt::serialize::Serialize;
 use itertools::Itertools;
 use tracing_subscriber::fmt::format;
-use redgold_schema::{error_info, ErrorInfoContext, SafeOption, structs, util};
-use redgold_schema::structs::{ErrorInfo, Hash, Proof, Signature, Transaction};
+use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, TestConstants, util, WithMetadataHashable};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, TransactionAmount, UtxoEntry};
+use redgold_schema::transaction::amount_data;
+use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::mnemonic_words::HDPathCursor;
 use redgold_schema::util::sign;
+use crate::genesis::create_genesis_transaction;
 use crate::util::cmd::run_cmd;
 use crate::util::keys::{public_key_from_bytes, ToPublicKey, ToPublicKeyFromLib};
-use crate::util::sha256_str;
+use crate::util::{init_logger, init_logger_once, sha256_str};
 
 const MISSING_DEVICE: &str = "Failed to find a Trezor device";
 const TREZORCTL: &str = "trezorctl";
 
 pub fn trezor_cmd(args: Vec<&str>) -> Result<String, ErrorInfo> {
-    println!("Running trezor cmd with args {:?}", args.clone());
+    tracing::debug!("Running trezor cmd with args {:?}", args.clone());
     let res = run_cmd(TREZORCTL, args);
-    println!("Trezor command raw output: {:?}", res.clone());
+    tracing::debug!("Trezor command raw output: {:?}", res.clone());
     if res.0.contains(MISSING_DEVICE) {
         Err(error_info("Failed to find a Trezor device".to_string()))?;
     }
     Ok(res.0)
 }
 
+// Failed to read details
 pub fn trezor_list_devices() -> Result<Option<String>, ErrorInfo> {
     let res = trezor_cmd(vec!["list"])?;
     let res = if res.is_empty() {
         None
     } else {
-        Some(res)
+        let strr = res.split("\n")
+            .filter(|l| {
+                !(l.contains("Failed to read details") || l.trim().is_empty())
+            })
+            .next()
+            .map(|l| l.to_string());
+        strr
     };
     Ok(res)
 }
@@ -155,7 +165,7 @@ pub fn get_public_key(cursor: HDPathCursor) -> Result<structs::PublicKey, ErrorI
 
 #[derive(Clone)]
 pub struct SignMessageResponse {
-    message: Vec<u8>,
+    // message: String,
     address: String,
     signature: Vec<u8>,
 }
@@ -168,7 +178,7 @@ impl SignMessageResponse {
         self.signature[1..].to_vec()
     }
     pub fn signature(&self) -> Signature {
-        Signature::ecdsa(self.signature_vec())
+        Signature::hardware(self.signature_vec())
     }
 }
 
@@ -201,17 +211,28 @@ pub fn sign_message(path: String, input_message: String) -> Result<SignMessageRe
     //     Err(error_info("Failed to find address output line".to_string()))?
     // )?.clone();
     let signature = base64::decode(sig).error_info("Failed to decode base64 signature")?;
-    let message = base64::decode(message).error_info("Failed to decode base64 message")?;
+    tracing::debug!("signature length: {:?}", signature.len());
+    // let message = base64::decode(message).error_info("Failed to decode base64 message")?;
     Ok(SignMessageResponse{
-        message,
+        // message,
         address,
         signature,
     })
 }
 
 
+const DEFAULT_ACCOUNT_NUM: u32 = 50;
+
+pub fn default_pubkey_path() -> String {
+    format!("m/44'/0'/{}'/0/0", DEFAULT_ACCOUNT_NUM)
+}
+
+pub fn default_pubkey() -> Result<structs::PublicKey, ErrorInfo> {
+    get_public_node(default_pubkey_path())?.public_key()
+}
+
 /// This returns a hardened xpub so it doesn't expose other accounts
-pub fn standard_path(account_num: u32, non_standard_coin_type: Option<String>) -> String {
+pub fn standard_xpub_path(account_num: u32, non_standard_coin_type: Option<String>) -> String {
     let coin_type = non_standard_coin_type.unwrap_or("0".to_string()).to_string();
     return format!("m/44'/{}'/{}'", coin_type, account_num.to_string()).to_string();
 }
@@ -222,7 +243,7 @@ pub fn standard_path(account_num: u32, non_standard_coin_type: Option<String>) -
 /// This is one of two dependencies on the trezor device and the primary interface for external
 /// usage
 pub fn get_standard_xpub(account_num: u32, non_standard_coin_type: Option<String>) -> Result<String, ErrorInfo> {
-    Ok(get_public_node(standard_path(account_num, non_standard_coin_type))?.xpub)
+    Ok(get_public_node(standard_xpub_path(account_num, non_standard_coin_type))?.xpub)
 }
 
 pub fn get_standard_public_key(
@@ -232,7 +253,7 @@ pub fn get_standard_public_key(
     index: u32
 ) -> Result<structs::PublicKey, ErrorInfo> {
     let path = format!("{}/{}/{}",
-                       standard_path(account_num, non_standard_coin_type),
+                       standard_xpub_path(account_num, non_standard_coin_type),
                        change.to_string(),
                        index.to_string()
     );
@@ -250,10 +271,69 @@ pub fn get_standard_public_key(
 pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Result<Proof, ErrorInfo> {
     let msg = util::bitcoin_message_signer::message_from_hash(hash);
     let signature = sign_message(path, msg)?;
-    let sig = Signature::hardware(signature.signature);
+    let sig = signature.signature();
     let proof = Proof::from(public, sig);
     proof.verify(hash)?;
     Ok(proof)
+}
+
+
+
+pub async fn sign_transaction(transaction: &mut Transaction, public: structs::PublicKey, path: String)
+    -> Result<Transaction, ErrorInfo> {
+    let hash: Hash = transaction.hash();
+    let addr = public.address()?;
+
+    for i in transaction.inputs.iter_mut() {
+        let proof = trezor_proof(&hash, public.clone(), path.clone())?;
+        let output = i.output
+            .safe_get_msg("Failed to get output")?;
+        let o = output.address
+            .safe_get_msg("Failed to get address")?;
+        if o == &addr {
+            let proof1 = proof.clone();
+            i.proof.push(proof1);
+            i.verify_proof(&addr, &hash)?;
+        }
+    }
+    Ok(transaction.clone())
+}
+
+
+#[ignore]
+#[tokio::test]
+async fn debug_sign_tx () {
+    init_logger_once();
+    let tc = TestConstants::new();
+    let pk = default_pubkey().expect("pk");
+    let address = pk.address().expect("a");
+    let addr = address.clone().address.safe_bytes().expect("");
+    let utxo = UtxoEntry{
+        transaction_hash: Hash::from_string("test").vec(),
+        output_index: 0,
+        address: addr.clone(),
+        output: Some(Output{
+            address: Some(address.clone()),
+            product_id: None,
+            counter_party_proofs: vec![],
+            data: amount_data(100),
+            contract: None,
+        }),
+        time: 0,
+    };
+    let ai = AddressInfo{
+        address: None,
+        utxo_entries: vec![utxo],
+        balance: 0,
+    };
+    let mut tb = TransactionBuilder::new();
+    tb.with_address_info(ai);
+    let destination = address.clone();
+    let amount = TransactionAmount::from(5);
+    tb.with_output(&destination, &amount);
+    let res = tb.build().expect("tx");
+    sign_transaction(&mut res.clone(), pk, default_pubkey_path())
+        .await.expect("sign");
 }
 
 

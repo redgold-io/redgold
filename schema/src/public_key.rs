@@ -1,6 +1,6 @@
 use bitcoin::secp256k1::PublicKey;
 use crate::{bytes_data, error_info, from_hex, SafeBytesAccess, ShortString, structs};
-use crate::structs::{ErrorInfo, PublicKeyType};
+use crate::structs::{Address, ErrorInfo, PublicKeyType};
 
 pub trait ToPublicKey {
     fn to_lib_public_key(&self) -> Result<PublicKey, ErrorInfo>;
@@ -43,5 +43,9 @@ impl structs::PublicKey {
 
     pub fn short_id(&self) -> String {
         self.hex().expect("hex").short_string().expect("worked")
+    }
+
+    pub fn address(&self) -> Result<Address, ErrorInfo> {
+        Address::from_struct_public(self)
     }
 }

@@ -1,9 +1,10 @@
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code};
+use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use itertools::Itertools;
+use crate::transaction_builder::TransactionBuilder;
 
 pub fn amount_to_raw_amount(redgold: u64) -> u64 {
     assert!(redgold <= MAX_COIN_SUPPLY as u64);
@@ -57,6 +58,27 @@ pub struct AddressBalance {
 }
 
 impl Transaction {
+
+    pub fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo> {
+        let hash = self.signable_hash();
+        let addr = key_pair.address_typed();
+        let mut signed = false;
+        for i in self.inputs.iter_mut() {
+            let o = i.output.safe_get_msg("Missing enriched output on transaction input during signing")?;
+            let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
+            if &addr == input_addr {
+                let proof = Proof::from_keypair_hash(&hash, &key_pair);
+                i.proof.push(proof);
+                signed = true;
+            }
+        }
+        if !signed {
+            return Err(error_info("Couldn't find appropriate input address to sign"));
+        }
+        Ok(self.with_hash().clone())
+    }
+
+
     // TODO: Is this wrong definition here?
     pub fn iter_utxo_outputs(&self) -> Vec<(Vec<u8>, i64)> {
         self.outputs
@@ -131,7 +153,7 @@ impl Transaction {
             ))?;
         Ok(Proof::verify_proofs(
             &input.proof,
-            &Hash::new(utxo_entry.transaction_hash.clone()),
+            &self.signable_hash(),
             &Address::from_bytes(utxo_entry.address.clone())?,
         )?)
     }
@@ -194,7 +216,7 @@ impl Transaction {
         }
     }
     #[allow(dead_code)]
-    fn signable_hash(&self) -> Hash {
+    pub fn signable_hash(&self) -> Hash {
         let mut clone = self.clone();
         clone.clear_input_proofs();
         clone.clear_counter_party_proofs();
@@ -248,99 +270,22 @@ impl Transaction {
         secret: &SecretKey,
         public: &PublicKey,
     ) -> Self {
-        let mut input = source.to_input();
-        let proof = Proof::new(
-            &input.transaction_hash.as_ref().expect("hash"),
-            secret,
-            public,
-        );
-        input.proof.push(proof);
+
         let mut amount_actual = amount;
         if amount < (MAX_COIN_SUPPLY as u64) {
             amount_actual = amount * (DECIMAL_MULTIPLIER as u64);
         }
-        let fee = 0 as u64; //MIN_FEE_RAW;
-        amount_actual -= fee;
-        let output = Output {
-            address: Address::address_data(destination.clone()),
-            data: amount_data(amount_actual),
-            product_id: None,
-            counter_party_proofs: vec![],
-            contract: None,
-        };
-
-        let mut outputs: Vec<Output> = vec![output];
-        // println!("{:?}, {:?}, {:?}", source.amount, amount_actual, fee);
-        if source.amount() > (amount_actual + fee) {
-            let remaining_amount = source.amount() - (amount_actual + fee);
-            // TODO: Don't re-use keys in constructor
-            let remainder = Output::from_public_amount(public, remaining_amount);
-            outputs.push(remainder);
-        }
-        let mut tx = Self {
-            inputs: vec![input],
-            outputs,
-            // TODO: Fix genesis cause this causes an issue
-            struct_metadata: struct_metadata(0 as i64),
-            options: None
-        };
-
-        tx.with_hash();
-
-        tx
+        let amount = TransactionAmount::from(amount as i64);
+        // let fee = 0 as u64; //MIN_FEE_RAW;
+        // amount_actual -= fee;
+        let destination = Address::from_bytes(destination.clone()).unwrap();
+        let txb = TransactionBuilder::new()
+            .with_utxo(&source).expect("")
+            .with_output(&destination, &amount)
+            .build().expect("")
+            .sign(&KeyPair::new(&secret.clone(), &public.clone())).expect("");
+        txb
     }
-    //
-    // pub fn from(
-    //     inputs: Vec<UtxoEntry>,
-    //     amount_address: Vec<(u64, Vec<u8>)>,
-    //     key_pairs: Vec<KeyPair>
-    // ) -> Self {
-    //     let mut input = source.to_input();
-    //     let proof = Proof::new(&input.id, secret, public);
-    //     input.proof.push(proof);
-    //     let amount_actual = amount * PRIME_MULTIPLIER;
-    //     let fee = MIN_FEE_RAW;
-    //     let output = Output {
-    //         address: destination.clone(),
-    //         data: CurrencyData {
-    //             amount: amount_actual,
-    //         }
-    //             .proto_serialize(),
-    //         contract: Transaction::currency_contract_hash(),
-    //         threshold: None,
-    //         weights: vec![],
-    //         product_id: None,
-    //         counter_party_proofs: vec![],
-    //     };
-    //
-    //     // println!("{:?}, {:?}, {:?}", source.amount, amount_actual, fee);
-    //     let remaining_amount = source.amount() - amount_actual - fee;
-    //     // TODO: Don't re-use keys in constructor
-    //     let remainder = Output {
-    //         address: address(public).to_vec(),
-    //         data: CurrencyData {
-    //             amount: remaining_amount,
-    //         }
-    //             .proto_serialize(),
-    //         contract: Transaction::currency_contract_hash(),
-    //         threshold: None,
-    //         weights: vec![],
-    //         product_id: None,
-    //         counter_party_proofs: vec![],
-    //     };
-    //
-    //     return Self {
-    //         inputs: vec![input],
-    //         outputs: vec![output, remainder],
-    //         fee,
-    //         version: None,
-    //         finalize_window: None,
-    //         confirmation_required: false,
-    //         confirmation_proofs: vec![],
-    //         message: None,
-    //         pow_proof: None,
-    //     };
-    // }
 
     pub fn peer_data(&self) -> Result<PeerData, ErrorInfo> {
         let mut res = vec![];
@@ -409,6 +354,11 @@ impl TransactionAmount {
         Self {
             amount
         }
+    }
+    pub fn from_float_string(str: &String) -> Result<Self, ErrorInfo> {
+        let amount = str.parse::<f64>()
+            .error_info("Invalid transaction amount")?;
+        Self::from_fractional(amount)
     }
 }
 

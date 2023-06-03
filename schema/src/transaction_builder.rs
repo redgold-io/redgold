@@ -1,13 +1,15 @@
 use bitcoin::secp256k1::rand;
 use bitcoin::secp256k1::rand::Rng;
-use crate::{Address, constants, ErrorInfo, KeyPair, NetworkEnvironment, PeerData, struct_metadata_new, StructMetadata, Transaction, util};
+use crate::{Address, constants, ErrorInfo, KeyPair, NetworkEnvironment, PeerData, SafeOption, struct_metadata_new, StructMetadata, Transaction, util};
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{NodeMetadata, Output, Proof, StandardData, TransactionAmount, TransactionOptions, UtxoEntry};
+use crate::structs::{AddressInfo, NodeMetadata, Output, Proof, StandardData, TransactionAmount, TransactionOptions, UtxoEntry};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
     pub transaction: Transaction,
-    pub balance: i64
+    pub balance: i64,
+    pub utxos: Vec<UtxoEntry>,
+    pub used_utxos: Vec<UtxoEntry>
 }
 
 impl TransactionBuilder {
@@ -27,40 +29,31 @@ impl TransactionBuilder {
                     offline_time_sponsor: None,
                 }),
             },
-            balance: 0
+            balance: 0,
+            utxos: vec![],
+            used_utxos: vec![],
         }
     }
 
-    pub fn with_input(&mut self, utxo: UtxoEntry, key_pair: KeyPair) -> &mut Self {
-        let mut input = utxo.to_input();
-
-        let data = utxo.output.expect("a").data.expect("b");
-        if let Some(a) = data.amount {
-            self.balance += a;
-        }
-        let proof = Proof::new(
-            &input.transaction_hash.as_ref().expect("hash"),
-            &key_pair.secret_key,
-            &key_pair.public_key,
-        );
-        input.proof.push(proof);
-        self.transaction.inputs.push(input);
-        self
+    pub fn with_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
+        let entry = utxo_entry.clone();
+        let o = utxo_entry.output.safe_get_msg("Missing output")?;
+        o.address.safe_get_msg("Missing address")?;
+        // TODO: This will throw errors on any input not currency related, be warned
+        // Or use separate method to deal with data inputs?
+        o.safe_ensure_amount()?;
+        self.utxos.push(entry);
+        Ok(self)
     }
 
-    // For external hardware signing
-    pub fn with_input_proof(&mut self, utxo: UtxoEntry, proof: Proof) -> &mut Self {
-        let mut input = utxo.to_input();
-        let data = utxo.output.expect("a").data.expect("b");
-        if let Some(a) = data.amount {
-            self.balance += a;
+    pub fn with_address_info(&mut self, ai: AddressInfo) -> Result<&mut Self, ErrorInfo> {
+        for u in ai.utxo_entries {
+            self.with_utxo(&u)?;
         }
-        input.proof.push(proof);
-        self.transaction.inputs.push(input);
-        self
+        Ok(self)
     }
 
-    pub fn with_output(&mut self, destination: &Address, amount: TransactionAmount) -> &mut Self {
+    pub fn with_output(&mut self, destination: &Address, amount: &TransactionAmount) -> &mut Self {
         self.balance -= amount.amount;
         let output = Output {
             address: Some(destination.clone()),
@@ -71,6 +64,45 @@ impl TransactionBuilder {
         };
         self.transaction.outputs.push(output);
         self
+    }
+
+    // Aha heres the issue, we're expecting output to be populated here
+    // Remove this assumption elsewhere
+    pub fn with_unsigned_input(&mut self, utxo: UtxoEntry) -> Result<&mut Self, ErrorInfo> {
+        let mut input = utxo.to_input();
+
+        let output = utxo.output.safe_get()?;
+        let data = output.data.safe_get()?;
+        if let Some(a) = data.amount {
+            self.balance += a;
+        }
+        self.used_utxos.push(utxo.clone());
+        self.transaction.inputs.push(input);
+        Ok(self)
+    }
+
+    pub fn build(&mut self) -> Result<Transaction, ErrorInfo> {
+
+        // TODO: Should we sort the other way instead? To compress as many UTXOs as possible?
+        // In order for that we'd need to raise transaction size limit
+        self.utxos.sort_by(|a, b| a.amount().cmp(&b.amount()));
+
+        for u in self.utxos.clone() {
+            self.with_unsigned_input(u.clone())?;
+            if self.balance > 0 {
+                break
+            }
+        }
+        if self.balance < 0 {
+            return Err(ErrorInfo::error_info("Insufficient funds"));
+        }
+
+        if self.balance > 0 {
+            self.with_remainder();
+        }
+
+        Ok(self.transaction.clone())
+        // self.balance
     }
 
     pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerData) -> &mut Self {

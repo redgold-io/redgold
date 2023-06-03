@@ -169,6 +169,12 @@ pub fn init_logger_once() {
     });
 }
 
+pub fn init_logger_main(log_level: String) {
+    INIT.call_once(|| {
+        init_tracing(&log_level);
+    });
+}
+
 pub fn init_logger() {
     // use log::LevelFilter;
     // use log4rs::append::console::ConsoleAppender;
