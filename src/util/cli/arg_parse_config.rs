@@ -162,8 +162,8 @@ impl ArgTranslate {
         let sha256 = sha256_vec(&self_exe_bytes);
         info!("Sha256 of currently running executable with read byte {}", hex::encode(sha256.to_vec()));
 
-        let sha3_256 = Hash::calc_bytes(self_exe_bytes);
-        info!("Sha3-256 of current exe {}", sha3_256.hex());
+        // let sha3_256 = Hash::calc_bytes(self_exe_bytes);
+        // info!("Sha3-256 of current exe {}", sha3_256.hex());
 
         use std::process::Command;
 
@@ -453,36 +453,23 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
                     commands::generate_address(a.clone(), &config).map(|_| ())
                 }
                 RgTopLevelSubcommand::Send(a) => {
-                    // let res = simple_runtime.block_on(
-                        commands::send(&a, &config).await
-                        // ));
-                    // res
+                    commands::send(&a, &config).await
                 }
                 RgTopLevelSubcommand::Query(a) => {
-                    // simple_runtime.block_on(
-                        commands::query(&a, &config).await
-                    // )
+                    commands::query(&a, &config).await
                 }
-                // Move all these block_on in an async match and block on this.
                 RgTopLevelSubcommand::Faucet(a) => {
-                    // simple_runtime.block_on(
-                        commands::faucet(&a, &config).await
-                    // )
+                    commands::faucet(&a, &config).await
                 }
                 RgTopLevelSubcommand::AddServer(a) => {
-                    // simple_runtime.block_on(
-                        commands::add_server(a, &config).await
-                    // )
+                    commands::add_server(a, &config).await
                 }
                 RgTopLevelSubcommand::Balance(a) => {
-                    // simple_runtime.block_on(
-                        commands::balance_lookup(a, &config).await
-                    // )
+                    commands::balance_lookup(a, &config).await
                 }
                 RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
                     commands::test_transaction(&test_transaction_cli, &config).await
                 }
-
                 _ => {
                     abort = false;
                     Ok(())
