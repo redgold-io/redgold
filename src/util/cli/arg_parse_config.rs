@@ -109,7 +109,7 @@ impl ArgTranslate {
         self.load_mnemonic()?;
         self.load_peer_id()?;
         self.load_internal_servers()?;
-        self.exe_hash();
+        self.calculate_executable_checksum_hash();
         // No logger for CLI commands to allow direct output read.
         self.abort = immediate_commands(&self.opts, &self.node_config).await;
 
@@ -145,7 +145,7 @@ impl ArgTranslate {
         }
     }
 
-    fn exe_hash(&mut self) {
+    fn calculate_executable_checksum_hash(&mut self) {
 
         let path_exec = std::env::current_exe().expect("Can't find the current exe");
 
@@ -155,14 +155,14 @@ impl ArgTranslate {
         let exec_name = path_exec.file_name().expect("filename access failure").to_str()
             .expect("Filename missing").to_string();
         info!("Filename of current executable: {:?}", exec_name.clone());
-
-        let self_exe_bytes = fs::read(path_exec.clone()).expect("Read bytes of current exe");
-        let mut md5f = crypto::md5::Md5::new();
-        md5f.input(&*self_exe_bytes);
-
-        info!("Md5 of currently running executable with read byte {}", md5f.result_str());
-        let sha256 = sha256_vec(&self_exe_bytes);
-        info!("Sha256 of currently running executable with read byte {}", hex::encode(sha256.to_vec()));
+        // This is somewhat slow for loading the GUI
+        // let self_exe_bytes = fs::read(path_exec.clone()).expect("Read bytes of current exe");
+        // let mut md5f = crypto::md5::Md5::new();
+        // md5f.input(&*self_exe_bytes);
+        //
+        // info!("Md5 of currently running executable with read byte {}", md5f.result_str());
+        // let sha256 = sha256_vec(&self_exe_bytes);
+        // info!("Sha256 of currently running executable with read byte {}", hex::encode(sha256.to_vec()));
 
         // let sha3_256 = Hash::calc_bytes(self_exe_bytes);
         // info!("Sha3-256 of current exe {}", sha3_256.hex());
