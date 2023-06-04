@@ -80,6 +80,10 @@ impl ArgTranslate {
         std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
     }
 
+    pub fn secure_data_path_buf() -> Option<PathBuf> {
+        std::env::var("REDGOLD_SECURE_DATA_PATH").ok().map(|a| PathBuf::from(a))
+    }
+
     pub fn secure_data_or_cwd() -> PathBuf {
         Self::secure_data_path_string().map(|s|
             std::path::Path::new(&s).to_path_buf()
@@ -98,6 +102,18 @@ impl ArgTranslate {
             self.node_config.servers = servers;
         }
         Ok(())
+    }
+
+    pub fn read_servers_file(servers: PathBuf) -> Result<Vec<Server>, ErrorInfo> {
+        let result = if servers.is_file() {
+            let contents = fs::read_to_string(servers)
+                .error_info("Failed to read servers file")?;
+            let servers = Server::parse(contents)?;
+            servers
+        } else {
+            vec![]
+        };
+        Ok(result)
     }
 
     pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {

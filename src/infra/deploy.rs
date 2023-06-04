@@ -9,6 +9,9 @@ use crate::infra::SSH;
 use crate::resources::Resources;
 use filepath::FilePath;
 use itertools::Itertools;
+ use crate::node_config::NodeConfig;
+ use crate::util::cli::arg_parse_config::ArgTranslate;
+ use crate::util::cli::data_folder::DataFolder;
 
  /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
@@ -176,10 +179,26 @@ async fn test_setup_server() {
 
     //
     //
-    let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
-    setup_ops_services(ssh, None, None, None).await.expect("");
+    // let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
+    // setup_ops_services(ssh, None, None, None).await.expect("");
     // setup_server_redgold(ssh, NetworkEnvironment::Predev, true, None, true).expect("worx");
     //
     // let ssh = SSH::new_ssh("interserver.redgold.io", None);
     // setup_server_redgold(ssh, NetworkEnvironment::Predev, false, None, true).expect("worx");
+    // let mut nc = NodeConfig::default();
+    let sd = ArgTranslate::secure_data_path_buf().expect("");
+    let sd = sd.join(".rg");
+    let df = DataFolder::from_path(sd);
+    let buf = df.all().servers_path();
+    println!("Reading servers file: {:?}", buf);
+    let s = ArgTranslate::read_servers_file(buf).expect("servers");
+    println!("Setting up servers: {:?}", s);
+    let mut gen = true;
+    for ss in s {
+        println!("Setting up server: {}", ss.host.clone());
+        let ssh = SSH::new_ssh(ss.host, None);
+        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, None, true).expect("worx");
+        gen = false
+    }
+    // df.all().data_store().config_store
 }
