@@ -31,7 +31,23 @@ cleanup() {
     kill -KILL $NODE_2_PID
     kill -KILL $NODE_3_PID
 
-    cat log0; cat log1; cat log2
+    echo "-----------------"
+    echo "LOGS FROM NODE 0 Below"
+    echo "-----------------"
+
+    cat log0
+
+    echo "-----------------"
+    echo "LOGS FROM NODE 1 Below"
+    echo "-----------------"
+
+    cat log1
+
+    echo "-----------------"
+    echo "LOGS FROM NODE 2 Below"
+    echo "-----------------"
+
+    cat log2
 }
 
 trap cleanup EXIT

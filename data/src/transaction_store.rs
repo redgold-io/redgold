@@ -217,6 +217,26 @@ impl TransactionStore {
         Ok(!res.is_empty())
     }
 
+    pub async fn delete_utxo(
+        &self,
+        fixed_utxo_id: &FixedUtxoId
+    ) -> Result<u64, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let transaction_hash = fixed_utxo_id.transaction_hash.safe_get()?;
+        let output_index = fixed_utxo_id.output_index.clone();
+        let bytes = transaction_hash.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"DELETE FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.rows_affected())
+    }
+
 
     pub async fn insert_utxo(
         &self,

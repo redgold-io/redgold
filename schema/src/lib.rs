@@ -95,7 +95,8 @@ pub fn struct_metadata(time: i64) -> Option<StructMetadata> {
         time: Some(time),
         version: VERSION as i32,
         hash: None,
-        sign_hash: None,
+        signable_hash: None,
+        signed_hash: None,
         counter_party_hash: None,
         confirmation_hash: None,
     })
@@ -858,7 +859,8 @@ impl PeerId {
 impl HashClear for StructMetadata {
     fn hash_clear(&mut self) {
         self.hash = None;
-        self.sign_hash = None;
+        self.signable_hash = None;
+        self.signed_hash = None;
         self.counter_party_hash = None;
         self.confirmation_hash = None;
     }

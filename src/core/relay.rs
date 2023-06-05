@@ -16,7 +16,7 @@ use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
-use redgold_schema::structs::{FixedUtxoId, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, FixedUtxoId, GossipTransactionRequest, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response, Transaction};
 
 use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -98,6 +98,7 @@ are instantiated by the node
 */
 
 use crate::core::internal_message::SendErrorInfo;
+use crate::core::peer_rx_event_handler::PeerRxEventHandler;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -169,7 +170,35 @@ impl Relay {
         Ok(res)
     }
 
+    pub async fn gossip(&self, tx: &Transaction) -> Result<(), ErrorInfo> {
+        let all = self.ds.peer_store.select_gossip_peers(tx).await?;
+        for p in all {
+            let mut req = Request::default();
+            let mut gtr = GossipTransactionRequest::default();
+            gtr.transaction = Some(tx.clone());
+            req.gossip_transaction_request = Some(gtr);
+            self.send_message(req, p).await?;
+        }
+        Ok(())
+    }
 
+    // TODO: Ensure this is only called within a separate bounded small discovery stream
+    // So it doesn't interrupt anything else.
+    pub async fn add_peer_flow(&self, node_tx: &Transaction) -> Result<(), ErrorInfo> {
+        let metadata = node_tx.node_metadata()?;
+        let pk = metadata.public_key.safe_get()?;
+        if pk == &self.node_config.public_key() {
+            return Ok(());
+        }
+        if self.ds.peer_store.query_public_key_node(pk.clone()).await?.is_some() {
+            return Ok(());
+        }
+        let mut req = Request::default();
+        req.about_node_request = Some(AboutNodeRequest::default());
+        let response = self.send_message_sync(req, pk.clone(), None).await;
+        PeerRxEventHandler::handle_about_peer_response(self.clone(), response).await?;
+        Ok(())
+    }
 
     pub async fn broadcast(
         relay: Relay,

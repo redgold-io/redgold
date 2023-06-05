@@ -2,7 +2,7 @@ use bitcoin::secp256k1::rand;
 use bitcoin::secp256k1::rand::Rng;
 use crate::{Address, constants, ErrorInfo, KeyPair, NetworkEnvironment, PeerData, SafeOption, struct_metadata_new, StructMetadata, Transaction, util};
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{AddressInfo, NodeMetadata, Output, Proof, StandardData, TransactionAmount, TransactionOptions, UtxoEntry};
+use crate::structs::{AddressInfo, NodeMetadata, Output, Proof, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -22,7 +22,8 @@ impl TransactionBuilder {
                 struct_metadata: struct_metadata_new(),
                 options: Some(TransactionOptions{
                     salt: Some(rng.gen::<i64>()),
-                    network_type: Some(NetworkEnvironment::Debug as i32),
+                    // TODO: None here or with setter?
+                    network_type: None,
                     key_value_options: vec![],
                     data: None,
                     contract: None,
@@ -43,6 +44,21 @@ impl TransactionBuilder {
         // Or use separate method to deal with data inputs?
         o.safe_ensure_amount()?;
         self.utxos.push(entry);
+        Ok(self)
+    }
+
+    pub fn with_message(&mut self, msg: impl Into<String>) -> Result<&mut Self, ErrorInfo> {
+        let mut x = self.transaction.options.as_mut().expect("");
+        match x.data.as_mut() {
+            None => {
+                let mut data = TransactionData::default();
+                data.message = Some(msg.into());
+                x.data = Some(data);
+            }
+            Some(d) => {
+                d.message = Some(msg.into());
+            }
+        }
         Ok(self)
     }
 
