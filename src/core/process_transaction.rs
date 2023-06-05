@@ -707,7 +707,7 @@ impl TransactionProcessContext {
         let is_peer_tx = p0.node_metadata().is_ok();
         if is_peer_tx {
             // Ignore for now, causes a giant loop think we need to avoid gossiping about self?
-            self.relay.add_peer_flow(p0).await.log_error().ok();
+            // self.relay.add_peer_flow(p0).await.log_error().ok();
         }
         Ok(is_peer_tx)
     }
