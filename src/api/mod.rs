@@ -127,7 +127,8 @@ impl RgHttpClient {
     pub async fn get_peers(&self) -> Result<Response, ErrorInfo> {
         let mut req = Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-        Ok(self.proto_post_request(&mut req, None).await?)
+        let response = self.proto_post_request(&mut req, None).await?;
+        Ok(response)
     }
 
 }

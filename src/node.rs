@@ -292,7 +292,6 @@ impl Node {
             result2?;
 
 
-
             info!("Added peer, attempting download");
             // relay
             //     .ds
@@ -304,7 +303,12 @@ impl Node {
             //     )
             //     .expect("insert peer on download");
             // todo: send_peer_request_response
-            let key = result.latest_node_transaction.safe_get()?.node_metadata()?.public_key_bytes()?;
+            let metadata = result.latest_node_transaction.safe_get()?.node_metadata()?;
+            let key = metadata.public_key_bytes()?;
+
+            let pk1 = metadata.public_key.safe_get()?;
+            PeerRxEventHandler::get_new_peers(relay.clone(), pk1).await?;
+
 
             // TODO Change this invocation to an .into() in a non-schema key module
             let pk = keys::public_key_from_bytes(&key).expect("works");
@@ -442,13 +446,24 @@ impl LocalNodes {
         self.nodes.iter().map(|x| x.public_client.client_wrapper().clone()).collect_vec()
     }
 
-    async fn verify_peers(clients: Vec<RgHttpClient>) -> Result<(), ErrorInfo> {
+    async fn verify_peers(&self) -> Result<(), ErrorInfo> {
+        let clients = self.nodes.iter().map(|n| n.public_client.client_wrapper()).collect_vec();
         let mut map: HashMap<structs::PublicKey, Vec<structs::PeerNodeInfo>> = HashMap::new();
         for x in &clients {
             let response = x.get_peers().await?;
             let pk = response.proof.safe_get()?.public_key.safe_get()?.clone();
             let peers = response.get_peers_info_response.safe_get()?.peer_info.clone();
             map.insert(pk, peers);
+        }
+        let uniques = map.keys().map(|x| x.clone()).collect_vec();
+        for (k, m) in map {
+            for p in m {
+                let nmd = p.latest_node_transaction.safe_get()?.node_metadata()?;
+                let pk = nmd.public_key.safe_get()?;
+                if !uniques.contains(pk) && pk != &k {
+                    return Err(ErrorInfo::error_info("Peer not found in all peers"));
+                }
+            }
         }
         Ok(())
     }
@@ -715,6 +730,8 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     // Debug for purpose of viewing 2nd node operations
     // tokio::time::sleep(Duration::from_secs(15)).await;
     after_2_nodes.at_least_n(2).unwrap();
+
+    local_nodes.verify_peers().await.expect("verify peers");
 
 
     let res = client1.multiparty_keygen(None).await;

@@ -133,6 +133,7 @@ impl ArgTranslate {
         self.lookup_ip().await;
 
         self.e2e_enable();
+        self.configure_seeds();
 
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
 
@@ -313,10 +314,15 @@ impl ArgTranslate {
 
         // Unify with other debug id stuff?
         if let Some(dbg_id) = self.opts.debug_id {
-            let offset = (dbg_id * 1000) as u16;
-            self.node_config.port_offset = self.node_config.network.default_port_offset() + offset;
+            self.node_config.port_offset = Self::debug_id_port_offset(
+                self.node_config.network.default_port_offset(),
+                dbg_id
+            );
         }
+    }
 
+    fn debug_id_port_offset(offset: u16, debug_id: i32) -> u16 {
+        offset + ((debug_id * 1000) as u16)
     }
 
     // pub fn parse_seed(&mut self) {
@@ -391,6 +397,21 @@ impl ArgTranslate {
         // self.opts.enable_e2e.map(|_| {
         //     self.node_config.e2e_enable = true;
         // });
+    }
+    fn configure_seeds(&mut self) {
+        if let Some(a) = &self.opts.seed_address {
+            let default_port = self.node_config.network.default_port_offset();
+            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            // TODO: replace this with the other seed class.
+            self.node_config.seeds.push(SeedNode {
+                peer_id: None,
+                trust: vec![],
+                public_key: None,
+                external_address: a.clone(),
+                port_offset: Some(port),
+                environments: vec![],
+            });
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 use std::convert::identity;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::channel::mpsc::Receiver;
 use futures::prelude::*;
@@ -14,7 +15,7 @@ use tokio::task::JoinHandle;
 
 use redgold_schema::{json_or, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoResponse, MultipartyThresholdResponse, QueryObservationProofResponse, Request, SubmitTransactionRequest};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, MultipartyThresholdResponse, PublicKey, QueryObservationProofResponse, Request, SubmitTransactionRequest};
 
 use crate::api::about;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
@@ -89,6 +90,7 @@ impl PeerRxEventHandler {
                         let port = (nmd.port_or(relay.node_config.network.clone()) as i64) + 1;
                         info!("Requesting peer info on runtime address: {}:{}",
                               address, port);
+                        // TODO: Not handling the errors here, need to move to its own stream.
                         tokio::spawn(async move {
 
                             let response = rest_peer(
@@ -121,7 +123,7 @@ impl PeerRxEventHandler {
     }
 
 
-    async fn handle_about_peer_response(
+    pub async fn handle_about_peer_response(
         relay: Relay, response: Result<Response, ErrorInfo>
     ) -> Result<(), ErrorInfo> {
         if let Some(e) = response.clone().err() {
@@ -130,10 +132,46 @@ impl PeerRxEventHandler {
         let result1 = response?;
         let result = result1.about_node_response.safe_get();
         let res = result?.peer_node_info.safe_get()?;
+        let nmd = res.latest_node_transaction.safe_get()?.node_metadata()?;
+        let pk = nmd.public_key.safe_get()?;
+        let short_peer_id = pk.short_id();
+
         // TODO: Validate transaction here
-        info!("Added new peer: {}", json(&res)?);
+        info!("Added new peer: {}", short_peer_id);
         // TODO: Change to optional trust
         relay.ds.peer_store.add_peer_new(res, 0f64).await?;
+        // TODO: Change this whole thing here to be its own stream / flow off the transaction stream
+
+        let res = Self::get_new_peers(relay, pk).await;
+        res.log_error().ok();
+
+
+        Ok(())
+    }
+
+    pub async fn get_new_peers(relay: Relay, pk: &PublicKey) -> Result<(), ErrorInfo> {
+        let mut req = Request::default();
+        req.get_peers_info_request = Some(GetPeersInfoRequest::default());
+
+        let res = relay.send_message_sync(req, pk.clone(), Some(Duration::from_secs(10))).await?;
+        res.as_error_info()?;
+        let p = res.get_peers_info_response.safe_get()?;
+        for p in &p.peer_info {
+            if let Some(pk) = p.clone().latest_node_transaction.
+                and_then(|x| x.node_metadata().ok()).and_then(|x| x.public_key) {
+                if pk == relay.node_config.public_key() {
+                    continue;
+                }
+                let res = relay.ds.peer_store.query_public_key_node(pk).await?;
+                if res.is_some() {
+                    continue;
+                } else {
+                    relay.ds.peer_store.add_peer_new(&p, 0f64).await?;
+                    relay.gossip(p.latest_node_transaction.safe_get()?).await?;
+                }
+            }
+
+        }
         Ok(())
     }
 

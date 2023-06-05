@@ -36,6 +36,8 @@ use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
+use crate::util::logging::Loggable;
+
 #[derive(Clone)]
 pub struct Conflict {
     //  Not really necessary but put other info here.
@@ -231,9 +233,21 @@ impl TransactionProcessContext {
         output_address: String,
         node_id: String
     ) -> Result<(), ErrorInfo> {
-        let result_or_error =
-            self.process(&transaction_message.transaction.clone(), current_time, request_uuid).await;
-        self.cleanup(None)?;
+
+        if self.check_peer_message(&transaction_message.transaction).await? {
+            return Ok(());
+        }
+
+        let result_or_error = {
+            match self.immediate_validation(&transaction_message.transaction).await {
+                Ok(_) => {
+                    let res = self.process(&transaction_message.transaction.clone(), current_time, request_uuid).await;
+                    self.cleanup(None)?;
+                    res
+                }
+                Err(e) => {Err(e)}
+            }
+        };
 
         // Use this as whether or not the request was successful
         let mut metadata = ResponseMetadata::default();
@@ -253,7 +267,7 @@ impl TransactionProcessContext {
 
         match transaction_message.response_channel {
             None => {
-                increment_counter!("redgold.transaction.missing_response_channel");
+                // increment_counter!("redgold.transaction.missing_response_channel");
                 // let details = ErrorInfo::error_info("Missing response channel for transaction");
                 // error!("Missing response channel for transaction {:?}", json_or(&details));
             }
@@ -290,24 +304,29 @@ impl TransactionProcessContext {
         self.relay.observe(om).await
     }
 
+    async fn immediate_validation(&mut self, transaction: &Transaction) -> Result<(), ErrorInfo> {
+
+        // Check if we already have a rejection reason for this transaction and abort if so
+        // returning the previous rejection reason.
+        let ds = self.relay.ds.clone();
+        if let Some((_, Some(pre_rejection))) = ds.transaction_store.query_maybe_transaction(&transaction.hash()).await? {
+            return Err(pre_rejection);
+        }
+
+        // Validate obvious schema related errors / local errors requiring no other context information
+        transaction.prevalidate()?;
+        Ok(())
+
+    }
+
     // TODO: Add a debug info thing here? to include data about debug calls? Thread local info? something ?
     async fn process(&mut self, transaction: &Transaction, processing_time_start: i64, request_uuid: String) -> Result<SubmitTransactionResponse, ErrorInfo> {
         increment_counter!("redgold.transaction.received");
         let hash = transaction.hash();
         self.transaction_hash = Some(hash.clone());
 
-        // Check if we already have a rejection reason for this transaction and abort if so
-        // returning the previous rejection reason.
-        let ds = self.relay.ds.clone();
-        if let Some((_, Some(pre_rejection))) = ds.transaction_store.query_maybe_transaction(&hash).await? {
-            return Err(pre_rejection);
-        }
-
         // Establish channels for other transaction threads to communicate conflicts with this one.
         let request_processor = self.create_receiver_or_err(&hash, request_uuid, &transaction)?;
-
-        // Validate obvious schema related errors / local errors requiring no other context information
-        transaction.prevalidate()?;
 
         // Attempt to resolve all the transaction inputs and outputs for context-aware validation
         // This is the place where balances checks and signature verifications are performed.
@@ -336,7 +355,7 @@ impl TransactionProcessContext {
         // And create a spawned thread for each UTXO pool to handle this that returns any conflicts back here.
         for utxo_id in fixed_utxo_ids {
             // Acquire locks to determine if another transaction is re-using some output
-            let entry = self.relay.utxo_channels.entry(utxo_id);
+            let entry = self.relay.utxo_channels.entry(utxo_id.clone());
             match entry {
                 Entry::Occupied(mut entry) => {
                     conflict_detected = true;
@@ -346,7 +365,12 @@ impl TransactionProcessContext {
                     for active_request in entry.get().active_requests.iter() {
                         // TODO: Handle unwrap issues
                         conflicts.push(active_request.clone());
-                        info!("Conflict between current: {} and {}", hash.hex(), active_request.transaction_hash.hex());
+                        info!(
+                            "Conflict between current: {} and {} on utxo_id {} output: {}",
+                            hash.hex(), active_request.transaction_hash.hex(),
+                            utxo_id.clone().transaction_hash.expect("h").hex(),
+                            utxo_id.output_index.clone()
+                        );
                         // Need to capture this conflict LOCALLY here for use later.
                         active_request
                             .request_processer
@@ -401,17 +425,7 @@ impl TransactionProcessContext {
         // A request type to handle that that'll alert this thread? OR should that just be the same
         // As transaction request? We might benefit from including additional information.
         // TODO: Replace all this with a relay method.
-        let mut request = Request::default();
-        let mut gossip_transaction_request = GossipTransactionRequest::default();
-        gossip_transaction_request.transaction = Some(transaction.clone());
-        request.gossip_transaction_request = Some(gossip_transaction_request);
-
-        let mut message = PeerMessage::empty();
-        message.request = request;
-        self.relay
-            .peer_message_tx
-            .sender
-            .send_err(message)?;
+        self.relay.gossip(transaction).await?;
 
         // tracing::info!("Gossiped transaction");
 
@@ -622,21 +636,15 @@ impl TransactionProcessContext {
                     &transaction, util::current_time_millis_i64(), true, None
                 ).await?;
 
-        for (output_index, input) in transaction.inputs.iter().enumerate() {
+        for fixed in transaction.fixed_utxo_ids_of_inputs()? {
             // This should maybe just put the whole node into a corrupted state? Or a retry?
-            DataStore::map_err(
-                self.relay.ds.delete_utxo(
-                    &input
-                        .transaction_hash
-                        .as_ref()
-                        .clone()
-                        .expect("hash")
-                        .bytes
-                        .safe_bytes()
-                        .expect("yes"),
-                    output_index as u32,
-                ),
-            )?;
+            tracing::info!("Attempting to delete utxo: {}", fixed.format_str());
+            self.relay.ds.transaction_store.delete_utxo(&fixed).await?;
+            let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
+                &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
+            ).await?;
+            let deleted = !utxo_valid;
+            tracing::info!("Utxo should be deleted: {}", deleted);
         }
 
         return Ok(());
@@ -694,6 +702,14 @@ impl TransactionProcessContext {
             }
         };
         res
+    }
+    async fn check_peer_message(&self, p0: &Transaction) -> Result<bool, ErrorInfo> {
+        let is_peer_tx = p0.node_metadata().is_ok();
+        if is_peer_tx {
+            // Ignore for now, causes a giant loop think we need to avoid gossiping about self?
+            self.relay.add_peer_flow(p0).await.log_error().ok();
+        }
+        Ok(is_peer_tx)
     }
 }
 

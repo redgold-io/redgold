@@ -1,3 +1,4 @@
+
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
@@ -5,6 +6,16 @@ use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesA
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
+
+pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
+
+
+impl FixedUtxoId {
+    pub fn format_str(&self) -> String {
+        format!("FixedUtxoId: {} output: {}", self.transaction_hash.clone().expect("").hex(), self.output_index)
+    }
+}
+
 
 pub fn amount_to_raw_amount(redgold: u64) -> u64 {
     assert!(redgold <= MAX_COIN_SUPPLY as u64);
@@ -59,6 +70,11 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn with_signable_hash(&mut self) -> Result<&mut Self, ErrorInfo> {
+        self.struct_metadata()?.signable_hash = Some(self.signable_hash());
+        Ok(self)
+    }
+
     pub fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo> {
         let hash = self.signable_hash();
         let addr = key_pair.address_typed();
@@ -75,7 +91,9 @@ impl Transaction {
         if !signed {
             return Err(error_info("Couldn't find appropriate input address to sign"));
         }
-        Ok(self.with_hash().clone())
+        let x = self.with_hash();
+        x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash());
+        Ok(x.clone())
     }
 
 
@@ -165,6 +183,24 @@ impl Transaction {
         if self.outputs.is_empty() {
             Err(error_code(RGError::MissingOutputs))?;
         }
+
+        if let Some(o) = &self.options {
+            if let Some(d) = &o.data {
+                if let Some(m) = &d.message {
+                    let i = m.len();
+                    if i > MAX_TRANSACTION_MESSAGE_SIZE {
+                        Err(
+                            error_info(
+                                format!(
+                                    "Message length: {} too large, expected {}", i, MAX_TRANSACTION_MESSAGE_SIZE
+                                )
+                            )
+                        )?;
+                    }
+                }
+            }
+        }
+
         // if self.fee < MIN_FEE_RAW {
         //     return Err(RGError::InsufficientFee);
         // }
@@ -179,6 +215,7 @@ impl Transaction {
             if input.proof.is_empty() {
                 Err(error_code(RGError::MissingProof))?;
             }
+            input.verify_signatures_only(&self.signable_hash())?;
         }
 
         for _output in self.outputs.iter() {

@@ -36,6 +36,11 @@ impl PeerStore {
 
     // pub async fn public_key_trust(&self) -> Result<>
 
+    // TODO: Implement XOR distance + fee distance metrics + trust distance metrics
+    pub async fn select_gossip_peers(&self, tx: &Transaction) -> Result<Vec<PublicKey>, ErrorInfo> {
+        self.active_nodes(None).await
+    }
+
     pub async fn query_public_key_node(
         &self,
         public: PublicKey,
