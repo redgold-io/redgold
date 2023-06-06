@@ -25,7 +25,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers
       - /var/run/docker.sock:/var/run/docker.sock
     network_mode: host
-    command: ["--network", "${REDGOLD_NETWORK:-dev}"]
+    command: ["--network", "${REDGOLD_NETWORK:-dev}", "node"]
     labels:
       - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"
   watchtower:
