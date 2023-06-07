@@ -324,7 +324,7 @@ impl NodeConfig {
         node_config
     }
     pub fn internal_mnemonic(&self) -> MnemonicWords {
-        MnemonicWords::from_mnemonic(&*self.mnemonic_words, None)
+        MnemonicWords::from_mnemonic_words(&*self.mnemonic_words, None)
     }
 
     pub async fn data_store(&self) -> DataStore {
@@ -378,9 +378,9 @@ impl NodeConfig {
 
 // TODO: Update function!
 pub fn peer_id_from_single_mnemonic(mnemonic_words: String) -> Result<MerkleTree, ErrorInfo> {
-    let wallet = MnemonicWords::from_mnemonic(&*mnemonic_words, None);
+    let wallet = MnemonicWords::from_mnemonic_words(&*mnemonic_words, None);
     let (_, pk) = wallet.active_key();
-    let h = structs::Hash::calc_bytes(pk.serialize().to_vec());
+    let h = structs::Hash::digest(pk.serialize().to_vec());
     merkle::build_root(vec![h])
 }
 

@@ -63,7 +63,7 @@ impl Address {
     }
 
     pub fn with_checksum(bytes: Vec<u8>) -> Vec<u8> {
-        let checksum_bytes = Hash::calc_bytes(bytes.clone()).vec();
+        let checksum_bytes = Hash::digest(bytes.clone()).vec();
         let mut res: Vec<u8> = Vec::new();
         res.extend_from_slice(&bytes);
         res.extend_from_slice(&checksum_bytes[0..4]);
