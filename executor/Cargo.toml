@@ -1,5 +1,5 @@
 [package]
-name = "redgold-runtime"
+name = "redgold-executor"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,11 +9,12 @@ edition = "2021"
 #sudo apt update
 #sudo apt install llvm-12
 [dependencies]
-wasmer = { version="2.3.0", features = ['dylib']} #, default-features=true, features = ["compiler", "cranelift", "universal"]}
-anyhow = "1.0.58"
-#wasmer-compiler-singlepass = "2.3.0"
-#wasmer-compiler-cranelift = "2.3.0"
-wasmer-compiler = "2.3.0"
-wasmer-compiler-llvm = "2.3.0"
-#llvmenv = "0.3.2"
-#llvm-sys = "120"
+#wasmer = { version="2.3.0", features = ['dylib']} #, default-features=true, features = ["compiler", "cranelift", "universal"]}
+#anyhow = "1.0.58"
+##wasmer-compiler-singlepass = "2.3.0"
+##wasmer-compiler-cranelift = "2.3.0"
+#wasmer-compiler = "2.3.0"
+#wasmer-compiler-llvm = "2.3.0"
+##llvmenv = "0.3.2"
+##llvm-sys = "120"
+extism = "0.4.0"

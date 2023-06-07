@@ -21,14 +21,14 @@ members = [
     "core",
     "data",
     "schema",
-    "sdk",
-#    "runtime"
+#    "sdk",
+    "executor"
 ]
-exclude = ["examples/rust_wasm"]
+exclude = ["examples/rust_wasm", "sdk", "sdk/*"]
 
 [dependencies]
 redgold-schema = { path = "schema"}
-#redgold-runtime = { path = "runtime"}
+redgold-executor = { path = "executor"}
 tempfile = "3.3.0"
 filepath = "0.1.2"
 svg = "0.10.0"
