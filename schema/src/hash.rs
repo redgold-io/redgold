@@ -46,17 +46,25 @@ impl Hash {
     }
 
     pub fn from_string(s: &str) -> Self {
-        Self::calc_bytes(s.as_bytes().to_vec())
+        Self::digest(s.as_bytes().to_vec())
     }
 
-    pub fn calc_bytes(s: Vec<u8>) -> Self {
+    pub fn digest(s: Vec<u8>) -> Self {
         Self::new(Sha3_256::digest(&s).to_vec())
     }
 
     pub fn merkle_combine(&self, right: Hash) -> Self {
         let mut vec = self.vec();
         vec.extend(right.vec());
-        Self::calc_bytes(vec)
+        Self::digest(vec)
+    }
+
+    pub fn checksum(&self) -> Result<Vec<u8>, ErrorInfo> {
+        Ok(self.safe_bytes()?[0..4].to_vec())
+    }
+
+    pub fn checksum_hex(&self) -> Result<String, ErrorInfo> {
+        Ok(hex::encode(self.checksum()?))
     }
 
 }

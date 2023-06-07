@@ -232,7 +232,7 @@ where
         let mut clone = self.clone();
         clone.hash_clear();
         let input = clone.proto_serialize();
-        Hash::calc_bytes(input)
+        Hash::digest(input)
     }
 }
 
