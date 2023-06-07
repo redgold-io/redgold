@@ -115,25 +115,27 @@ pub fn copy_to_clipboard(ui: &mut Ui, text: String) {
     }
 }
 
-pub fn data_item(ui: &mut Ui, label: String, text: String) {
+pub fn data_item(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>) {
     ui.horizontal(|ui| {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Small);
-        ui.label(label);
-        let text_line = &mut text.clone();
+        ui.label(label.into());
+        let string = text.into();
+        let text_line = &mut string.clone();
         ui.add(egui::TextEdit::singleline(text_line).clip_text(false));
-        copy_to_clipboard(ui, text.clone());
+        copy_to_clipboard(ui, string.clone());
     });
 }
 
-pub fn medium_data_item(ui: &mut Ui, label: String, text: String) {
+pub fn medium_data_item(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>) {
     ui.horizontal(|ui| {
-        ui.label(label);
+        ui.label(label.into());
         ui.spacing();
-        ui.label(text.clone());
+        let x = text.into();
+        ui.label(x.clone());
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Small);
-        copy_to_clipboard(ui, text.clone());
+        copy_to_clipboard(ui, x.clone());
     });
 }
 

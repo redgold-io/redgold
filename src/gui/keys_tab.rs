@@ -1,16 +1,60 @@
 use eframe::egui;
-use eframe::egui::{Context, Separator, TextEdit, Ui};
+use eframe::egui::{Context, Separator, TextEdit, Ui, Widget};
 use itertools::Itertools;
 use redgold_schema::util::mnemonic_builder;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
 use crate::gui::util::valid_label;
+use crate::gui::wallet_tab::{data_item, medium_data_item};
+use crate::util::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::cli::commands::{generate_mnemonic, generate_random_mnemonic};
+use crate::util::keys::ToPublicKeyFromLib;
 
+
+// TODO: implement a passphrase checksum as well.
+// Recalculate these values on change of passphrase
 pub struct MnemonicWindowState {
-    mnemonic_window_open: bool,
-    mnemonic_window_value: String,
-    mnemonic_window_label: String,
+    open: bool,
+    words: String,
+    label: String,
+    bitcoin_p2wpkh_44: String,
+    bitcoin_p2wpkh_84: String,
+    ethereum_address_44: String,
+    ethereum_address_84: String,
+    words_checksum: String,
+    seed_checksum: Option<String>,
+    passphrase: Option<String>,
+    redgold_node_address: String,
+    redgold_hardware_default_address: String,
+    passphrase_input: String,
+    passphrase_input_show: bool,
+    requires_reset: bool,
+}
+
+impl MnemonicWindowState {
+
+    pub fn set_words_from_passphrase(&mut self) {
+        let passphrase = self.passphrase.clone();
+        let w = MnemonicWords::from_mnemonic_words(
+            &*self.words.clone(), passphrase.clone()
+        );
+        self.bitcoin_p2wpkh_44 = w.btc_key_44_0().public_key.to_struct_public_key().to_bitcoin_address().unwrap();
+        self.bitcoin_p2wpkh_84 = w.btc_key_84_0().public_key.to_struct_public_key().to_bitcoin_address().unwrap();
+        self.ethereum_address_44 = w.eth_key_44_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
+        self.ethereum_address_84 = w.eth_key_84_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
+        self.words_checksum = w.words_checksum().unwrap();
+        self.seed_checksum = passphrase.and(w.seed_checksum().ok());
+        self.redgold_node_address = w.address().render_string().unwrap();
+        self.redgold_hardware_default_address = w.hardware_default_address().render_string().unwrap();
+    }
+
+    pub fn set_words(&mut self, words: impl Into<String>, label: impl Into<String>) {
+        self.open = true;
+        self.words = words.into();
+        self.label = label.into();
+        self.set_words_from_passphrase();
+    }
 }
 
 pub struct GenerateMnemonicState {
@@ -30,9 +74,21 @@ impl KeygenState {
     pub fn new() -> Self {
         Self {
             mnemonic_window_state: MnemonicWindowState {
-                mnemonic_window_open: false,
-                mnemonic_window_value: "".to_string(),
-                mnemonic_window_label: "".to_string(),
+                open: false,
+                words: "".to_string(),
+                label: "".to_string(),
+                bitcoin_p2wpkh_44: "".to_string(),
+                bitcoin_p2wpkh_84: "".to_string(),
+                ethereum_address_44: "".to_string(),
+                ethereum_address_84: "".to_string(),
+                words_checksum: "".to_string(),
+                seed_checksum: None,
+                passphrase: None,
+                redgold_node_address: "".to_string(),
+                redgold_hardware_default_address: "".to_string(),
+                passphrase_input: "".to_string(),
+                passphrase_input_show: false,
+                requires_reset: false,
             },
             generate_mnemonic_state: GenerateMnemonicState {
                 random_input_mnemonic: "".to_string(),
@@ -54,11 +110,10 @@ pub fn keys_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
     ui.spacing();
     ui.horizontal(|ui| {
         if ui.button("Generate random mnemonic").clicked() {
-            key.mnemonic_window_state.mnemonic_window_value =
-                generate_random_mnemonic().to_string();
-            key.mnemonic_window_state.mnemonic_window_open = true;
-            key.mnemonic_window_state.mnemonic_window_label =
-                "Generated with internal random entropy".to_string();
+            key.mnemonic_window_state.set_words(
+                generate_random_mnemonic().to_string(),
+                "Generated with internal random entropy"
+            );
         }
         ui.spacing();
     });
@@ -118,39 +173,38 @@ pub fn keys_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
             let rounds = key.generate_mnemonic_state.num_rounds.parse::<u32>()
                 .unwrap_or(0) as usize;
             let mnemonic = mnemonic_builder::from_str_rounds(&*string.clone(), rounds).to_string();
-            key.mnemonic_window_state.mnemonic_window_value = mnemonic.to_string();
-            key.mnemonic_window_state.mnemonic_window_open = true;
-            key.mnemonic_window_state.mnemonic_window_label =
-                "Generated from password".to_string();
+            key.mnemonic_window_state.set_words(mnemonic.to_string(), "Generated from password");
         }
         // This is the original function used, need a switch around this to different ones.
     };
 
-    let mnem = key.mnemonic_window_state.mnemonic_window_value.clone();
+    let mnem = key.mnemonic_window_state.words.clone();
     mnemonic_window(
-        ctx,
-        &mnem,
-        &mut key.mnemonic_window_state.mnemonic_window_open,
-        &key.mnemonic_window_state.mnemonic_window_label,
+        ctx, &mut key.mnemonic_window_state
     );
 
 
 }
 
-fn mnemonic_window<S: Into<String>>(
-    ctx: &Context, display_words: &String, open: &mut bool, label: S
+fn mnemonic_window(
+    ctx: &Context, state: &mut MnemonicWindowState
 ) {
+
+    if state.requires_reset {
+        state.set_words_from_passphrase();
+        state.requires_reset = false;
+    }
     egui::Window::new("Mnemonic")
-        .open(open)
+        .open(&mut state.open)
         .resizable(false)
         .collapsible(false)
         .min_width(500.0)
         .default_width(500.0)
         .show(ctx, |ui| {
             ui.vertical(|ui| {
-                ui.label(label.into());
+                ui.label(state.label.clone());
                 // ui.add(Separator::default().spacing(400f32));
-                let mut string = display_words.clone();
+                let mut string = state.words.clone();
                 let split = string.split(" ")
                     .enumerate()
                     .map(|(i, s)| format!("{:?}: {}", i + 1, s))
@@ -159,6 +213,41 @@ fn mnemonic_window<S: Into<String>>(
                     .collect_vec()
                     .clone();
                 text_table(ui, split);
+                ui.vertical(|ui| {
+                    medium_data_item(ui, "Redgold m/44'/0'/50'/0/0' Address", state.redgold_hardware_default_address.clone());
+                    medium_data_item(ui, "Redgold m/84'/16180'/0'/0/0 Address", state.redgold_node_address.clone());
+                    medium_data_item(ui, "Bitcoin m/44'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_44.clone());
+                    medium_data_item(ui, "Bitcoin m/84'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_84.clone());
+                    medium_data_item(ui, "Ethereum m/44'/60'/0'/0/0 Address", state.ethereum_address_44.clone());
+                    medium_data_item(ui, "Ethereum m/84'/60'/0'/0/0 Address", state.ethereum_address_84.clone());
+                    ui.horizontal(|ui| {
+                        medium_data_item(ui, "Words Checksum", state.words_checksum.clone());
+                        if let Some(c) = &state.seed_checksum {
+                            medium_data_item(ui, "Seed Checksum", c.clone());
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Passphrase Input");
+                        TextEdit::singleline(&mut state.passphrase_input)
+                            .desired_width(150f32)
+                            .password(state.passphrase_input_show)
+                            .lock_focus(false)
+                            .ui(ui);
+                        if ui.small_button("Show").on_hover_text("Show password").clicked() {
+                            state.passphrase_input_show = !state.passphrase_input_show;
+                        };
+                        if ui.button("Update").clicked() {
+                            let string = state.passphrase_input.clone();
+                            if string.is_empty() {
+                                state.passphrase = None;
+                            } else {
+                                state.passphrase = Some(string);
+                            }
+                            state.requires_reset = true;
+                        }
+                    })
+
+                });
                 // ui.add(Separator::default().spacing(400f32));
                 let edit = TextEdit::multiline(&mut string)
                     .desired_width(400f32);
