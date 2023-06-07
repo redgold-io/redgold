@@ -50,6 +50,7 @@ use crate::schema::TestConstants;
 use crate::util::trace_setup::init_tracing;
 use tokio::task::spawn_blocking;
 use tracing::Span;
+use crate::observability::dynamic_prometheus::update_prometheus_configs;
 
 #[derive(Clone)]
 pub struct Node {
@@ -149,6 +150,7 @@ impl Node {
             join_handles.push(cwh);
         }
 
+        join_handles.push(update_prometheus_configs(relay.clone()).await);
 
         join_handles
     }

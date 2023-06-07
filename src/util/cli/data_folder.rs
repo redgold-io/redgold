@@ -19,8 +19,17 @@ impl EnvDataFolder {
     pub fn mnemonic_path(&self) -> PathBuf {
         self.path.join("mnemonic")
     }
+
     pub fn peer_id_path(&self) -> PathBuf {
         self.path.join("peer_id")
+    }
+
+    pub fn metrics_list(&self) -> PathBuf {
+        self.path.join("metrics_list")
+    }
+
+    pub fn targets(&self) -> PathBuf {
+        self.path.join("targets.json")
     }
 
     pub fn servers_path(&self) -> PathBuf {
