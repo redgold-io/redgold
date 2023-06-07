@@ -17,7 +17,6 @@ use std::sync::Arc;
 use bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
-use multihash::Code::Sha3_256;
 use tokio::runtime::Runtime;
 use redgold_schema::{ErrorInfoContext, from_hex, SafeOption};
 use redgold_schema::servers::Server;
