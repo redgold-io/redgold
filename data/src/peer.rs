@@ -1,9 +1,9 @@
 use std::time::Duration;
-use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, PeerData, PeerNodeInfo, PublicKey, Transaction};
+use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, NodeMetadata, PeerData, PeerNodeInfo, PublicKey, Transaction};
 use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
-
+use itertools::Itertools;
 #[derive(Clone)]
 pub struct PeerStore {
     pub ctx: DataStoreContext
@@ -271,6 +271,46 @@ impl PeerStore {
         }
         Ok(res)
     }
+
+
+    pub async fn active_peer_node_info(
+        &self,
+        delay: Option<Duration>
+    ) -> Result<Vec<PeerNodeInfo>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+        let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
+        let delay = delay.as_millis() as i64;
+        let cutoff = util::current_time_millis() - delay;
+
+        let rows = sqlx::query!(
+            r#"SELECT peer_node_info FROM peer_key WHERE last_seen > ?1"#,
+            cutoff
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let deser = PeerNodeInfo::proto_deserialize(row.peer_node_info.safe_get_msg("Missing peer node info in database")?.clone())?;
+            res.push(deser);
+        }
+        Ok(res)
+    }
+
+    pub async fn active_node_metadata(
+        &self,
+        delay: Option<Duration>
+    ) -> Result<Vec<NodeMetadata>, ErrorInfo> {
+        let res = self.active_peer_node_info(delay).await?
+            .iter()
+            .filter_map(|pni|
+                            pni.latest_node_transaction.as_ref()
+                                .and_then(|tx| tx.node_metadata().ok())
+            ).collect_vec();
+        Ok(res)
+    }
+
+
     //
     // pub async fn peers_by_utxo_distance(
     //     &self,

@@ -111,6 +111,7 @@ message NodeMetadata {
   optional string name = 10;
   PeerId peer_id = 11;
   optional bool nat_restricted = 12;
+  NetworkEnvironment network_environment = 13;
 }
 /**
 Used to store the version of the executable and the commit hash of the source code used to build it.

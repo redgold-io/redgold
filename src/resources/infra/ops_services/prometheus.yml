@@ -8,23 +8,52 @@ global:
 
 # A scrape configuration containing exactly one endpoint to scrape:
 # Here it's Prometheus itself.
+#scrape_configs:
+#  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+#  - job_name: 'prometheus'
+#    static_configs:
+#      - targets: ['localhost:9090']
+#  - job_name: 'node'
+#    static_configs:
+#      - targets: ['localhost:9100']
+#  - job_name: 'redgold-dev'
+#    static_configs:
+#      - targets: ['localhost:16479']
+#  - job_name: 'redgold-test'
+#    static_configs:
+#      - targets: ['localhost:16279']
+#  - job_name: 'redgold-main'
+#    static_configs:
+#      - targets: ['localhost:16179']
+#  - job_name: 'redgold-predev'
+#    static_configs:
+#      - targets: ['localhost:16579']
 scrape_configs:
-  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
   - job_name: 'node'
     static_configs:
       - targets: ['localhost:9100']
-  - job_name: 'redgold-dev'
-    static_configs:
-      - targets: ['localhost:16479']
-  - job_name: 'redgold-test'
-    static_configs:
-      - targets: ['localhost:16279']
-  - job_name: 'redgold-main'
+  - job_name: 'redgold'
     static_configs:
       - targets: ['localhost:16179']
-  - job_name: 'redgold-predev'
-    static_configs:
+        labels:
+          environment: 'main'
+      - targets: ['localhost:16279']
+        labels:
+          environment: 'test'
+      - targets: ['localhost:16379']
+        labels:
+          environment: 'staging'
+      - targets: ['localhost:16479']
+        labels:
+          environment: 'dev'
       - targets: ['localhost:16579']
+        labels:
+          environment: 'predev'
+  - job_name: 'dynamic'
+    scrape_interval: 1m
+    file_sd_configs:
+      - files:
+          - targets.json

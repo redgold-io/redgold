@@ -125,6 +125,8 @@ impl NodeConfig {
             name: None,
             peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
             nat_restricted: None,
+            // network_environment: self.network as i32,
+            network_environment: self.network.clone() as i32
         }
     }
 
