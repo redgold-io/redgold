@@ -133,5 +133,7 @@ features = ["serde", "bitcoinconsensus"]
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
-[profile.release]
-debug = true
+# Only enable for debugging performance with heap dumps of remote cluster,
+# Bloats the binary size a lot
+#[profile.release]
+#debug = true
