@@ -205,7 +205,7 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
         IntervalStream::new(interval1)
             .map(|x| Ok(x))
             .try_fold(c, |mut c, _| async {
-                e2e_tick(&mut c).await.map(|_| c).log_error()
+                e2e_tick(&mut c).await.map(|_| c)
         }).await?;
         Ok(())
     }
