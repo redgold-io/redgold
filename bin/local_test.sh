@@ -1,14 +1,26 @@
+#!/bin/bash
 
+# If no argument supplied, set default path and build the binary.
+if [ -z "$1" ]
+then
+    echo "No argument supplied, building the binary."
+    cargo build
+    REDGOLD_BINARY_PATH="./target/debug/redgold"
+else
+    REDGOLD_BINARY_PATH="$1"
+fi
 
-cargo build
+echo "Using binary at path: $REDGOLD_BINARY_PATH"
 
+# Continue with rest of script
 pkill -f redgold
 rm -rf ~/.rg/local_test
 sleep 1
-export REDGOLD_BINARY_PATH="./target/debug/redgold"
+
+export REDGOLD_BINARY_PATH
 export RUST_BACKTRACE=1
 
-export RUST_MIN_STACK=10485760
+export RUST_MIN_STACK=10485760 # 10mb
 
 
 $REDGOLD_BINARY_PATH --network local --debug-id 0 --genesis --disable-e2e node >log0 2>&1 &
