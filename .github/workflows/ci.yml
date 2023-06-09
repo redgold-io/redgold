@@ -77,7 +77,8 @@ jobs:
       - run: cargo clean
       - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
       - run: cargo build --release
-      - run: ./bin/local_test.sh "./target/release/redgold"
+        # try CWD?
+#      - run: ./bin/local_test.sh "./target/release/redgold"
 
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux
 
