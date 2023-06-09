@@ -137,6 +137,10 @@ struct LiveE2E {
     generator: TransactionGenerator,
 }
 
+impl LiveE2E {
+
+}
+
 #[allow(dead_code)]
 pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
     let node_config = relay.node_config.clone();
@@ -201,9 +205,7 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
         IntervalStream::new(interval1)
             .map(|x| Ok(x))
             .try_fold(c, |mut c, _| async {
-                e2e_tick(&mut c).await?;
-                Ok(c)
-
+                e2e_tick(&mut c).await.map(|_| c).log_error()
         }).await?;
         Ok(())
     }
