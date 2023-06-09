@@ -45,7 +45,7 @@ impl Hash {
         Ok(hash)
     }
 
-    pub fn from_string(s: &str) -> Self {
+    pub fn from_string_calculate(s: &str) -> Self {
         Self::digest(s.as_bytes().to_vec())
     }
 
@@ -72,7 +72,7 @@ impl Hash {
 #[test]
 fn hash_rendering() {
 
-    let h = Hash::from_string("test");
+    let h = Hash::from_string_calculate("test");
     println!("hash: {}", h.hex());
     // let mh = constants::HASHER.digest("test".as_bytes());
     // let mhb = hex::encode(mh.to_bytes());
