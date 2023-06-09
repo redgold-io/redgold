@@ -1,4 +1,4 @@
-name: ci
+name: Continuous Integration
 env:
   BUILD_OUTPUT: "./target/release/redgold"
   AWS_EC2_METADATA_DISABLED: true
@@ -74,9 +74,11 @@ jobs:
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
+      - run: cargo clean
       - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
-      - run: ./bin/local_test.sh
       - run: cargo build --release
+      - run: ./bin/local_test.sh "./target/release/redgold"
+
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux
 
       - uses: actions/upload-artifact@v3
