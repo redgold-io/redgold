@@ -126,7 +126,7 @@ impl TransactionSubmitter {
 
     pub async fn with_faucet(&self) -> Result<FaucetResponse, ErrorInfo> {
         let pc = &self.client;
-        let w = MnemonicWords::from_phrase("random").key_at(0);
+        let w = MnemonicWords::from_iterated_phrase("random").key_at(0);
         let a = w.address_typed();
         let vec_a = a.address.safe_bytes()?;
         let res = //self.runtime.block_on(

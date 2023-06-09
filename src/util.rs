@@ -17,6 +17,7 @@ pub mod logging;
 pub mod trace_setup;
 pub mod test_util;
 pub mod address_external;
+pub mod argon_kdf;
 
 use std::io::{Cursor, Write};
 use std::time::{SystemTime, UNIX_EPOCH};

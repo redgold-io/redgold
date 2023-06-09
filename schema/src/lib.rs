@@ -579,8 +579,8 @@ impl TestConstants {
             peer_ids,
             peer_trusts,
             address_1: addr.into(),
-            rhash_1: Hash::from_string("asdf"),
-            rhash_2: Hash::from_string("asdf2"),
+            rhash_1: Hash::from_string_calculate("asdf"),
+            rhash_2: Hash::from_string_calculate("asdf2"),
         };
     }
 }
@@ -886,3 +886,5 @@ impl ShortString for String {
         Ok(x.to_string())
     }
 }
+
+pub type RgResult<T> = Result<T, ErrorInfo>;

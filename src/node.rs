@@ -746,7 +746,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     assert!(res.is_ok());
 
     let party = res.expect("ok");
-    let signing_data = Hash::from_string("hey");
+    let signing_data = Hash::from_string_calculate("hey");
     let vec1 = signing_data.vec();
     let vec = bytes_data(vec1.clone()).expect("");
     let res =

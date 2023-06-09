@@ -17,7 +17,7 @@ use bitcoin_wallet::mnemonic::Mnemonic;
 use hdpath::{Purpose, StandardHDPath};
 
 use crate::constants::REDGOLD_KEY_DERIVATION_PATH;
-use crate::{error_info, ErrorInfoContext, KeyPair};
+use crate::{error_info, ErrorInfoContext, KeyPair, RgResult};
 use crate::structs::{Address, ErrorInfo, Hash};
 use crate::util::mnemonic_builder;
 
@@ -233,7 +233,7 @@ impl MnemonicWords {
         self.keypair(&cursor)
     }
 
-    pub fn from_phrase(s: &str) -> Self {
+    pub fn from_iterated_phrase(s: &str) -> Self {
         let m = mnemonic_builder::from_str(s);
 
         return MnemonicWords {
@@ -284,7 +284,7 @@ impl MnemonicWords {
     }
 
     pub fn test_default() -> Self {
-        return MnemonicWords::from_phrase(STANDARD_TEST_PHRASE);
+        return MnemonicWords::from_iterated_phrase(STANDARD_TEST_PHRASE);
     }
 
     pub fn key(&self, hd_path: &StandardHDPath) -> (SecretKey, PublicKey) {
@@ -313,6 +313,21 @@ impl MnemonicWords {
         let pk = key.private_key.key;
         let pub_key = MnemonicWords::get_public_key(&key);
         return KeyPair::new(&pk, &pub_key);
+    }
+
+    pub fn keypair_from_path_str_checked(&self, hd_path: String) -> RgResult<KeyPair> {
+        let hd_path = StandardHDPath::from_str(&*hd_path)
+            .map_err(|e| error_info("invalid hd path"))?;
+        let key = get_pk(&self.seed.0, &hd_path);
+        let pk = key.private_key.key;
+        let pub_key = MnemonicWords::get_public_key(&key);
+        return Ok(KeyPair::new(&pk, &pub_key));
+    }
+
+    pub fn private_hex(&self, hd_path: String) -> RgResult<String> {
+        let kp = self.keypair_from_path_str_checked(hd_path)?;
+        let res = kp.secret_key.to_string();
+        Ok(res)
     }
 
     pub fn get_public_key(key: &ExtendedPrivKey) -> PublicKey {
