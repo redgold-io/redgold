@@ -26,6 +26,7 @@ use crate::util;
 use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
 use redgold_schema::EasyJson;
+use crate::util::logging::Loggable;
 
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {
@@ -106,7 +107,7 @@ impl PeerOutgoingEventHandler {
             Ok(r) => {
                 // debug!("Send message peer response: {}", json_or(&r));
                 if let Some(response_channel) = &message.response {
-                    response_channel.send_err(r).add("Error sending message back on response channel")?;
+                    response_channel.send_err(r).add("Error sending message back on response channel").log_error().ok();
                 }
             }
             Err(e)=> {
