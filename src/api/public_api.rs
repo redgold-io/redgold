@@ -514,7 +514,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             let relay3 = bin_relay.clone();
             async move {
                 // TODO: Isn't this supposed to go to peerRX event handler?
-                info!{"Warp request from {:?}", address};
+                // info!{"Warp request from {:?}", address};
                 let res: Result<Json, warp::reject::Rejection> = {
                     let response = relay3.receive_message_sync(request, None).await;
                     //PeerRxEventHandler::request_response(relay3, request, )

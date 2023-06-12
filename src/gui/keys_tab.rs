@@ -9,6 +9,7 @@ use crate::gui::tables::text_table;
 use crate::gui::util::valid_label;
 use crate::gui::wallet_tab::{copy_to_clipboard, data_item, medium_data_item};
 use crate::util::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::{generate_mnemonic, generate_random_mnemonic};
 use crate::util::keys::ToPublicKeyFromLib;
 
@@ -112,7 +113,8 @@ pub struct GenerateMnemonicState {
     p_cost_input: String,
     m_cost: Option<u32>,
     p_cost: Option<u32>,
-    t_cost: Option<u32>
+    t_cost: Option<u32>,
+    pub t_cost_input: String,
 }
 
 impl GenerateMnemonicState {
@@ -168,11 +170,12 @@ impl KeygenState {
                 key_derivation: KeyDerivation::Argon2d,
                 rounds_type: Rounds::TenK,
                 salt_words: "".to_string(),
-                m_cost_input: "20000".to_string(),
+                m_cost_input: "65536".to_string(),
                 p_cost_input: "2".to_string(),
-                m_cost: Some(20000),
+                t_cost_input: "10".to_string(),
+                m_cost: Some(65536),
                 p_cost: Some(2),
-                t_cost: Some(10000),
+                t_cost: Some(10),
             },
         }
     }
@@ -264,13 +267,16 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
 
     });
     ui.horizontal(|ui| {
-        ui.label("Salt Words");
-        valid_label(ui, Mnemonic::from_str(&key.generate_mnemonic_state.salt_words).is_ok());
+        ui.vertical(|ui| {
+            ui.label("Salt Words");
+            valid_label(ui, Mnemonic::from_str(&key.generate_mnemonic_state.salt_words).is_ok());
+        });
+        TextEdit::multiline(&mut key.generate_mnemonic_state.salt_words)
+            .desired_width(500f32)
+            .desired_rows(2)
+            .show(ui);
     });
-    TextEdit::multiline(&mut key.generate_mnemonic_state.salt_words)
-        .desired_width(500f32)
-        .desired_rows(2)
-        .show(ui);
+
     // TODO: Only validate on update.
 
     if key.generate_mnemonic_state.toggle_concat_password {
@@ -302,7 +308,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                 TextEdit::multiline(&mut key.generate_mnemonic_state.modular_passwords[i as usize])
                     .password(!key.generate_mnemonic_state.show_password)
                     .lock_focus(false)
-                    .desired_width(300f32)
+                    .desired_width(450f32)
                     .desired_rows(1)
                     .show(ui);
             });
@@ -364,66 +370,95 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                 ui.selectable_value(radio, KeyDerivation::Argon2d, "Argon2d");
             });
 
+        if key.generate_mnemonic_state.key_derivation == KeyDerivation::DoubleSha256 {
+            ui.horizontal(|ui| {
+                ui.label("Number of rounds");
+                let radio = &mut key.generate_mnemonic_state.rounds_type;
+                ui.radio_value(radio, Rounds::TenK, "10k");
+                ui.radio_value(radio, Rounds::OneM, "1m");
+                ui.radio_value(radio, Rounds::TenM, "10m");
+                ui.radio_value(radio, Rounds::Custom, "Custom");
+                match radio {
+                    Rounds::TenK => {
+                        key.generate_mnemonic_state.num_rounds = "10000".to_string();
+                    }
+                    Rounds::OneM => {
+                        key.generate_mnemonic_state.num_rounds = "1000000".to_string();
+                    }
+                    Rounds::TenM => {
+                        key.generate_mnemonic_state.num_rounds = "10000000".to_string();
+                    }
+                    Rounds::Custom => {
+                        ui.add(TextEdit::singleline(&mut key.generate_mnemonic_state.num_rounds)
+                            .desired_width(80f32)
+                        );
+                        let num_rounds = key.generate_mnemonic_state.num_rounds.parse::<u32>();
+                        valid_label(ui, num_rounds.is_ok());
+                    }
+                }
+            });
+        }
 
-        ui.horizontal(|ui| {
-            ui.label("Number of rounds");
-            let radio = &mut key.generate_mnemonic_state.rounds_type;
-            ui.radio_value(radio, Rounds::TenK, "10k");
-            ui.radio_value(radio, Rounds::OneM, "1m");
-            ui.radio_value(radio, Rounds::TenM, "10m");
-            ui.radio_value(radio, Rounds::Custom, "Custom");
-            match radio {
-                Rounds::TenK => {
-                    key.generate_mnemonic_state.num_rounds = "10000".to_string();
-                }
-                Rounds::OneM => {
-                    key.generate_mnemonic_state.num_rounds = "1000000".to_string();
-                }
-                Rounds::TenM => {
-                    key.generate_mnemonic_state.num_rounds = "10000000".to_string();
-                }
-                Rounds::Custom => {
-                    ui.add(TextEdit::singleline(&mut key.generate_mnemonic_state.num_rounds)
-                        .desired_width(80f32)
-                    );
-                    let num_rounds = key.generate_mnemonic_state.num_rounds.parse::<u32>();
-                    valid_label(ui, num_rounds.is_ok());
-                }
-            }
-        });
+        if key.generate_mnemonic_state.key_derivation == KeyDerivation::Argon2d {
+            // TODO: Validators
+            ui.horizontal(|ui| {
+                ui.label("Memory KiB");
+                TextEdit::singleline(&mut key.generate_mnemonic_state.m_cost_input)
+                    .desired_width(100f32)
+                    .show(ui);
+                ui.label("Threads");
+                TextEdit::singleline(&mut key.generate_mnemonic_state.p_cost_input)
+                    .desired_width(100f32)
+                    .show(ui);
+                ui.label("Iterations");
+                TextEdit::singleline(&mut key.generate_mnemonic_state.t_cost_input)
+                    .desired_width(100f32)
+                    .show(ui);
+
+                key.generate_mnemonic_state.m_cost = key.generate_mnemonic_state.m_cost_input.parse::<u32>().ok();
+                key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.p_cost_input.parse::<u32>().ok();
+                key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.t_cost_input.parse::<u32>().ok();
+            });
+        }
+
 
         // .desired_width(100f32);
         // TODO: Validation
     });
-
-    if key.generate_mnemonic_state.key_derivation == KeyDerivation::Argon2d {
-        // TODO: Validators
-        ui.horizontal(|ui| {
-            ui.label("Memory Cost:");
-            TextEdit::singleline(&mut key.generate_mnemonic_state.m_cost_input)
-                .desired_width(100f32)
-                .show(ui);
-            ui.label("Parallelism:");
-            TextEdit::singleline(&mut key.generate_mnemonic_state.p_cost_input)
-                .desired_width(100f32)
-                .show(ui);
-            key.generate_mnemonic_state.m_cost = key.generate_mnemonic_state.m_cost_input.parse::<u32>().ok();
-            key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.p_cost_input.parse::<u32>().ok();
-        });
-    }
 
     if ui.button("Generate Password Mnemonic").clicked() {
         let string = key.generate_mnemonic_state.password_input.clone();
         // TODO validate on password length
         // TODO: Hover text on valid button showing reason?
         if !string.is_empty() {
-            if let Some(rounds) = key.generate_mnemonic_state.num_rounds.parse::<u32>().ok() {
-                let mnemonic = mnemonic_builder::from_str_rounds(
-                    &*string.clone(),
-                                                                 rounds as usize
-                ).to_string();
-                key.mnemonic_window_state.set_words(mnemonic.to_string(), "Generated from password");
+            match key.generate_mnemonic_state.key_derivation {
+                KeyDerivation::DoubleSha256 => {
+                    if let Some(rounds) = key.generate_mnemonic_state.num_rounds.parse::<u32>().ok() {
+                        let mnemonic = mnemonic_builder::from_str_rounds(
+                            &*string.clone(),
+                            rounds as usize
+                        ).to_string();
+                        key.mnemonic_window_state.set_words(mnemonic.to_string(), "Generated from password");
+                    }
+                }
+                KeyDerivation::Argon2d => {
+                    if let (Some(m_cost), Some(p_cost), Some(t_cost), Some(m)) = (
+                        key.generate_mnemonic_state.m_cost,
+                        key.generate_mnemonic_state.p_cost,
+                        key.generate_mnemonic_state.t_cost,
+                        Mnemonic::from_str(&*key.generate_mnemonic_state.salt_words).ok()
+                    ) {
+                        let salt = m.to_seed(None).0;
+                        let result = argon2d_hash(salt, string.as_bytes().to_vec(), m_cost, t_cost, p_cost);
+                        if let Some(r) = result.ok() {
+                            if let Some(w) = Mnemonic::new(&*r).ok() {
+                                key.mnemonic_window_state.set_words(w.to_string(), "Generated from password Argon2d");
+                            }
+                        }
+                    }
+                }
             }
+
         }
         // This is the original function used, need a switch around this to different ones.
     };

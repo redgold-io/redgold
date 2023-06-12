@@ -64,6 +64,8 @@ cleanup() {
 
 trap cleanup EXIT
 
+sleep 10
+
 cargo test local_e2e_it -- --nocapture || { echo 'First test failed, aborting.'; exit 1; }
 export TEST_EXIT_CODE=$?
 

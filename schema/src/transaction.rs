@@ -2,7 +2,7 @@
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info};
+use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info, RgResult};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
@@ -69,6 +69,14 @@ pub struct AddressBalance {
 }
 
 impl Transaction {
+
+    pub fn validate(&self) -> RgResult<()> {
+        self.prevalidate()?;
+        for i in &self.inputs {
+            i.verify(&self.signable_hash())?;
+        }
+        Ok(())
+    }
 
     pub fn with_signable_hash(&mut self) -> Result<&mut Self, ErrorInfo> {
         self.struct_metadata()?.signable_hash = Some(self.signable_hash());

@@ -37,6 +37,11 @@ impl structs::PublicKey {
         let b = self.bytes.safe_bytes()?;
         Ok(hex::encode(b))
     }
+
+    pub fn hex_or(&self) -> String {
+        self.hex().unwrap_or("hex error".to_string())
+    }
+
     pub fn bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
         self.bytes.safe_bytes()
     }

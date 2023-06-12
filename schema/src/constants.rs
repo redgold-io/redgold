@@ -3,8 +3,8 @@
 pub const REDGOLD_KEY_DERIVATION_PATH: i64 = 16180;
 pub const DECIMAL_MULTIPLIER: i64 = 1e8 as i64;
 pub const DECIMALS: i64 = 8;
-pub const MAX_COIN_SUPPLY: i64 = 1e8 as i64;
-pub const REWARD_CYCLES: i64 = 1000;
+pub const MAX_COIN_SUPPLY: i64 = 1e7 as i64;
+pub const REWARD_CYCLES: i64 = 100;
 pub const REWARD_AMOUNT: i64 = 1e5 as i64;
 pub const REWARD_AMOUNT_RAW: i64 = REWARD_AMOUNT * DECIMAL_MULTIPLIER;
 

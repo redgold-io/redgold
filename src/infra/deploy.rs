@@ -194,10 +194,13 @@ async fn test_setup_server() {
     let s = ArgTranslate::read_servers_file(buf).expect("servers");
     println!("Setting up servers: {:?}", s);
     let mut gen = true;
+    let mut hm = HashMap::new();
+    hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
     for ss in s {
+        let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host, None);
-        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, None, true).expect("worx");
+        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), true).expect("worx");
         gen = false
     }
     // df.all().data_store().config_store

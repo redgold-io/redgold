@@ -14,6 +14,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
@@ -133,10 +134,17 @@ impl ArgTranslate {
 
         self.e2e_enable();
         self.configure_seeds();
+        self.set_discovery_interval();
 
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
 
         Ok(())
+    }
+
+    fn set_discovery_interval(&mut self) {
+        if !self.node_config.is_local_debug() {
+            self.node_config.discovery_interval = Duration::from_secs(60)
+        }
     }
 
     fn guard_faucet(&mut self) {

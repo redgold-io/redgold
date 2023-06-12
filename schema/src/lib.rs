@@ -473,7 +473,7 @@ pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
-    let stack = slice_vec_eager(stacktrace_abridged, 14, 30).join("\n").to_string();
+    let stack = slice_vec_eager(stacktrace_abridged, 0, 50).join("\n").to_string();
 
     let details = get_task_local().iter().map(|(k, v)| {
         ErrorDetails {

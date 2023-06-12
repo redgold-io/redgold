@@ -15,4 +15,15 @@ impl NodeMetadata {
         Ok(y)
     }
 
+    pub fn long_identifier(&self) -> String {
+        let pk = self.public_key.clone().and_then(|p| p.hex().ok()).unwrap_or("".to_string());
+        let ip = self.external_address.clone();
+        let environment = NetworkEnvironment::from_i32(self.network_environment).unwrap_or(NetworkEnvironment::Debug);
+        format!("alias {} public key {} ip {}:{} network: {}",
+                self.alias.clone().unwrap_or("none".to_string()), pk, ip,
+                self.port_or(environment),
+                (environment).to_std_string()
+        )
+    }
+
 }

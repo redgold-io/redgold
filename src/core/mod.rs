@@ -14,3 +14,5 @@ pub mod run_main;
 pub mod status;
 pub mod seeds;
 pub mod transact;
+pub mod discovery;
+pub mod stream_handlers;
