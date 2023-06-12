@@ -55,7 +55,7 @@ impl PeerStore {
 
         let vec = public.validate()?.bytes()?;
 
-        info!("Querying public key node: {}", public.hex()?);
+        // info!("Querying public key node: {}", public.hex()?);
 
         let rows = sqlx::query!(
             r#"SELECT peer_node_info FROM peer_key WHERE public_key = ?1"#,
@@ -64,7 +64,7 @@ impl PeerStore {
             .fetch_optional(&mut pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        info!("Rows_m is some: {}", rows_m.is_some());
+        // info!("Rows_m is some: {}", rows_m.is_some());
 
         if let Some(rows) = rows_m {
             let pni = rows.peer_node_info.safe_get_msg("Missing peer node info in database")?.clone();
@@ -171,8 +171,8 @@ impl PeerStore {
         let pid = nmd.peer_id.safe_get()?.peer_id.safe_bytes()?;
         let ser_nmd = nmd.proto_serialize();
         let pni = pi.proto_serialize();
-        info!("insert_node_key pk_bytes {:?}", public_key.hex().expect("h"));
-        info!("insert_node_key peernodeinfo {:?}", pi.json_or());
+        // info!("insert_node_key pk_bytes {:?}", public_key.hex().expect("h"));
+        // info!("insert_node_key peernodeinfo {:?}", pi.json_or());
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata, peer_node_info) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
             pk_bytes,
@@ -192,7 +192,7 @@ impl PeerStore {
 
     pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, trust: f64) -> Result<(), ErrorInfo> {
         // return Err(ErrorInfo::error_info("debug error return"));
-        tracing::info!("add_peer_new");
+        // tracing::info!("add_peer_new");
         self.insert_peer(
             peer_info
                 .latest_peer_transaction

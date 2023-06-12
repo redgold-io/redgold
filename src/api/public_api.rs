@@ -368,7 +368,7 @@ pub async fn as_warp_proto_bytes<T: ProtoSerde>(response: Result<T, ErrorInfo>) 
 pub async fn handle_proto_post(reqb: Bytes, address: Option<SocketAddr>, relay: Relay) -> Result<RResponse, ErrorInfo> {
     let vec_b = reqb.to_vec();
     let request = Request::proto_deserialize(vec_b)?;
-    info!{"Warp request from {:?}", address};
+    // info!{"Warp request from {:?}", address};
     // TODO: increment metric?
     let c = new_channel::<RResponse>();
     let mut msg = PeerMessage::empty();

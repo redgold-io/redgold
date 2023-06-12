@@ -39,7 +39,7 @@ impl PeerOutgoingEventHandler {
     async fn send_peer_message(relay: Relay, message: PeerMessage) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.peer.send");
         let ser_msgp = json_or(&message.request.clone());
-        tracing::info!("PeerOutgoingEventHandler send message {}", ser_msgp);
+        // tracing::info!("PeerOutgoingEventHandler send message {}", ser_msgp);
         if let Some(pk) = &message.public_key {
             let res = relay.ds.peer_store.query_public_key_node(pk.clone()).await?
                 .and_then(|pd| pd.latest_node_transaction)
@@ -104,7 +104,7 @@ impl PeerOutgoingEventHandler {
         ).await;
         match res {
             Ok(r) => {
-                debug!("Send message peer response: {}", json_or(&r));
+                // debug!("Send message peer response: {}", json_or(&r));
                 if let Some(response_channel) = &message.response {
                     response_channel.send_err(r).add("Error sending message back on response channel")?;
                 }

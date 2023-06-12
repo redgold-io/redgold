@@ -56,17 +56,22 @@ impl IntervalFold for Discovery {
         }
 
         debug!("Discovery found {} total peers", results.len());
+        let mut new_peers_count = 0;
         for r in &results {
             if let Some(pk) = r.latest_node_transaction.clone()
                 .and_then(|t| t.node_metadata().ok())
                 .and_then(|t| t.public_key){
                 if pk != self.relay.node_config.public_key() {
-                    debug!("Discovery invoking database add for new peer {}", pk.hex().expect("hex"));
-                    // TODO: we need to validate this peerNodeInfo first BEFORE adding it to peer store
-                    // For now just dropping errors to log
-                    // TODO: Query trust for this peerId first, before updating trust score.
-                    // Security thing here needs to be fixed later.
-                    self.relay.ds.peer_store.add_peer_new(r, 1f64).await.log_error().ok();
+
+                    let known = self.relay.ds.peer_store.query_public_key_node(pk.clone()).await?.is_some();
+                    if !known {
+                        debug!("Discovery invoking database add for new peer {}", pk.hex().expect("hex"));
+                        // TODO: we need to validate this peerNodeInfo first BEFORE adding it to peer store
+                        // For now just dropping errors to log
+                        // TODO: Query trust for this peerId first, before updating trust score.
+                        // Security thing here needs to be fixed later.
+                        self.relay.ds.peer_store.add_peer_new(r, 1f64).await.log_error().ok();
+                    }
                 }
             } else {
                 error!("Discovery found peer with no public key: {}", r.json_or())
@@ -75,39 +80,6 @@ impl IntervalFold for Discovery {
         Ok(())
     }
 }
-/*
-
-    pub async fn get_new_peers(relay: Relay, pk: &PublicKey) -> Result<(), ErrorInfo> {
-        let mut req = Request::default();
-        req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-
-        let res = relay.send_message_sync(req, pk.clone(), Some(Duration::from_secs(10))).await?;
-        res.as_error_info()?;
-        let p = res.get_peers_info_response.safe_get()?;
-        for p in &p.peer_info {
-            if let Some(pk) = p.clone().latest_node_transaction.
-                and_then(|x| x.node_metadata().ok()).and_then(|x| x.public_key) {
-                if pk == relay.node_config.public_key() {
-                    continue;
-                }
-                let res = relay.ds.peer_store.query_public_key_node(pk).await?;
-                if res.is_some() {
-                    continue;
-                } else {
-                    relay.ds.peer_store.add_peer_new(&p, 0f64).await?;
-                    // Honestly do we even need this? Maybe this should just be responsibility of
-                    // nodes via polling if they see something they don't recognize?
-                    // relay.gossip(p.latest_node_transaction.safe_get_msg(
-                    //     "Missing latest node transaction on get new peers attempt for gossiping info about new peer"
-                    // )?).await?;
-                    //
-                }
-            }
-
-        }
-        Ok(())
-    }
- */
 
 #[derive(Clone)]
 pub struct DiscoveryMessage {

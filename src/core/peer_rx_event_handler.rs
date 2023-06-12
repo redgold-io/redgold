@@ -72,7 +72,7 @@ impl PeerRxEventHandler {
 
         // Handle the request
 
-        tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
+        // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
         let mut response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine();
         response.with_metadata(relay.node_config.node_metadata());
@@ -80,7 +80,7 @@ impl PeerRxEventHandler {
         if let Some(c) = pm.response {
             let ser = response.clone().json_or();
             let peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
-            debug!("Sending response to peer {} contents {}", peer, ser);
+            // debug!("Sending response to peer {} contents {}", peer, ser);
             c.send_err(response).add("Send message to response channel failed in handle incoming message")?;
         }
 
