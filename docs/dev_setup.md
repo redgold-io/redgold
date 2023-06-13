@@ -56,6 +56,17 @@ otherwise pkill -f .vscode-server
 
 # Mac
 
+For WASM compilation errors on M1 Mac, try this:
+
+```shell
+softwareupdate --install-rosetta
+export MACOSX_DEPLOYMENT_TARGET=10.7
+```
+
+https://github.com/rust-bitcoin/rust-secp256k1/issues/283
+
+https://github.com/rustwasm/wasm-pack/issues/952
+
 
 If you get an error with -lgmp during build, make sure to add the following to your .profile or .zshrc
 (This is a requirement from the multiparty threshold ECDSA library)
@@ -161,3 +172,15 @@ Or in ~/.gitconfig (full settings with GPG)
 ```
 
 Cargo publishing: https://crates.io/settings/tokens
+
+# Errors:
+
+Make sure you're on most recent rustc version. If you get an error like this:
+
+```
+error: package `wasmtime v8.0.1` cannot be built because it requires rustc 1.66.0 or newer, while the currently active rustc version is 1.65.0
+```
+
+Update rustc with
+
+`rustup update`

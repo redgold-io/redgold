@@ -136,7 +136,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
         .sign(&kp)?;
 
     let response = client.send_transaction(&b, false).await?;
-    let tx_hex = response.transaction_hash.expect("hash").hex();
+    let tx_hex = response.transaction_hash.safe_get()?.hex();
     println!("{}", tx_hex);
     Ok(())
 }

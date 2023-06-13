@@ -21,15 +21,14 @@ members = [
     "core",
     "data",
     "schema",
-    "sdk",
-#    "runtime"
+#    "sdk",
+    "executor"
 ]
-exclude = ["examples/rust_wasm"]
+exclude = ["examples/rust_wasm", "sdk", "sdk/*"]
 
 [dependencies]
 redgold-schema = { path = "schema"}
-#redgold-runtime = { path = "runtime"}
-#ethereum = "0.14.0
+redgold-executor = { path = "executor"}
 tempfile = "3.3.0"
 #web3 = { version = "0.18.0", default-features = false, features = ["http-rustls-tls"] }
 sha3 = "0.10.8"
