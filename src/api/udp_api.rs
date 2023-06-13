@@ -254,10 +254,7 @@ impl UdpServer {
         let req = Request::proto_deserialize(data)?;
         let node_pk = req.verify_auth()?;
         let mut pm = PeerMessage::empty();
-        let pkb = node_pk.bytes.safe_bytes()?;
-        let pkk = public_key_from_bytes(&pkb)
-            .error_info("Failed to create public key from bytes")?;
-        pm.public_key = Some(pkk);
+        pm.public_key = Some(node_pk.clone());
         pm.socket_addr = Some(addr);
         pm.request = req;
         self.relay.peer_message_rx.sender.send_err(pm)?;

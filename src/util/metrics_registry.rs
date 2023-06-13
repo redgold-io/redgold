@@ -7,16 +7,7 @@
 //! which are documented in detail for the respective macro.
 
 use log::info;
-use metrics::{
-    //absolute_counter, counter, decrement_gauge,
-    describe_counter,
-    describe_gauge,
-    //describe_histogram, gauge, histogram, increment_counter, increment_gauge,
-    register_counter,
-    register_gauge,
-    //register_gauge, register_histogram,
-    KeyName,
-};
+use metrics::{describe_counter, describe_gauge, register_counter, register_gauge, KeyName, increment_counter};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::Arc;
@@ -59,6 +50,10 @@ pub fn register_metric_names() {
     register_counter!("redgold.e2e.failure");
     register_counter!("redgold.e2e.success");
     register_counter!("redgold.peer.message.received");
+    increment_counter!("redgold.peer.rest.send.error");
+    increment_counter!("redgold.peer.rest.send");
+    increment_counter!("redgold.peer.send");
+    increment_counter!("redgold.peer.discovery.recv_for_each");
 
     // register_gauge!("redgold.libp2p.active_connections");
     // register_counter!("redgold.libp2p.total_established_connections");

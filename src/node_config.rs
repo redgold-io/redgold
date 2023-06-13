@@ -81,6 +81,7 @@ pub struct NodeConfig {
     pub data_folder: DataFolder,
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
+    pub discovery_interval: Duration,
 }
 
 impl NodeConfig {
@@ -289,6 +290,7 @@ impl NodeConfig {
             data_folder: DataFolder::target(0),
             secure_data_folder: None,
             enable_logging: true,
+            discovery_interval: Duration::from_secs(5),
         }
     }
 

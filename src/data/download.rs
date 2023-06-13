@@ -11,7 +11,7 @@ use bitcoin::secp256k1::PublicKey;
 use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
-use redgold_schema::SafeOption;
+use redgold_schema::{SafeOption, structs};
 use redgold_schema::structs::ErrorInfo;
 use redgold_schema::EasyJson;
 
@@ -28,7 +28,7 @@ pub async fn download_msg(
     start_time: i64,
     end_time: i64,
     data_type: DownloadDataType,
-    key: PublicKey,
+    key: structs::PublicKey,
 ) -> Result<Response, ErrorInfo> {
 
     // let key_hex = hex::encode(key.serialize().to_vec());
@@ -64,7 +64,7 @@ pub async fn download_all(
     relay: &Relay,
     start_time: i64,
     end_time: i64,
-    key: PublicKey,
+    key: structs::PublicKey,
     clean_up_utxo: bool,
 ) -> Result<(), ErrorInfo> {
     let rr = download_msg(
@@ -72,7 +72,7 @@ pub async fn download_all(
         start_time,
         end_time,
         DownloadDataType::UtxoEntry,
-        key,
+        key.clone(),
     ).await;
 
     let vec = rr.unwrap().download_response.unwrap().utxo_entries;
@@ -86,7 +86,7 @@ pub async fn download_all(
         start_time,
         end_time,
         DownloadDataType::TransactionEntry,
-        key,
+        key.clone(),
     ).await?;
 
     let dr = r.download_response.safe_get()?;
@@ -113,7 +113,7 @@ pub async fn download_all(
         start_time,
         end_time,
         DownloadDataType::ObservationEntry,
-        key,
+        key.clone(),
     ).await?;
     let dr = r.download_response.safe_get()?;
     info!("Downloaded: {} observation entries", dr.observations.len());
@@ -127,7 +127,7 @@ pub async fn download_all(
         start_time,
         end_time,
         DownloadDataType::ObservationEdgeEntry,
-        key,
+        key.clone(),
     ).await?;
     let dr = r.download_response.safe_get()?;
     for x in &dr.observation_edges {
@@ -140,7 +140,7 @@ pub async fn download_all(
 Actual download process should start with getting the current parquet part file
 snapshot through IPFS for all the different data types. The compacted format.
 */
-pub async fn download(relay: Relay, key: PublicKey) {
+pub async fn download(relay: Relay, key: structs::PublicKey) {
     // remove genesis entry if it exists.
     // for (x, y) in create_genesis_transaction().iter_utxo_outputs() {
     //     // let err = DataStore::map_err(relay.ds.clone().delete_utxo(&x, y as u32));

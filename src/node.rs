@@ -23,7 +23,7 @@ use crate::api::{RgHttpClient, public_api};
 use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
 use crate::e2e::tx_submit::TransactionSubmitter;
-use crate::core::block_formation;
+use crate::core::{block_formation, stream_handlers};
 use crate::core::block_formation::BlockFormationProcess;
 use crate::core::observation::ObservationBuffer;
 use crate::core::peer_event_handler::PeerOutgoingEventHandler;
@@ -50,7 +50,11 @@ use crate::schema::TestConstants;
 use crate::util::trace_setup::init_tracing;
 use tokio::task::spawn_blocking;
 use tracing::Span;
+use crate::core::discovery::{Discovery, DiscoveryMessage};
+use crate::core::internal_message::SendErrorInfo;
+use crate::core::stream_handlers::IntervalFold;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
+use crate::util::logging::Loggable;
 
 #[derive(Clone)]
 pub struct Node {
@@ -62,6 +66,7 @@ impl Node {
     #[tracing::instrument(skip(relay))]
     pub async fn start_services(relay: Relay) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
         Span::current().record("node_id", &relay.node_config.public_key().short_id());
+        tracing::info!("start services tracing node_id test");
         let mut join_handles = vec![];
         let node_config = relay.node_config.clone();
 
@@ -146,11 +151,20 @@ impl Node {
         // join_handles.push(amh);
         let c_config = relay.clone();
         if node_config.e2e_enabled {
+            // TODO: Distinguish errors here
             let cwh = tokio::spawn(e2e::run(c_config));
-            join_handles.push(cwh);
+            // join_handles.push(cwh);
         }
 
         join_handles.push(update_prometheus_configs(relay.clone()).await);
+
+        let discovery = Discovery::new(relay.clone()).await;
+        join_handles.push(stream_handlers::run_interval_fold(
+            discovery.clone(), relay.node_config.discovery_interval, false
+        ).await);
+        join_handles.push(stream_handlers::run_recv(
+            discovery, relay.discovery.receiver.clone(), 100
+        ).await);
 
         join_handles
     }
@@ -278,45 +292,47 @@ impl Node {
             let client = PublicClient::from(seed.external_address.clone(), port);
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
             let response = client.about().await?;
-            let result =
-                // runtimes.auxiliary.block_on(
-                    response.peer_node_info.safe_get()?;
-                // );
+            let result = response.peer_node_info.safe_get()?;
 
             info!("Got LB node info {}, adding peer", result.json_or());
-            // Local debug mode
-            // First attempt to insert all trust scores for seeds and ignore conflict
-            let result2 =
-                    relay.ds.peer_store.add_peer_new(result, 1f64).await;
-                // runtimes.auxiliary.block_on(
-                //     relay.ds.peer_store.add_peer(&peer_tx, 1f64).await; //);
-            info!("Peer add result: {:?}", result2);
-            result2?;
 
+            relay.ds.peer_store.add_peer_new(result, 1f64).await?;
 
             info!("Added peer, attempting download");
-            // relay
-            //     .ds
-            //     .insert_peer_single(
-            //         &seed.peer_id,
-            //         seed.trust,
-            //         &seed.public_key.serialize().to_vec().clone(),
-            //         seed.external_address.clone(),
-            //     )
-            //     .expect("insert peer on download");
-            // todo: send_peer_request_response
-            let metadata = result.latest_node_transaction.safe_get()?.node_metadata()?;
-            let key = metadata.public_key_bytes()?;
 
+            let x = result.latest_node_transaction.safe_get()?;
+            let metadata = x.node_metadata()?;
             let pk1 = metadata.public_key.safe_get()?;
-            PeerRxEventHandler::get_new_peers(relay.clone(), pk1).await?;
 
+            // ensure peer added successfully
+            let key = pk1.clone();
+            let qry_result = relay.ds.peer_store.query_public_key_node(key).await;
+            qry_result.log_error().ok();
+            let opt_info = qry_result.expect("query public key node");
+            let pk_store = opt_info
+                .expect("query public key node")
+                .latest_node_transaction.expect("")
+                .node_metadata().expect("node metadata")
+                .public_key.expect("pk");
+            assert_eq!(&pk_store, pk1);
+
+            // This triggers peer exploration.
+            tracing::info!("Attempting discovery process of peers on startup for node");
+            let mut discovery = Discovery::new(relay.clone()).await;
+            discovery.interval_fold().await?;
+            // This was only immediate discovery of that node and is already covered
+            // // TODO: Remove this in favor of discovery
+            // relay.discovery.sender.send_err(
+            //     DiscoveryMessage::new(metadata.clone(), result.dynamic_node_metadata.clone())
+            // )?;
+
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            info!("Now starting download after discovery has ran.");
 
             // TODO Change this invocation to an .into() in a non-schema key module
-            let pk = keys::public_key_from_bytes(&key).expect("works");
             download::download(
                 relay.clone(),
-                pk
+                pk1.clone()
             ).await;
         }
 
