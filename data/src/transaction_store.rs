@@ -1,7 +1,7 @@
 use sqlx::query::Map;
 use sqlx::{Error, Sqlite};
 use sqlx::sqlite::{SqliteArguments, SqliteRow};
-use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, PeerData, Transaction, UtxoEntry};
+use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, PeerData, Transaction, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -215,6 +215,62 @@ impl TransactionStore {
             }
         }
         Ok(!res.is_empty())
+    }
+
+    pub async fn query_utxo_address(
+        &self,
+        address: &Address
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let bytes = address.address.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT transaction_hash, output_index, address, output, time FROM utxo WHERE address = ?1"#,
+            bytes
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            //Address::from_bytes(
+            let address = row.address.safe_get_msg("Missing Address")?.clone();
+            let transaction_hash = row.transaction_hash.safe_get_msg("Missing transaction hash")?.clone();
+            let output_index = row.output_index.safe_get_msg("Missing output index")?.clone();
+            let time = row.time.safe_get_msg("Missing time")?.clone();
+            let output = Some(
+                Output::proto_deserialize(row.output.safe_get_msg("Missing output")?.clone())?
+            );
+            let entry = UtxoEntry {
+                transaction_hash,
+                output_index,
+                address,
+                output,
+                time,
+            };
+            res.push(entry)
+        }
+        Ok(res)
+    }
+
+    pub async fn delete_utxo(
+        &self,
+        fixed_utxo_id: &FixedUtxoId
+    ) -> Result<u64, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let transaction_hash = fixed_utxo_id.transaction_hash.safe_get()?;
+        let output_index = fixed_utxo_id.output_index.clone();
+        let bytes = transaction_hash.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"DELETE FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.rows_affected())
     }
 
 

@@ -13,7 +13,6 @@ use rocket::http::ext::IntoCollection;
 use tokio::join;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, structs, TestConstants, WithMetadataHashable};
-use crate::e2e::run;
 use crate::genesis::create_genesis_transaction;
 
 #[async_trait]

@@ -99,9 +99,10 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         let utxo = utxos.get(0).safe_get()?.clone().clone();
         let addr = Address::parse(&address_input)?;
         let mut builder = TransactionBuilder::new();
-        let transaction = builder
+        let mut transaction = builder
             .with_utxo(&utxo.utxo_entry)?
             .with_output(&addr, &TransactionAmount::from_fractional(5 as f64)?)
+            .with_message("faucet")?
             .build()?
             .sign(&utxo.key_pair)?;
 

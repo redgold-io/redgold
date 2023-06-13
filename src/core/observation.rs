@@ -202,12 +202,7 @@ impl ObservationBuffer {
         request.gossip_observation_request = Some(GossipObservationRequest {
                 observation: Some(o.clone()),
         });
-        let mut message = PeerMessage::empty();
-        message.request = request;
-        self.relay
-            .peer_message_tx
-            .sender
-            .send_err(message)?;
+        self.relay.gossip_req(&request, &o.hash()).await?;
         increment_counter!("redgold.observation.created");
         gauge!("redgold.observation.height", height as f64);
         gauge!("redgold.observation.last.size", num_observations as f64);

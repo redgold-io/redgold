@@ -95,7 +95,8 @@ pub fn struct_metadata(time: i64) -> Option<StructMetadata> {
         time: Some(time),
         version: VERSION as i32,
         hash: None,
-        sign_hash: None,
+        signable_hash: None,
+        signed_hash: None,
         counter_party_hash: None,
         confirmation_hash: None,
     })
@@ -231,7 +232,7 @@ where
         let mut clone = self.clone();
         clone.hash_clear();
         let input = clone.proto_serialize();
-        Hash::calc_bytes(input)
+        Hash::digest(input)
     }
 }
 
@@ -472,7 +473,7 @@ pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
-    let stack = slice_vec_eager(stacktrace_abridged, 14, 30).join("\n").to_string();
+    let stack = slice_vec_eager(stacktrace_abridged, 0, 50).join("\n").to_string();
 
     let details = get_task_local().iter().map(|(k, v)| {
         ErrorDetails {
@@ -578,8 +579,8 @@ impl TestConstants {
             peer_ids,
             peer_trusts,
             address_1: addr.into(),
-            rhash_1: Hash::from_string("asdf"),
-            rhash_2: Hash::from_string("asdf2"),
+            rhash_1: Hash::from_string_calculate("asdf"),
+            rhash_2: Hash::from_string_calculate("asdf2"),
         };
     }
 }
@@ -858,7 +859,8 @@ impl PeerId {
 impl HashClear for StructMetadata {
     fn hash_clear(&mut self) {
         self.hash = None;
-        self.sign_hash = None;
+        self.signable_hash = None;
+        self.signed_hash = None;
         self.counter_party_hash = None;
         self.confirmation_hash = None;
     }
@@ -884,3 +886,5 @@ impl ShortString for String {
         Ok(x.to_string())
     }
 }
+
+pub type RgResult<T> = Result<T, ErrorInfo>;

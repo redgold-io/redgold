@@ -1,60 +1,565 @@
+use bitcoin_wallet::mnemonic::Mnemonic;
 use eframe::egui;
-use eframe::egui::{TextEdit, Ui};
+use eframe::egui::{Context, ScrollArea, Separator, TextEdit, Ui, Widget};
 use itertools::Itertools;
+use redgold_schema::util::mnemonic_builder;
+use redgold_schema::util::mnemonic_words::MnemonicWords;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
+use crate::gui::util::valid_label;
+use crate::gui::wallet_tab::{copy_to_clipboard, data_item, medium_data_item};
+use crate::util::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::{generate_mnemonic, generate_random_mnemonic};
+use crate::util::keys::ToPublicKeyFromLib;
+
+
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+// #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+enum KeyDerivation {
+    DoubleSha256,
+    Argon2d,
+}
+
+
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+enum Rounds {
+    TenK,
+    OneM,
+    TenM,
+    Custom
+}
+
+
+// TODO: implement a passphrase checksum as well.
+// Recalculate these values on change of passphrase
+#[derive(Clone)]
+pub struct MnemonicWindowState {
+    open: bool,
+    words: String,
+    label: String,
+    bitcoin_p2wpkh_44: String,
+    bitcoin_p2wpkh_84: String,
+    ethereum_address_44: String,
+    ethereum_address_84: String,
+    words_checksum: String,
+    seed_checksum: Option<String>,
+    passphrase: Option<String>,
+    redgold_node_address: String,
+    redgold_hardware_default_address: String,
+    passphrase_input: String,
+    passphrase_input_show: bool,
+    requires_reset: bool,
+    hd_path: String,
+    private_key_hex: String,
+    calc_private_key_hex: bool,
+}
+
+impl MnemonicWindowState {
+    pub fn get_private_key_hex(&self) -> String {
+        self.mnemonic_words().private_hex(self.hd_path.clone()).unwrap_or("err".to_string())
+    }
+}
+
+impl MnemonicWindowState {
+
+    pub fn mnemonic_words(&self) -> MnemonicWords {
+        let w = MnemonicWords::from_mnemonic_words(
+            &*self.words.clone(), self.passphrase.clone()
+        );
+        w
+    }
+
+    pub fn set_words_from_passphrase(&mut self) {
+        let passphrase = self.passphrase.clone();
+        let w = MnemonicWords::from_mnemonic_words(
+            &*self.words.clone(), passphrase.clone()
+        );
+        self.bitcoin_p2wpkh_44 = w.btc_key_44_0().public_key.to_struct_public_key().to_bitcoin_address().unwrap();
+        self.bitcoin_p2wpkh_84 = w.btc_key_84_0().public_key.to_struct_public_key().to_bitcoin_address().unwrap();
+        self.ethereum_address_44 = w.eth_key_44_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
+        self.ethereum_address_84 = w.eth_key_84_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
+        self.words_checksum = w.words_checksum().unwrap();
+        self.seed_checksum = passphrase.and(w.seed_checksum().ok());
+        self.redgold_node_address = w.address().render_string().unwrap();
+        self.redgold_hardware_default_address = w.hardware_default_address().render_string().unwrap();
+    }
+
+    pub fn set_words(&mut self, words: impl Into<String>, label: impl Into<String>) {
+        self.open = true;
+        self.words = words.into();
+        self.label = label.into();
+        self.set_words_from_passphrase();
+    }
+}
+
+pub struct GenerateMnemonicState {
+    random_input_mnemonic: String,
+    random_input_requested: bool,
+    password_input: String,
+    show_password: bool,
+    num_rounds: String,
+    toggle_concat_password: bool,
+    toggle_show_metadata: bool,
+    num_modular_passwords_input: String,
+    num_modular_passwords: u32,
+    modular_passwords: Vec<String>,
+    concat_password: String,
+    metadata_fields: Vec<String>,
+    key_derivation: KeyDerivation,
+    rounds_type: Rounds,
+    salt_words: String,
+    m_cost_input: String,
+    p_cost_input: String,
+    m_cost: Option<u32>,
+    p_cost: Option<u32>,
+    t_cost: Option<u32>,
+    pub t_cost_input: String,
+}
+
+impl GenerateMnemonicState {
+    pub fn compound_passwords(&mut self) {
+        let mod_join = self.modular_passwords.iter().join("");
+        let metadata_join = self.metadata_fields.iter()
+            .map(|s| s.to_uppercase()).join("");
+        self.concat_password = format!("{}{}", mod_join, metadata_join);
+    }
+}
 
 pub struct KeygenState {
-    random_window_open: bool,
-    random_mnemonic: Option<String>
+    mnemonic_window_state: MnemonicWindowState,
+    generate_mnemonic_state: GenerateMnemonicState,
 }
 
 impl KeygenState {
     pub fn new() -> Self {
         Self {
-            random_window_open: false,
-            random_mnemonic: None,
+            mnemonic_window_state: MnemonicWindowState {
+                open: false,
+                words: "".to_string(),
+                label: "".to_string(),
+                bitcoin_p2wpkh_44: "".to_string(),
+                bitcoin_p2wpkh_84: "".to_string(),
+                ethereum_address_44: "".to_string(),
+                ethereum_address_84: "".to_string(),
+                words_checksum: "".to_string(),
+                seed_checksum: None,
+                passphrase: None,
+                redgold_node_address: "".to_string(),
+                redgold_hardware_default_address: "".to_string(),
+                passphrase_input: "".to_string(),
+                passphrase_input_show: false,
+                requires_reset: false,
+                hd_path: "m/44'/5555'/0'/0/0".to_string(),
+                private_key_hex: "".to_string(),
+                calc_private_key_hex: false,
+            },
+            generate_mnemonic_state: GenerateMnemonicState {
+                random_input_mnemonic: "".to_string(),
+                random_input_requested: false,
+                password_input: "".to_string(),
+                show_password: false,
+                num_rounds: "10000".to_string(),
+                toggle_concat_password: false,
+                toggle_show_metadata: false,
+                num_modular_passwords_input: "6".to_string(),
+                num_modular_passwords: 6,
+                modular_passwords: (0..6).map(|_| "".to_string()).collect_vec(),
+                concat_password: "".to_string(),
+                metadata_fields: (0..4).map(|_| "".to_string()).collect_vec(),
+                key_derivation: KeyDerivation::Argon2d,
+                rounds_type: Rounds::TenK,
+                salt_words: "".to_string(),
+                m_cost_input: "65536".to_string(),
+                p_cost_input: "2".to_string(),
+                t_cost_input: "10".to_string(),
+                m_cost: Some(65536),
+                p_cost: Some(2),
+                t_cost: Some(10),
+            },
         }
     }
 }
-pub fn keys_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
-    ui.heading("Keygen");
-    ui.separator();
-    let keygen_state = &mut local_state.keygen_state;
-    ui.spacing();
-    ui.label("Utilities");
-    ui.spacing();
+
+pub fn keys_screen_scroll(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+    let key = &mut local_state.keygen_state;
     ui.horizontal(|ui| {
-        if ui.button("Generate random mnemonic").clicked() {
-            keygen_state.random_mnemonic = Some(generate_random_mnemonic().to_string());
-            keygen_state.random_window_open = true;
+        if ui.button("Generate Random Entropy Mnemonic Words").clicked() {
+            key.mnemonic_window_state.set_words(
+                generate_random_mnemonic().to_string(),
+                "Generated with internal random entropy"
+            );
         }
         ui.spacing();
     });
 
-    egui::Window::new("Mnemonic")
-        .open(&mut keygen_state.random_window_open)
-        // .resizable(true)
-        .default_width(280.0)
-        .show(ctx, |ui| {
-            ui.label("Generated with internal random entropy");
-            ui.separator();
-            let mut string = keygen_state.random_mnemonic.clone().unwrap_or("".to_string());
-            let split = string.split(" ")
-                .enumerate()
-                .map(|(i, s)| format!("{:?}: {}", i+1, s))
-                .collect_vec().chunks(6)
-                .map(|chunk| chunk.to_vec())
-                .collect_vec()
-                .clone();
-            text_table(ui, split);
-            ui.separator();
-            let edit = TextEdit::multiline(&mut string);
-            ui.add(edit);
-        });
+    // ui.toggle_value(
+    //     &mut key.generate_mnemonic_state.random_input_requested,
+    //     "Enable Source Entropy Input",
+    // );
+    //
+    // if key.generate_mnemonic_state.random_input_requested {
+    //     // TODO: Toggle here to load manually or load from file
+    //     // TODO: abstract function
+    //     // let edit = TextEdit::multiline(
+    //     //     &mut key.generate_mnemonic_state
+    //     //         .random_input_mnemonic
+    //     // )
+    //     //     .password(!key.generate_mnemonic_state.show_password)
+    //     //     .lock_focus(false)
+    //     //     .desired_width(400f32)
+    //     //     .desired_rows(2);
+    // }
+
+    password_derivation(key, ui);
+
+    // let mnem = key.mnemonic_window_state.words.clone();
+    mnemonic_window(
+        ctx, &mut key.mnemonic_window_state
+    );
 
 }
+
+pub fn keys_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+    ui.heading("Keygen");
+    ui.separator();
+    ScrollArea::vertical().show(ui, |ui| keys_screen_scroll(ui, ctx, local_state));
+}
+
+fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
+
+    ui.separator();
+    ui.spacing();
+    ui.label("Generate mnemonic using password derivation");
+
+    if !key.generate_mnemonic_state.toggle_concat_password {
+        for m in &mut key.generate_mnemonic_state.modular_passwords {
+            m.clear();
+        }
+    }
+
+    if !key.generate_mnemonic_state.toggle_show_metadata {
+        for mut m in &mut key.generate_mnemonic_state.metadata_fields {
+            m.clear();
+        }
+    }
+
+    ui.horizontal(|ui| {
+        ui.checkbox(
+            &mut key.generate_mnemonic_state.show_password,
+            "Show Password",
+        );
+
+        ui.checkbox(&mut key.generate_mnemonic_state.toggle_concat_password,
+                    "Modular Concat Password"
+        );
+
+
+        if key.generate_mnemonic_state.toggle_concat_password {
+            ui.checkbox(&mut key.generate_mnemonic_state.toggle_show_metadata,
+                        "Metadata Fields"
+            );
+
+            ui.label("Num Passwords");
+            TextEdit::singleline(&mut key.generate_mnemonic_state.num_modular_passwords_input)
+                .desired_width(30f32).show(ui);
+        }
+
+    });
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.label("Salt Words");
+            valid_label(ui, Mnemonic::from_str(&key.generate_mnemonic_state.salt_words).is_ok());
+        });
+        TextEdit::multiline(&mut key.generate_mnemonic_state.salt_words)
+            .desired_width(500f32)
+            .desired_rows(2)
+            .show(ui);
+    });
+
+    // TODO: Only validate on update.
+
+    if key.generate_mnemonic_state.toggle_concat_password {
+        ui.horizontal(|ui| {
+
+            if let Some(mut i) = key.generate_mnemonic_state.num_modular_passwords_input.clone().parse::<u32>().ok() {
+                if i >= 10 {
+                    i = 10;
+                }
+                let current = key.generate_mnemonic_state.num_modular_passwords;
+                if current != i {
+                    let diff = i as i32 - current as i32;
+                    if diff > 0 {
+                        for _ in 0..diff {
+                            key.generate_mnemonic_state.modular_passwords.push("".to_string());
+                        }
+                    } else {
+                        for _ in 0..diff.abs() {
+                            key.generate_mnemonic_state.modular_passwords.pop();
+                        }
+                    }
+                }
+                key.generate_mnemonic_state.num_modular_passwords = i;
+            }
+        });
+        for i in 0..key.generate_mnemonic_state.num_modular_passwords {
+            ui.horizontal(|ui| {
+                ui.label(format!("Password {}", i + 1));
+                TextEdit::multiline(&mut key.generate_mnemonic_state.modular_passwords[i as usize])
+                    .password(!key.generate_mnemonic_state.show_password)
+                    .lock_focus(false)
+                    .desired_width(450f32)
+                    .desired_rows(1)
+                    .show(ui);
+            });
+        }
+        key.generate_mnemonic_state.password_input = key.generate_mnemonic_state.modular_passwords.join("");
+    }
+
+    if key.generate_mnemonic_state.toggle_show_metadata && key.generate_mnemonic_state.toggle_concat_password {
+        ui.label("Metadata Fields Used For Increasing Entropy");
+        ui.horizontal(|ui| {
+            ui.label("First Name:");
+            TextEdit::singleline(&mut key.generate_mnemonic_state.metadata_fields[0])
+                .desired_width(100f32).show(ui);
+            ui.label("Middle Name:");
+            TextEdit::singleline(&mut key.generate_mnemonic_state.metadata_fields[1])
+                .desired_width(100f32).show(ui);
+            ui.label("Last Name:");
+            TextEdit::singleline(&mut key.generate_mnemonic_state.metadata_fields[2])
+                .desired_width(100f32).show(ui);
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Birthdate YYYYMMDD");
+            TextEdit::singleline(&mut key.generate_mnemonic_state.metadata_fields[3])
+                .desired_width(100f32).show(ui);
+        });
+    }
+
+    key.generate_mnemonic_state.compound_passwords();
+
+    ui.horizontal(|ui| {
+        let mut fixed_concat = key.generate_mnemonic_state.concat_password.clone();
+        let text = if key.generate_mnemonic_state.toggle_concat_password {
+            &mut fixed_concat
+        } else {
+            &mut key.generate_mnemonic_state
+                .password_input
+        };
+        ui.label("Password");
+        let edit = TextEdit::multiline(text)
+            .password(!key.generate_mnemonic_state.show_password)
+            .lock_focus(false)
+            .desired_width(400f32)
+            .desired_rows(2);
+        ui.add(edit);
+
+    });
+
+    ui.horizontal(|ui| {
+
+        let radio = &mut key.generate_mnemonic_state.key_derivation;
+        ui.label("KDF");
+        egui::ComboBox::from_id_source("Key Derive Function")
+            .selected_text(format!("{:?}", radio))
+            .show_ui(ui, |ui| {
+                ui.style_mut().wrap = Some(false);
+                ui.set_min_width(60.0);
+                ui.selectable_value(radio, KeyDerivation::DoubleSha256, "DSha256");
+                ui.selectable_value(radio, KeyDerivation::Argon2d, "Argon2d");
+            });
+
+        if key.generate_mnemonic_state.key_derivation == KeyDerivation::DoubleSha256 {
+            ui.horizontal(|ui| {
+                ui.label("Number of rounds");
+                let radio = &mut key.generate_mnemonic_state.rounds_type;
+                ui.radio_value(radio, Rounds::TenK, "10k");
+                ui.radio_value(radio, Rounds::OneM, "1m");
+                ui.radio_value(radio, Rounds::TenM, "10m");
+                ui.radio_value(radio, Rounds::Custom, "Custom");
+                match radio {
+                    Rounds::TenK => {
+                        key.generate_mnemonic_state.num_rounds = "10000".to_string();
+                    }
+                    Rounds::OneM => {
+                        key.generate_mnemonic_state.num_rounds = "1000000".to_string();
+                    }
+                    Rounds::TenM => {
+                        key.generate_mnemonic_state.num_rounds = "10000000".to_string();
+                    }
+                    Rounds::Custom => {
+                        ui.add(TextEdit::singleline(&mut key.generate_mnemonic_state.num_rounds)
+                            .desired_width(80f32)
+                        );
+                        let num_rounds = key.generate_mnemonic_state.num_rounds.parse::<u32>();
+                        valid_label(ui, num_rounds.is_ok());
+                    }
+                }
+            });
+        }
+
+        if key.generate_mnemonic_state.key_derivation == KeyDerivation::Argon2d {
+            // TODO: Validators
+            ui.horizontal(|ui| {
+                ui.label("Memory KiB");
+                TextEdit::singleline(&mut key.generate_mnemonic_state.m_cost_input)
+                    .desired_width(100f32)
+                    .show(ui);
+                ui.label("Threads");
+                TextEdit::singleline(&mut key.generate_mnemonic_state.p_cost_input)
+                    .desired_width(100f32)
+                    .show(ui);
+                ui.label("Iterations");
+                TextEdit::singleline(&mut key.generate_mnemonic_state.t_cost_input)
+                    .desired_width(100f32)
+                    .show(ui);
+
+                key.generate_mnemonic_state.m_cost = key.generate_mnemonic_state.m_cost_input.parse::<u32>().ok();
+                key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.p_cost_input.parse::<u32>().ok();
+                key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.t_cost_input.parse::<u32>().ok();
+            });
+        }
+
+
+        // .desired_width(100f32);
+        // TODO: Validation
+    });
+
+    if ui.button("Generate Password Mnemonic").clicked() {
+        let string = key.generate_mnemonic_state.password_input.clone();
+        // TODO validate on password length
+        // TODO: Hover text on valid button showing reason?
+        if !string.is_empty() {
+            match key.generate_mnemonic_state.key_derivation {
+                KeyDerivation::DoubleSha256 => {
+                    if let Some(rounds) = key.generate_mnemonic_state.num_rounds.parse::<u32>().ok() {
+                        let mnemonic = mnemonic_builder::from_str_rounds(
+                            &*string.clone(),
+                            rounds as usize
+                        ).to_string();
+                        key.mnemonic_window_state.set_words(mnemonic.to_string(), "Generated from password");
+                    }
+                }
+                KeyDerivation::Argon2d => {
+                    if let (Some(m_cost), Some(p_cost), Some(t_cost), Some(m)) = (
+                        key.generate_mnemonic_state.m_cost,
+                        key.generate_mnemonic_state.p_cost,
+                        key.generate_mnemonic_state.t_cost,
+                        Mnemonic::from_str(&*key.generate_mnemonic_state.salt_words).ok()
+                    ) {
+                        let salt = m.to_seed(None).0;
+                        let result = argon2d_hash(salt, string.as_bytes().to_vec(), m_cost, t_cost, p_cost);
+                        if let Some(r) = result.ok() {
+                            if let Some(w) = Mnemonic::new(&*r).ok() {
+                                key.mnemonic_window_state.set_words(w.to_string(), "Generated from password Argon2d");
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+        // This is the original function used, need a switch around this to different ones.
+    };
+
+}
+
+fn mnemonic_window(
+    ctx: &Context, state: &mut MnemonicWindowState
+) {
+
+    if state.requires_reset {
+        state.set_words_from_passphrase();
+        state.requires_reset = false;
+    }
+    if state.calc_private_key_hex {
+        state.private_key_hex = state.clone().mnemonic_words()
+            .private_hex(state.hd_path.clone()).unwrap_or("err".to_string());
+        state.calc_private_key_hex = false;
+    }
+
+    egui::Window::new("Mnemonic")
+        .open(&mut state.open)
+        .resizable(false)
+        .collapsible(false)
+        .min_width(500.0)
+        .default_width(500.0)
+        .show(ctx, |ui| {
+            // Layout doesn't seem to work here.
+            // let layout = egui::Layout::top_down(egui::Align::Center);
+            // ui.with_layout(layout, |ui| {
+                ui.vertical(|ui| {
+                    ui.label(state.label.clone());
+                    // ui.add(Separator::default().spacing(400f32));
+                    let mut string = state.words.clone();
+                    let split = string.split(" ")
+                        .enumerate()
+                        .map(|(i, s)| format!("{:?}: {}", i + 1, s))
+                        .collect_vec().chunks(6)
+                        .map(|chunk| chunk.to_vec())
+                        .collect_vec()
+                        .clone();
+                    text_table(ui, split);
+                    ui.vertical(|ui| {
+                        medium_data_item(ui, "Redgold m/44'/0'/50'/0/0' Address", state.redgold_hardware_default_address.clone());
+                        medium_data_item(ui, "Redgold m/84'/16180'/0'/0/0 Address", state.redgold_node_address.clone());
+                        medium_data_item(ui, "Bitcoin m/44'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_44.clone());
+                        medium_data_item(ui, "Bitcoin m/84'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_84.clone());
+                        medium_data_item(ui, "Ethereum m/44'/60'/0'/0/0 Address", state.ethereum_address_44.clone());
+                        medium_data_item(ui, "Ethereum m/84'/60'/0'/0/0 Address", state.ethereum_address_84.clone());
+                        ui.horizontal(|ui| {
+                            medium_data_item(ui, "Words Checksum", state.words_checksum.clone());
+                            if let Some(c) = &state.seed_checksum {
+                                medium_data_item(ui, "Seed Checksum", c.clone());
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Passphrase Input");
+                            TextEdit::singleline(&mut state.passphrase_input)
+                                .desired_width(150f32)
+                                .password(state.passphrase_input_show)
+                                .lock_focus(false)
+                                .ui(ui);
+                            if ui.small_button("Show").on_hover_text("Show password").clicked() {
+                                state.passphrase_input_show = !state.passphrase_input_show;
+                            };
+                            if ui.button("Update").clicked() {
+                                let string = state.passphrase_input.clone();
+                                if string.is_empty() {
+                                    state.passphrase = None;
+                                } else {
+                                    state.passphrase = Some(string);
+                                }
+                                state.requires_reset = true;
+                            }
+                        })
+                    });
+                    // ui.add(Separator::default().spacing(400f32));
+                    ui.horizontal(|ui| {
+                        TextEdit::multiline(&mut string)
+                            .desired_width(400f32).show(ui);
+                        copy_to_clipboard(ui, string.clone());
+                    });
+                    ui.label("Get Private Key Hex");
+                    ui.horizontal(|ui| {
+                        ui.label("Path");
+                        TextEdit::singleline(&mut state.hd_path)
+                            .desired_width(130f32)
+                            .ui(ui);
+                        if ui.button("Calculate").clicked() {
+                           state.calc_private_key_hex = true;
+                        }
+                        if ui.button("Clear").clicked() {
+                            state.private_key_hex = "".to_string();
+                        }
+                    });
+                    medium_data_item(ui, "Private Key Hex", state.private_key_hex.clone());
+            });
+        });
+}
+
+
 /*
           egui::Grid::new("my_grid")
                 .num_columns(2)

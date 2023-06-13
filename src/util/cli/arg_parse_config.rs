@@ -14,10 +14,10 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
-use multihash::Code::Sha3_256;
 use tokio::runtime::Runtime;
 use redgold_schema::{ErrorInfoContext, from_hex, SafeOption};
 use redgold_schema::servers::Server;
@@ -80,6 +80,10 @@ impl ArgTranslate {
         std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
     }
 
+    pub fn secure_data_path_buf() -> Option<PathBuf> {
+        std::env::var("REDGOLD_SECURE_DATA_PATH").ok().map(|a| PathBuf::from(a))
+    }
+
     pub fn secure_data_or_cwd() -> PathBuf {
         Self::secure_data_path_string().map(|s|
             std::path::Path::new(&s).to_path_buf()
@@ -100,6 +104,18 @@ impl ArgTranslate {
         Ok(())
     }
 
+    pub fn read_servers_file(servers: PathBuf) -> Result<Vec<Server>, ErrorInfo> {
+        let result = if servers.is_file() {
+            let contents = fs::read_to_string(servers)
+                .error_info("Failed to read servers file")?;
+            let servers = Server::parse(contents)?;
+            servers
+        } else {
+            vec![]
+        };
+        Ok(result)
+    }
+
     pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
         self.check_load_logger()?;
         self.determine_network()?;
@@ -109,7 +125,7 @@ impl ArgTranslate {
         self.load_mnemonic()?;
         self.load_peer_id()?;
         self.load_internal_servers()?;
-        self.exe_hash();
+        self.calculate_executable_checksum_hash();
         // No logger for CLI commands to allow direct output read.
         self.abort = immediate_commands(&self.opts, &self.node_config).await;
 
@@ -117,10 +133,18 @@ impl ArgTranslate {
         self.lookup_ip().await;
 
         self.e2e_enable();
+        self.configure_seeds();
+        self.set_discovery_interval();
 
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
 
         Ok(())
+    }
+
+    fn set_discovery_interval(&mut self) {
+        if !self.node_config.is_local_debug() {
+            self.node_config.discovery_interval = Duration::from_secs(60)
+        }
     }
 
     fn guard_faucet(&mut self) {
@@ -145,7 +169,7 @@ impl ArgTranslate {
         }
     }
 
-    fn exe_hash(&mut self) {
+    fn calculate_executable_checksum_hash(&mut self) {
 
         let path_exec = std::env::current_exe().expect("Can't find the current exe");
 
@@ -155,14 +179,14 @@ impl ArgTranslate {
         let exec_name = path_exec.file_name().expect("filename access failure").to_str()
             .expect("Filename missing").to_string();
         info!("Filename of current executable: {:?}", exec_name.clone());
-
-        let self_exe_bytes = fs::read(path_exec.clone()).expect("Read bytes of current exe");
-        let mut md5f = crypto::md5::Md5::new();
-        md5f.input(&*self_exe_bytes);
-
-        info!("Md5 of currently running executable with read byte {}", md5f.result_str());
-        let sha256 = sha256_vec(&self_exe_bytes);
-        info!("Sha256 of currently running executable with read byte {}", hex::encode(sha256.to_vec()));
+        // This is somewhat slow for loading the GUI
+        // let self_exe_bytes = fs::read(path_exec.clone()).expect("Read bytes of current exe");
+        // let mut md5f = crypto::md5::Md5::new();
+        // md5f.input(&*self_exe_bytes);
+        //
+        // info!("Md5 of currently running executable with read byte {}", md5f.result_str());
+        // let sha256 = sha256_vec(&self_exe_bytes);
+        // info!("Sha256 of currently running executable with read byte {}", hex::encode(sha256.to_vec()));
 
         // let sha3_256 = Hash::calc_bytes(self_exe_bytes);
         // info!("Sha3-256 of current exe {}", sha3_256.hex());
@@ -297,10 +321,15 @@ impl ArgTranslate {
 
         // Unify with other debug id stuff?
         if let Some(dbg_id) = self.opts.debug_id {
-            let offset = (dbg_id * 1000) as u16;
-            self.node_config.port_offset = self.node_config.network.default_port_offset() + offset;
+            self.node_config.port_offset = Self::debug_id_port_offset(
+                self.node_config.network.default_port_offset(),
+                dbg_id
+            );
         }
+    }
 
+    fn debug_id_port_offset(offset: u16, debug_id: i32) -> u16 {
+        offset + ((debug_id * 1000) as u16)
     }
 
     // pub fn parse_seed(&mut self) {
@@ -375,6 +404,21 @@ impl ArgTranslate {
         // self.opts.enable_e2e.map(|_| {
         //     self.node_config.e2e_enable = true;
         // });
+    }
+    fn configure_seeds(&mut self) {
+        if let Some(a) = &self.opts.seed_address {
+            let default_port = self.node_config.network.default_port_offset();
+            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            // TODO: replace this with the other seed class.
+            self.node_config.seeds.push(SeedNode {
+                peer_id: None,
+                trust: vec![],
+                public_key: None,
+                external_address: a.clone(),
+                port_offset: Some(port),
+                environments: vec![],
+            });
+        }
     }
 }
 

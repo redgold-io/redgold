@@ -81,6 +81,7 @@ pub struct NodeConfig {
     pub data_folder: DataFolder,
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
+    pub discovery_interval: Duration,
 }
 
 impl NodeConfig {
@@ -125,6 +126,8 @@ impl NodeConfig {
             name: None,
             peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
             nat_restricted: None,
+            // network_environment: self.network as i32,
+            network_environment: self.network.clone() as i32
         }
     }
 
@@ -287,6 +290,7 @@ impl NodeConfig {
             data_folder: DataFolder::target(0),
             secure_data_folder: None,
             enable_logging: true,
+            discovery_interval: Duration::from_secs(5),
         }
     }
 
@@ -322,7 +326,7 @@ impl NodeConfig {
         node_config
     }
     pub fn internal_mnemonic(&self) -> MnemonicWords {
-        MnemonicWords::from_mnemonic(&*self.mnemonic_words, None)
+        MnemonicWords::from_mnemonic_words(&*self.mnemonic_words, None)
     }
 
     pub async fn data_store(&self) -> DataStore {
@@ -376,9 +380,9 @@ impl NodeConfig {
 
 // TODO: Update function!
 pub fn peer_id_from_single_mnemonic(mnemonic_words: String) -> Result<MerkleTree, ErrorInfo> {
-    let wallet = MnemonicWords::from_mnemonic(&*mnemonic_words, None);
+    let wallet = MnemonicWords::from_mnemonic_words(&*mnemonic_words, None);
     let (_, pk) = wallet.active_key();
-    let h = structs::Hash::calc_bytes(pk.serialize().to_vec());
+    let h = structs::Hash::digest(pk.serialize().to_vec());
     merkle::build_root(vec![h])
 }
 

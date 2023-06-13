@@ -111,6 +111,7 @@ message NodeMetadata {
   optional string name = 10;
   PeerId peer_id = 11;
   optional bool nat_restricted = 12;
+  NetworkEnvironment network_environment = 13;
 }
 /**
 Used to store the version of the executable and the commit hash of the source code used to build it.
@@ -365,13 +366,16 @@ message StructMetadata {
   optional int64 time = 1;
   // The version of the object, used for backwards / forward compatability and to determine which fields are present
   int32 version = 2;
+  // The hash of the present object data, including all relevant fields, but excluding any enriched / hydrated data fields
+  // This can be any one of the below hash values, and reflects the current state of the object.
+  Hash hash = 3;
   // The hash of the object data, excluding any witness information, object should be cleared of other fields
   // or hydration related fields before signing.
   // This is equivalent to the SegWit hash.
-  Hash hash = 5;
+  Hash signable_hash = 5;
   // The hash of the object after being signed once, this is the hash that includes the witness data / signature data.
   // This is equivalent to the hash of a transaction containing witness data ala standard ETH transaction.
-  Hash sign_hash = 6;
+  Hash signed_hash = 6;
   // The hash of the object after being signed twice, includes witness data from a counter-signature from an
   // accepting party. Used for transaction contracts that require counter party acceptance
   Hash counter_party_hash = 7;

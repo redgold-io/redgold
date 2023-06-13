@@ -30,6 +30,9 @@ exclude = ["examples/rust_wasm", "sdk", "sdk/*"]
 redgold-schema = { path = "schema"}
 redgold-executor = { path = "executor"}
 tempfile = "3.3.0"
+#web3 = { version = "0.18.0", default-features = false, features = ["http-rustls-tls"] }
+sha3 = "0.10.8"
+argon2 = "0.5.0"
 filepath = "0.1.2"
 svg = "0.10.0"
 noise = "0.7.0"
@@ -131,5 +134,7 @@ features = ["serde", "bitcoinconsensus"]
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
-[profile.release]
-debug = true
+# Only enable for debugging performance with heap dumps of remote cluster,
+# Bloats the binary size a lot
+#[profile.release]
+#debug = true

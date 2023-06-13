@@ -1,6 +1,7 @@
 use std::convert::identity;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::channel::mpsc::Receiver;
 use futures::prelude::*;
@@ -12,11 +13,13 @@ use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use redgold_schema::{json_or, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoResponse, MultipartyThresholdResponse, QueryObservationProofResponse, Request, SubmitTransactionRequest};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, MultipartyThresholdResponse, PublicKey, QueryObservationProofResponse, Request, SubmitTransactionRequest};
 
 use crate::api::about;
+use crate::core::discovery::DiscoveryMessage;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::{MultipartyRequestResponse, Relay};
@@ -43,77 +46,42 @@ pub struct PeerRxEventHandler {
 
 impl PeerRxEventHandler {
 
-    pub async fn request_response_rest(
+    pub async fn handle_incoming_message(
         relay: Relay, pm: PeerMessage
         // , rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.peer.message.received");
 
-        // pm.request.verify_auth()?;
+        // This is important for some requests but not others, use in case by case basis
+        let verified = pm.request.verify_auth();
 
-        // info!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let mut response = Self::request_response(relay.clone(), pm.request.clone(),
-                                                  // rt.clone()
-        ).await
+        // Check if we know the peer, if not, attempt discovery
+        if let Some(pk) = pm.request.clone().proof.clone().and_then(|r| r.public_key) {
+            let known = relay.ds.peer_store.query_public_key_node(pk.clone()).await?.is_some();
+            if known {
+                relay.ds.peer_store.update_last_seen(pk).await.ok();
+            } else {
+                if let Some(nmd) = &pm.request.node_metadata {
+                    info!("Attempting immediate discovery on peer {}", pk.short_id());
+                    relay.discovery.sender.send_err(
+                        DiscoveryMessage::new(nmd.clone(), pm.dynamic_node_metadata.clone())
+                    ).log_error().ok();
+                }
+            }
+        }
+
+        // Handle the request
+
+        // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
+        let mut response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine();
         response.with_metadata(relay.node_config.node_metadata());
         response.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
         if let Some(c) = pm.response {
-            // info!("Sending response to channel");
-            c.send_err(response)?;
-        } else {
-            // info!("No response channel");
-        }
-
-        let peers = relay.ds.peer_store.all_peers().await?;
-
-        if let Some(prf) = pm.request.proof.clone() {
-            if let Some(pk) = prf.public_key {
-
-                let known_peer = peers.iter().find(|p|
-                    p.node_metadata.iter().find(|nmd|
-                        match (nmd.public_key_bytes().ok(), pk.bytes.safe_bytes().ok()) {
-                            (Some(pk1), Some(pk2)) => pk1 == pk2,
-                            _ => false
-                        }).is_some()
-                );
-                // info!("Is peer known?: {:?}", json(&known_peer.clone())?);
-
-                if known_peer.is_none() {
-                    if let Some(nmd) = pm.request.node_metadata {
-
-                        let mut request = relay.node_config.request().about();
-
-                        let relay = relay.clone();
-                        let address = nmd.external_address.clone();
-                        let port = (nmd.port_or(relay.node_config.network.clone()) as i64) + 1;
-                        info!("Requesting peer info on runtime address: {}:{}",
-                              address, port);
-                        tokio::spawn(async move {
-
-                            let response = rest_peer(
-                                relay.node_config.clone(), address,
-                                port,
-                                &mut request
-                            ).await;
-                            Self::handle_about_peer_response(relay.clone(), response).await
-                        });
-                    }
-
-                }
-            }
-
-
-
-        } else {
-            // info!("No proof on incoming request, unknown peer");
-        }
-
-        if let Some(p) = pm.public_key {
-            let struct_pk = structs::PublicKey::from_bytes(p.serialize().to_vec());
-            // Only update last seen if peer already exists
-            // TODO: Distinguish between database failure and row not present
-            relay.ds.peer_store.update_last_seen(struct_pk).await.ok();
+            let ser = response.clone().json_or();
+            let peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
+            // debug!("Sending response to peer {} contents {}", peer, ser);
+            c.send_err(response).add("Send message to response channel failed in handle incoming message")?;
         }
 
         Ok(())
@@ -121,25 +89,12 @@ impl PeerRxEventHandler {
     }
 
 
-    async fn handle_about_peer_response(
-        relay: Relay, response: Result<Response, ErrorInfo>
-    ) -> Result<(), ErrorInfo> {
-        if let Some(e) = response.clone().err() {
-            tracing::error!("Error getting peer info: {}", e.json_or());
-        }
-        let result1 = response?;
-        let result = result1.about_node_response.safe_get();
-        let res = result?.peer_node_info.safe_get()?;
-        // TODO: Validate transaction here
-        info!("Added new peer: {}", json(&res)?);
-        // TODO: Change to optional trust
-        relay.ds.peer_store.add_peer_new(res, 0f64).await?;
-        Ok(())
-    }
-
-    pub async fn request_response(relay: Relay, request: Request
+    pub async fn request_response(relay: Relay, request: Request, verified: RgResult<PublicKey>
                                   // , arc: Arc<Runtime>
     ) -> Result<Response, ErrorInfo> {
+
+
+        // TODO: Rate limiting here
 
         // TODO: add a uuid here
         let mut response = Response::empty_success();
@@ -275,7 +230,7 @@ impl PeerRxEventHandler {
         let relay = self.relay.clone();
         receiver.into_stream().map(|r| Ok(r)).try_for_each_concurrent(10, |pm| {
             // info!("Received peer message");
-            Self::request_response_rest(relay.clone(), pm)
+            Self::handle_incoming_message(relay.clone(), pm)
         }).await
     }
 

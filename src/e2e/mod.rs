@@ -14,9 +14,9 @@ use std::time::Duration;
 use metrics::{increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
 use tokio_stream::wrappers::IntervalStream;
-use redgold_schema::KeyPair;
+use redgold_schema::{KeyPair, RgResult, SafeOption};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
-use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest};
+use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest, Transaction, TransactionAmount, UtxoEntry};
 use crate::core::relay::Relay;
 use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
 use tokio_stream::{StreamExt};
@@ -24,6 +24,8 @@ pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
 use redgold_schema::EasyJson;
+use redgold_schema::transaction::amount_to_raw_amount;
+use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::util::logging::Loggable;
 // i think this is the one currently in use?
 
@@ -130,94 +132,86 @@ use crate::util::logging::Loggable;
 
 struct LiveE2E {
     relay: Relay,
-    utxos: Vec<SpendableUTXO>,
     last_failure: i64,
     failed_once: bool,
     num_success: u64,
-    generator: TransactionGenerator,
+}
+
+
+impl LiveE2E {
+    pub async fn build_tx(&self) -> RgResult<Transaction> {
+
+        let mut map: HashMap<Address, KeyPair> = HashMap::new();
+        let min_offset = 20;
+        let max_offset = 30;
+        for i in min_offset..max_offset {
+            let key = self.relay.node_config.internal_mnemonic().key_at(i);
+            let address = key.address_typed();
+            map.insert(address, key);
+        }
+        let addresses = map.keys().map(|a| a.clone()).collect_vec();
+        let mut utxo: Option<SpendableUTXO> = None;
+        for (a, k) in map.iter() {
+            let result = self.relay.ds.transaction_store.query_utxo_address(a).await?;
+            let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
+            let utxo_m = vec.get(0);
+            if let Some(u) = utxo_m {
+                utxo = Some(SpendableUTXO {
+                    utxo_entry: u.clone().clone(),
+                    key_pair: k.clone(),
+                });
+                break;
+            }
+        }
+        let u = utxo.safe_get_msg("No utxo in e2e")?;
+        let mut tx_b = TransactionBuilder::new();
+        let destination = addresses.iter()
+            .find(|a| u.key_pair.address_typed() != a.clone().clone())
+            .safe_get_msg("No destination address")?.clone().clone();
+        let amount = TransactionAmount::from_fractional(1f64).expect("");
+        let tx = tx_b
+            .with_output(&destination, &amount)
+            .with_unsigned_input(u.utxo_entry.clone())?
+            .build()?
+            .sign(&u.key_pair)?;
+        return Ok(tx);
+    }
+}
+
+pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
+    run_wrapper(relay).await.log_error()
 }
 
 #[allow(dead_code)]
-pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
-    let node_config = relay.node_config.clone();
-    sleep(Duration::from_secs(60));
-    info!("Starting e2e");
+pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
+    let c = LiveE2E {
+        relay,
+        last_failure: util::current_time_millis_i64(),
+        failed_once: false,
+        num_success: 0
+    };
 
-    // runtime.spawn(auto_update::from_node_config(node_config.clone()));
+    // See if we should start at all
+    c.build_tx().await?;
 
-    let mut map: HashMap<Vec<u8>, KeyPair> = HashMap::new();
-    let min_offset = 20;
-    let max_offset = 30;
-    for i in min_offset..max_offset {
-        let key = node_config.internal_mnemonic().key_at(i);
-        let address = key.address_typed();
-        map.insert(address.address.unwrap().value, key);
-    }
-    let addresses = map.keys().map(|k| Address::from_bytes(k.clone()).unwrap()).collect_vec();
-    // let client: PublicClient = PublicClient {
-    //     url: "localhost".to_string(),
-    //     port: node_config.public_port(),
-    //     timeout: Duration::from_secs(90),
-    // };
-    //
-    //
-
-    // let result = runtime.block_on(client.query_addresses(addresses));
-    let result = relay.clone().ds.query_utxo_address(addresses).await;
-    if let Err(e) = &result {
-        error!("Canary query utxo failure {}", e.to_string());
-    }
-
-    let res = result.unwrap_or(vec![]);
-    let utxos = res
-        .iter()
-        .map(|u| SpendableUTXO {
-            utxo_entry: u.clone(),
-            key_pair: map.get(&*u.address).expect("Map missing entry").clone(),
-        })
-        .collect_vec();
-
-    let generator = TransactionGenerator::default_adv(
-        utxos.clone(), min_offset, max_offset, node_config.internal_mnemonic()
-    );
-
-
-    if utxos.is_empty() {
-        // TODO: Faucet here from seed node.
-        info!("Unable to start e2e, no UTXOs");
-        Ok(())
-    } else {
-        // TODO Change to tokio
-        let c = LiveE2E {
-            relay,
-            utxos,
-            generator,
-            last_failure: util::current_time_millis_i64(),
-            failed_once: false,
-            num_success: 0
-        };
-        let interval1 = tokio::time::interval(Duration::from_secs(60));
-        use futures::TryStreamExt;
-        IntervalStream::new(interval1)
-            .map(|x| Ok(x))
-            .try_fold(c, |mut c, _| async {
-                e2e_tick(&mut c).await?;
-                Ok(c)
-
-        }).await?;
-        Ok(())
-    }
+    let interval1 = tokio::time::interval(Duration::from_secs(60));
+    use futures::TryStreamExt;
+    IntervalStream::new(interval1)
+        .map(|x| Ok(x))
+        .try_fold(c, |mut c, _| async {
+            e2e_tick(&mut c).await.map(|_| c)
+    }).await.map(|x| ())
 }
 
 async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
-    let result1 = c.generator.generate_simple_tx();
+    let result1 = c.build_tx().await;
     let result = result1.log_error().clone();
     match result {
         Err(e) => {}
         Ok(transaction) => {
             let transaction = transaction.clone();
             let res = c.relay.submit_transaction(SubmitTransactionRequest {
-                transaction: Some(transaction.transaction.clone()),
+                transaction: Some(transaction.clone()),
                 sync_query_response: true
             }).await;
 

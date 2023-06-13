@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use env_logger::Env;
 use redgold_schema::structs::NetworkEnvironment;
+use crate::data::data_store::DataStore;
 
 // TODO: Move everything to use this
 
@@ -18,8 +19,17 @@ impl EnvDataFolder {
     pub fn mnemonic_path(&self) -> PathBuf {
         self.path.join("mnemonic")
     }
+
     pub fn peer_id_path(&self) -> PathBuf {
         self.path.join("peer_id")
+    }
+
+    pub fn metrics_list(&self) -> PathBuf {
+        self.path.join("metrics_list")
+    }
+
+    pub fn targets(&self) -> PathBuf {
+        self.path.join("targets.json")
     }
 
     pub fn servers_path(&self) -> PathBuf {
@@ -27,13 +37,18 @@ impl EnvDataFolder {
     }
 
     pub fn ensure_exists(&self) -> &Self {
-        std::fs::create_dir_all(&self.path).expect("Failed to create data folder");
+        std::fs::create_dir_all(&self.path).ok();
         self
     }
 
     pub fn delete(&self) -> &Self {
         std::fs::remove_dir_all(&self.path).ok();
         self
+    }
+
+    pub async fn data_store(&self) -> DataStore {
+        // TODO: From file path
+        DataStore::from_file_path(self.data_store_path().to_str().expect("Data store path").to_string()).await
     }
 
 }
@@ -44,6 +59,14 @@ pub struct DataFolder {
 }
 
 impl DataFolder {
+
+    pub fn from_string(path: String) -> Self {
+        Self{path: PathBuf::from(path)}
+    }
+
+    pub fn from_path(path: PathBuf) -> Self {
+        Self{path}
+    }
 
     pub fn all(&self) -> EnvDataFolder {
         self.by_env(NetworkEnvironment::All)

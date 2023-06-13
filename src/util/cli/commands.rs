@@ -166,7 +166,7 @@ pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 
 pub fn mnemonic_fingerprint(m: Mnemonic) -> String {
     let vec = m.to_seed(None).0;
-    let res = Hash::calc_bytes(vec);
+    let res = Hash::digest(vec);
     let vec2 = res.vec();
     let vec1 = vec2[0..4].to_vec();
     let hx = hex::encode(vec1);

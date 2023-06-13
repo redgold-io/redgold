@@ -19,12 +19,16 @@ use tokio::task::JoinError;
 //     };
 // }
 
+/// Bidirectional message type
 #[derive(Clone)]
 pub struct PeerMessage {
     pub request: Request,
     pub response: Option<flume::Sender<Response>>,
-    pub public_key: Option<PublicKey>,
-    pub socket_addr: Option<SocketAddr>
+    pub public_key: Option<structs::PublicKey>,
+    pub socket_addr: Option<SocketAddr>,
+    pub destinations: Vec<PublicKey>,
+    pub node_metadata: Option<NodeMetadata>,
+    pub dynamic_node_metadata: Option<DynamicNodeMetadata>
 }
 
 impl PeerMessage {
@@ -33,9 +37,27 @@ impl PeerMessage {
             request: Request::empty(),
             response: None,
             public_key: None,
-            socket_addr: None
+            socket_addr: None,
+            destinations: vec![],
+            node_metadata: None,
+            dynamic_node_metadata: None,
         }
     }
+
+    pub fn from_metadata(request: Request, metadata: NodeMetadata) -> Self {
+        let mut mt = Self::empty();
+        mt.request = request;
+        mt.node_metadata = Some(metadata);
+        mt
+    }
+
+    pub fn from_pk(request: &Request, pk: &structs::PublicKey) -> Self {
+        let mut mt = Self::empty();
+        mt.request = request.clone();
+        mt.public_key = Some(pk.clone());
+        mt
+    }
+
     // pub async fn send(nc: NodeConfig) -> Result<Response, Error> {
     //     let req = nc.request();
     //     let c = new_channel::<Response>();
@@ -57,7 +79,8 @@ use flume::TryRecvError;
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::select;
 use tokio::task::JoinHandle;
-use redgold_schema::{error_info, ErrorInfoContext};
+use redgold_schema::{error_info, ErrorInfoContext, structs};
+use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata};
 use crate::api::rosetta::models::Peer;
 use crate::node_config::NodeConfig;
 

@@ -1,3 +1,4 @@
+use std::process::Child;
 use std::str::FromStr as frmstr;
 
 use bitcoin::{
@@ -16,8 +17,8 @@ use bitcoin_wallet::mnemonic::Mnemonic;
 use hdpath::{Purpose, StandardHDPath};
 
 use crate::constants::REDGOLD_KEY_DERIVATION_PATH;
-use crate::{error_info, ErrorInfoContext, KeyPair};
-use crate::structs::{Address, ErrorInfo};
+use crate::{error_info, ErrorInfoContext, KeyPair, RgResult};
+use crate::structs::{Address, ErrorInfo, Hash};
 use crate::util::mnemonic_builder;
 
 // use libp2p::identity::{secp256k1, Keypair};
@@ -131,6 +132,8 @@ pub fn get_pk(seed: &[u8], hd_path: &StandardHDPath) -> ExtendedPrivKey {
         .and_then(|k| k.derive_priv(&secp, &path))
         .unwrap()
 }
+
+
 //
 // pub fn get_epk(seed: &[u8], network: Network) -> ExtendedPrivKey {
 //     let secp = Secp256k1::new();
@@ -161,7 +164,76 @@ impl MnemonicWords {
         return cursor;
     }
 
-    pub fn from_phrase(s: &str) -> Self {
+    pub fn seed_checksum(&self) -> Result<String, ErrorInfo> {
+        Hash::digest(self.seed.0.clone()).checksum_hex()
+    }
+
+    // TODO: errors
+    pub fn words_checksum(&self) -> Result<String, ErrorInfo> {
+        let b = Mnemonic::from_str(&*self.words).unwrap().to_seed(None).0.clone();
+        Hash::digest(b).checksum_hex()
+    }
+
+    pub fn get_xpub(&self, purpose: u32, coin_type: u32, account: u32) -> ExtendedPubKey {
+        let xpriv = ExtendedPrivKey::new_master(Network::Bitcoin, &*self.seed.0)
+            .unwrap();
+        let secp = Secp256k1::new();
+        // this crazy direct reference is required to fix CI for some reason?
+        let cn = vec![
+          ChildNumber::from_hardened_idx(purpose).unwrap(),
+            ChildNumber::from_hardened_idx(coin_type).unwrap(),
+            ChildNumber::from_hardened_idx(account).unwrap(),
+        ];
+        let path = DerivationPath::from(cn);
+        let a_priv = xpriv.derive_priv(&secp, &path).unwrap();
+        ExtendedPubKey::from_private(&secp, &a_priv)
+    }
+
+    pub fn eth_key_84_0(&self) -> KeyPair {
+        let cursor = StandardHDPath::new(
+            Purpose::Witness,
+            60,
+            0,
+            0,
+            0,
+        );
+        self.keypair(&cursor)
+    }
+
+    pub fn eth_key_44_0(&self) -> KeyPair {
+        let cursor = StandardHDPath::new(
+            Purpose::Pubkey,
+            60,
+            0,
+            0,
+            0,
+        );
+        self.keypair(&cursor)
+    }
+
+    pub fn btc_key_44_0(&self) -> KeyPair {
+        let cursor = StandardHDPath::new(
+            Purpose::Pubkey,
+            0,
+            0,
+            0,
+            0,
+        );
+        self.keypair(&cursor)
+    }
+
+    pub fn btc_key_84_0(&self) -> KeyPair {
+        let cursor = StandardHDPath::new(
+            Purpose::Witness,
+            0,
+            0,
+            0,
+            0,
+        );
+        self.keypair(&cursor)
+    }
+
+    pub fn from_iterated_phrase(s: &str) -> Self {
         let m = mnemonic_builder::from_str(s);
 
         return MnemonicWords {
@@ -172,7 +244,7 @@ impl MnemonicWords {
         };
     } // let hd_path = StandardHDPath::from_str("m/44'/0'/0'/0/0").unwrap();
     #[allow(dead_code, unused_assignments)]
-    pub fn from_mnemonic(s: &str, passphrase: Option<String>) -> Self {
+    pub fn from_mnemonic_words(s: &str, passphrase: Option<String>) -> Self {
         let m = Mnemonic::from_str(s).unwrap();
 
         let mut option: Option<&str> = None;
@@ -206,8 +278,13 @@ impl MnemonicWords {
         return x.address_typed();
     }
 
+    pub fn hardware_default_address(&self) -> Address {
+        self.keypair(&StandardHDPath::new(Purpose::Pubkey, 0, 50, 0, 0))
+            .address_typed()
+    }
+
     pub fn test_default() -> Self {
-        return MnemonicWords::from_phrase(STANDARD_TEST_PHRASE);
+        return MnemonicWords::from_iterated_phrase(STANDARD_TEST_PHRASE);
     }
 
     pub fn key(&self, hd_path: &StandardHDPath) -> (SecretKey, PublicKey) {
@@ -238,6 +315,21 @@ impl MnemonicWords {
         return KeyPair::new(&pk, &pub_key);
     }
 
+    pub fn keypair_from_path_str_checked(&self, hd_path: String) -> RgResult<KeyPair> {
+        let hd_path = StandardHDPath::from_str(&*hd_path)
+            .map_err(|e| error_info("invalid hd path"))?;
+        let key = get_pk(&self.seed.0, &hd_path);
+        let pk = key.private_key.key;
+        let pub_key = MnemonicWords::get_public_key(&key);
+        return Ok(KeyPair::new(&pk, &pub_key));
+    }
+
+    pub fn private_hex(&self, hd_path: String) -> RgResult<String> {
+        let kp = self.keypair_from_path_str_checked(hd_path)?;
+        let res = kp.secret_key.to_string();
+        Ok(res)
+    }
+
     pub fn get_public_key(key: &ExtendedPrivKey) -> PublicKey {
         let secp = Secp256k1::new();
         let pub_key = ExtendedPubKey::from_private(&secp, &key).public_key.key;
@@ -265,6 +357,7 @@ impl MnemonicWords {
         );
         return self.keypair(&cursor);
     }
+
 }
 
 // Change to impl?

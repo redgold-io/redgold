@@ -5,12 +5,15 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use futures::FutureExt;
 use libp2p::Multiaddr;
 use log::{error, info};
+use metrics::increment_counter;
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
+use tracing::debug;
 
-use redgold_schema::SafeOption;
-use redgold_schema::structs::{ErrorInfo, PeerData};
+use redgold_schema::{error_info, json_or, SafeOption};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerData};
 
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
@@ -22,6 +25,9 @@ use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util;
 use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
+use redgold_schema::EasyJson;
+use crate::util::logging::Loggable;
+
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {
     // pub(crate) p2p_client: crate::api::p2p_io::rgnetwork::Client,
@@ -31,42 +37,32 @@ pub struct PeerOutgoingEventHandler {
 
 impl PeerOutgoingEventHandler {
 
-    //async fn send_message(&mut self) ->
-
-    async fn handle_peer_message(relay: Relay, message: PeerMessage) -> Result<(), ErrorInfo> {
-        // let ser_msg = json(&message.request.clone())?;
-        // info!("PeerOutgoingEventHandler received message {}", ser_msg);
-        let peers = relay.ds.peer_store.all_peers().await?;
-        // let ser_msgp = json(&peers.clone())?;
-        // info!("PeerOutgoingEventHandler query all peers {}", ser_msgp);
-
-        if let Some(pk) = message.public_key {
-
-            let vec = pk.serialize().to_vec();
-            let peer = peers.iter()
-                .find(|p| p.node_metadata.iter().find(|nmd|
-                    nmd.public_key_bytes().map(|v| v == vec).unwrap_or(false)
-                ).is_some());
-            match peer {
-                None => {
-                    error!("Peer public key not found to send message to {}", hex::encode(vec));
-                }
-                Some(pd) => {
-                    // TODO: Deal with this guy
-                    tokio::spawn(Self::send_message_rest(message.clone(), pd.clone(), relay.node_config.clone()));
-                }
+    async fn send_peer_message(relay: Relay, message: PeerMessage) -> Result<(), ErrorInfo> {
+        increment_counter!("redgold.peer.send");
+        let ser_msgp = json_or(&message.request.clone());
+        // tracing::info!("PeerOutgoingEventHandler send message {}", ser_msgp);
+        if let Some(pk) = &message.public_key {
+            let res = relay.ds.peer_store.query_public_key_node(pk.clone()).await?
+                .and_then(|pd| pd.latest_node_transaction)
+                .and_then(|nt| nt.node_metadata().ok());
+            // TODO if metadata known, check if udp is required
+            if let Some(nmd) = res {
+                Self::send_message_rest(message.clone(), nmd, relay.node_config.clone()).await?;
+            } else {
+                error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex_or(), ser_msgp);
             }
-
-        } else if peers.len() > 0 {
-            // let peers2 = peers.iter().map(|pd| pd.)
-            // Relay::broadcast(relay.clone(), )
-            // Change this to the same broadcast function as above^
-
-            // info!("Attempting broadcast to {}", &peers.len());
-            for pd in &peers {
-                // TODO: Deal with this guy too
-                tokio::spawn(Self::send_message_rest(message.clone(), pd.clone(), relay.node_config.clone()));
-            }
+        } else if let Some(nmd) = &message.node_metadata {
+            debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",
+                nmd.json_or(),
+                ser_msgp
+            );
+            Self::send_message_rest(message.clone(), nmd.clone(), relay.node_config.clone()).await?;
+            // TODO: if node metadata in message then attempt to send there to unknown peer, falling back to other types
+            // Do we also need dynamic node metadata here too for UDP?
+        } else {
+            let s = format!("Missing public key or node metadata in peer messsage, unable to process contents {}", ser_msgp);
+            error!("{}", s);
+            return Err(error_info(s));
         }
         Ok(())
     }
@@ -82,28 +78,40 @@ impl PeerOutgoingEventHandler {
             .map(|x| Ok(x))
             .try_for_each_concurrent(200, |message| {
             async {
-                Self::handle_peer_message(relay.clone(), message).await
+                Self::send_peer_message(relay.clone(), message).await
             }
         });
         err.await
     }
 
-    pub async fn send_message_rest(mut message: PeerMessage, pd: PeerData, nc: NodeConfig) -> Result<(), ErrorInfo> {
+    pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, nc: NodeConfig) -> Result<(), ErrorInfo> {
+        increment_counter!("redgold.peer.rest.send");
 
-        let nmd = pd.node_metadata[0].clone();
+
+        let option = NetworkEnvironment::from_i32(nmd.network_environment);
+        let peer_env = option
+            .safe_get_msg("Missing network environment in node metadata on attempt to send peer message")?;
+        if peer_env != &nc.network {
+            return Err(error_info(format!("\
+            Attempted to send message to peer {} with network {} while this node is on network {} contents: {}",
+                                          nmd.long_identifier(), peer_env.to_std_string(), nc.network.to_std_string(),
+                                          json_or(&message.request.clone())
+            )));
+        }
+        let port = nmd.port_or(nc.network) + 1;
         let res = rest_peer(
-            nc, nmd.external_address.clone(), nmd.port_offset.safe_get()? + 1, &mut message.request
+            nc, nmd.external_address.clone(), nmd.port_offset
+                .safe_get_msg("Missing port offset in node metadata on attempt to send peer message")? + 1, &mut message.request
         ).await;
         match res {
             Ok(r) => {
-                // info!("PeerOutgoingEventHandler sent message to {} and received response {}", nmd.external_address.clone(), json(&r.clone())?);
+                // debug!("Send message peer response: {}", json_or(&r));
                 if let Some(response_channel) = &message.response {
-                    response_channel.send_err(r)?;
-                } else {
-                    // info!("No response channel to respond with");
+                    response_channel.send_err(r).add("Error sending message back on response channel").log_error().ok();
                 }
             }
             Err(e)=> {
+                increment_counter!("redgold.peer.rest.send.error");
                 log::error!("Error sending message to peer: {}", json(&e)?)
             }
         }
