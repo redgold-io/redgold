@@ -319,7 +319,7 @@ impl Relay {
             .await?;
 
         let mut response = SubmitTransactionResponse {
-            transaction_hash: tx.clone().hash().into(),
+            transaction_hash: tx.clone().hash_or().into(),
             query_transaction_response: None,
             transaction: Some(tx.clone()),
         };

@@ -281,7 +281,7 @@ pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Re
 
 pub async fn sign_transaction(transaction: &mut Transaction, public: structs::PublicKey, path: String)
     -> Result<Transaction, ErrorInfo> {
-    let hash: Hash = transaction.hash();
+    let hash: Hash = transaction.hash_or();
     let addr = public.address()?;
 
     for i in transaction.inputs.iter_mut() {

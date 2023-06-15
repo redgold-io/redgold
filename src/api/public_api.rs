@@ -36,7 +36,7 @@ use crate::schema::structs::{QueryAddressesResponse, Transaction};
 use crate::schema::{bytes_data, error_info};
 use crate::schema::{response_metadata, SafeBytesAccess, WithMetadataHashable};
 use crate::{api, schema, util};
-use crate::api::{about, as_warp_json_response};
+use crate::api::{about, as_warp_json_response, explorer};
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
@@ -546,6 +546,30 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             result
         });
 
+    let explorer_relay = relay.clone();
+    let explorer_hash = warp::get()
+        .and(warp::path("explorer"))
+        .and(warp::path("hash"))
+        .and(warp::path::param())
+        .and_then(move |hash: String| {
+            let relay3 = explorer_relay.clone();
+            async move {
+                as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone()).await)
+            }
+        }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+
+
+    let explorer_relay2 = relay.clone();
+    let explorer_recent = warp::get()
+        .and(warp::path("explorer"))
+        .and_then(move || {
+            let relay3 = explorer_relay2.clone();
+            async move {
+                as_warp_json_response( explorer::handle_explorer_recent(relay3.clone()).await)
+            }
+        })
+        .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+
     let port = relay2.node_config.public_port();
     info!("Running public API on port: {:?}", port.clone());
     Ok(
@@ -560,6 +584,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
                 .or(peers)
                 .or(transaction_lookup)
                 .or(address_lookup)
+                .or(explorer_hash)
+                .or(explorer_recent)
                 .or(home)
     )
         .run(([0, 0, 0, 0], port))
@@ -582,7 +608,7 @@ async fn mock_relay(relay: Relay) {
         let tm = relay.transaction.receiver.recv().unwrap();
         let mut response = structs::Response::default();
         response.submit_transaction_response = Some(SubmitTransactionResponse {
-                transaction_hash: create_genesis_transaction().hash().into(),
+                transaction_hash: create_genesis_transaction().hash_or().into(),
                 query_transaction_response: Some(QueryTransactionResponse {
                     observation_proofs: vec![],
                     block_hash: None,

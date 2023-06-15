@@ -225,12 +225,11 @@ impl Node {
 
         // log::debug!("Select all DS tables: {:?}", relay.ds.select_all_tables());
 
+
         let result1 = std::env::var("REDGOLD_GENESIS");
         // log::debug!("REDGOLD_GENESIS environment variable: {:?}", result1);
 
-        let flag_genesis = result1
-            .map(|g| g.replace("\"", "").trim().to_string() == "true".to_string())
-            .unwrap_or(false) && node_config.main_stage_network();
+        let flag_genesis = node_config.genesis && node_config.main_stage_network();
         let debug_genesis = !node_config.main_stage_network() && relay.node_config.seeds.is_empty();
 
         if flag_genesis || debug_genesis {

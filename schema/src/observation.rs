@@ -56,7 +56,7 @@ impl Observation {
     pub fn leafs_hash(&self) -> Vec<Hash> {
         self.observations
             .iter()
-            .map(|r| r.hash())
+            .map(|r| r.hash_or())
             .collect_vec()
     }
 
@@ -74,13 +74,13 @@ impl Observation {
         let merkle_tree = util::merkle::build_root(leafs.clone()).expect("merkle failure");
         // info!("Store observation leafs len={:?}", leafs.len());
         for observation_metadata in &self.observations {
-            let hash = observation_metadata.hash();
+            let hash = observation_metadata.hash_or();
             let merkle_proof = merkle_tree.proof(hash.clone());
             let mut op = ObservationProof::default();
             op.metadata = Some(observation_metadata.clone());
             op.merkle_proof = Some(merkle_proof);
             op.proof = proof.clone();
-            op.observation_hash = Some(self.hash());
+            op.observation_hash = Some(self.hash_or());
             res.push(op);
         };
         res

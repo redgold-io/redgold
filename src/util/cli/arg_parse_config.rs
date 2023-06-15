@@ -24,7 +24,7 @@ use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId};
 use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
-use crate::util::cli::args::{RgArgs, RgTopLevelSubcommand};
+use crate::util::cli::args::{NodeCli, RgArgs, RgTopLevelSubcommand};
 use crate::util::cli::commands::mnemonic_fingerprint;
 use crate::util::cli::data_folder::DataFolder;
 use crate::util::{init_logger, init_logger_main, ip_lookup, metrics_registry, not_local_debug_mode, sha256_vec};
@@ -137,6 +137,9 @@ impl ArgTranslate {
         self.set_discovery_interval();
 
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
+
+        self.apply_node_opts();
+        self.genesis();
 
         Ok(())
     }
@@ -418,6 +421,24 @@ impl ArgTranslate {
                 port_offset: Some(port),
                 environments: vec![],
             });
+        }
+    }
+    fn apply_node_opts(&mut self) {
+        match &self.opts.subcmd {
+            Some(RgTopLevelSubcommand::Node(node_cli)) => {
+                if let Some(i) = &node_cli.live_e2e_interval {
+                    self.node_config.live_e2e_interval = Duration::from_secs(i.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    fn genesis(&mut self) {
+        if let Some(o) = std::env::var("REDGOLD_GENESIS").ok() {
+            self.node_config.genesis = true;
+        }
+        if self.opts.genesis {
+            self.node_config.genesis = true;
         }
     }
 }

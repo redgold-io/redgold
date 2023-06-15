@@ -22,6 +22,7 @@ use redgold_schema::util::{dhash_vec, merkle};
 use redgold_schema::util::merkle::MerkleTree;
 use crate::api::public_api::PublicClient;
 use crate::core::seeds::SeedNode;
+use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 
@@ -82,6 +83,9 @@ pub struct NodeConfig {
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
     pub discovery_interval: Duration,
+    pub live_e2e_interval: Duration,
+    pub genesis: bool,
+    pub opts: RgArgs
 }
 
 impl NodeConfig {
@@ -291,6 +295,9 @@ impl NodeConfig {
             secure_data_folder: None,
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
+            live_e2e_interval: Duration::from_secs(60),
+            genesis: false,
+            opts: RgArgs::default(),
         }
     }
 

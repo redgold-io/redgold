@@ -130,7 +130,7 @@ impl PeerRxEventHandler {
 
         if let Some(t) = request.gossip_transaction_request {
             if let Some(t) = t.transaction {
-                info!("Received gossip transaction request for {}", &t.hash().hex());
+                info!("Received gossip transaction request for {}", &t.hash_or().hex());
                 relay.submit_transaction(SubmitTransactionRequest {
                     transaction: Some(t),
                     sync_query_response: false,

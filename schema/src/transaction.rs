@@ -100,7 +100,7 @@ impl Transaction {
             return Err(error_info("Couldn't find appropriate input address to sign"));
         }
         let x = self.with_hash();
-        x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash());
+        x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())
     }
 
@@ -167,6 +167,12 @@ impl Transaction {
             }
         }
         total
+    }
+
+    pub fn total_output_amount_float(&self) -> f64 {
+        TransactionAmount::from(
+        self.total_output_amount()
+        ).to_fractional()
     }
 
     pub fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {

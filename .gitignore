@@ -20,3 +20,4 @@ log/
 ignore/
 /.idea/
 /.vscode
+vue-web/package-lock.json

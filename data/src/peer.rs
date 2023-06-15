@@ -142,7 +142,7 @@ impl PeerStore {
         let pd = tx.peer_data()?;
         let tx_blob = tx.proto_serialize();
         let pd_blob = pd.proto_serialize();
-        let tx_hash = tx.hash().vec();
+        let tx_hash = tx.hash_or().vec();
         let mut pool = self.ctx.pool().await?;
         let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().value;
 

@@ -309,7 +309,7 @@ impl TransactionProcessContext {
         // Check if we already have a rejection reason for this transaction and abort if so
         // returning the previous rejection reason.
         let ds = self.relay.ds.clone();
-        if let Some((_, Some(pre_rejection))) = ds.transaction_store.query_maybe_transaction(&transaction.hash()).await? {
+        if let Some((_, Some(pre_rejection))) = ds.transaction_store.query_maybe_transaction(&transaction.hash_or()).await? {
             return Err(pre_rejection);
         }
 
@@ -322,7 +322,7 @@ impl TransactionProcessContext {
     // TODO: Add a debug info thing here? to include data about debug calls? Thread local info? something ?
     async fn process(&mut self, transaction: &Transaction, processing_time_start: i64, request_uuid: String) -> Result<SubmitTransactionResponse, ErrorInfo> {
         increment_counter!("redgold.transaction.received");
-        let hash = transaction.hash();
+        let hash = transaction.hash_or();
         self.transaction_hash = Some(hash.clone());
 
         // Establish channels for other transaction threads to communicate conflicts with this one.
