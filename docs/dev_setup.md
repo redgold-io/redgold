@@ -190,3 +190,30 @@ If you have dependency conflicts or issues please first use:
 `cargo update`
 
 `cargo clean`
+
+
+If you get this error:
+
+`error: error returned from database: unable to open database file`
+
+Try 
+
+`rm -rf ~/.rg/sqlx`
+
+`cargo build -p redgold-data`
+
+`cargo test -p redgold-data`
+
+Alternatively you should inspect the build.rs script output in data for errors
+
+Also, verify if you're debugging that you haven't re-used a timestamp, as that can cause issues too.
+ Also double check your schema to make sure it's correct if errors not easy to find.
+
+Sometimes really strange things happen if you use a time code that is too close to the others? 
+I have no idea why but if everything seems correct try randomly incrementing the time code 
+by a day or so? in the migrations file.
+
+Also, just change the time code as a precaution, sometimes that fixes it
+
+Also, try changing the build.rs in redgold-data sometimes, this error seems to happen frequently and I'm not sure why. 
+May be due to some kind of lock on removing database file and the build.rs not re-executing for some reason?

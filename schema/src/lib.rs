@@ -52,6 +52,7 @@ pub mod seeds;
 pub mod trust;
 pub mod input;
 pub mod debug_version;
+pub mod transaction_info;
 
 
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {

@@ -386,6 +386,10 @@ impl Transaction {
         self.outputs.first().and_then(|o| o.address.clone())
     }
 
+    pub fn first_output_amount(&self) -> Option<f64> {
+        self.outputs.first().as_ref().map(|o| o.rounded_amount())
+    }
+
 }
 
 impl TransactionAmount {

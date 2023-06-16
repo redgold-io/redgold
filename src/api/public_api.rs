@@ -342,7 +342,7 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
         response1.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
     }
     if let Some(r) = request.hash_search_request {
-        let res = hash_query(relay.clone(), r.search_string).await?;
+        let res = hash_query(relay.clone(), r.search_string, None, None).await?;
         response1.hash_search_response = Some(res);
     }
 
@@ -435,7 +435,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             let relay3 = qry_relay.clone();
             async move {
                 let res: Result<Json, warp::reject::Rejection> =
-                    Ok(hash_query(relay3.clone(), address).await
+                    Ok(hash_query(relay3.clone(), address, None, None).await
                         .map_err(|e| warp::reply::json(&e))
                         .map(|r| warp::reply::json(&r))
                         .combine()
@@ -551,10 +551,11 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and(warp::path("explorer"))
         .and(warp::path("hash"))
         .and(warp::path::param())
-        .and_then(move |hash: String| {
+        .and(warp::query::<Pagination>())
+        .and_then(move |hash: String, pagination: Pagination| {
             let relay3 = explorer_relay.clone();
             async move {
-                as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone()).await)
+                as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone(), pagination).await)
             }
         }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
@@ -591,6 +592,12 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .run(([0, 0, 0, 0], port))
         .await
     )
+}
+
+#[derive(serde::Deserialize)]
+pub struct Pagination {
+    pub offset: Option<u32>,
+    pub limit: Option<u32>,
 }
 
 pub fn start_server(relay: Relay

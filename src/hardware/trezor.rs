@@ -325,6 +325,7 @@ async fn debug_sign_tx () {
         address: None,
         utxo_entries: vec![utxo],
         balance: 0,
+        recent_transactions: vec![]
     };
     let mut tb = TransactionBuilder::new();
     tb.with_address_info(ai);
