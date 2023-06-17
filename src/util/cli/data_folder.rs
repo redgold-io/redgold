@@ -37,6 +37,7 @@ impl EnvDataFolder {
         self.path.join("servers")
     }
 
+    // Change to cert.pem
     pub fn cert_path(&self) -> PathBuf {
         self.path.join("certificate.crt")
     }
@@ -49,6 +50,7 @@ impl EnvDataFolder {
         tokio::fs::read(self.key_path()).await.error_info("Missing key")
     }
 
+    // Change to privkey.pem
     pub fn key_path(&self) -> PathBuf {
         self.path.join("private_key.key")
     }
@@ -99,7 +101,7 @@ impl DataFolder {
 
     pub fn target(id: u32) -> Self {
         let cwd = std::env::current_dir().expect("Current dir");
-        let cwd_target = cwd.join("target2");
+        let cwd_target = cwd.join("target");
         Self{path: cwd_target.join(format!("node_{}", id))}
     }
 

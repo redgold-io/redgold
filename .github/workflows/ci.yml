@@ -218,7 +218,7 @@ jobs:
       - run: aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha256_checksum
       - run: aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum
 
-      - run: cd vue-explorer; npm run build
+      - run: cd vue-explorer; npm install && npm run build
 
       - name: Upload Distribution to S3
         if: github.ref == 'refs/heads/dev'

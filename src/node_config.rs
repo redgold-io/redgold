@@ -321,8 +321,8 @@ impl NodeConfig {
             .vec();
         // let path: String = ""
         let folder = DataFolder::target(seed_id.clone() as u32);
-        // folder.delete().ensure_exists();
-        folder.ensure_exists();
+        folder.delete().ensure_exists();
+        // folder.ensure_exists();
         let mut node_config = NodeConfig::default();
         node_config.self_peer_id = self_peer_id;
         node_config.mnemonic_words = words;
