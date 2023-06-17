@@ -19,7 +19,7 @@ use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Req
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
 // use crate::api::p2p_io::P2P;
-use crate::api::{RgHttpClient, public_api};
+use crate::api::{RgHttpClient, public_api, explorer};
 use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
 use crate::e2e::tx_submit::TransactionSubmitter;
@@ -122,6 +122,11 @@ impl Node {
         join_handles.push(public_api::start_server(relay.clone(),
                                                    // runtimes.public_api.clone()
         ));
+
+        join_handles.push(explorer::server::start_server(relay.clone(),
+                                                   // runtimes.public_api.clone()
+        ));
+
         let obs_handler = ObservationHandler{relay: relay.clone()};
         join_handles.push(tokio::spawn(async move { obs_handler.run().await }));
         //

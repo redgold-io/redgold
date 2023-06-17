@@ -3,6 +3,7 @@ env:
   BUILD_OUTPUT: "./target/release/redgold"
   AWS_EC2_METADATA_DISABLED: true
   S3_RELEASE_PREFIX: "s3://redgold-public/release"
+  S3_EXPLORER_PREFIX: "s3://redgold-explorer"
   DOCKER_USER: "redgoldio"
   TOOLCHAIN: "nightly"
 on: push
@@ -216,6 +217,13 @@ jobs:
       - run: aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum
       - run: aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha256_checksum
       - run: aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum
+
+      - run: cd vue-explorer; npm run build
+
+      - name: Upload Distribution to S3
+        if: github.ref == 'refs/heads/dev'
+        run: aws s3 rm $${env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/ --recursive && aws s3 cp --recursive ./vue-explorer/dist/ $${env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
+
 
       # AWS Mac artifacts
 #

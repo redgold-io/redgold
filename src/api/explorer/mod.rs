@@ -1,3 +1,5 @@
+pub mod server;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use eframe::egui::accesskit::Role::Math;

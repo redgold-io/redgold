@@ -15,7 +15,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use warp::reply::Json;
-use warp::Filter;
+use warp::{Filter, Server};
 use warp::http::Response;
 use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, ProtoSerde, SafeOption, structs};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
@@ -545,53 +545,80 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             };
             result
         });
-
-    let explorer_relay = relay.clone();
-    let explorer_hash = warp::get()
-        .and(warp::path("explorer"))
-        .and(warp::path("hash"))
-        .and(warp::path::param())
-        .and(warp::query::<Pagination>())
-        .and_then(move |hash: String, pagination: Pagination| {
-            let relay3 = explorer_relay.clone();
-            async move {
-                as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone(), pagination).await)
-            }
-        }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
-
-
-    let explorer_relay2 = relay.clone();
-    let explorer_recent = warp::get()
-        .and(warp::path("explorer"))
-        .and_then(move || {
-            let relay3 = explorer_relay2.clone();
-            async move {
-                as_warp_json_response( explorer::handle_explorer_recent(relay3.clone()).await)
-            }
-        })
-        .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+    //
+    // let explorer_relay = relay.clone();
+    // let explorer_hash = warp::get()
+    //     .and(warp::path("explorer"))
+    //     .and(warp::path("hash"))
+    //     .and(warp::path::param())
+    //     .and(warp::query::<Pagination>())
+    //     .and_then(move |hash: String, pagination: Pagination| {
+    //         let relay3 = explorer_relay.clone();
+    //         async move {
+    //             as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone(), pagination).await)
+    //         }
+    //     }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+    //
+    //
+    // let explorer_relay2 = relay.clone();
+    // let explorer_recent = warp::get()
+    //     .and(warp::path("explorer"))
+    //     .and_then(move || {
+    //         let relay3 = explorer_relay2.clone();
+    //         async move {
+    //             as_warp_json_response( explorer::handle_explorer_recent(relay3.clone()).await)
+    //         }
+    //     })
+    //     .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
     let port = relay2.node_config.public_port();
     info!("Running public API on port: {:?}", port.clone());
-    Ok(
-        warp::serve(
-            hello
-                .or(transaction)
-                .or(faucet)
-                .or(query_hash)
-                .or(about)
-                .or(request_normal)
-                .or(request_bin)
-                .or(peers)
-                .or(transaction_lookup)
-                .or(address_lookup)
-                .or(explorer_hash)
-                .or(explorer_recent)
-                .or(home)
-    )
-        .run(([0, 0, 0, 0], port))
-        .await
-    )
+
+    let routes = hello
+        .or(transaction)
+        .or(faucet)
+        .or(query_hash)
+        .or(about)
+        .or(request_normal)
+        .or(request_bin)
+        .or(peers)
+        .or(transaction_lookup)
+        .or(address_lookup)
+        // .or(explorer_hash)
+        // .or(explorer_recent)
+        .or(home);
+
+    // Create a warp Service using the filter
+    // Create the server
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+
+
+    //
+    // let folder = relay2.node_config.data_folder.all();
+    //
+    // let cert = if let (Ok(cert), Ok(key)) = (folder.cert().await, folder.key().await) {
+    //     Some((cert, key))
+    // } else {
+    //     info!("Unable to find TLS / SSL cert in: {}", folder.path.to_str().unwrap().to_string());
+    //     None
+    // };
+    //
+
+    let server =
+    //     if let Some((cert, key)) = cert {
+    //     info!("Using SSL/TLS on public API");
+    //     warp::serve(routes)
+    //         .tls()
+    //         .cert(cert)
+    //         .key(key)
+    //         .run(addr)
+    //         .await
+    // } else {
+        warp::serve(routes)
+            .run(addr)
+            .await;
+    // };
+    Ok(server)
 }
 
 #[derive(serde::Deserialize)]

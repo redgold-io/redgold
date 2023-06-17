@@ -255,6 +255,10 @@ impl NodeConfig {
         self.port_offset + 5
     }
 
+    pub fn explorer_port(&self) -> u16 {
+        self.port_offset + 6
+    }
+
     pub fn default_debug() -> Self {
         NodeConfig::from_test_id(&(0 as u16))
     }
@@ -317,7 +321,8 @@ impl NodeConfig {
             .vec();
         // let path: String = ""
         let folder = DataFolder::target(seed_id.clone() as u32);
-        folder.delete().ensure_exists();
+        // folder.delete().ensure_exists();
+        folder.ensure_exists();
         let mut node_config = NodeConfig::default();
         node_config.self_peer_id = self_peer_id;
         node_config.mnemonic_words = words;
