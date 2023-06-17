@@ -525,6 +525,7 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
     }
     let total_accepted_transactions =
         r.ds.transaction_store.count_total_accepted_transactions().await?;
+
     let peers = r.ds.peer_store.active_nodes(None).await?;
     let num_active_peers = peers.len() as i64;
 
