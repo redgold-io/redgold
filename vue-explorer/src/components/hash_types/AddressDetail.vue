@@ -47,6 +47,10 @@
           <nav>
             <ul class="pagination">
               <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
+                <a class="page-link" href="#" @click.prevent="goToPage(1)" :aria-disabled="currentPage === 1">First</a>
+              </li>
+
+              <li class="page-item" :class="{ 'disabled': currentPage === 1 }">
                 <a class="page-link" href="#" @click.prevent="currentPage--" :aria-disabled="currentPage === 1">Previous</a>
               </li>
 
@@ -57,6 +61,11 @@
               <li class="page-item" :class="{ 'disabled': currentPage === pageCount }">
                 <a class="page-link" href="#" @click.prevent="currentPage++" :aria-disabled="currentPage === pageCount">Next</a>
               </li>
+
+              <li class="page-item" :class="{ 'disabled': currentPage === pageCount }">
+                <a class="page-link" href="#" @click.prevent="goToPage(pageCount)" :aria-disabled="currentPage === pageCount">Last</a>
+              </li>
+
             </ul>
           </nav>
 
@@ -73,10 +82,11 @@
 import CopyClipboard from "@/components/CopyClipboard.vue";
 // import RenderTime from "@/components/RenderTime.vue";
 import BriefTransaction from "@/components/BriefTransaction.vue";
+import fetchHashInfo from "@/components/mixins/fetchHashInfo";
 
 export default {
   name: 'TransactionDetail',
-  props: ['hashData'],
+  props: ['hashDataInitial'],
   components: {
     BriefTransaction,
     // RenderTime,
@@ -87,9 +97,11 @@ export default {
     return {
       transactionType: 'all',
       currentPage: 1,
-      perPage: 10
+      perPage: 10,
+      hashData: this.hashDataInitial
     }
   },
+  mixins: [fetchHashInfo],
   computed: {
     filteredTransactions() {
       if (this.transactionType === 'incoming') {
@@ -122,9 +134,16 @@ export default {
     },
   },
   methods: {
-    goToPage(page) {
+    async goToPage(page) {
       if (page !== this.currentPage) {
         this.currentPage = page;
+
+        // Calculate offset and limit for fetching data
+        let offset = (this.currentPage - 1) * this.perPage;
+        let limit = this.perPage;
+
+        // Fetch data and update hashData
+        await this.fetchData(null, "16481",  offset, limit)
       }
     }
   }
@@ -181,5 +200,24 @@ export default {
   padding-left: 10px;
   background-color: #191a19 !important;
 }
+
+.pagination {
+  background-color: #000000; /* slightly lighter grey for the active page */
+}
+
+.page-link {
+  color: #fff; /* white text */
+  background-color: #000000; /* slightly lighter grey for the active page */
+}
+
+.page-item.active .page-link {
+  background-color: #000000; /* slightly lighter grey for the active page */
+  border-color: #666;
+}
+
+.page-item.disabled .page-link {
+  color: #999; /* lighter grey text for disabled buttons */
+}
+
 
 </style>

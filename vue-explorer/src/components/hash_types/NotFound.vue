@@ -28,10 +28,15 @@ import CopyClipboard from "@/components/CopyClipboard.vue";
 
 export default {
   name: 'NotFound',
-  props: ['hashData'],
+  props: ['hashDataInitial'],
   components: {
     CopyClipboard
-  }
+  },
+  data() {
+    return {
+      hashData: this.hashDataInitial
+    }
+  },
 }
 </script>
 

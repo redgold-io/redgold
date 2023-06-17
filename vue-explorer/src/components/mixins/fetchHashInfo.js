@@ -1,9 +1,34 @@
 export default {
     methods: {
-        async fetchData(url) {
+        async fetchData(url= null, port= null, offset = null, limit = null) {
             const hash = this.$route.params.param; // get the hash from the route parameter
 
-            const response = await fetch(`${url}/explorer/hash/${hash}`);
+            if (url == null) {
+                url = process.env.VUE_APP_API_URL
+            }
+
+            if (port == null) {
+                port = "16481"
+            }
+
+            url += ":" + port
+
+
+            let input = `${url}/explorer/hash/${hash}`;
+
+            // Add offset and limit as query parameters if they are present
+            let params = new URLSearchParams();
+            if (offset !== null) {
+                params.append('offset', offset);
+            }
+            if (limit !== null) {
+                params.append('limit', limit);
+            }
+            if (params.toString()) {
+                input += `?${params.toString()}`;
+            }
+
+            const response = await fetch(input);
             const data = await response.json();
             // console.log(data)
             // console.log(JSON.stringify(data))

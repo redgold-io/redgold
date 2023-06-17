@@ -6,7 +6,7 @@
     </div>
 
     <!-- Render the component dynamically once the data is fetched -->
-    <component v-else :is="componentToRender" :hashData="hashData"></component>
+    <component v-else :is="componentToRender" :hashDataInitial="hashData"></component>
   </div>
 </template>
 
@@ -34,7 +34,7 @@ export default {
   mixins: [fetchHashInfo],
   async created() {
 
-    await this.fetchData("http://localhost:16481");
+    await this.fetchData();
     // const hash = this.$route.params.param; // get the hash from the route parameter
     //
     // const response = await fetch(`http://localhost:16481/explorer/hash/${hash}`);

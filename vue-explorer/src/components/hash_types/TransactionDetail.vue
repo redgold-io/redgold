@@ -174,12 +174,17 @@ import RenderTime from "@/components/RenderTime.vue";
 
 export default {
   name: 'TransactionDetail',
-  props: ['hashData'],
+  props: ['hashDataInitial'],
   components: {
     RenderTime,
     HashLink,
     CopyClipboard
-  }
+  },
+  data() {
+    return {
+      hashData: this.hashDataInitial
+    }
+  },
 }
 </script>
 
