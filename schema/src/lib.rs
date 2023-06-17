@@ -52,6 +52,7 @@ pub mod seeds;
 pub mod trust;
 pub mod input;
 pub mod debug_version;
+pub mod transaction_info;
 
 
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {
@@ -247,7 +248,7 @@ pub trait WithMetadataHashable {
     fn struct_metadata_err(&self) -> Result<&StructMetadata, ErrorInfo>;
     fn version(&self) -> Result<i32, ErrorInfo>;
     fn time(&self) -> Result<&i64, ErrorInfo>;
-    fn hash(&self) -> Hash;
+    fn hash_or(&self) -> Hash;
     fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo>;
     fn hash_vec(&self) -> Vec<u8>;
     fn hash_hex(&self) -> Result<String, ErrorInfo>;
@@ -277,14 +278,14 @@ where
         Ok(self.struct_metadata_opt_ref().safe_get()?.time.safe_get()?)
     }
 
-    fn hash(&self) -> Hash {
+    fn hash_or(&self) -> Hash {
         self.struct_metadata_opt_ref()
             .and_then(|s| s.hash.clone()) // TODO: Change to as_ref() to prevent clone?
             .unwrap_or(self.calculate_hash())
     }
 
     fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self.hash().bytes.safe_bytes()?)
+        Ok(self.hash_or().bytes.safe_bytes()?)
     }
 
     fn hash_vec(&self) -> Vec<u8> {
@@ -292,7 +293,7 @@ where
     }
 
     fn hash_hex(&self) -> Result<String, ErrorInfo> {
-        Ok(hex::encode(self.hash().bytes.safe_bytes()?))
+        Ok(hex::encode(self.hash_or().bytes.safe_bytes()?))
     }
 
     fn hash_hex_or_missing(&self) -> String {

@@ -53,7 +53,7 @@ async fn init_db() {
 }
 
 fn main() {
-    println!("Datastore SQL migrations build script started");
+    println!("Redgold Data datastore SQL migrations build script started");
 
     Builder::new_current_thread()
         .enable_all()

@@ -1,44 +1,63 @@
 {
-  "name": "my-profile-vuejs",
+  "name": "vue-project-template",
   "version": "0.1.0",
   "private": true,
+  "description": "A Vue.js project (boilerplate) template.",
+  "author": "Jon LaBelle",
+  "bugs": {
+    "url": "https://github.com/jonlabelle/vue-project-template/issues"
+  },
+  "homepage": "https://github.com/jonlabelle/vue-project-template",
+  "keywords": [
+    "vue",
+    "project-template",
+    "template"
+  ],
+  "license": "MIT",
+  "repository": "jonlabelle/vue-project-template",
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "serve": "vue-cli-service serve --mode development --port 8080",
+    "build": "vue-cli-service build --mode production",
+    "lint": "vue-cli-service lint --fix",
+    "build-dev": "vue-cli-service build --mode development",
+    "build-report": "vue-cli-service build --mode production --report",
+    "format": "prettier . --write '!**/*.{yml,md}'",
+    "format-check": "prettier . --check '!**/*.{yml,md}'",
+    "format-check-debug": "prettier . --check --loglevel debug '!**/*.{yml,md}'",
+    "test": "vue-cli-service test:unit",
+    "docker": "docker run --rm --name vue-project-template-dev --publish 8080:80 vue-project-template:dev",
+    "docker-build": "docker build --no-cache --file .docker/Dockerfile --tag vue-project-template:dev ."
   },
   "dependencies": {
-    "bootstrap": "^4.5.2",
-    "bootstrap-vue": "^2.17.3",
-    "core-js": "^3.6.5",
-    "vue": "^2.6.11"
+    "axios": "^1.3.1",
+    "bootstrap": "^5.2.3",
+    "core-js": "^3.27.2",
+    "register-service-worker": "^1.7.2",
+    "vue": "^3.2.47",
+    "vue-router": "^4.1.6",
+    "vuex": "^4.1.0"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "~4.5.0",
-    "@vue/cli-plugin-eslint": "~4.5.0",
-    "@vue/cli-service": "~4.5.0",
-    "babel-eslint": "^10.1.0",
-    "eslint": "^6.7.2",
-    "eslint-plugin-vue": "^6.2.2",
-    "vue-template-compiler": "^2.6.11"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "eslint:recommended"
-    ],
-    "parserOptions": {
-      "parser": "babel-eslint"
-    },
-    "rules": {}
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead"
-  ]
+    "@babel/core": "^7.20.12",
+    "@babel/eslint-parser": "^7.19.1",
+    "@fullhuman/postcss-purgecss": "^5.0.0",
+    "@fullhuman/vue-cli-plugin-purgecss": "~5.0.0",
+    "@vue/cli-plugin-babel": "~5.0.8",
+    "@vue/cli-plugin-eslint": "~5.0.8",
+    "@vue/cli-plugin-router": "~5.0.8",
+    "@vue/cli-plugin-unit-jest": "~5.0.8",
+    "@vue/cli-plugin-vuex": "~5.0.8",
+    "@vue/cli-service": "~5.0.8",
+    "@vue/test-utils": "^2.2.9",
+    "@vue/vue3-jest": "^27.0.0-alpha.4",
+    "babel-jest": "^27.5.1",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-vue": "^8.5.0",
+    "jest": "^27.5.1",
+    "prettier": "^2.8.3",
+    "sass": "^1.58.0",
+    "sass-loader": "^12.0.0"
+  }
 }

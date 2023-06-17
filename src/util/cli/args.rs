@@ -116,7 +116,12 @@ pub struct GUI {}
 /// Run a peer to peer node
 #[derive(Args, Debug, Clone)]
 pub struct NodeCli {
-    debug_enable_faucet: bool
+    /// Force enable faucet
+    #[clap(long)]
+    pub debug_enable_faucet: bool,
+    /// E2E test interval
+    #[clap(long)]
+    pub live_e2e_interval: Option<u64>
 }
 
 

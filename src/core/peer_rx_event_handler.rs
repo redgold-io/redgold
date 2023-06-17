@@ -104,7 +104,7 @@ impl PeerRxEventHandler {
         // No auth required requests first
         if let Some(r) = request.hash_search_request {
             response.hash_search_response =
-                Some(crate::api::hash_query::hash_query(relay.clone(), r.search_string).await?);
+                Some(crate::api::hash_query::hash_query(relay.clone(), r.search_string, None, None).await?);
         }
         // TODO: implement this, but first question is why isn't the observation handler accepting them properly?
         if let Some(r) = request.query_observation_proof_request {
@@ -130,7 +130,7 @@ impl PeerRxEventHandler {
 
         if let Some(t) = request.gossip_transaction_request {
             if let Some(t) = t.transaction {
-                info!("Received gossip transaction request for {}", &t.hash().hex());
+                info!("Received gossip transaction request for {}", &t.hash_or().hex());
                 relay.submit_transaction(SubmitTransactionRequest {
                     transaction: Some(t),
                     sync_query_response: false,

@@ -96,6 +96,7 @@
         "structs.TaskLocalDetails",
         "structs.DebugVersionChange",
         "structs.DebugVersionChange2",
+        "structs.PeerIdInfo",
         "structs.VersionInfo"
       ]
     },
@@ -104,6 +105,8 @@
       "description": "serde support for enum",
       "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString)]",
       "paths": [
+        "structs.TransactionState",
+        "structs.ValidationType",
         "structs.State",
         "structs.HashType",
         "structs.Error",

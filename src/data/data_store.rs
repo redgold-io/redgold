@@ -74,11 +74,6 @@ pub struct DataStore {
        .await
        .expect("Connection failure");
 */
-#[derive(Clone)]
-pub struct PeerTrustQueryResult {
-    peer_id: Vec<u8>,
-    trust: f64,
-}
 
 #[derive(Clone)]
 pub struct RewardQueryResult {

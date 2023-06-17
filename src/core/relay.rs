@@ -137,7 +137,7 @@ impl Relay {
         };
         self.observation_metadata.sender.send_err(omi)?;
         let res = tokio::time::timeout(
-            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 1),
+            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 10),
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
@@ -319,7 +319,7 @@ impl Relay {
             .await?;
 
         let mut response = SubmitTransactionResponse {
-            transaction_hash: tx.clone().hash().into(),
+            transaction_hash: tx.clone().hash_or().into(),
             query_transaction_response: None,
             transaction: Some(tx.clone()),
         };

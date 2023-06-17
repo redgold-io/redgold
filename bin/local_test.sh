@@ -20,7 +20,7 @@ sleep 1
 export REDGOLD_BINARY_PATH
 export RUST_BACKTRACE=1
 
-export RUST_MIN_STACK=10485760 # 10mb
+export RUST_MIN_STACK=20485760 # 20mb
 
 
 $REDGOLD_BINARY_PATH --network local --debug-id 0 --genesis --disable-e2e node >log0 2>&1 &

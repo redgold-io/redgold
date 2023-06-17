@@ -238,7 +238,7 @@ fn test_decoding() {
     let bytes = t.proto_serialize();
     let t2 = Transaction::proto_deserialize(bytes).unwrap();
     assert_eq!(t, t2);
-    assert_eq!(t.hash(), t2.hash());
+    assert_eq!(t.hash_or(), t2.hash_or());
 }
 
 //

@@ -407,7 +407,10 @@ message Block {
 
 enum State {
   PENDING = 0;
+  // TODO: Change to accepted
   FINALIZED = 1;
+  // Does this belong here?
+  REJECTED = 2;
 }
 
 enum HashType {
@@ -628,6 +631,11 @@ message PeerNodeInfo {
   DynamicNodeMetadata dynamic_node_metadata = 3;
 }
 
+message PeerIdInfo {
+  Transaction latest_peer_transaction = 1;
+  repeated PeerNodeInfo peer_node_info = 2;
+}
+
 message GetPeersInfoResponse {
   repeated PeerNodeInfo peer_info = 2;
 }
@@ -837,19 +845,22 @@ message TransactionInfo {
   ErrorInfo rejection_reason = 6;
   // Move this outside to the class / request that requires it for resolving.
   optional bool queried_output_index_valid = 7;
+  TransactionState state = 8;
 }
 
 message AddressInfo {
   Address address = 1;
   repeated UtxoEntry utxo_entries = 2;
   int64 balance = 3;
+  repeated Transaction recent_transactions = 4;
 }
 
 message HashSearchResponse {
   TransactionInfo transaction_info = 1;
   AddressInfo address_info = 2;
   Observation observation = 3;
-  PeerData peer_data = 4;
+  PeerNodeInfo peer_node_info = 4;
+  PeerIdInfo peer_id_info = 5;
 }
 
 message PublicRequest {
@@ -1068,5 +1079,15 @@ message DebugVersionChange {
 message DebugVersionChange2 {
   optional string field1 = 1;
   optional string field2 = 2;
+}
+
+enum TransactionState {
+  Rejected = 0;
+  Mempool = 1;
+  Validated = 2;
+  Pending = 3;
+  Finalized = 4;
+  Accepted = 5;
+  Unknown = 6;
 }
 
