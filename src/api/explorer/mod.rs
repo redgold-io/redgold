@@ -2,6 +2,7 @@ pub mod server;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use eframe::egui::accesskit::Role::Math;
 use itertools::Itertools;
 use rocket::form::FromForm;
@@ -10,7 +11,7 @@ use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Serialize, Deserialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, ErrorInfo, Observation, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, Transaction, UtxoEntry, ValidationType};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, Transaction, TrustLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::Pagination;
@@ -116,21 +117,67 @@ pub struct BriefUtxoEntry {
 }
 
 
+
 #[derive(Serialize, Deserialize)]
-pub struct DetailedObservation {
-    pub address: String,
+pub struct DetailedObservationMetadata {
+    pub observed_hash: String,
+    pub observed_hash_type: String,
+    pub validation_type: String,
+    pub state: String,
+    pub validation_confidence: f64,
+    pub time: i64,
+    pub metadata_hash: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DetailedObservation {
+    pub merkle_root: String,
+    pub observations: Vec<DetailedObservationMetadata>,
+    pub public_key: String,
+    pub signature: String,
+    pub time: i64,
+    pub hash: String,
+    pub signable_hash: String,
+    pub salt: i64,
+    pub height: i64,
+    pub parent_hash: String
+}
+
+
+
+#[derive(Serialize, Deserialize)]
+pub struct DetailedTrust {
+    pub peer_id: String,
+    pub trust: f64,
+}
 
 
 #[derive(Serialize, Deserialize)]
 pub struct DetailedPeer {
-    pub address: String,
+    pub peer_id: String,
+    pub merkle_root: String,
+    pub public_key: String,
+    pub signature: String,
+    pub nodes: Vec<DetailedPeerNode>,
+    pub trust: Vec<DetailedTrust>
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct DetailedPeerNode {
-    pub address: String,
+    pub external_address: String,
+    pub public_key: String,
+    pub node_type: String,
+    pub executable_checksum: String,
+    pub commit_hash: String,
+    pub next_executable_checksum: String,
+    pub next_upgrade_time: Option<i64>,
+    pub utxo_distance: f64,
+    pub port_offset: i64,
+    pub alias: String,
+    pub name: String,
+    pub peer_id: String,
+    pub nat_restricted: bool,
+    pub network_environment: String,
 }
 
 
@@ -147,7 +194,8 @@ pub struct ExplorerHashSearchResponse {
 pub struct RecentDashboardResponse {
     pub recent_transactions: Vec<BriefTransaction>,
     total_accepted_transactions: i64,
-    num_active_peers: i64
+    num_active_peers: i64,
+    pub active_peers_abridged: Vec<DetailedPeer>
 }
 
 pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
@@ -190,16 +238,88 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
 }
 
 
-pub async fn handle_observation(p0: &Observation, p1: &Relay) -> RgResult<DetailedObservation> {
-    todo!()
+pub fn convert_observation_metadata(om: &ObservationMetadata) -> RgResult<DetailedObservationMetadata> {
+    Ok(DetailedObservationMetadata{
+        observed_hash: om.observed_hash.safe_get()?.clone().hex(),
+        observed_hash_type:
+        format!("{:?}", HashType::from_i32(om.observed_hash.safe_get()?.clone().hash_type).safe_get()?.clone()),
+        validation_type:
+        format!("{:?}", ValidationType::from_i32(om.observation_type.clone()).safe_get()?.clone()),
+        state:
+        format!("{:?}", State::from_i32(om.state.safe_get()?.clone()).safe_get()?.clone()),
+        validation_confidence: om.validation_confidence.safe_get()?.clone().label() * 10.0,
+        time: om.struct_metadata.safe_get()?.time.safe_get()?.clone(),
+        metadata_hash: om.struct_metadata.safe_get()?.hash.safe_get()?.hex(),
+    })
 }
 
-pub async fn handle_peer(p0: &PeerIdInfo, p1: &Relay) -> RgResult<DetailedPeer> {
-    todo!()
+pub async fn handle_observation(o: &Observation, r: &Relay) -> RgResult<DetailedObservation> {
+
+    Ok(DetailedObservation {
+        merkle_root: o.merkle_root.safe_get()?.hex(),
+        observations: o.observations.iter()
+            .map(|om| convert_observation_metadata(om))
+            .collect::<RgResult<Vec<DetailedObservationMetadata>>>()?,
+        public_key: o.proof.safe_get()?.public_key.safe_get()?.hex_or(),
+        signature: hex::encode(o.proof.safe_get()?.signature.safe_get()?.bytes.safe_bytes()?),
+        time: o.struct_metadata.safe_get()?.time.safe_get()?.clone(),
+        hash: o.struct_metadata.safe_get()?.hash.safe_get()?.hex(),
+        signable_hash: o.signable_hash().hex(),
+        salt: o.salt.clone(),
+        height: o.height.clone(),
+        parent_hash: o.parent_hash.as_ref().map(|h| h.hex()).unwrap_or("".to_string()),
+    })
 }
 
-pub async fn handle_peer_node(p0: &PeerNodeInfo, p1: &Relay) -> RgResult<DetailedPeerNode> {
-    todo!()
+pub fn convert_trust(trust: &TrustLabel) -> RgResult<DetailedTrust> {
+    Ok(DetailedTrust{
+        peer_id: hex::encode(&trust.peer_id),
+        trust: trust.trust_data.get(0).safe_get()?.label(),
+    })
+}
+
+pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
+    let pd = p.latest_peer_transaction.safe_get()?.peer_data()?;
+    let mut nodes = vec![];
+    for pni in &p.peer_node_info {
+        nodes.push(handle_peer_node(pni, &r).await?);
+    }
+    Ok(DetailedPeer {
+        peer_id: hex::encode(pd.peer_id.safe_get()?.peer_id.safe_bytes()?),
+        merkle_root: pd.merkle_proof.safe_get()?.root.safe_get()?.hex(),
+        public_key: pd.proof.safe_get()?.public_key.safe_get()?.hex_or(),
+        signature: hex::encode(pd.proof.safe_get()?.signature.safe_get()?.bytes.safe_bytes()?),
+        nodes,
+        trust: pd.labels.iter().map(|l| convert_trust(l))
+            .collect::<RgResult<Vec<DetailedTrust>>>()?,
+    })
+}
+
+pub async fn handle_peer_node(p: &PeerNodeInfo, r: &Relay) -> RgResult<DetailedPeerNode> {
+    let nmd = p.latest_node_transaction.safe_get()?.node_metadata()?;
+    let vi = nmd.version_info.clone().safe_get()?.clone();
+    Ok(DetailedPeerNode{
+        external_address: nmd.external_address.clone(),
+        public_key: nmd.public_key.safe_get()?.hex()?,
+        node_type:  format!("{:?}", NodeType::from_i32(nmd.node_type.safe_get()?.clone()).safe_get()?.clone()),
+        executable_checksum: vi.executable_checksum.clone(),
+        commit_hash: vi.commit_hash.unwrap_or("".to_string()),
+        next_executable_checksum: vi.next_executable_checksum.clone().unwrap_or("".to_string()),
+        next_upgrade_time: vi.next_upgrade_time.clone(),
+        utxo_distance: nmd.partition_info.as_ref()
+            .and_then(|p| p.utxo_distance)
+            .map(|d| (d as f64) / 1000 as f64) // TODO: use a function for this
+            .unwrap_or(1.0),
+        port_offset: nmd.port_offset.unwrap_or(0),
+        alias: nmd.alias.unwrap_or("".to_string()),
+        name: nmd.name.unwrap_or("".to_string()),
+        peer_id: nmd.peer_id.as_ref()
+            .and_then(|p| p.peer_id.safe_bytes().ok())
+            .map(|p| hex::encode(p)).unwrap_or("".to_string()),
+        nat_restricted: nmd.nat_restricted.unwrap_or(false),
+        network_environment:
+        format!("{:?}", NetworkEnvironment::from_i32(nmd.network_environment.clone()).safe_get()?.clone()),
+    })
 }
 
 pub async fn handle_explorer_hash(hash_input: String, p1: Relay, pagination: Pagination) -> RgResult<ExplorerHashSearchResponse> {
@@ -405,12 +525,28 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
     }
     let total_accepted_transactions =
         r.ds.transaction_store.count_total_accepted_transactions().await?;
-    let num_active_peers = r.ds.peer_store.active_nodes(None).await?.len() as i64;
+    let peers = r.ds.peer_store.active_nodes(None).await?;
+    let num_active_peers = peers.len() as i64;
 
+    let pks = peers[0..10.min(peers.len())].to_vec();
+    let mut active_peers_abridged = vec![];
+    for pk in pks {
+        if let Some(pid) = r.ds.peer_store.query_public_key_node(pk).await?
+            .and_then(|p| p.latest_peer_transaction)
+            .and_then(|p| p.peer_data().ok())
+            .and_then(|p| p.peer_id) {
+            if let Some(pid_info) = r.ds.peer_store.query_peer_id_info(&pid).await? {
+                if let Some(p) = handle_peer(&pid_info, &r).await.ok() {
+                    active_peers_abridged.push(p);
+                }
+            }
+        }
+    }
     Ok(RecentDashboardResponse {
         recent_transactions,
         total_accepted_transactions,
-        num_active_peers
+        num_active_peers,
+        active_peers_abridged,
     })
 }
 

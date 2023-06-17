@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use crate::structs::{Observation, ObservationMetadata, ObservationProof};
-use crate::{struct_metadata_new, Hash, HashClear, StructMetadata, TestConstants, WithMetadataHashable, WithMetadataHashableFields, util};
+use crate::{struct_metadata_new, Hash, HashClear, StructMetadata, TestConstants, WithMetadataHashable, WithMetadataHashableFields, util, ProtoHashable};
 
 
 impl HashClear for Observation {
@@ -84,6 +84,12 @@ impl Observation {
             res.push(op);
         };
         res
+    }
+
+    pub fn signable_hash(&self) -> Hash {
+        let mut s = self.clone();
+        s.proof = None;
+        s.calculate_hash()
     }
 
 }
