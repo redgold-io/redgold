@@ -69,7 +69,7 @@ pub fn setup_server_redgold(
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 1), true);
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 4), true);
     ssh.exec(format!("sudo ufw allow proto udp from any to any port {}", port + 5), true);
-    ssh.exec(format!("sudo ufw allow proto udp from any to any port {}", port + 6), true);
+    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 6), true);
 
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))

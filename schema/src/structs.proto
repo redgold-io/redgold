@@ -92,7 +92,9 @@ message TrustLabel {
 }
 
 message PartitionInfo {
-  // etc.
+  // Times 1000
+  // TODO: Change to UtxoDistance
+  // so we can preserve PartialEq and convert explicitly
   optional int64 utxo_distance = 1;
 }
 
@@ -138,8 +140,12 @@ message PeerId {
 message PeerData {
   optional PeerId peer_id = 1;
   optional MerkleProof merkle_proof = 2;
+  // This proof should be removed in favor of the one
+  // on the transaction itself
   optional Proof proof = 3;
   repeated NodeMetadata node_metadata = 4;
+  // Rename as RatingLabel
+  // Also we need to store model outputs on NMD dynamic?
   repeated TrustLabel labels = 5;
   optional VersionInfo version_info = 6;
 }
