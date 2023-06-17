@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use env_logger::Env;
-use redgold_schema::structs::NetworkEnvironment;
+use redgold_schema::ErrorInfoContext;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use crate::data::data_store::DataStore;
 
 // TODO: Move everything to use this
@@ -34,6 +35,22 @@ impl EnvDataFolder {
 
     pub fn servers_path(&self) -> PathBuf {
         self.path.join("servers")
+    }
+
+    pub fn cert_path(&self) -> PathBuf {
+        self.path.join("certificate.crt")
+    }
+
+    pub async fn cert(&self) -> Result<Vec<u8>, ErrorInfo> {
+        tokio::fs::read(self.cert_path()).await.error_info("Missing cert")
+    }
+
+    pub async fn key(&self) -> Result<Vec<u8>, ErrorInfo> {
+        tokio::fs::read(self.key_path()).await.error_info("Missing key")
+    }
+
+    pub fn key_path(&self) -> PathBuf {
+        self.path.join("private_key.key")
     }
 
     pub fn ensure_exists(&self) -> &Self {
@@ -82,7 +99,7 @@ impl DataFolder {
 
     pub fn target(id: u32) -> Self {
         let cwd = std::env::current_dir().expect("Current dir");
-        let cwd_target = cwd.join("target");
+        let cwd_target = cwd.join("target2");
         Self{path: cwd_target.join(format!("node_{}", id))}
     }
 

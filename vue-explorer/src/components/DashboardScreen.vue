@@ -82,7 +82,14 @@ export default {
     }
   },
   mounted() {
-    axios.get('http://localhost:16481/explorer')
+
+    let url = process.env.VUE_APP_API_URL;
+    let port = "16486";
+
+    url += ":" + port
+
+
+    axios.get(`${url}/explorer`)
         .then(response => {
           console.log(response.data); // log the response data
           this.transactions = response.data['recent_transactions'];
