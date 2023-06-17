@@ -145,7 +145,9 @@ pub struct ExplorerHashSearchResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct RecentDashboardResponse {
-    pub recent_transactions: Vec<BriefTransaction>
+    pub recent_transactions: Vec<BriefTransaction>,
+    total_accepted_transactions: i64,
+    num_active_peers: i64
 }
 
 pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
@@ -401,8 +403,14 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
         let brief_tx = brief_transaction(&tx)?;
         recent_transactions.push(brief_tx);
     }
+    let total_accepted_transactions =
+        r.ds.transaction_store.count_total_accepted_transactions().await?;
+    let num_active_peers = r.ds.peer_store.active_nodes(None).await?.len() as i64;
+
     Ok(RecentDashboardResponse {
         recent_transactions,
+        total_accepted_transactions,
+        num_active_peers
     })
 }
 
