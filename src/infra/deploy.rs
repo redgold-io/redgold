@@ -152,6 +152,12 @@ pub async fn setup_ops_services(
         format!("{}/dashboards/node-exporter.json", remote_path)
     );
 
+    let x = include_str!("../resources/infra/ops_services/dashboards/redgold_rev0.json");
+    ssh.copy(
+        x.clone(),
+        format!("{}/dashboards/redgold.json", remote_path)
+    );
+
     // println!("Copying node exporter dashboard: {}", x);
 
     ssh.copy(
@@ -194,10 +200,11 @@ async fn test_setup_server() {
     println!("Reading servers file: {:?}", buf);
     let s = ArgTranslate::read_servers_file(buf).expect("servers");
     println!("Setting up servers: {:?}", s);
-    let mut gen = true;
+    // let mut gen = true;
+    let mut gen = false;
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
-    for ss in s {
+    for ss in s[1..].to_vec() {
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host, None);

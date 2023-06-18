@@ -141,6 +141,9 @@ impl ArgTranslate {
         self.apply_node_opts();
         self.genesis();
 
+        tracing::info!("Parsed args successfully with args: {:?}", self.args);
+        tracing::info!("RgArgs options parsed: {:?}", self.opts);
+
         Ok(())
     }
 
@@ -435,7 +438,9 @@ impl ArgTranslate {
     }
     fn genesis(&mut self) {
         if let Some(o) = std::env::var("REDGOLD_GENESIS").ok() {
-            self.node_config.genesis = true;
+            if let Ok(b) = o.parse::<bool>() {
+                self.node_config.genesis = b;
+            }
         }
         if self.opts.genesis {
             self.node_config.genesis = true;
