@@ -8,29 +8,20 @@
       <!-- Main content div -->
       <div class="col-10">
 
-        <!-- Columns for transaction and peers -->
-        <div class="row">
+        <div><strong>Total Transactions {{total_transactions}}</strong></div>
+        <div><strong>Total Peers {{num_active_peers}}</strong></div>
 
-          <!-- Transactions Table -->
-          <div class="col-sm-9">
-            <h4>Recent Transactions</h4>
-            <BriefTransaction :transactions="transactions"/>
-          </div>
+        <h4>Recent Transactions</h4>
+        <BriefTransaction :transactions="transactions"/>
 
-          <!-- Peers Table -->
-          <div class="col-sm-3">
-            <h4>Active Peers</h4>
-<!--            <b-table striped hover :items="peers">-->
-<!--              <template v-slot:cell(peerId)="data">-->
-<!--                <a :href="`https://example.com/peers/${data.value}`">{{ data.value }}</a>-->
-<!--              </template>-->
-<!--            </b-table>-->
-          </div>
+        <h4>Recent Observations</h4>
+        <BriefObservation :data="observations"/>
 
-        </div>
-
+        <h4>Active Peers</h4>
+        <BriefPeer :data="peers"/>
 
       </div>
+
       <!-- Buffer div -->
       <div class="col-1"></div>
 
@@ -46,11 +37,18 @@
 import axios from 'axios'
 // import HashLink from './HashLink';
 import BriefTransaction from "@/components/BriefTransaction.vue";
+// import PeerInfo from "@/components/hash_types/PeerInfo.vue";
+// import ObservationDetail from "@/components/ObservationDetail.vue";
+import BriefObservation from "@/components/BriefObservation.vue";
+import BriefPeer from "@/components/BriefPeer.vue";
 
 export default {
   name: 'DashboardScreen',
   components: {
+    BriefObservation,
     BriefTransaction,
+    BriefPeer,
+    // ObservationDetail
     // BJumbotron,
     // BButton,
     // BForm,
@@ -71,14 +69,10 @@ export default {
           timestamp: 1580000000,
         },
       ],
-      //   { key: 'transactionId', label: 'Transaction ID', formatter: value => `<a href="https://example.com/transactions/${value}">${value}</a>` },
-      peers: [
-        { peerId: 'P123', address: '192.168.1.1' },
-      ],
-      // peerFields: [
-      //   { key: 'peerId', label: 'Peer ID', formatter: value => `<a href="https://example.com/peers/${value}">${value}</a>` },
-      //   { key: 'address', label: 'Address' },
-      // ]
+      peers: [],
+      observations: [],
+      total_transactions: 0,
+      num_active_peers: 0
     }
   },
   mounted() {
@@ -91,8 +85,16 @@ export default {
 
     axios.get(`${url}/explorer`)
         .then(response => {
-          console.log(response.data); // log the response data
-          this.transactions = response.data['recent_transactions'];
+          let data = response.data;
+          console.log(data); // log the response data
+          this.transactions = data['recent_transactions'];
+          // for (let i = 0; i < peers.length; i++) {
+          //   peers[i].nodes = peers[i].nodes.slice(0, 1);
+          // }
+          this.peers = data['active_peers_abridged'];
+          this.observations = data['recent_observations'];
+          this.total_transactions = data.total_accepted_transactions
+          this.num_active_peers = data.num_active_peers
         })
         .catch(error => {
           console.error(error);
@@ -102,5 +104,10 @@ export default {
 </script>
 
 <style>
+
+h4 {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
 
 </style>

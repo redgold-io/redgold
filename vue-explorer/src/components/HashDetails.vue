@@ -17,6 +17,10 @@ import NotFound from './hash_types/NotFound.vue';
 // import HashTypeB from './HashTypeB.vue';
 // import HashTypeC from './HashTypeC.vue';
 import fetchHashInfo from './mixins/fetchHashInfo.js';
+import ObservationDetail from "@/components/hash_types/ObservationDetail.vue";
+import PeerInfo from "@/components/hash_types/PeerInfo.vue";
+// import PeerNodeInfo from "@/components/hash_types/PeerNodeInfo.vue";
+import PeerNodeDetail from "@/components/hash_types/PeerNodeDetail.vue";
 export default {
   name: 'HashDetails',
   data() {
@@ -29,6 +33,9 @@ export default {
   components: {
     TransactionDetail,
     AddressDetail,
+    ObservationDetail,
+    PeerInfo,
+    PeerNodeDetail,
     NotFound,
   },
   mixins: [fetchHashInfo],

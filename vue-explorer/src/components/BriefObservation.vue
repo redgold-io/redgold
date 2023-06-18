@@ -3,34 +3,20 @@
     <table class="table table-striped table-hover">
       <thead>
       <tr>
-        <th v-for="field in this.transactionFields" :key="field.key">
-          {{ field.key.charAt(0).toUpperCase() + field.key.slice(1) }}
+        <th v-for="field in this.fields" :key="field.key">
+          {{ formatTitle(field.key) }}
         </th>
       </tr>
       </thead>
       <tbody>
-      <tr v-for="transaction in transactions" :key="transaction.hash">
-        <td>
-          <HashLink :data="transaction.hash" />
-        </td>
-        <td>
-          <HashLink :data="transaction.from" />
-        </td>
-        <td>
-          <HashLink :data="transaction.to" />
-        </td>
-        <td>
-          {{ transaction.amount }}
-        </td>
-        <td>
-          {{ transaction.fee }}
-        </td>
-        <td>
-          {{ transaction.bytes }}
-        </td>
-        <td>
-          <RenderTime :timestamp="transaction.timestamp" />
-        </td>
+      <tr v-for="(d, index) in data" :key="index">
+        <td><HashLink :data="d.public_key" /></td>
+        <td><HashLink :data="d.hash" /></td>
+        <td> {{d.observations.length}} </td>
+        <td> {{d.height}} </td>
+        <td><HashLink :data="d.parent_hash" /></td>
+        <td><HashLink :data="d.observations[0].observed_hash" /></td>
+        <td> <RenderTime :timestamp="d.time"/></td>
       </tr>
       </tbody>
     </table>
@@ -39,29 +25,35 @@
 <script>
 import HashLink from "@/components/util/HashLink.vue";
 import RenderTime from "@/components/RenderTime.vue";
+import {toTitleCase} from "@/utils";
 export default {
-  name: "BriefTransaction",
+  name: "BriefObservation",
   components: {
     HashLink,
     RenderTime
   },
   props: {
-    transactions: Array,
+    data: Object,
+  },
+  methods: {
+    // Now you can use toTitleCase in this component
+    formatTitle(key) {
+      return toTitleCase(key);
+    },
+    shortenExeChecksum(h) {
+      return h.substring(h.length - 8)
+    }
   },
   data() {
     return {
-      transactionFields: [
-        {key: 'hash'},
-        {key: 'from'},
-        {key: 'to'},
-        {key: 'amount'},
-        {key: 'fee'},
-        {key: 'bytes'},
-        {
-          key: 'timestamp', formatter: (value) => {
-            return new Date(value).toLocaleString(); // This line is assuming the timestamp is in milliseconds
-          }
-        },
+      fields: [
+        {key: 'public_key'},
+        {key: 'observation_hash'},
+        {key: 'count'},
+        {key: 'height'},
+        {key: 'parent_hash'},
+        {key: 'sample'},
+        {key: 'time'}
       ],
     };
   }

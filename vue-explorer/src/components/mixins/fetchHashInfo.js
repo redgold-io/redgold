@@ -30,7 +30,7 @@ export default {
 
             const response = await fetch(input);
             const data = await response.json();
-            // console.log(data)
+            console.log(data)
             // console.log(JSON.stringify(data))
             // console.log(Object.keys(data)); // Output: ["a", "b", "c"]
             // determine which component to render based on the data
@@ -41,6 +41,18 @@ export default {
                 this.hashData = data.address;
                 this.componentToRender = 'AddressDetail';
                 console.log("Loading address detail");
+            } else if (data.observation != null) {
+                this.hashData = data.observation;
+                this.componentToRender = 'ObservationDetail';
+                console.log("Loading observation detail");
+            } else if (data.peer != null) {
+                this.hashData = data.peer;
+                this.componentToRender = 'PeerInfo';
+                console.log("Loading PeerInfo detail");
+            } else if (data.peer_node != null) {
+                this.hashData = data.peer_node;
+                this.componentToRender = 'PeerNodeDetail';
+                console.log("Loading PeerNodeDetail detail");
             } else {
                 this.hashData = hash;
                 this.componentToRender = 'NotFound';

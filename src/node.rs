@@ -514,7 +514,9 @@ impl LocalNodes {
                 .node
                 .relay
                 .ds
-                .query_time_observation(0, end_time)
+                .observation
+                .query_time_observation(0, end_time as i64)
+                .await
                 .unwrap()
                 .into_iter()
                 .map(|x| x.observation.unwrap().proto_serialize())
