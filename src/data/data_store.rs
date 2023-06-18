@@ -141,57 +141,6 @@ impl DataStore {
     }
 
 
-    fn create_observation(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS observation (
-                  root    BLOB PRIMARY KEY,
-                  raw_observation    BLOB,
-                  public_key    BLOB,
-                  proof    BLOB,
-                  time INTEGER
-                  )",
-                [],
-            )
-        });
-    }
-
-    fn create_observation_edge(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS observation_edge (
-                  root    BLOB NOT NULL,
-                  leaf_hash    BLOB NOT NULL,
-                  observation_hash    BLOB NOT NULL,
-                  observation_metadata BLOB NOT NULL,
-                  merkle_proof BLOB NOT NULL,
-                  time INTEGER,
-                  PRIMARY KEY(observation_hash, leaf_hash, root)
-                  )",
-                [],
-            )
-        });
-    }
-    //
-    // fn create_mnemonic(&self) -> rusqlite::Result<usize, Error> {
-    //     return self.connection().and_then(|c| {
-    //         c.execute(
-    //             "CREATE TABLE IF NOT EXISTS mnemonic (
-    //               words    STRING PRIMARY KEY,
-    //               time INTEGER,
-    //               peer_id BLOB
-    //               )",
-    //             /*
-    //               ,
-    //             rounds INTEGER,
-    //             iv BLOB,
-    //             password_id BLOB
-    //                */
-    //             [],
-    //         )
-    //     });
-    // }
-
     #[allow(dead_code)]
     pub(crate) async fn create_mnemonic(&self) -> result::Result<usize, sqlx::Error> {
         let mut conn = self.pool.acquire().await?;
@@ -835,26 +784,6 @@ impl DataStore {
         return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
     }
 
-    pub fn query_time_observation(
-        &self,
-        start_time: u64,
-        end_time: u64,
-    ) -> rusqlite::Result<Vec<ObservationEntry>, Error> {
-        let conn = self.connection()?;
-
-        let mut statement = conn.prepare(
-            "SELECT raw_observation, time FROM observation WHERE time >= ?1 AND time < ?2",
-        )?;
-
-        let rows = statement.query_map(params![start_time, end_time], |row| {
-            let vec = row.get(0)?;
-            let time: u64 = row.get(1)?;
-            let observation = Some(Observation::proto_deserialize(vec).unwrap());
-            Ok(ObservationEntry { observation, time })
-        })?;
-        return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
-    }
-
     pub fn query_time_utxo(
         &self,
         start_time: u64,
@@ -929,20 +858,6 @@ WHERE
         )?;
         let rows = statement.execute(params![transaction_hash, output_index])?;
         return Ok(rows);
-    }
-
-    pub fn query_balance(&self, address: &Vec<u8>) -> rusqlite::Result<u64, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare("SELECT output FROM utxo WHERE address = ?1")?;
-
-        let rows = statement.query_map(params![address], |row| {
-            let data: Vec<u8> = row.get(0)?;
-            Ok(Output::proto_deserialize(data).unwrap().amount())
-        })?;
-
-        let total: u64 = rows.map(|r| r.unwrap()).sum();
-
-        return Ok(total);
     }
 
     pub async fn from_path(path: String) -> DataStore {

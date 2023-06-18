@@ -196,6 +196,9 @@ impl ObservationBuffer {
         let proofs = o.build_observation_proofs();
         self.relay.ds.observation.insert_observation_and_edges(&o, struct_metadata.safe_get()?.time.expect("time")).await?;
 
+        // Verify stored.
+        assert!(self.relay.ds.observation.query_observation(&o.hash_or()).await?.is_some());
+
         self.latest = Some(o.clone());
         // self.relay.ds.transaction_store
         let mut request = Request::empty();

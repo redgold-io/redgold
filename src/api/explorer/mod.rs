@@ -15,6 +15,7 @@ use redgold_schema::structs::{AddressInfo, ErrorInfo, HashType, NetworkEnvironme
 use strum_macros::EnumString;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::Pagination;
+use crate::util;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {
@@ -155,7 +156,6 @@ pub struct DetailedTrust {
 #[derive(Serialize, Deserialize)]
 pub struct DetailedPeer {
     pub peer_id: String,
-    pub merkle_root: String,
     pub public_key: String,
     pub signature: String,
     pub nodes: Vec<DetailedPeerNode>,
@@ -195,7 +195,8 @@ pub struct RecentDashboardResponse {
     pub recent_transactions: Vec<BriefTransaction>,
     total_accepted_transactions: i64,
     num_active_peers: i64,
-    pub active_peers_abridged: Vec<DetailedPeer>
+    pub active_peers_abridged: Vec<DetailedPeer>,
+    pub recent_observations: Vec<DetailedObservation>
 }
 
 pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
@@ -247,7 +248,9 @@ pub fn convert_observation_metadata(om: &ObservationMetadata) -> RgResult<Detail
         format!("{:?}", ValidationType::from_i32(om.observation_type.clone()).safe_get()?.clone()),
         state:
         format!("{:?}", State::from_i32(om.state.safe_get()?.clone()).safe_get()?.clone()),
-        validation_confidence: om.validation_confidence.safe_get()?.clone().label() * 10.0,
+        validation_confidence: om.validation_confidence.as_ref()
+            .map(|l| l.label() * 10.0)
+            .unwrap_or(10.0),
         time: om.struct_metadata.safe_get()?.time.safe_get()?.clone(),
         metadata_hash: om.struct_metadata.safe_get()?.hash.safe_get()?.hex(),
     })
@@ -286,9 +289,10 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
     }
     Ok(DetailedPeer {
         peer_id: hex::encode(pd.peer_id.safe_get()?.peer_id.safe_bytes()?),
-        merkle_root: pd.merkle_proof.safe_get()?.root.safe_get()?.hex(),
-        public_key: pd.proof.safe_get()?.public_key.safe_get()?.hex_or(),
-        signature: hex::encode(pd.proof.safe_get()?.signature.safe_get()?.bytes.safe_bytes()?),
+        // TODO: From transaction, should include address and latest input pk?
+        // or do the merkle proofs contain this?
+        public_key: "".to_string(), //pd.proof.safe_get()?.public_key.safe_get()?.hex_or(),
+        signature: "".to_string(), // hex::encode(pd.proof.safe_get()?.signature.safe_get()?.bytes.safe_bytes()?),
         nodes,
         trust: pd.labels.iter().map(|l| convert_trust(l))
             .collect::<RgResult<Vec<DetailedTrust>>>()?,
@@ -526,10 +530,13 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
     let total_accepted_transactions =
         r.ds.transaction_store.count_total_accepted_transactions().await?;
     let peers = r.ds.peer_store.active_nodes(None).await?;
-    let num_active_peers = peers.len() as i64;
+    let num_active_peers = (peers.len() as i64) + 1;
 
-    let pks = peers[0..10.min(peers.len())].to_vec();
+    let pks = peers[0..9.min(peers.len())].to_vec();
     let mut active_peers_abridged = vec![];
+    active_peers_abridged.push(
+        handle_peer(&r.node_config.self_peer_id_info(), &r).await?
+    );
     for pk in pks {
         if let Some(pid) = r.ds.peer_store.query_public_key_node(pk).await?
             .and_then(|p| p.latest_peer_transaction)
@@ -542,11 +549,24 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
             }
         }
     }
+
+
+    let obs = r.ds.observation.recent_observation(
+        Some(10),
+    ).await?;
+
+    let mut recent_observations = vec![];
+    for i in obs[0..10.min(obs.len())].iter() {
+        let o = handle_observation(&i, &r).await?;
+        recent_observations.push(o);
+    }
+
     Ok(RecentDashboardResponse {
         recent_transactions,
         total_accepted_transactions,
         num_active_peers,
         active_peers_abridged,
+        recent_observations
     })
 }
 

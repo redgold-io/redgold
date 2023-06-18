@@ -24,7 +24,7 @@
 <script>
 
 
-import CopyClipboard from "@/components/CopyClipboard.vue";
+import CopyClipboard from "@/components/util/CopyClipboard.vue";
 
 export default {
   name: 'NotFound',

@@ -79,7 +79,7 @@
 <script>
 
 // import HashLink from "@/components/HashLink.vue";
-import CopyClipboard from "@/components/CopyClipboard.vue";
+import CopyClipboard from "@/components/util/CopyClipboard.vue";
 // import RenderTime from "@/components/RenderTime.vue";
 import BriefTransaction from "@/components/BriefTransaction.vue";
 import fetchHashInfo from "@/components/mixins/fetchHashInfo";

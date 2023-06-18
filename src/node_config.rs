@@ -16,7 +16,7 @@ use itertools::Itertools;
 use log::{debug, info};
 use redgold_schema::servers::Server;
 use redgold_schema::{ErrorInfoContext, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerNodeInfo, Request, Response, VersionInfo};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerIdInfo, PeerNodeInfo, Request, Response, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::{dhash_vec, merkle};
 use redgold_schema::util::merkle::MerkleTree;
@@ -109,6 +109,15 @@ impl NodeConfig {
         self.public_key().hex()?.short_string()
     }
 
+    pub fn version_info(&self) -> VersionInfo {
+        VersionInfo{
+            executable_checksum: self.executable_checksum.clone().unwrap_or("".to_string()),
+            commit_hash: None,
+            next_upgrade_time: None,
+            next_executable_checksum: None,
+        }
+    }
+
     pub fn node_metadata(&self) -> NodeMetadata {
         let pair = self.internal_mnemonic().active_keypair();
         let pk_vec = pair.public_key_vec();
@@ -118,12 +127,7 @@ impl NodeConfig {
             public_key: Some(self.public_key()),
             proof: None,
             node_type: Some(NodeType::Static as i32),
-            version_info: Some(VersionInfo{
-                executable_checksum: self.executable_checksum.clone().unwrap_or("".to_string()),
-                commit_hash: None,
-                next_upgrade_time: None,
-                next_executable_checksum: None,
-            }),
+            version_info: Some(self.version_info()),
             partition_info: None,
             port_offset: Some(self.port_offset as i64),
             alias: None,
@@ -159,6 +163,13 @@ impl NodeConfig {
         }
     }
 
+    pub fn self_peer_id_info(&self) -> PeerIdInfo {
+        PeerIdInfo {
+            latest_peer_transaction: Some(self.peer_data_tx()),
+            peer_node_info: vec![self.self_peer_info()],
+        }
+    }
+
     pub fn peer_data_tx(&self) -> Transaction {
         let pair = self.internal_mnemonic().active_keypair();
 
@@ -168,7 +179,7 @@ impl NodeConfig {
             proof: None,
             node_metadata: vec![self.node_metadata()],
             labels: vec![],
-            version_info: None
+            version_info: Some(self.version_info())
         };
 
         let tx = TransactionBuilder::new().with_output_peer_data(

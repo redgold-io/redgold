@@ -168,8 +168,8 @@
 
 <script>
 
-import HashLink from "@/components/HashLink.vue";
-import CopyClipboard from "@/components/CopyClipboard.vue";
+import HashLink from "@/components/util/HashLink.vue";
+import CopyClipboard from "@/components/util/CopyClipboard.vue";
 import RenderTime from "@/components/RenderTime.vue";
 
 export default {

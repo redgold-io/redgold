@@ -61,19 +61,38 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
     }
 
     if let Some(pk) = PublicKey::from_hex(hash_input.clone()).ok() {
+        if relay.node_config.public_key() == pk {
+            response.peer_node_info = Some(relay.node_config.self_peer_info());
+            return Ok(response);
+        }
         if let Some(pni) = relay.ds.peer_store.query_public_key_node(pk).await? {
             response.peer_node_info = Some(pni);
             return Ok(response);
         }
     }
 
-    let id = PeerId::from_bytes(from_hex(hash_input.clone())?);
+    let result = from_hex(hash_input.clone())?;
+    let id = PeerId::from_bytes(result.clone());
+    if relay.node_config.self_peer_id == result {
+        response.peer_id_info = Some(relay.node_config.self_peer_id_info());
+        return Ok(response);
+    }
+
     if let Some(pid_info) = relay.ds.peer_store
         .query_peer_id_info(&id)
         .await? {
         response.peer_id_info = Some(pid_info);
         return Ok(response);
     }
+
+    if let Some(h) = Hash::from_hex(hash_input.clone()).ok() {
+        let r = relay.ds.observation.query_observation(&h).await?;
+        if let Some(r) = r {
+            response.observation = r.observation.clone();
+            return Ok(response);
+        }
+    }
+
     // Err(error_info("Hash not found"))
     Ok(response)
 }
