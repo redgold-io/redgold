@@ -10,9 +10,7 @@ homepage = "https://redgold.io"
 repository = "https://github.com/redgold-io/redgold"
 license = "MIT"
 keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
-categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slugs
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-#exclude = ["/.github", "bin", "vue-explorer"]
+categories = ["cryptography::cryptocurrencies"]
 
 
 
