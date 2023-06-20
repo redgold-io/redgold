@@ -1,6 +1,6 @@
 [package]
 name = "redgold-data"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Redgold"]
 description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
