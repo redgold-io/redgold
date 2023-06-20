@@ -2,15 +2,14 @@
 name = "redgold-schema"
 version = "0.1.0"
 edition = "2021"
-authors = ["Redgold Labs"]
+authors = ["Redgold"]
 description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
-documentation = "https://redgold.app/docs"
+documentation = "https://dev.docs.redgold.io/"
 readme = "README.md"
-homepage = "https://redgold.app"
-repository = "https://github.com/redgold-app/redgold"
+homepage = "https://redgold.io"
+repository = "https://github.com/redgold-io/redgold"
 license = "MIT"
-keywords = ["crypto", "cryptocurrency", "trust",
-    "reputation", "custodial", "decentralized", "p2p", "contracts", "peer-to-peer", "merkle"]
+keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
 categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slugs
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
