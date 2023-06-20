@@ -45,7 +45,7 @@ async fn init_db() {
         .expect("Connection failure");
 
     // this works
-    sqlx::migrate!("../migrations")
+    sqlx::migrate!("./migrations")
         .run(&pool)
         .await
         .expect("Wtf");

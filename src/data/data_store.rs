@@ -921,7 +921,7 @@ WHERE
     }
 
     pub async fn run_migrations(&self) -> result::Result<(), ErrorInfo> {
-        sqlx::migrate!("./migrations")
+        sqlx::migrate!("./data/migrations")
             .run(&*self.pool)
             .await
             .map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
@@ -1213,7 +1213,7 @@ async fn test_sqlx_migrations() {
     let mut conn = ds.pool.acquire().await.expect("connection");
 
     // this works
-    sqlx::migrate!("./migrations")
+    sqlx::migrate!("./data/migrations")
         .run(&*ds.pool)
         .await
         .expect("Wtf");
