@@ -17,8 +17,8 @@ categories = ["cryptography::cryptocurrencies"]
 [workspace]
 members = [
 #    "app",
-    "core",
-#    "data",
+#    "core",
+    "data",
     "schema",
 #    "sdk",
     "executor"
