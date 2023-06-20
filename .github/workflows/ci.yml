@@ -205,6 +205,7 @@ jobs:
           if [ -f "./redgold_mac" ]; then
           echo "MAC_BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
           else
+          touch redgold_mac
           echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
           fi
 
@@ -292,7 +293,7 @@ jobs:
         with:
           files: |
             redgold_linux
-#            redgold_mac
+            redgold_mac
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           body: "
