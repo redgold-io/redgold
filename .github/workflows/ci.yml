@@ -220,7 +220,7 @@ jobs:
       - run: aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum
 #      - run: cd .; echo 'Intended upload path: s3://${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}'
       - run: cd vue-explorer; npm install && npm run build
-      - run: cd docs; npm install && npm run build
+      - run: cd docs; npm install && npm run generate
 
       - name: Upload Explorer Distribution to S3
         if: github.ref == 'refs/heads/dev'
