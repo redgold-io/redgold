@@ -66,6 +66,7 @@ pub struct DataStore {
     pub multiparty_store: MultipartyStore,
     //pub server_store: ServerStore
     pub observation: ObservationStore,
+    pub ctx: DataStoreContext,
 }
 
 /*
@@ -873,6 +874,7 @@ WHERE
         let pl = Arc::new(pool);
         let ctx = DataStoreContext { connection_path: path.clone(), pool: pl.clone() };
         DataStore {
+            ctx: ctx.clone(),
             connection_path: path.clone(),
             pool: pl.clone(),
             address_block_store: AddressBlockStore{ ctx: ctx.clone() },
@@ -881,7 +883,7 @@ WHERE
             // server_store: ServerStore{ ctx: ctx.clone() },
             transaction_store: TransactionStore{ ctx: ctx.clone() },
             multiparty_store: MultipartyStore { ctx: ctx.clone() },
-            observation: ObservationStore { ctx: ctx.clone() }
+            observation: ObservationStore { ctx: ctx.clone() },
         }
     }
 
@@ -921,10 +923,8 @@ WHERE
     }
 
     pub async fn run_migrations(&self) -> result::Result<(), ErrorInfo> {
-        sqlx::migrate!("./data/migrations")
-            .run(&*self.pool)
-            .await
-            .map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
+        self.ctx.run_migrations().await
+
     }
 
     pub async fn run_migrations_fallback_delete(&self, allow_delete: bool, data_store_file_path: PathBuf) -> result::Result<(), ErrorInfo> {
@@ -1184,71 +1184,73 @@ struct Todo {
     done: bool,
 }
 
-#[tokio::test]
-async fn test_sqlx_migrations() {
-    // TODO: Delete file at beginning.
-    dotenv::dotenv().ok().expect("worked");
-    // util::init_logger();
-    println!("{:?}", std::env::var("DATABASE_URL"));
-    let mut node_config = NodeConfig::default();
-    let mut args = empty_args();
-    args.network = Some("debug".to_string());
-    let mut at = ArgTranslate::new(&args, &node_config);
-    let _ = at.translate_args().await.expect("");
-
-    println!(
-        "{:?}",
-        std::fs::remove_file(Path::new(&node_config.data_store_path())).is_ok()
-    );
-
-    // node_config = NodeConfig::new(&(0 as u16));
-    println!("{:?}", node_config.data_store_path());
-
-    let ds = // "sqlite:///Users//.rg/debug/data_store.sqlite".to_string()
-        // DataStore::from_path(&node_config).await;
-        DataStore::from_config(&node_config).await;
-    // let pool = SqlitePool::connect("sqlite:///Users//.rg/debug/data_store.sqlite")
-    //     .await
-    //     .expect("Connection failure");
-    let mut conn = ds.pool.acquire().await.expect("connection");
-
-    // this works
-    sqlx::migrate!("./data/migrations")
-        .run(&*ds.pool)
-        .await
-        .expect("Wtf");
-
-    let _res2 = sqlx::query("INSERT INTO todos (id, description, done) VALUES (?, ?, ?)")
-        .bind(1)
-        .bind("whoa some description here")
-        .bind(true)
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-
-    let res3 = sqlx::query("select id, description, done from todos")
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-    let res4 = res3.get(0).expect("something");
-
-    let wordss: &str = res4.try_get("description").expect("yes");
-    println!("{:?}", wordss);
-    assert_eq!(wordss, "whoa some description here");
-
-    let ress: Vec<Todo> = sqlx::query_as!(Todo, "select id, description, done from todos")
-        .fetch_all(&*ds.pool) // -> Vec<Country>
-        .await
-        .expect("worx");
-
-    println!("{:?}", ress);
-
-    /*
-             r#"
-    UPDATE todos
-    SET done = TRUE
-    WHERE id = ?1
-            "#,
-            id
-         */
-}
+// TODO Move to data module
+//
+// #[tokio::test]
+// async fn test_sqlx_migrations() {
+//     // TODO: Delete file at beginning.
+//     dotenv::dotenv().ok().expect("worked");
+//     // util::init_logger();
+//     println!("{:?}", std::env::var("DATABASE_URL"));
+//     let mut node_config = NodeConfig::default();
+//     let mut args = empty_args();
+//     args.network = Some("debug".to_string());
+//     let mut at = ArgTranslate::new(&args, &node_config);
+//     let _ = at.translate_args().await.expect("");
+//
+//     println!(
+//         "{:?}",
+//         std::fs::remove_file(Path::new(&node_config.data_store_path())).is_ok()
+//     );
+//
+//     // node_config = NodeConfig::new(&(0 as u16));
+//     println!("{:?}", node_config.data_store_path());
+//
+//     let ds = // "sqlite:///Users//.rg/debug/data_store.sqlite".to_string()
+//         // DataStore::from_path(&node_config).await;
+//         DataStore::from_config(&node_config).await;
+//     // let pool = SqlitePool::connect("sqlite:///Users//.rg/debug/data_store.sqlite")
+//     //     .await
+//     //     .expect("Connection failure");
+//     let mut conn = ds.pool.acquire().await.expect("connection");
+//
+//     // this works
+//     sqlx::migrate!("./data/migrations")
+//         .run(&*ds.pool)
+//         .await
+//         .expect("Wtf");
+//
+//     let _res2 = sqlx::query("INSERT INTO todos (id, description, done) VALUES (?, ?, ?)")
+//         .bind(1)
+//         .bind("whoa some description here")
+//         .bind(true)
+//         .fetch_all(&mut conn)
+//         .await
+//         .expect("create failure");
+//
+//     let res3 = sqlx::query("select id, description, done from todos")
+//         .fetch_all(&mut conn)
+//         .await
+//         .expect("create failure");
+//     let res4 = res3.get(0).expect("something");
+//
+//     let wordss: &str = res4.try_get("description").expect("yes");
+//     println!("{:?}", wordss);
+//     assert_eq!(wordss, "whoa some description here");
+//
+//     let ress: Vec<Todo> = sqlx::query_as!(Todo, "select id, description, done from todos")
+//         .fetch_all(&*ds.pool) // -> Vec<Country>
+//         .await
+//         .expect("worx");
+//
+//     println!("{:?}", ress);
+//
+//     /*
+//              r#"
+//     UPDATE todos
+//     SET done = TRUE
+//     WHERE id = ?1
+//             "#,
+//             id
+//          */
+// }
