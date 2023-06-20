@@ -17,7 +17,7 @@ categories = ["cryptography::cryptocurrencies"]
 
 [dependencies]
 sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
-redgold-schema = { path = "../schema"}
+redgold-schema = { path = "../schema", version = "0.1.0" }
 serde_json = "1.0.59"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 itertools = "0.10.5"
