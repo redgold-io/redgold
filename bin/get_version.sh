@@ -1,0 +1,1 @@
+head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'
