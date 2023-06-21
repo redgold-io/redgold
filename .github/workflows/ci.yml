@@ -102,8 +102,8 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write
-#    env:
-#      DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    env:
+      DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -177,7 +177,7 @@ jobs:
 
       - name: Check branch
         id: check-branch
-        run: ./bin/release_branch.sh
+        run: ./bin/release_branches.sh
         shell: bash
       - name: Cargo Publish
         if: steps.check-branch.outcome == 'success'
@@ -185,6 +185,7 @@ jobs:
           echo "Branch is release branch, doing cargo publish"
           cargo login ${{ secrets.CARGO_TOKEN }} &&
           ./bin/cargo_publish.sh
+
 
       - run: ls -lA .
       - run: ls -lA ./redgold_linux

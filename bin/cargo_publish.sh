@@ -9,3 +9,5 @@ cd ..
 cd data
 cargo publish
 cd ..
+
+cargo publish
