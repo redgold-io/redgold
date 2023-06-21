@@ -177,7 +177,7 @@ jobs:
 
       - name: Check branch
         id: check-branch
-        run: ./bin/release_branch.sh
+        run: ./bin/release_branches.sh
         shell: bash
       - name: Cargo Publish
         if: steps.check-branch.outcome == 'success'
