@@ -186,6 +186,7 @@ jobs:
           cargo login ${{ secrets.CARGO_TOKEN }} &&
           ./bin/cargo_publish.sh
 
+
       - run: ls -lA .
       - run: ls -lA ./redgold_linux
 
