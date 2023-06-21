@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [[ "$GITHUB_REF" =~ ^refs/heads/(staging|test|main)$ ]]; then
-    exit 0
+    echo "MATCH=1"
 else
-    exit 1
+    echo "MATCH=0"
 fi

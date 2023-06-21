@@ -180,7 +180,7 @@ jobs:
         run: ./bin/release_branches.sh
         shell: bash
       - name: Cargo Publish
-        if: steps.check-branch.outcome == 'success'
+        if: steps.check-branch.match == '1'
         run: |
           echo "Branch is release branch, doing cargo publish"
           cargo login ${{ secrets.CARGO_TOKEN }} &&
@@ -224,7 +224,7 @@ jobs:
       - run: docker image push ${{ env.DOCKER_USER }}/redgold:${{ env.BRANCH }}
 
       - name: Push Docker Versioned Image
-        if: steps.check-branch.outcome == 'success'
+        if: steps.check-branch.match == '1'
         run: docker image push ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}}
 
       # Todo: change to output https://docs.github.com/en/actions/using-jobs/defining-outputs-for-jobs
@@ -241,7 +241,7 @@ jobs:
       - run: echo ${{ env.DOCKER_SHA256 }} > docker_sha256_checksum
       - run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/docker_sha256_checksum
 
-      - if: steps.check-branch.outcome == 'success'
+      - if: steps.check-branch.match == '1'
         run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum
 
       # AWS Linux artifacts
@@ -259,7 +259,7 @@ jobs:
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
 
-      - if: steps.check-branch.outcome == 'success'
+      - if: steps.check-branch.match == '1'
         run: |
           aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
           aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum &&
