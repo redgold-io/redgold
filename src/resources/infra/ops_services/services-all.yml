@@ -86,10 +86,11 @@ services:
       - 3000
     ports:
       - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD__FILE=/etc/grafana/grafana_secret
+    env_file:
+      - ./ops_var.env
     volumes:
       - ~/.rg/all/grafana_password:/etc/grafana/grafana_secret
+      - ~/.rg/all/grafana.ini:/etc/grafana/grafana.ini
       - ~/.rg/all/data/grafana:/var/lib/grafana
       - ~/.rg/all/prometheus-datasource.yaml:/etc/grafana/provisioning/datasources/prometheus.yaml
       - ~/.rg/all/dashboards:/etc/grafana/provisioning/dashboards
