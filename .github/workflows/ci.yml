@@ -206,7 +206,7 @@ jobs:
           if [ -f "./redgold_mac" ]; then
           echo "MAC_BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
           else
-          touch redgold_mac
+          echo "asdf" > redgold_mac
           echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
           fi
 
@@ -279,6 +279,8 @@ jobs:
       - name: Upload Docs Distribution to S3
         if: github.ref == 'refs/heads/dev'
         run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
+
+      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:

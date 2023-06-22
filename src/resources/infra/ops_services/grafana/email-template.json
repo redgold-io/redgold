@@ -30,7 +30,7 @@
             "type": "email",
             "disableResolveMessage": false,
             "settings": {
-              "addresses": "accounts@redgold.io",
+              "addresses": "info@redgold.io",
               "singleEmail": false
             },
             "secureFields": {}
