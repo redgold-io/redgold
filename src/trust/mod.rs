@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub mod eigentrust;
 pub mod moon;
 pub mod rewards;
+pub mod embed;
 
 #[allow(dead_code)]
 struct Trust {
