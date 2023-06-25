@@ -378,13 +378,13 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
 
             //https://github.com/emilk/egui/blob/master/egui_demo_lib/src/apps/http_app.rs
             // ui.image(TextureId::default())
-            ui.set_max_width(84f32);
+            ui.set_max_width(54f32);
             // ui.set_max_width(104f32);
 
             ui.with_layout(
                 egui::Layout::top_down_justified(egui::Align::default()),
                 |ui| {
-                    let scale = 3.4;
+                    let scale = 2.0;
                     let size =
                         egui::Vec2::new((img.size()[0] as f32 / scale) as f32, (img.size()[1] as f32 / scale) as f32);
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
