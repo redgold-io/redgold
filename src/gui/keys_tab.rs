@@ -420,7 +420,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
 
                 key.generate_mnemonic_state.m_cost = key.generate_mnemonic_state.m_cost_input.parse::<u32>().ok();
                 key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.p_cost_input.parse::<u32>().ok();
-                key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.t_cost_input.parse::<u32>().ok();
+                key.generate_mnemonic_state.t_cost = key.generate_mnemonic_state.t_cost_input.parse::<u32>().ok();
             });
         }
 
