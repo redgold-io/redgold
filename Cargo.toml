@@ -116,6 +116,11 @@ tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "r
 tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
 tokio-stream = "0.1.14"
 
+#cleora = "1.2.3"
+#graphembed =  {version = "0.0.7", features = ["default"]}
+#annembed = "0.0.10"
+csv = "1.1"
+
 [dependencies.bitcoin]
 version = "0.21"
 features = ["serde", "bitcoinconsensus"]
@@ -140,3 +145,8 @@ opt-level = 3
 [dependencies.openssl-sys]
 version = "0.9.88"
 features = ["vendored"]
+
+#[dependencies.simdeez]
+#version = "1.0"  # Use the latest version available
+#default-features = false
+#features = ["simdeez_f"]  # scalar for no SIMD, you can also use "sse2", "sse41", "avx2", "avx", "neon"
