@@ -143,7 +143,7 @@ export default {
         let limit = this.perPage;
 
         // Fetch data and update hashData
-        await this.fetchData(null, "16481",  offset, limit)
+        await this.fetchData(null, null,  offset, limit)
       }
     }
   }

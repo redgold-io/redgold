@@ -397,29 +397,6 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, local_state: &mu
             }
             ui.spacing();
 
-
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-            ui.label(format!("X:{} Y:{}", ui.available_size().x.to_string(), ui.available_size().y.to_string()));
-
         }
         WalletTab::Software => {
 

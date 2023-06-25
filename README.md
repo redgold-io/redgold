@@ -9,7 +9,7 @@
 [Run A Node](docs/run_a_node.md) | 
 [Security Procedures](docs/security_procedures.md)
 
-Redgold or "philosophical gold", is named to indicate the ideological opposite of BlackRock. It is a 
+Redgold or "philosophical gold", is intended as an ideological opposite of BlackRock. It is a 
 decentralized, open-source, peer-to-peer platform 
 designed to act as a financial data and computation layer for the cryptocurrency ecosystem. The primary product 
 intention is focused around ETFs & Portfolio target models, and finance, but the platform is designed to be general purpose 
