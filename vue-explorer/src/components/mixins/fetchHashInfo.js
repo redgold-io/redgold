@@ -8,7 +8,12 @@ export default {
             }
 
             if (port == null) {
-                port = "16486"
+                const hostname = window.location.hostname;
+                if (hostname.includes('staging')) {
+                    port = "16386";
+                } else {
+                    port = "16486"
+                }
             }
 
             url += ":" + port

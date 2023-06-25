@@ -24,7 +24,7 @@ use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId};
 use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
-use crate::util::cli::args::{NodeCli, RgArgs, RgTopLevelSubcommand};
+use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand};
 use crate::util::cli::commands::mnemonic_fingerprint;
 use crate::util::cli::data_folder::DataFolder;
 use crate::util::{init_logger, init_logger_main, ip_lookup, metrics_registry, not_local_debug_mode, sha256_vec};
@@ -117,6 +117,7 @@ impl ArgTranslate {
     }
 
     pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
+        self.set_gui_on_empty();
         self.check_load_logger()?;
         self.determine_network()?;
         self.ports();
@@ -136,11 +137,11 @@ impl ArgTranslate {
         self.configure_seeds();
         self.set_discovery_interval();
 
-        tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
 
         self.apply_node_opts();
         self.genesis();
 
+        tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
         tracing::info!("Parsed args successfully with args: {:?}", self.args);
         tracing::info!("RgArgs options parsed: {:?}", self.opts);
 
@@ -444,6 +445,12 @@ impl ArgTranslate {
         }
         if self.opts.genesis {
             self.node_config.genesis = true;
+        }
+    }
+    fn set_gui_on_empty(&mut self) {
+        // println!("args: {:?}", self.args.clone());
+        if self.args.len() == 1 {
+            self.opts.subcmd = Some(RgTopLevelSubcommand::GUI(GUI{}));
         }
     }
 }

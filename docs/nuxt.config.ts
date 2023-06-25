@@ -9,5 +9,8 @@ export default defineNuxtConfig({
     '@nuxt/devtools'
   ],
   target: 'static', // default is 'server'
-  ssr: true
+  ssr: true,
+  head: { // this doesn't seem to work
+    link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.png' }]
+  }
 })
