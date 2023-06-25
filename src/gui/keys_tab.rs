@@ -8,6 +8,7 @@ use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
 use crate::gui::util::valid_label;
 use crate::gui::wallet_tab::{copy_to_clipboard, data_item, medium_data_item};
+use crate::util;
 use crate::util::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::{generate_mnemonic, generate_random_mnemonic};
@@ -53,6 +54,7 @@ pub struct MnemonicWindowState {
     hd_path: String,
     private_key_hex: String,
     calc_private_key_hex: bool,
+    generation_time_seconds: String,
 }
 
 impl MnemonicWindowState {
@@ -153,6 +155,7 @@ impl KeygenState {
                 hd_path: "m/44'/5555'/0'/0/0".to_string(),
                 private_key_hex: "".to_string(),
                 calc_private_key_hex: false,
+                generation_time_seconds: "".to_string(),
             },
             generate_mnemonic_state: GenerateMnemonicState {
                 random_input_mnemonic: "".to_string(),
@@ -417,7 +420,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
 
                 key.generate_mnemonic_state.m_cost = key.generate_mnemonic_state.m_cost_input.parse::<u32>().ok();
                 key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.p_cost_input.parse::<u32>().ok();
-                key.generate_mnemonic_state.p_cost = key.generate_mnemonic_state.t_cost_input.parse::<u32>().ok();
+                key.generate_mnemonic_state.t_cost = key.generate_mnemonic_state.t_cost_input.parse::<u32>().ok();
             });
         }
 
@@ -449,10 +452,18 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                         Mnemonic::from_str(&*key.generate_mnemonic_state.salt_words).ok()
                     ) {
                         let salt = m.to_seed(None).0;
+                        tracing::info!("Attempting to run Argon2d with params: {} {} {}", m_cost, p_cost, t_cost);
+                        let start = util::current_time_millis_i64();
                         let result = argon2d_hash(salt, string.as_bytes().to_vec(), m_cost, t_cost, p_cost);
+                        let end = util::current_time_millis_i64();
+                        let delta_seconds = ((end - start) as f64) / 1000.0;
+                        tracing::info!("Argon2d took {} seconds", delta_seconds.clone());
+
                         if let Some(r) = result.ok() {
                             if let Some(w) = Mnemonic::new(&*r).ok() {
-                                key.mnemonic_window_state.set_words(w.to_string(), "Generated from password Argon2d");
+                                key.mnemonic_window_state.set_words(w.to_string(),
+                                                                    format!("Generated from password Argon2d in {} seconds", delta_seconds));
+                                key.mnemonic_window_state.generation_time_seconds = delta_seconds.to_string();
                             }
                         }
                     }
@@ -490,6 +501,7 @@ fn mnemonic_window(
             // let layout = egui::Layout::top_down(egui::Align::Center);
             // ui.with_layout(layout, |ui| {
                 ui.vertical(|ui| {
+
                     ui.label(state.label.clone());
                     // ui.add(Separator::default().spacing(400f32));
                     let mut string = state.words.clone();
