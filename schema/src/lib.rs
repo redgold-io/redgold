@@ -550,6 +550,7 @@ impl TestConstants {
             public_key: self.public,
         }
     }
+
     pub fn new() -> TestConstants {
         let (secret, public) = crate::util::mnemonic_words::generate_key();
         let (secret2, public2) = generate_key_i(1);
