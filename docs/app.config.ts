@@ -30,6 +30,20 @@ export default defineAppConfig({
       fluid: true
     },
     footer: {
+      textLinks: [
+        {
+          href: 'https://redgold.io',
+          text: 'Main Website'
+        },
+        {
+          href: 'https://dev.explorer.redgold.io',
+          text: 'Explorer'
+        },
+        {
+          href: 'https://discord.gg/86fzxJg8ce',
+          text: 'Discord'
+        },
+      ],
       iconLinks: [
         {
           href: 'https://redgold.io',
