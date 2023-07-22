@@ -1,7 +1,7 @@
 use std::ops::Mul;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
-use bdk::blockchain::{noop_progress, ElectrumBlockchain, Blockchain};
+use bdk::blockchain::{noop_progress, ElectrumBlockchain, Blockchain, GetTx};
 use bdk::database::MemoryDatabase;
 use bdk::{Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, TxBuilder, Wallet};
 use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash, Txid};
@@ -22,12 +22,13 @@ use bitcoin::AddressType::P2wpkh;
 use bitcoin::consensus::serialize;
 use miniscript::{Descriptor, Legacy, Segwitv0};
 use crate::util::cli::commands::send;
-use redgold_schema::{error_info, ErrorInfoContext, KeyPair, SafeBytesAccess, SafeOption, structs, TestConstants};
+use redgold_schema::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
 use redgold_schema::public_key::ToPublicKey;
-use redgold_schema::structs::{ErrorInfo, Proof};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof};
 use crate::util::keys::ToPublicKeyFromLib;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io::Read;
 
 #[test]
 fn schnorr_test() {
@@ -53,6 +54,7 @@ pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitco
 
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::signer::SignerContext::{Segwitv0 as Segwitv0Context};
+use log::error;
 
 fn p2wpkh_script_code(script: &Script) -> Script {
     ScriptBuilder::new()
@@ -210,23 +212,38 @@ impl InputSigner for MultipartySigner {
 }
 
 
-struct SingleKeyBitcoinWallet {
+pub struct SingleKeyBitcoinWallet {
     wallet: Wallet<MemoryDatabase>,
     public_key: structs::PublicKey,
     network: Network,
-    psbt: Option<PartiallySignedTransaction>,
-    transaction_details: Option<TransactionDetails>,
+    pub psbt: Option<PartiallySignedTransaction>,
+    pub transaction_details: Option<TransactionDetails>,
     client: ElectrumBlockchain,
     custom_signer: Arc<MultipartySigner>
+}
+
+#[derive(Clone, Debug)]
+pub struct ExternalTimedTransaction {
+    pub tx_id: String,
+    pub timestamp: u64,
+    pub other_address: String,
+    pub amount: u64,
+    pub incoming: bool
 }
 
 
 impl SingleKeyBitcoinWallet {
 
-    pub async fn new_wallet(
+    pub fn new_wallet(
         public_key: structs::PublicKey,
-        network: bdk::bitcoin::Network
+        network: NetworkEnvironment,
+        do_sync: bool
     ) -> Result<Self, ErrorInfo> {
+        let network = if network == NetworkEnvironment::Main {
+            Network::Bitcoin
+        } else {
+            Network::Testnet
+        };
         let client = Client::new("ssl://electrum.blockstream.info:60002")
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
@@ -256,11 +273,13 @@ impl SingleKeyBitcoinWallet {
             custom_signer.clone(),
         );
 
-        bitcoin_wallet.sync().await?;
+        if do_sync {
+            bitcoin_wallet.sync()?;
+        }
         Ok(bitcoin_wallet)
     }
 
-    pub async fn sync(&self) -> Result<(), ErrorInfo> {
+    pub fn sync(&self) -> Result<(), ErrorInfo> {
         self.wallet.sync(&self.client, SyncOptions::default()).error_info("Error syncing BDK wallet")?;
         Ok(())
     }
@@ -273,20 +292,91 @@ impl SingleKeyBitcoinWallet {
         Ok(addr.to_string())
     }
 
-    pub async fn get_wallet_balance(&self
+    pub fn parse_address(addr: &String) -> RgResult<Address> {
+        Address::from_str(&addr).error_info("Unable to convert destination pk to bdk address")
+    }
+
+    pub fn get_sourced_tx(&self) -> Result<Vec<ExternalTimedTransaction>, ErrorInfo> {
+        let self_addr = self.address()?;
+        let mut res = vec![];
+        let result = self.wallet.list_transactions(true)
+            .error_info("Error listing transactions")?;
+        for x in result.iter() {
+            let tx = x.transaction.safe_get_msg("Error getting transaction")?;
+            let mut to_self_output_amount: Option<u64> = None;
+            for o in &tx.output {
+                if let Some(a) = Address::from_script(&o.script_pubkey, self.network).ok() {
+                    if a.to_string() == self_addr {
+                        // sum value here instead?
+                        to_self_output_amount = Some(o.value)
+                    }
+                }
+            }
+            // This is probably fine for now, but we should really keep track of all inputs
+            // in the event of use of multiple addresses?
+            let mut non_self_input_addr: Option<String> = None;
+            for i in &tx.input {
+                let txid = i.previous_output.txid;
+                let vout = i.previous_output.vout;
+                let prev_tx = self.client.get_tx(&txid).error_info("Error getting tx")?;
+                let prev_tx = prev_tx.safe_get_msg("No tx found")?;
+                let prev_output = prev_tx.output.get(vout as usize);
+                let prev_output = prev_output.safe_get_msg("Error getting output")?;
+                let a = Address::from_script(&prev_output.script_pubkey, self.network).ok();
+                // println!("{}", format!("TxIn address: {:?}", a));
+                if let Some(a) = a {
+                    let a = a.to_string();
+                    if a != self_addr {
+                        non_self_input_addr = Some(a)
+                    }
+                }
+            }
+
+            // println!("{}", format!("Transaction: {} received: {} sent: {} non_self_input_addr {} \
+            // nonself_output_addr {}",
+            //                        x.txid, x.received, x.sent,
+            //                        non_self_input_addr.unwrap_or("None".to_string()),
+            //                        to_self_output_amount.unwrap_or(0)
+            // ));
+            if let (Some(c), Some(a), Some(value)) =
+                (x.confirmation_time.clone(), non_self_input_addr, to_self_output_amount) {
+
+                let ett = ExternalTimedTransaction {
+                    tx_id: x.txid.to_string(),
+                    timestamp: c.timestamp,
+                    other_address: a,
+                    amount: value,
+                    incoming: true,
+                };
+                res.push(ett)
+            }
+        }
+        Ok(res)
+    }
+
+    pub fn get_wallet_balance(&self
     ) -> Result<Balance, ErrorInfo> {
         let balance = self.wallet.get_balance().error_info("Error getting BDK wallet balance")?;
         Ok(balance)
     }
 
-    pub async fn create_transaction(&mut self, destination: structs::PublicKey, amount: u64) -> Result<(), ErrorInfo> {
-        let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*destination.bytes.safe_bytes()?)
-            .error_info("Unable to convert destination pk to bdk public key")?;
-        let addr = bdk::bitcoin::util::address::Address::p2wpkh(&pk2, self.network)
-            .error_info("Unable to convert destination pk to bdk address")?;
+    pub fn create_transaction(&mut self, destination: Option<structs::PublicKey>, destination_str: Option<String>, amount: u64) -> Result<(), ErrorInfo> {
+
+        let addr = if let Some(destination) = destination {
+            let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*destination.bytes.safe_bytes()?)
+                .error_info("Unable to convert destination pk to bdk public key")?;
+            let addr = Address::p2wpkh(&pk2, self.network)
+                .error_info("Unable to convert destination pk to bdk address")?;
+            addr
+        } else if let Some(d) = destination_str {
+            Address::from_str(&*d).error_info("Unable to parse address")?
+        } else {
+            return Err(error_info("No destination specified".to_string()))
+        };
+
         println!("Source address: {}", self.address()?);
         println!("Send to address: {}", addr.to_string());
-        self.sync().await?;
+        self.sync()?;
 
         let mut builder = self.wallet.build_tx();
         builder
@@ -302,6 +392,35 @@ impl SingleKeyBitcoinWallet {
         self.psbt = Some(psbt);
         // self.custom_signer.proofs = HashMap::new();
         Ok(())
+    }
+
+    pub fn create_transaction_output_batch(&mut self, destinations: Vec<(String, u64)>) -> Result<(), ErrorInfo> {
+
+        self.sync()?;
+
+        let mut builder = self.wallet.build_tx();
+
+        builder.enable_rbf()
+            .fee_rate(FeeRate::from_sat_per_vb(1.0));
+
+        for (d, amount) in destinations {
+            let addr = Address::from_str(&*d).error_info("Unable to parse address")?;
+            builder
+                .add_recipient(addr.script_pubkey(), amount);
+        }
+
+        let (psbt, details) = builder
+            .finish()
+            .error_info("Builder TX issue")?;
+
+        self.transaction_details = Some(details);
+        self.psbt = Some(psbt);
+        Ok(())
+    }
+
+    pub fn txid(&self) -> Result<String, ErrorInfo> {
+        let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid;
+        Ok(txid.to_string())
     }
 
     pub fn signable_hashes(&mut self) -> Result<Vec<(Vec<u8>, EcdsaSighashType)>, ErrorInfo> {
@@ -374,7 +493,7 @@ test integrations::bitcoin::bdk_example::balance_test ... ok
 
  */
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn balance_test() {
     let tc = TestConstants::new();
@@ -384,22 +503,33 @@ async fn balance_test() {
     // Source address: tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4
     // Send to address: tb1q68rhft47r5jwq5832k9urtypggpvzyh5z9c9gn
     let mut w = SingleKeyBitcoinWallet
-    ::new_wallet(tc.public.to_struct_public_key(), Network::Testnet).await.expect("worx");
-    let balance = w.get_wallet_balance().await.expect("");
+    ::new_wallet(tc.public.to_struct_public_key(), NetworkEnvironment::Test, true).expect("worx");
+    let balance = w.get_wallet_balance().expect("");
     println!("balance: {:?}", balance);
-    w.create_transaction(tc.public2.to_struct_public_key(), 3500).await.expect("");
-    let d = w.transaction_details.clone().expect("d");
-    println!("txid: {:?}", d.txid);
-    let signables = w.signable_hashes().expect("");
-    println!("num signable hashes: {:?}", signables.len());
-    for (i, (hash, sighashtype)) in signables.iter().enumerate() {
-        println!("signable {}: {}", i, hex::encode(hash));
-        let prf = Proof::from_keypair(hash, tc.key_pair());
-        w.affix_input_signature(i, &prf, sighashtype);
-    }
-    let finalized = w.sign().expect("sign");
-    println!("finalized: {:?}", finalized);
-    w.broadcast_tx().expect("broadcast");
+    println!("address: {:?}", w.address().expect(""));
+    // w.get_source_addresses();
+    let mut w2 = SingleKeyBitcoinWallet
+    ::new_wallet(tc.public2.to_struct_public_key(), NetworkEnvironment::Test, true).expect("worx");
+    let balance = w2.get_wallet_balance().expect("");
+    println!("balance2: {:?}", balance);
+    println!("address2: {:?}", w2.address().expect(""));
+    println!("{:?}", w2.get_sourced_tx().expect(""));
+
+
+    // w.create_transaction(tc.public2.to_struct_public_key(), 3500).expect("");
+    // let d = w.transaction_details.clone().expect("d");
+    // println!("txid: {:?}", d.txid);
+    // let signables = w.signable_hashes().expect("");
+    // println!("num signable hashes: {:?}", signables.len());
+    // for (i, (hash, sighashtype)) in signables.iter().enumerate() {
+    //     println!("signable {}: {}", i, hex::encode(hash));
+    //     let prf = Proof::from_keypair(hash, tc.key_pair());
+    //     w.affix_input_signature(i, &prf, sighashtype);
+    // }
+    // let finalized = w.sign().expect("sign");
+    // println!("finalized: {:?}", finalized);
+
+    // w.broadcast_tx().expect("broadcast");
     // let txid = w.broadcast_tx().expect("txid");
     // println!("txid: {:?}", txid);
 }

@@ -108,6 +108,15 @@ impl PeerStore {
         Ok(None)
     }
 
+    pub async fn query_public_key_metadata(
+        &self,
+        public: &PublicKey,
+    ) -> Result<Option<NodeMetadata>, ErrorInfo> {
+        Ok(self.query_public_key_node(public.clone()).await?
+            .and_then(|v| v.latest_node_transaction)
+            .and_then(|v| v.node_metadata().ok())
+        )
+    }
 
     pub async fn query_peer_id_info(
         &self,

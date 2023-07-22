@@ -4,8 +4,8 @@ use crate::structs::ControlRequest;
 impl ControlRequest {
     pub fn empty() -> Self {
         Self {
-            initiate_multiparty_keygen_request: None,
-            initiate_multiparty_signing_request: None,
+            control_multiparty_keygen_request: None,
+            control_multiparty_signing_request: None,
         }
     }
 }

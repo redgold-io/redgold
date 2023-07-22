@@ -16,7 +16,7 @@ use itertools::Itertools;
 use log::{debug, info};
 use redgold_schema::servers::Server;
 use redgold_schema::{ErrorInfoContext, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerIdInfo, PeerNodeInfo, Request, Response, VersionInfo};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerIdInfo, PeerNodeInfo, Request, Response, Seed, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::{dhash_vec, merkle};
 use redgold_schema::util::merkle::MerkleTree;
@@ -48,6 +48,8 @@ pub struct NodeConfig {
     // TODO: Should this be a class Peer_ID with a multihash of the top level?
     // TODO: Review all schemas to see if we can switch to multiformats types.
     pub self_peer_id: Vec<u8>,
+    // Remove above and rename to peer_id -- this field is not in use yet.
+    pub peer_id: PeerId,
     // TODO: Change to Seed class? or maybe not leave it as it's own
     pub mnemonic_words: String,
     // Sometimes adjusted user params
@@ -67,7 +69,7 @@ pub struct NodeConfig {
     pub network: NetworkEnvironment,
     pub check_observations_done_poll_interval: Duration,
     pub check_observations_done_poll_attempts: u64,
-    pub seeds: Vec<SeedNode>,
+    pub seeds: Vec<Seed>,
     pub executable_checksum: Option<String>,
     pub disable_auto_update: bool,
     pub auto_update_poll_interval: Duration,
@@ -77,6 +79,7 @@ pub struct NodeConfig {
     pub e2e_enabled: bool,
     pub load_balancer_url: String,
     pub external_ip: String,
+    pub external_host: String,
     pub servers: Vec<Server>,
     pub log_level: String,
     pub data_folder: DataFolder,
@@ -89,6 +92,25 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    // This should ONLY be used by the genesis node when starting for the very first time
+    // Probably another way to deal with this, mostly used for debug runs and so on
+    // Where seeds are being specified by CLI -- shouldn't be used by main network environments
+    pub fn self_seed(&self) -> Seed {
+        Seed {
+            // TODO: Make this external host and attempt a DNS lookup on the seed to get the IP
+            external_address: self.external_ip.clone(),
+            environments: vec![self.network.clone() as i32],
+            port_offset: Some(self.port_offset.clone() as u32),
+            trust: vec![TrustData::from_label(1.0)],
+            peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
+            public_key: Some(self.public_key()),
+        }
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        PeerId::from_bytes(self.self_peer_id.clone())
+    }
 
     pub fn env_data_folder(&self) -> EnvDataFolder {
         self.data_folder.by_env(self.network)
@@ -277,6 +299,7 @@ impl NodeConfig {
     pub fn default() -> Self {
         Self {
             self_peer_id: vec![],
+            peer_id: Default::default(),
             mnemonic_words: "".to_string(),
             port_offset: NetworkEnvironment::Debug.default_port_offset(),
             p2p_port: None,
@@ -304,6 +327,7 @@ impl NodeConfig {
             e2e_enabled: true,
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string(),
+            external_host: "localhost".to_string(),
             servers: vec![],
             log_level: "DEBUG".to_string(),
             data_folder: DataFolder::target(0),

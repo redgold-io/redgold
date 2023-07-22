@@ -55,12 +55,18 @@ pub mod debug_version;
 pub mod transaction_info;
 
 
+impl BytesData {
+    pub fn from(data: Vec<u8>) -> Self {
+        BytesData {
+            value: data,
+            decoder: BytesDecoder::Standard as i32,
+            version: constants::STANDARD_VERSION,
+        }
+    }
+}
+
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {
-    Some(BytesData {
-        value: data,
-        decoder: BytesDecoder::Standard as i32,
-        version: constants::STANDARD_VERSION,
-    })
+    Some(BytesData::from(data))
 }
 
 pub const VERSION: u32 = 0;
@@ -76,6 +82,15 @@ pub fn i64_from_string(value: String) -> Result<i64, ErrorInfo> {
 
 pub fn from_hex(hex_value: String) -> Result<Vec<u8>, ErrorInfo> {
     hex::decode(hex_value.clone()).map_err(|e| {
+        error_message(
+            Error::HexDecodeFailure,
+            format!("Error decoding hex string value to bytes: {} {}", hex_value, e.to_string()),
+        )
+    })
+}
+
+pub fn from_hex_ref(hex_value: &String) -> Result<Vec<u8>, ErrorInfo> {
+    hex::decode(hex_value).map_err(|e| {
         error_message(
             Error::HexDecodeFailure,
             format!("Error decoding hex string value to bytes: {} {}", hex_value, e.to_string()),

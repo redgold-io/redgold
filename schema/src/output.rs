@@ -1,4 +1,4 @@
-use crate::structs::{ErrorInfo, Output, UtxoEntry};
+use crate::structs::{ErrorInfo, Output, StandardContractType, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, SafeOption};
 use bitcoin::secp256k1::PublicKey;
@@ -36,6 +36,11 @@ impl Output {
             counter_party_proofs: vec![],
             contract: None,
         }
+    }
+
+    pub fn is_swap(&self) -> bool {
+        self.contract.as_ref().and_then(|c| c.standard_contract_type)
+            .filter(|&c| c == StandardContractType::Swap as i32).is_some()
     }
 
     pub fn to_utxo_entry(

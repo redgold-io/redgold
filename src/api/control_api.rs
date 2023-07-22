@@ -12,8 +12,8 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 use warp::{Filter, Rejection};
 use warp::reply::Json;
-use redgold_schema::{json_or, response_metadata, SafeOption, structs};
-use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, Request};
+use redgold_schema::{json_or, response_metadata, RgResult, SafeOption, structs};
+use redgold_schema::structs::{BytesData, ControlMultipartyKeygenRequest, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ControlMultipartySigningResponse, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, Request};
 use crate::api::{as_warp_json_response, RgHttpClient};
 use crate::api::rosetta::models::Error;
 
@@ -40,31 +40,26 @@ impl ControlClient {
         Ok(result)
     }
 
-    pub async fn multiparty_keygen(&self, req: Option<InitiateMultipartyKeygenRequest>) -> Result<InitiateMultipartyKeygenResponse, ErrorInfo> {
+    pub async fn multiparty_keygen(&self, req: Option<ControlMultipartyKeygenRequest>)
+        -> RgResult<ControlMultipartyKeygenResponse> {
         let mut cr = ControlRequest::empty();
-        let req = req.unwrap_or(InitiateMultipartyKeygenRequest::default());
-        cr.initiate_multiparty_keygen_request = Some(req);
+        let req = req.unwrap_or(ControlMultipartyKeygenRequest::default());
+        cr.control_multiparty_keygen_request = Some(req);
 
         info!("Sending multiparty control request");
         let res: ControlResponse = self.request(cr).await?;
 
-        res.initiate_multiparty_keygen_response.ok_or(ErrorInfo::error_info("No response"))
+        res.control_multiparty_keygen_response.ok_or(ErrorInfo::error_info("No response"))
     }
 
     pub async fn multiparty_signing(&self,
-                                    req: Option<InitiateMultipartySigningRequest>,
-                                    keygen: Option<InitiateMultipartyKeygenRequest>,
-                                    data_to_sign: BytesData,
-    ) -> Result<InitiateMultipartySigningResponse, ErrorInfo> {
+                                    req: ControlMultipartySigningRequest,
+    ) -> RgResult<ControlMultipartySigningResponse> {
         let mut cr = ControlRequest::empty();
-        let mut req = req.unwrap_or(InitiateMultipartySigningRequest::default());
-        req.keygen_room = keygen;
-        req.data_to_sign = Some(data_to_sign);
-        cr.initiate_multiparty_signing_request = Some(req);
-
+        cr.control_multiparty_signing_request = Some(req);
         info!("Sending multiparty signing control request");
         let res: ControlResponse = self.request(cr).await?;
-        res.initiate_multiparty_signing_response.ok_or(ErrorInfo::error_info("No response"))
+        res.control_multiparty_signing_response.ok_or(ErrorInfo::error_info("No response"))
     }
 
     pub fn local(port: u16) -> Self {
@@ -100,57 +95,34 @@ impl ControlServer {
         let mut response = ControlResponse::empty();
 
         // TODO: Shouldn't both of these really be in the initiate function?
-        if let Some(mps) = request.initiate_multiparty_keygen_request {
+        if let Some(mps) = request.control_multiparty_keygen_request {
 
-            let keys = find_multiparty_key_pairs(relay.clone()
-                                                 // , rt.clone()
+            info!("Initiate multiparty request: {}", json_or(&mps));
+            let result = initiate_mp_keygen(
+                relay.clone(),
+                mps.multiparty_identifier.clone(),
+                true
             ).await?;
-            // let num_parties = keys.len() as i64;
-
-            let mut req = mps.clone();
-            // TODO: Separate request types so we don't have to do this
-            req.index = Some(1);
-            req.port = Some(relay.node_config.mparty_port().clone() as u32);
-            req.host_address = Some(relay.node_config.external_ip.clone()); // Some("127.0.0.1".to_string());
-            req.store_local_share = Some(true);
-            req.return_local_share = Some(true);
-            req.host_key = Some(relay.node_config.public_key().clone());
-            req.identifier = fill_identifier(keys, req.identifier);
-            // let d = mps.clone();
-            info!("Initiate multiparty request: {}", json_or(&req));
-            let result = initiate_mp_keygen(relay.clone(), req,
-                                            // rt.clone()
-            ).await?;
-            response.initiate_multiparty_keygen_response = Some(result);
-        } else if let Some(mut req) = request.initiate_multiparty_signing_request {
-            let keygen = req.keygen_room.safe_get()?;
-            let keys = find_multiparty_key_pairs(relay.clone()
-                                                 // , rt.clone()
-            ).await?;
-            req.identifier = fill_identifier(keys, req.identifier);
-            // TODO: Remove these from schema, enforce node knowing about this
-            req.port = Some(relay.node_config.mparty_port().clone() as u32);
-            req.host_address = Some(relay.node_config.external_ip.clone()); // Some("127.0.0.1".to_string());
-            req.host_key = Some(relay.node_config.public_key().clone());
-            req.store_proof = Some(true);
-
-            let mut hm: HashMap<Vec<u8>, usize> = HashMap::default();
-            for (i, pk) in keygen.identifier.safe_get()?.party_keys.iter().enumerate() {
-                hm.insert(pk.bytes()?, i + 1);
-            };
-            let mut parties = vec![];
-            for pk in req.identifier.clone().unwrap().party_keys {
-                if let Some(i) = hm.get(&pk.bytes()?) {
-                    parties.push(i.clone() as i64);
-                }
+            let mut resp = ControlMultipartyKeygenResponse::default();
+            if mps.return_local_share {
+                resp.local_share = Some(result.local_share);
             }
-            req.party_indexes = parties;
+            resp.multiparty_identifier = Some(result.identifier);
+            response.control_multiparty_keygen_response = Some(resp);
+        } else if let Some(mut req) = request.control_multiparty_signing_request {
 
+            let req = req.signing_request.safe_get_msg("Missing signing request")?;
             let result = initiate_mp_keysign(
-                relay.clone(), req,
-                // rt.clone()
+                relay.clone(),
+                req.identifier.safe_get_msg("Missing identifier")?.clone(),
+                req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
+                req.signing_party_keys.clone(),
+                Some(req.signing_room_id.clone())
             ).await?;
-            response.initiate_multiparty_signing_response = Some(result);
+            let mut res = ControlMultipartySigningResponse::default();
+            res.identifier = req.identifier.clone();
+            res.proof = Some(result.proof.clone());
+            response.control_multiparty_signing_response = Some(res);
         }
         // if add_peer_full_request.is_some() {
         //     let add: AddPeerFullRequest = add_peer_full_request.unwrap();

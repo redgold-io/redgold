@@ -8,9 +8,10 @@ use clap::{Args, Parser, Subcommand};
 use crypto::digest::Digest;
 #[allow(unused_imports)]
 use futures::StreamExt;
-use log::info;
+use log::{error, info};
 use std::fs;
 use std::io::Read;
+use std::net::{AddrParseError, IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -20,8 +21,9 @@ use crypto::sha2::Sha256;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
 use redgold_schema::{ErrorInfoContext, from_hex, SafeOption};
+use redgold_schema::seeds::get_seeds;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, Hash, PeerId};
+use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand};
@@ -162,6 +164,30 @@ impl ArgTranslate {
     }
 
     async fn lookup_ip(&mut self) {
+
+        std::env::var("REDGOLD_EXTERNAL_IP").ok().map(|a| {
+            // TODO: First determine if this is an nslookup requirement
+            let parsed = IpAddr::from_str(&a);
+            match parsed {
+                Ok(_) => {
+                    self.node_config.external_ip = a;
+                }
+                Err(_) => {
+                    let lookup = dns_lookup::lookup_host(&a);
+                    match lookup {
+                        Ok(addr) => {
+                            if addr.len() > 0 {
+                                self.node_config.external_ip = addr[0].to_string();
+                            }
+                        }
+                        Err(_) => {
+                            error!("Invalid REDGOLD_EXTERNAL_IP environment variable: {}", a);
+                        }
+                    }
+                }
+            }
+            // self.node_config.external_ip = a;
+        });
         // TODO: We can use the lb or another node to check if port is reciprocal open
         // TODO: Check ports open in separate thing
         // TODO: Also set from HOSTNAME maybe? With nslookup for confirmation of IP?
@@ -413,17 +439,28 @@ impl ArgTranslate {
         // });
     }
     fn configure_seeds(&mut self) {
+
+        let seeds = get_seeds();
+        for seed in seeds {
+            let env_match = seed.environments.contains(&(self.node_config.network as i32));
+            let all_env = !self.node_config.is_local_debug() &&
+                seed.environments.contains(&(NetworkEnvironment::All as i32));
+            if env_match || all_env {
+                self.node_config.seeds.push(seed);
+            }
+        }
+
         if let Some(a) = &self.opts.seed_address {
             let default_port = self.node_config.network.default_port_offset();
             let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
             // TODO: replace this with the other seed class.
-            self.node_config.seeds.push(SeedNode {
-                peer_id: None,
-                trust: vec![],
-                public_key: None,
+            self.node_config.seeds.push(Seed {
                 external_address: a.clone(),
-                port_offset: Some(port),
-                environments: vec![],
+                environments: vec![self.node_config.network as i32],
+                port_offset: Some(port as u32),
+                trust: vec![TrustData::from_label(1.0)],
+                peer_id: Some(self.node_config.peer_id()),
+                public_key: Some(self.node_config.public_key()),
             });
         }
     }
@@ -445,6 +482,9 @@ impl ArgTranslate {
         }
         if self.opts.genesis {
             self.node_config.genesis = true;
+        }
+        if self.node_config.genesis {
+            self.node_config.seeds.push(self.node_config.self_seed())
         }
     }
     fn set_gui_on_empty(&mut self) {

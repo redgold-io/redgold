@@ -214,6 +214,8 @@ message StandardData {
   Hash data_hash = 12;
   Hash hash = 13;
   Observation observation = 14;
+  optional string bitcoin_address = 15;
+  optional string bitcoin_txid = 16;
 }
 
 message KeyedTypedValue {
@@ -259,7 +261,7 @@ message CodeExecutionContract {
 message OutputContract {
   // hash references, same issue as other thing
   optional StandardContractType standard_contract_type = 1;
-  optional CodeExecutionContract code_execution_contract = 2;
+  CodeExecutionContract code_execution_contract = 2;
   optional int64 threshold = 3;
   repeated int64 weights = 4;
 }
@@ -360,7 +362,6 @@ message Transaction {
   repeated Output outputs = 2;
   StructMetadata struct_metadata = 3;
   TransactionOptions options = 4;
-
 }
 
 message BlockMetadata {
@@ -672,21 +673,6 @@ message MultipartySubscribeEvent {
   string message = 3;
 }
 
-message MultipartyThresholdRequest {
-  MultipartyBroadcast multiparty_broadcast = 1;
-  MultipartyIssueUniqueIndex multiparty_issue_unique_index = 2;
-  MultipartySubscribe multiparty_subscribe = 3;
-  repeated MultipartySubscribeEvent multiparty_subscribe_events = 4;
-  // TODO ^ all of these are only used by the internal adaptation which hit an error, only below are actually used
-  InitiateMultipartyKeygenRequest initiate_keygen = 5;
-  InitiateMultipartySigningRequest initiate_signing = 6;
-}
-
-message MultipartyThresholdResponse {
-  MultipartyIssueUniqueIndexResponse multiparty_issue_unique_index_response = 1;
-  InitiateMultipartyKeygenResponse initiate_keygen_response = 2;
-  InitiateMultipartySigningResponse initiate_signing_response = 3;
-}
 
 
 message UtxoConflictResolveRequest {
@@ -717,7 +703,8 @@ message Request {
   NodeMetadata node_metadata = 8;
   GetPeersInfoRequest get_peers_info_request = 9;
   //  optional DownloadMetadataRequest download_metadata_request = 5;
-  MultipartyThresholdRequest multiparty_threshold_request = 10;
+  InitiateMultipartyKeygenRequest initiate_keygen = 10;
+  InitiateMultipartySigningRequest initiate_signing = 17;
   SubmitTransactionRequest submit_transaction_request = 11;
   UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
   QueryObservationProofRequest query_observation_proof_request = 13;
@@ -736,7 +723,9 @@ message Response {
   NodeMetadata node_metadata = 6;
   Proof proof = 7;
 
-  MultipartyThresholdResponse multiparty_threshold_response = 8;
+  InitiateMultipartyKeygenResponse initiate_keygen_response = 8;
+  InitiateMultipartySigningResponse initiate_signing_response = 13;
+
   SubmitTransactionResponse submit_transaction_response = 9;
   UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
   QueryObservationProofResponse query_observation_proof_response = 11;
@@ -798,7 +787,7 @@ message AboutNodeResponse {
 enum AddressType {
   Sha3_224_Checksum_Public = 0;
   MULTIHASH_KEYHASH = 1;
-  BITCOIN_COMPAT_ADDRESS = 2;
+  Bitcoin_External_String = 2;
   ETHEREUM_COMPAT_ADDRESS = 3;
   PUBLIC_KEY_DIRECT_ADDRESS = 4;
   UNKNOWN_ADDRESS_TYPE = 5;
@@ -933,46 +922,53 @@ message MultipartyIdentifier {
   repeated PublicKey party_keys = 1;
   int64 threshold = 2;
   string uuid = 3;
-  int64 num_parties = 4;
+}
+
+message ControlMultipartyKeygenRequest {
+  optional MultipartyIdentifier multiparty_identifier = 1;
+  bool return_local_share = 2;
+}
+
+message ControlMultipartyKeygenResponse {
+  optional string local_share = 1;
+  MultipartyIdentifier multiparty_identifier = 2;
+}
+
+message ControlMultipartySigningRequest {
+  InitiateMultipartySigningRequest signing_request = 1;
+}
+
+message ControlMultipartySigningResponse {
+  Proof proof = 1;
+  MultipartyIdentifier identifier = 2;
 }
 
 message InitiateMultipartyKeygenRequest {
   MultipartyIdentifier identifier = 1;
-  optional PublicKey host_key = 2;
-  optional string host_address = 3;
-  optional uint32 port = 4;
-  optional int64 index = 6;
-  optional bool return_local_share = 7;
-  optional bool store_local_share = 8;
-  optional int64 timeout_seconds = 9;
 }
 
 message InitiateMultipartyKeygenResponse {
-  optional string local_share = 1;
-  optional InitiateMultipartyKeygenRequest initial_request = 2;
+  InitiateMultipartyKeygenRequest initial_request = 2;
 }
+
 message InitiateMultipartySigningResponse{
   Proof proof = 1;
-  optional InitiateMultipartySigningRequest initial_request = 2;
+  InitiateMultipartySigningRequest initial_request = 2;
 }
 
 message InitiateMultipartySigningRequest {
   MultipartyIdentifier identifier = 1;
-  optional PublicKey host_key = 2;
-  optional string host_address = 3;
-  optional uint32 port = 4;
-  repeated int64 party_indexes = 5;
-  BytesData data_to_sign = 6;
-  optional bool store_proof = 8;
-  optional int64 timeout_seconds = 9;
-  InitiateMultipartyKeygenRequest keygen_room = 10;
+  string signing_room_id = 2;
+  repeated PublicKey signing_party_keys = 3;
+  BytesData data_to_sign = 4;
 }
+
 
 
 message ControlRequest {
 //  AddPeerFullRequest add_peer_full_request = 1;
-  InitiateMultipartyKeygenRequest initiate_multiparty_keygen_request = 2;
-  InitiateMultipartySigningRequest initiate_multiparty_signing_request = 3;
+  ControlMultipartyKeygenRequest control_multiparty_keygen_request = 2;
+  ControlMultipartySigningRequest control_multiparty_signing_request = 3;
 }
 
 message UpdatePeerTrustRequest {}
@@ -980,8 +976,8 @@ message UpdatePeerTrustRequest {}
 
 message ControlResponse {
   ResponseMetadata response_metadata = 1;
-  InitiateMultipartyKeygenResponse initiate_multiparty_keygen_response = 2;
-  InitiateMultipartySigningResponse initiate_multiparty_signing_response = 3;
+  ControlMultipartyKeygenResponse control_multiparty_keygen_response = 2;
+  ControlMultipartySigningResponse control_multiparty_signing_response = 3;
 }
 
 enum Error {
@@ -1097,3 +1093,8 @@ enum TransactionState {
   Unknown = 6;
 }
 
+enum ExternalCurrency {
+  USD = 0;
+  Bitcoin = 1;
+  Ethereum = 2;
+}
