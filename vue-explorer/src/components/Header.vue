@@ -1,16 +1,29 @@
 <template>
   <div class="container-fluid">
     <nav class="navbar custom-navbar">
-      <a class="navbar-brand brand" href="/">
-        <img :src="require('@/assets/logo.png')" alt="Logo" class="logo">
-        Redgold Explorer
-      </a>
+      <div class="navbar-container">
+        <a class="navbar-brand brand" href="/">
+          <img :src="require('@/assets/logo.png')" alt="Logo" class="logo">
+          Redgold Explorer
+        </a>
+        <a class="navbar-brand brand" href="https://redgold.io">
+          Website
+        </a>
+        <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
+          Discord
+        </a>
+        <a class="navbar-brand brand" href="https://dev.docs.redgold.io">
+          Docs
+        </a>
+
+      </div>
+
       <!-- Navbar items -->
-      <!-- <ul class="navbar-nav ml-auto">
-        <li class="nav-item">
-          <h6 class="nav-link">Home</h6>
-        </li>
-      </ul> -->
+<!--      <ul class="navbar-nav ml-auto">-->
+<!--        <li class="nav-item">-->
+<!--          <h6 class="nav-link">Home</h6>-->
+<!--        </li>-->
+<!--      </ul>-->
     </nav>
     <div class="row no-gutters">
       <!-- Buffer div -->

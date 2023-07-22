@@ -1,6 +1,6 @@
 <template>
   <div class="center-container">
-    <a href="https://redgold.io"><img width="64" height="64" src="/img/logo.png"/></a>
+    <a href="/"><img width="64" height="64" src="/img/logo.png"/></a>
     <h1 class="header-title">Redgold Documentation</h1>
   </div>
 </template>

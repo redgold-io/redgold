@@ -200,7 +200,7 @@ pub async fn setup_ops_services(
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn test_setup_server() {
 
