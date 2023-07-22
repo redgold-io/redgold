@@ -309,7 +309,7 @@ jobs:
           body: "
           Redgold ${{ env.BRANCH }} Release
           
-          ${{steps.build_changelog.outputs.changelog}
+          ${{steps.build_changelog.outputs.changelog}}
           
           COMMIT_HASH=${{ github.sha }}
           
