@@ -31,6 +31,13 @@ impl DataStoreContext {
         DataStoreContext::map_err_sqlx(self.pool.acquire().await)
     }
 
+    pub async fn run_migrations(&self) -> Result<(), ErrorInfo> {
+        sqlx::migrate!("./migrations")
+            .run(&*self.pool)
+            .await
+            .map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
+    }
+
     pub fn map_err_sqlx<A>(error: Result<A, sqlx::Error>) -> Result<A, ErrorInfo> {
         error.map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
     }

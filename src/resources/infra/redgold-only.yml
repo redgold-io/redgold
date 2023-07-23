@@ -10,11 +10,11 @@ services:
 #    environment:
 #      - REDGOLD_NETWORK=${REDGOLD_NETWORK:-dev}
 #      - REDGOLD_GENESIS=${REDGOLD_GENESIS:-false}
-    ports:
-      - ${REDGOLD_METRICS_PORT:-16179}:${REDGOLD_METRICS_PORT:-16179}
-      - ${REDGOLD_P2P_PORT:-16180}:${REDGOLD_P2P_PORT:-16180}
-      - ${REDGOLD_PUBLIC_PORT:-16181}:${REDGOLD_PUBLIC_PORT:-16181}
-      - ${REDGOLD_CONTROL_PORT:-16182}:${REDGOLD_CONTROL_PORT:-16182}
+#    ports:
+#      - ${REDGOLD_METRICS_PORT:-16179}:${REDGOLD_METRICS_PORT:-16179}
+#      - ${REDGOLD_P2P_PORT:-16180}:${REDGOLD_P2P_PORT:-16180}
+#      - ${REDGOLD_PUBLIC_PORT:-16181}:${REDGOLD_PUBLIC_PORT:-16181}
+#      - ${REDGOLD_CONTROL_PORT:-16182}:${REDGOLD_CONTROL_PORT:-16182}
 #    expose:
 #      - ${REDGOLD_METRICS_PORT:-16179}
 #      - ${REDGOLD_P2P_PORT:-16180}
@@ -25,7 +25,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers
       - /var/run/docker.sock:/var/run/docker.sock
     network_mode: host
-    command: ["--network", "${REDGOLD_NETWORK:-dev}", "${REDGOLD_OPTS:-}", "node"]
+    command: ["--network", "${REDGOLD_NETWORK:-dev}", "node"]
     labels:
       - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"
   watchtower:

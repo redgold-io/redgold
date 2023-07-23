@@ -3,8 +3,11 @@ env:
   BUILD_OUTPUT: "./target/release/redgold"
   AWS_EC2_METADATA_DISABLED: true
   S3_RELEASE_PREFIX: "s3://redgold-public/release"
+  S3_EXPLORER_PREFIX: "s3://redgold-explorer"
+  S3_DOCS_PREFIX: "s3://redgold-docs"
   DOCKER_USER: "redgoldio"
   TOOLCHAIN: "nightly"
+  DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
 on: push
 jobs:
   test:
@@ -19,8 +22,8 @@ jobs:
     runs-on: ubuntu-20.04
     permissions:
       contents: write
-    env:
-      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+#    env:
+#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
@@ -38,7 +41,7 @@ jobs:
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
-      - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
+      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: ./bin/local_test.sh
   build-linux:
 #    needs: [test]
@@ -53,8 +56,8 @@ jobs:
     runs-on: ubuntu-20.04
     permissions:
       contents: write
-    env:
-      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+#    env:
+#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
@@ -76,7 +79,7 @@ jobs:
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
       - run: cargo clean
-      - run: export RUST_MIN_STACK=10485760; cargo test --lib -- --test-threads=1
+      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: cargo build --release
         # try CWD?
 #      - run: ./bin/local_test.sh "./target/release/redgold"
@@ -88,49 +91,50 @@ jobs:
           name: redgold_linux
           path: ./redgold_linux
 
-#  build-mac:
+  build-mac:
 #    needs: [test]
-#    if:
-#      contains('
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref)
-#    runs-on: macos-latest
-#    permissions:
-#      contents: write
-#    env:
-#      DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v1
-#      - name: Cache Rust dependencies
-#        uses: actions/cache@v1.0.1
-#        with:
-#          path: target
-#          key: ${{ runner.OS }}-build-${{ hashFiles('**/Cargo.lock') }}
-#          restore-keys: |
-#            ${{ runner.OS }}-build-
-#      - name: Install latest rust toolchain
-#        uses: actions-rs/toolchain@v1
-#        with:
-#          toolchain: stable
-#          target: x86_64-apple-darwin
-#          default: true
-#          override: true
-#
-#      - run: brew install llvm@12
-#      - run: echo 'export PATH="/usr/local/opt/llvm@12/bin:$PATH"' >> /Users/runner/.bash_profile
-#      - run: echo $(llvm-config --version)
-#
-#      - run: cargo build --all --release
-#      - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
-#
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: redgold_mac
-#          path: ./redgold_mac
+    if:
+      contains('
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Cache Rust dependencies
+        uses: actions/cache@v1.0.1
+        with:
+          path: target
+          key: ${{ runner.OS }}-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.OS }}-build-
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-apple-darwin
+          default: true
+          override: true
+      # is this still necessary?
+      - run: brew install llvm@12
+      - run: echo 'export PATH="/usr/local/opt/llvm@12/bin:$PATH"' >> /Users/runner/.bash_profile
+      - run: echo $(llvm-config --version)
+
+      - run: brew install openssl@3
+      - run: cargo clean
+      - run: cargo build --all --release
+      - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: redgold_mac
+          path: ./redgold_mac
 
   release:
     needs: [build-linux] #, build-mac]
@@ -148,15 +152,45 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
+      - name: Download redgold_mac artifact
+        if: contains('
+          refs/heads/staging 
+          refs/heads/test 
+          refs/heads/main', 
+          github.ref)
+        uses: actions/download-artifact@v3
+        with:
+          name: redgold_mac
       - uses: actions/download-artifact@v3
         with:
           name: redgold_linux
-#      - uses: actions/download-artifact@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      #      - uses: actions/download-artifact@v3
 #        with:
 #          name: redgold_mac
+
+
+      - name: Check branch
+        id: check-branch
+        run: ./bin/release_branches.sh
+        shell: bash
+      - name: Cargo Publish
+        if: steps.check-branch.match == '1'
+        run: |
+          echo "Branch is release branch, doing cargo publish"
+          cargo login ${{ secrets.CARGO_TOKEN }} &&
+          ./bin/cargo_publish.sh
+
+
       - run: ls -lA .
       - run: ls -lA ./redgold_linux
-
 
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
@@ -168,9 +202,15 @@ jobs:
       - run: echo "BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
       - run: echo "BUILD_CHECKSUM_SHA512=$(shasum -a 512 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
 
-#      - run: echo "MAC_BUILD_CHECKSUM=$(md5sum ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
-#      - run: echo "MAC_BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
-#      - run: echo "MAC_BUILD_CHECKSUM_SHA512=$(shasum -a 512 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
+      # TODO Change on branch release?
+      - name: Calculate Mac SHA256 Checksum
+        run: |
+          if [ -f "./redgold_mac" ]; then
+          echo "MAC_BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
+          else
+          echo "asdf" > redgold_mac
+          echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
+          fi
 
       # Docker Image
       # TODO: This works but need to setup self hosted registry also
@@ -183,11 +223,14 @@ jobs:
       - run: cd docker-build-tmp; docker build -f release.Dockerfile -t ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}} .; cd ..
       - run: echo ${{ secrets.DOCKER_TOKEN }} | docker login --username ${{ env.DOCKER_USER }} --password-stdin
       - run: docker tag ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}} ${{ env.DOCKER_USER }}/redgold:${{ env.BRANCH }}
-      - run: docker image push ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}}
       - run: docker image push ${{ env.DOCKER_USER }}/redgold:${{ env.BRANCH }}
 
+      - name: Push Docker Versioned Image
+        if: steps.check-branch.match == '1'
+        run: docker image push ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}}
+
       # Todo: change to output https://docs.github.com/en/actions/using-jobs/defining-outputs-for-jobs
-      - run: export DOCKER_SHA256=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}} | cut -d ':' -f 2 | tr -d ' '); echo "DOCKER_SHA256=$DOCKER_SHA256" >> $GITHUB_ENV
+      - run: export DOCKER_SHA256=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.DOCKER_USER }}/redgold:${{env.BRANCH}} | cut -d ':' -f 2 | tr -d ' '); echo "DOCKER_SHA256=$DOCKER_SHA256" >> $GITHUB_ENV
 
       # AWS artifacts
       - run: curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -199,7 +242,9 @@ jobs:
       # AWS Docker image hash
       - run: echo ${{ env.DOCKER_SHA256 }} > docker_sha256_checksum
       - run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/docker_sha256_checksum
-      - run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum
+
+      - if: steps.check-branch.match == '1'
+        run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum
 
       # AWS Linux artifacts
       - run: echo ${{ env.BUILD_CHECKSUM }} > md5_checksum
@@ -212,67 +257,67 @@ jobs:
       - run: aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux_sha256_checksum
       - run: aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux_sha512_checksum
 
-      - run: aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux
-      - run: aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum
-      - run: aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha256_checksum
-      - run: aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum
+      # Mac
+      - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
+      - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
 
-      # AWS Mac artifacts
-#
-#      - run: echo ${{ env.MAC_BUILD_CHECKSUM }} > mac_md5_checksum
-#      - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
-#      - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA512 }} > mac_sha512_checksum
-#
-#      - run: aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac
-#      - run: aws s3 cp mac_md5_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_md5_checksum
-#      - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
-#      - run: aws s3 cp mac_sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha512_checksum
-#
-#      - run: aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac
-#      - run: aws s3 cp mac_md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_md5_checksum
-#      - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha256_checksum
-#      - run: aws s3 cp mac_sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha512_checksum
+      - if: steps.check-branch.match == '1'
+        run: |
+          aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
+          aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum &&
+          aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha256_checksum &&
+          aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum &&
+          aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum && 
+          aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha256_checksum &&
+          aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac
+#      - run: cd .; echo 'Intended upload path: s3://${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}'
+      - run: cd vue-explorer; npm install && npm run build
+      - run: cd docs; npm install && npm run generate
 
-#      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
-#        with:
-#          tag_name: v0.1.0 #(required) tag name to delete
-#          github_token: ${{ secrets.GITHUB_TOKEN }} # (required) a GitHub token with write access to the repo that needs to be modified
-#          delete_release: true #(optional) default: true
-#          repo: <owner>/<repoName> #(optional) target repository. default: repo running this action
+      - name: Upload Explorer Distribution to S3
+        if: github.ref == 'refs/heads/dev'
+        run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
+
+      - name: Upload Docs Distribution to S3
+        if: github.ref == 'refs/heads/dev'
+        run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
+
+      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
+
+      - name: "Build Changelog"
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@{latest-release}
+
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
           delete_release: true # default: false
           tag_name: release/${{ env.BRANCH }} # tag name to delete
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sleep for 5 seconds
+        run: sleep 5
       # https://github.com/marketplace/actions/rust-release-binary these steps came from below
+      # TODO: Duplicate this release step with 'version' tagged releases
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             redgold_linux
-#            redgold_mac
+            redgold_mac
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           body: "
           Redgold ${{ env.BRANCH }} Release
           
+          ${{steps.build_changelog.outputs.changelog}}
+          
           COMMIT_HASH=${{ github.sha }}
           
           DOCKER_SHA256=${{ env.DOCKER_SHA256 }}
 
-          LINUX_MD5=${{ env.BUILD_CHECKSUM }}
-           
           LINUX_SHA256=${{ env.BUILD_CHECKSUM_SHA256 }}
-           
-          LINUX_SHA512=${{ env.BUILD_CHECKSUM_SHA512 }}
-          
-          MAC_MD5=${{ env.MAC_BUILD_CHECKSUM }}
-           
-          MAC_SHA256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}
-          
-          MAC_SHA512=${{ env.MAC_BUILD_CHECKSUM_SHA512 }}
-          
+                     
+          MAC_SHA256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
           
           "
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -52,14 +52,21 @@ pub mod seeds;
 pub mod trust;
 pub mod input;
 pub mod debug_version;
+pub mod transaction_info;
 
+
+impl BytesData {
+    pub fn from(data: Vec<u8>) -> Self {
+        BytesData {
+            value: data,
+            decoder: BytesDecoder::Standard as i32,
+            version: constants::STANDARD_VERSION,
+        }
+    }
+}
 
 pub fn bytes_data(data: Vec<u8>) -> Option<BytesData> {
-    Some(BytesData {
-        value: data,
-        decoder: BytesDecoder::Standard as i32,
-        version: constants::STANDARD_VERSION,
-    })
+    Some(BytesData::from(data))
 }
 
 pub const VERSION: u32 = 0;
@@ -75,6 +82,15 @@ pub fn i64_from_string(value: String) -> Result<i64, ErrorInfo> {
 
 pub fn from_hex(hex_value: String) -> Result<Vec<u8>, ErrorInfo> {
     hex::decode(hex_value.clone()).map_err(|e| {
+        error_message(
+            Error::HexDecodeFailure,
+            format!("Error decoding hex string value to bytes: {} {}", hex_value, e.to_string()),
+        )
+    })
+}
+
+pub fn from_hex_ref(hex_value: &String) -> Result<Vec<u8>, ErrorInfo> {
+    hex::decode(hex_value).map_err(|e| {
         error_message(
             Error::HexDecodeFailure,
             format!("Error decoding hex string value to bytes: {} {}", hex_value, e.to_string()),
@@ -247,7 +263,7 @@ pub trait WithMetadataHashable {
     fn struct_metadata_err(&self) -> Result<&StructMetadata, ErrorInfo>;
     fn version(&self) -> Result<i32, ErrorInfo>;
     fn time(&self) -> Result<&i64, ErrorInfo>;
-    fn hash(&self) -> Hash;
+    fn hash_or(&self) -> Hash;
     fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo>;
     fn hash_vec(&self) -> Vec<u8>;
     fn hash_hex(&self) -> Result<String, ErrorInfo>;
@@ -277,14 +293,14 @@ where
         Ok(self.struct_metadata_opt_ref().safe_get()?.time.safe_get()?)
     }
 
-    fn hash(&self) -> Hash {
+    fn hash_or(&self) -> Hash {
         self.struct_metadata_opt_ref()
             .and_then(|s| s.hash.clone()) // TODO: Change to as_ref() to prevent clone?
             .unwrap_or(self.calculate_hash())
     }
 
     fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self.hash().bytes.safe_bytes()?)
+        Ok(self.hash_or().bytes.safe_bytes()?)
     }
 
     fn hash_vec(&self) -> Vec<u8> {
@@ -292,7 +308,7 @@ where
     }
 
     fn hash_hex(&self) -> Result<String, ErrorInfo> {
-        Ok(hex::encode(self.hash().bytes.safe_bytes()?))
+        Ok(hex::encode(self.hash_or().bytes.safe_bytes()?))
     }
 
     fn hash_hex_or_missing(&self) -> String {
@@ -549,6 +565,7 @@ impl TestConstants {
             public_key: self.public,
         }
     }
+
     pub fn new() -> TestConstants {
         let (secret, public) = crate::util::mnemonic_words::generate_key();
         let (secret2, public2) = generate_key_i(1);
@@ -678,10 +695,9 @@ impl Request {
 
     pub fn verify_auth(&self) -> Result<PublicKey, ErrorInfo> {
         let hash = self.calculate_hash();
-        // println!("verify_auth hash: {:?}", hash.hex());
-        self.proof.safe_get()?.verify(&hash)?;
-        let proof = self.proof.safe_get()?;
-        let pk = proof.public_key.safe_get()?;
+        let proof = self.proof.safe_get_msg("Missing proof on request authentication verification")?;
+        proof.verify(&hash)?;
+        let pk = proof.public_key.safe_get_msg("Missing public key on request authentication verification")?;
         Ok(pk.clone())
     }
 

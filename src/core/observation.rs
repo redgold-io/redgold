@@ -173,11 +173,11 @@ impl ObservationBuffer {
         self.data.clear();
         let hashes = clone
             .iter()
-            .map(|r| r.hash())
+            .map(|r| r.hash_or())
             .collect_vec();
         let root = redgold_schema::util::merkle::build_root(hashes)?.root;
         let vec = root.safe_bytes()?;
-        let parent_hash = self.latest.clone().map(|o| o.hash());
+        let parent_hash = self.latest.clone().map(|o| o.hash_or());
         let height = self.latest.clone().map(|o| o.height + 1).unwrap_or(0);
         let struct_metadata = struct_metadata_new();
         let mut o = Observation {
@@ -196,13 +196,16 @@ impl ObservationBuffer {
         let proofs = o.build_observation_proofs();
         self.relay.ds.observation.insert_observation_and_edges(&o, struct_metadata.safe_get()?.time.expect("time")).await?;
 
+        // Verify stored.
+        assert!(self.relay.ds.observation.query_observation(&o.hash_or()).await?.is_some());
+
         self.latest = Some(o.clone());
         // self.relay.ds.transaction_store
         let mut request = Request::empty();
         request.gossip_observation_request = Some(GossipObservationRequest {
                 observation: Some(o.clone()),
         });
-        self.relay.gossip_req(&request, &o.hash()).await?;
+        self.relay.gossip_req(&request, &o.hash_or()).await?;
         increment_counter!("redgold.observation.created");
         gauge!("redgold.observation.height", height as f64);
         gauge!("redgold.observation.last.size", num_observations as f64);

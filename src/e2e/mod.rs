@@ -185,7 +185,7 @@ pub async fn run(relay: Relay) -> Result<(), ErrorInfo> {
 #[allow(dead_code)]
 pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
     let c = LiveE2E {
-        relay,
+        relay: relay.clone(),
         last_failure: util::current_time_millis_i64(),
         failed_once: false,
         num_success: 0
@@ -194,7 +194,7 @@ pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
     // See if we should start at all
     c.build_tx().await?;
 
-    let interval1 = tokio::time::interval(Duration::from_secs(60));
+    let interval1 = tokio::time::interval(relay.node_config.clone().live_e2e_interval.clone());
     use futures::TryStreamExt;
     IntervalStream::new(interval1)
         .map(|x| Ok(x))

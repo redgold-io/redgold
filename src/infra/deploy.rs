@@ -69,6 +69,7 @@ pub fn setup_server_redgold(
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 1), true);
     ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 4), true);
     ssh.exec(format!("sudo ufw allow proto udp from any to any port {}", port + 5), true);
+    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 6), true);
 
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
@@ -95,6 +96,7 @@ pub async fn setup_ops_services(
     _additional_env: Option<HashMap<String, String>>,
     remote_path_prefix: Option<String>,
     grafana_pass: Option<String>,
+    purge_data: bool,
 ) -> Result<(), ErrorInfo> {
     let remote_path = remote_path_prefix.unwrap_or("/root/.rg/all".to_string());
     ssh.verify()?;
@@ -151,6 +153,12 @@ pub async fn setup_ops_services(
         format!("{}/dashboards/node-exporter.json", remote_path)
     );
 
+    let x = include_str!("../resources/infra/ops_services/dashboards/redgold_rev0.json");
+    ssh.copy(
+        x.clone(),
+        format!("{}/dashboards/redgold.json", remote_path)
+    );
+
     // println!("Copying node exporter dashboard: {}", x);
 
     ssh.copy(
@@ -158,10 +166,31 @@ pub async fn setup_ops_services(
         format!("{}/dashboards/dashboard_config.yaml", remote_path)
     );
 
+    ssh.copy(
+        include_str!("../resources/infra/ops_services/grafana/grafana.ini"),
+        format!("{}/grafana.ini", remote_path)
+    );
+
+    // Environment
+    let mut env = _additional_env.unwrap_or(Default::default());
+    env.insert("GF_SECURITY_ADMIN_PASSWORD__FILE".to_string(), "/etc/grafana/grafana_secret".to_string());
+    let copy_env = vec!["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM_ADDRESS", "SMTP_FROM_NAME"];
+    for e in copy_env {
+        for i in std::env::var(e).ok() {
+            env.insert(e.to_string(), i);
+        }
+    }
+    let env_contents = env.iter().map(|(k, v)| {
+        format!("{}={}", k, format!("{}", v))
+    }).join("\n");
+    ssh.copy(env_contents.clone(), format!("{}/ops_var.env", remote_path));
+
     ssh.stream_partial(format!("cd {}; docker-compose -f services-all.yml down", remote_path), false, p).await?;
 
     for s in vec!["grafana", "prometheus", "esdata"] {
-        ssh.stream_partial(format!("rm -r {}/data/{}", remote_path, s), false, p).await?;
+        if purge_data {
+            ssh.stream_partial(format!("rm -r {}/data/{}", remote_path, s), false, p).await?;
+        }
         ssh.stream_partial(format!("mkdir {}/data/{}", remote_path, s), false, p).await?;
     };
 
@@ -174,18 +203,7 @@ pub async fn setup_ops_services(
 #[ignore]
 #[tokio::test]
 async fn test_setup_server() {
-    // sudo ufw allow proto tcp from any to any port 16181
-        // sudo ufw allow proto tcp from any to any port 16180
 
-    //
-    //
-    // let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
-    // setup_ops_services(ssh, None, None, None).await.expect("");
-    // setup_server_redgold(ssh, NetworkEnvironment::Predev, true, None, true).expect("worx");
-    //
-    // let ssh = SSH::new_ssh("interserver.redgold.io", None);
-    // setup_server_redgold(ssh, NetworkEnvironment::Predev, false, None, true).expect("worx");
-    // let mut nc = NodeConfig::default();
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -193,15 +211,17 @@ async fn test_setup_server() {
     println!("Reading servers file: {:?}", buf);
     let s = ArgTranslate::read_servers_file(buf).expect("servers");
     println!("Setting up servers: {:?}", s);
-    let mut gen = true;
+    // let mut gen = true;
+    let purge = false;
+    let mut gen = false;
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
-    for ss in s {
+    for ss in s.to_vec().last() {
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
-        let ssh = SSH::new_ssh(ss.host, None);
-        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), true).expect("worx");
-        gen = false
+        let ssh = SSH::new_ssh(ss.host.clone(), None);
+        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), purge).expect("worx");
+        gen = false;
+        // setup_ops_services(ssh, None, None, None, false).await.expect("")
     }
-    // df.all().data_store().config_store
 }

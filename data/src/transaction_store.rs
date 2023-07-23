@@ -1,8 +1,10 @@
+use std::collections::HashSet;
 use sqlx::query::Map;
 use sqlx::{Error, Sqlite};
 use sqlx::sqlite::{SqliteArguments, SqliteRow};
 use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, PeerData, Transaction, UtxoEntry};
-use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, WithMetadataHashable};
+use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants, WithMetadataHashable};
+use redgold_schema::transaction::AddressBalance;
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -217,6 +219,24 @@ impl TransactionStore {
         Ok(!res.is_empty())
     }
 
+    pub async fn get_balance(&self, address: &Address) -> RgResult<Option<i64>> {
+        self.query_utxo_address(address).await.map(|utxos| {
+            let mut balance = 0;
+            for utxo in &utxos {
+                if let Some(o) = &utxo.output {
+                    if let Some(a) = o.opt_amount() {
+                        balance += a;
+                    }
+                }
+            }
+            if balance > 0 {
+                Some(balance)
+            } else {
+                None
+            }
+        })
+    }
+
     pub async fn query_utxo_address(
         &self,
         address: &Address
@@ -380,6 +400,131 @@ impl TransactionStore {
         Ok(rows_m.last_insert_rowid())
     }
 
+
+    pub async fn insert_address_transaction_single(
+        &self,
+        address: &Address,
+        tx_hash: &Hash,
+        time: i64,
+        incoming: bool
+    ) -> Result<i64, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+        let hash_vec = tx_hash.safe_bytes()?;
+        let address_vec = address.address.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"
+        INSERT OR REPLACE INTO address_transaction
+        (address, tx_hash, time, incoming) VALUES (?1, ?2, ?3, ?4)"#,
+           address_vec, hash_vec, time, incoming
+        )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.last_insert_rowid())
+    }
+
+    pub async fn get_all_tx_for_address(
+        &self,
+        address: &Address,
+        limit: i64,
+        offset: i64
+    ) -> Result<Vec<Transaction>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let bytes = address.address.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT tx_hash FROM address_transaction WHERE address = ?1 ORDER BY time DESC LIMIT ?2 OFFSET ?3"#,
+            bytes, limit, offset
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let tx_hash: Vec<u8> = row.tx_hash.clone();
+            let tx_hash = Hash::new(tx_hash);
+            // Suppress failed transactions from listing, maybe add a flag to show them
+            if let Some((tx, None)) = self.query_maybe_transaction(&tx_hash).await? {
+                res.push(tx)
+            }
+        }
+        Ok(res)
+    }
+
+    pub async fn get_filter_tx_for_address(
+        &self,
+        address: &Address,
+        limit: i64,
+        offset: i64,
+        incoming: bool
+    ) -> Result<Vec<Transaction>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let bytes = address.address.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT tx_hash FROM address_transaction WHERE address = ?1 AND incoming=?4 ORDER BY time DESC LIMIT ?2 OFFSET ?3"#,
+            bytes, limit, offset, incoming
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let tx_hash: Vec<u8> = row.tx_hash.clone();
+            let tx_hash = Hash::new(tx_hash);
+            // Suppress failed transactions from listing, maybe add a flag to show them
+            if let Some((tx, None)) = self.query_maybe_transaction(&tx_hash).await? {
+                res.push(tx)
+            }
+        }
+        Ok(res)
+    }
+
+    pub async fn get_count_filter_tx_for_address(
+        &self,
+        address: &Address,
+        incoming: bool
+    ) -> Result<i64, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let bytes = address.address.safe_bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT COUNT(tx_hash) as count FROM address_transaction WHERE address = ?1 AND incoming=?2"#,
+            bytes, incoming
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        for row in rows_m {
+            let count = row.count;
+            return Ok(count as i64);
+        }
+        Ok(0)
+    }
+
+    pub async fn insert_address_transaction(&self, tx: &Transaction) -> RgResult<()> {
+        let mut addr_incoming = HashSet::new();
+        let mut addr_outgoing = HashSet::new();
+        for i in &tx.inputs {
+            addr_outgoing.insert(i.address()?);
+        }
+        for i in &tx.outputs {
+            addr_incoming.insert(i.address.safe_get_msg("No address on output for insert_address_transaction")?.clone());
+        }
+        let hash = tx.hash_or();
+        let time = tx.struct_metadata.as_ref().and_then(|s| s.time)
+            .safe_get_msg("No time on transaction for insert_address_transaction")?.clone();
+        for address in addr_incoming {
+            self.insert_address_transaction_single(&address, &hash, time.clone(), true).await?;
+        }
+        for address in addr_outgoing {
+            self.insert_address_transaction_single(&address, &hash, time.clone(), false).await?;
+        }
+
+        Ok(())
+
+    }
+
     pub async fn insert_transaction(
         &self,
         tx: &Transaction,
@@ -387,10 +532,11 @@ impl TransactionStore {
         accepted: bool,
         rejection_reason: Option<ErrorInfo>,
     ) -> Result<i64, ErrorInfo> {
-        let i = self.insert_transaction_raw(tx, time, accepted, rejection_reason).await?;
-        for entry in UtxoEntry::from_transaction(tx, time as i64) {
+        let i = self.insert_transaction_raw(tx, time.clone(), accepted, rejection_reason).await?;
+        for entry in UtxoEntry::from_transaction(tx, time.clone() as i64) {
             self.insert_utxo(&entry).await?;
         }
+        self.insert_address_transaction(tx).await?;
         return Ok(i);
     }
 }

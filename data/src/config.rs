@@ -1,11 +1,11 @@
 use sqlx::Row;
 use sqlx::sqlite::SqliteRow;
 use redgold_schema::structs::{Address, ErrorInfo, Hash};
-use redgold_schema::{ErrorInfoContext, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants};
+use redgold_schema::{EasyJsonDeser, ErrorInfoContext, json_from, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use crate::schema::json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct ConfigStore {
@@ -120,6 +120,16 @@ impl ConfigStore {
 
     pub async fn store_proto<T: ProtoSerde, S: Into<String>>(&self, key: S, value: T) -> Result<i64, ErrorInfo> {
         self.insert_update_bytes(key.into(), value.proto_serialize()).await
+    }
+
+    pub async fn get_json<T: for<'de> Deserialize<'de> + Clone>(&self, key: impl Into<String>) -> RgResult<Option<T>> {
+        let option = self.select_config(key.into()).await?;
+        if let Some(str) = option {
+            let res: T = str.json_from()?;
+            Ok(Some(res.clone()))
+        } else {
+            Ok(None)
+        }
     }
 
 }

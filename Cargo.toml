@@ -1,24 +1,23 @@
 [package]
 name = "redgold"
-version = "0.1.0"
+version = "0.1.3"
 edition = "2021"
-authors = ["Redgold Labs"]
-description = "A relative proof conflict resolution & irreversibility service for executor contracts"
-documentation = "https://redgold.app/docs"
+authors = ["Redgold"]
+description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
+documentation = "https://dev.docs.redgold.io/"
 readme = "README.md"
-homepage = "https://redgold.app"
-repository = "https://github.com/redgold-app/redgold"
+homepage = "https://redgold.io"
+repository = "https://github.com/redgold-io/redgold"
 license = "MIT"
-keywords = ["crypto", "cryptocurrency", "trust",
-    "reputation", "custodial", "decentralized", "p2p", "contracts", "peer-to-peer", "merkle"]
-categories = ["cryptography::cryptocurrencies"] # https://crates.io/category_slugs
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
+categories = ["cryptography::cryptocurrencies"]
+
 
 
 [workspace]
 members = [
-    "app",
-    "core",
+#    "app",
+#    "core",
     "data",
     "schema",
 #    "sdk",
@@ -27,8 +26,10 @@ members = [
 exclude = ["examples/rust_wasm", "sdk", "sdk/*"]
 
 [dependencies]
-redgold-schema = { path = "schema"}
-redgold-executor = { path = "executor"}
+[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
+redgold-data = { path = "data", version = "0.1.3"}
+redgold-schema = { path = "schema", version = "0.1.3"}
+redgold-executor = { path = "executor", version = "0.1.3"}
 tempfile = "3.3.0"
 #web3 = { version = "0.18.0", default-features = false, features = ["http-rustls-tls"] }
 sha3 = "0.10.8"
@@ -45,7 +46,6 @@ backtrace = "0.3.65"
 # todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
 #swagger = "2.2" # breaks openssl?
 flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
-multihash = "*"
 dotenv = "0.15.0"
 futures = "0.3.1"
 bitcoin-wallet = "1.1.0"
@@ -57,7 +57,7 @@ rusqlite = "0.25.3"
 default-args = "1.0.0"
 crossbeam-channel = "0.5.1"
 crossbeam = "0.8.1"
-uuid = { version = "0.8.2", features = ["serde", "v4"] }
+uuid = { version = "1.3.3", features = ["serde", "v4", "v1"] }
 eframe = "0.21.0" # Gives us egui, epi and web+native backends
 egui_extras = {version = "0.21.0", features = ["default", "image"]}
 strum = "0.21"
@@ -73,7 +73,7 @@ async-std = { version = "1.6.2", features = ["attributes"] }
 async-trait = "0.1.56"
 env_logger = "0.9.0"
 structopt = "0.3.21"
-warp = "0.3"
+warp = {version = "0.3", features = ["tls", "default"]}
 reqwest = { version = "0.11", features = ["json"] }
 prost-helper = "0.5.0"
 serde = "1.0.130"
@@ -86,18 +86,20 @@ ssh2 = "0.9.1"
 ndarray = "0.15.3"
 chrono = "0.4.19"
 config = "0.11.0"
-bdk = "0.14.0"
-miniscript = "6.0.1"
+bdk = "0.28.0"
+#miniscript = "6.0.1"
+miniscript = { version = "9.0", default-features = false, features = ["serde"] }
 itertools = "0.10.1"
 bytes = "1.1.0"
 #bitcoin = {version = "0.29.1", features = ["serde", "bitcoinconsensus"]}
 #Dependencies for email sending
 aws-config = "0.55.1"
 aws-sdk-sesv2 = "0.26.0"
+dns-lookup = "2.0.2"
 #tracing-subscriber = "0.3.17"
 
 #Dependencies for multiparty threshold ecdsa
-multi-party-ecdsa = { git = "https://github.com/ZenGo-X/multi-party-ecdsa"}
+multi-party-ecdsa = "0.8.1"
 anyhow = "1"
 round-based = { version = "0.1.4", features = [] }
 async-sse = "5"
@@ -109,14 +111,17 @@ curv-kzen = { version = "0.9", default-features = false }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
-redgold-data = { path = "data"}
 metrics-exporter-prometheus = "0.9.0"
 # conflict with multi-party-ecdsa
 libp2p = "0.44.0"
 tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
 tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
 tokio-stream = "0.1.14"
+
+#cleora = "1.2.3"
+#graphembed =  {version = "0.0.7", features = ["default"]}
+#annembed = "0.0.10"
+csv = "1.1"
 
 [dependencies.bitcoin]
 version = "0.21"
@@ -138,3 +143,12 @@ opt-level = 3
 # Bloats the binary size a lot
 #[profile.release]
 #debug = true
+#
+[dependencies.openssl-sys]
+version = "0.9.88"
+features = ["vendored"]
+
+#[dependencies.simdeez]
+#version = "1.0"  # Use the latest version available
+#default-features = false
+#features = ["simdeez_f"]  # scalar for no SIMD, you can also use "sse2", "sse41", "avx2", "avx", "neon"

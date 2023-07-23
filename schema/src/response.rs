@@ -3,7 +3,7 @@ use std::ptr::hash;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
 use crate::{EasyJson, error_info, HashClear, KeyPair, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
-use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, MultipartyThresholdResponse, NodeMetadata, Proof, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse};
+use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, NodeMetadata, Proof, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse};
 
 impl AboutNodeResponse {
     pub fn empty() -> Self {
@@ -78,8 +78,8 @@ impl ControlResponse {
     pub fn empty() -> Self {
         Self {
             response_metadata: response_metadata(),
-            initiate_multiparty_keygen_response: None,
-            initiate_multiparty_signing_response: None,
+            control_multiparty_keygen_response: None,
+            control_multiparty_signing_response: None,
         }
     }
 
@@ -93,15 +93,6 @@ impl ControlResponse {
     }
 }
 
-impl MultipartyThresholdResponse {
-    pub fn empty() -> Self {
-        Self {
-            multiparty_issue_unique_index_response: None,
-            initiate_keygen_response: None,
-            initiate_signing_response: None,
-        }
-    }
-}
 
 impl QueryTransactionResponse {
 

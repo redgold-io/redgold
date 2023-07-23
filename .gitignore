@@ -20,3 +20,12 @@ log/
 ignore/
 /.idea/
 /.vscode
+vue-web/package-lock.json
+node_modules
+package.json
+package-lock.json
+git-filter-repo
+log0
+log1
+log2
+ignore

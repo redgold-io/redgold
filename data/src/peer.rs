@@ -1,19 +1,54 @@
 use std::time::Duration;
-use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, NodeMetadata, PeerData, PeerNodeInfo, PublicKey, Transaction};
+use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, NodeMetadata, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
 use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use itertools::Itertools;
 use tracing::info;
 use redgold_schema::EasyJson;
+use redgold_schema::structs::PeerIdInfo;
 
 #[derive(Clone)]
 pub struct PeerStore {
     pub ctx: DataStoreContext
 }
 
+#[derive(Clone)]
+pub struct PeerTrustQueryResult {
+    pub peer_id: PeerId,
+    pub trust: f64,
+}
+
 
 impl PeerStore {
+
+    pub async fn node_peer_id_trust(
+        &self,
+        public: &PublicKey,
+    ) -> Result<Option<PeerTrustQueryResult>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+
+        let vec = public.validate()?.bytes()?;
+
+        let rows = sqlx::query!(
+            r#"SELECT peers.id, peers.trust FROM peer_key JOIN peers on peer_key.id = peers.id WHERE public_key = ?1"#,
+            vec
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+
+        for rows in rows_m {
+            let pid: Vec<u8> = rows.id.safe_get_msg("Missing peer id from row query")?.clone();
+            let peer_id = PeerId::from_bytes(pid);
+            let trust = rows.trust.safe_get_msg("Missing trust from row query")?.clone() as f64;
+            return Ok(Some(PeerTrustQueryResult {
+                peer_id,
+                trust,
+            }));
+        }
+        Ok(None)
+    }
 
     /*
         pub fn select_broadcast_peers(&self) -> rusqlite::Result<Vec<PeerQueryResult>, Error> {
@@ -69,6 +104,63 @@ impl PeerStore {
         if let Some(rows) = rows_m {
             let pni = rows.peer_node_info.safe_get_msg("Missing peer node info in database")?.clone();
             return Ok(Some(PeerNodeInfo::proto_deserialize(pni)?));
+        }
+        Ok(None)
+    }
+
+    pub async fn query_public_key_metadata(
+        &self,
+        public: &PublicKey,
+    ) -> Result<Option<NodeMetadata>, ErrorInfo> {
+        Ok(self.query_public_key_node(public.clone()).await?
+            .and_then(|v| v.latest_node_transaction)
+            .and_then(|v| v.node_metadata().ok())
+        )
+    }
+
+    pub async fn query_peer_id_info(
+        &self,
+        peer_id: &PeerId,
+    ) -> Result<Option<PeerIdInfo>, ErrorInfo> {
+        let tx = self.query_peer_id_tx(peer_id).await?;
+        let mut res = vec![];
+        if let Some(tx) = &tx{
+            for nmd in tx.peer_data()?.node_metadata {
+                if let Some(pk) = nmd.public_key {
+                    if let Some(v) = self.query_public_key_node(pk).await? {
+                        res.push(v);
+                    }
+                }
+            };
+        }
+        if let Some(tx) = tx {
+            return Ok(Some(PeerIdInfo {
+                latest_peer_transaction: Some(tx),
+                peer_node_info: res
+            }))
+        }
+        Ok(None)
+    }
+
+    pub async fn query_peer_id_tx(
+        &self,
+        peer_id: &PeerId,
+    ) -> Result<Option<Transaction>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+
+        let vec = peer_id.peer_id.safe_bytes()?;
+
+        let rows = sqlx::query!(
+            r#"SELECT tx FROM peers WHERE id = ?1"#,
+            vec
+        )
+            .fetch_optional(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+
+        if let Some(rows) = rows_m {
+            let pni: Vec<u8> = rows.tx.clone();
+            return Ok(Some(Transaction::proto_deserialize(pni)?));
         }
         Ok(None)
     }
@@ -142,7 +234,7 @@ impl PeerStore {
         let pd = tx.peer_data()?;
         let tx_blob = tx.proto_serialize();
         let pd_blob = pd.proto_serialize();
-        let tx_hash = tx.hash().vec();
+        let tx_hash = tx.hash_or().vec();
         let mut pool = self.ctx.pool().await?;
         let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().value;
 

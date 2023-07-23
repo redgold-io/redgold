@@ -59,12 +59,6 @@ pub fn validate_utxo(
     return validate_currency_utxo(transaction, data_store);
     // Err(RGError::UnknownError)
 }
-pub fn delete_utxo_inputs(transaction: &Transaction, ds: DataStore) -> Result<(), rusqlite::Error> {
-    for (x, y) in transaction.iter_utxo_inputs() {
-        ds.delete_utxo(&x, y as u32)?;
-    }
-    Ok(())
-}
 
 pub fn validate_currency_utxo(
     transaction: &Transaction,
@@ -238,7 +232,7 @@ fn test_decoding() {
     let bytes = t.proto_serialize();
     let t2 = Transaction::proto_deserialize(bytes).unwrap();
     assert_eq!(t, t2);
-    assert_eq!(t.hash(), t2.hash());
+    assert_eq!(t.hash_or(), t2.hash_or());
 }
 
 //

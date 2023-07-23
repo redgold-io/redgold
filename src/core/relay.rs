@@ -17,7 +17,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, FixedUtxoId, GossipTransactionRequest, Hash, MultipartySubscribeEvent, MultipartyThresholdRequest, MultipartyThresholdResponse, NodeMetadata, ObservationProof, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, FixedUtxoId, GossipTransactionRequest, Hash, NodeMetadata, ObservationProof, Request, Response, Transaction};
 use crate::core::discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
@@ -42,34 +42,34 @@ pub struct TrustUpdate {
     pub update: PeerData,
     pub remove_peer: Option<Vec<u8>>,
 }
-
-#[derive(Clone)]
-pub struct MultipartyRequestResponse {
-    pub request: Option<MultipartyThresholdRequest>,
-    pub response: Option<MultipartyThresholdResponse>,
-    pub sender: Option<flume::Sender<MultipartyThresholdResponse>>,
-    pub origin: Option<NodeMetadata>,
-    pub internal_subscribe: Option<MultipartyRoomInternalSubscribe>
-}
-
-impl MultipartyRequestResponse {
-
-    pub fn empty() -> Self {
-        Self {
-            request: None,
-            response: None,
-            sender: None,
-            origin: None,
-            internal_subscribe: None,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct MultipartyRoomInternalSubscribe {
-    pub room_id: String,
-    pub sender: flume::Sender<MultipartySubscribeEvent>
-}
+//
+// #[derive(Clone)]
+// pub struct MultipartyRequestResponse {
+//     pub request: Option<MultipartyThresholdRequest>,
+//     pub response: Option<MultipartyThresholdResponse>,
+//     pub sender: Option<flume::Sender<MultipartyThresholdResponse>>,
+//     pub origin: Option<NodeMetadata>,
+//     pub internal_subscribe: Option<MultipartyRoomInternalSubscribe>
+// }
+//
+// impl MultipartyRequestResponse {
+//
+//     pub fn empty() -> Self {
+//         Self {
+//             request: None,
+//             response: None,
+//             sender: None,
+//             origin: None,
+//             internal_subscribe: None,
+//         }
+//     }
+// }
+//
+// #[derive(Clone)]
+// pub struct MultipartyRoomInternalSubscribe {
+//     pub room_id: String,
+//     pub sender: flume::Sender<MultipartySubscribeEvent>
+// }
 
 #[derive(Clone)]
 pub struct ObservationMetadataInternalSigning {
@@ -86,7 +86,7 @@ pub struct Relay {
     /// Externally received observations TODO: Merge this into transaction
     pub observation: Channel<Observation>,
     /// Threshold encryption multiparty signing flow
-    pub multiparty: Channel<MultipartyRequestResponse>,
+    // pub multiparty: Channel<MultipartyRequestResponse>,
     /// Internal signing stream for handling some validated data that is to be observed and signed
     pub observation_metadata: Channel<ObservationMetadataInternalSigning>,
     /// Incoming interface for receiving messages from other peers
@@ -137,7 +137,7 @@ impl Relay {
         };
         self.observation_metadata.sender.send_err(omi)?;
         let res = tokio::time::timeout(
-            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 1),
+            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 10),
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
@@ -319,7 +319,7 @@ impl Relay {
             .await?;
 
         let mut response = SubmitTransactionResponse {
-            transaction_hash: tx.clone().hash().into(),
+            transaction_hash: tx.clone().hash_or().into(),
             query_transaction_response: None,
             transaction: Some(tx.clone()),
         };
@@ -342,7 +342,7 @@ impl Relay {
             node_config,
             transaction: internal_message::new_channel::<TransactionMessage>(),
             observation: internal_message::new_channel::<Observation>(),
-            multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
+            // multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
             observation_metadata: internal_message::new_channel::<ObservationMetadataInternalSigning>(),
             peer_message_tx: internal_message::new_channel::<PeerMessage>(),
             peer_message_rx: internal_message::new_channel::<PeerMessage>(),
