@@ -218,10 +218,7 @@ impl Node {
         (tx, res)
     }
 
-    pub async fn from_config(relay: Relay
-                       // , runtimes: NodeRuntimes
-    ) -> Result<Node, ErrorInfo> {
-        // Inter thread communication
+    pub async fn from_config(relay: Relay) -> Result<Node, ErrorInfo> {
 
         let node = Self {
             relay: relay.clone()
@@ -229,16 +226,7 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
-        // log::debug!("Select all DS tables: {:?}", relay.ds.select_all_tables());
-
-
-        let result1 = std::env::var("REDGOLD_GENESIS");
-        // log::debug!("REDGOLD_GENESIS environment variable: {:?}", result1);
-
-        let flag_genesis = node_config.genesis && node_config.main_stage_network();
-        let debug_genesis = !node_config.main_stage_network() && relay.node_config.seeds.is_empty();
-
-        if flag_genesis || debug_genesis {
+        if node_config.genesis {
             info!("Starting from genesis");
             // relay.node_state.store(NodeState::Ready);
             // TODO: Replace with genesis per network type.
@@ -363,6 +351,7 @@ impl LocalTestNodeContext {
     async fn new(id: u16, random_port_offset: u16, seed: Option<Seed>) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.port_offset = random_port_offset;
+        node_config.genesis = true;
         for x in seed {
             node_config.seeds = vec![x];
         }

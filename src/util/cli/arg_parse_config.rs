@@ -42,6 +42,8 @@ pub fn get_default_data_top_folder() -> PathBuf {
     redgold_dir
 }
 
+use redgold_schema::EasyJson;
+
 
 pub struct ArgTranslate {
     // runtime: Arc<Runtime>,
@@ -136,6 +138,7 @@ impl ArgTranslate {
         self.lookup_ip().await;
 
         self.e2e_enable();
+        self.set_public_key();
         self.configure_seeds();
         self.set_discovery_interval();
 
@@ -486,12 +489,20 @@ impl ArgTranslate {
         if self.node_config.genesis {
             self.node_config.seeds.push(self.node_config.self_seed())
         }
+        if self.node_config.genesis {
+            info!("Starting node as genesis node");
+        }
     }
     fn set_gui_on_empty(&mut self) {
         // println!("args: {:?}", self.args.clone());
         if self.args.len() == 1 {
             self.opts.subcmd = Some(RgTopLevelSubcommand::GUI(GUI{}));
         }
+    }
+    fn set_public_key(&mut self) {
+        let pk = self.node_config.public_key();
+        self.node_config.public_key = pk.clone();
+        info!("Starting node with public key: {}", pk.json_or());
     }
 }
 

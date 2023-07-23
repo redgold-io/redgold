@@ -50,6 +50,8 @@ pub struct NodeConfig {
     pub self_peer_id: Vec<u8>,
     // Remove above and rename to peer_id -- this field is not in use yet.
     pub peer_id: PeerId,
+    // This field is not used yet; it is a placeholder for future use.
+    pub public_key: structs::PublicKey,
     // TODO: Change to Seed class? or maybe not leave it as it's own
     pub mnemonic_words: String,
     // Sometimes adjusted user params
@@ -300,6 +302,7 @@ impl NodeConfig {
         Self {
             self_peer_id: vec![],
             peer_id: Default::default(),
+            public_key: structs::PublicKey::default(),
             mnemonic_words: "".to_string(),
             port_offset: NetworkEnvironment::Debug.default_port_offset(),
             p2p_port: None,
