@@ -351,7 +351,9 @@ impl LocalTestNodeContext {
     async fn new(id: u16, random_port_offset: u16, seed: Option<Seed>) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.port_offset = random_port_offset;
-        node_config.genesis = true;
+        if id == 0 {
+            node_config.genesis = true;
+        }
         for x in seed {
             node_config.seeds = vec![x];
         }
