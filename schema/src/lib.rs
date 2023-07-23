@@ -695,10 +695,9 @@ impl Request {
 
     pub fn verify_auth(&self) -> Result<PublicKey, ErrorInfo> {
         let hash = self.calculate_hash();
-        // println!("verify_auth hash: {:?}", hash.hex());
-        self.proof.safe_get()?.verify(&hash)?;
-        let proof = self.proof.safe_get()?;
-        let pk = proof.public_key.safe_get()?;
+        let proof = self.proof.safe_get_msg("Missing proof on request authentication verification")?;
+        proof.verify(&hash)?;
+        let pk = proof.public_key.safe_get_msg("Missing public key on request authentication verification")?;
         Ok(pk.clone())
     }
 

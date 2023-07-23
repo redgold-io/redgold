@@ -18,7 +18,7 @@ use crate::multiparty::{gg20_keygen, gg20_signing};
 fn debug() {
 
 }
-
+use redgold_schema::EasyJson;
 #[derive(Clone, Debug)]
 pub struct SelfInitiateKeygenResult {
     pub local_share: String,
@@ -39,7 +39,7 @@ pub async fn default_identifier(relay: Relay) -> RgResult<MultipartyIdentifier> 
     let kp = find_multiparty_key_pairs(relay.clone()).await?;
     let ident = MultipartyIdentifier {
         uuid: default_room_id(),
-        threshold: kp.len() as i64,
+        threshold: (kp.len()-1) as i64,
         party_keys: kp,
     };
     Ok(ident)
@@ -88,25 +88,24 @@ pub async fn initiate_mp_keygen(
 
     let mut base_request = InitiateMultipartyKeygenRequest::default();
     base_request.identifier = Some(ident.clone());
+    let mut req = Request::empty();
+    req.initiate_keygen = Some(base_request.clone());
+    let peers = ident.party_keys.iter().filter(|&p| p != &self_key)
+        .map(|x| x.clone())
+        .collect_vec();
+    info!("Sending initiate keygen request to peers: {} message: {}", peers.json_or(), req.json_or());
+
+    let results = relay.broadcast_async(peers, req, Some(Duration::from_secs(100))).await?;
 
     let mut successful = 0;
-    // TODO: Ensure party key self is first? or is it not present?
-    // TODO: Change this to a broadcast.
-    for (i_zero_index, peer) in ident.party_keys.iter().enumerate() {
-        // Party index is required to be 1-indexed.
-        let i = i_zero_index + 1;
-        if peer == &self_key {
-            continue;
-        }
-        let mut req = Request::empty();
-        let mpt = base_request.clone();
-        info!("Sending initiate keygen request to peer: {}", peer.hex()?);
-        let res0 = relay.send_message_sync(req, peer.clone(), None).await;
-        // info!("Received initiate keygen response from peer: {:?}", res0.clone());
-        let res = res0.clone()
+
+    for result in results {
+
+        info!("Received initiate keygen response from peer: {:?}", result);
+        let res = result.clone()
             .and_then(|r| r.as_error_info());
         match res {
-            Ok(_) => {
+            Ok(r) => {
                 successful += 1
             }
             Err(e) => {
@@ -151,7 +150,7 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
 
     let ident = mp_req.identifier.safe_get()?;
     let index = ident.party_keys.iter().enumerate().find(|(idx, x)| x == &&relay.node_config.public_key())
-        .map(|(idx, x)| idx as u16)
+        .map(|(idx, x)| (idx as u16) + 1)
         .ok_or(error_info("Not a participant"))?;
     // TODO: Verify address matches host key
     // let key = mp_req.host_key.safe_get()?.clone();
@@ -164,7 +163,8 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
     let metadata = relay.ds.peer_store.query_public_key_metadata(host_key).await?;
     let metadata = metadata.safe_get_msg("No host key metadata")?;
     let address = metadata.external_address.clone();
-    let port = relay.node_config.mparty_port();
+    let port = metadata.port_offset.map(|o| (o+4) as u16).unwrap_or(relay.node_config.mparty_port());
+
     let timeout = Duration::from_secs(100); // mp_req.timeout_seconds.unwrap_or(100) as u64);
 
     info!("Initiating mp keygen follower for room: {} with index: {} num_parties: {}, threshold: {}, port: {}",
@@ -260,6 +260,7 @@ pub struct SelfInitiateKeysignResult {
 pub async fn initiate_mp_keysign(
     relay: Relay,
     ident: MultipartyIdentifier,
+    // Change to &Vec<u8>
     data_to_sign: BytesData,
     mut parties: Vec<PublicKey>,
     signing_room_id: Option<String>
@@ -300,29 +301,32 @@ pub async fn initiate_mp_keysign(
     let option = mp_req.data_to_sign.clone().safe_bytes()?;
 
     let rid = signing_room_id.clone();
+    let index2 = index.clone();
     let jh = tokio::spawn(async move { tokio::time::timeout(
         timeout,
         gg20_signing::signing(
-            address, port, rid, local_share.clone(), index, option),
+            address, port, rid, local_share.clone(), index2, option),
     ).await.error_info("Timeout")});
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let self_key = relay.node_config.public_key();
-    let mut successful = 0;
-    for (_, peer) in ident.party_keys.iter().enumerate() {
-        if peer == &self_key {
-            continue;
-        }
-        let mut mp_req_external = mp_req.clone();
-        let mut req = Request::empty();
-        req.initiate_signing = Some(mp_req_external);
-        // TODO: Distinguish here between separate server and localhost
-        let reqser = req.clone();
-        info!("Sending initiate keysign request to peer {:?}", crate::schema::json_or(&reqser));
+    let mp_req_external = mp_req.clone();
+    let mut req = Request::empty();
+    req.initiate_signing = Some(mp_req_external);
 
-        let result = relay.send_message_sync(req, peer.clone(), None).await;
-        info!("Sent initiate keysign request to peer {:?}", result.clone());
+    let self_key = relay.node_config.public_key();
+    let peers = parties.iter().filter(|&p| p != &self_key)
+        .map(|x| x.clone())
+        .collect_vec();
+
+    info!("Sending initiate keysign request to peers: {} message: {} self_port: {} signing_room_id: {} index: {}",
+        peers.json_or(), req.json_or(), port, signing_room_id.clone(), index.json_or());
+
+    let results = relay.broadcast_async(peers, req, Some(Duration::from_secs(100))).await?;
+
+    let mut successful = 0;
+
+    for result in results {
         let res = result
             .and_then(|r| r.as_error_info());
         match res {
@@ -346,7 +350,7 @@ pub async fn initiate_mp_keysign(
     relay.ds.multiparty_store.add_signing_proof(
         init_keygen_req_room_id, signing_room_id.clone(), proof.clone(), mp_req.clone()
     ).await?;
-    let mut response1 = SelfInitiateKeysignResult{
+    let response1 = SelfInitiateKeysignResult{
         ident,
         signing_room_id: signing_room_id.clone(),
         parties,
@@ -374,8 +378,13 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
     // let key = mp_req.host_key.safe_get()?.clone();
     // let number_of_parties = ident.num_parties as u16;
     let signing_room_id = mp_req.signing_room_id.clone();
-    let address = "127.0.0.1".to_string();
-    let port = relay.node_config.mparty_port();
+    let host_key = mp_req.signing_party_keys.get(0).cloned();
+    let host_key = host_key.safe_get_msg("No host key")?;
+    let metadata = relay.ds.peer_store.query_public_key_metadata(host_key).await?;
+    let metadata = metadata.safe_get_msg("No host key metadata")?;
+    let address = metadata.external_address.clone();
+    let port = metadata.port_offset.map(|o| (o+4) as u16).unwrap_or(relay.node_config.mparty_port());
+
     let timeout = Duration::from_secs(100);
 
     //TODO: This should be returned as immediate failure on the response level instead of going
@@ -385,7 +394,10 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
 
-    log::info!("Initiating follower keysign for room {} with parties {:?}", signing_room_id.clone(), index.clone());
+    info!("Initiating follower keysign for \
+    room {} with parties {} address: {} port: {} host_key: {}",
+        signing_room_id.clone(), index.clone().json_or(), address, port, host_key.json_or()
+    );
     let signing_bytes = mp_req.data_to_sign.clone().safe_get()?.clone().value;
     let res = tokio::time::timeout(
         timeout,

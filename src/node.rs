@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, Transaction, TrustData};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, Transaction, TrustData};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -746,38 +746,56 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     local_nodes.verify_peers().await.expect("verify peers");
 
 
-    let res = client1.multiparty_keygen(None).await;
+    let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
     // println!("{:?}", res);
     /*
     "protocol execution terminated with error: handle received message: received message didn't pass pre-validation: got message which was sent by this party"
     this happens sometimes?
     Do we need some kind of sleep in here before the other peers start? very confusing.
      */
-    assert!(res.is_ok());
 
-    let party = res.expect("ok");
-    let signing_data = Hash::from_string_calculate("hey");
-    let vec1 = signing_data.vec();
-    let vec = bytes_data(vec1.clone()).expect("");
-    let mut signing_request = ControlMultipartySigningRequest::default();
-    let mut init_signing = InitiateMultipartySigningRequest::default();
-    let identifier = party.multiparty_identifier.expect("");
-    init_signing.signing_room_id = default_room_id_signing(identifier.uuid.clone());
-    init_signing.data_to_sign = Some(vec);
-    init_signing.identifier = Some(identifier.clone());
-    signing_request.signing_request = Some(init_signing);
-    let res =
-        client1.multiparty_signing(signing_request).await;
-    // println!("{:?}", res);
-    assert!(res.is_ok());
-    res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
+    // tokio::time::sleep(Duration::from_secs(10)).await;
+
+    let do_signing = |party: ControlMultipartyKeygenResponse| async {
+
+        let signing_data = Hash::from_string_calculate("hey");
+        let vec1 = signing_data.vec();
+        let vec = bytes_data(vec1.clone()).expect("");
+        let mut signing_request = ControlMultipartySigningRequest::default();
+        let mut init_signing = InitiateMultipartySigningRequest::default();
+        let identifier = party.multiparty_identifier.expect("");
+        init_signing.signing_room_id = default_room_id_signing(identifier.uuid.clone());
+        init_signing.data_to_sign = Some(vec);
+        init_signing.identifier = Some(identifier.clone());
+        signing_request.signing_request = Some(init_signing);
+        let res =
+            client1.multiparty_signing(signing_request).await;
+        // println!("{:?}", res);
+        assert!(res.is_ok());
+        res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
+
+    };
+
+    do_signing(keygen1).await;
 
     tracing::info!("After MP test");
-
 
     submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
 
     local_nodes.verify_data_equivalent().await;
+
+    // three nodes
+    local_nodes.add_node().await;
+    local_nodes.verify_data_equivalent().await;
+    local_nodes.verify_peers().await?;
+
+    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+
+    // submit.submit().await?.at_least_n(3).unwrap();
+
+    let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    do_signing(keygen2).await;
+
 
     std::mem::forget(local_nodes);
     std::mem::forget(submit);

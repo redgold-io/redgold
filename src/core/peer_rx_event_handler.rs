@@ -158,33 +158,37 @@ impl PeerRxEventHandler {
         }
 
         // Verified requests only below here
-        let pk = verified?;
-
+        // if let Ok(pk) = verified {
         if let Some(r) = request.initiate_keygen {
             // TODO Track future with loop poll pattern
             // oh wait can we remove this spawn entirely?
             info!("Received MP request on peer rx: {}", json_or(&r));
             let rel2 = relay.clone();
             // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-            tokio::spawn(async move {
+            // tokio::spawn(async move {
                 let result1 = initiate_mp_keygen_follower(
                     rel2.clone(), r).await;
                 let mp_response: String = result1.clone()
                     .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                info!("Multiparty response from follower: {}", mp_response);
-            });
+            info!("Multiparty response from follower: {}", mp_response);
+
+            response.initiate_keygen_response = Some(result1?);
+
+            // });
         }
         if let Some(k) = request.initiate_signing {
-                let rel2 = relay.clone();
-                info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
-                // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                tokio::spawn(async move {
-                    let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
-                    let mp_response: String = result1.clone()
-                        .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                    info!("Multiparty signing response from follower: {}", mp_response);
-                });
+            let rel2 = relay.clone();
+            info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
+            // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
+            // tokio::spawn(async move {
+                let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
+                let mp_response: String = result1.clone()
+                    .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+                info!("Multiparty signing response from follower: {}", mp_response);
+                response.initiate_signing_response = Some(result1?);
+            // });
         }
+        // }
         // info!(
         //                 "Preparing response to peer RX event handler: {}",
         //                 serde_json::to_string(&response.clone()).unwrap_or("json fail".into())
