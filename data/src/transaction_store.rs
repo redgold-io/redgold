@@ -4,6 +4,7 @@ use sqlx::{Error, Sqlite};
 use sqlx::sqlite::{SqliteArguments, SqliteRow};
 use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, PeerData, Transaction, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants, WithMetadataHashable};
+use redgold_schema::transaction::AddressBalance;
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -216,6 +217,24 @@ impl TransactionStore {
             }
         }
         Ok(!res.is_empty())
+    }
+
+    pub async fn get_balance(&self, address: &Address) -> RgResult<Option<i64>> {
+        self.query_utxo_address(address).await.map(|utxos| {
+            let mut balance = 0;
+            for utxo in &utxos {
+                if let Some(o) = &utxo.output {
+                    if let Some(a) = o.opt_amount() {
+                        balance += a;
+                    }
+                }
+            }
+            if balance > 0 {
+                Some(balance)
+            } else {
+                None
+            }
+        })
     }
 
     pub async fn query_utxo_address(

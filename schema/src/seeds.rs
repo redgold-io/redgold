@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use crate::structs::{NetworkEnvironment, Seed, TrustData, TrustLabel};
+use crate::util::current_time_millis;
 
 
 #[derive(Debug, serde::Deserialize)]
@@ -10,8 +11,7 @@ struct SeedCsvRecord {
 }
 
 
-fn parse_seeds_csv_resource() -> Vec<SeedCsvRecord> {
-    let str = include_str!("resources/seeds/seeds.csv");
+fn parse_seeds_csv_resource(str: &str) -> Vec<SeedCsvRecord> {
     let mut rdr = csv::Reader::from_reader(str.as_bytes());
     let mut res = vec![];
     for result in rdr.deserialize() {
@@ -24,8 +24,15 @@ fn parse_seeds_csv_resource() -> Vec<SeedCsvRecord> {
     res
 }
 
-fn get_seeds() -> Vec<Seed> {
-    let csv_records = parse_seeds_csv_resource();
+pub fn get_seeds() -> Vec<Seed> {
+    // Use this for triggering upgrades to the seed list
+    let activation_time = 0;
+    let contents = if current_time_millis() < activation_time {
+        include_str!("resources/seeds/seeds-old.csv")
+    } else {
+        include_str!("resources/seeds/seeds.csv")
+    };
+    let csv_records = parse_seeds_csv_resource(contents);
     // TODO: Embed any additional data in code here afterwards.
     csv_records.iter().map(|r| {
         let mut s = Seed::default();

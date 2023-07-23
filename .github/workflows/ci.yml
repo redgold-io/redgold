@@ -284,6 +284,10 @@ jobs:
 
       - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
+      - name: "Build Changelog"
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@{latest-release}
+
       - uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
           delete_release: true # default: false
@@ -293,6 +297,7 @@ jobs:
       - name: Sleep for 5 seconds
         run: sleep 5
       # https://github.com/marketplace/actions/rust-release-binary these steps came from below
+      # TODO: Duplicate this release step with 'version' tagged releases
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
@@ -304,16 +309,14 @@ jobs:
           body: "
           Redgold ${{ env.BRANCH }} Release
           
+          ${{steps.build_changelog.outputs.changelog}}
+          
           COMMIT_HASH=${{ github.sha }}
           
           DOCKER_SHA256=${{ env.DOCKER_SHA256 }}
 
-          LINUX_MD5=${{ env.BUILD_CHECKSUM }}
-           
           LINUX_SHA256=${{ env.BUILD_CHECKSUM_SHA256 }}
-           
-          LINUX_SHA512=${{ env.BUILD_CHECKSUM_SHA512 }}
-          
+                     
           MAC_SHA256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
           
           "

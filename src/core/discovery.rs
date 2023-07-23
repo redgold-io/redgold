@@ -33,7 +33,7 @@ impl IntervalFold for Discovery {
             .active_nodes(None).await
             .add("Active nodes query in discovery failure")?;
 
-        debug!("Running discovery for {} stored peers", peers.len());
+        // debug!("Running discovery for {} stored peers", peers.len());
         let mut results = HashSet::new();
 
         let mut req = structs::Request::default();
@@ -55,7 +55,7 @@ impl IntervalFold for Discovery {
             }
         }
 
-        debug!("Discovery found {} total peers", results.len());
+        // debug!("Discovery found {} total peers", results.len());
         let mut new_peers_count = 0;
         for r in &results {
             if let Some(pk) = r.latest_node_transaction.clone()

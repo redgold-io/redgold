@@ -43,6 +43,17 @@ impl Address {
         // })?;
         // Ok(address_vec.into())
     }
+
+    // Maybe consider checking here to see if the address is valid?
+    // Or before this actually, we should potentially not do 'into bytes'
+    // but instead change this to a vec and decode it.
+    pub fn from_bitcoin(address: &String) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: AddressType::BitcoinExternalString as i32,
+        }
+    }
+
     pub fn render_string(&self) -> Result<String, ErrorInfo> {
         let result = self.address.safe_bytes()?;
         Ok(Self::address_to_str(&result))

@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{GetPeersInfoRequest, Hash, NetworkEnvironment, Request, Transaction};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, Transaction, TrustData};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -53,6 +53,7 @@ use tracing::Span;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::stream_handlers::IntervalFold;
+use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::util::logging::Loggable;
 
@@ -217,10 +218,7 @@ impl Node {
         (tx, res)
     }
 
-    pub async fn from_config(relay: Relay
-                       // , runtimes: NodeRuntimes
-    ) -> Result<Node, ErrorInfo> {
-        // Inter thread communication
+    pub async fn from_config(relay: Relay) -> Result<Node, ErrorInfo> {
 
         let node = Self {
             relay: relay.clone()
@@ -228,16 +226,7 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
-        // log::debug!("Select all DS tables: {:?}", relay.ds.select_all_tables());
-
-
-        let result1 = std::env::var("REDGOLD_GENESIS");
-        // log::debug!("REDGOLD_GENESIS environment variable: {:?}", result1);
-
-        let flag_genesis = node_config.genesis && node_config.main_stage_network();
-        let debug_genesis = !node_config.main_stage_network() && relay.node_config.seeds.is_empty();
-
-        if flag_genesis || debug_genesis {
+        if node_config.genesis {
             info!("Starting from genesis");
             // relay.node_state.store(NodeState::Ready);
             // TODO: Replace with genesis per network type.
@@ -280,20 +269,21 @@ impl Node {
                 let nmd = pd.node_metadata.get(0).expect("nmd");
                 let vec = nmd.public_key_bytes().expect("ok");
                 let vec1 = pd.peer_id.safe_get()?.clone().peer_id.safe_bytes()?.clone();
-                SeedNode{
-                    peer_id: Some(vec1),
-                    trust: vec![],
-                    public_key: Some(keys::public_key_from_bytes(&vec).expect("pk")),
+                // TODO: Derive from NodeMetadata?
+                Seed{
+                    peer_id: Some(PeerId::from_bytes(vec1)),
+                    trust: vec![TrustData::from_label(1.0)],
+                    public_key: Some(nmd.public_key.safe_get_msg("Missing pk on about").cloned()?),
                     external_address: nmd.external_address.clone(),
-                    port_offset: Some(nmd.port_offset.unwrap_or(node_config.network.default_port_offset() as i64) as u16),
-                    environments: vec![],
+                    port_offset: Some(nmd.port_offset.unwrap_or(node_config.network.default_port_offset() as i64) as u32),
+                    environments: vec![node_config.network as i32],
                 }
             } else {
                 relay.node_config.seeds.get(0).unwrap().clone()
 
             };
             let port = seed.port_offset.unwrap() + 1;
-            let client = PublicClient::from(seed.external_address.clone(), port);
+            let client = PublicClient::from(seed.external_address.clone(), port as u16);
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
             let response = client.about().await?;
             let result = response.peer_node_info.safe_get()?;
@@ -358,9 +348,12 @@ pub struct LocalTestNodeContext {
 }
 
 impl LocalTestNodeContext {
-    async fn new(id: u16, random_port_offset: u16, seed: Option<SeedNode>) -> Self {
+    async fn new(id: u16, random_port_offset: u16, seed: Option<Seed>) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.port_offset = random_port_offset;
+        if id == 0 {
+            node_config.genesis = true;
+        }
         for x in seed {
             node_config.seeds = vec![x];
         }
@@ -408,7 +401,7 @@ async fn throw_panic() {
 struct LocalNodes {
     nodes: Vec<LocalTestNodeContext>,
     connections: Vec<Connection>,
-    current_seed: SeedNode,
+    current_seed: Seed,
 }
 
 impl LocalNodes {
@@ -445,21 +438,7 @@ impl LocalNodes {
         let start = LocalTestNodeContext::new(0, port_offset, None).await;
         LocalNodes {
             connections: vec![], //connection],
-            current_seed: SeedNode {
-                peer_id: Some(start.node.relay.node_config.clone().self_peer_id),
-                trust: vec![],
-                public_key: Some(start
-                    .node
-                    .relay
-                    .node_config
-                    .clone()
-                    .internal_mnemonic()
-                    .active_keypair().public_key.clone()
-                ),
-                external_address: start.node.relay.node_config.external_ip.clone(),
-                port_offset: Some(start.node.relay.node_config.port_offset),
-                environments: vec![],
-            },
+            current_seed: start.node.relay.node_config.self_seed(),
             nodes: vec![start],
         }
     }
@@ -758,31 +737,58 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     local_nodes.verify_peers().await.expect("verify peers");
 
 
-    let res = client1.multiparty_keygen(None).await;
+    let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
     // println!("{:?}", res);
     /*
     "protocol execution terminated with error: handle received message: received message didn't pass pre-validation: got message which was sent by this party"
     this happens sometimes?
     Do we need some kind of sleep in here before the other peers start? very confusing.
      */
-    assert!(res.is_ok());
 
-    let party = res.expect("ok");
-    let signing_data = Hash::from_string_calculate("hey");
-    let vec1 = signing_data.vec();
-    let vec = bytes_data(vec1.clone()).expect("");
-    let res =
-        client1.multiparty_signing(None, party.initial_request, vec).await;
-    // println!("{:?}", res);
-    assert!(res.is_ok());
-    res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
+    // tokio::time::sleep(Duration::from_secs(10)).await;
+
+    let do_signing = |party: ControlMultipartyKeygenResponse| async {
+
+        let signing_data = Hash::from_string_calculate("hey");
+        let vec1 = signing_data.vec();
+        let vec = bytes_data(vec1.clone()).expect("");
+        let mut signing_request = ControlMultipartySigningRequest::default();
+        let mut init_signing = InitiateMultipartySigningRequest::default();
+        let identifier = party.multiparty_identifier.expect("");
+        init_signing.signing_room_id = default_room_id_signing(identifier.uuid.clone());
+        init_signing.data_to_sign = Some(vec);
+        init_signing.identifier = Some(identifier.clone());
+        signing_request.signing_request = Some(init_signing);
+        let res =
+            client1.multiparty_signing(signing_request).await;
+        // println!("{:?}", res);
+        assert!(res.is_ok());
+        res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
+
+    };
+
+    do_signing(keygen1).await;
 
     tracing::info!("After MP test");
-
 
     submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
 
     local_nodes.verify_data_equivalent().await;
+
+    // three nodes
+    local_nodes.add_node().await;
+    local_nodes.verify_data_equivalent().await;
+    local_nodes.verify_peers().await?;
+
+    // This works but is really flaky for some reason?
+    // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+
+    // submit.submit().await?.at_least_n(3).unwrap();
+
+    // This works sometimes but is flaky, unsure the exact reason.
+    // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    // do_signing(keygen2).await;
+    //
 
     std::mem::forget(local_nodes);
     std::mem::forget(submit);

@@ -203,18 +203,7 @@ pub async fn setup_ops_services(
 #[ignore]
 #[tokio::test]
 async fn test_setup_server() {
-    // sudo ufw allow proto tcp from any to any port 16181
-        // sudo ufw allow proto tcp from any to any port 16180
 
-    //
-    //
-    // let ssh = SSH::new_ssh("hostnoc.redgold.io", None);
-    // setup_ops_services(ssh, None, None, None).await.expect("");
-    // setup_server_redgold(ssh, NetworkEnvironment::Predev, true, None, true).expect("worx");
-    //
-    // let ssh = SSH::new_ssh("interserver.redgold.io", None);
-    // setup_server_redgold(ssh, NetworkEnvironment::Predev, false, None, true).expect("worx");
-    // let mut nc = NodeConfig::default();
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -222,16 +211,17 @@ async fn test_setup_server() {
     println!("Reading servers file: {:?}", buf);
     let s = ArgTranslate::read_servers_file(buf).expect("servers");
     println!("Setting up servers: {:?}", s);
-    let mut gen = true;
-    // let mut gen = false;
+    // let mut gen = true;
+    let purge = false;
+    let mut gen = false;
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
-    for ss in s.to_vec() {
+    for ss in s.to_vec().last() {
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
-        let ssh = SSH::new_ssh(ss.host, None);
-        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), false).expect("worx");
-        gen = false
+        let ssh = SSH::new_ssh(ss.host.clone(), None);
+        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), purge).expect("worx");
+        gen = false;
         // setup_ops_services(ssh, None, None, None, false).await.expect("")
     }
 }

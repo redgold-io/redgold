@@ -26,6 +26,7 @@ use crate::util;
 use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
 use redgold_schema::EasyJson;
+use crate::util::lang_util::SameResult;
 use crate::util::logging::Loggable;
 
 #[derive(Clone)]
@@ -86,7 +87,18 @@ impl PeerOutgoingEventHandler {
 
     pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, nc: NodeConfig) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.peer.rest.send");
-
+        let result = Self::send_message_rest_ret_err(&mut message, nmd, nc).await;
+        let r = result.map_err(|e| {
+            increment_counter!("redgold.peer.rest.send.error");
+            log::error!("Error sending message to peer: {}", json_or(&e));
+            Response::from_error_info(e)
+        }).combine();
+        if let Some(response_channel) = &message.response {
+            response_channel.send_err(r).add("Error sending message back on response channel").log_error().ok();
+        }
+        Ok(())
+    }
+    pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, nc: NodeConfig) -> Result<Response, ErrorInfo> {
 
         let option = NetworkEnvironment::from_i32(nmd.network_environment);
         let peer_env = option
@@ -100,22 +112,9 @@ impl PeerOutgoingEventHandler {
         }
         let port = nmd.port_or(nc.network) + 1;
         let res = rest_peer(
-            nc, nmd.external_address.clone(), nmd.port_offset
-                .safe_get_msg("Missing port offset in node metadata on attempt to send peer message")? + 1, &mut message.request
+            nc, nmd.external_address.clone(), port as i64, &mut message.request
         ).await;
-        match res {
-            Ok(r) => {
-                // debug!("Send message peer response: {}", json_or(&r));
-                if let Some(response_channel) = &message.response {
-                    response_channel.send_err(r).add("Error sending message back on response channel").log_error().ok();
-                }
-            }
-            Err(e)=> {
-                increment_counter!("redgold.peer.rest.send.error");
-                log::error!("Error sending message to peer: {}", json(&e)?)
-            }
-        }
-        Ok(())
+        res
     }
 
 

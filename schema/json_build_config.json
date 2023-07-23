@@ -97,6 +97,10 @@
         "structs.DebugVersionChange",
         "structs.DebugVersionChange2",
         "structs.PeerIdInfo",
+        "structs.ControlMultipartySigningRequest",
+        "structs.ControlMultipartyKeygenRequest",
+        "structs.ControlMultipartySigningResponse",
+        "structs.ControlMultipartyKeygenResponse",
         "structs.VersionInfo"
       ]
     },

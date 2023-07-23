@@ -31,4 +31,9 @@ impl TrustData {
     pub fn label(&self) -> f64 {
         self.label.to_rounded_f64()
     }
+    pub fn from_label(label: f64) -> Self {
+        let mut t = TrustData::default();
+        t.with_label(label);
+        t
+    }
 }

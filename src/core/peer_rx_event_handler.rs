@@ -16,13 +16,13 @@ use tokio::task::JoinHandle;
 use redgold_schema::{json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, MultipartyThresholdResponse, PublicKey, QueryObservationProofResponse, Request, SubmitTransactionRequest};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, Request, SubmitTransactionRequest};
 
 use crate::api::about;
 use crate::core::discovery::DiscoveryMessage;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
-use crate::core::relay::{MultipartyRequestResponse, Relay};
+use crate::core::relay::{ Relay};
 use crate::data::data_store::DataStore;
 use crate::data::download::process_download_request;
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
@@ -157,49 +157,38 @@ impl PeerRxEventHandler {
             response.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
         }
 
-        if let Some(r) = request.multiparty_threshold_request {
-            info!("Received multiparty threshold request");
-            // let (sender, rec) =
-            //     flume::bounded::<MultipartyThresholdResponse>(1);
-            // let result = relay.multiparty.sender.send(MultipartyRequestResponse{
-            //     request: Some(r),
-            //     response: None,
-            //     sender: Some(sender),
-            //     origin: request.node_metadata.clone(),
-            //     internal_subscribe: None,
-            // }).expect("Multiparty send failure");
-            // let result = rec.recv_async_err().await?;
-            // response.multiparty_threshold_response = Some(result);
-            let _res_inner = MultipartyThresholdResponse::empty();
+        // Verified requests only below here
+        // if let Ok(pk) = verified {
+        if let Some(r) = request.initiate_keygen {
+            // TODO Track future with loop poll pattern
+            // oh wait can we remove this spawn entirely?
+            info!("Received MP request on peer rx: {}", json_or(&r));
+            let rel2 = relay.clone();
+            // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
+            // tokio::spawn(async move {
+                let result1 = initiate_mp_keygen_follower(
+                    rel2.clone(), r).await;
+                let mp_response: String = result1.clone()
+                    .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+            info!("Multiparty response from follower: {}", mp_response);
 
-            if let Some(k) = r.initiate_keygen {
-                // TODO Track future with loop poll pattern
-                // oh wait can we remove this spawn entirely?
-                info!("Received MP request on peer rx: {}", json_or(&k));
-                let rel2 = relay.clone();
-                // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                tokio::spawn(async move {
-                    let result1 = initiate_mp_keygen_follower(
-                        rel2.clone(), k).await;
-                    let mp_response: String = result1.clone()
-                        .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                    info!("Multiparty response from follower: {}", mp_response);
-                });
-                // });
-            }
-            if let Some(k) = r.initiate_signing {
-                let rel2 = relay.clone();
-                info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
-                // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                tokio::spawn(async move {
-                    let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
-                    let mp_response: String = result1.clone()
-                        .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                    info!("Multiparty signing response from follower: {}", mp_response);
-                });
-            }
+            response.initiate_keygen_response = Some(result1?);
 
+            // });
         }
+        if let Some(k) = request.initiate_signing {
+            let rel2 = relay.clone();
+            info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
+            // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
+            // tokio::spawn(async move {
+                let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
+                let mp_response: String = result1.clone()
+                    .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+                info!("Multiparty signing response from follower: {}", mp_response);
+                response.initiate_signing_response = Some(result1?);
+            // });
+        }
+        // }
         // info!(
         //                 "Preparing response to peer RX event handler: {}",
         //                 serde_json::to_string(&response.clone()).unwrap_or("json fail".into())

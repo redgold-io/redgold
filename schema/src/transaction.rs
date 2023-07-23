@@ -1,8 +1,8 @@
 
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardContractType, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info, RgResult};
+use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info, RgResult, structs};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
@@ -83,6 +83,13 @@ impl Transaction {
         Ok(self)
     }
 
+    pub fn add_proof_per_input(&mut self, proof: &Proof) -> &Transaction {
+        for i in self.inputs.iter_mut() {
+            i.proof.push(proof.clone());
+        }
+        self
+    }
+
     pub fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo> {
         let hash = self.signable_hash();
         let addr = key_pair.address_typed();
@@ -157,6 +164,42 @@ impl Transaction {
                 rounded_balance: o.rounded_amount()
             })
             .collect()
+    }
+
+    pub fn output_amount_of(&self, address: &Address) -> i64 {
+        self.outputs
+            .iter()
+            .filter_map(|o| o.address.as_ref().filter(|&a| a == address).and_then(|_| o.opt_amount()))
+            .sum::<i64>()
+    }
+
+    pub fn output_swap_amount_of(&self, address: &Address) -> i64 {
+        self.outputs
+            .iter()
+            .filter_map(|o| {
+                if o.is_swap() {
+                    o.address.as_ref()
+                        .filter(|&a| a == address)
+                        .and_then(|_| o.opt_amount())
+                } else {
+                    None
+                }
+            }).sum::<i64>()
+    }
+
+    pub fn output_bitcoin_address_of(&self, address: &Address) -> Option<&String> {
+        self.outputs
+            .iter()
+            .filter(|o| {
+                if o.is_swap() {
+                    o.address.as_ref()
+                        .filter(|&a| a == address).is_some()
+                } else {
+                    false
+                }
+            })
+            .filter_map(|o| o.data.as_ref().and_then(|d| d.bitcoin_address.as_ref()))
+            .next()
     }
 
     pub fn total_output_amount(&self) -> i64 {
@@ -382,6 +425,12 @@ impl Transaction {
         self.inputs.first().and_then(|o| o.address().ok())
     }
 
+    pub fn first_input_proof_public_key(&self) -> Option<&structs::PublicKey> {
+        self.inputs.first()
+            .and_then(|o| o.proof.get(0))
+            .and_then(|o| o.public_key.as_ref())
+    }
+
     pub fn first_output_address(&self) -> Option<Address> {
         self.outputs.first().and_then(|o| o.address.clone())
     }
@@ -426,22 +475,7 @@ pub fn amount_data(amount: u64) -> Option<StandardData> {
 impl StandardData {
 
     pub fn empty() -> Self {
-        Self {
-            amount: None,
-            typed_value: None,
-            typed_value_list: vec![],
-            keyed_typed_value: None,
-            keyed_typed_value_list: vec![],
-            matrix_typed_value: None,
-            matrix_typed_value_list: vec![],
-            peer_data: None,
-            node_metadata: None,
-            dynamic_node_metadata: None,
-            height: None,
-            data_hash: None,
-            hash: None,
-            observation: None,
-        }
+        Self::default()
     }
     pub fn peer_data(pd: PeerData) -> Option<Self> {
         let mut mt = Self::empty();
