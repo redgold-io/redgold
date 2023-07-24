@@ -9,7 +9,7 @@ use libp2p::{Multiaddr, PeerId};
 use libp2p::request_response::ResponseChannel;
 use log::{debug, error, info};
 use metrics::increment_counter;
-use svg::Node;
+// use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 

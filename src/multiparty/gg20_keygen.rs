@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use futures::StreamExt;
 use std::path::PathBuf;
-use structopt::StructOpt;
+// use structopt::StructOpt;
 
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::keygen::Keygen;
 use round_based::async_runtime::AsyncProtocol;

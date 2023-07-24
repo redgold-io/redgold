@@ -7,7 +7,7 @@ use bitcoin::secp256k1::{Message, Secp256k1, Signature};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::party_i::SignatureRecid;
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::keygen::LocalKey;
-use structopt::StructOpt;
+// use structopt::StructOpt;
 
 use curv::arithmetic::Converter;
 use curv::BigInt;
