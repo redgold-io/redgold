@@ -12,33 +12,6 @@ use clap::Parser;
 use redgold_schema::error_info;
 use redgold_schema::structs::ErrorInfo;
 
-#[derive(Debug, Parser)]
-struct Opt {
-    /// The contact list containing email addresses to send the message to.
-    #[structopt(short, long)]
-    contact_list: String,
-
-    /// The AWS Region.
-    #[structopt(short, long)]
-    region: Option<String>,
-
-    /// The email address of the sender.
-    #[structopt(short, long)]
-    from_address: String,
-
-    /// The message of the email.
-    #[structopt(short, long)]
-    message: String,
-
-    /// The subject of the email.
-    #[structopt(short, long)]
-    subject: String,
-
-    /// Whether to display additional information.
-    #[structopt(short, long)]
-    verbose: bool,
-}
-
 // Sends a message to all members of the contact list.
 // snippet-start:[ses.rust.send-email]
 async fn send_message(
