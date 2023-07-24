@@ -27,6 +27,7 @@ use std::str::FromStr;
 /// 3. Sync the watch only wallet and create a spending transaction to return all funds to the testnet faucet.
 /// 4. Sync the signing wallet and sign and finalize the PSBT created by the watch only wallet.
 /// 5. Broadcast the transactions from the finalized PSBT.
+#[ignore]
 #[test]
 fn debug_example() -> Result<(), Box<dyn Error>> {
     // test key created with `bdk-cli key generate` and `bdk-cli key derive` commands
