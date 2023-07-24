@@ -40,3 +40,7 @@ cd ..
 cd data
 bump_patch_version
 cd ..
+
+cd executor
+bump_patch_version
+cd ..
