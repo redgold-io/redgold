@@ -10,4 +10,8 @@ cd data
 cargo publish
 cd ..
 
+cd executor
+cargo publish
+cd ..
+
 cargo publish
