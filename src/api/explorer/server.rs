@@ -50,6 +50,18 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         })
         .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
+    let explorer_relay3 = relay.clone();
+    let explorer_swap = warp::get()
+        .and(warp::path("explorer"))
+        .and(warp::path("swap"))
+        .and_then(move || {
+            let relay3 = explorer_relay3.clone();
+            async move {
+                as_warp_json_response( explorer::handle_explorer_swap(relay3.clone()).await)
+            }
+        })
+        .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+
     let port = relay2.node_config.explorer_port();
     info!("Running explorer API on port: {:?}", port.clone());
 

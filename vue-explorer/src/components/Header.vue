@@ -31,6 +31,17 @@
 
       <!-- Main content div -->
       <div class="col-10">
+
+        <div class="hash-container">
+          <div>Swap Deposit Address: {{ btcSwapAddress ? '' : 'loading...' }} </div>
+          <HashLink v-if="btcSwapAddress !== ''" :data="btcSwapAddress" :shorten=false />
+          <div>{{ rgdBtcStr }} RDG/BTC</div>
+          <div>${{ usdRdgStr }} USD/RDG</div>
+          <div>${{ usdBtcStr }} USD/BTC</div>
+        </div>
+
+
+
         <!-- Search bar -->
         <div class="jumbotron search-bar py-4">
           <h5 class="text-light">Enter hash search query:</h5>
@@ -47,17 +58,45 @@
 </template>
 
 <script>
+import fetchHashInfo from "@/components/mixins/fetchHashInfo";
+import HashLink from "@/components/util/HashLink.vue";
+
 export default {
   name: 'HeaderBox',
+  components: {
+    HashLink,
+  },
   data() {
     return {
-      searchValue: ''
+      searchValue: '',
+      btcSwapAddress: '',
+      rgdBtc: 100.012312,
+      rgdBtcStr: '100.012312',
+      usdRdg: 1.012312,
+      usdRdgStr: '1.012',
+      usdBtc: 30000.3210,
+      usdBtcStr: '30000.32'
     };
   },
+  mixins: [fetchHashInfo],
   methods: {
     handleSubmit() {
       this.$router.push(`/hash/${this.searchValue}`);
     }
+  },
+  async created() {
+    this.usdBtc = await this.btcUsdPrice();
+    console.log(this.usdBtc);
+    this.usdBtcStr = this.usdBtc.toFixed(2);
+    let swapInfo = await this.fetchSwapInfo();
+    if (swapInfo != null) {
+      this.btcSwapAddress = swapInfo.btc_address;
+      this.rgdBtc = swapInfo.bid_ask.center_price;
+      this.rgdBtcStr = this.rgdBtc.toFixed(2);
+      this.usdRdg = (1 / this.rgdBtc) * this.usdBtc;
+      this.usdRdgStr = this.usdRdg.toFixed(2);
+    }
+
   }
 }
 </script>
@@ -98,6 +137,13 @@ export default {
 }
 .search-input::placeholder {
   color: #ccc;
+}
+
+
+.hash-container {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Set the gap you want */
 }
 
 </style>

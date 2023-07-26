@@ -1,5 +1,43 @@
 export default {
     methods: {
+        getUrl() {
+            let url = process.env.VUE_APP_API_URL
+            let port = "16186"
+            const hostname = window.location.hostname;
+
+            if (hostname.includes('staging')) {
+                port = "16386";
+            } else {
+                port = "16486"
+            }
+            url += ":" + port
+            return url
+        },
+        async btcUsdPrice() {
+            const url = "https://api.coinbase.com/v2/exchange-rates?currency=BTC"
+            const response = await fetch(url);
+            const data = await response.json();
+            console.log(data);
+            return Number(data.data.rates.USD)
+        },
+        async fetchSwapInfo() {
+            try {
+                let url = this.getUrl()
+                let input = `${url}/explorer/swap`;
+                const response = await fetch(input);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log(data)
+                return data
+            } catch (error) {
+                console.error('An error occurred:', error);
+                return null;
+            }
+        },
         async fetchData(url= null, port= null, offset = null, limit = null) {
             const hash = this.$route.params.param; // get the hash from the route parameter
 

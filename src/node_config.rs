@@ -88,6 +88,7 @@ pub struct NodeConfig {
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
     pub discovery_interval: Duration,
+    pub watcher_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
     pub opts: RgArgs
@@ -337,6 +338,7 @@ impl NodeConfig {
             secure_data_folder: None,
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
+            watcher_interval: Duration::from_secs(120),
             live_e2e_interval: Duration::from_secs(60),
             genesis: false,
             opts: RgArgs::default(),

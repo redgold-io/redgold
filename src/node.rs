@@ -54,6 +54,7 @@ use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp::default_room_id_signing;
+use crate::multiparty::watcher::Watcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::util::logging::Loggable;
 
@@ -168,6 +169,12 @@ impl Node {
         join_handles.push(stream_handlers::run_interval_fold(
             discovery.clone(), relay.node_config.discovery_interval, false
         ).await);
+
+        join_handles.push(stream_handlers::run_interval_fold(
+            Watcher::new(relay.clone()), relay.node_config.discovery_interval, false
+        ).await);
+
+
         join_handles.push(stream_handlers::run_recv(
             discovery, relay.discovery.receiver.clone(), 100
         ).await);

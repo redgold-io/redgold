@@ -13,9 +13,12 @@ use serde::{Serialize, Deserialize};
 use redgold_data::peer::PeerTrustQueryResult;
 use redgold_schema::structs::{AddressInfo, ErrorInfo, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, Transaction, TrustLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
+use warp::get;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::Pagination;
+use crate::multiparty::watcher::{BidAsk, DepositWatcherConfig};
 use crate::util;
+use crate::util::address_external::ToBitcoinAddress;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {
@@ -95,6 +98,15 @@ pub struct DetailedTransaction {
 
 
 #[derive(Serialize, Deserialize)]
+pub struct AddressPoolInfo {
+    rdg_address: String,
+    rdg_balance: f64,
+    btc_address: String,
+    btc_balance: f64,
+    bid_ask: BidAsk,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct DetailedAddress {
     pub address: String,
     pub balance: f64,
@@ -106,6 +118,7 @@ pub struct DetailedAddress {
     pub incoming_count: i64,
     pub outgoing_count: i64,
     pub total_count: i64,
+    pub address_pool_info: Option<AddressPoolInfo>,
 }
 
 
@@ -208,6 +221,30 @@ pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
     })
 }
 
+pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>> {
+
+    let res: Option<DepositWatcherConfig> = r.ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
+    let res = match res {
+        None => {
+            None
+        }
+        Some(d) => {
+            let a = d.deposit_allocations.get(0).safe_get_msg("Missing deposit alloc")?.clone();
+            let btc_swap_address = a.key.to_bitcoin_address_network(relay.node_config.network.clone())?;
+            let btc_amount = (a.balance_btc as f64) / 1e8;
+            let rdg_amount = (a.balance_rdg as f64) / 1e8;
+            AddressPoolInfo {
+                rdg_address: a.key.address()?.render_string()?,
+                rdg_balance: rdg_amount,
+                btc_address: btc_swap_address,
+                btc_balance: btc_amount,
+                bid_ask: d.bid_ask.clone(),
+            }
+        }
+    };
+    Ok(res)
+}
+
 pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>, offset: Option<i64>) -> RgResult<DetailedAddress> {
 
     let a = ai.address.safe_get_msg("Missing address")?.clone();
@@ -223,8 +260,12 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
     let outgoing_count = r.ds.transaction_store.get_count_filter_tx_for_address(&a, false).await?;
     let total_count = incoming_count.clone() + outgoing_count.clone();
 
+    let address_str = a.render_string()?;
+    let address_pool_info = get_address_pool_info(r.clone()).await?
+        .filter(|p| p.btc_address == address_str || p.rdg_address == address_str);
+
     let detailed = DetailedAddress {
-        address: a.render_string()?,
+        address: address_str,
         balance: rounded_balance_i64(ai.balance.clone()),
         total_utxos: ai.utxo_entries.len() as i64,
         recent_transactions: recent.iter().map(|u| brief_transaction(&u)).collect::<RgResult<Vec<BriefTransaction>>>()?,
@@ -234,6 +275,7 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
         incoming_count,
         outgoing_count,
         total_count,
+        address_pool_info,
     };
     Ok(detailed)
 }
@@ -570,3 +612,6 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
     })
 }
 
+pub async fn handle_explorer_swap(relay: Relay) -> RgResult<Option<AddressPoolInfo>> {
+    get_address_pool_info(relay).await
+}

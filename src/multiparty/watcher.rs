@@ -1,16 +1,18 @@
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
-use bdk::bitcoin::Address;
+use log::info;
+
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{BytesData, ErrorInfo, ExternalCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
 
 use serde::{Serialize, Deserialize};
 use redgold_schema::transaction_builder::TransactionBuilder;
-use crate::integrations::bitcoin::bdk_example::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
+use redgold_schema::util::bdk_example::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
 use crate::multiparty::initiate_mp::{default_room_id, initiate_mp_keysign};
+use crate::node::Node;
 use crate::util::address_external::ToBitcoinAddress;
 use crate::util::logging::Loggable;
 
@@ -25,9 +27,9 @@ struct DepositKeyAllocation {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct PriceVolume {
-    price: f64, // RDG/BTC (in satoshis for both) for now
-    volume: u64, // Volume of RDG available
+pub struct PriceVolume {
+    pub price: f64, // RDG/BTC (in satoshis for both) for now
+    pub volume: u64, // Volume of RDG available
 }
 
 impl PriceVolume {
@@ -82,13 +84,17 @@ fn inspect_price_volume() {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct BidAsk{
-    bids: Vec<PriceVolume>,
-    asks: Vec<PriceVolume>,
-    center_price: f64
+pub struct BidAsk{
+    pub bids: Vec<PriceVolume>,
+    pub asks: Vec<PriceVolume>,
+    pub center_price: f64
 }
 
 impl BidAsk {
+
+    pub fn asking_price(&self) -> f64 {
+        self.asks.get(0).map(|v| v.price).unwrap_or(0.)
+    }
 
     pub fn sum_bid_volume(&self) -> u64 {
         self.bids.iter().map(|v| v.volume).sum::<u64>()
@@ -223,16 +229,40 @@ impl BidAsk {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct DepositWatcherConfig {
-    deposit_allocations: Vec<DepositKeyAllocation>,
+pub struct DepositWatcherConfig {
+    pub deposit_allocations: Vec<DepositKeyAllocation>,
     // TODO: Make this a map over currency type
-    bid_ask: BidAsk,
-    last_btc_timestamp: u64
+    pub bid_ask: BidAsk,
+    pub last_btc_timestamp: u64
 }
 
-struct Watcher {
+#[derive(Clone)]
+pub struct Watcher {
     relay: Relay,
     wallet: Vec<Arc<Mutex<SingleKeyBitcoinWallet>>>
+}
+
+impl Watcher {
+    pub async fn genesis_funding(&self, destination: &Address) -> RgResult<()> {
+        let (_, utxos) = Node::genesis_from(self.relay.node_config.clone());
+        let u = utxos.get(15).safe_get_msg("Missing utxo")?.clone();
+        let a = u.key_pair.address_typed();
+        let res = self.relay.ds.transaction_store.query_utxo_address(&a).await?;
+        if !res.is_empty() {
+            info!("Sending genesis funding to multiparty address");
+            let mut tb = TransactionBuilder::new();
+            for u in &res {
+                tb.with_utxo(u);
+            }
+            tb.with_output_all(destination);
+            let mut tx = tb.build()?;
+            tx.sign(&u.key_pair)?;
+            self.relay.submit_transaction_sync(&tx).await?;
+        } else {
+            info!("Can't send genesis multiparty funding, no funds");
+        }
+        Ok(())
+    }
 }
 
 struct CurveUpdateResult {
@@ -479,6 +509,9 @@ impl IntervalFold for Watcher {
         // How best to represent this to user? As trustData?
         let nodes = ds.peer_store.active_nodes(None).await?;
 
+        // Fund from genesis for test purposes
+        // self.genesis_funding().await?;
+
         // let kp = initiate_mp::find_multiparty_key_pairs(self.relay.clone()).await;
         // match kp {
         //     Ok(_) => {}
@@ -498,10 +531,14 @@ impl IntervalFold for Watcher {
                 }
                 let mut w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
-                    self.process_requests(d, cfg.bid_ask, cfg.last_btc_timestamp, &w).await?;
+                    let update_result = self.process_requests(d, cfg.bid_ask, cfg.last_btc_timestamp, &w).await?;
+                    let mut cfg2 = cfg.clone();
+                    cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
+                    cfg2.bid_ask = update_result.updated_bid_ask;
+                    cfg2.deposit_allocations = vec![update_result.updated_allocation];
+                    ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
                 }
             }
-
         } else {
             // Initiate MP keysign etc. gather public key and original proof and params
             let res = initiate_mp::initiate_mp_keygen(self.relay.clone(), None, true).await.log_error();
@@ -531,6 +568,7 @@ impl IntervalFold for Watcher {
                         bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: 0.0 },
                         last_btc_timestamp: 0,
                     };
+                    self.genesis_funding(&pk.address()?).await.log_error().ok();
                     ds.config_store.insert_update_json("deposit_watcher_config", cfg).await?;
                 }
             }

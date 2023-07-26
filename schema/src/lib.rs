@@ -557,6 +557,7 @@ pub struct TestConstants {
     pub address_1: Address,
     pub rhash_1: Hash,
     pub rhash_2: Hash,
+    pub words: String
 }
 impl TestConstants {
     pub fn key_pair(&self) -> KeyPair {
@@ -598,6 +599,7 @@ impl TestConstants {
             address_1: addr.into(),
             rhash_1: Hash::from_string_calculate("asdf"),
             rhash_2: Hash::from_string_calculate("asdf2"),
+            words: "abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string(),
         };
     }
 }
