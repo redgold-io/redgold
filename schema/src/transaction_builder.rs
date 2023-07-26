@@ -90,6 +90,19 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn with_output_all(&mut self, destination: &Address) -> &mut Self {
+        let output = Output {
+            address: Some(destination.clone()),
+            data: amount_data(self.balance as u64),
+            product_id: None,
+            counter_party_proofs: vec![],
+            contract: None,
+        };
+        self.balance = 0;
+        self.transaction.outputs.push(output);
+        self
+    }
+
     // Should this be hex or bytes data?
     pub fn with_last_output_deposit_swap(&mut self, btc_txid: String) -> &mut Self {
         if let Some(o) = self.transaction.outputs.last_mut() {

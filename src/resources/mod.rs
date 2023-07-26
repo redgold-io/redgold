@@ -1,4 +1,3 @@
-use bdk::bitcoin::hashes::hash160::Hash;
 use std::collections::HashMap;
 
 pub struct Resources {

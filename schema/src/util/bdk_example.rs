@@ -20,11 +20,10 @@ use bdk::wallet::AddressIndex::New;
 use bitcoin::AddressType::P2wpkh;
 
 use bitcoin::consensus::serialize;
-use miniscript::{Descriptor, Legacy, Segwitv0};
-use crate::util::cli::commands::send;
-use redgold_schema::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
-use redgold_schema::public_key::ToPublicKey;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof};
+// use crate::util::cli::commands::send;
+use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
+use crate::public_key::ToPublicKey;
+use crate::structs::{ErrorInfo, NetworkEnvironment, Proof};
 use crate::util::keys::ToPublicKeyFromLib;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -54,7 +53,7 @@ pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitco
 
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::signer::SignerContext::{Segwitv0 as Segwitv0Context};
-use log::error;
+// use log::error;
 
 fn p2wpkh_script_code(script: &Script) -> Script {
     ScriptBuilder::new()

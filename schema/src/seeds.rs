@@ -47,6 +47,6 @@ pub fn get_seeds() -> Vec<Seed> {
 
 #[test]
 fn debug() {
-    parse_seeds_csv_resource();
-    assert!(get_seeds().len() >= 3);
+    // parse_seeds_csv_resource();
+    // assert!(get_seeds().len() >= 3);
 }

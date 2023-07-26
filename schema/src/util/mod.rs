@@ -112,6 +112,9 @@ pub mod mnemonic_builder;
 pub mod mnemonic_words;
 pub mod merkle;
 pub mod bitcoin_message_signer;
+pub mod bdk_example;
+pub mod keys;
+pub mod mnemonic_support;
 
 pub fn sha256(s: &[u8]) -> [u8; 32] {
     let mut hash = [0u8; 32];

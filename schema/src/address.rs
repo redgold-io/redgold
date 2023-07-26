@@ -1,5 +1,5 @@
 use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, UtxoEntry};
-use crate::{bytes_data, error_info, from_hex, SafeBytesAccess};
+use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, SafeBytesAccess};
 use crate::{error_message, structs};
 use bitcoin::secp256k1::{PublicKey};
 use bitcoin::util::base58;
@@ -56,6 +56,9 @@ impl Address {
 
     pub fn render_string(&self) -> Result<String, ErrorInfo> {
         let result = self.address.safe_bytes()?;
+        if self.address_type == AddressType::BitcoinExternalString as i32 {
+            return Ok(String::from_utf8(result).error_info("Unable to convert bitcoin address bytes to utf8 string")?);
+        }
         Ok(Self::address_to_str(&result))
     }
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
