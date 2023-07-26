@@ -35,7 +35,7 @@ num-traits = "0.2.15"
 tokio = { version = "1.0.0", features = ["rt"] }
 bdk = {version = "0.28.0", features = ["default", "keys-bip39", "bip39"]}
 #miniscript = "6.0.1"
-miniscript = { version = "9.0", default-features = false, features = ["serde"] }
+#miniscript = { version = "9.0", default-features = false, features = ["serde"] }
 
 [dependencies.bitcoin]
 version = "0.21"

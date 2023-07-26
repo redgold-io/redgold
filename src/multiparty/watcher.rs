@@ -18,7 +18,7 @@ use crate::util::logging::Loggable;
 
 
 #[derive(Serialize, Deserialize, Clone)]
-struct DepositKeyAllocation {
+pub struct DepositKeyAllocation {
     pub key: PublicKey,
     pub allocation: f64,
     pub initiate: InitiateMultipartyKeygenRequest,
@@ -162,10 +162,10 @@ impl BidAsk {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct OrderFulfillment {
-    order_amount: u64,
-    fulfilled_amount: u64,
-    updated_curve: Vec<PriceVolume>
+pub struct OrderFulfillment {
+    pub order_amount: u64,
+    pub fulfilled_amount: u64,
+    pub updated_curve: Vec<PriceVolume>
 }
 
 impl OrderFulfillment {
@@ -175,7 +175,7 @@ impl OrderFulfillment {
 }
 
 
-struct WithdrawalBitcoin {
+pub struct WithdrawalBitcoin {
     outputs: Vec<(String, u64)>,
     updated_bidask: BidAsk,
     used_tx: Vec<Transaction>
@@ -265,7 +265,7 @@ impl Watcher {
     }
 }
 
-struct CurveUpdateResult {
+pub struct CurveUpdateResult {
     updated_bid_ask: BidAsk,
     updated_btc_timestamp: u64,
     updated_allocation: DepositKeyAllocation
@@ -531,7 +531,7 @@ impl IntervalFold for Watcher {
                 }
                 let mut w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
-                    let update_result = self.process_requests(d, cfg.bid_ask, cfg.last_btc_timestamp, &w).await?;
+                    let update_result = self.process_requests(d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w).await?;
                     let mut cfg2 = cfg.clone();
                     cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
                     cfg2.bid_ask = update_result.updated_bid_ask;

@@ -20,7 +20,6 @@ use bdk::wallet::AddressIndex::New;
 use bitcoin::AddressType::P2wpkh;
 
 use bitcoin::consensus::serialize;
-use miniscript::{Descriptor, Legacy, Segwitv0};
 // use crate::util::cli::commands::send;
 use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
 use crate::public_key::ToPublicKey;

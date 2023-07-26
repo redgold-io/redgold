@@ -230,16 +230,16 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
         }
         Some(d) => {
             let a = d.deposit_allocations.get(0).safe_get_msg("Missing deposit alloc")?.clone();
-            let btc_swap_address = a.key.to_bitcoin_address_network(relay.node_config.network.clone())?;
+            let btc_swap_address = a.key.to_bitcoin_address_network(r.node_config.network.clone())?;
             let btc_amount = (a.balance_btc as f64) / 1e8;
             let rdg_amount = (a.balance_rdg as f64) / 1e8;
-            AddressPoolInfo {
+            Some(AddressPoolInfo {
                 rdg_address: a.key.address()?.render_string()?,
                 rdg_balance: rdg_amount,
                 btc_address: btc_swap_address,
                 btc_balance: btc_amount,
                 bid_ask: d.bid_ask.clone(),
-            }
+            })
         }
     };
     Ok(res)
