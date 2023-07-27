@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Redgold"]
 description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
@@ -27,9 +27,9 @@ exclude = ["examples/rust_wasm", "sdk", "sdk/*"]
 
 [dependencies]
 [target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
-redgold-data = { path = "data", version = "0.1.4"}
-redgold-schema = { path = "schema", version = "0.1.4"}
-redgold-executor = { path = "executor", version = "0.1.4"}
+redgold-data = { path = "data", version = "0.1.5"}
+redgold-schema = { path = "schema", version = "0.1.5"}
+redgold-executor = { path = "executor", version = "0.1.5"}
 tempfile = "3.3.0"
 #web3 = { version = "0.18.0", default-features = false, features = ["http-rustls-tls"] }
 sha3 = "0.10.8"
