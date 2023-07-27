@@ -93,7 +93,7 @@ impl PeerOutgoingEventHandler {
             .error_info(
                 format!("Timeout sending message to peer with duration {} secs",
                         message.send_timeout.as_secs())
-            )?;
+            ).flatten();
         let r = result.map_err(|e| {
             increment_counter!("redgold.peer.rest.send.error");
             log::error!("Error sending message to peer: {}", json_or(&e));
