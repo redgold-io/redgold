@@ -128,6 +128,8 @@ jobs:
       - run: echo 'export PATH="/usr/local/opt/llvm@12/bin:$PATH"' >> /Users/runner/.bash_profile
       - run: echo $(llvm-config --version)
 
+      - run: rustup default nightly
+      - run: rustup toolchain list
       - run: brew install openssl@3
       - run: cargo clean
       - run: cargo build --all --release
