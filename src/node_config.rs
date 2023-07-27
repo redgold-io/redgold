@@ -338,7 +338,7 @@ impl NodeConfig {
             secure_data_folder: None,
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
-            watcher_interval: Duration::from_secs(120),
+            watcher_interval: Duration::from_secs(200),
             live_e2e_interval: Duration::from_secs(60),
             genesis: false,
             opts: RgArgs::default(),

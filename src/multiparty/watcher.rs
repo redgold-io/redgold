@@ -504,6 +504,11 @@ impl Watcher {
 #[async_trait]
 impl IntervalFold for Watcher {
     async fn interval_fold(&mut self) -> RgResult<()> {
+
+        if self.relay.node_config.is_local_debug() {
+            return Ok(())
+        }
+
         let ds = self.relay.ds.clone();
         // TODO: Change to query to include trust information re: deposit score
         // How best to represent this to user? As trustData?
@@ -531,16 +536,20 @@ impl IntervalFold for Watcher {
                 }
                 let mut w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
-                    let update_result = self.process_requests(d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w).await?;
-                    let mut cfg2 = cfg.clone();
-                    cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
-                    cfg2.bid_ask = update_result.updated_bid_ask;
-                    cfg2.deposit_allocations = vec![update_result.updated_allocation];
-                    ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
+                    let update_result = self.process_requests(
+                        d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
+                    ).await.log_error().ok();
+                    if let Some(update_result) = update_result {
+                        let mut cfg2 = cfg.clone();
+                        cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
+                        cfg2.bid_ask = update_result.updated_bid_ask;
+                        cfg2.deposit_allocations = vec![update_result.updated_allocation];
+                        ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
+                    }
                 }
             }
         } else {
-            info!("Attempting to start MP watcher keysign round");
+            info!("Attempting to start MP watcher keygen round");
             // Initiate MP keysign etc. gather public key and original proof and params
             let res = initiate_mp::initiate_mp_keygen(self.relay.clone(), None, true).await.log_error();
             // TODO: Get this from local share instead of from a second keysign round.
