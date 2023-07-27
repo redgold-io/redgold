@@ -174,7 +174,7 @@ pub struct Deploy {
     /// Go through the deployment wizard process with prompts for configuring all steps
     #[clap(short, long)]
     pub wizard: bool,
-    /// Indicates this starts from genesis flow, only used for debugging
+    /// Indicates this starts from genesis flow or contains a genesis node, only used for debugging
     #[clap(short, long)]
     pub genesis: bool,
 

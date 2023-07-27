@@ -171,7 +171,7 @@ impl Node {
         ).await);
 
         join_handles.push(stream_handlers::run_interval_fold(
-            Watcher::new(relay.clone()), relay.node_config.discovery_interval, false
+            Watcher::new(relay.clone()), relay.node_config.watcher_interval, false
         ).await);
 
 

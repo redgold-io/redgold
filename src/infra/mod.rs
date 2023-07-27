@@ -16,7 +16,7 @@ use std::path::Path;
 
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 use ssh2::{Channel, Session};
-use redgold_schema::ErrorInfoContext;
+use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::ErrorInfo;
 
@@ -170,7 +170,7 @@ impl SSH {
         Ok(result)
     }
 
-    pub async fn read_channel_partial(channel: &mut Channel, partial: fn(String) -> Result<(), ErrorInfo>) -> Result<String, ErrorInfo>  {
+    pub async fn read_channel_partial< F: Fn(String) -> RgResult<()> + 'static>(channel: &mut Channel, partial: &Box<F>) -> Result<String, ErrorInfo>  {
         let mut result = String::new();
         loop {
             let available = channel.read_window().available;
@@ -181,8 +181,10 @@ impl SSH {
                 let s = String::from_utf8_lossy(&buffer[..bytes_read]);
                 let x = &s;
                 let partial_read = x.clone().to_string();
-                result.push_str(x);
-                partial(partial_read)?;
+                if !partial_read.trim().is_empty() {
+                    result.push_str(x);
+                    partial(partial_read)?;
+                }
             } else {
                 let mut stderr = channel.stderr();
                 let mut buffer = [0u8; 1024];
@@ -190,8 +192,10 @@ impl SSH {
                 let s = String::from_utf8_lossy(&buffer[..bytes_read]);
                 let x = &s;
                 let partial_read = x.clone().to_string();
-                result.push_str(x);
-                partial(partial_read)?;
+                if !partial_read.trim().is_empty() {
+                    result.push_str(x);
+                    partial(partial_read)?;
+                }
             }
             if channel.eof() {
                 break;
@@ -211,8 +215,14 @@ impl SSH {
         channel
     }
 
-    pub async fn stream_partial<S: Into<String>>(&mut self, cmd: S, print: bool, partial: fn(String)
-                                                                                       -> Result<(), ErrorInfo>) -> Result<String, ErrorInfo> {
+
+    pub async fn exes<S: Into<String>, F: Fn(String) -> RgResult<()> + 'static>(&mut self, cmd: S, partial: &Box<F>)
+                                       -> Result<String, ErrorInfo> {
+        self.execs(cmd, true, partial).await
+    }
+
+    pub async fn execs<S: Into<String>,  F: Fn(String) -> RgResult<()> + 'static>(
+        &mut self, cmd: S, print: bool, partial: &Box<F>) -> Result<String, ErrorInfo> {
         let sess = self.session();
         let mut channel = sess.channel_session().unwrap();
         let string = cmd.into();

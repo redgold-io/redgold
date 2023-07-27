@@ -360,7 +360,7 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
 pub async fn as_warp_proto_bytes<T: ProtoSerde>(response: Result<T, ErrorInfo>) -> Response<Vec<u8>> {
     let vec = response
         .map(|r| r.proto_serialize())
-        .map_err(|e| e.proto_serialize())
+        .map_err(|e| RResponse::from_error_info(e).proto_serialize())
         .combine();
     Response::builder().body(vec).expect("a")
 }

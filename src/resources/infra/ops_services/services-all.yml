@@ -72,20 +72,20 @@ services:
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
-    expose:
-      - 9090
-    ports:
-      - 9090:9090
+#    expose:
+#      - 9090
+#    ports:
+#      - 9090:9090
     network_mode: host
   grafana:
     image: grafana/grafana-oss
     container_name: grafana
     restart: unless-stopped
     user: root
-    expose:
-      - 3000
-    ports:
-      - "3000:3000"
+#    expose:
+#      - 3000
+#    ports:
+#      - "3000:3000"
     env_file:
       - ./ops_var.env
     volumes:
