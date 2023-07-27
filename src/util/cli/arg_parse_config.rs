@@ -13,6 +13,7 @@ use std::fs;
 use std::io::Read;
 use std::net::{AddrParseError, IpAddr, SocketAddr};
 use std::path::PathBuf;
+use std::process::abort;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -133,6 +134,9 @@ impl ArgTranslate {
         self.calculate_executable_checksum_hash();
         // No logger for CLI commands to allow direct output read.
         self.abort = immediate_commands(&self.opts, &self.node_config).await;
+        if self.abort {
+            return Ok(());
+        }
 
         self.guard_faucet();
         self.lookup_ip().await;
@@ -611,6 +615,9 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
                 }
                 RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
                     commands::test_transaction(&test_transaction_cli, &config).await
+                }
+                RgTopLevelSubcommand::Deploy(d) => {
+                    commands::deploy(d, &config).await
                 }
                 _ => {
                     abort = false;

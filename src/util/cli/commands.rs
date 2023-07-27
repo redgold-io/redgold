@@ -21,6 +21,7 @@ use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
+use crate::infra::deploy::default_deploy;
 // use crate::util::init_logger;
 use crate::util::runtimes::build_runtime;
 
@@ -226,9 +227,20 @@ pub fn add_server_prompt() -> Server {
     }
 }
 
-pub async fn deploy(deploy: Deploy, _config: NodeConfig) -> Result<(), ErrorInfo> {
-
+pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
     if deploy.wizard {
+        deploy_wizard(deploy, _config).await?;
+        return Ok(());
+    }
+
+    default_deploy().await;
+
+    Ok(())
+}
+
+// Move to own file
+pub async fn deploy_wizard(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
+
         println!("Welcome to the Redgold deployment wizard!");
         let mut data_dir = _config.data_folder.all().path;
         let path = std::env::var(REDGOLD_SECURE_DATA_PATH);
@@ -329,11 +341,7 @@ pub async fn deploy(deploy: Deploy, _config: NodeConfig) -> Result<(), ErrorInfo
         // for server in servers {
         //
         // }
-
-
-    }
     Ok(())
-
 }
 
 pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig

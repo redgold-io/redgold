@@ -9,6 +9,7 @@ use crate::infra::SSH;
 use crate::resources::Resources;
 // use filepath::FilePath;
 use itertools::Itertools;
+ use redgold_schema::RgResult;
  use crate::node_config::NodeConfig;
  use crate::util::cli::arg_parse_config::ArgTranslate;
  use crate::util::cli::data_folder::DataFolder;
@@ -19,7 +20,7 @@ They must be manually deployed.
 
  This whole thing should really have a streaming output for the lines and stuff.
  */
-pub fn setup_server_redgold(
+pub async fn setup_server_redgold(
     mut ssh: SSH,
     network: NetworkEnvironment,
     is_genesis: bool,
@@ -28,6 +29,15 @@ pub fn setup_server_redgold(
 ) -> Result<(), ErrorInfo> {
 
     ssh.verify()?;
+
+
+     let host = ssh.host.clone();
+     let p= &Box::new(move |s: String| {
+         println!("{} output: {}", host.clone(), s);
+         Ok::<(), ErrorInfo>(())
+     });
+
+    ssh.exes("apt install -y ufw", p).await?;
 
     let compose = ssh.exec("docker-compose", true);
     if !(compose.stderr.contains("applications")) {
@@ -101,12 +111,12 @@ pub async fn setup_ops_services(
     let remote_path = remote_path_prefix.unwrap_or("/root/.rg/all".to_string());
     ssh.verify()?;
 
-    let p = |s: String| {
+    let p = &Box::new(|s: String| {
         println!("Partial output: {}", s);
         Ok(())
-    };
+    });
 
-    ssh.stream_partial("docker ps", false, p).await?;
+    ssh.execs("docker ps", false, p).await?;
     ssh.copy(
         include_str!("../resources/infra/ops_services/services-all.yml"),
         format!("{}/services-all.yml", remote_path)
@@ -115,7 +125,7 @@ pub async fn setup_ops_services(
         include_str!("../resources/infra/ops_services/filebeat.docker.yml"),
         format!("{}/filebeat.docker.yml", remote_path)
     );
-    let promtheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
+    let prometheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
 //     match std::env::var("GRAFANA_CLOUD_USER") {
 //         Ok(u) => {
 //             promtheus_yml += &*format!("remote_write:
@@ -131,7 +141,7 @@ pub async fn setup_ops_services(
 //         Err(_) => {}
 //     }
     ssh.copy(
-        promtheus_yml,
+        prometheus_yml,
         format!("{}/prometheus.yml", remote_path)
     );
     ssh.copy(
@@ -144,8 +154,8 @@ pub async fn setup_ops_services(
         format!("{}/grafana_password", remote_path)
     );
 
-    ssh.stream_partial(format!("rm -r {}/dashboards", remote_path), false, p).await?;
-    ssh.stream_partial(format!("mkdir {}/dashboards", remote_path), false, p).await?;
+    ssh.execs(format!("rm -r {}/dashboards", remote_path), false, p).await?;
+    ssh.execs(format!("mkdir {}/dashboards", remote_path), false, p).await?;
 
     let x = include_str!("../resources/infra/ops_services/dashboards/node-exporter-full_rev31.json");
     ssh.copy(
@@ -185,25 +195,23 @@ pub async fn setup_ops_services(
     }).join("\n");
     ssh.copy(env_contents.clone(), format!("{}/ops_var.env", remote_path));
 
-    ssh.stream_partial(format!("cd {}; docker-compose -f services-all.yml down", remote_path), false, p).await?;
+    ssh.execs(format!("cd {}; docker-compose -f services-all.yml down", remote_path), false, p).await?;
 
     for s in vec!["grafana", "prometheus", "esdata"] {
         if purge_data {
-            ssh.stream_partial(format!("rm -r {}/data/{}", remote_path, s), false, p).await?;
+            ssh.execs(format!("rm -r {}/data/{}", remote_path, s), false, p).await?;
         }
-        ssh.stream_partial(format!("mkdir {}/data/{}", remote_path, s), false, p).await?;
+        ssh.execs(format!("mkdir -p {}/data/{}", remote_path, s), false, p).await?;
     };
 
-    ssh.stream_partial(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), false, p).await?;
+    ssh.exes(format!("chmod -R 777 {}/data/esdata", remote_path), p).await?;
+
+    ssh.execs(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), false, p).await?;
 
     Ok(())
 }
 
-
-#[ignore]
-#[tokio::test]
-async fn test_setup_server() {
-
+pub async fn default_deploy() {
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -216,12 +224,20 @@ async fn test_setup_server() {
     let mut gen = false;
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
-    for ss in s.to_vec().last() {
+    for ss in s.to_vec() {
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
-        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), purge).expect("worx");
+        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), purge).await.expect("worx");
         gen = false;
-        // setup_ops_services(ssh, None, None, None, false).await.expect("")
+        let ssh = SSH::new_ssh(ss.host.clone(), None);
+        setup_ops_services(ssh, None, None, None, false).await.expect("")
     }
+}
+
+
+#[ignore]
+#[tokio::test]
+async fn test_setup_server() {
+    default_deploy().await;
 }
