@@ -28,7 +28,8 @@ pub struct PeerMessage {
     pub socket_addr: Option<SocketAddr>,
     pub destinations: Vec<PublicKey>,
     pub node_metadata: Option<NodeMetadata>,
-    pub dynamic_node_metadata: Option<DynamicNodeMetadata>
+    pub dynamic_node_metadata: Option<DynamicNodeMetadata>,
+    pub send_timeout: Duration
 }
 
 impl PeerMessage {
@@ -41,6 +42,7 @@ impl PeerMessage {
             destinations: vec![],
             node_metadata: None,
             dynamic_node_metadata: None,
+            send_timeout: Duration::from_secs(60),
         }
     }
 

@@ -11,7 +11,7 @@ use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
-use redgold_schema::{error_info, json_or, SafeOption};
+use redgold_schema::{error_info, ErrorInfoContext, json_or, SafeOption};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerData};
 
@@ -87,7 +87,13 @@ impl PeerOutgoingEventHandler {
 
     pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, nc: NodeConfig) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.peer.rest.send");
-        let result = Self::send_message_rest_ret_err(&mut message, nmd, nc).await;
+        let result = tokio::time::timeout(
+            message.send_timeout.clone(), Self::send_message_rest_ret_err(&mut message, nmd, nc)
+        ).await
+            .error_info(
+                format!("Timeout sending message to peer with duration {} secs",
+                        message.send_timeout.as_secs())
+            )?;
         let r = result.map_err(|e| {
             increment_counter!("redgold.peer.rest.send.error");
             log::error!("Error sending message to peer: {}", json_or(&e));
