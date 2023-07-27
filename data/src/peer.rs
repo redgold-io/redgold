@@ -282,13 +282,20 @@ impl PeerStore {
         Ok(rows_m.last_insert_rowid())
     }
 
-    pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, trust: f64) -> Result<(), ErrorInfo> {
+    pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, trust: f64, self_key: &PublicKey) -> Result<(), ErrorInfo> {
         // return Err(ErrorInfo::error_info("debug error return"));
         // tracing::info!("add_peer_new");
+        if peer_info.public_keys().contains(&self_key) {
+            return Err(ErrorInfo::error_info(
+                format!("Self key found in peer info {}", peer_info.json_or())))
+        }
+
         self.insert_peer(
             peer_info
                 .latest_peer_transaction
-                .safe_get_msg("Add peer failed due to missing latest peer transaction")?, trust).await?;
+                .safe_get_msg("Add peer failed due to missing latest peer transaction")?,
+            trust,
+        ).await?;
         self.insert_node_key(peer_info).await?;
         Ok(())
     }
