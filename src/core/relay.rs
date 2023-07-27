@@ -155,14 +155,16 @@ impl Relay {
         Ok(res)
     }
 
+    // Try to eliminate this function
     pub async fn send_message_sync_static(relay: Relay, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
-        let timeout = timeout.unwrap_or(Duration::from_secs(60));
         let (s, r) = flume::bounded::<Response>(1);
         let mut pm = PeerMessage::from_pk(&request, &node.clone());
         pm.response = Some(s);
+        if let Some(t) = timeout {
+            pm.send_timeout = t;
+        }
         relay.peer_message_tx.sender.send_err(pm)?;
-        let res = tokio::time::timeout(timeout, r.recv_async_err()).await
-            .map_err(|e| error_info(e.to_string()))??;
+        let res = r.recv_async_err().await?;
         res.as_error_info()?;
         Ok(res)
     }
@@ -211,13 +213,13 @@ impl Relay {
         let mut results = vec![];
         for p in nodes {
             let mut req = request.clone();
-            let res = self.send_message_async(req, p).await?;
+            let timeout = Some(timeout.unwrap_or(Duration::from_secs(20)));
+            let res = self.send_message_async(req, p, timeout).await?;
             results.push(res);
         }
         let mut responses = vec![];
         for r in &results {
-            let x = r
-                .recv_async_err_timeout(timeout.unwrap_or(Duration::from_secs(20)));
+            let x = r.recv_async_err();
             responses.push(x);
         }
         let res = futures::future::join_all(responses).await;
@@ -263,10 +265,18 @@ impl Relay {
     }
 
 
-    pub async fn send_message_async(&self, request: Request, node: structs::PublicKey) -> Result<flume::Receiver<Response>, ErrorInfo> {
+    pub async fn send_message_async(
+        &self,
+        request: Request,
+        node: structs::PublicKey,
+        timeout: Option<Duration>
+    ) -> Result<flume::Receiver<Response>, ErrorInfo> {
         let (s, r) = flume::bounded(1);
         let mut pm = PeerMessage::from_pk(&request, &node);
         pm.response = Some(s);
+        if let Some(t) = timeout {
+            pm.send_timeout = t;
+        }
         self.peer_message_tx.sender.send_err(pm)?;
         Ok(r)
     }
@@ -281,8 +291,10 @@ impl Relay {
     pub async fn send_message_sync_pm(&self, mut pm: PeerMessage, timeout: Option<Duration>) -> RgResult<Response> {
         let (s, r) = flume::bounded(1);
         pm.response = Some(s);
+        let duration = timeout.unwrap_or(Duration::from_secs(20));
+        pm.send_timeout = duration;
         self.peer_message_tx.send(pm).await?;
-        r.recv_async_err_timeout(timeout.unwrap_or(Duration::from_secs(20))).await
+        r.recv_async_err().await
     }
 
 
