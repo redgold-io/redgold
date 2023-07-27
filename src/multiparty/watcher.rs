@@ -540,6 +540,7 @@ impl IntervalFold for Watcher {
                 }
             }
         } else {
+            info!("Attempting to start MP watcher keysign round");
             // Initiate MP keysign etc. gather public key and original proof and params
             let res = initiate_mp::initiate_mp_keygen(self.relay.clone(), None, true).await.log_error();
             // TODO: Get this from local share instead of from a second keysign round.

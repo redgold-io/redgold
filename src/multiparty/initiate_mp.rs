@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use async_std::prelude::FutureExt;
-use log::info;
+use log::{error, info};
 
 use redgold_schema::{error_info, ErrorInfoContext, json_pretty, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, Proof, PublicKey, Request, Response};
@@ -60,14 +60,14 @@ pub async fn initiate_mp_keygen(
         Some(x) => {x}
     };
 
-    let index = 1 as u16;
+    let index = 1u16;
     let number_of_parties = ident.party_keys.len() as u16;
     let threshold = ident.threshold as u16;
     let room_id = ident.uuid.clone();
     let address = "127.0.0.1".to_string();
     let port = relay.node_config.mparty_port();
     // TODO: From nodeconfig?
-    let timeout = Duration::from_secs(100 as u64);
+    let timeout = Duration::from_secs(100u64);
 
     // TODO: First query all peers to determine if they are online.
     let self_key = relay.node_config.public_key();
@@ -196,16 +196,26 @@ pub async fn find_multiparty_key_pairs(relay: Relay
     // TODO: Safer, query all pk
     let pk =
         peers.iter().map(|p| p.node_metadata.get(0).clone().unwrap().public_key.clone().unwrap())
+            .filter(|p| {
+                if p == &relay.node_config.public_key() {
+                    error!("Found self in peer list");
+                    false
+                } else {
+                    true
+                }
+            })
             .collect_vec();
 
     info!("Multiparty found {} possible peers", pk.len());
     let results = Relay::broadcast(relay.clone(),
         pk, Request::empty().about(),
                                    // runtime.clone(),
-                                   Some(Duration::from_secs(20))
+                                   Some(Duration::from_secs(60))
     ).await;
+    // Check if response also is not error info
     let valid_pks = results.iter()
-        .filter_map(|(pk, r)| if r.is_ok() { Some(pk.clone()) } else { None })
+        .filter_map(|(pk, r)| if r.as_ref().ok().filter(|r| r.as_error_info().is_ok())
+            .is_some() { Some(pk.clone()) } else { None })
         .collect_vec();
     // TODO: Separate this type of error here instead to be optional only converted later
     info!("Multiparty found {} valid_pks peers", valid_pks.len());
