@@ -297,7 +297,9 @@ impl Node {
 
             info!("Got LB node info {}, adding peer", result.json_or());
 
-            relay.ds.peer_store.add_peer_new(result, 1f64).await?;
+            // TODO: How do we handle situation where we get self peer id here other than an error?
+            relay.ds.peer_store.add_peer_new(result, 1f64,
+                                             &relay.node_config.public_key()).await?;
 
             info!("Added peer, attempting download");
 

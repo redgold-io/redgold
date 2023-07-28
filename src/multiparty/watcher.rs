@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
-use log::info;
+use log::{error, info};
 
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
@@ -15,7 +15,7 @@ use crate::multiparty::initiate_mp::{default_room_id, initiate_mp_keysign};
 use crate::node::Node;
 use crate::util::address_external::ToBitcoinAddress;
 use crate::util::logging::Loggable;
-
+use redgold_schema::EasyJson;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {
@@ -504,6 +504,11 @@ impl Watcher {
 #[async_trait]
 impl IntervalFold for Watcher {
     async fn interval_fold(&mut self) -> RgResult<()> {
+
+        if self.relay.node_config.is_local_debug() {
+            return Ok(())
+        }
+
         let ds = self.relay.ds.clone();
         // TODO: Change to query to include trust information re: deposit score
         // How best to represent this to user? As trustData?
@@ -531,15 +536,22 @@ impl IntervalFold for Watcher {
                 }
                 let mut w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
-                    let update_result = self.process_requests(d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w).await?;
-                    let mut cfg2 = cfg.clone();
-                    cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
-                    cfg2.bid_ask = update_result.updated_bid_ask;
-                    cfg2.deposit_allocations = vec![update_result.updated_allocation];
-                    ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
+                    let update_result = self.process_requests(
+                        d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
+                    ).await;
+                    if let Ok(update_result) = &update_result {
+                        let mut cfg2 = cfg.clone();
+                        cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
+                        cfg2.bid_ask = update_result.updated_bid_ask.clone();
+                        cfg2.deposit_allocations = vec![update_result.updated_allocation.clone()];
+                        ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
+                    } else if let Err(e) = update_result {
+                        error!("Error processing requests: {}", e.json_or());
+                    }
                 }
             }
         } else {
+            info!("Attempting to start MP watcher keygen round");
             // Initiate MP keysign etc. gather public key and original proof and params
             let res = initiate_mp::initiate_mp_keygen(self.relay.clone(), None, true).await.log_error();
             // TODO: Get this from local share instead of from a second keysign round.

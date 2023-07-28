@@ -81,7 +81,8 @@ impl PeerRxEventHandler {
             let ser = response.clone().json_or();
             let peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
             // debug!("Sending response to peer {} contents {}", peer, ser);
-            c.send_err(response).add("Send message to response channel failed in handle incoming message")?;
+            c.send_err(response).add("Send message to response channel failed in handle incoming message")
+                .log_error().ok();
         }
 
         Ok(())

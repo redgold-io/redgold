@@ -41,6 +41,7 @@ jobs:
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
+      - run: rustup toolchain list
 #      - run: cargo build --release
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: ./bin/local_test.sh
@@ -118,7 +119,7 @@ jobs:
       - name: Install latest rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ env.TOOLCHAIN }}
           target: x86_64-apple-darwin
           default: true
           override: true
@@ -127,6 +128,8 @@ jobs:
       - run: echo 'export PATH="/usr/local/opt/llvm@12/bin:$PATH"' >> /Users/runner/.bash_profile
       - run: echo $(llvm-config --version)
 
+      - run: rustup default nightly
+      - run: rustup toolchain list
       - run: brew install openssl@3
       - run: cargo clean
       - run: cargo build --all --release

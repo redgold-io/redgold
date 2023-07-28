@@ -5,6 +5,7 @@ use async_std::prelude::FutureExt;
 use eframe::epaint::ahash::{HashMap, HashMapExt};
 use tokio::task_local;
 use tracing::{debug, error, info, span, warn, Level};
+use tracing_subscriber::fmt::format::Format;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use redgold_schema::{EasyJson, error_info, error_message, task_local};
@@ -187,7 +188,12 @@ pub fn init_tracing(log_level: &str) {
 
     use tracing_subscriber::EnvFilter;
 
-    let fmt_layer = tracing_subscriber::fmt::Layer::default();
+
+    // let fmt_layer = tracing_subscriber::fmt::Layer::builder()
+    //     .fmt_fields(Format::default().compact())
+    //     .build();
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().compact();
     let filter_layer = EnvFilter::new(format!(
         "sqlx=ERROR,warp=WARN,rocket=WARN,redgold={}", log_level));
 

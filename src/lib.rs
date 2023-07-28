@@ -1,3 +1,4 @@
+// #![feature(result_flattening)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
 pub mod api;

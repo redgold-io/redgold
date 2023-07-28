@@ -70,7 +70,7 @@ impl IntervalFold for Discovery {
                         // For now just dropping errors to log
                         // TODO: Query trust for this peerId first, before updating trust score.
                         // Security thing here needs to be fixed later.
-                        self.relay.ds.peer_store.add_peer_new(r, 1f64).await.log_error().ok();
+                        self.relay.ds.peer_store.add_peer_new(r, 1f64, &self.relay.node_config.public_key()).await.log_error().ok();
                     }
                 }
             } else {
@@ -159,7 +159,7 @@ impl Discovery {
 
         // TODO: Validate message and so on here.
         // Are we verifying auth on the response somewhere else?
-        self.relay.ds.peer_store.add_peer_new(res, 1f64).await?;
+        self.relay.ds.peer_store.add_peer_new(res, 1f64, &self.relay.node_config.public_key()).await?;
         tracing::debug!("Added new peer from immediate discovery: {}", short_peer_id);
 
         Ok(())

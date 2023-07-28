@@ -1,5 +1,5 @@
-use crate::{HashClear, SafeOption};
-use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata};
+use crate::{HashClear, RgResult, SafeOption};
+use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerNodeInfo, PublicKey};
 
 impl HashClear for NodeMetadata {
     fn hash_clear(&mut self) {}
@@ -26,4 +26,30 @@ impl NodeMetadata {
         )
     }
 
+}
+
+
+impl PeerNodeInfo {
+    pub fn public_keys(&self) -> Vec<PublicKey> {
+        let mut res = vec![];
+        if let Some(t) = &self.latest_node_transaction {
+            if let Ok(p) = &t.peer_data() {
+                for n in &p.node_metadata {
+                    if let Some(p) = &n.public_key {
+                        res.push(p.clone());
+                    }
+                }
+            }
+        }
+
+        if let Some(t) = &self.latest_node_transaction {
+            if let Ok(n) = &t.node_metadata() {
+                if let Some(p) = &n.public_key {
+                    res.push(p.clone());
+                }
+            }
+        }
+
+        res
+    }
 }
