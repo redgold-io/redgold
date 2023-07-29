@@ -7,6 +7,7 @@ use std::sync::{
 use config::Environment;
 
 use futures::Stream;
+use log::info;
 use rocket::data::ToByteUnit;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
@@ -15,6 +16,9 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, RwLock};
+use redgold_schema::{EasyJsonDeser, structs};
+use crate::core::relay::Relay;
+use crate::util::logging::Loggable;
 
 #[rocket::get("/rooms/<room_id>/subscribe")]
 async fn subscribe(
@@ -22,54 +26,96 @@ async fn subscribe(
     mut shutdown: rocket::Shutdown,
     last_seen_msg: LastEventId,
     room_id: &str,
-) -> EventStream<impl Stream<Item = Event>> {
+    // request: &rocket::Request<'r>,
+) -> Result<EventStream<impl Stream<Item = Event>>, rocket::http::Status> {
     println!("Subscribe message");
-    let room = db.get_room_or_create_empty(room_id).await;
-    let mut subscription = room.subscribe(last_seen_msg.0);
-    EventStream::from(stream! {
-        loop {
-            let (id, msg) = tokio::select! {
-                message = subscription.next() => message,
-                _ = &mut shutdown => return,
-            };
-            yield Event::data(msg)
-                .event("new-message")
-                .id(id.to_string())
+    // TODO: https://stackoverflow.com/questions/64829301/how-to-retrieve-http-headers-from-a-request-in-rocket
+    // let headers = request.headers();
+    // You can now access individual headers. For example, to access a header named "X-Custom-Header":
+    if true { //let Some(custom_header) = headers.get_one("auth") {
+        // println!("The value of auth Custom-Header is: {}", custom_header);
+        if true { //let Some(_) = verify_message(room_id, custom_header.to_string(), db).await {
+            let room = db.get_room_or_create_empty(room_id).await;
+            let mut subscription = room.subscribe(last_seen_msg.0);
+            return Ok(EventStream::from(stream! {
+                loop {
+                    let (id, msg) = tokio::select! {
+                        message = subscription.next() => message,
+                        _ = &mut shutdown => return,
+                    };
+                    yield Event::data(msg)
+                        .event("new-message")
+                        .id(id.to_string())
+                }
+            }))
         }
-    })
+    }
+    Err(rocket::http::Status::Unauthorized)
+
 }
 
-#[rocket::post("/rooms/<room_id>/issue_unique_idx")]
-async fn issue_idx(db: &State<Db>, room_id: &str) -> Json<IssuedUniqueIdx> {
+fn verify_message(room_id: &str, message: String, db: &State<Db>) -> Option<(usize, Option<String>)> {
+    // info!("Attempting to verify message: {}", message.clone());
+    let decoded = message.json_from::<structs::Request>().log_error();
+    let mut ret = None;
+    if let Ok(d) = &decoded {
+        if let Some(m) = &d.multiparty_authentication_request {
+            if let Ok(pk) = &d.verify_auth() {
+                if let Ok(Some(a)) = db.relay.check_mp_authorized(&room_id.to_string(), &pk) {
+                    // db.get_room_or_create_empty(room_id).await;
+                    ret = Some((a, m.message.clone()));
+                } else {
+                    info!("Failed to verify internal lock mp authorized on room_id {}", room_id.clone());
+                }
+            } else {
+                info!("Failed to verify auth");
+            }
+        } else {
+            info!("No multiparty_authentication_request");
+        }
+    } else {
+        info!("Failed to decode message");
+    }
+    ret
+}
+
+#[rocket::post("/rooms/<room_id>/issue_unique_idx", data = "<message>")]
+async fn issue_idx(db: &State<Db>, room_id: &str, message: String) -> Json<IssuedUniqueIdx> {
     println!("room issue message");
-    let room = db.get_room_or_create_empty(room_id).await;
-    let idx = room.issue_unique_idx();
-    Json::from(IssuedUniqueIdx { unique_idx: idx })
+    let mut idx = 5000;
+    if let Some((i, _)) = verify_message(room_id, message, db) {
+        idx = i;
+    }
+    Json::from(IssuedUniqueIdx { unique_idx: idx as u16 })
 }
 
 #[rocket::post("/rooms/<room_id>/broadcast", data = "<message>")]
 async fn broadcast(db: &State<Db>, room_id: &str, message: String) -> Status {
     println!("room broadcast");
-    let room = db.get_room_or_create_empty(room_id).await;
-    room.publish(message).await;
+    if let Some((i, Some(msg))) = verify_message(room_id, message, db) {
+        let room = db.get_room_or_create_empty(room_id).await;
+        room.publish(msg).await;
+    }
     Status::Ok
 }
 
 struct Db {
     rooms: RwLock<HashMap<String, Arc<Room>>>,
+    relay: Arc<Relay>
 }
 
 struct Room {
     messages: RwLock<Vec<String>>,
     message_appeared: Notify,
     subscribers: AtomicU16,
-    next_idx: AtomicU16,
+    // next_idx: AtomicU16,
 }
 
 impl Db {
-    pub fn empty() -> Self {
+    pub fn empty(relay: Relay) -> Self {
         Self {
             rooms: RwLock::new(HashMap::new()),
+            relay: Arc::new(relay),
         }
     }
 
@@ -102,7 +148,7 @@ impl Room {
             messages: RwLock::new(vec![]),
             message_appeared: Notify::new(),
             subscribers: AtomicU16::new(0),
-            next_idx: AtomicU16::new(1),
+            // next_idx: AtomicU16::new(1),
         }
     }
 
@@ -124,9 +170,9 @@ impl Room {
         self.subscribers.load(Ordering::SeqCst) == 0
     }
 
-    pub fn issue_unique_idx(&self) -> u16 {
-        self.next_idx.fetch_add(1, Ordering::Relaxed)
-    }
+    // pub fn issue_unique_idx(&self) -> u16 {
+    //     self.next_idx.fetch_add(1, Ordering::Relaxed)
+    // }
 }
 
 struct Subscription {
@@ -184,7 +230,7 @@ struct IssuedUniqueIdx {
 }
 
 
-pub(crate) async fn run_server(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) async fn run_server(port: u16, relay: Relay) -> Result<(), Box<dyn std::error::Error>> {
     // let figment = rocket::Config::figment().merge((
     //     "limits",
     //     rocket::data::Limits::new().limit("string", 100.megabytes()),
@@ -197,7 +243,7 @@ pub(crate) async fn run_server(port: u16) -> Result<(), Box<dyn std::error::Erro
 
     rocket::custom(config)
         .mount("/", rocket::routes![subscribe, issue_idx, broadcast])
-        .manage(Db::empty())
+        .manage(Db::empty(relay))
         .launch()
         .await?;
     Ok(())

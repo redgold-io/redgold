@@ -12,6 +12,7 @@ use itertools::Itertools;
  use redgold_schema::RgResult;
  use crate::node_config::NodeConfig;
  use crate::util::cli::arg_parse_config::ArgTranslate;
+ use crate::util::cli::args::Deploy;
  use crate::util::cli::data_folder::DataFolder;
 
  /**
@@ -211,7 +212,7 @@ pub async fn setup_ops_services(
     Ok(())
 }
 
-pub async fn default_deploy() {
+pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) {
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -220,18 +221,27 @@ pub async fn default_deploy() {
     let s = ArgTranslate::read_servers_file(buf).expect("servers");
     println!("Setting up servers: {:?}", s);
     // let mut gen = true;
-    let purge = false;
-    let mut gen = false;
+    let purge = deploy.purge;
+    let mut gen = deploy.genesis;
+    if std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok() {
+        gen = true;
+    }
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
+
+    let mut net = node_config.network;
+    if net == NetworkEnvironment::Local {
+        net = NetworkEnvironment::Dev;
+    }
     for ss in s.to_vec() {
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
-        setup_server_redgold(ssh, NetworkEnvironment::Dev, gen, Some(hm), purge).await.expect("worx");
+
+        setup_server_redgold(ssh, net, gen, Some(hm), purge).await.expect("worx");
         gen = false;
         let ssh = SSH::new_ssh(ss.host.clone(), None);
-        setup_ops_services(ssh, None, None, None, false).await.expect("")
+        setup_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
     }
 }
 
@@ -239,5 +249,5 @@ pub async fn default_deploy() {
 #[ignore]
 #[tokio::test]
 async fn test_setup_server() {
-    default_deploy().await;
+    // default_deploy().await;
 }
