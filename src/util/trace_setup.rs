@@ -193,7 +193,9 @@ pub fn init_tracing(log_level: &str) {
     //     .fmt_fields(Format::default().compact())
     //     .build();
 
-    let fmt_layer = tracing_subscriber::fmt::Layer::default().compact();
+    let fmt_layer = tracing_subscriber::fmt::Layer::default()
+        .compact()
+        .with_ansi(false);
     let filter_layer = EnvFilter::new(format!(
         "sqlx=ERROR,warp=WARN,rocket=WARN,redgold={}", log_level));
 
