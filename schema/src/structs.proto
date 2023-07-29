@@ -692,6 +692,11 @@ message QueryObservationProofResponse {
   repeated ObservationProof observation_proof = 1;
 }
 
+message MultipartyAuthenticationRequest {
+  optional string message = 1;
+  string room_id = 2;
+}
+
 
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
@@ -711,6 +716,7 @@ message Request {
   HashSearchRequest hash_search_request = 14;
   optional string trace_id = 15;
   optional bool trace = 16;
+  MultipartyAuthenticationRequest multiparty_authentication_request = 18;
 }
 
 message Response {

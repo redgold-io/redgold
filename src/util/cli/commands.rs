@@ -233,7 +233,7 @@ pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorIn
         return Ok(());
     }
 
-    default_deploy().await;
+    default_deploy(deploy, _config).await;
 
     Ok(())
 }

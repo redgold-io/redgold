@@ -166,12 +166,16 @@ impl NodeConfig {
 
     pub fn request(&self) -> Request {
         let mut req = Request::empty();
-        req.with_auth(&self.internal_mnemonic().active_keypair()).with_metadata(self.node_metadata()).clone()
+        self.sign_request(&mut req)
     }
 
     pub fn response(&self) -> Response {
         let mut req = Response::empty_success();
-        req.with_auth(&self.internal_mnemonic().active_keypair()).with_metadata(self.node_metadata()).clone()
+        req.with_metadata(self.node_metadata()).with_auth(&self.internal_mnemonic().active_keypair()).clone()
+    }
+
+    pub fn sign_request(&self, req: &mut Request) -> Request {
+        req.with_metadata(self.node_metadata()).with_auth(&self.internal_mnemonic().active_keypair()).clone()
     }
 
     pub fn dynamic_node_metadata(&self) -> Option<DynamicNodeMetadata> {

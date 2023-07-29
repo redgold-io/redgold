@@ -177,8 +177,9 @@ pub struct Deploy {
     /// Indicates this starts from genesis flow or contains a genesis node, only used for debugging
     #[clap(short, long)]
     pub genesis: bool,
-
-
+    /// Purge or remove metrics / logs / ops services data
+    #[clap(long)]
+    pub purge_ops: bool,
 }
 
 // Wallet commands

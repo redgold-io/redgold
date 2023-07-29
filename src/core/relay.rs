@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crossbeam::atomic::AtomicCell;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::core::internal_message;
@@ -9,6 +9,7 @@ use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerData, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
+use eframe::egui::TextBuffer;
 use futures::future;
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
@@ -17,7 +18,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, FixedUtxoId, GossipTransactionRequest, Hash, NodeMetadata, ObservationProof, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Request, Response, Transaction};
 use crate::core::discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
@@ -113,6 +114,16 @@ pub struct Relay {
     /// Haha, discovery channel
     /// Used for immediate discovery messages for unknown or unrecognized message
     pub discovery: Channel<DiscoveryMessage>,
+    /// Authorization channel for multiparty keygen to determine room_id and participating keys
+    pub mp_keygen_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartyKeygenRequest>>>,
+    pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>
+}
+
+
+impl Relay {
+
+
+
 }
 
 /**
@@ -127,6 +138,46 @@ pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
 // as the other 'half' here.
 impl Relay {
+
+    pub fn authorize_signing(&self, p0: InitiateMultipartySigningRequest) -> RgResult<()> {
+        let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        l.insert(p0.signing_room_id.clone(), p0);
+        Ok(())
+    }
+    pub fn remove_signing_authorization(&self, room_id: &String) -> RgResult<()> {
+        let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        l.remove(room_id);
+        Ok(())
+    }
+    pub fn check_signing_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+        let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        Ok(l.get(room_id).safe_get_msg("missing room_id")
+            .and_then(|x| x.identifier.safe_get_msg("missing identifier")
+            ).map(|p| p.party_index(public_key)).unwrap_or(None))
+    }
+
+    pub fn authorize_keygen(&self, p0: InitiateMultipartyKeygenRequest) -> RgResult<()> {
+        let mut l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        l.insert(p0.identifier.safe_get_msg("missing identifier")?.uuid.clone(), p0);
+        Ok(())
+    }
+    pub fn remove_keygen_authorization(&self, room_id: &String) -> RgResult<()> {
+        let mut l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        l.remove(room_id);
+        Ok(())
+    }
+    pub fn check_keygen_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+        let mut l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        Ok(l.get(room_id).safe_get_msg("missing room_id")
+            .and_then(|x| x.identifier.safe_get_msg("missing identifier")
+            ).map(|p| p.party_index(public_key)).unwrap_or(None))
+    }
+    pub fn check_mp_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+        let stripped_one = room_id.strip_suffix("-online").unwrap_or(room_id.as_str());
+        let room_id = stripped_one.strip_suffix("-offline").unwrap_or(stripped_one.as_str()).to_string();
+        Ok(self.check_keygen_authorized(&room_id, public_key)?.or(self.check_signing_authorized(&room_id, public_key)?))
+    }
+
 
     pub async fn observe(&self, mut om: ObservationMetadata) -> Result<ObservationProof, ErrorInfo> {
         om.with_hash();
@@ -365,6 +416,8 @@ impl Relay {
             node_state: Arc::new(AtomicCell::new(NodeState::Initializing)),
             udp_outgoing_messages: internal_message::new_channel::<PeerMessage>(),
             discovery: internal_message::new_bounded_channel(100),
+            mp_keygen_authorizations: Arc::new(Mutex::new(Default::default())),
+            mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
         }
     }
 }

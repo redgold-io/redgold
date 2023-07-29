@@ -139,7 +139,8 @@ impl Node {
         // join_handles.push(tokio::spawn(async move { mph.run().await }));
 
         let sm_port = relay.node_config.mparty_port();
-        join_handles.push(tokio::spawn(async move { gg20_sm_manager::run_server(sm_port)
+        let sm_relay = relay.clone();
+        join_handles.push(tokio::spawn(async move { gg20_sm_manager::run_server(sm_port, sm_relay)
                 .await.map_err(|e| error_info(e.to_string())) }));
 
 
@@ -747,12 +748,6 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
 
     let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
-    // println!("{:?}", res);
-    /*
-    "protocol execution terminated with error: handle received message: received message didn't pass pre-validation: got message which was sent by this party"
-    this happens sometimes?
-    Do we need some kind of sleep in here before the other peers start? very confusing.
-     */
 
     // tokio::time::sleep(Duration::from_secs(10)).await;
 
@@ -794,10 +789,9 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     // submit.submit().await?.at_least_n(3).unwrap();
 
-    // This works sometimes but is flaky, unsure the exact reason.
-    // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
-    // do_signing(keygen2).await;
-    //
+    let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    do_signing(keygen2).await;
+
 
     std::mem::forget(local_nodes);
     std::mem::forget(submit);
