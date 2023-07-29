@@ -80,6 +80,8 @@ jobs:
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
+      - run: cargo toolchain list
+      - run: rustup default nightly
       - run: cargo clean
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: cargo build --release
