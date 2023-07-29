@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use log::{error, info};
 
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -557,10 +557,11 @@ impl IntervalFold for Watcher {
             // TODO: Get this from local share instead of from a second keysign round.
             if let Ok(r) = res {
                 let test_sign = r.identifier.uuid.clone();
-                let bd = BytesData::from(test_sign.into_bytes());
+                let h = Hash::from_string_calculate(&test_sign);
+                let bd = h.bytes.safe_get_msg("Missing bytes in immediate hash calculation")?;
                 let ksr = initiate_mp::initiate_mp_keysign(
                     self.relay.clone(), r.identifier.clone(),
-                    bd,
+                    bd.clone(),
                     r.identifier.party_keys.clone(),
                     None
                 ).await.log_error();
