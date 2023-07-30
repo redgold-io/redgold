@@ -95,7 +95,10 @@ impl PeerOutgoingEventHandler {
                         message.send_timeout.as_secs())
             ) {
             Ok(r) => {r}
-            Err(e) => {Err(e)}
+            Err(e) => {
+                increment_counter!("redgold.peer.rest.send.timeout");
+                Err(e)
+            }
         };
         let r = result.map_err(|e| {
             increment_counter!("redgold.peer.rest.send.error");

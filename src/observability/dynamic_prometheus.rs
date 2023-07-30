@@ -8,6 +8,8 @@ use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, json_from};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata};
 use serde::{Serialize, Deserialize};
 use crate::core::relay::Relay;
+use crate::node::Node;
+use crate::node_config::NodeConfig;
 
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -64,10 +66,11 @@ async fn update_tick(relay: &Relay) -> Result<(), ErrorInfo> {
 
     let mut updated_targets: HashMap<String, Vec<String>> = HashMap::new();
 
-    for u in updated {
-        let or = &mut vec![];
-        let mut targets = updated_targets.get_mut(&u.network.to_std_string()).unwrap_or(or);
-        targets.push(format!("{}:{}", u.ip, u.port));
+    for u in &updated {
+        let key = u.network.to_std_string();
+        let mut targets = updated_targets.get(&key).cloned().unwrap_or(vec![]);
+        targets.push(format!("{}:{}", u.ip.clone(), u.port.clone()));
+        updated_targets.insert(key, targets.clone());
     }
 
     let mut ser2 = vec![];
@@ -93,4 +96,15 @@ pub async fn update_prometheus_configs(relay: Relay) -> JoinHandle<Result<(), Er
             update_tick(&r).await.map(|_| r)
         }).await.map(|_| ())
     })
+}
+
+#[ignore]
+#[tokio::test]
+async fn debug_targets() {
+    let nc = NodeConfig::from_test_id(&10u16);
+    let nc2 = NodeConfig::from_test_id(&11u16);
+    let relay = Relay::new(nc.clone()).await;
+    Node::prelim_setup(relay.clone()).await.unwrap();
+    relay.ds.peer_store.add_peer_new(&nc2.self_peer_info(), 1f64, &nc.public_key()).await.unwrap();
+    update_tick(&relay).await.unwrap();
 }
