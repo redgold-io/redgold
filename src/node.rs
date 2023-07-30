@@ -194,6 +194,7 @@ impl Node {
             node_config.clone().network != NetworkEnvironment::Main,
             node_config.env_data_folder().data_store_path()
         ).await?;
+        relay.ds.count_gauges()?;
         Ok(())
     }
 

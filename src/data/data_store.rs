@@ -7,7 +7,7 @@ use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use libp2p::PeerId;
 use log::info;
-use metrics::increment_counter;
+use metrics::{gauge, increment_counter};
 use rusqlite::{params, Connection, Error, Result};
 use sqlx::migrate::MigrateError;
 use sqlx::pool::PoolConnection;
@@ -42,7 +42,7 @@ use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
 use crate::schema::structs;
 use redgold_schema::constants::EARLIEST_TIME;
-use redgold_schema::{error_info, error_message, ProtoSerde, SafeOption};
+use redgold_schema::{error_info, error_message, ProtoSerde, RgResult, SafeOption};
 use redgold_schema::structs::{AddressInfo, NetworkEnvironment};
 use redgold_schema::transaction::AddressBalance;
 use crate::util::cli::arg_parse_config::ArgTranslate;
@@ -94,6 +94,16 @@ impl PeerQueryResult {
 }
 
 impl DataStore {
+
+    pub async fn count_gauges(&self) -> RgResult<()> {
+        let tx_count = self.transaction_store.count_total_accepted_transactions().await?;
+        gauge!("redgold.transaction.accepted.total", tx_count as f64);
+        let obs_count = self.observation.count_total_observations().await?;
+        gauge!("redgold.observation.total", obs_count as f64);
+        gauge!("redgold.utxo.total", self.transaction_store.count_total_utxos().await? as f64);
+        Ok(())
+    }
+
     pub fn connection(&self) -> rusqlite::Result<Connection, Error> {
         return Connection::open(self.connection_path.clone());
     }
