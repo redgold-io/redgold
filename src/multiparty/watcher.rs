@@ -16,6 +16,7 @@ use crate::node::Node;
 use crate::util::address_external::ToBitcoinAddress;
 use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
+use redgold_schema::errors::EnhanceErrorInfo;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {
@@ -536,17 +537,23 @@ impl IntervalFold for Watcher {
                 }
                 let mut w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
-                    let update_result = self.process_requests(
-                        d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
-                    ).await;
-                    if let Ok(update_result) = &update_result {
-                        let mut cfg2 = cfg.clone();
-                        cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
-                        cfg2.bid_ask = update_result.updated_bid_ask.clone();
-                        cfg2.deposit_allocations = vec![update_result.updated_allocation.clone()];
-                        ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
-                    } else if let Err(e) = update_result {
-                        error!("Error processing requests: {}", e.json_or());
+
+                    let balance = self.relay.ds.transaction_store.get_balance(&d.key.address()?).await?;
+                    if balance.map(|x| x > 0).unwrap_or(false) {
+                        let update_result = self.process_requests(
+                            d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
+                        ).await;
+                        if let Ok(update_result) = &update_result {
+                            let mut cfg2 = cfg.clone();
+                            cfg2.last_btc_timestamp = update_result.updated_btc_timestamp;
+                            cfg2.bid_ask = update_result.updated_bid_ask.clone();
+                            cfg2.deposit_allocations = vec![update_result.updated_allocation.clone()];
+                            ds.config_store.insert_update_json("deposit_watcher_config", cfg2).await?;
+                        } else if let Err(e) = update_result {
+                            error!("Error processing requests: {}", e.json_or());
+                        }
+                    } else {
+                        info!("No balance found for key: {}", d.key.address()?.render_string()?);
                     }
                 }
             }
@@ -581,7 +588,7 @@ impl IntervalFold for Watcher {
                         bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: 0.0 },
                         last_btc_timestamp: 0,
                     };
-                    self.genesis_funding(&pk.address()?).await.log_error().ok();
+                    self.genesis_funding(&pk.address()?).await.add("Genesis watcher funding error").log_error().ok();
                     ds.config_store.insert_update_json("deposit_watcher_config", cfg).await?;
                 }
             }

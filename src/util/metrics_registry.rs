@@ -54,6 +54,7 @@ pub fn register_metric_names() {
     increment_counter!("redgold.peer.rest.send");
     increment_counter!("redgold.peer.send");
     increment_counter!("redgold.peer.discovery.recv_for_each");
+    increment_counter!("redgold.peer.rest.send.timeout");
 
     // register_gauge!("redgold.libp2p.active_connections");
     // register_counter!("redgold.libp2p.total_established_connections");

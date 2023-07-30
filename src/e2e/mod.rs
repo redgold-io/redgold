@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 
-use metrics::{increment_counter, increment_gauge};
+use metrics::{gauge, increment_counter, increment_gauge};
 use tokio::runtime::Runtime;
 use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::{KeyPair, RgResult, SafeOption};
@@ -221,7 +221,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                     info!("Live E2E request success");
                     increment_counter!("redgold.e2e.success");
                     if let Some(q) = response.query_transaction_response {
-                        increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
+                        gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
                     }
                 }
                 Err(e) => {
