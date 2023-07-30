@@ -180,6 +180,13 @@ pub struct Deploy {
     /// Purge or remove metrics / logs / ops services data
     #[clap(long)]
     pub purge_ops: bool,
+    /// Only deploy or redeploy the ops services
+    #[clap(long)]
+    pub ops: bool,
+    /// Update server index
+    #[clap(long)]
+    pub server_index: Option<i32>,
+
 }
 
 // Wallet commands

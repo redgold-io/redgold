@@ -65,6 +65,7 @@ services:
     restart: unless-stopped
     volumes:
       - ~/.rg/all/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ~/.rg/all/targets.json:/etc/prometheus/targets.json
       - ~/.rg/all/data/prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

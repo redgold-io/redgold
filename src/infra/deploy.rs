@@ -233,12 +233,19 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) {
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
     }
-    for ss in s.to_vec() {
+    let mut servers = s.to_vec();
+    if let Some(i) = deploy.server_index {
+        let x = servers.get(i as usize).expect("").clone();
+        servers = vec![x]
+    }
+
+    for ss in servers {
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
-
-        setup_server_redgold(ssh, net, gen, Some(hm), purge).await.expect("worx");
+        if !deploy.ops {
+            setup_server_redgold(ssh, net, gen, Some(hm), purge).await.expect("worx");
+        }
         gen = false;
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         setup_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
