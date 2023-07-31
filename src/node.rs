@@ -775,7 +775,6 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
         // println!("{:?}", res);
         assert!(res.is_ok());
         res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
-
     };
 
     do_signing(keygen1).await;
