@@ -105,11 +105,10 @@ impl ConfigStore {
         let rows = sqlx::query!(
             r#"SELECT value_bytes FROM config WHERE key_name = ?1"#,
             key
-         ).fetch_all(&mut pool).await;
+         ).fetch_optional(&mut pool).await;
 
         let rows2 = DataStoreContext::map_err_sqlx(rows)?;
-        let x = rows2.get(0).safe_get()?.value_bytes.clone();
-        Ok(x) // ooh this is cool
+        Ok(rows2.and_then(|row| row.value_bytes))
     }
 
     pub async fn get_proto<T: ProtoSerde>(&self, key: impl Into<String>) -> Result<T, ErrorInfo> {
