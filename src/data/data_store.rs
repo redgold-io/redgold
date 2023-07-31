@@ -117,7 +117,8 @@ impl DataStore {
         gauge!("redgold.transaction.accepted.total", tx_count as f64);
         let obs_count = self.observation.count_total_observations().await?;
         gauge!("redgold.observation.total", obs_count as f64);
-        gauge!("redgold.utxo.total", self.transaction_store.count_total_utxos().await? as f64);
+        let utxo_total = self.transaction_store.count_total_utxos().await?;
+        gauge!("redgold.utxo.total", utxo_total as f64);
         Ok(())
     }
 
