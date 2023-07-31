@@ -1,6 +1,6 @@
-
+use std::collections::HashMap;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardContractType, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, ProductId, Proof, StandardContractType, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info, RgResult, structs};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
@@ -234,6 +234,19 @@ impl Transaction {
         )?)
     }
 
+    pub fn output_amounts_by_product(&self) -> HashMap<ProductId, TransactionAmount> {
+        let mut map = HashMap::new();
+        for output in &self.outputs {
+            if let Some(product_id) = output.product_id.as_ref() {
+                if let Some(a) = output.opt_amount() {
+                    let aa = map.get(product_id).map(|x: &TransactionAmount| x.amount + a).unwrap_or(a);
+                    map.insert(product_id.clone(), TransactionAmount::from(aa));
+                }
+            }
+        }
+        map
+    }
+
     pub fn prevalidate(&self) -> Result<(), ErrorInfo> {
         if self.inputs.is_empty() {
             Err(error_code(RGError::MissingInputs))?;
@@ -287,6 +300,9 @@ impl Transaction {
                 }
             }
         }
+
+        // TODO: Sum by product Id
+
         return Ok(());
     }
 

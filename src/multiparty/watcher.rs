@@ -603,6 +603,7 @@ impl IntervalFold for Watcher {
     }
 }
 
+#[ignore]
 #[tokio::test]
 async fn debug_local_ds_utxo_balance() {
     let mut opts = RgArgs::default();
