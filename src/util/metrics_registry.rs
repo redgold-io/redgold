@@ -28,9 +28,12 @@ pub fn register_metric_names() {
     register_counter!("redgold.observation.buffer.added");
     register_counter!("redgold.observation.failed_to_send_to_transaction_processor");
     register_gauge!("redgold.observation.height");
+    register_gauge!("redgold.observation.total");
     register_gauge!("redgold.observation.last.size");
+    register_gauge!("redgold.utxo.total");
 
     register_counter!("redgold.transaction.accepted");
+    register_gauge!("redgold.transaction.accepted.total");
     register_counter!("redgold.transaction.received");
     register_counter!("redgold.transaction.missing_response_channel");
     register_counter!("redgold.transaction.resolve.input");

@@ -7,7 +7,7 @@ use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use libp2p::PeerId;
 use log::info;
-use metrics::increment_counter;
+use metrics::{gauge, increment_counter};
 use rusqlite::{params, Connection, Error, Result};
 use sqlx::migrate::MigrateError;
 use sqlx::pool::PoolConnection;
@@ -111,6 +111,17 @@ impl PeerQueryResult {
 }
 
 impl DataStore {
+
+    pub async fn count_gauges(&self) -> RgResult<()> {
+        let tx_count = self.transaction_store.count_total_accepted_transactions().await?;
+        gauge!("redgold.transaction.accepted.total", tx_count as f64);
+        let obs_count = self.observation.count_total_observations().await?;
+        gauge!("redgold.observation.total", obs_count as f64);
+        let utxo_total = self.transaction_store.count_total_utxos().await?;
+        gauge!("redgold.utxo.total", utxo_total as f64);
+        Ok(())
+    }
+
     pub fn connection(&self) -> rusqlite::Result<Connection, Error> {
         return Connection::open(self.connection_path.clone());
     }

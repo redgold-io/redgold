@@ -15,6 +15,25 @@ use crate::schema::json_or;
 
 impl ObservationStore {
 
+    pub async fn count_total_observations(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM observation"#
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(row.count as i64);
+        }
+        let option = res.get(0).safe_get()?.clone().clone();
+        Ok(option)
+    }
+
     pub async fn select_latest_observation(&self, peer_key: PublicKey) -> Result<Option<Observation>, ErrorInfo> {
 
         let mut pool = self.ctx.pool().await?;

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use metrics::{decrement_gauge, increment_gauge};
 use sqlx::query::Map;
 use sqlx::{Error, Sqlite};
 use sqlx::sqlite::{SqliteArguments, SqliteRow};
@@ -120,6 +121,26 @@ impl TransactionStore {
         let option = res.get(0).safe_get()?.clone().clone();
         Ok(option)
     }
+
+    pub async fn count_total_utxos(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM utxo"#
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(row.count as i64);
+        }
+        let option = res.get(0).safe_get()?.clone().clone();
+        Ok(option)
+    }
+
     //
     // pub async fn count_total_accepted_transactions(
     //     &self
@@ -354,6 +375,7 @@ impl TransactionStore {
             .execute(&mut pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        decrement_gauge!("redgold.utxo.total", 1.0);
         Ok(rows_m.rows_affected())
     }
 
@@ -386,6 +408,7 @@ impl TransactionStore {
             .execute(&mut pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        increment_gauge!("redgold.utxo.total", 1.0);
         Ok(rows_m.last_insert_rowid())
     }
     //
@@ -609,6 +632,7 @@ impl TransactionStore {
             self.insert_utxo(&entry).await?;
         }
         self.insert_address_transaction(tx).await?;
+        increment_gauge!("redgold.transaction.accepted.total", 1.0);
         return Ok(i);
     }
 }

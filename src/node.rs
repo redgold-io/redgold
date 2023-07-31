@@ -194,6 +194,7 @@ impl Node {
             node_config.clone().network != NetworkEnvironment::Main,
             node_config.env_data_folder().data_store_path()
         ).await?;
+        relay.ds.count_gauges().await?;
 
         relay.ds.check_consistency_apply_fixes().await?;
         Ok(())
@@ -774,7 +775,6 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
         // println!("{:?}", res);
         assert!(res.is_ok());
         res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
-
     };
 
     do_signing(keygen1).await;
