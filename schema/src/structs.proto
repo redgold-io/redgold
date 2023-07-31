@@ -488,10 +488,12 @@ message ObservationEdge {
 // TODO: Update types here
 // Derived data structure, not a primary chain data structure
 message UtxoEntry {
-  bytes transaction_hash = 1;
+  // Changed this to FixedUtxoId, maybe rename FixedUtxoId just to UtxoId?
+  Hash transaction_hash = 1;
+  // TODO: Change to OutputIndex
   int64 output_index = 2;
   // This is duplicated, but used for indexing.
-  bytes address = 3;
+  Address address = 3;
   Output output = 4;
   int64 time = 5;
   // Consider adding additional fields to index here? amount? etc. for now just de-ser

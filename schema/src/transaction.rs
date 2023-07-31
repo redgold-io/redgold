@@ -226,10 +226,11 @@ impl Transaction {
                 RGError::MissingInputs,
                 format!("missing input index: {}", utxo_entry.output_index),
             ))?;
+        let address = utxo_entry.address.safe_get_msg("Missing address during verify_utxo_entry_proof")?;
         Ok(Proof::verify_proofs(
             &input.proof,
             &self.signable_hash(),
-            &Address::from_bytes(utxo_entry.address.clone())?,
+            address,
         )?)
     }
 
@@ -280,6 +281,11 @@ impl Transaction {
             //     // println!("address id len : {:?}", output.address.len());
             //     return Err(RGError::InvalidHashLength);
             // }
+            if let Some(a) = _output.opt_amount() {
+                if a < 10_000 {
+                    Err(error_info(format!("Insufficient amount output of {a}")))?;
+                }
+            }
         }
         return Ok(());
     }
@@ -445,6 +451,9 @@ impl TransactionAmount {
     pub fn from_fractional(a: f64) -> Result<Self, ErrorInfo> {
         if a <= 0 as f64 {
             Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
+        }
+        if a > DECIMAL_MULTIPLIER as f64 {
+            Err(ErrorInfo::error_info("Invalid transaction amount"))?
         }
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
         Ok(TransactionAmount{

@@ -25,14 +25,14 @@
 //     }
 // }
 
-use crate::structs::{Input, Output, UtxoEntry};
+use crate::structs::{Address, Hash, Input, Output, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{SafeBytesAccess, Transaction, WithMetadataHashable};
 
 impl UtxoEntry {
     pub fn to_utxo_id(&self) -> UtxoId {
         UtxoId {
-            transaction_hash: self.transaction_hash.clone(),
+            transaction_hash: self.transaction_hash.safe_bytes().expect(""),
             output_index: self.output_index,
         }
     }
@@ -73,7 +73,7 @@ impl UtxoEntry {
     pub fn to_input(&self) -> Input {
         // let (id, idx) = self.to_values();
         return Input {
-            transaction_hash: Some(self.transaction_hash.clone().into()),
+            transaction_hash: self.transaction_hash.clone(),
             proof: vec![],
             product_id: None,
             output_index: self.output_index,
@@ -104,9 +104,9 @@ impl UtxoEntry {
         time: i64,
     ) -> UtxoEntry {
         return UtxoEntry {
-            transaction_hash: transaction_hash.clone(),
+            transaction_hash: Some(Hash::new(transaction_hash.clone())).clone(),
             output_index,
-            address: output.address.safe_bytes().expect("bytes"),
+            address: Some(Address::new(output.address.safe_bytes().expect("bytes"))),
             output: Some(output.clone()),
             time,
         };

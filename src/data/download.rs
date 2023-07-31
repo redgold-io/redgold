@@ -236,7 +236,9 @@ pub async fn process_download_request(
             } else {
                 relay
                     .ds
-                    .query_time_utxo(download_request.start_time, download_request.end_time)?
+                    .transaction_store
+                    .utxo_filter_time(download_request.start_time as i64, download_request.end_time as i64).await
+                    .expect("")
             }
         },
         transactions: {

@@ -12,7 +12,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
         peer_id_info: None
     };
     if let Ok(a) = Address::parse(hash_input.clone()) {
-        let res = DataStore::map_err_sqlx(relay.ds.query_utxo_address(vec![a.clone()]).await)?;
+        let res = relay.ds.transaction_store.query_utxo_address(&a).await?;
         let mut info = AddressInfo::from_utxo_entries(a.clone(), res);
         let limit = limit.unwrap_or(10);
         let offset = offset.unwrap_or(0);

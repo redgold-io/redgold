@@ -98,13 +98,6 @@ impl TransactionGenerator {
         }
     }
 
-    pub fn get_addresses(&self) -> Vec<Vec<u8>> {
-        self.finished_pool
-            .iter()
-            .map(|u| u.utxo_entry.address.clone())
-            .collect_vec()
-    }
-
     pub fn split_value_transaction(&mut self, prev: &SpendableUTXO) -> TransactionWithKey {
         let kp = self.next_kp();
         let kp2 = kp.clone();

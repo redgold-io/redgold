@@ -335,7 +335,7 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
     }
     if let Some(r) = request.query_addresses_request {
         // TODO: make this thing async and map errors to rejections
-        let k = DataStore::map_err_sqlx(relay.clone().ds.query_utxo_address(r.addresses).await)?;
+        let k = relay.ds.transaction_store.utxo_for_addresses(&r.addresses).await?;
         response1.query_addresses_response = Some(QueryAddressesResponse { utxo_entries: k });
     }
     if let Some(r) = request.about_node_request {
