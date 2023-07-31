@@ -146,7 +146,7 @@ impl TransactionSubmitter {
         let tx = submit_r.transaction.as_ref().expect("tx");
         let vec = tx.to_utxo_entries(0);
         let vec1 = vec.iter().filter(|u|
-            u.address == vec_a).collect_vec();
+            u.address == Some(a.clone())).collect_vec();
         let matching_entries = vec1.get(0);
         let utxos = matching_entries.expect("utxo").clone().clone();
 
@@ -166,10 +166,6 @@ impl TransactionSubmitter {
             h.push((self.spawn(x.clone().transaction), x));
         }
         self.await_results(h).await
-    }
-
-    pub fn get_addresses(&self) -> Vec<Vec<u8>> {
-        self.generator.lock().unwrap().get_addresses()
     }
 
     pub async fn submit_duplicate(&self) -> Vec<Result<SubmitTransactionResponse, ErrorInfo>> {

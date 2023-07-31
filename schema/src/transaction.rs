@@ -1,6 +1,6 @@
-
+use std::collections::HashMap;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, Proof, StandardContractType, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, ProductId, Proof, StandardContractType, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info, RgResult, structs};
 use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
@@ -226,11 +226,25 @@ impl Transaction {
                 RGError::MissingInputs,
                 format!("missing input index: {}", utxo_entry.output_index),
             ))?;
+        let address = utxo_entry.address.safe_get_msg("Missing address during verify_utxo_entry_proof")?;
         Ok(Proof::verify_proofs(
             &input.proof,
             &self.signable_hash(),
-            &Address::from_bytes(utxo_entry.address.clone())?,
+            address,
         )?)
+    }
+
+    pub fn output_amounts_by_product(&self) -> HashMap<ProductId, TransactionAmount> {
+        let mut map = HashMap::new();
+        for output in &self.outputs {
+            if let Some(product_id) = output.product_id.as_ref() {
+                if let Some(a) = output.opt_amount() {
+                    let aa = map.get(product_id).map(|x: &TransactionAmount| x.amount + a).unwrap_or(a);
+                    map.insert(product_id.clone(), TransactionAmount::from(aa));
+                }
+            }
+        }
+        map
     }
 
     pub fn prevalidate(&self) -> Result<(), ErrorInfo> {
@@ -280,7 +294,15 @@ impl Transaction {
             //     // println!("address id len : {:?}", output.address.len());
             //     return Err(RGError::InvalidHashLength);
             // }
+            if let Some(a) = _output.opt_amount() {
+                if a < 10_000 {
+                    Err(error_info(format!("Insufficient amount output of {a}")))?;
+                }
+            }
         }
+
+        // TODO: Sum by product Id
+
         return Ok(());
     }
 
@@ -445,6 +467,9 @@ impl TransactionAmount {
     pub fn from_fractional(a: f64) -> Result<Self, ErrorInfo> {
         if a <= 0 as f64 {
             Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
+        }
+        if a > DECIMAL_MULTIPLIER as f64 {
+            Err(ErrorInfo::error_info("Invalid transaction amount"))?
         }
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
         Ok(TransactionAmount{

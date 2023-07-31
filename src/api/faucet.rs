@@ -65,23 +65,23 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
     let min_offset = 1;
     let max_offset = 5;
 
-    let mut map: HashMap<Vec<u8>, KeyPair> = HashMap::new();
+    let mut map: HashMap<Address, KeyPair> = HashMap::new();
     for i in min_offset..max_offset {
         let key = node_config.internal_mnemonic().key_at(i);
         let address = key.address_typed();
-        map.insert(address.address.unwrap().value, key);
+        map.insert(address, key);
     }
 
-    let addresses = map.keys().map(|k| Address::from_bytes(k.clone()).unwrap()).collect_vec();
+    let addresses = map.keys().map(|k| k.clone()).collect_vec();
 
     let store = relay.clone().ds;
-    let result = DataStoreContext::map_err_sqlx(store.query_utxo_address(addresses).await)?;
+    let result = store.transaction_store.utxo_for_addresses(&addresses.clone()).await?;
     // info!("Result here: {:?}", result);
     let utxos = result
         .iter()
         .map(|u| SpendableUTXO {
             utxo_entry: u.clone(),
-            key_pair: map.get(&*u.address).expect("Map missing entry").clone(),
+            key_pair: map.get(&u.address.clone().expect("a")).expect("Map missing entry").clone(),
         })
         .collect_vec();
     //

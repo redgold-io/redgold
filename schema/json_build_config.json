@@ -134,8 +134,6 @@
         "structs.PoWProof.proof",
         "structs.AddPeerFull.id",
         "structs.AddPeerFull.public_key",
-        "structs.UtxoEntry.transaction_hash",
-        "structs.UtxoEntry.address",
         "structs.BytesData.value",
         "structs.Tombstone.hash",
         "structs.NodeMetadata.multi_hash",

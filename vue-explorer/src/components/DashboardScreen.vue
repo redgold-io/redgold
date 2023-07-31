@@ -67,6 +67,7 @@ export default {
           fee: 0.0,
           bytes: 400,
           timestamp: 1580000000,
+          first_amount: 1,
         },
       ],
       peers: [],

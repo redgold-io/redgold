@@ -214,7 +214,7 @@ pub struct RecentDashboardResponse {
 
 pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
     Ok(BriefUtxoEntry {
-        transaction_hash: hex::encode(u.transaction_hash.clone()),
+        transaction_hash: u.transaction_hash.safe_get_msg("Missing transaction hash")?.hex(),
         output_index: u.output_index.clone(),
         amount: rounded_balance(u.amount()),
         time: u.time.clone(),

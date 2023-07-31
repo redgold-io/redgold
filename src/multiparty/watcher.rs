@@ -17,6 +17,9 @@ use crate::util::address_external::ToBitcoinAddress;
 use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
+use crate::node_config::NodeConfig;
+use crate::util::cli::arg_parse_config::ArgTranslate;
+use crate::util::cli::args::RgArgs;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {
@@ -247,20 +250,21 @@ impl Watcher {
     pub async fn genesis_funding(&self, destination: &Address) -> RgResult<()> {
         let (_, utxos) = Node::genesis_from(self.relay.node_config.clone());
         let u = utxos.get(15).safe_get_msg("Missing utxo")?.clone();
-        let a = u.key_pair.address_typed();
-        let res = self.relay.ds.transaction_store.query_utxo_address(&a).await?;
-        if !res.is_empty() {
-            info!("Sending genesis funding to multiparty address");
+        let a = u.key_pair.address_typed().render_string().expect("a");
+        let res = self.relay.ds.transaction_store.query_utxo_id_valid(
+            &u.utxo_entry.transaction_hash.clone().expect("hash"), u.utxo_entry.output_index.clone()
+        ).await?;
+        let uu = u.utxo_entry.clone().json_or();
+        if res {
+            info!("Sending genesis funding to multiparty address from origin {a} using utxo {uu}");
             let mut tb = TransactionBuilder::new();
-            for u in &res {
-                tb.with_utxo(u);
-            }
-            tb.with_output_all(destination);
+            tb.with_utxo(&u.utxo_entry)?;
+            tb.with_output(&destination, &TransactionAmount::from(u.utxo_entry.amount() as i64));
             let mut tx = tb.build()?;
             tx.sign(&u.key_pair)?;
             self.relay.submit_transaction_sync(&tx).await?;
         } else {
-            info!("Can't send genesis multiparty funding, no funds");
+            info!("No genesis funding possible to send");
         }
         Ok(())
     }
@@ -588,7 +592,8 @@ impl IntervalFold for Watcher {
                         bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: 0.0 },
                         last_btc_timestamp: 0,
                     };
-                    self.genesis_funding(&pk.address()?).await.add("Genesis watcher funding error").log_error().ok();
+                    self.genesis_funding(&pk.address()?)
+                        .await.add("Genesis watcher funding error").log_error().ok();
                     ds.config_store.insert_update_json("deposit_watcher_config", cfg).await?;
                 }
             }
@@ -596,4 +601,32 @@ impl IntervalFold for Watcher {
         }
         Ok(())
     }
+}
+
+#[ignore]
+#[tokio::test]
+async fn debug_local_ds_utxo_balance() {
+    let mut opts = RgArgs::default();
+    opts.network = Some("dev".to_string());
+    let mut node_config = NodeConfig::default();
+    let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
+    arg_translate.translate_args().await.unwrap();
+    let nc = arg_translate.node_config;
+    let r = Relay::new(nc.clone()).await;
+    let a = Address::parse("cf4989701946ae307efdb902efd73c13d933efda0ef04bcbc3eef2146850534a").expect("");
+    let utxos = r.ds.transaction_store.query_utxo_address(&a).await.unwrap();
+    println!("UTXOS: {}", utxos.json_or());
+    println!("{}", nc.mnemonic_words.clone());
+    let (tx, gutxos) = Node::genesis_from(nc.clone());
+    // let res = r.ds.transaction_store.query_utxo_output_index(&tx.hash_or()).await.unwrap();
+    // println!("UTXO: {}", res.json_or());
+    println!("Genesis hash {}", tx.hash_or().hex());
+    //
+    // // Node::prelim_setup(r);
+    // for (i,utxo) in gutxos.iter().enumerate() {
+    //     let res = r.ds.transaction_store.query_utxo_id_valid(&tx.hash_or(), i as i64).await.unwrap();
+    //     if res {
+    //         println!("UTXO {i}: {}", utxo.utxo_entry.json_or());
+    //     }
+    // }
 }
