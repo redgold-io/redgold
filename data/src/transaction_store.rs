@@ -560,7 +560,7 @@ impl TransactionStore {
             self.insert_utxo(&entry).await?;
         }
         self.insert_address_transaction(tx).await?;
-        increment_gauge!("redgold.transaction.accepted.total");
+        increment_gauge!("redgold.transaction.accepted.total", 1.0);
         return Ok(i);
     }
 }
