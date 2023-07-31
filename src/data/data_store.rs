@@ -69,6 +69,23 @@ pub struct DataStore {
     pub ctx: DataStoreContext,
 }
 
+impl DataStore {
+
+    // Example fix for schema migration
+    pub async fn check_consistency_apply_fixes(&self) -> RgResult<()> {
+        // let lim = 10000;
+        // let mut offset = 0;
+        // while {
+        //     let res = self.transaction_store.utxo_scroll(lim, 0).await?;
+        //     for r in res {
+        //
+        //     }
+        //     res.len() == lim
+        // } {}
+        Ok(())
+    }
+}
+
 /*
 
    let pool = SqlitePool::connect(&*path.clone())
@@ -447,101 +464,9 @@ impl DataStore {
     // TODO: Move to utxoStore
     pub async fn get_address_string_info(&self, address: String) -> Result<AddressInfo, ErrorInfo> {
         let addr = Address::parse(address)?;
-        let result = self.query_utxo_address(vec![addr.clone()]).await;
-        let res = Self::map_err_sqlx(result)?;
+        let res = self.transaction_store.query_utxo_address(&addr).await?;
         Ok(AddressInfo::from_utxo_entries(addr.clone(), res))
     }
-
-    pub async fn query_utxo_address(
-        &self,
-        addresses: Vec<Address>,
-    ) -> result::Result<Vec<UtxoEntry>, sqlx::Error> {
-        let mut conn = self.pool.acquire().await?;
-
-        let mut res: Vec<UtxoEntry> = vec![];
-        // let vec1 = addresses.iter().map(|a| a.address).collect_vec();
-        for address in addresses {
-            // TODO:
-            // If this sql query has a syntax error, it breaks the e2e but NOT the e2e? wtf
-            let rows = sqlx::query(
-                "SELECT transaction_hash, output_index, address, output, time FROM utxo WHERE address = ?"
-            ).bind(address.address.clone().safe_bytes().expect("bytes"))
-                .map(|row: SqliteRow| {
-                    let transaction_hash = row.try_get(0)?;
-                    let output_index = row.try_get(1)?;
-                    let address = row.try_get(2)?;
-                    let time: i64 = row.try_get(4)?;
-                    let output = Output::proto_deserialize(row.try_get(3)?).unwrap();
-                    let res: Result<UtxoEntry, sqlx::Error> = Ok(UtxoEntry {
-                        transaction_hash,
-                        output_index,
-                        address,
-                        output: Some(output),
-                        time, // TODO: lol
-                    });
-                    res
-                })
-                .fetch_all(&mut conn)
-                .await?;
-            for row in rows {
-                let result: UtxoEntry = row?;
-                res.push(result);
-            }
-        }
-        Ok(res)
-    }
-
-    /*
-
-
-    pub fn query_utxo_all_debug(&self) -> rusqlite::Result<Vec<UtxoEntry>, Error> {
-        let conn = self.connection()?;
-        let mut statement =
-            conn.prepare("SELECT transaction_hash, output_index, address, output, time FROM utxo")?;
-
-        let rows = statement.query_map(params![], |row| {
-            Ok(UtxoEntry {
-                transaction_hash: row.get(0)?,
-                output_index: row.get(1)?,
-                address: row.get(2)?,
-                output: Output::proto_deserialize(row.get(3)?).unwrap(),
-                time: row.get(4)?,
-            })
-        })?;
-        // TODO error handling for multiple rows
-        let unwrapped = rows.map(|r| r.unwrap());
-        return Ok(unwrapped.collect_vec());
-    }
-
-     */
-
-    /*
-    use sqlx::Connection;
-    // DATABASE_URL=sqlite:///Users//test_sqlite.sqlite
-    let path = DataStore::in_memory().connection_path;
-    //std::env::set_var("DATABASE_URL", path.clone());
-
-
-    let pool = SqlitePool::connect(&*path.clone())
-        .await
-        .expect("Connection failure");
-    let mut conn = pool.acquire().await.expect("acquire failure");
-    // conn.
-    let res = sqlx::query(tbl)
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-
-    let res3 = sqlx::query("select words, time, peer_id from mnemonic")
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-    let res4 = res3.get(0).expect("something");
-
-    let wordss: &str = res4.try_get("words").expect("yes");
-    println!("{:?}", wordss);
-    assert_eq!(wordss "yo");
-     */
 
     #[allow(dead_code)]
     fn create_private_key(&self) -> rusqlite::Result<usize, Error> {
@@ -672,87 +597,7 @@ impl DataStore {
         error.map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
     }
 
-    pub fn query_utxo_all_debug(&self) -> rusqlite::Result<Vec<UtxoEntry>, Error> {
-        let conn = self.connection()?;
-        let mut statement =
-            conn.prepare("SELECT transaction_hash, output_index, address, output, time FROM utxo")?;
 
-        let rows = statement.query_map(params![], |row| {
-            Ok(UtxoEntry {
-                transaction_hash: row.get(0)?,
-                output_index: row.get(1)?,
-                address: row.get(2)?,
-                output: Some(Output::proto_deserialize(row.get(3)?).unwrap()),
-                time: row.get(4)?,
-            })
-        })?;
-        // TODO error handling for multiple rows
-        let unwrapped = rows.map(|r| r.unwrap());
-        return Ok(unwrapped.collect_vec());
-    }
-
-    pub fn query_all_balance(&self) -> rusqlite::Result<Vec<AddressBalance>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare("SELECT address, output FROM utxo")?;
-
-        let rows = statement.query_map(params![], |row| {
-            let address_val: Vec<u8> = row.get(0)?;
-            let output_raw: Vec<u8> = row.get(1)?;
-            let output = Output::proto_deserialize(output_raw).unwrap();
-            let rounded_balance = output.rounded_amount();
-            Ok(AddressBalance {
-                address: hex::encode(address_val),
-                rounded_balance,
-            })
-        })?;
-        // TODO error handling for multiple rows
-        let mut totals: HashMap<String, f64> = HashMap::new();
-
-        for row in rows {
-            let row_q = row?;
-            totals.insert(
-                row_q.address.clone(),
-                totals.get(&row_q.address.clone()).unwrap_or(&0.0) + row_q.rounded_balance,
-            );
-        }
-        let mut res: Vec<AddressBalance> = vec![];
-        for (k, v) in totals {
-            res.push(AddressBalance {
-                address: k,
-                rounded_balance: v,
-            })
-        }
-        return Ok(res);
-    }
-
-    pub fn query_utxo(
-        &self,
-        transaction_hash: &Vec<u8>,
-        output_index: u32,
-    ) -> rusqlite::Result<Option<UtxoEntry>, Error> {
-        let conn = self.connection()?;
-
-        let mut statement = conn.prepare(
-            "SELECT output, time FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2",
-        )?;
-
-        let rows = statement.query_map(params![transaction_hash, output_index], |row| {
-            let vec = row.get(0)?;
-            let output = Output::proto_deserialize(vec).unwrap();
-            let time: u64 = row.get(1)?;
-            Ok(UtxoEntry::from_output(
-                &output,
-                transaction_hash,
-                output_index as i64,
-                time as i64,
-            ))
-        })?;
-        for row in rows {
-            let row_q = row?;
-            return Ok(Some(row_q));
-        }
-        return Ok(None);
-    }
 
     pub fn query_transaction(
         &self,
@@ -795,27 +640,6 @@ impl DataStore {
         return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
     }
 
-    pub fn query_time_utxo(
-        &self,
-        start_time: u64,
-        end_time: u64,
-    ) -> rusqlite::Result<Vec<UtxoEntry>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare(
-            "SELECT transaction_hash, output_index, address, output, time \
-            FROM utxo WHERE time >= ?1 AND time < ?2",
-        )?;
-        let rows = statement.query_map(params![start_time, end_time], |row| {
-            Ok(UtxoEntry {
-                transaction_hash: row.get(0)?,
-                output_index: row.get(1)?,
-                address: row.get(2)?,
-                output: Some(Output::proto_deserialize(row.get(3)?).unwrap()),
-                time: row.get(4)?,
-            })
-        })?;
-        return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
-    }
 
     pub fn select_all_tables(&self) -> rusqlite::Result<Vec<String>, Error> {
         let conn = self.connection()?;

@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, SafeOption, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, SafeBytesAccess, SafeOption, util, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
@@ -126,7 +126,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     if utxos.len() == 0 {
         return Err(ErrorInfo::error_info("No UTXOs found for this address"));
     }
-    let option = hm.get(&utxos.get(0).safe_get_msg("first")?.address);
+    let option = hm.get(&utxos.get(0).safe_get_msg("first")?.address.safe_bytes()?);
     let kp = option.safe_get_msg("keypair")?.clone().clone();
 
     let utxo = utxos.get(0).expect("first").clone();

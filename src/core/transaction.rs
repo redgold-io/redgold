@@ -38,116 +38,6 @@ use crate::schema::transaction::rounded_balance;
 
 // TODO Proof verification unit tests.
 
-pub fn validate_utxo(
-    transaction: &Transaction,
-    data_store: &DataStore,
-) -> Result<Vec<(Vec<u8>, i64)>, ErrorInfo> {
-    // TODO: Add errors around unsupported types.
-    // let contracts = self
-    //     .outputs
-    //     .iter()
-    //     .map(|o| o.contract.clone())
-    //     .collect::<HashSet<Vec<u8>>>();
-    // if contracts.len() > 1 {
-    //     return Err(RGError::UnknownError);
-    // }
-    // let contract = contracts.iter().next().unwrap().clone();
-    //
-    // if contract == Transaction::currency_contract_hash() {
-    //     return self.validate_currency_utxo(data_store);
-    // }
-    return validate_currency_utxo(transaction, data_store);
-    // Err(RGError::UnknownError)
-}
-
-pub fn validate_currency_utxo(
-    transaction: &Transaction,
-    data_store: &DataStore,
-) -> Result<Vec<(Vec<u8>, i64)>, ErrorInfo> {
-    // Validate all UTXO's present
-    let mut balance: u64 = 0;
-    let vec = transaction.iter_utxo_inputs();
-    // .iter() instead?
-    for input in transaction.inputs.clone() {
-
-        // TODO: change to utxo_id and update the query func to be sqlx.
-        let hash = input.transaction_hash.safe_bytes()?.clone();
-        let output_id = input.output_index;
-    // for (hash, output_id) in vec.clone() {
-        // TODO: How to handle DB failure here?
-        let utxo_id_hex = hex::encode(hash.clone()) + " " + &*format!("{:?}", output_id);
-        let query_result = data_store.query_utxo(&hash, output_id as u32).unwrap();
-        match query_result {
-            None => {
-                log::debug!("Unknown utxo id: {}", utxo_id_hex);
-                log::debug!(
-                    "Query all utxo {:?}",
-                    data_store.query_utxo_all_debug().unwrap()
-                );
-                log::debug!("Unknown utxo id: {} output {:?}", utxo_id_hex, output_id);
-                // let details = ErrorDetails {
-                //     detail_name: "utxo_id".to_string(),
-                //     detail: utxo_id_hex,
-                // };
-                // TODO: Return all sorts of debug information here, including the input serialized etc.
-                return Err(error_message(
-                    RGError::UnknownUtxo,
-                    "Transaction validation func",
-                ));
-            }
-            Some(utxo_entry) => {
-                let amount = utxo_entry
-                    .output
-                    .safe_get_msg("UTXO entry from query transaction validate output")?
-                    .amount();
-                balance += amount;
-                log::debug!(
-                    "idx: {:?}, amount: {:?}, balance: {:?}, raw: {:?} UtxoEntry: {}",
-                    utxo_id_hex,
-                    rounded_balance(amount),
-                    rounded_balance(balance),
-                    amount,
-                    serde_json::to_string(&utxo_entry.clone()).unwrap()
-                );
-                // let option = transaction.inputs.get(output_id as usize);
-                // let input = option.safe_get_msg("Transaction input get output_id empty")?;
-                Proof::verify_proofs(
-                    &input.proof,
-                    &utxo_entry.transaction_hash.into(),
-                    &utxo_entry.address.into(),
-                )?;
-            }
-        }
-    }
-    let desired_spend: u64 = transaction
-        .outputs
-        .iter()
-        .map(|o| {
-            let amount = o.amount();
-            // info!(
-            //     "Desired spend raw: {:?} address: {:?}",
-            //     amount,
-            //     hex::encode(o.address.clone())
-            // );
-            amount
-        })
-        .sum();
-    let total = desired_spend;
-    log::debug!(
-        "balance {:?} desired_spend {:?} total {:?}",
-        balance,
-        desired_spend,
-        total
-    );
-    if total > balance {
-        return Err(error_message(RGError::InsufficientBalance, "total greater than balance"));
-    }
-    if total != balance {
-        return Err(error_message(RGError::BalanceMismatch, "Unused funds"));
-    }
-    return Ok(vec);
-}
-
 //const GENESIS_HEX_STR =
 #[allow(dead_code)]
 pub struct TransactionTestContext {
@@ -178,7 +68,7 @@ impl TransactionTestContext {
             .await.expect("Insert fail");
         info!(
             "Data store immediate genesis query {:?}",
-            ds.query_utxo_all_debug().unwrap()
+            ds.transaction_store.utxo_all_debug().await.unwrap()
         );
 
         let tx_gen = TransactionGenerator::default(vec![]).with_genesis();

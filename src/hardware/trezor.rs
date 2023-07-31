@@ -309,9 +309,9 @@ async fn debug_sign_tx () {
     let address = pk.address().expect("a");
     let addr = address.clone().address.safe_bytes().expect("");
     let utxo = UtxoEntry{
-        transaction_hash: Hash::from_string_calculate("test").vec(),
+        transaction_hash: Some(Hash::from_string_calculate("test")),
         output_index: 0,
-        address: addr.clone(),
+        address: Some(address.clone()),
         output: Some(Output{
             address: Some(address.clone()),
             product_id: None,

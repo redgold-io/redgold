@@ -20,7 +20,7 @@
           <HashLink :data="transaction.to" />
         </td>
         <td>
-          {{ transaction.amount }}
+          {{ transaction.first_amount }}
         </td>
         <td>
           {{ transaction.fee }}
@@ -57,6 +57,7 @@ export default {
         {key: 'amount'},
         {key: 'fee'},
         {key: 'bytes'},
+        {key: 'amount'},
         {
           key: 'timestamp', formatter: (value) => {
             return new Date(value).toLocaleString(); // This line is assuming the timestamp is in milliseconds

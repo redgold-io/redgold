@@ -206,10 +206,8 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.output_index;
-            if let Some(o) = option1 {
-                res.push(o as i32);
-            }
+            let o = row.output_index;
+            res.push(o as i32);
         }
         Ok(res)
     }
@@ -232,10 +230,8 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.output_index;
-            if let Some(o) = option1 {
-                res.push(o as i64);
-            }
+            let o = row.output_index;
+            res.push(o as i64);
         }
         Ok(!res.is_empty())
     }
@@ -258,6 +254,15 @@ impl TransactionStore {
         })
     }
 
+    pub async fn utxo_for_addresses(&self, addresses: &Vec<Address>) -> RgResult<Vec<UtxoEntry>> {
+        let mut res = vec![];
+        for address in addresses {
+            let utxos = self.query_utxo_address(address).await?;
+            res.extend(utxos);
+        }
+        Ok(res)
+    }
+
     pub async fn query_utxo_address(
         &self,
         address: &Address
@@ -274,22 +279,81 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            //Address::from_bytes(
-            let address = row.address.safe_get_msg("Missing Address")?.clone();
-            let transaction_hash = row.transaction_hash.safe_get_msg("Missing transaction hash")?.clone();
-            let output_index = row.output_index.safe_get_msg("Missing output index")?.clone();
+            let address = row.address;
+            let transaction_hash = row.transaction_hash;
+            let output_index = row.output_index;
             let time = row.time.safe_get_msg("Missing time")?.clone();
             let output = Some(
-                Output::proto_deserialize(row.output.safe_get_msg("Missing output")?.clone())?
+                Output::proto_deserialize(row.output)?
             );
             let entry = UtxoEntry {
-                transaction_hash,
+                transaction_hash: Some(Hash::new(transaction_hash)),
                 output_index,
-                address,
+                address: Some(Address::new(address)),
                 output,
                 time,
             };
             res.push(entry)
+        }
+        Ok(res)
+    }
+
+    pub async fn utxo_all_debug(
+        &self
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT raw FROM utxo"#,
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(UtxoEntry::proto_deserialize(row.raw)?)
+        }
+        Ok(res)
+    }
+
+    pub async fn utxo_scroll(
+        &self, limit: i64, offset: i64
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT raw FROM utxo LIMIT ?1 OFFSET ?2"#,
+            limit,
+            offset
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(UtxoEntry::proto_deserialize(row.raw)?)
+        }
+        Ok(res)
+    }
+
+    pub async fn utxo_filter_time(
+        &self,
+        start: i64,
+        end: i64
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT raw FROM utxo WHERE time >= ?1 AND time < ?2"#,
+            start,
+            end
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(UtxoEntry::proto_deserialize(row.raw)?)
         }
         Ok(res)
     }
@@ -316,22 +380,30 @@ impl TransactionStore {
     }
 
 
+
+// TODO: Add productId to utxo amount
     pub async fn insert_utxo(
         &self,
         utxo_entry: &UtxoEntry
     ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-        let hash = utxo_entry.transaction_hash.clone();
+        let hash = utxo_entry.transaction_hash.safe_bytes()?;
         let output_index = utxo_entry.output_index;
-        let output = utxo_entry.output.safe_get_msg("UTxo entry insert missing output")?.proto_serialize();
+        let output = utxo_entry.output.safe_get_msg("UTxo entry insert missing output")?;
+        let amount = output.opt_amount().clone();
+        let output = output.proto_serialize();
+        let raw = utxo_entry.proto_serialize();
+        let address = utxo_entry.address.safe_bytes()?;
         let rows = sqlx::query!(
             r#"
-        INSERT OR REPLACE INTO utxo (transaction_hash, output_index, address, output, time) VALUES (?1, ?2, ?3, ?4, ?5)"#,
+        INSERT OR REPLACE INTO utxo (transaction_hash, output_index, address, output, time, amount, raw) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
             hash,
             output_index,
-            utxo_entry.address,
+            address,
             output,
-            utxo_entry.time
+            utxo_entry.time,
+            amount,
+            raw
         )
             .execute(&mut pool)
             .await;

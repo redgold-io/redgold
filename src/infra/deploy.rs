@@ -39,6 +39,8 @@ pub async fn setup_server_redgold(
      });
 
     ssh.exes("apt install -y ufw", p).await?;
+    ssh.exes("sudo ufw allow ssh", p).await?;
+    ssh.exes("echo 'y' | sudo ufw enable", p).await?;
 
     let compose = ssh.exec("docker-compose", true);
     if !(compose.stderr.contains("applications")) {
@@ -99,6 +101,8 @@ pub async fn setup_server_redgold(
 
     ssh.exec(format!("cd {}; docker-compose -f redgold-only.yml pull", path), true);
     ssh.exec(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), true);
+    ssh.exes("sudo ufw reload", p).await?;
+
     Ok(())
 }
 
@@ -233,12 +237,24 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) {
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
     }
-    for ss in s.to_vec() {
+    let mut servers = s.to_vec();
+    if let Some(i) = deploy.server_index {
+        let x = servers.get(i as usize).expect("").clone();
+        servers = vec![x]
+    }
+
+    for (ii, ss) in servers.iter().enumerate() {
+        if let Some(i) = deploy.exclude_server_index {
+            if ii == i as usize {
+                continue;
+            }
+        }
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
-
-        setup_server_redgold(ssh, net, gen, Some(hm), purge).await.expect("worx");
+        if !deploy.ops {
+            setup_server_redgold(ssh, net, gen, Some(hm), purge).await.expect("worx");
+        }
         gen = false;
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         setup_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")

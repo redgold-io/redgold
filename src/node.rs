@@ -195,6 +195,8 @@ impl Node {
             node_config.env_data_folder().data_store_path()
         ).await?;
         relay.ds.count_gauges().await?;
+
+        relay.ds.check_consistency_apply_fixes().await?;
         Ok(())
     }
 
@@ -249,9 +251,10 @@ impl Node {
             // } else {
             //     info!("Genesis local test multiple kp");
 
+            let existing = relay.ds.config_store.get_maybe_proto::<Transaction>("genesis").await?;
+
+            if existing.is_none() {
                 let tx = Node::genesis_from(node_config.clone()).0;
-
-
                 // runtimes.auxiliary.block_on(
                 relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
                 let _res_err =
@@ -260,9 +263,10 @@ impl Node {
                         .ds
                         .transaction_store
                         .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None)
-                .await?;
-            // }
-            // .expect("Genesis inserted or already exists");
+                        .await?;
+                // }
+                // .expect("Genesis inserted or already exists");
+            }
 
         } else {
 
@@ -537,7 +541,9 @@ impl LocalNodes {
                 .node
                 .relay
                 .ds
-                .query_time_utxo(0, end_time)
+                .transaction_store
+                .utxo_filter_time(0, end_time as i64)
+                .await
                 .unwrap()
                 .into_iter()
                 .map(|x| {

@@ -31,20 +31,3 @@ use redgold_schema::util::mnemonic_words::generate_key;
 //     assert_eq!(value3, value);
 //     // let res2 = UtxoEntry::from_fixed_values(&hash.to_vec(), &bytes.to_vec());
 // }
-
-pub fn get_example_utxo_entry() -> UtxoEntry {
-    let vec1 = Address::address(&generate_key().1).to_vec();
-    return UtxoEntry {
-        transaction_hash: util::sha256_str("asdf").to_vec(),
-        address: vec1.clone(),
-        output: Some(Output {
-            address: Address::address_data(vec1.clone()),
-            product_id: None,
-            counter_party_proofs: vec![],
-            data: amount_data(100),
-            contract: None,
-        }),
-        output_index: 0,
-        time: 0,
-    };
-}

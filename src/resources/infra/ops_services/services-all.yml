@@ -6,11 +6,12 @@ services:
     image: docker.elastic.co/kibana/kibana-oss:7.6.2
     container_name: kibana
     #    user: root
-    ports:
-      - 5601:5601
-    expose:
-      - 5601
+#    ports:
+#      - "127.0.0.1:5601:5601"
     restart: unless-stopped
+    network_mode: host
+    environment:
+      - ELASTICSEARCH_HOSTS=http://localhost:9200
   #    volumes:
   #      - /root/data/kibana.yml:/usr/share/kibana/config/kibana.yml
   elasticsearch:
@@ -21,8 +22,9 @@ services:
     environment:
       discovery.type: "single-node"
     #      volumes:
-    ports:
-      - 9200:9200
+#    ports:
+#      - "127.0.0.1:9200:9200"
+    network_mode: host
     volumes:
       - ~/.rg/all/data/esdata:/usr/share/elasticsearch/data
     ulimits:
@@ -41,6 +43,7 @@ services:
       - ~/.rg/all/filebeat.docker.yml:/usr/share/filebeat/filebeat.yml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    network_mode: host
   node-exporter:
     image: prom/node-exporter:latest
     user: root
@@ -55,8 +58,8 @@ services:
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    expose:
-      - 9100
+#    expose:
+#      - 9100
     network_mode: host
   prometheus:
     image: prom/prometheus:latest
@@ -65,6 +68,7 @@ services:
     restart: unless-stopped
     volumes:
       - ~/.rg/all/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ~/.rg/all/targets.json:/etc/prometheus/targets.json
       - ~/.rg/all/data/prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

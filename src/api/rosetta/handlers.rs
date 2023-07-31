@@ -3,7 +3,7 @@ use warp::Rejection;
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 
-use redgold_schema::{constants, ProtoSerde, struct_metadata_new};
+use redgold_schema::{constants, ProtoSerde, SafeOption, struct_metadata_new};
 
 use crate::{schema, util};
 use crate::core::relay::Relay;
@@ -80,8 +80,7 @@ pub async fn account_coins(
     r.validate_currencies(&request.currencies).await?;
     let address = Address::parse(request.account_identifier.address)?;
     let block: structs::Block = r.latest_block().await?;
-    let entries: Vec<UtxoEntry> =
-        DataStore::map_err_sqlx(r.relay.ds.query_utxo_address(vec![address]).await)?;
+    let entries = r.relay.ds.transaction_store.query_utxo_address(&address).await?;
     let mut map: HashMap<Vec<u8>, UtxoEntry> = HashMap::new();
     for e in entries {
         map.insert(e.to_utxo_id().coin_id(), e);
@@ -244,8 +243,9 @@ pub async fn construction_metadata(
     let mut utxos = vec![];
     for k in keys {
         let address: Address = Rosetta::translate_public_key(k)?.into();
-        let utxo =
-            DataStore::map_err_sqlx(r.relay.ds.query_utxo_address(vec![address]).await)?;
+        let utxo = r.relay.ds.transaction_store.query_utxo_address(&address).await?;
+        // let utxo =
+        //     DataStore::map_err_sqlx(r.relay.ds.query_utxo_address(vec![address]).await)?;
         utxos.extend(utxo);
     }
     Ok(ConstructionMetadataResponse {
@@ -301,15 +301,15 @@ pub async fn construction_payloads(
     let meta = request
         .metadata
         .ok_or(error_message(RGError::MissingField, "Missing metadata"))?;
-    let mut input_address_utxo_map: HashMap<Vec<u8>, Vec<UtxoEntry>> = HashMap::new();
+    let mut input_address_utxo_map: HashMap<Address, Vec<UtxoEntry>> = HashMap::new();
     for x in meta.utxos {
-        let entry = input_address_utxo_map.get_mut(&x.address.clone());
+        let entry = input_address_utxo_map.get_mut(&x.address.safe_get()?.clone());
         match entry {
             Some(e) => {
                 e.push(x.clone());
             }
             None => {
-                input_address_utxo_map.insert(x.address.clone(), vec![x.clone()]);
+                input_address_utxo_map.insert(x.address.clone().expect("a"), vec![x.clone()]);
             }
         }
     }
@@ -331,14 +331,14 @@ pub async fn construction_payloads(
                 } else {
                     let utxos =
                         input_address_utxo_map
-                            .get(&addr_bytes)
+                            .get(&addr)
                             .ok_or(error_message(
                                 RGError::MissingField,
                                 "Missing metadata for input",
                             ))?;
                     for utxo in utxos {
                         tx.inputs.push(Input {
-                            transaction_hash: Some(utxo.transaction_hash.clone().into()),
+                            transaction_hash: utxo.transaction_hash.clone(),
                             output_index: utxo.output_index,
                             proof: vec![],
                             product_id: None,
@@ -347,7 +347,7 @@ pub async fn construction_payloads(
                         payloads.push(SigningPayload {
                             address: Some(acc.address.clone()),
                             account_identifier: Some(acc.clone()),
-                            hex_bytes: hex::encode(utxo.transaction_hash.clone()),
+                            hex_bytes: utxo.transaction_hash.safe_get()?.hex(),
                             signature_type: Some(SignatureType::ECDSA),
                         });
                     }
