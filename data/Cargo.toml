@@ -28,4 +28,4 @@ metrics = "0.18.1"
 [build-dependencies]
 sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
 tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
-rusqlite = "0.25.3"
+rusqlite = "0.29.0"
