@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use bdk::bitcoin::Network;
+use bdk::bitcoin::{Network, PrivateKey};
 use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::secp256k1::rand::RngCore;
 use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey};
@@ -13,7 +13,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeOption, structs, TestConstants};
 use crate::structs::NetworkEnvironment;
-use crate::util::bdk_example::{SingleKeyBitcoinWallet, struct_public_to_address};
+use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
 use crate::util::mnemonic_words::MnemonicWords;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -106,6 +106,26 @@ pub fn generate_test() {
     let w = WordsPass::generate().expect("words");
     println!("{}", w.words.clone());
     assert_eq!(24, w.words.split(" ").collect_vec().len());
+}
+
+pub fn test_pkey_hex() -> Option<String> {
+    if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
+        let w = WordsPass::new(w, None);
+        let path = "m/84'/0'/0'/0/0";
+        Some(w.private_at(path.to_string()).expect("private key"))
+    } else {
+        None
+    }
+}
+
+pub fn test_pubk() -> Option<structs::PublicKey> {
+    if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
+        let w = WordsPass::new(w, None);
+        let path = "m/84'/0'/0'/0/0";
+        Some(w.public_at(path.to_string()).expect("private key"))
+    } else {
+        None
+    }
 }
 
 #[test]
