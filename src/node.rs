@@ -65,10 +65,18 @@ pub struct Node {
 
 impl Node {
 
+    #[tracing::instrument()]
+    pub async fn debug_span_test(test_str: &str, empty_val: Option<String>) {
+        // Span::current().
+        Span::current().record("test_str", "asdf");
+        tracing::info!("start services tracing node_id test2");
+    }
+
     #[tracing::instrument(skip(relay))]
     pub async fn start_services(relay: Relay) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
         Span::current().record("node_id", &relay.node_config.public_key().short_id());
         tracing::info!("start services tracing node_id test");
+        // Self::debug_span_test("input_func", None).await;
         let mut join_handles = vec![];
         let node_config = relay.node_config.clone();
 

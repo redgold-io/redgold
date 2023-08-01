@@ -53,6 +53,7 @@ pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitco
 
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::signer::SignerContext::{Segwitv0 as Segwitv0Context};
+use serde::{Deserialize, Serialize};
 use crate::util::mnemonic_words::MnemonicWords;
 // use log::error;
 
@@ -222,7 +223,7 @@ pub struct SingleKeyBitcoinWallet {
     custom_signer: Arc<MultipartySigner>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExternalTimedTransaction {
     pub tx_id: String,
     pub timestamp: u64,
