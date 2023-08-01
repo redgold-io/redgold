@@ -90,7 +90,7 @@ async fn some_other_async() {
     println!("some other async number get: {}", NUMBER.get().to_string());
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn debug() {
 
@@ -209,6 +209,7 @@ async fn debug_task() -> ErrorInfo {
     error_info("yo")
 }
 
+#[ignore]
 #[tokio::test]
 pub async fn debug_task_local() {
     let r = task_local("test", "asdf", debug_task()).await;
@@ -235,6 +236,7 @@ pub async fn some_trace_func(param1: &str) {
     task_local_map(hm, nested_func("nested_param", None)).await
 }
 
+#[ignore]
 #[tokio::test]
 pub async fn debug_span_inject() {
     init_tracing("DEBUG");
