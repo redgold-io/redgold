@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use log::{error, info};
 
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, TransactionAmount};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -179,6 +179,7 @@ impl OrderFulfillment {
 }
 
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct WithdrawalBitcoin {
     outputs: Vec<(String, u64)>,
     updated_bidask: BidAsk,
@@ -270,6 +271,7 @@ impl Watcher {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CurveUpdateResult {
     updated_bid_ask: BidAsk,
     updated_btc_timestamp: u64,
@@ -316,7 +318,7 @@ impl Watcher {
     }
 
     pub async fn build_rdg_ask_swap_tx(&self, btc_deposits: Vec<ExternalTimedTransaction>, bid_ask: BidAsk, key_address: &structs::Address)
-        -> RgResult<(Transaction, BidAsk)> {
+        -> RgResult<(Option<Transaction>, BidAsk)> {
 
         let mut bid_ask_latest = bid_ask.clone();
 
@@ -327,6 +329,11 @@ impl Watcher {
         // for our pubkey multisig address
         let mut tb = TransactionBuilder::new();
         for u in &utxos {
+            // Check contract type here
+            // let o = u.output.safe_get_msg("Missing output on UTXO")?;
+            // if let Some(o) = &o.contract.as_ref().and_then(|c| c.standard_contract_type) {
+            //     if o == StandardContractType::Swap as i32
+            // }
             tb.with_maybe_currency_utxo(u)?;
         }
 
@@ -345,8 +352,11 @@ impl Watcher {
             bid_ask_latest = bid_ask_latest.regenerate(price)
 
         }
-        let mut tx = tb.build()?;
-        Ok((tx, bid_ask_latest))
+        let mut tx_ret = None;
+        if !btc_deposits.is_empty() {
+            tx_ret = Some(tb.build()?);
+        }
+        Ok((tx_ret, bid_ask_latest))
     }
 
     pub async fn send_ask_fulfillment_transaction(&self, tx: &mut Transaction, identifier: MultipartyIdentifier) -> RgResult<SubmitTransactionResponse> {
@@ -475,22 +485,41 @@ impl Watcher {
         let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
         let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
 
+
         let bid_ask = BidAsk::generate_default(rdg_starting_balance, btc_starting_balance, bid_ask_original.center_price);
+
+        info!("Starting watcher process request with balances: RDG:{}, BTC:{} bid_ask: {}", rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
+
 
         let mut bid_ask_latest = bid_ask.clone();
 
         // Prepare Fulfill Asks RDG Transaction from BTC deposits to this multiparty address,
         // but don't yet broadcast the transaction.
         let (updated_last_ts, deposit_txs) = self.get_btc_deposits(last_timestamp, w).await?;
+
+        info!("Found {} new deposits last_updated {} updated_last_ts {} deposit_txs {}",
+            deposit_txs.len(), last_timestamp, updated_last_ts, deposit_txs.json_or());
+
         let (tx, bid_ask_updated_ask_side) = self.build_rdg_ask_swap_tx(deposit_txs, bid_ask_latest, &key_address.clone()).await?;
+        info!("Built RDG ask swap tx: {} bid_ask_updated {}", tx.json_or(), bid_ask_updated_ask_side.json_or());
+        if let Some(tx) = tx {
+            self.send_ask_fulfillment_transaction(&mut tx.clone(), identifier.clone()).await?;
+        }
+
         bid_ask_latest = bid_ask_updated_ask_side;
 
         let withdrawals = self.get_rdg_withdrawals_bids(bid_ask_latest, &key_address).await?;
         bid_ask_latest = withdrawals.updated_bidask.clone();
 
-        let txid = self.fulfill_btc_bids(w, identifier, withdrawals.outputs.clone()).await?;
-        // On failure here really need to handle this somehow?
-        self.update_withdrawal_datastore(withdrawals, txid, &key_address).await?;
+        info!("Found {} new withdrawals {} bid_ask {}",
+            withdrawals.outputs.len(), withdrawals.json_or(), bid_ask_latest.json_or());
+
+        if withdrawals.outputs.len() > 0 {
+            let txid = self.fulfill_btc_bids(w, identifier, withdrawals.outputs.clone()).await?;
+            info!("Fullfilled btc Txid: {}", txid);
+            // On failure here really need to handle this somehow?
+            self.update_withdrawal_datastore(withdrawals, txid, &key_address).await?;
+        }
 
         let mut updated_allocation = alloc.clone();
         updated_allocation.balance_btc = bid_ask_latest.sum_bid_volume();
@@ -501,6 +530,8 @@ impl Watcher {
             updated_allocation,
         };
 
+        info!("Updated Curve Result {}", update.json_or());
+
         Ok(update)
     }
 }
@@ -508,7 +539,11 @@ impl Watcher {
 
 #[async_trait]
 impl IntervalFold for Watcher {
+
+    #[tracing::instrument(skip(self))]
     async fn interval_fold(&mut self) -> RgResult<()> {
+
+        info!("Deposit watcher interval fold complete");
 
         if self.relay.node_config.is_local_debug() {
             return Ok(())
@@ -541,9 +576,12 @@ impl IntervalFold for Watcher {
                 }
                 let mut w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
+                    let btc_starting_balance = w.lock()
+                        .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+                        .get_wallet_balance()?.confirmed;
 
                     let balance = self.relay.ds.transaction_store.get_balance(&d.key.address()?).await?;
-                    if balance.map(|x| x > 0).unwrap_or(false) {
+                    if balance.map(|x| x > 0).unwrap_or(false) { // && btc_starting_balance > 3500 {
                         let update_result = self.process_requests(
                             d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
                         ).await;
@@ -557,7 +595,7 @@ impl IntervalFold for Watcher {
                             error!("Error processing requests: {}", e.json_or());
                         }
                     } else {
-                        info!("No balance found for key: {}", d.key.address()?.render_string()?);
+                        info!("No balance found for key: {} or insufficient bitcoin balance of {}", d.key.address()?.render_string()?, btc_starting_balance);
                     }
                 }
             }
@@ -599,6 +637,7 @@ impl IntervalFold for Watcher {
             }
             // self.relay.broadcast_async(nodes, req)
         }
+
         Ok(())
     }
 }

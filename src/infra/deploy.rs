@@ -40,6 +40,7 @@ pub async fn setup_server_redgold(
 
     ssh.exes("apt install -y ufw", p).await?;
     ssh.exes("sudo ufw allow ssh", p).await?;
+    ssh.exes("sudo ufw allow in on tailscale0", p).await?;
     ssh.exes("echo 'y' | sudo ufw enable", p).await?;
 
     let compose = ssh.exec("docker-compose", true);
