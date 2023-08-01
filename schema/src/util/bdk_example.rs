@@ -53,6 +53,7 @@ pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitco
 
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::signer::SignerContext::{Segwitv0 as Segwitv0Context};
+use crate::util::mnemonic_words::MnemonicWords;
 // use log::error;
 
 fn p2wpkh_script_code(script: &Script) -> Script {
@@ -491,6 +492,11 @@ finalized: true
 test integrations::bitcoin::bdk_example::balance_test ... ok
 
  */
+
+#[tokio::test]
+async fn tx_debug() {
+    // MnemonicWords::from_mnemonic_words()
+}
 
 // #[ignore]
 #[tokio::test]
