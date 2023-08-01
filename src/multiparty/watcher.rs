@@ -10,7 +10,7 @@ use crate::multiparty::initiate_mp;
 
 use serde::{Serialize, Deserialize};
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::bdk_example::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
+use redgold_schema::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
 use crate::multiparty::initiate_mp::{default_room_id, initiate_mp_keysign};
 use crate::node::Node;
 use crate::util::address_external::ToBitcoinAddress;
