@@ -82,7 +82,7 @@ reqwest = { version = "0.11", features = ["json"] }
 prost-helper = "0.5.0"
 serde = "1.0.130"
 serde_json = "1.0.59"
-base64 = "0.13.0"
+base64 = "0.21.2"
 serde_with = { version = "1.10.0", features = ["hex"] }
 log4rs = "1.0.0"
 metrics = "0.18.1"
