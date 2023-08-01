@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Result};
 use backtrace::Backtrace;
+use bitcoin::secp256k1::Secp256k1;
 use bitcoin::util::psbt::serialize::Deserialize;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
@@ -642,6 +643,16 @@ impl KeyPair {
 
     pub fn public_key_vec(&self) -> Vec<u8> {
         self.public_key.serialize().to_vec()
+    }
+
+    pub fn from_private_hex(hex: String) -> RgResult<Self> {
+        let secret_key = bitcoin::secp256k1::SecretKey::from_str(&*hex)
+            .error_info("Unable to parse private key hex")?;
+        let public_key = bitcoin::secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &secret_key);
+        return Ok(Self {
+            secret_key,
+            public_key,
+        });
     }
 }
 

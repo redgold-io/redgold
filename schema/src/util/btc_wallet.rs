@@ -53,6 +53,7 @@ pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitco
 
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::signer::SignerContext::{Segwitv0 as Segwitv0Context};
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
 use serde::{Deserialize, Serialize};
 use crate::util::mnemonic_words::MnemonicWords;
 // use log::error;
@@ -480,6 +481,30 @@ impl SingleKeyBitcoinWallet {
         Ok(())
     }
 
+    pub fn send_local(&mut self, dest: String, amount: u64, pkey_hex: String) -> RgResult<()> {
+        self.create_transaction_output_batch(vec![(dest, amount)])?;
+        let kp = KeyPair::from_private_hex(pkey_hex)?;
+        // let d = w.transaction_details.clone().expect("d");
+        // println!("txid: {:?}", d.txid);
+        let signables = self.signable_hashes()?;
+        // println!("num signable hashes: {:?}", signables.len());
+        for (i, (hash, sighashtype)) in signables.iter().enumerate() {
+            // println!("signable {}: {}", i, hex::encode(hash));
+            let prf = Proof::from_keypair(hash, kp);
+            self.affix_input_signature(i, &prf, sighashtype);
+        }
+        let finalized = self.sign()?;
+        if !finalized {
+            return Err(error_info("Not finalized"));
+        }
+        // println!("finalized: {:?}", finalized);
+
+        self.broadcast_tx()?;
+        // let txid = w.broadcast_tx().expect("txid");
+        // println!("txid: {:?}", txid);
+        Ok(())
+    }
+
 }
 
 /*
@@ -494,9 +519,21 @@ test integrations::bitcoin::bdk_example::balance_test ... ok
 
  */
 
+#[ignore]
 #[tokio::test]
 async fn tx_debug() {
     // MnemonicWords::from_mnemonic_words()
+    let pkey = test_pkey_hex().expect("");
+    let public = test_pubk().expect("");
+    let mut w = SingleKeyBitcoinWallet
+    ::new_wallet(public, NetworkEnvironment::Test, true).expect("worx");
+    let balance = w.get_wallet_balance().expect("");
+    println!("balance: {:?}", balance);
+    println!("address: {:?}", w.address().expect(""));
+    w.send_local("tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4".to_string(), 3500, pkey).expect("");
+    let txid = w.transaction_details.expect("d").txid.to_string();
+    println!("txid: {}", txid);
+    // 2485227b319650fcd689009ca8b5fb2a02e556098f7c568e832ae72ac07ab8e8
 }
 
 // #[ignore]

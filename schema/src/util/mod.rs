@@ -112,7 +112,7 @@ pub mod mnemonic_builder;
 pub mod mnemonic_words;
 pub mod merkle;
 pub mod bitcoin_message_signer;
-pub mod bdk_example;
+pub mod btc_wallet;
 pub mod keys;
 pub mod mnemonic_support;
 

@@ -75,6 +75,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     };
 
     let routes = explorer_hash
+        .or(explorer_swap)
         .or(explorer_recent)
         .or(home);
 
