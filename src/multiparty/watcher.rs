@@ -534,6 +534,11 @@ impl Watcher {
 
         Ok(update)
     }
+
+    pub async fn get_starting_center_price(&self) -> f64 {
+        // RDG / BTC
+        1f64
+    }
 }
 
 
@@ -564,7 +569,13 @@ impl IntervalFold for Watcher {
         // }
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
         //.ok.andthen?
-        if let Some(cfg) = cfg {
+        if let Some(mut cfg) = cfg {
+            if cfg.bid_ask.center_price == 0f64 {
+                info!("Regenerating starting price due to zero stored in config.");
+                cfg.bid_ask = cfg.bid_ask.regenerate(self.get_starting_center_price().await);
+                ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
+            }
+
             // Check to see if other nodes are dead / not responding, if so, move the thing.
             // Also check bitcoin transaction balances? Find the address they came from.
             // we'll need a guide saying to send from a single account
@@ -627,7 +638,7 @@ impl IntervalFold for Watcher {
                             balance_btc: 0,
                             balance_rdg: 0,
                         }],
-                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: 0.0 },
+                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price().await },
                         last_btc_timestamp: 0,
                     };
                     self.genesis_funding(&pk.address()?)
