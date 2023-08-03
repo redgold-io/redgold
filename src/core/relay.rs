@@ -162,10 +162,14 @@ impl Relay {
     }
 
     pub async fn dynamic_node_metadata(&self) -> RgResult<DynamicNodeMetadata> {
-        let tx = self.ds.config_store.get_dynamic_md().await?.safe_get_msg(
-            "Can't find existing peer tx"
-        )?.clone();
-        Ok(tx)
+        let tx = self.ds.config_store.get_dynamic_md().await?;
+        if let Some(tx) = tx {
+            Ok(tx)
+        } else {
+            let tx = self.node_config.dynamic_node_metadata_fixed();
+            self.ds.config_store.set_dynamic_md(&tx).await?;
+            Ok(tx)
+        }
     }
 
     pub async fn peer_node_info(&self) -> RgResult<PeerNodeInfo> {

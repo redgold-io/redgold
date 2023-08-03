@@ -194,6 +194,15 @@ impl NodeConfig {
         tx
     }
 
+    pub fn dynamic_node_metadata_fixed(&self) -> DynamicNodeMetadata {
+        DynamicNodeMetadata {
+            udp_port: None,
+            proof: None,
+            peer_id: None,
+            height: 0,
+        }
+    }
+
     pub fn node_tx_fixed(&self) -> Transaction {
         let pair = self.internal_mnemonic().active_keypair();
         let tx = TransactionBuilder::new().with_output_node_metadata(
