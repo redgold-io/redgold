@@ -325,7 +325,7 @@ impl ArgTranslate {
             self.node_config.peer_id = PeerId::from_hex(p)?;
         }
 
-        if self.node_config.peer_id.peer_id.safe_bytes()?.is_empty() {
+        if self.node_config.peer_id.peer_id.is_none() {
             tracing::info!("No peer_id found, attempting to generate a single key peer_id from existing mnemonic");
             // let string = self.node_config.mnemonic_words.clone();
             // TODO: we need to persist the merkle tree here as json or something
