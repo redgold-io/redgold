@@ -100,6 +100,7 @@ message PartitionInfo {
 
 // This also needs a proof maybe?
 message NodeMetadata {
+  // Primary address used to reference the node, can be anything that is parsable.
   string external_address = 1;
   bytes multi_hash = 2;
   // May not be to store public key if we merkle the multi_hashes too.
@@ -114,6 +115,12 @@ message NodeMetadata {
   PeerId peer_id = 11;
   optional bool nat_restricted = 12;
   NetworkEnvironment network_environment = 13;
+  // Exact IPv4 address
+  optional string external_ipv4 = 14;
+  // Exact IPv6 address
+  optional string external_ipv6 = 15;
+  // CNAME like reference i.e. node.example.com
+  optional string external_host = 16;
 }
 /**
 Used to store the version of the executable and the commit hash of the source code used to build it.
@@ -133,7 +140,7 @@ message VersionInfo {
 }
 
 message PeerId {
-  BytesData peer_id = 1;
+  PublicKey peer_id = 1;
   repeated Proof known_proof = 3;
 }
 
@@ -185,6 +192,7 @@ message DynamicNodeMetadata {
   optional int64 udp_port = 1;
   Proof proof = 2;
   PeerId peer_id = 3;
+  int64 height = 4;
 }
 
 // Where to store parquet schema, avro schema, etc. etc.

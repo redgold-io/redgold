@@ -8,6 +8,7 @@ use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::key
 use round_based::async_runtime::AsyncProtocol;
 use redgold_schema::error_info;
 use redgold_schema::structs::ErrorInfo;
+use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 
 use super::gg20_sm_client::join_computation;
@@ -35,12 +36,12 @@ async fn keygen_original(
     index: u16,
     threshold: u16,
     number_of_parties: u16,
-    node_config: &NodeConfig
+    relay: &Relay
 ) -> Result<String> {
 
-    info!("Starting join computation for room {} on node {} index: {}", room.clone(), node_config.short_id().expect(""), index);
+    info!("Starting join computation for room {} on node {} index: {}", room.clone(), relay.node_config.short_id().expect(""), index);
     let (_i, incoming, outgoing) =
-        join_computation(address, room, node_config)
+        join_computation(address, room, relay)
         .await
         .context("join computation")?;
 
@@ -72,10 +73,10 @@ pub async fn keygen(
     index: u16,
     threshold: u16,
     number_of_parties: u16,
-    node_config: NodeConfig
+    relay: Relay
 ) -> Result<String, ErrorInfo>  {
     let url = external_address_to_surf_url(external_address, port)?;
-    keygen_original(url, &*room, index, threshold, number_of_parties, &node_config)
+    keygen_original(url, &*room, index, threshold, number_of_parties, &relay)
         .await
         .map_err(|e| error_info(e.to_string()))
 

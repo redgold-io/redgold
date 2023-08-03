@@ -34,9 +34,9 @@ use crate::util::keys::ToPublicKeyFromLib;
 use crate::util::lang_util::SameResult;
 use crate::util::logging::Loggable;
 
-pub async fn rest_peer(nc: NodeConfig, ip: String, port: i64, request: &mut Request) -> Result<Response, ErrorInfo> {
-    let client = crate::api::RgHttpClient::new(ip, port as u16);
-    client.proto_post_request(request, Some(nc)).await
+pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: &mut Request) -> Result<Response, ErrorInfo> {
+    let client = crate::api::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
+    client.proto_post_request(request, Some(relay)).await
 }
 
 pub struct PeerRxEventHandler {
@@ -75,7 +75,7 @@ impl PeerRxEventHandler {
         // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
         let mut response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine();
-        response.with_metadata(relay.node_config.node_metadata());
+        response.with_metadata(relay.node_config.node_metadata_fixed());
         response.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
         if let Some(c) = pm.response {
             let ser = response.clone().json_or();

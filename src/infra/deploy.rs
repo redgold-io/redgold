@@ -218,6 +218,7 @@ pub async fn setup_ops_services(
 }
 
 pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) {
+
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);

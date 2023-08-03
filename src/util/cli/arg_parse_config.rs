@@ -21,7 +21,8 @@ use bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
-use redgold_schema::{ErrorInfoContext, from_hex, SafeOption};
+use redgold_schema::{ErrorInfoContext, from_hex, SafeBytesAccess, SafeOption};
+use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::seeds::get_seeds;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
@@ -96,6 +97,7 @@ impl ArgTranslate {
     }
 
     pub fn load_internal_servers(&mut self) -> Result<(), ErrorInfo> {
+        // TODO: From better data folder options
         let data_folder = Self::secure_data_or_cwd();
         let rg = data_folder.join(".rg");
         let all = rg.join(NetworkEnvironment::All.to_std_string());
@@ -128,27 +130,26 @@ impl ArgTranslate {
         self.ports();
         metrics_registry::register_metrics(self.node_config.port_offset);
         self.data_folder()?;
+        self.secure_data_folder();
         self.load_mnemonic()?;
         self.load_peer_id()?;
+        self.set_public_key();
         self.load_internal_servers()?;
         self.calculate_executable_checksum_hash();
-        // No logger for CLI commands to allow direct output read.
+        self.guard_faucet();
+        self.e2e_enable();
+        self.configure_seeds();
+        self.set_discovery_interval();
+        self.apply_node_opts();
+        self.genesis();
+
         self.abort = immediate_commands(&self.opts, &self.node_config).await;
         if self.abort {
             return Ok(());
         }
 
-        self.guard_faucet();
+        // Unnecessary for CLI commands, hence after immediate commands
         self.lookup_ip().await;
-
-        self.e2e_enable();
-        self.set_public_key();
-        self.configure_seeds();
-        self.set_discovery_interval();
-
-
-        self.apply_node_opts();
-        self.genesis();
 
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
         tracing::info!("Parsed args successfully with args: {:?}", self.args);
@@ -312,24 +313,24 @@ impl ArgTranslate {
         if let Some(path) = &self.opts.peer_id_path {
             let p = fs::read_to_string(path)
                 .error_info("Failed to read peer_id_path file")?;
-            self.node_config.self_peer_id = from_hex(p)?;
+            self.node_config.peer_id = PeerId::from_hex(p)?;
         }
 
         // TODO: This will have to change to read the whole merkle tree really, lets just remove this maybe?
         if let Some(p) = &self.opts.peer_id {
-            self.node_config.self_peer_id = from_hex(p.clone())?;
+            self.node_config.peer_id = PeerId::from_hex(p)?;
         }
 
         if let Some(p) = fs::read_to_string(self.node_config.env_data_folder().peer_id_path()).ok() {
-            self.node_config.self_peer_id = from_hex(p.clone())?;
+            self.node_config.peer_id = PeerId::from_hex(p)?;
         }
 
-        if self.node_config.self_peer_id.is_empty() {
+        if self.node_config.peer_id.peer_id.safe_bytes()?.is_empty() {
             tracing::info!("No peer_id found, attempting to generate a single key peer_id from existing mnemonic");
-            let string = self.node_config.mnemonic_words.clone();
+            // let string = self.node_config.mnemonic_words.clone();
             // TODO: we need to persist the merkle tree here as json or something
-            let tree = crate::node_config::peer_id_from_single_mnemonic(string)?;
-            self.node_config.self_peer_id = tree.root.vec();
+            // let tree = crate::node_config::peer_id_from_single_mnemonic(string)?;
+            self.node_config.peer_id = self.node_config.default_peer_id()?;
         }
 
         Ok(())
@@ -507,6 +508,11 @@ impl ArgTranslate {
         let pk = self.node_config.public_key();
         self.node_config.public_key = pk.clone();
         info!("Starting node with public key: {}", pk.json_or());
+    }
+    fn secure_data_folder(&mut self) {
+        if let Some(pb) = Self::secure_data_path_buf() {
+            self.node_config.secure_data_folder = Some(DataFolder::from_path(pb));
+        }
     }
 }
 

@@ -104,7 +104,9 @@ async fn debug_targets() {
     let nc = NodeConfig::from_test_id(&10u16);
     let nc2 = NodeConfig::from_test_id(&11u16);
     let relay = Relay::new(nc.clone()).await;
+    let relay2 = Relay::new(nc2.clone()).await;
     Node::prelim_setup(relay.clone()).await.unwrap();
-    relay.ds.peer_store.add_peer_new(&nc2.self_peer_info(), 1f64, &nc.public_key()).await.unwrap();
+    // Need to update peer node info to genesis peer node info maybe?
+    relay.ds.peer_store.add_peer_new(&relay2.peer_node_info().await.expect(""), 1f64, &nc.public_key()).await.unwrap();
     update_tick(&relay).await.unwrap();
 }

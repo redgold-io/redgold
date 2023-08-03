@@ -15,6 +15,7 @@ use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_schema::{error_info, ProtoHashable, SafeOption};
 use redgold_schema::structs::{GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
+use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use crate::util::lang_util::SameResult;
 
@@ -36,14 +37,16 @@ pub struct RgHttpClient {
     pub url: String,
     pub port: u16,
     pub timeout: Duration,
+    pub relay: Option<Relay>
 }
 
 impl RgHttpClient {
-    pub fn new(url: String, port: u16) -> Self {
+    pub fn new(url: String, port: u16, relay: Option<Relay>) -> Self {
         Self {
             url,
             port,
             timeout: Duration::from_secs(60),
+            relay,
         }
     }
     #[allow(dead_code)]
@@ -105,10 +108,10 @@ impl RgHttpClient {
         Ok(deser)
     }
 
-    pub async fn proto_post_request(&self, r: &mut Request, nc: Option<NodeConfig>) -> Result<Response, ErrorInfo> {
-        if let Some(nc) = nc {
-            r.with_metadata(nc.node_metadata());
-            r.with_auth(&nc.internal_mnemonic().active_keypair());
+    pub async fn proto_post_request(&self, r: &mut Request, nc: Option<&Relay>) -> Result<Response, ErrorInfo> {
+        if let Some(relay) = nc {
+            r.with_metadata(relay.node_metadata().await?);
+            r.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
         }
         let result = self.proto_post(r, "request_proto".to_string()).await?;
         result.as_error_info()?;
@@ -120,7 +123,7 @@ impl RgHttpClient {
         Req: Serialize + ?Sized,
         Resp: DeserializeOwned
     {
-        let client = RgHttpClient::new("localhost".into(), port);
+        let client = RgHttpClient::new("localhost".into(), port, None);
         tokio::time::sleep(Duration::from_secs(2)).await;
         client.json_post::<Req, Resp>(&req, endpoint).await
     }

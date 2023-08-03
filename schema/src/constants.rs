@@ -1,5 +1,8 @@
 
 
+// 44 for non-segwit to match Ethereum equivalent since witness data is included in transactions
+// 84 would be if we were excluding the witness info like Segwit
+pub const REDGOLD_PURPOSE: i64 = 44;
 pub const REDGOLD_KEY_DERIVATION_PATH: i64 = 16180;
 pub const DECIMAL_MULTIPLIER: i64 = 1e8 as i64;
 pub const DECIMALS: i64 = 8;
@@ -30,3 +33,7 @@ pub const REDGOLD: &str = "redgold";
 pub const SYMBOL: &str = "RDG";
 
 pub const STANDARD_VERSION: i64 = 0;
+
+pub fn default_node_internal_derivation_path(account: i64) -> String {
+    format!("m/{REDGOLD_PURPOSE}'/{REDGOLD_KEY_DERIVATION_PATH}'/{account}'/0/0")
+}

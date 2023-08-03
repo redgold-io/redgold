@@ -52,17 +52,17 @@ use curv::elliptic::curves::Point;
 // #[tokio::main]
 async fn signing_original(
     address: surf::Url, room: &str, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>,
-    node_config: NodeConfig
+    relay: Relay
 ) -> Result<SignatureRecid> {
 
     let local_share = serde_json::from_str(&local_share).context("parse local share")?;
     let number_of_parties = parties.len();
 
     // Ahh here we go.
-    info!("Starting signing join computation offline for room {} on node {}", room.clone(), node_config.short_id().expect(""));
+    info!("Starting signing join computation offline for room {} on node {}", room.clone(), relay.node_config.short_id().expect(""));
 
     let (i, incoming, outgoing) =
-        join_computation(address.clone(), &format!("{}-offline", room), &node_config)
+        join_computation(address.clone(), &format!("{}-offline", room), &relay)
             .await
             .context("join offline computation")?;
 
@@ -76,10 +76,10 @@ async fn signing_original(
         .await
         .map_err(|e| anyhow!("protocol execution terminated with error: {}", e))?;
 
-    info!("Starting signing join computation online for room {} on node {}", room.clone(), node_config.short_id().expect(""));
+    info!("Starting signing join computation online for room {} on node {}", room.clone(), relay.node_config.short_id().expect(""));
 
     let (i, incoming, outgoing) = join_computation(
-        address, &format!("{}-online", room), &node_config)
+        address, &format!("{}-online", room), &relay)
         .await
         .context("join online computation")?;
 
@@ -114,13 +114,14 @@ async fn signing_original(
 }
 use curv::elliptic::curves::ECScalar;
 use log::info;
+use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 
 pub async fn signing(
-    external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, node_config: NodeConfig
+    external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, relay: Relay
 ) -> Result<Proof, ErrorInfo> {
     let url = external_address_to_surf_url(external_address, port)?;
-    let sig = signing_original(url, &*room, local_share, parties, data_to_sign.clone(), node_config)
+    let sig = signing_original(url, &*room, local_share, parties, data_to_sign.clone(), relay)
         .await
         .map_err(|e| error_info(e.to_string()))?;
     let mut vec: Vec<u8> = vec![];

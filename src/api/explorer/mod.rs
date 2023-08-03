@@ -330,7 +330,7 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
         nodes.push(handle_peer_node(pni, &r).await?);
     }
     Ok(DetailedPeer {
-        peer_id: hex::encode(pd.peer_id.safe_get()?.peer_id.safe_bytes()?),
+        peer_id: hex::encode(pd.peer_id.safe_get()?.peer_id.safe_get()?.bytes.safe_bytes()?),
         // TODO: From transaction, should include address and latest input pk?
         // or do the merkle proofs contain this?
         public_key: "".to_string(), //pd.proof.safe_get()?.public_key.safe_get()?.hex_or(),
@@ -360,7 +360,8 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, r: &Relay) -> RgResult<DetailedP
         alias: nmd.alias.unwrap_or("".to_string()),
         name: nmd.name.unwrap_or("".to_string()),
         peer_id: nmd.peer_id.as_ref()
-            .and_then(|p| p.peer_id.safe_bytes().ok())
+            .and_then(|p| p.peer_id.safe_get().ok())
+            .and_then(|p| p.bytes.safe_bytes().ok())
             .map(|p| hex::encode(p)).unwrap_or("".to_string()),
         nat_restricted: nmd.nat_restricted.unwrap_or(false),
         network_environment:
@@ -368,11 +369,11 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, r: &Relay) -> RgResult<DetailedP
     })
 }
 
-pub async fn handle_explorer_hash(hash_input: String, p1: Relay, pagination: Pagination) -> RgResult<ExplorerHashSearchResponse> {
+pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagination) -> RgResult<ExplorerHashSearchResponse> {
     // TODO: Math min
     let limit = Some(std::cmp::min(pagination.limit.unwrap_or(10) as i64, 100));
     let offset = Some(pagination.offset.unwrap_or(0) as i64);
-    let hq = hash_query(p1.clone(), hash_input, limit.clone(), offset.clone()).await?;
+    let hq = hash_query(r.clone(), hash_input, limit.clone(), offset.clone()).await?;
     let mut h = ExplorerHashSearchResponse{
         transaction: None,
         address: None,
@@ -381,16 +382,16 @@ pub async fn handle_explorer_hash(hash_input: String, p1: Relay, pagination: Pag
         peer_node: None,
     };
     if let Some(ai) = &hq.address_info {
-        h.address = Some(handle_address_info(ai, &p1, limit, offset).await?);
+        h.address = Some(handle_address_info(ai, &r, limit, offset).await?);
     }
     if let Some(o) = &hq.observation {
-        h.observation = Some(handle_observation(o, &p1).await?);
+        h.observation = Some(handle_observation(o, &r).await?);
     }
     if let Some(p) = &hq.peer_id_info {
-        h.peer = Some(handle_peer(p, &p1).await?);
+        h.peer = Some(handle_peer(p, &r).await?);
     }
     if let Some(p) = &hq.peer_node_info {
-        h.peer_node = Some(handle_peer_node(p, &p1).await?);
+        h.peer_node = Some(handle_peer_node(p, &r).await?);
     }
 
     if let Some(t) = hq.transaction_info {
@@ -413,16 +414,16 @@ pub async fn handle_explorer_hash(hash_input: String, p1: Relay, pagination: Pag
                     let _ = if let Some((peer_id, existing)) = public_to_peer.get_mut(pk) {
                         // existing
                     } else {
-                        let query_result = p1.ds.peer_store
+                        let query_result = r.ds.peer_store
                             .node_peer_id_trust(pk).await?
                             .unwrap_or({
                                 let empty = PeerTrustQueryResult {
                                     peer_id: PeerId::from_bytes(vec![]),
                                     trust: 0.0,
                                 };
-                                let result = if &p1.node_config.clone().public_key() == pk {
+                                let result = if &r.node_config.clone().public_key() == pk {
                                     PeerTrustQueryResult {
-                                        peer_id: PeerId::from_bytes(p1.node_config.clone().self_peer_id.clone()),
+                                        peer_id: r.node_config.peer_id(),
                                         trust: 1.0,
                                     }
                                 } else {
@@ -480,7 +481,7 @@ pub async fn handle_explorer_hash(hash_input: String, p1: Relay, pagination: Pag
             } else {
                 let peer_signer = PeerSignerDetailed {
                     // TODO: query peer ID from peer store
-                    peer_id: hex::encode(pt.peer_id.peer_id.safe_bytes()?),
+                    peer_id: hex::encode(pt.peer_id.peer_id.safe_get()?.bytes.safe_bytes()?),
                     trust: pt.trust.clone() * 10.0,
                     nodes: vec![ns.clone()],
                 };
@@ -577,7 +578,7 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
     let pks = peers[0..9.min(peers.len())].to_vec();
     let mut active_peers_abridged = vec![];
     active_peers_abridged.push(
-        handle_peer(&r.node_config.self_peer_id_info(), &r).await?
+        handle_peer(&r.peer_id_info().await?, &r).await?
     );
     for pk in pks {
         if let Some(pid) = r.ds.peer_store.query_public_key_node(pk).await?

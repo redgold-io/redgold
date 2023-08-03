@@ -5,21 +5,19 @@ use crate::{genesis, util};
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
 use bitcoin::secp256k1::PublicKey;
 use eframe::egui::TextBuffer;
-use redgold_schema::constants::{
-    DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS,
-    REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS,
-};
+use redgold_schema::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, default_node_internal_derivation_path, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use itertools::Itertools;
 use log::{debug, info};
 use redgold_schema::servers::Server;
-use redgold_schema::{ErrorInfoContext, ShortString, structs};
+use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerIdInfo, PeerNodeInfo, Request, Response, Seed, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::{dhash_vec, merkle};
 use redgold_schema::util::merkle::MerkleTree;
+use redgold_schema::util::mnemonic_support::WordsPass;
 use crate::api::public_api::PublicClient;
 use crate::core::seeds::SeedNode;
 use crate::util::cli::args::RgArgs;
@@ -47,7 +45,7 @@ pub struct NodeConfig {
     // User supplied params
     // TODO: Should this be a class Peer_ID with a multihash of the top level?
     // TODO: Review all schemas to see if we can switch to multiformats types.
-    pub self_peer_id: Vec<u8>,
+    // pub self_peer_id: Vec<u8>,
     // Remove above and rename to peer_id -- this field is not in use yet.
     pub peer_id: PeerId,
     // This field is not used yet; it is a placeholder for future use.
@@ -96,6 +94,17 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
+
+    pub fn default_peer_id(&self) -> RgResult<PeerId> {
+        let pk = self.words().public_at(default_node_internal_derivation_path(1))?;
+        let pid = PeerId::from_pk(pk);
+        Ok(pid)
+    }
+
+    pub fn words(&self) -> WordsPass {
+        WordsPass::new(self.mnemonic_words.clone(), None)
+    }
+
     // This should ONLY be used by the genesis node when starting for the very first time
     // Probably another way to deal with this, mostly used for debug runs and so on
     // Where seeds are being specified by CLI -- shouldn't be used by main network environments
@@ -106,13 +115,13 @@ impl NodeConfig {
             environments: vec![self.network.clone() as i32],
             port_offset: Some(self.port_offset.clone() as u32),
             trust: vec![TrustData::from_label(1.0)],
-            peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
+            peer_id: Some(self.peer_id.clone()),
             public_key: Some(self.public_key()),
         }
     }
 
     pub fn peer_id(&self) -> PeerId {
-        PeerId::from_bytes(self.self_peer_id.clone())
+        self.peer_id.clone()
     }
 
     pub fn env_data_folder(&self) -> EnvDataFolder {
@@ -143,7 +152,7 @@ impl NodeConfig {
         }
     }
 
-    pub fn node_metadata(&self) -> NodeMetadata {
+    pub fn node_metadata_fixed(&self) -> NodeMetadata {
         let pair = self.internal_mnemonic().active_keypair();
         let pk_vec = pair.public_key_vec();
         NodeMetadata{
@@ -157,71 +166,38 @@ impl NodeConfig {
             port_offset: Some(self.port_offset as i64),
             alias: None,
             name: None,
-            peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
+            peer_id: Some(self.peer_id.clone()),
             nat_restricted: None,
             // network_environment: self.network as i32,
-            network_environment: self.network.clone() as i32
+            network_environment: self.network.clone() as i32,
+            external_ipv4: None,
+            external_ipv6: None,
+            external_host: None
         }
     }
 
-    pub fn request(&self) -> Request {
-        let mut req = Request::empty();
-        self.sign_request(&mut req)
-    }
-
-    pub fn response(&self) -> Response {
-        let mut req = Response::empty_success();
-        req.with_metadata(self.node_metadata()).with_auth(&self.internal_mnemonic().active_keypair()).clone()
-    }
-
-    pub fn sign_request(&self, req: &mut Request) -> Request {
-        req.with_metadata(self.node_metadata()).with_auth(&self.internal_mnemonic().active_keypair()).clone()
-    }
-
-    pub fn dynamic_node_metadata(&self) -> Option<DynamicNodeMetadata> {
-        // TODO: Load from config
-        // self.data_store()
-        None
-    }
-
-    pub fn self_peer_info(&self) -> PeerNodeInfo {
-        PeerNodeInfo {
-            latest_peer_transaction: Some(self.peer_data_tx()),
-            latest_node_transaction: Some(self.peer_node_data_tx()),
-            dynamic_node_metadata: self.dynamic_node_metadata(),
-        }
-    }
-
-    pub fn self_peer_id_info(&self) -> PeerIdInfo {
-        PeerIdInfo {
-            latest_peer_transaction: Some(self.peer_data_tx()),
-            peer_node_info: vec![self.self_peer_info()],
-        }
-    }
-
-    pub fn peer_data_tx(&self) -> Transaction {
+    pub fn peer_tx_fixed(&self) -> Transaction {
         let pair = self.internal_mnemonic().active_keypair();
 
         let pd = PeerData {
-            peer_id: Some(PeerId::from_bytes(self.self_peer_id.clone())),
+            peer_id: Some(self.peer_id()),
             merkle_proof: None,
             proof: None,
-            node_metadata: vec![self.node_metadata()],
+            node_metadata: vec![self.node_metadata_fixed()],
             labels: vec![],
             version_info: Some(self.version_info())
         };
 
         let tx = TransactionBuilder::new().with_output_peer_data(
-            &pair.address_typed(), pd
+            &pair.address_typed(), pd, 0
         ).transaction.clone();
         tx
     }
 
-    pub fn peer_node_data_tx(&self) -> Transaction {
+    pub fn node_tx_fixed(&self) -> Transaction {
         let pair = self.internal_mnemonic().active_keypair();
-
         let tx = TransactionBuilder::new().with_output_node_metadata(
-            &pair.address_typed(), self.node_metadata()
+            &pair.address_typed(), self.node_metadata_fixed(), 0
         ).transaction.clone();
         tx
     }
@@ -239,7 +215,7 @@ impl NodeConfig {
             }
         };
         info!("Load balancer host: {} port: {:?}", host, port);
-        PublicClient::from(host, port)
+        PublicClient::from(host, port, None)
     }
 
     pub fn is_local_debug(&self) -> bool {
@@ -305,7 +281,6 @@ impl NodeConfig {
 
     pub fn default() -> Self {
         Self {
-            self_peer_id: vec![],
             peer_id: Default::default(),
             public_key: structs::PublicKey::default(),
             mnemonic_words: "".to_string(),
@@ -359,17 +334,13 @@ impl NodeConfig {
             0,
         )
         .to_string();
-        let self_peer_id = peer_id_from_single_mnemonic(words.clone())
-            .expect("")
-            .root
-            .vec();
         // let path: String = ""
         let folder = DataFolder::target(seed_id.clone() as u32);
         folder.delete().ensure_exists();
         // folder.ensure_exists();
         let mut node_config = NodeConfig::default();
-        node_config.self_peer_id = self_peer_id;
         node_config.mnemonic_words = words;
+        node_config.peer_id = node_config.default_peer_id().expect("worx");
         node_config.port_offset = (node_config.port_offset + (seed_id.clone() * 100)) as u16;
         node_config.data_folder = folder;
         node_config.observation_formation_millis = Duration::from_millis(1000 as u64);
@@ -426,10 +397,6 @@ impl NodeConfig {
         self.secure_all_path().and_then(|p| {
             fs::read_to_string(p).ok()
         })
-    }
-
-    pub async fn loopback_public_client(&self) -> PublicClient {
-        PublicClient::from("127.0.0.1".to_string(), self.public_port())
     }
 
 }

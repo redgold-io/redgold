@@ -64,7 +64,7 @@ impl ControlClient {
 
     pub fn local(port: u16) -> Self {
         Self {
-            client: RgHttpClient::new("localhost".to_string(), port)
+            client: RgHttpClient::new("localhost".to_string(), port, None)
         }
     }
 
