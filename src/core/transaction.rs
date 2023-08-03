@@ -50,45 +50,45 @@ pub struct TransactionTestContext {
     pub relay: Relay,
     pub tx_gen: TransactionGenerator,
 }
-
-impl TransactionTestContext {
-    #[allow(dead_code)]
-    pub async fn default() -> Self {
-        let relay = Relay::default().await;
-        let tc = TestConstants::new();
-        let ds = relay.ds.clone();
-        info!("Data store path in test context {}", ds.connection_path);
-        let c = ds
-            .create_all_err_info()
-            //.await
-            .expect("create");
-        let g = genesis::create_genesis_transaction();
-
-        ds.transaction_store.insert_transaction(&g, EARLIEST_TIME, true, None)
-            .await.expect("Insert fail");
-        info!(
-            "Data store immediate genesis query {:?}",
-            ds.transaction_store.utxo_all_debug().await.unwrap()
-        );
-
-        let tx_gen = TransactionGenerator::default(vec![]).with_genesis();
-
-        let vec = g.to_utxo_entries(0 as u64);
-        let source = vec.get(0).unwrap();
-        let t = Transaction::new(source, &tc.addr, 20000, &tc.secret, &tc.public);
-        let t2 = Transaction::new(source, &tc.addr2, 20000, &tc.secret, &tc.public);
-        Self {
-            tc,
-            ds,
-            c,
-            g,
-            t,
-            t2,
-            relay,
-            tx_gen,
-        }
-    }
-}
+//
+// impl TransactionTestContext {
+//     #[allow(dead_code)]
+//     pub async fn default() -> Self {
+//         let relay = Relay::default().await;
+//         let tc = TestConstants::new();
+//         let ds = relay.ds.clone();
+//         info!("Data store path in test context {}", ds.connection_path);
+//         let c = ds
+//             .create_all_err_info()
+//             //.await
+//             .expect("create");
+//         let g = genesis::create_genesis_transaction();
+//
+//         ds.transaction_store.insert_transaction(&g, EARLIEST_TIME, true, None)
+//             .await.expect("Insert fail");
+//         info!(
+//             "Data store immediate genesis query {:?}",
+//             ds.transaction_store.utxo_all_debug().await.unwrap()
+//         );
+//
+//         let tx_gen = TransactionGenerator::default(vec![]).with_genesis();
+//
+//         let vec = g.to_utxo_entries(0 as u64);
+//         let source = vec.get(0).unwrap();
+//         let t = Transaction::new(source, &tc.addr, 20000, &tc.secret, &tc.public);
+//         let t2 = Transaction::new(source, &tc.addr2, 20000, &tc.secret, &tc.public);
+//         Self {
+//             tc,
+//             ds,
+//             c,
+//             g,
+//             t,
+//             t2,
+//             relay,
+//             tx_gen,
+//         }
+//     }
+// }
 
 // Re-enable later.
 // // TODO: assertions about bad proofs and insufficent balance and so on.

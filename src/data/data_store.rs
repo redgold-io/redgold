@@ -126,36 +126,6 @@ impl DataStore {
         return Connection::open(self.connection_path.clone());
     }
 
-    pub fn create_transactions(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS transactions (
-                  hash    BLOB PRIMARY KEY,
-                  raw_transaction       BLOB,
-                  time       INTEGER
-                  )",
-                [],
-            )
-        });
-    }
-
-    // Change utxo schema? What fields are we actually going to query here?
-    pub fn create_utxo(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS utxo (
-                  transaction_hash BLOB,
-                  output_index INTEGER,
-                  address    BLOB,
-                  output    BLOB,
-                  time INTEGER,
-                  PRIMARY KEY (transaction_hash, output_index)
-                  )",
-                [],
-            )
-        });
-    }
-
     // Change utxo schema? What fields are we actually going to query here?
     pub fn create_debug_table(&self) -> rusqlite::Result<usize, Error> {
         return self.connection().and_then(|c| {
