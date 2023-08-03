@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bitcoin::secp256k1::PublicKey;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use futures::FutureExt;
-use libp2p::Multiaddr;
+// use libp2p::Multiaddr;
 use log::{error, info};
 use metrics::increment_counter;
 use tokio::runtime::Runtime;
@@ -23,7 +23,7 @@ use crate::node_config::NodeConfig;
 use crate::schema::json;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util;
-use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
+// use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
 use redgold_schema::EasyJson;
 use crate::util::lang_util::SameResult;

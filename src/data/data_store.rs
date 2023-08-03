@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
-use libp2p::PeerId;
+// use libp2p::PeerId;
 use log::info;
 use metrics::{gauge, increment_counter};
 use rusqlite::{params, Connection, Error, Result};
@@ -38,7 +38,7 @@ use crate::schema::TestConstants;
 use crate::schema::{ProtoHashable, SafeBytesAccess, WithMetadataHashable};
 use crate::util::cli::args::{empty_args, RgArgs};
 use crate::util::keys::public_key_from_bytes;
-use crate::util::to_libp2p_peer_id;
+// use crate::util::to_libp2p_peer_id;
 use crate::{schema, util};
 use crate::schema::structs;
 use redgold_schema::constants::EARLIEST_TIME;
@@ -97,12 +97,12 @@ pub struct PeerQueryResult {
     pub public_key: Vec<u8>,
     pub trust: f64,
 }
-
-impl PeerQueryResult {
-    pub fn to_peer_id(&self) -> PeerId {
-        to_libp2p_peer_id(&public_key_from_bytes(&self.public_key).unwrap())
-    }
-}
+//
+// impl PeerQueryResult {
+//     pub fn to_peer_id(&self) -> PeerId {
+//         to_libp2p_peer_id(&public_key_from_bytes(&self.public_key).unwrap())
+//     }
+// }
 
 impl DataStore {
 

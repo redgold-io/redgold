@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use futures::channel::mpsc::Receiver;
 use futures::prelude::*;
-use libp2p::{Multiaddr, PeerId};
-use libp2p::request_response::ResponseChannel;
+// use libp2p::{Multiaddr, PeerId};
+// use libp2p::request_response::ResponseChannel;
 use log::{debug, error, info};
 use metrics::increment_counter;
 // use svg::Node;
