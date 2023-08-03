@@ -82,6 +82,8 @@ jobs:
       - run: ./bin/install_build_deps.sh
       - run: rustup toolchain list
       - run: rustup default nightly
+      - run: rustup update
+      - run: rustup -V
       - run: cargo clean
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: cargo build --release
