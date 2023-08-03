@@ -21,9 +21,9 @@ use bitcoin::AddressType::P2wpkh;
 
 use bitcoin::consensus::serialize;
 // use crate::util::cli::commands::send;
-use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
+use crate::{EasyJson, error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
 use crate::public_key::ToPublicKey;
-use crate::structs::{ErrorInfo, NetworkEnvironment, Proof};
+use crate::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
 use crate::util::keys::ToPublicKeyFromLib;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -216,7 +216,7 @@ impl InputSigner for MultipartySigner {
 
 pub struct SingleKeyBitcoinWallet {
     wallet: Wallet<MemoryDatabase>,
-    public_key: structs::PublicKey,
+    pub public_key: structs::PublicKey,
     network: Network,
     pub psbt: Option<PartiallySignedTransaction>,
     pub transaction_details: Option<TransactionDetails>,
@@ -519,7 +519,7 @@ test integrations::bitcoin::bdk_example::balance_test ... ok
 
  */
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn tx_debug() {
     // MnemonicWords::from_mnemonic_words()
@@ -530,11 +530,27 @@ async fn tx_debug() {
     let balance = w.get_wallet_balance().expect("");
     println!("balance: {:?}", balance);
     println!("address: {:?}", w.address().expect(""));
-    w.send_local("tb1qsm00q9456ja7ehp37ftqyh869rdtxktpdjq69l".to_string(), 3500, pkey).expect("");
+    w.send_local("tb1qaq8de62av8xkcnwfrgjmvatsl56hmpc4q6m3uz".to_string(), 2500, pkey).expect("");
     // w.send_local("tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4".to_string(), 3500, pkey).expect("");
     let txid = w.transaction_details.expect("d").txid.to_string();
     println!("txid: {}", txid);
     // 2485227b319650fcd689009ca8b5fb2a02e556098f7c568e832ae72ac07ab8e8
+}
+
+
+#[tokio::test]
+async fn balance_test2() {
+    let mut w = SingleKeyBitcoinWallet
+    ::new_wallet(PublicKey::from_hex("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
+    let balance = w.get_wallet_balance().expect("");
+
+
+    println!("balance: {:?}", balance);
+    println!("address: {:?}", w.address().expect(""));
+    let txs = w.get_sourced_tx().expect("");
+    for t in txs {
+        println!("tx: {}", t.json_or());
+    }
 }
 
 // #[ignore]

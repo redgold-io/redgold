@@ -295,9 +295,15 @@ impl Watcher {
     }
 
     pub async fn get_btc_deposits(&mut self, last_timestamp: u64, w: &Arc<Mutex<SingleKeyBitcoinWallet>>) -> Result<(u64, Vec<ExternalTimedTransaction>), ErrorInfo>{
-        let mut sourced_tx = w.lock()
-            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+        let guard = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?;
+
+
+        let mut sourced_tx = guard
             .get_sourced_tx()?;
+
+        info!("public key: {} Got {} sourced tx raw: {}", guard.public_key.hex_or(), sourced_tx.len(), sourced_tx.json_or());
+
         let mut max_ts: u64 = last_timestamp;
         sourced_tx.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
         let mut res = vec![];
@@ -501,8 +507,9 @@ impl Watcher {
             deposit_txs.len(), last_timestamp, updated_last_ts, deposit_txs.json_or());
 
         let (tx, bid_ask_updated_ask_side) = self.build_rdg_ask_swap_tx(deposit_txs, bid_ask_latest, &key_address.clone()).await?;
-        info!("Built RDG ask swap tx: {} bid_ask_updated {}", tx.json_or(), bid_ask_updated_ask_side.json_or());
+        // info!("Built RDG ask swap tx: {} bid_ask_updated {}", tx.json_or(), bid_ask_updated_ask_side.json_or());
         if let Some(tx) = tx {
+            info!("Sending RDG ask swap tx: {}", tx.json_or());
             self.send_ask_fulfillment_transaction(&mut tx.clone(), identifier.clone()).await?;
         }
 
@@ -511,8 +518,8 @@ impl Watcher {
         let withdrawals = self.get_rdg_withdrawals_bids(bid_ask_latest, &key_address).await?;
         bid_ask_latest = withdrawals.updated_bidask.clone();
 
-        info!("Found {} new withdrawals {} bid_ask {}",
-            withdrawals.outputs.len(), withdrawals.json_or(), bid_ask_latest.json_or());
+        info!("Found {} new withdrawals {}",
+            withdrawals.outputs.len(), withdrawals.json_or());
 
         if withdrawals.outputs.len() > 0 {
             let txid = self.fulfill_btc_bids(w, identifier, withdrawals.outputs.clone()).await?;
