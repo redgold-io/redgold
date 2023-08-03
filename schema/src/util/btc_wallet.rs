@@ -530,7 +530,8 @@ async fn tx_debug() {
     let balance = w.get_wallet_balance().expect("");
     println!("balance: {:?}", balance);
     println!("address: {:?}", w.address().expect(""));
-    w.send_local("tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4".to_string(), 3500, pkey).expect("");
+    w.send_local("tb1qsm00q9456ja7ehp37ftqyh869rdtxktpdjq69l".to_string(), 3500, pkey).expect("");
+    // w.send_local("tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4".to_string(), 3500, pkey).expect("");
     let txid = w.transaction_details.expect("d").txid.to_string();
     println!("txid: {}", txid);
     // 2485227b319650fcd689009ca8b5fb2a02e556098f7c568e832ae72ac07ab8e8
