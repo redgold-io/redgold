@@ -281,20 +281,21 @@ pub async fn deploy_wizard(deploy: &Deploy, _config: &NodeConfig) -> Result<(), 
 
         // Check to see if we have a mnemonic stored in backup for generating a random seed
 
-        let mnemonics = DataStoreContext::map_err_sqlx(ds.query_all_mnemonic().await)?;
+        let mnemonics: Vec<Mnemonic> = vec![]; // TODO: Replace from config; DataStoreContext::map_err_sqlx(ds.query_all_mnemonic().await)?;
         let mnemonic = if mnemonics.is_empty() {
             println!("Unable to find random mnemonic from backup, generating a new one and saving");
             let m = generate_random_mnemonic();
-            DataStoreContext::map_err_sqlx(ds.insert_mnemonic(MnemonicEntry{
-                words: m.to_string(),
-                time: util::current_time_millis(),
-                peer_id: vec![]
-            }).await)?;
+            // TODO: Replace this with updating an internal config, potentially encrypted.
+            // DataStoreContext::map_err_sqlx(ds.insert_mnemonic(MnemonicEntry{
+            //     words: m.to_string(),
+            //     time: util::current_time_millis(),
+            //     peer_id: vec![]
+            // }).await)?;
             m
         } else {
             println!("Found stored random mnemonic");
             let x = mnemonics.get(0).expect("").clone();
-            let string = x.words.clone();
+            let string = x.to_string().clone();
             Mnemonic::from_str(&string).expect("words")
         };
         println!("Random mnemonic fingerprint: {}", mnemonic_fingerprint(mnemonic.clone()));

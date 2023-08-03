@@ -583,13 +583,13 @@ impl LocalNodes {
 
     async fn add_node(&mut self) {
         let port_offset = util::random_port();
-        let path = NodeConfig::memdb_path(&self.current_seed_id());
-        let store = DataStore::from_path(path).await;
-        let connection =
-            // runtime.block_on(
-            store.create_all_err_info()
-                // )
-                .expect("test failure create tables");
+        // let path = NodeConfig::memdb_path(&self.current_seed_id());
+        // let store = DataStore::from_path(path).await;
+        // let connection =
+        //     // runtime.block_on(
+        //     store.create_all_err_info()
+        //         // )
+        //         .expect("test failure create tables");
         let start = LocalTestNodeContext::new(
             self.current_seed_id(),
             port_offset,
@@ -608,7 +608,7 @@ impl LocalNodes {
         );
 
         self.nodes.push(start);
-        self.connections.push(connection);
+        // self.connections.push(connection);
     }
 }
 //
