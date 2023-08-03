@@ -295,14 +295,15 @@ impl Watcher {
     }
 
     pub async fn get_btc_deposits(&mut self, last_timestamp: u64, w: &Arc<Mutex<SingleKeyBitcoinWallet>>) -> Result<(u64, Vec<ExternalTimedTransaction>), ErrorInfo>{
-        let guard = w.lock()
-            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?;
+        let pk_hex = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+            .public_key.hex_or();
 
-
-        let mut sourced_tx = guard
+        let mut sourced_tx = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
             .get_sourced_tx()?;
 
-        info!("public key: {} Got {} sourced tx raw: {}", guard.public_key.hex_or(), sourced_tx.len(), sourced_tx.json_or());
+        info!("public key: {} Got {} sourced tx raw: {}", pk_hex, sourced_tx.len(), sourced_tx.json_or());
 
         let mut max_ts: u64 = last_timestamp;
         sourced_tx.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));

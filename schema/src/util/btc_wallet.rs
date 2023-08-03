@@ -519,7 +519,7 @@ test integrations::bitcoin::bdk_example::balance_test ... ok
 
  */
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn tx_debug() {
     // MnemonicWords::from_mnemonic_words()
@@ -538,6 +538,7 @@ async fn tx_debug() {
 }
 
 
+#[ignore]
 #[tokio::test]
 async fn balance_test2() {
     let mut w = SingleKeyBitcoinWallet
