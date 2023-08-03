@@ -17,7 +17,7 @@ use redgold_schema::structs::{BytesData, ControlMultipartyKeygenRequest, Control
 use crate::api::{as_warp_json_response, RgHttpClient};
 use crate::api::rosetta::models::Error;
 
-use crate::util::to_libp2p_peer_id;
+// use crate::util::to_libp2p_peer_id;
 
 use crate::core::relay::Relay;
 use crate::multiparty::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};

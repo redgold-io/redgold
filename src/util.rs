@@ -36,9 +36,9 @@ use bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 use eframe::egui::accesskit::Node;
-use libp2p::core::identity::{Keypair, secp256k1};
-use libp2p::core::PublicKey as LPublicKey;
-use libp2p::PeerId;
+// use libp2p::core::identity::{Keypair, secp256k1};
+// use libp2p::core::PublicKey as LPublicKey;
+// use libp2p::PeerId;
 use log::SetLoggerError;
 use log4rs::config::Logger;
 use log4rs::encode::pattern::PatternEncoder;
@@ -218,35 +218,36 @@ pub fn init_logger() {
 pub trait Short {
     fn short_id(&self) -> String;
 }
+//
+// impl Short for PeerId {
+//     fn short_id(&self) -> String {
+//         let string = self.to_base58();
+//         return string[(string.len() - 5)..string.len()].to_string();
+//     }
+// }
 
-impl Short for PeerId {
-    fn short_id(&self) -> String {
-        let string = self.to_base58();
-        return string[(string.len() - 5)..string.len()].to_string();
-    }
-}
-
-pub fn to_libp2p_kp(s: &SecretKey) -> Keypair {
-    let hex_dec = hex::decode(s.to_hex()).unwrap();
-    let s4 = secp256k1::SecretKey::from_bytes(hex_dec).unwrap();
-    let kp1 = secp256k1::Keypair::from(s4);
-    let kp2 = Keypair::Secp256k1(kp1);
-    return kp2;
-}
-
-pub fn to_libp2p_pk(pk: &PublicKey) -> LPublicKey {
-    let s4 = secp256k1::PublicKey::decode(&*pk.serialize().to_vec()).unwrap();
-    let pkl = LPublicKey::Secp256k1(s4);
-    return pkl;
-}
-
-pub fn to_libp2p_peer_id(pk: &PublicKey) -> PeerId {
-    return PeerId::from(to_libp2p_pk(&pk));
-}
-
-pub fn to_libp2p_peer_id_ser(pk: &Vec<u8>) -> PeerId {
-    return PeerId::from(to_libp2p_pk(&PublicKey::from_slice(pk).unwrap()));
-}
+//
+// pub fn to_libp2p_kp(s: &SecretKey) -> Keypair {
+//     let hex_dec = hex::decode(s.to_hex()).unwrap();
+//     let s4 = secp256k1::SecretKey::from_bytes(hex_dec).unwrap();
+//     let kp1 = secp256k1::Keypair::from(s4);
+//     let kp2 = Keypair::Secp256k1(kp1);
+//     return kp2;
+// }
+//
+// pub fn to_libp2p_pk(pk: &PublicKey) -> LPublicKey {
+//     let s4 = secp256k1::PublicKey::decode(&*pk.serialize().to_vec()).unwrap();
+//     let pkl = LPublicKey::Secp256k1(s4);
+//     return pkl;
+// }
+//
+// pub fn to_libp2p_peer_id(pk: &PublicKey) -> PeerId {
+//     return PeerId::from(to_libp2p_pk(&pk));
+// }
+//
+// pub fn to_libp2p_peer_id_ser(pk: &Vec<u8>) -> PeerId {
+//     return PeerId::from(to_libp2p_pk(&PublicKey::from_slice(pk).unwrap()));
+// }
 //
 // #[test]
 // fn test_libp2p_conversion() {

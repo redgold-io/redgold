@@ -24,9 +24,4 @@ both object code and source code.
 
 The following provides more details on the included cryptographic software:
 
-This software uses libp2p to support authentication, and encryption and
-decryption of data sent across the network between services.
-
-It also uses rust-bitcoin and rust-crypto for primitives used for signing data and key pair generation.
-
-multihash is used for message digests and generic hashing functionality which includes crypto primitives
+It uses rust-bitcoin and rust-crypto for primitives used for signing data and key pair generation.
