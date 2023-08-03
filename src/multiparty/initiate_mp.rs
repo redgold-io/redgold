@@ -102,7 +102,7 @@ pub async fn initiate_mp_keygen_authed(
     info!("Initiating mp keygen starter for room: {} with index: {} num_parties: {}, threshold: {}, port: {}",
         room_id, index.to_string(), number_of_parties.to_string(), threshold.to_string(), port.to_string());
     let ridc = room_id.clone();
-    let nc = relay.node_config.clone();
+    let nc = relay.clone();
     let res = tokio::spawn(async move {
         tokio::time::timeout(
             timeout,
@@ -192,7 +192,7 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
 
     info!("Initiating mp keygen follower for room: {} with index: {} num_parties: {}, threshold: {}, port: {}",
         room_id, index.to_string(), number_of_parties.to_string(), threshold.to_string(), port.to_string());
-    let config = relay.node_config.clone();
+    let config = relay.clone();
     let res = tokio::time::timeout(
         timeout,
         gg20_keygen::keygen(address, port, room_id.clone(), index, threshold, number_of_parties, config),
@@ -356,7 +356,7 @@ pub async fn initiate_mp_keysign_authed(
 
     let rid = signing_room_id.clone();
     let index2 = index.clone();
-    let nc = relay.node_config.clone();
+    let nc = relay.clone();
     let jh = tokio::spawn(async move { tokio::time::timeout(
         timeout,
         gg20_signing::signing(
@@ -454,7 +454,7 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
         signing_room_id.clone(), index.clone().json_or(), address, port, host_key.json_or()
     );
     let signing_bytes = mp_req.data_to_sign.clone().safe_get()?.clone().value;
-    let nc = relay.node_config.clone();
+    let nc = relay.clone();
     let res = tokio::time::timeout(
         timeout,
         gg20_signing::signing(

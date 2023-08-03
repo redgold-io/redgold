@@ -27,7 +27,7 @@
 
 use crate::structs::{Address, Hash, Input, Output, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{SafeBytesAccess, Transaction, WithMetadataHashable};
+use crate::{RgResult, SafeBytesAccess, SafeOption, Transaction, WithMetadataHashable};
 
 impl UtxoEntry {
     pub fn to_utxo_id(&self) -> UtxoId {
@@ -39,6 +39,13 @@ impl UtxoEntry {
 
     pub fn amount(&self) -> u64 {
         return self.output.as_ref().unwrap().amount();
+    }
+
+    pub fn height(&self) -> RgResult<i64> {
+        let h = self.output.as_ref()
+            .and_then(|o| o.data.as_ref())
+            .and_then(|o| o.height);
+        h.safe_get_msg("Missing height on utxo output").cloned()
     }
 
     // pub fn id_from_values(hash: &Vec<u8>, value: &Vec<u8>) -> Vec<u8> {

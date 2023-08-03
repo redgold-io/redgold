@@ -48,7 +48,7 @@ impl PeerOutgoingEventHandler {
                 .and_then(|nt| nt.node_metadata().ok());
             // TODO if metadata known, check if udp is required
             if let Some(nmd) = res {
-                Self::send_message_rest(message.clone(), nmd, relay.node_config.clone()).await?;
+                Self::send_message_rest(message.clone(), nmd, &relay).await?;
             } else {
                 error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex_or(), ser_msgp);
             }
@@ -57,7 +57,7 @@ impl PeerOutgoingEventHandler {
                 nmd.json_or(),
                 ser_msgp
             );
-            Self::send_message_rest(message.clone(), nmd.clone(), relay.node_config.clone()).await?;
+            Self::send_message_rest(message.clone(), nmd.clone(), &relay).await?;
             // TODO: if node metadata in message then attempt to send there to unknown peer, falling back to other types
             // Do we also need dynamic node metadata here too for UDP?
         } else {
@@ -85,10 +85,10 @@ impl PeerOutgoingEventHandler {
         err.await
     }
 
-    pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, nc: NodeConfig) -> Result<(), ErrorInfo> {
+    pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<(), ErrorInfo> {
         increment_counter!("redgold.peer.rest.send");
         let result = match tokio::time::timeout(
-            message.send_timeout.clone(), Self::send_message_rest_ret_err(&mut message, nmd, nc)
+            message.send_timeout.clone(), Self::send_message_rest_ret_err(&mut message, nmd, relay)
         ).await
             .error_info(
                 format!("Timeout sending message to peer with duration {} secs",
@@ -110,21 +110,21 @@ impl PeerOutgoingEventHandler {
         }
         Ok(())
     }
-    pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, nc: NodeConfig) -> Result<Response, ErrorInfo> {
+    pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<Response, ErrorInfo> {
 
         let option = NetworkEnvironment::from_i32(nmd.network_environment);
         let peer_env = option
             .safe_get_msg("Missing network environment in node metadata on attempt to send peer message")?;
-        if peer_env != &nc.network {
+        if peer_env != &relay.node_config.network {
             return Err(error_info(format!("\
             Attempted to send message to peer {} with network {} while this node is on network {} contents: {}",
-                                          nmd.long_identifier(), peer_env.to_std_string(), nc.network.to_std_string(),
+                                          nmd.long_identifier(), peer_env.to_std_string(), relay.node_config.network.to_std_string(),
                                           json_or(&message.request.clone())
             )));
         }
-        let port = nmd.port_or(nc.network) + 1;
+        let port = nmd.port_or(relay.node_config.network) + 1;
         let res = rest_peer(
-            nc, nmd.external_address.clone(), port as i64, &mut message.request
+            relay, nmd.external_address.clone(), port as i64, &mut message.request
         ).await;
         res
     }

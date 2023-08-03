@@ -51,6 +51,7 @@ pub struct PublicClient {
     pub url: String,
     pub port: u16,
     pub timeout: Duration,
+    pub relay: Option<Relay>
 }
 
 impl PublicClient {
@@ -59,32 +60,27 @@ impl PublicClient {
     // }
 
     pub fn client_wrapper(&self) -> api::RgHttpClient {
-        api::RgHttpClient::new(self.url.clone(), self.port as u16)
+        api::RgHttpClient::new(self.url.clone(), self.port as u16, self.relay.clone())
     }
 
-    pub fn local(port: u16) -> Self {
+    pub fn local(port: u16, relay: Option<Relay>) -> Self {
         Self {
             url: "localhost".to_string(),
             port,
             timeout: Duration::from_secs(30),
+            relay: None,
         }
     }
 
-    pub fn from(url: String, port: u16) -> Self {
+    pub fn from(url: String, port: u16, relay: Option<Relay>) -> Self {
         Self {
             url,
             port,
             timeout: Duration::from_secs(30),
+            relay,
         }
     }
 
-    pub fn from_env(url: String, network: NetworkEnvironment) -> Self {
-        Self {
-            url,
-            port: network.default_port_offset(),
-            timeout: Duration::from_secs(30),
-        }
-    }
 
     fn formatted_url(&self) -> String {
         return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();

@@ -7,15 +7,16 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // use structopt::StructOpt;
 
 use round_based::Msg;
-use redgold_schema::EasyJson;
+use redgold_schema::{EasyJson, RgResult};
 use redgold_schema::structs::Request;
+use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::MultipartyAuthenticationRequest;
 
 pub async fn join_computation<M>(
     address: surf::Url,
     room_id: &str,
-    node_config: &NodeConfig
+    relay: &Relay
 ) -> Result<(
     u16,
     impl Stream<Item = Result<Msg<M>>>,
@@ -24,7 +25,7 @@ pub async fn join_computation<M>(
     where
         M: Serialize + DeserializeOwned,
 {
-    let client = SmClient::new(address, room_id, node_config).context("construct SmClient")?;
+    let client = SmClient::new(address, room_id, relay).context("construct SmClient")?;
 
     // Construct channel of incoming messages
     let incoming = client
@@ -60,29 +61,29 @@ pub async fn join_computation<M>(
 
 pub struct SmClient {
     http_client: surf::Client,
-    node_config: NodeConfig,
+    relay: Relay,
     room_id: String
 }
 
 impl SmClient {
-    pub fn new(address: surf::Url, room_id: &str, node_config: &NodeConfig) -> Result<Self> {
+    pub fn new(address: surf::Url, room_id: &str, relay: &Relay) -> Result<Self> {
         let config = surf::Config::new()
             .set_base_url(address.join(&format!("rooms/{}/", room_id))?)
             .set_timeout(None);
         Ok(Self {
             http_client: config.try_into()?,
-            node_config: node_config.clone(),
+            relay: relay.clone(),
             room_id: room_id.to_string().clone(),
         })
     }
 
-    pub fn request(&self, message: Option<String>) -> Request {
+    pub async fn request(&self, message: Option<String>) -> Request {
         let mut req = Request::empty();
         let mut mpa = MultipartyAuthenticationRequest::default();
         mpa.message = message;
         mpa.room_id = self.room_id.clone();
         req.multiparty_authentication_request = Some(mpa);
-        req = self.node_config.sign_request(&mut req);
+        req = self.relay.sign_request(&mut req).await.expect("Bad signing request in SM client");
         let result = req.verify_auth();
         if result.is_err() {
             panic!("Wtf")
@@ -92,7 +93,7 @@ impl SmClient {
     }
 
     pub async fn issue_index(&self) -> Result<u16> {
-        let mut req = self.request(None);
+        let mut req = self.request(None).await;
         let response = self
             .http_client
             .post("issue_unique_idx")
@@ -105,7 +106,7 @@ impl SmClient {
 
     // TODO: Add auth
     pub async fn broadcast(&self, message: &str) -> Result<()> {
-        let req = self.request(Some(message.to_string()));
+        let req = self.request(Some(message.to_string())).await;
         self.http_client
             .post("broadcast")
             .body(req.json_or())
@@ -119,7 +120,7 @@ impl SmClient {
         let response = self
             .http_client
             .get("subscribe")
-            .header("auth", self.request(None).json_or())
+            .header("auth", self.request(None).await.json_or())
             .await
             .map_err(|e| e.into_inner())?;
         let events = async_sse::decode(response);

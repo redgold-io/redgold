@@ -13,13 +13,13 @@ pub async fn handle_about_node(_p0: AboutNodeRequest, relay: Relay) -> Result<Ab
 
     // let mut about = AboutNodeResponse::default();
     // relay.
-   let peer_node_info = Some(relay.node_config.self_peer_info());
+   let peer_node_info = Some(relay.peer_node_info().await?);
     Ok(AboutNodeResponse{
         // This should be the peer_id value stored in config data store
-        latest_metadata: Some(relay.node_config.peer_data_tx()),
+        latest_metadata: Some(relay.peer_tx().await?),
         // This should be the local latest transaction value also stored in config store, but
         // with updates made by the node keypair
-        latest_node_metadata: Some(relay.node_config.peer_node_data_tx()),
+        latest_node_metadata: Some(relay.node_tx().await?),
         num_known_peers: num_total_peers as i64,
         num_active_peers: num_active_peers as i64,
         recent_transactions,

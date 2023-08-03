@@ -304,7 +304,7 @@ impl Node {
 
             };
             let port = seed.port_offset.unwrap() + 1;
-            let client = PublicClient::from(seed.external_address.clone(), port as u16);
+            let client = PublicClient::from(seed.external_address.clone(), port as u16, Some(relay.clone()));
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
             let response = client.about().await?;
             let result = response.peer_node_info.safe_get()?;
@@ -403,7 +403,7 @@ impl LocalTestNodeContext {
             id,
             port_offset: random_port_offset,
             node: node.clone(),
-            public_client: PublicClient::local(node.relay.node_config.public_port()),
+            public_client: PublicClient::local(node.relay.node_config.public_port(), Some(relay.clone())),
             control_client: ControlClient::local(node.relay.node_config.control_port()),
             // futures
         }

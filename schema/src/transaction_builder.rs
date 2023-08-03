@@ -139,10 +139,12 @@ impl TransactionBuilder {
         // self.balance
     }
 
-    pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerData) -> &mut Self {
+    pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerData, height: i64) -> &mut Self {
+        let mut option = StandardData::peer_data(pd).expect("o");
+        option.height = Some(height);
         let output = Output {
             address: Some(destination.clone()),
-            data: StandardData::peer_data(pd),
+            data: Some(option),
             product_id: None,
             counter_party_proofs: vec![],
             contract: None,
@@ -151,9 +153,10 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn with_output_node_metadata(&mut self, destination: &Address, pd: NodeMetadata) -> &mut Self {
+    pub fn with_output_node_metadata(&mut self, destination: &Address, pd: NodeMetadata, height: i64) -> &mut Self {
         let mut data = StandardData::default();
         data.node_metadata = Some(pd);
+        data.height = Some(height);
         let data = Some(data);
         let output = Output {
             address: Some(destination.clone()),

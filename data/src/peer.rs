@@ -148,7 +148,8 @@ impl PeerStore {
     ) -> Result<Option<Transaction>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
-        let vec = peer_id.peer_id.safe_bytes()?;
+        let x = peer_id.peer_id.safe_get()?;
+        let vec = x.bytes.safe_bytes()?;
 
         let rows = sqlx::query!(
             r#"SELECT tx FROM peers WHERE id = ?1"#,
@@ -236,7 +237,7 @@ impl PeerStore {
         let pd_blob = pd.proto_serialize();
         let tx_hash = tx.hash_or().vec();
         let mut pool = self.ctx.pool().await?;
-        let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().value;
+        let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().bytes()?;
 
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO peers (id, peer_data, tx, trust, tx_hash) VALUES (?1, ?2, ?3, ?4, ?5)"#,
@@ -260,7 +261,7 @@ impl PeerStore {
         let public_key = nmd.public_key.safe_get()?;
         public_key.validate()?;
         let pk_bytes = public_key.bytes()?;
-        let pid = nmd.peer_id.safe_get()?.peer_id.safe_bytes()?;
+        let pid = nmd.peer_id.safe_get()?.peer_id.safe_get()?.bytes.safe_bytes()?;
         let ser_nmd = nmd.proto_serialize();
         let pni = pi.proto_serialize();
         // info!("insert_node_key pk_bytes {:?}", public_key.hex().expect("h"));

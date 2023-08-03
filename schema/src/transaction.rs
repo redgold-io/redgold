@@ -357,6 +357,26 @@ impl Transaction {
         return UtxoEntry::from_transaction(self, time as i64);
     }
 
+    pub fn utxo_outputs(&self) -> RgResult<Vec<UtxoEntry>> {
+        let t = self.time()?;
+        return Ok(UtxoEntry::from_transaction(self, t.clone()));
+    }
+
+    pub fn head_utxo(&self) -> RgResult<UtxoEntry> {
+        let utxos = self.utxo_outputs()?;
+        let head_utxo = utxos.get(0);
+        let utxo = head_utxo.safe_get_msg("Missing UTXO output for node metadata")?;
+        Ok(utxo.clone().clone())
+    }
+
+    pub fn height(&self) -> RgResult<i64> {
+        let h = self.options.as_ref()
+            .and_then(|o| o.data.as_ref())
+            .and_then(|d| d.standard_data.as_ref())
+            .and_then(|s| s.height);
+        h.safe_get_msg("Missing height").cloned()
+    }
+
     // pub fn to_utxo_outputs_as_inputs(&self, time: u64) -> Vec<Input> {
     //     return UtxoEntry::from_transaction(self, time as i64)
     //         .iter()

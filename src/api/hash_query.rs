@@ -62,7 +62,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
 
     if let Some(pk) = PublicKey::from_hex(hash_input.clone()).ok() {
         if relay.node_config.public_key() == pk {
-            response.peer_node_info = Some(relay.node_config.self_peer_info());
+            response.peer_node_info = Some(relay.peer_node_info().await?);
             return Ok(response);
         }
         if let Some(pni) = relay.ds.peer_store.query_public_key_node(pk).await? {
@@ -73,8 +73,8 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
 
     let result = from_hex(hash_input.clone())?;
     let id = PeerId::from_bytes(result.clone());
-    if relay.node_config.self_peer_id == result {
-        response.peer_id_info = Some(relay.node_config.self_peer_id_info());
+    if relay.node_config.peer_id == id {
+        response.peer_id_info = Some(relay.peer_id_info().await?);
         return Ok(response);
     }
 

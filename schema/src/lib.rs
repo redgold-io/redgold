@@ -136,16 +136,16 @@ impl SafeBytesAccess for Option<BytesData> {
             .clone())
     }
 }
-
-impl SafeBytesAccess for Option<Hash> {
-    fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self
-            .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "hash"))?
-            .bytes
-            .safe_bytes()?)
-    }
-}
+//
+// impl SafeBytesAccess for Option<Hash> {
+//     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+//         Ok(self
+//             .as_ref() // TODO: parent Field message? necessary or not?
+//             .ok_or(error_message(Error::MissingField, "hash"))?
+//             .bytes
+//             .safe_bytes()?)
+//     }
+// }
 
 impl SafeBytesAccess for Hash {
     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
@@ -157,9 +157,43 @@ impl SafeBytesAccess for Option<Address> {
     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
         Ok(self
             .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "hash"))?
+            .ok_or(error_message(Error::MissingField, "address"))?
             .address
             .safe_bytes()?)
+    }
+}
+
+impl SafeBytesAccess for Option<PublicKey> {
+    fn safe_bytes(&self) -> RgResult<Vec<u8>> {
+        Ok(self
+            .as_ref() // TODO: parent Field message? necessary or not?
+            .ok_or(error_message(Error::MissingField, "Missing public key"))?
+            .bytes
+            .safe_bytes()?
+        )
+    }
+}
+
+impl SafeBytesAccess for Option<PeerId> {
+    fn safe_bytes(&self) -> RgResult<Vec<u8>> {
+        Ok(self
+            .as_ref() // TODO: parent Field message? necessary or not?
+            .ok_or(error_message(Error::MissingField, "Missing peerid"))?
+            .peer_id
+            .safe_bytes()?
+        )
+    }
+}
+
+impl<T> SafeBytesAccess for Option<T>
+where T: SafeBytesAccess + Sized
+{
+    fn safe_bytes(&self) -> RgResult<Vec<u8>> {
+        Ok(self
+            .as_ref() // TODO: parent Field message? necessary or not?
+            .ok_or(error_message(Error::MissingField, "Missing safe bytes field"))?
+            .safe_bytes()?
+        )
     }
 }
 
@@ -879,10 +913,23 @@ pub fn json_from<'a, T: serde::Deserialize<'a>>(t: &'a str) -> Result<T, ErrorIn
 impl PeerId {
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self {
-            peer_id: bytes_data(bytes),
+            peer_id: Some(PublicKey::from_bytes(bytes)),
             known_proof: vec![],
         }
     }
+
+    pub fn from_hex(hex: impl Into<String>) -> RgResult<Self> {
+        Ok(Self::from_bytes(from_hex(hex.into())?))
+    }
+
+    pub fn from_pk(pk: PublicKey) -> Self {
+        Self {
+            peer_id: Some(pk),
+            known_proof: vec![],
+        }
+    }
+
+
 }
 
 impl HashClear for StructMetadata {

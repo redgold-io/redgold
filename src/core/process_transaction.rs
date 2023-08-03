@@ -13,7 +13,7 @@ use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::{json_or, ProtoHashable, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
+use redgold_schema::{json_or, ProtoHashable, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
 use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -238,7 +238,7 @@ impl TransactionProcessContext {
     ) -> Result<(), ErrorInfo> {
 
         if self.check_peer_message(&transaction_message.transaction).await? {
-            return Ok(());
+            return self.process_peer_transaction(&transaction_message.transaction).await;
         }
 
         let result_or_error = {
@@ -707,12 +707,20 @@ impl TransactionProcessContext {
         res
     }
     async fn check_peer_message(&self, p0: &Transaction) -> Result<bool, ErrorInfo> {
-        let is_peer_tx = p0.node_metadata().is_ok();
+        let is_peer_tx = p0.node_metadata().is_ok() || p0.peer_data().is_ok();
         if is_peer_tx {
             // Ignore for now, causes a giant loop think we need to avoid gossiping about self?
             // self.relay.add_peer_flow(p0).await.log_error().ok();
         }
         Ok(is_peer_tx)
+    }
+    async fn process_peer_transaction(&self, tx: &Transaction) -> RgResult<()> {
+        if let Some(nmd) = tx.node_metadata().ok() {
+            // self.relay.ds.peer_store.
+        } else if let Some(pd) = tx.peer_data().ok() {
+
+        }
+        Ok(())
     }
 }
 

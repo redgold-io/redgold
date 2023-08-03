@@ -1,6 +1,6 @@
 use sqlx::Row;
 use sqlx::sqlite::SqliteRow;
-use redgold_schema::structs::{Address, ErrorInfo, Hash};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, Hash, Transaction};
 use redgold_schema::{EasyJsonDeser, ErrorInfoContext, json_from, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -129,6 +129,10 @@ impl ConfigStore {
         self.insert_update_bytes(key.into(), value.proto_serialize()).await
     }
 
+    pub async fn store_proto_ref<T: ProtoSerde, S: Into<String>>(&self, key: S, value: &T) -> Result<i64, ErrorInfo> {
+        self.insert_update_bytes(key.into(), value.proto_serialize()).await
+    }
+
     pub async fn get_json<T: for<'de> Deserialize<'de> + Clone>(&self, key: impl Into<String>) -> RgResult<Option<T>> {
         let option = self.select_config(key.into()).await?;
         if let Some(str) = option {
@@ -137,6 +141,30 @@ impl ConfigStore {
         } else {
             Ok(None)
         }
+    }
+
+    pub async fn get_peer_tx(&self) -> RgResult<Option<Transaction>> {
+        self.get_maybe_proto("peer_tx").await
+    }
+
+    pub async fn set_peer_tx(&self, tx: &Transaction) -> RgResult<i64> {
+        self.store_proto_ref("peer_tx", tx).await
+    }
+
+    pub async fn get_node_tx(&self) -> RgResult<Option<Transaction>> {
+        self.get_maybe_proto("node_tx").await
+    }
+
+    pub async fn set_node_tx(&self, tx: &Transaction) -> RgResult<i64> {
+        self.store_proto_ref("node_tx", tx).await
+    }
+
+    pub async fn get_dynamic_md(&self) -> RgResult<Option<DynamicNodeMetadata>> {
+        self.get_maybe_proto("dynamic_node_metadata").await
+    }
+
+    pub async fn set_dynamic_md(&self, tx: &DynamicNodeMetadata) -> RgResult<i64> {
+        self.store_proto_ref("dynamic_node_metadata", tx).await
     }
 
 }

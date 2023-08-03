@@ -9,7 +9,6 @@ use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerData, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
-use eframe::egui::TextBuffer;
 use futures::future;
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
@@ -18,7 +17,8 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
+use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
@@ -139,6 +139,89 @@ pub struct StrictRelay {}
 // as the other 'half' here.
 impl Relay {
 
+    pub async fn node_tx(&self) -> RgResult<Transaction> {
+        let tx = self.ds.config_store.get_node_tx().await?;
+        if let Some(tx) = tx {
+            Ok(tx)
+        } else {
+            let tx = self.node_config.node_tx_fixed();
+            self.ds.config_store.set_node_tx(&tx).await?;
+            Ok(tx)
+        }
+    }
+
+    pub async fn peer_tx(&self) -> RgResult<Transaction> {
+        let tx = self.ds.config_store.get_peer_tx().await?;
+        if let Some(tx) = tx {
+            Ok(tx)
+        } else {
+            let tx = self.node_config.peer_tx_fixed();
+            self.ds.config_store.set_peer_tx(&tx).await?;
+            Ok(tx)
+        }
+    }
+
+    pub async fn dynamic_node_metadata(&self) -> RgResult<DynamicNodeMetadata> {
+        let tx = self.ds.config_store.get_dynamic_md().await?;
+        if let Some(tx) = tx {
+            Ok(tx)
+        } else {
+            let tx = self.node_config.dynamic_node_metadata_fixed();
+            self.ds.config_store.set_dynamic_md(&tx).await?;
+            Ok(tx)
+        }
+    }
+
+    pub async fn peer_node_info(&self) -> RgResult<PeerNodeInfo> {
+        Ok(PeerNodeInfo {
+            latest_peer_transaction: Some(self.peer_tx().await?),
+            latest_node_transaction: Some(self.node_tx().await?),
+            dynamic_node_metadata: Some(self.dynamic_node_metadata().await?),
+        })
+    }
+
+    // TODO: This is incorrect, it should issue queries to each node to get their latest
+    // Otherwise rely on data store query for each public key.
+    pub async fn peer_id_info(&self) -> RgResult<PeerIdInfo> {
+        Ok(PeerIdInfo {
+            latest_peer_transaction: Some(self.peer_tx().await?),
+            peer_node_info: vec![self.peer_node_info().await?],
+        })
+    }
+
+
+    pub async fn update_dynamic_node_metadata(&self, d: &DynamicNodeMetadata) -> RgResult<()> {
+        let mut d2 = d.clone();
+        // TODO: Sign here, increment height.
+        self.ds.config_store.set_dynamic_md(&d2).await?;
+        Ok(())
+    }
+
+    pub async fn update_node_metadata(&self, node_metadata: &NodeMetadata) -> RgResult<()> {
+        let mut tx = self.node_tx().await?;
+        let mut tx_b = TransactionBuilder::new();
+        let utxo = tx.head_utxo()?;
+        let h = utxo.height()?;
+        let address = self.node_config.public_key().address()?;
+        tx_b.with_maybe_currency_utxo(&utxo)?;
+        tx_b.with_output_node_metadata(&address, node_metadata.clone(), h+1);
+        let updated = tx_b.build()?;
+        self.ds.config_store.set_node_tx(&updated).await?;
+        let _ = self.submit_transaction_with(&updated, false).await?;
+        Ok(())
+    }
+
+    pub async fn sign_request(&self, req: &mut Request) -> RgResult<Request> {
+        Ok(req
+            .with_metadata(self.node_metadata().await?)
+            .with_auth(&self.node_config.internal_mnemonic().active_keypair()).clone())
+    }
+
+
+    pub async fn node_metadata(&self) -> RgResult<NodeMetadata> {
+        self.node_tx().await?.node_metadata()
+    }
+
     pub fn authorize_signing(&self, p0: InitiateMultipartySigningRequest) -> RgResult<()> {
         let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         l.insert(p0.signing_room_id.clone(), p0);
@@ -174,7 +257,7 @@ impl Relay {
     }
     pub fn check_mp_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let stripped_one = room_id.strip_suffix("-online").unwrap_or(room_id.as_str());
-        let room_id = stripped_one.strip_suffix("-offline").unwrap_or(stripped_one.as_str()).to_string();
+        let room_id = stripped_one.strip_suffix("-offline").unwrap_or(stripped_one).to_string();
         Ok(self.check_keygen_authorized(&room_id, public_key)?.or(self.check_signing_authorized(&room_id, public_key)?))
     }
 
@@ -356,6 +439,17 @@ impl Relay {
         self.submit_transaction(SubmitTransactionRequest{
             transaction: Some(tx.clone()),
             sync_query_response: true,
+        }).await
+    }
+
+    pub async fn submit_transaction_with(
+        &self,
+        tx: &Transaction,
+        sync: bool,
+    ) -> Result<SubmitTransactionResponse, ErrorInfo> {
+        self.submit_transaction(SubmitTransactionRequest{
+            transaction: Some(tx.clone()),
+            sync_query_response: sync,
         }).await
     }
 

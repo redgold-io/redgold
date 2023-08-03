@@ -11,18 +11,34 @@ use bitcoin::hashes::hex::ToHex;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeOption, structs, TestConstants};
+use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
 use crate::structs::NetworkEnvironment;
 use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
 use crate::util::mnemonic_words::MnemonicWords;
 
 #[derive(Clone, Serialize, Deserialize)]
-struct WordsPass {
-    words: String,
-    passphrase: Option<String>,
+pub struct WordsPass {
+    pub words: String,
+    pub passphrase: Option<String>,
 }
 
 impl WordsPass {
+
+    pub fn seed(&self) -> RgResult<[u8; 64]> {
+        Ok(self.mnemonic()?.to_seed(self.passphrase.clone().unwrap_or("".to_string())))
+    }
+
+    pub fn hash_derive_words(&self, concat_nonce: String) -> RgResult<Self> {
+        let mut vec = self.seed()?.to_vec();
+        vec.extend(concat_nonce.as_bytes());
+        let entropy = structs::Hash::digest(vec).safe_bytes()?;
+        let m = Mnemonic::from_entropy(&*entropy).error_info("Failed to derive mnemonic from entropy")?;
+        Ok(Self {
+            words: m.to_string(),
+            passphrase: None
+        })
+    }
+
     pub fn new(words: String, passphrase: Option<String>) -> Self {
         Self {
             words,
@@ -159,6 +175,7 @@ pub fn test() {
         words.clone(),
     ).unwrap();
     let seed = mnemonic.to_seed("test");
+    // let test_seed_no_p = mnemonic.to_seed(None);
     assert_eq!(seed1.clone(), seed.clone().to_vec());
     let xkey: ExtendedKey =
         (mnemonic, Some("test".to_string()))
