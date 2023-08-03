@@ -1,4 +1,4 @@
-use redgold_schema::{bytes_data, constants, error_message, from_hex, SafeBytesAccess, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, constants, error_message, from_hex, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{Address, Error as RGError, ErrorInfo, Proof, State};
 use crate::api::rosetta::models::{AccountIdentifier, Amount, Block, BlockIdentifier, CoinAction, CoinChange, CoinIdentifier, Currency, NetworkIdentifier, Operation, OperationIdentifier, PublicKey, Signature, Transaction, TransactionIdentifier};
 use crate::core::relay::Relay;
@@ -179,15 +179,17 @@ impl Rosetta {
         })
     }
 
-    pub fn input_output(&self, input: structs::Input) -> Result<structs::Output, ErrorInfo> {
+    pub async fn input_output(&self, input: structs::Input) -> Result<structs::Output, ErrorInfo> {
         let output = match input.output {
             None => {
-                let hash = input.transaction_hash.safe_bytes()?;
-                let result = DataStore::map_err(self.relay.ds.query_transaction(&hash))?;
+                let hash = input.transaction_hash.safe_get()?;
+                let result = self.relay.ds.transaction_store
+                    .query_maybe_transaction(&hash).await?;
                 // TODO: Translate result to error here
                 let out = result
                     .as_ref()
                     .expect("a")
+                    .0
                     .outputs
                     .get(input.output_index as usize)
                     .expect("a");
@@ -198,7 +200,7 @@ impl Rosetta {
         Ok(output)
     }
 
-    pub fn translate_operation(
+    pub async fn translate_operation(
         &self,
         transaction: &structs::Transaction,
         state: State,
@@ -217,7 +219,7 @@ impl Rosetta {
         }
         for input in &transaction.inputs {
             // TODO: Enrich input's output if missing
-            let output = self.input_output(input.clone())?;
+            let output = self.input_output(input.clone()).await?;
             operations.push(Self::operation(
                 index,
                 state,
@@ -230,20 +232,20 @@ impl Rosetta {
         Ok(operations)
     }
 
-    pub fn translate_transaction(
+    pub async fn translate_transaction(
         &self,
         transaction: structs::Transaction,
         state: State,
     ) -> Result<Transaction, ErrorInfo> {
         Ok(Transaction {
             transaction_identifier: Self::transaction_identifier(&transaction)?,
-            operations: self.translate_operation(&transaction, state)?,
+            operations: self.translate_operation(&transaction, state).await?,
             related_transactions: None,
             metadata: None,
         })
     }
 
-    pub fn translate_block(&self, block: structs::Block, state: State) -> Result<Block, ErrorInfo> {
+    pub async fn translate_block(&self, block: structs::Block, state: State) -> Result<Block, ErrorInfo> {
         let parent_height = std::cmp::max(block.height - 1, block.height);
         let parent_hash = block
             .clone()
@@ -255,7 +257,7 @@ impl Rosetta {
 
         let mut translated = vec![];
         for t in &block.transactions {
-            let transaction = self.translate_transaction(t.clone(), state)?;
+            let transaction = self.translate_transaction(t.clone(), state).await?;
             translated.push(transaction);
         }
 

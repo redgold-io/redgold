@@ -133,7 +133,7 @@ pub async fn block(r: Rosetta, request: BlockRequest) -> Result<BlockResponse, E
         .await?;
     Ok(BlockResponse {
         block: match maybe_block {
-            Some(b) => r.translate_block(b, State::Finalized)?.into(),
+            Some(b) => r.translate_block(b, State::Finalized).await?.into(),
             None => None,
         },
         other_transactions: None,
@@ -158,7 +158,7 @@ pub async fn block_transaction(
 
     for t in block.transactions {
         if t.hash_hex()? == request.transaction_identifier.hash {
-            let transaction = r.translate_transaction(t.clone(), State::Finalized)?;
+            let transaction = r.translate_transaction(t.clone(), State::Finalized).await?;
             return Ok(BlockTransactionResponse { transaction });
         }
     }
@@ -260,7 +260,7 @@ pub async fn construction_parse(
 ) -> Result<ConstructionParseResponse, ErrorInfo> {
     r.validate_network(request.network_identifier).await?;
     let tx = structs::Transaction::from_hex(request.transaction)?;
-    let tx_r = r.translate_transaction(tx.clone(), State::Pending)?;
+    let tx_r = r.translate_transaction(tx.clone(), State::Pending).await?;
     let operations = tx_r.operations.clone();
     let mut signers = None;
     let mut account_identifier_signers = None;
@@ -269,7 +269,7 @@ pub async fn construction_parse(
         let mut ai_signers_v = vec![];
         for i in tx.inputs {
             if !i.proof.is_empty() {
-                let output = r.input_output(i.clone())?;
+                let output = r.input_output(i.clone()).await?;
                 let address = output.address.expect("a");
                 signers_v.push(address.render_string()?);
                 ai_signers_v.push(Rosetta::account_identifier(address)?);
@@ -445,7 +445,7 @@ pub async fn mempool_transaction(
     let result = r.relay.transaction_channels.get(&hash);
     if let Some(rr) = result {
         let tx = rr.value().transaction.clone();
-        let transaction = r.translate_transaction(tx, State::Pending)?;
+        let transaction = r.translate_transaction(tx, State::Pending).await?;
         Ok({MempoolTransactionResponse{
             transaction,
             metadata: None

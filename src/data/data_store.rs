@@ -86,12 +86,6 @@ impl DataStore {
     }
 }
 
-/*
-
-   let pool = SqlitePool::connect(&*path.clone())
-       .await
-       .expect("Connection failure");
-*/
 
 #[derive(Clone)]
 pub struct RewardQueryResult {
@@ -124,78 +118,6 @@ impl DataStore {
 
     pub fn connection(&self) -> rusqlite::Result<Connection, Error> {
         return Connection::open(self.connection_path.clone());
-    }
-
-    // Change utxo schema? What fields are we actually going to query here?
-    pub fn create_debug_table(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS debug_table (
-                  something STRING PRIMARY KEY,
-                  output_index INTEGER
-                  )",
-                [],
-            )
-        });
-    }
-
-
-    #[allow(dead_code)]
-    pub(crate) async fn create_mnemonic(&self) -> result::Result<usize, sqlx::Error> {
-        let mut conn = self.pool.acquire().await?;
-        let tbl = "CREATE TABLE IF NOT EXISTS mnemonic (
-                  words    STRING PRIMARY KEY,
-                  time INTEGER,
-                  peer_id BLOB
-                  )";
-        // TODO: Read from resource directory as included byte string
-        sqlx::query(tbl).fetch_all(&mut conn).await?;
-        Ok(0)
-    }
-
-    pub fn map_sqlx_error(err: sqlx::Error) -> ErrorInfo {
-        error_info(err.to_string()) // TODO: code
-    }
-
-    pub async fn insert_mnemonic(
-        &self,
-        mnemonic_entry: MnemonicEntry,
-    ) -> result::Result<(), sqlx::Error> {
-        let mut conn = self.pool.acquire().await?;
-
-        sqlx::query("INSERT INTO mnemonic (words, time, peer_id) VALUES (?, ?, ?)")
-            .bind(mnemonic_entry.words)
-            .bind(mnemonic_entry.time)
-            .bind(mnemonic_entry.peer_id)
-            .fetch_all(&mut conn)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn query_all_mnemonic(&self) -> result::Result<Vec<MnemonicEntry>, sqlx::Error> {
-        let mut conn = self.pool.acquire().await?;
-
-        let rows = sqlx::query("select words, time, peer_id from mnemonic")
-            .map(|x: SqliteRow| {
-                let words: &str = x.try_get("words")?;
-                let time: i64 = x.try_get("time")?;
-                let peer_id: Vec<u8> = x.try_get("peer_id")?;
-                let res: Result<MnemonicEntry, sqlx::Error> = Ok(MnemonicEntry {
-                    words: words.to_string(),
-                    time,
-                    peer_id,
-                });
-                res
-            })
-            .fetch_all(&mut conn)
-            .await?;
-
-        let mut res: Vec<MnemonicEntry> = vec![];
-        for row in rows {
-            let result: MnemonicEntry = row?;
-            res.push(result);
-        }
-        Ok(res)
     }
 
     pub async fn pool(&self) -> std::result::Result<PoolConnection<Sqlite>, ErrorInfo> {
@@ -439,54 +361,6 @@ impl DataStore {
         Ok(AddressInfo::from_utxo_entries(addr.clone(), res))
     }
 
-    #[allow(dead_code)]
-    fn create_private_key(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS private_key (
-                  data    BLOB PRIMARY KEY,
-                  iv BLOB,
-                  time INTEGER,
-                  rounds INTEGER,
-                  password_id BLOB
-                  )",
-                [],
-            )
-        });
-    }
-
-    #[allow(dead_code)]
-    fn create_password(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS password (
-                  id BLOB PRIMARY KEY,
-                  name STRING,
-                  checksum BLOB,
-                  time INTEGER,
-                  rounds INTEGER,
-                  data    STRING,
-                  iv BLOB
-                  )",
-                [],
-            )
-        });
-    }
-
-    #[allow(dead_code)]
-    fn create_rewards(&self) -> rusqlite::Result<usize, Error> {
-        return self.connection().and_then(|c| {
-            c.execute(
-                "CREATE TABLE IF NOT EXISTS rewards (
-                  time BLOB PRIMARY KEY,
-                  hash BLOB,
-                  transaction BLOB
-                  )",
-                [],
-            )
-        });
-    }
-
     pub fn select_latest_reward_hash(&self) -> Result<Vec<u8>, Error> {
         let conn = self.connection()?;
         let mut statement = conn.prepare("SELECT hash FROM rewards ORDER BY time DESC LIMIT 1")?;
@@ -540,25 +414,6 @@ impl DataStore {
     //     return Ok(map);
     // }
 
-
-    pub fn select_broadcast_peers(&self) -> rusqlite::Result<Vec<PeerQueryResult>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare(
-            "SELECT public_key, peers.trust FROM peer_key JOIN peers on peer_key.id = peers.id",
-        )?;
-
-        let rows = statement.query_map(params![], |row| {
-            let result: f64 = row.get(1).unwrap_or(0 as f64);
-            Ok(PeerQueryResult {
-                public_key: row.get(0)?,
-                trust: result,
-            })
-        })?;
-
-        let res = rows.map(|r| r.unwrap()).collect::<Vec<PeerQueryResult>>();
-
-        return Ok(res);
-    }
 
     pub fn map_err<A>(error: rusqlite::Result<A, rusqlite::Error>) -> result::Result<A, ErrorInfo> {
         error.map_err(|e| error_info(e.to_string()))
@@ -710,22 +565,6 @@ WHERE
     }
 
 
-    pub fn create_all_err(&self) -> rusqlite::Result<Connection, Error> {
-        let c = self.connection()?;
-        self.create_debug_table()?;
-        // self.create_peers()?;
-        // self.create_peer_keys()?;
-        // self.create_transactions()?;
-        // self.create_observation()?;
-        // self.create_observation_edge()?;
-        //
-        // sqlx::migrate!("./migrations")
-        //     .run(&*self.pool)
-        //     .await
-        //     .expect("Migrations failure");
-
-        return Ok(c);
-    }
 
     pub async fn run_migrations(&self) -> result::Result<(), ErrorInfo> {
         self.ctx.run_migrations().await
@@ -748,9 +587,6 @@ WHERE
         Ok(())
     }
 
-    pub fn create_all_err_info(&self) -> Result<Connection, ErrorInfo> {
-        DataStore::map_err(self.create_all_err())
-    }
 }
 
 // "file:memdb1?mode=memory&cache=shared"
@@ -893,23 +729,6 @@ pub struct MnemonicEntry {
 //
 //     Ok(id)
 // }
-
-#[tokio::test]
-async fn test_mnemonic() {
-    let ds = DataStore::in_memory().await;
-    ds.create_mnemonic().await.expect("created");
-    ds.insert_mnemonic(MnemonicEntry {
-        words: "asdf".to_string(),
-        time: 0,
-        peer_id: vec![],
-    })
-    .await
-    .expect("insert");
-    let res = ds.query_all_mnemonic().await;
-    let vec1 = res.expect("query");
-    let m = vec1.get(0).expect("0").clone();
-    assert_eq!(m.words, "asdf".to_string());
-}
 
 // Fix later
 #[ignore]

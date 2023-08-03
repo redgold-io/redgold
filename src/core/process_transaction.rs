@@ -102,10 +102,13 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     // or rather node size determines minimum -- partition?
 
     // TODO: replace this func
-    let peer_publics = relay.ds.select_broadcast_peers().unwrap();
+    // relay.ds.peer_store.node_peer_id_trust()
+    let an = relay.ds.peer_store.active_nodes(None).await?;
+    // let peer_publics = relay.ds.select_broadcast_peers().unwrap();
     let mut map = HashMap::<Vec<u8>, f64>::new();
-    for peer in peer_publics {
-        map.insert(peer.public_key, peer.trust);
+    for peer in &an {
+        let t = relay.ds.peer_store.node_peer_id_trust(peer).await?.map(|q| q.trust).unwrap_or(0.0);
+        map.insert(peer.bytes.safe_bytes()?, t);
     }
 
     let mut trust_conflicts = vec![];
