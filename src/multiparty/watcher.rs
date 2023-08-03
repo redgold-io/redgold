@@ -580,6 +580,7 @@ impl IntervalFold for Watcher {
             // Also check bitcoin transaction balances? Find the address they came from.
             // we'll need a guide saying to send from a single account
             if let Some(d) = cfg.deposit_allocations.get(0) {
+                info!("Watcher checking deposit allocation pubkey hex: {}", d.key.hex()?);
                 if self.wallet.get(0).is_none() {
                     let key = &d.key;
                     let w = SingleKeyBitcoinWallet::new_wallet(key.clone(), self.relay.node_config.network, true)?;
