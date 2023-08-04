@@ -290,15 +290,16 @@ impl Transaction {
         }
 
         for _output in self.outputs.iter() {
+            // TODO: Reimplement dust separate from testing?
             // if output.address.len() != 20 {
             //     // println!("address id len : {:?}", output.address.len());
             //     return Err(RGError::InvalidHashLength);
             // }
-            if let Some(a) = _output.opt_amount() {
-                if a < 10_000 {
-                    Err(error_info(format!("Insufficient amount output of {a}")))?;
-                }
-            }
+            // if let Some(a) = _output.opt_amount() {
+            //     if a < 10_000 {
+            //         Err(error_info(format!("Insufficient amount output of {a}")))?;
+            //     }
+            // }
         }
 
         // TODO: Sum by product Id

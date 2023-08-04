@@ -545,7 +545,7 @@ impl Watcher {
 
     pub async fn get_starting_center_price(&self) -> f64 {
         // RDG / BTC
-        1f64
+        30_000.0
     }
 }
 
@@ -578,7 +578,7 @@ impl IntervalFold for Watcher {
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
         //.ok.andthen?
         if let Some(mut cfg) = cfg {
-            if cfg.bid_ask.center_price == 0f64 {
+            if cfg.bid_ask.center_price == 1f64 {
                 info!("Regenerating starting price due to zero stored in config.");
                 cfg.bid_ask = cfg.bid_ask.regenerate(self.get_starting_center_price().await);
                 ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
