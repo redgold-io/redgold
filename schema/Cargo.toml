@@ -33,10 +33,10 @@ prost-helper = "0.2.0"
 num-traits = "0.2.15"
 # TODO: Change to feature only for not including in WASM
 tokio = { version = "1.0.0", features = ["rt"] }
-bdk = {version = "0.28.1", features = ["default", "keys-bip39", "bip39"]}
-
-[patch.crates-io]
-miniscript = { version = "10.0.0" }
+bdk = {version = "1.0.0-alpha.0", features = ["default", "keys-bip39", "bip39"]}
+#
+#[patch.crates-io]
+#miniscript = { version = "10.0.0" }
 
 [dependencies.bitcoin]
 version = "0.21"
