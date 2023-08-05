@@ -28,9 +28,9 @@ impl WordsPass {
         Ok(self.mnemonic()?.to_seed(self.passphrase.clone().unwrap_or("".to_string())))
     }
 
-    pub fn hash_derive_words(&self, concat_nonce: String) -> RgResult<Self> {
+    pub fn hash_derive_words(&self, concat_nonce: impl Into<String>) -> RgResult<Self> {
         let mut vec = self.seed()?.to_vec();
-        vec.extend(concat_nonce.as_bytes());
+        vec.extend(concat_nonce.into().as_bytes());
         let entropy = structs::Hash::digest(vec).safe_bytes()?;
         let m = Mnemonic::from_entropy(&*entropy).error_info("Failed to derive mnemonic from entropy")?;
         Ok(Self {
