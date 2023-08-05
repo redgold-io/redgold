@@ -281,7 +281,8 @@ pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut Local
                         NetworkEnvironment::Dev,
                         is_genesis,
                         None,
-                        true
+                        true,
+                        ,
                     );
                     // local_state.server_state.deployment_result_info_box.lock().expect("").push(result);
                 };

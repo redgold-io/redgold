@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use env_logger::Env;
-use redgold_schema::ErrorInfoContext;
+use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use crate::data::data_store::DataStore;
 
@@ -19,6 +19,10 @@ impl EnvDataFolder {
 
     pub fn mnemonic_path(&self) -> PathBuf {
         self.path.join("mnemonic")
+    }
+
+    pub async fn mnemonic(&self) -> RgResult<String> {
+        tokio::fs::read(self.mnemonic_path()).await.error_info("Bad mnemonic read")
     }
 
     pub fn peer_id_path(&self) -> PathBuf {
@@ -114,5 +118,10 @@ impl DataFolder {
         std::fs::remove_dir_all(&self.path).ok();
         self
     }
+
+}
+
+#[test]
+fn debug() {
 
 }

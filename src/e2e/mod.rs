@@ -188,7 +188,7 @@ pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
         relay: relay.clone(),
         last_failure: util::current_time_millis_i64(),
         failed_once: false,
-        num_success: 0
+        num_success: 0,
     };
 
     // See if we should start at all

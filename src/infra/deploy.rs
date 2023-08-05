@@ -1,7 +1,7 @@
  use std::collections::HashMap;
  use std::env::VarError;
  use std::fs::File;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId};
 use std::io::{Write, Read, Seek, SeekFrom};
 use std::thread::sleep;
 use std::time::Duration;
@@ -10,9 +10,12 @@ use crate::resources::Resources;
 // use filepath::FilePath;
 use itertools::Itertools;
  use redgold_schema::RgResult;
+ use redgold_schema::util::mnemonic_support::WordsPass;
+ use crate::hardware::trezor;
  use crate::node_config::NodeConfig;
  use crate::util::cli::arg_parse_config::ArgTranslate;
  use crate::util::cli::args::Deploy;
+ use crate::util::cli::commands::get_input;
  use crate::util::cli::data_folder::DataFolder;
 
  /**
@@ -22,12 +25,14 @@ They must be manually deployed.
  This whole thing should really have a streaming output for the lines and stuff.
  */
 pub async fn setup_server_redgold(
-    mut ssh: SSH,
-    network: NetworkEnvironment,
-    is_genesis: bool,
-    additional_env: Option<HashMap<String, String>>,
-    purge_data: bool,
-) -> Result<(), ErrorInfo> {
+     mut ssh: SSH,
+     network: NetworkEnvironment,
+     is_genesis: bool,
+     additional_env: Option<HashMap<String, String>>,
+     purge_data: bool,
+     words: Option<String>,
+     peer_id_hex: Option<String>,
+ ) -> Result<(), ErrorInfo> {
 
     ssh.verify()?;
 
@@ -45,21 +50,30 @@ pub async fn setup_server_redgold(
 
     let compose = ssh.exec("docker-compose", true);
     if !(compose.stderr.contains("applications")) {
-        ssh.run("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh");
-        ssh.run("sudo apt install -y docker-compose");
+        ssh.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
+        ssh.exes("sudo apt install -y docker-compose", p).await?;
     }
     let r = Resources::default();
 
     let path = format!("/root/.rg/{}", network.to_std_string());
+    let all_path = format!("/root/.rg/{}", NetworkEnvironment::All.to_std_string());
+
+     // Copy mnemonic / peer_id
+     if let Some(words) = words {
+         ssh.copy_p(words, format!("{}/mnemonic", all_path), p)?;
+     }
+     if let Some(peer_id_hex) = peer_id_hex {
+         ssh.copy_p(peer_id_hex, format!("{}/peer_id", path), p)?;
+     }
+
 
     // TODO: Investigate issue with tmpfile, not working
     // // let mut tmpfile: File = tempfile::tempfile().unwrap();
     // // write!(tmpfile, "{}", r.redgold_docker_compose).unwrap();
     // TODO: Also wget from github directly depending on security concerns -- not verified from checksum hash
     // Only should be done to override if the given exe is outdated.
-    ssh.exec(format!("mkdir -p {}", path), true);
-
-    ssh.copy(r.redgold_docker_compose, format!("{}/redgold-only.yml", path));
+    ssh.exes(format!("mkdir -p {}", path), p).await?;
+    ssh.copy_p(r.redgold_docker_compose, format!("{}/redgold-only.yml", path), p)?;
 
     let port = network.default_port_offset();
     let mut env = additional_env.unwrap_or(Default::default());
@@ -78,30 +92,28 @@ pub async fn setup_server_redgold(
     }
 
      // TODO: Lol not this
-    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port), true);
-    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port - 1), true);
-    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 1), true);
-    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 4), true);
-    ssh.exec(format!("sudo ufw allow proto udp from any to any port {}", port + 5), true);
-    ssh.exec(format!("sudo ufw allow proto tcp from any to any port {}", port + 6), true);
+     let port_range = vec![-1, 0, 1, 4, 5, 6];
+     for port in port_range {
+         ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port), p).await?;
+     }
 
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
     }).join("\n");
-    ssh.copy(env_contents.clone(), format!("{}/var.env", path));
-    ssh.copy(env_contents, format!("{}/.env", path));
+    ssh.copy_p(env_contents.clone(), format!("{}/var.env", path))?;
+    ssh.copy_p(env_contents, format!("{}/.env", path))?;
 
     sleep(Duration::from_secs(4));
 
-    ssh.exec(format!("cd {}; docker-compose -f redgold-only.yml down", path), true);
+    ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml down", path), p).await?;
 
     if purge_data {
         println!("Purging data");
-        ssh.exec(format!("rm -rf {}/{}", path, "data_store.sqlite"), true);
+        ssh.exes(format!("rm -rf {}/{}", path, "data_store.sqlite"), p).await?;
     }
 
-    ssh.exec(format!("cd {}; docker-compose -f redgold-only.yml pull", path), true);
-    ssh.exec(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), true);
+    ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
+    ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
     ssh.exes("sudo ufw reload", p).await?;
 
     Ok(())
@@ -217,12 +229,51 @@ pub async fn setup_ops_services(
     Ok(())
 }
 
-pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) {
+
+pub async fn derive_mnemonic_and_peer_id(
+    mnemonic: String, server_index: usize, cold: bool, passphrase: Option<String>,
+    opt_peer_id: Option<String>
+)
+ -> RgResult<(String, String)> {
+
+    let w = WordsPass::new(mnemonic, passphrase);
+    let new = w.hash_derive_words(server_index)?;
+    let server_mnemonic = new.words;
+    let account = (99 - server_index) as u32;
+    let mut pid_hex = "".to_string();
+    if let Some(pid) = opt_peer_id {
+        pid_hex = pid;
+    } else {
+        let pk = if cold {
+            trezor::get_standard_public_key(
+                account, None, 0, 0)?
+        } else {
+            w.public_at(format!("m/44'/0'/{}/0/0", account))?
+        };
+        pid_hex = pk.hex()?;
+    }
+
+    Ok((server_mnemonic, pid_hex))
+}
+
+pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<()> {
 
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
     let buf = df.all().servers_path();
+    let m = df.all().mnemonic().await.expect("");
+    let passphrase = if deploy.ask_pass {
+        let passphrase = get_input("Enter passphrase for mnemonic: ").await?;
+        passphrase
+    } else {
+        None
+    };
+    // Ok heres what to do, in here we need to potentially invoke the HW signer for peer id
+    // if we don't have one generated FOR THE ENVIRONMENT of interest.
+    // So check to see if the peer id exists, if not, generate it according to hardware signer
+    // ONLY IF mainnet do we use hardware signer?
+    //WordsPass::new(m)
     println!("Reading servers file: {:?}", buf);
     let s = ArgTranslate::read_servers_file(buf).expect("servers");
     println!("Setting up servers: {:?}", s);
@@ -245,22 +296,47 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) {
         servers = vec![x]
     }
 
+    let mut peer_id_index: HashMap<i64, String> = HashMap::default();
+
     for (ii, ss) in servers.iter().enumerate() {
         if let Some(i) = deploy.exclude_server_index {
             if ii == i as usize {
                 continue;
             }
         }
+
+        let opt_peer_id: Option<String> = peer_id_index.get(&ss.peer_id_index).cloned();
+        let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
+            m.clone(), ss.peer_id_index as usize, deploy.cold, passphrase.clone(), opt_peer_id
+        ).await?;
+        let words_opt = if deploy.words || deploy.words_and_id {
+            Some(words.clone())
+        } else {
+            None
+        };
+        let peer_id_hex_opt = if deploy.peer_id  || deploy.words_and_id {
+            Some(peer_id_hex.clone())
+        } else {
+            None
+        };
+        peer_id_index.insert(ss.peer_id_index, peer_id_hex.clone());
         let mut hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         if !deploy.ops {
-            setup_server_redgold(ssh, net, gen, Some(hm), purge).await.expect("worx");
+            setup_server_redgold(
+                ssh, net, gen, Some(hm), purge,
+                words_opt,
+                peer_id_hex_opt,
+            ).await.expect("worx");
         }
         gen = false;
-        let ssh = SSH::new_ssh(ss.host.clone(), None);
-        setup_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
+        if !deploy.skip_ops {
+            let ssh = SSH::new_ssh(ss.host.clone(), None);
+            setup_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
+        }
     }
+    Ok(())
 }
 
 

@@ -250,6 +250,10 @@ impl ArgTranslate {
             self.node_config.mnemonic_words = words;
         };
 
+        if let Ok(words) = self.node_config.data_folder.all().mnemonic() {
+            self.node_config.mnemonic_words = words;
+        };
+
         // Then override with optional found file
         // TODO: Should we just change this to an ALL folder?
         let mnemonic_disk_path = self.node_config.env_data_folder().mnemonic_path();
@@ -296,7 +300,8 @@ impl ArgTranslate {
             //     peer_id: node_config.self_peer_id.clone(),
         //     // });
         //     std::fs::create_dir_all(mnemonic_disk_path.clone()).expect("Unable to create data dir");
-        fs::write(mnemonic_disk_path.clone(), self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
+        fs::write(self.node_config.data_folder.all().mnemonic_path(),
+                  self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
 
 
         Ok(())
@@ -332,6 +337,8 @@ impl ArgTranslate {
             // let tree = crate::node_config::peer_id_from_single_mnemonic(string)?;
             self.node_config.peer_id = self.node_config.default_peer_id()?;
         }
+
+        info!("Starting with peer id {}", self.node_config.peer_id.json_or());
 
         Ok(())
 

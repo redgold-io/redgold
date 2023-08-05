@@ -251,6 +251,15 @@ impl SSH {
         fs::remove_file("tmpfile").unwrap();
     }
 
+    pub fn copy_p<F: Fn(String) -> RgResult<()> + 'static>(
+        &mut self, contents: impl Into<String>, remote_path: impl Into<String>,
+        partial: &Box<F>
+    ) -> RgResult<()> {
+        partial(format!("Copying to: {}", remote_path.into()))?;
+        self.copy(contents.into(), remote_path.into());
+        Ok(())
+    }
+
     pub fn scp(&mut self, file: &str, remote_path: &str) {
         use std::io::prelude::*;
 
