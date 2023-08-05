@@ -707,6 +707,9 @@ message MultipartyAuthenticationRequest {
   string room_id = 2;
 }
 
+message HealthRequest {
+
+}
 
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
@@ -727,6 +730,11 @@ message Request {
   optional string trace_id = 15;
   optional bool trace = 16;
   MultipartyAuthenticationRequest multiparty_authentication_request = 18;
+  HealthRequest health_request = 19;
+}
+
+message HealthResponse {
+
 }
 
 message Response {
@@ -746,6 +754,7 @@ message Response {
   UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
   QueryObservationProofResponse query_observation_proof_response = 11;
   HashSearchResponse hash_search_response = 12;
+  HealthResponse health_response = 14;
 }
 
 message QueryTransactionRequest {

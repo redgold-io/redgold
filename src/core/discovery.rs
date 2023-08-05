@@ -38,7 +38,8 @@ impl IntervalFold for Discovery {
 
         let mut req = structs::Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-        for r in self.relay.broadcast_async(peers.clone(), req, None).await? {
+        for (r, pk) in self.relay.broadcast_async(
+            peers.clone(), req, None).await?.iter().zip(peers.clone()) {
             match r {
                 Ok(o) => {
                     if let Some(o) = o.get_peers_info_response {
@@ -50,7 +51,8 @@ impl IntervalFold for Discovery {
                     }
                 }
                 Err(e) => {
-                    error!("Error in discovery: {}", e.json_or())
+                    error!("Error in discovery: {}", e.json_or());
+                    self.relay.ds.peer_store.remove_node(&pk).await?;
                 }
             }
         }
