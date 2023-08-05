@@ -46,7 +46,7 @@ jobs:
       - run: rustup update
       - run: rustup -V
       - run: cargo clean
-      - run: cargo build -j1 --release
+      - run: cargo build --release
 #      - run: cargo build --release
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: ./bin/local_test.sh
