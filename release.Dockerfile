@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:latest
 RUN apt update
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt install -y automake libtool libssl-dev \
