@@ -42,12 +42,12 @@ impl IntervalFold for Discovery {
             peers.clone(), req, None).await?.iter().zip(peers.clone()) {
             match r {
                 Ok(o) => {
-                    if let Some(o) = o.get_peers_info_response {
+                    if let Some(o) = &o.get_peers_info_response {
                         // TODO: There's probably a better way to merge peer info here.
                         // Problem here is we might have slightly different but almost same based
                         // on observation ordinal
                         // o.peer_info
-                        results.extend(o.peer_info)
+                        results.extend(o.peer_info.clone())
                     }
                 }
                 Err(e) => {
