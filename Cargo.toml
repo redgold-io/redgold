@@ -155,3 +155,6 @@ features = ["vendored"]
 #version = "1.0"  # Use the latest version available
 #default-features = false
 #features = ["simdeez_f"]  # scalar for no SIMD, you can also use "sse2", "sse41", "avx2", "avx", "neon"
+
+[profile.release]
+codegen-units=1
