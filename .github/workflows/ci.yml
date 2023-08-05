@@ -19,7 +19,7 @@ jobs:
       refs/heads/test
       refs/heads/main
       ', github.ref) }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest-m
     permissions:
       contents: write
 #    env:
