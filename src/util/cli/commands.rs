@@ -7,11 +7,12 @@ use clap::command;
 use log::info;
 use rocket::form::FromForm;
 use serde_json::error::Category::Data;
+use tokio::io::AsyncReadExt;
 use tokio::runtime::Runtime;
 use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
 use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, SafeBytesAccess, SafeOption, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, RgResult, SafeBytesAccess, SafeOption, util, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
@@ -233,9 +234,21 @@ pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorIn
         return Ok(());
     }
 
-    default_deploy(deploy, _config).await;
+    default_deploy(deploy, _config).await?;
 
     Ok(())
+}
+
+pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {
+    println!("{}", prompt.into());
+    let mut input = String::new();
+    // TODO: Replace with tokio async read if necessary
+    std::io::stdin().read_line(&mut input).error_info("Failed to read line")?;
+    if input.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(input))
+    }
 }
 
 // Move to own file

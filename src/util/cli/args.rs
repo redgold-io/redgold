@@ -189,6 +189,21 @@ pub struct Deploy {
     /// Exclude server index
     #[clap(long)]
     pub exclude_server_index: Option<i32>,
+    #[clap(long)]
+    pub skip_ops: bool,
+    #[clap(long)]
+    pub ask_pass: bool,
+    #[clap(long)]
+    pub cold: bool,
+    /// Whether or not to update the remote mnemonic words
+    #[clap(long)]
+    pub words: bool,
+    /// Whether or not to update the remote peer_id
+    #[clap(long)]
+    pub peer_id: bool,
+    #[clap(long)]
+    pub words_and_id: bool,
+
 
 }
 

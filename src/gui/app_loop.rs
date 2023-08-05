@@ -272,20 +272,21 @@ pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut Local
         ui.spacing();
         if ui.button("Deploy").clicked() {
             info!("Deploying");
-            tokio::spawn(async {
-                for server in servers {
-                    let ssh = SSH::from_server(&server);
-                    let is_genesis = server.index == 0;
-                    let _result = deploy::setup_server_redgold(
-                        ssh,
-                        NetworkEnvironment::Dev,
-                        is_genesis,
-                        None,
-                        true
-                    );
-                    // local_state.server_state.deployment_result_info_box.lock().expect("").push(result);
-                };
-            });
+            // tokio::spawn(async {
+            //     for server in servers {
+            //         let ssh = SSH::from_server(&server);
+            //         let is_genesis = server.index == 0;
+            //         let _result = deploy::setup_server_redgold(
+            //             ssh,
+            //             NetworkEnvironment::Dev,
+            //             is_genesis,
+            //             None,
+            //             true,
+            //             ,
+            //         );
+            //         // local_state.server_state.deployment_result_info_box.lock().expect("").push(result);
+            //     };
+            // });
             ()
         }
     });
