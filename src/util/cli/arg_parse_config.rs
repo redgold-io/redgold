@@ -131,7 +131,7 @@ impl ArgTranslate {
         metrics_registry::register_metrics(self.node_config.port_offset);
         self.data_folder()?;
         self.secure_data_folder();
-        self.load_mnemonic()?;
+        self.load_mnemonic().await?;
         self.load_peer_id()?;
         self.set_public_key();
         self.load_internal_servers()?;
@@ -240,7 +240,7 @@ impl ArgTranslate {
         info!("Sha256 checksum from shell script: {}", shasum);
     }
 
-    fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
+    async fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
 
         // Remove any defaults; we want to be explicit
         self.node_config.mnemonic_words = "".to_string();
@@ -250,7 +250,7 @@ impl ArgTranslate {
             self.node_config.mnemonic_words = words;
         };
 
-        if let Ok(words) = self.node_config.data_folder.all().mnemonic() {
+        if let Ok(words) = self.node_config.data_folder.all().mnemonic().await {
             self.node_config.mnemonic_words = words;
         };
 

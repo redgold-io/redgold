@@ -252,11 +252,11 @@ impl SSH {
     }
 
     pub fn copy_p<F: Fn(String) -> RgResult<()> + 'static>(
-        &mut self, contents: impl Into<String>, remote_path: impl Into<String>,
+        &mut self, contents: impl Into<String>, remote_path: impl Into<String> + Clone,
         partial: &Box<F>
     ) -> RgResult<()> {
-        partial(format!("Copying to: {}", remote_path.into()))?;
-        self.copy(contents.into(), remote_path.into());
+        partial(format!("Copying to: {}", remote_path.clone().into().clone()))?;
+        self.copy(contents.into(), remote_path.into().clone());
         Ok(())
     }
 

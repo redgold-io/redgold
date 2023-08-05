@@ -22,7 +22,7 @@ impl EnvDataFolder {
     }
 
     pub async fn mnemonic(&self) -> RgResult<String> {
-        tokio::fs::read(self.mnemonic_path()).await.error_info("Bad mnemonic read")
+        tokio::fs::read_to_string(self.mnemonic_path()).await.error_info("Bad mnemonic read")
     }
 
     pub fn peer_id_path(&self) -> PathBuf {

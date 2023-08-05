@@ -100,8 +100,8 @@ pub async fn setup_server_redgold(
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
     }).join("\n");
-    ssh.copy_p(env_contents.clone(), format!("{}/var.env", path))?;
-    ssh.copy_p(env_contents, format!("{}/.env", path))?;
+    ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p)?;
+    ssh.copy_p(env_contents, format!("{}/.env", path), p)?;
 
     sleep(Duration::from_secs(4));
 
@@ -237,7 +237,7 @@ pub async fn derive_mnemonic_and_peer_id(
  -> RgResult<(String, String)> {
 
     let w = WordsPass::new(mnemonic, passphrase);
-    let new = w.hash_derive_words(server_index)?;
+    let new = w.hash_derive_words(server_index.to_string())?;
     let server_mnemonic = new.words;
     let account = (99 - server_index) as u32;
     let mut pid_hex = "".to_string();
