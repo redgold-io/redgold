@@ -251,11 +251,12 @@ impl SSH {
         fs::remove_file("tmpfile").unwrap();
     }
 
-    pub fn copy_p<F: Fn(String) -> RgResult<()> + 'static>(
+    pub async fn copy_p<F: Fn(String) -> RgResult<()> + 'static>(
         &mut self, contents: impl Into<String>, remote_path: impl Into<String> + Clone,
         partial: &Box<F>
     ) -> RgResult<()> {
         partial(format!("Copying to: {}", remote_path.clone().into().clone()))?;
+        self.exes(format!("rm -f {}", remote_path.clone().into().clone()), partial).await?;
         self.copy(contents.into(), remote_path.into().clone());
         Ok(())
     }
