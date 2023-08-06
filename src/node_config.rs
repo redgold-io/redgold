@@ -157,7 +157,6 @@ impl NodeConfig {
         let pk_vec = pair.public_key_vec();
         NodeMetadata{
             external_address: self.external_ip.clone(),
-            multi_hash: vec![], //util::to_libp2p_peer_id_ser(&pk_vec).to_bytes(),
             public_key: Some(self.public_key()),
             proof: None,
             node_type: Some(NodeType::Static as i32),

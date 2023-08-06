@@ -57,9 +57,9 @@ impl PeerRxEventHandler {
 
         // Check if we know the peer, if not, attempt discovery
         if let Some(pk) = pm.request.clone().proof.clone().and_then(|r| r.public_key) {
-            let known = relay.ds.peer_store.query_public_key_node(pk.clone()).await?.is_some();
+            let known = relay.ds.peer_store.query_public_key_node(&pk).await?.is_some();
             if known {
-                relay.ds.peer_store.update_last_seen(pk).await.ok();
+                relay.ds.peer_store.update_last_seen(&pk).await.ok();
             } else {
                 if let Some(nmd) = &pm.request.node_metadata {
                     info!("Attempting immediate discovery on peer {}", pk.short_id());
@@ -123,7 +123,7 @@ impl PeerRxEventHandler {
         // if let some(f) = request.fau
         if let Some(_) = request.get_peers_info_request {
             let mut get_peers_info_response = GetPeersInfoResponse::default();
-            let vec = relay.ds.peer_store.peer_node_info().await?;
+            let vec = relay.ds.peer_store.all_peers_info().await?;
             get_peers_info_response.peer_info = vec;
             response.get_peers_info_response = Some(get_peers_info_response);
             // response.get_peers_info_response = Some(relay.get_peers_info(r).await?);

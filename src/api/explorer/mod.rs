@@ -580,11 +580,8 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
     active_peers_abridged.push(
         handle_peer(&r.peer_id_info().await?, &r).await?
     );
-    for pk in pks {
-        if let Some(pid) = r.ds.peer_store.query_public_key_node(pk).await?
-            .and_then(|p| p.latest_peer_transaction)
-            .and_then(|p| p.peer_data().ok())
-            .and_then(|p| p.peer_id) {
+    for pk in &pks {
+        if let Some(pid) = r.ds.peer_store.peer_id_for_node_pk(pk).await? {
             if let Some(pid_info) = r.ds.peer_store.query_peer_id_info(&pid).await? {
                 if let Some(p) = handle_peer(&pid_info, &r).await.ok() {
                     active_peers_abridged.push(p);
