@@ -22,36 +22,24 @@ pub struct PeerTrustQueryResult {
 
 impl PeerStore {
 
-
-    pub async fn peer_id_for_node_pk(&self, public_key: &PublicKey) -> RgResult<Option<PeerId>> {
-        let mut pool = self.ctx.pool().await?;
-        let vec = public_key.validate()?.bytes()?;
-        let rows = sqlx::query!(
-            r#"SELECT id FROM peer_key WHERE public_key = ?1"#,
-            vec
-        )
-            .fetch_optional(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        if let Some(r) = rows_m {
-            let id = r.id.safe_get_msg("Missing id")?;
-            Ok(Some(PeerId::from_bytes(id.clone())))
-        } else {
-            Ok(None)
+    // This should actually just be a join based select.
+    pub async fn all_peers_info(&self) -> RgResult<Vec<PeerNodeInfo>> {
+        let nodes = self.nodes_tx().await?;
+        // let peers = self.all_peers_tx().await?;
+        let mut res = vec![];
+        for n in nodes {
+            if let Some(pid) = n.node_metadata()?.peer_id {
+                let tx = self.query_peer_id_tx(&pid).await?;
+                if let Some(t) = tx {
+                    res.push(PeerNodeInfo {
+                        latest_peer_transaction: Some(t),
+                        latest_node_transaction: Some(n),
+                        dynamic_node_metadata: None,
+                    })
+                }
+            }
         }
-    }
-
-    pub async fn peer_id_count_node_pk(&self, public_key: &PublicKey) -> RgResult<i32> {
-        let mut pool = self.ctx.pool().await?;
-        let vec = public_key.validate()?.bytes()?;
-        let rows = sqlx::query!(
-            r#"SELECT count(id) as count FROM peer_key WHERE public_key = ?1"#,
-            vec
-        )
-            .fetch_one(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        Ok(rows_m.count)
+        Ok(res)
     }
 
     pub async fn remove_peer_id(&self, p: &PeerId) -> RgResult<()> {
@@ -64,24 +52,6 @@ impl PeerStore {
         Ok(())
     }
 
-    pub async fn remove_node(&self, p0: &PublicKey) -> RgResult<()> {
-        let pid = self.peer_id_for_node_pk(p0).await?;
-        if let Some(p) = pid {
-            let mut pool = self.ctx.pool().await?;
-            let vec = p0.validate()?.bytes()?;
-            let rows = sqlx::query!("DELETE FROM peer_key WHERE public_key = ?1", vec)
-                .execute(&mut pool)
-                .await;
-            let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-            let c = self.peer_id_count_node_pk(p0).await?;
-            if c > 0 {
-                self.remove_peer_id(&p).await?;
-            }
-
-        }
-        Ok(())
-    }
-
     pub async fn node_peer_id_trust(
         &self,
         public: &PublicKey,
@@ -91,7 +61,7 @@ impl PeerStore {
         let vec = public.validate()?.bytes()?;
 
         let rows = sqlx::query!(
-            r#"SELECT peers.id, peers.trust FROM peer_key JOIN peers on peer_key.id = peers.id WHERE public_key = ?1"#,
+            r#"SELECT peers.id, peers.trust FROM nodes JOIN peers on nodes.peer_id = peers.id WHERE public_key = ?1"#,
             vec
         )
             .fetch_all(&mut pool)
@@ -110,29 +80,6 @@ impl PeerStore {
         Ok(None)
     }
 
-    /*
-        pub fn select_broadcast_peers(&self) -> rusqlite::Result<Vec<PeerQueryResult>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare(
-            "SELECT public_key, peers.trust FROM peer_key JOIN peers on peer_key.id = peers.id",
-        )?;
-
-        let rows = statement.query_map(params![], |row| {
-            let result: f64 = row.get(1).unwrap_or(0 as f64);
-            Ok(PeerQueryResult {
-                public_key: row.get(0)?,
-                trust: result,
-            })
-        })?;
-
-        let res = rows.map(|r| r.unwrap()).collect::<Vec<PeerQueryResult>>();
-
-        return Ok(res);
-    }
-
-     */
-
-    // pub async fn public_key_trust(&self) -> Result<>
 
     // TODO: Implement XOR distance + fee distance metrics + trust distance metrics
     pub async fn select_gossip_peers(&self, tx: &Transaction) -> Result<Vec<PublicKey>, ErrorInfo> {
@@ -142,38 +89,12 @@ impl PeerStore {
         self.active_nodes(None).await
     }
 
-    pub async fn query_public_key_node(
-        &self,
-        public: PublicKey,
-    ) -> Result<Option<PeerNodeInfo>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-
-        let vec = public.validate()?.bytes()?;
-
-        // info!("Querying public key node: {}", public.hex()?);
-
-        let rows = sqlx::query!(
-            r#"SELECT peer_node_info FROM peer_key WHERE public_key = ?1"#,
-            vec
-        )
-            .fetch_optional(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        // info!("Rows_m is some: {}", rows_m.is_some());
-
-        if let Some(rows) = rows_m {
-            let pni = rows.peer_node_info.safe_get_msg("Missing peer node info in database")?.clone();
-            return Ok(Some(PeerNodeInfo::proto_deserialize(pni)?));
-        }
-        Ok(None)
-    }
 
     pub async fn query_public_key_metadata(
         &self,
         public: &PublicKey,
     ) -> Result<Option<NodeMetadata>, ErrorInfo> {
-        Ok(self.query_public_key_node(public.clone()).await?
-            .and_then(|v| v.latest_node_transaction)
+        Ok(self.query_public_key_node(public).await?
             .and_then(|v| v.node_metadata().ok())
         )
     }
@@ -186,7 +107,7 @@ impl PeerStore {
         let mut res = vec![];
         if let Some(tx) = &tx{
             for nmd in tx.peer_data()?.node_metadata {
-                if let Some(pk) = nmd.public_key {
+                if let Some(pk) = &nmd.public_key {
                     if let Some(v) = self.query_public_key_node(pk).await? {
                         res.push(v);
                     }
@@ -194,6 +115,11 @@ impl PeerStore {
             };
         }
         if let Some(tx) = tx {
+            let res = res.iter().map(|r| PeerNodeInfo{
+                latest_peer_transaction: Some(tx.clone()),
+                latest_node_transaction: Some(r.clone()),
+                dynamic_node_metadata: None,
+            }).collect_vec();
             return Ok(Some(PeerIdInfo {
                 latest_peer_transaction: Some(tx),
                 peer_node_info: res
@@ -225,9 +151,9 @@ impl PeerStore {
         }
         Ok(None)
     }
-    pub async fn update_last_seen(&self, node: PublicKey) -> Result<(), ErrorInfo> {
+    pub async fn update_last_seen(&self, node: &PublicKey) -> Result<(), ErrorInfo> {
 
-        let res = self.query_public_key_node(node.clone()).await?;
+        let res = self.query_public_key_node(node).await?;
         if res.is_none() {
             return Err(ErrorInfo::error_info("Missing node in database"));
         }
@@ -237,7 +163,7 @@ impl PeerStore {
         let bytes = node.bytes.safe_bytes()?;
         let time = util::current_time_millis();
         let rows = sqlx::query!(
-            r#"UPDATE peer_key SET last_seen = ?1 WHERE public_key = ?2"#,
+            r#"UPDATE nodes SET last_seen = ?1 WHERE public_key = ?2"#,
             time,
             bytes
         ) // Execute instead of fetch
@@ -313,36 +239,6 @@ impl PeerStore {
         Ok(rows_m.last_insert_rowid())
     }
 
-    pub async fn insert_node_key(&self, pi: &PeerNodeInfo) -> Result<i64, ErrorInfo> {
-        let tx = pi.latest_node_transaction.safe_get()?;
-        let time = util::current_time_millis();
-        let mut pool = self.ctx.pool().await?;
-        let nmd = tx.node_metadata()?;
-        let public_key = nmd.public_key.safe_get()?;
-        public_key.validate()?;
-        let pk_bytes = public_key.bytes()?;
-        let pid = nmd.peer_id.safe_get()?.peer_id.safe_get()?.bytes.safe_bytes()?;
-        let ser_nmd = nmd.proto_serialize();
-        let pni = pi.proto_serialize();
-        // info!("insert_node_key pk_bytes {:?}", public_key.hex().expect("h"));
-        // info!("insert_node_key peernodeinfo {:?}", pi.json_or());
-        let rows = sqlx::query!(
-            r#"INSERT OR REPLACE INTO peer_key (public_key, id, multi_hash, address, status, last_seen, node_metadata, peer_node_info) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
-            pk_bytes,
-            pid,
-            nmd.multi_hash,
-            nmd.external_address,
-            "",
-                time,
-                ser_nmd,
-                pni
-            )
-            .execute(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        Ok(rows_m.last_insert_rowid())
-    }
-
     pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, trust: f64, self_key: &PublicKey) -> Result<(), ErrorInfo> {
         // return Err(ErrorInfo::error_info("debug error return"));
         // tracing::info!("add_peer_new");
@@ -357,47 +253,11 @@ impl PeerStore {
                 .safe_get_msg("Add peer failed due to missing latest peer transaction")?,
             trust,
         ).await?;
-        self.insert_node_key(peer_info).await?;
+        self.insert_node(peer_info.latest_node_transaction.safe_get_msg("Missing peer info latest node tx")?).await?;
         Ok(())
     }
 
-    pub async fn peer_node_info(&self) -> Result<Vec<PeerNodeInfo>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let rows = sqlx::query!(
-            r#"SELECT peer_node_info FROM peer_key"#
-        )
-            .fetch_all(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            if let Some(r) = row.peer_node_info {
-                let deser = PeerNodeInfo::proto_deserialize(r)?;
-                res.push(deser);
-            }
-        }
-        Ok(res)
-    }
-
     pub async fn all_peers_tx(
-        &self
-    ) -> Result<Vec<Transaction>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let rows = sqlx::query!(
-            r#"SELECT tx FROM peers"#
-        )
-            .fetch_all(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            let deser = Transaction::proto_deserialize(row.tx)?;
-            res.push(deser);
-        }
-        Ok(res)
-    }
-
-    pub async fn all_peers_nodes(
         &self
     ) -> Result<Vec<Transaction>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
@@ -431,7 +291,7 @@ impl PeerStore {
         let cutoff = util::current_time_millis() - delay;
 
         let rows = sqlx::query!(
-            r#"SELECT public_key FROM peer_key WHERE last_seen > ?1"#,
+            r#"SELECT public_key FROM nodes WHERE last_seen > ?1"#,
             cutoff
         )
             .fetch_all(&mut pool)
@@ -449,30 +309,6 @@ impl PeerStore {
     }
 
 
-    pub async fn active_peer_node_info(
-        &self,
-        delay: Option<Duration>
-    ) -> Result<Vec<PeerNodeInfo>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
-        let delay = delay.as_millis() as i64;
-        let cutoff = util::current_time_millis() - delay;
-
-        let rows = sqlx::query!(
-            r#"SELECT peer_node_info FROM peer_key WHERE last_seen > ?1"#,
-            cutoff
-        )
-            .fetch_all(&mut pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            let deser = PeerNodeInfo::proto_deserialize(row.peer_node_info.safe_get_msg("Missing peer node info in database")?.clone())?;
-            res.push(deser);
-        }
-        Ok(res)
-    }
-
     pub async fn active_node_metadata(
         &self,
         delay: Option<Duration>
@@ -480,42 +316,170 @@ impl PeerStore {
         let res = self.active_peer_node_info(delay).await?
             .iter()
             .filter_map(|pni|
-                            pni.latest_node_transaction.as_ref()
-                                .and_then(|tx| tx.node_metadata().ok())
+                            pni.node_metadata().ok()
             ).collect_vec();
         Ok(res)
     }
 
 
-    //
-    // pub async fn peers_by_utxo_distance(
-    //     &self,
-    //     hash: Hash,
-    // ) -> Result<usize, ErrorInfo> {
-    //     let mut pool = self.ctx.pool().await?;
-    //     // let rows = sqlx::query!(
-    //     //     r#"SELECT UNIQUE(peers.peer_data) FROM peer_key INNER JOIN on peer_key.id = peers.id WHERE peer_key.id"#,
-    //     //     height
-    //     // )
-    //     //     .fetch_all(&mut pool)
-    //     //     .await;
-    //     // let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-    //     // let mut res = vec![];
-    //     // for row in rows_m {
-    //     //     res.push(AddressHistoricalBalance{
-    //     //         address: Address::from_bytes(row.address.safe_get_msg("Row missing address")?.clone())?,
-    //     //         balance: row.balance.safe_get_msg("Row missing balance")?.clone(),
-    //     //         height: height.clone()
-    //     //     });
-    //     // }
-    //     // Ok(res)
-    //     Ok(0)
-    // }
-
 }
 
 // Peer Node Key Store Functions
 impl PeerStore {
+
+    pub async fn nodes_tx(&self) -> Result<Vec<Transaction>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT tx FROM nodes"#
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let deser = Transaction::proto_deserialize(row.tx)?;
+            res.push(deser);
+        }
+        Ok(res)
+    }
+
+    pub async fn active_peer_node_info(
+        &self,
+        delay: Option<Duration>
+    ) -> Result<Vec<Transaction>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+        let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
+        let delay = delay.as_millis() as i64;
+        let cutoff = util::current_time_millis() - delay;
+
+        let rows = sqlx::query!(
+            r#"SELECT tx FROM nodes WHERE last_seen > ?1"#,
+            cutoff
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let deser = Transaction::proto_deserialize(row.tx)?;
+            res.push(deser);
+        }
+        Ok(res)
+    }
+
+    pub async fn peer_id_for_node_pk(&self, public_key: &PublicKey) -> RgResult<Option<PeerId>> {
+        let mut pool = self.ctx.pool().await?;
+        let vec = public_key.validate()?.bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT peer_id FROM nodes WHERE public_key = ?1"#,
+            vec
+        )
+            .fetch_optional(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        if let Some(r) = rows_m {
+            Ok(Some(PeerId::from_bytes(r.peer_id)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn peer_id_count_node_pk(&self, public_key: &PublicKey) -> RgResult<i32> {
+        let mut pool = self.ctx.pool().await?;
+        let vec = public_key.validate()?.bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT count(peer_id) as count FROM nodes WHERE public_key = ?1"#,
+            vec
+        )
+            .fetch_one(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.count)
+    }
+
+
+    pub async fn remove_node(&self, p0: &PublicKey) -> RgResult<()> {
+        let pid = self.peer_id_for_node_pk(p0).await?;
+        if let Some(p) = pid {
+            let mut pool = self.ctx.pool().await?;
+            let vec = p0.validate()?.bytes()?;
+            let rows = sqlx::query!("DELETE FROM nodes WHERE public_key = ?1", vec)
+                .execute(&mut pool)
+                .await;
+            let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+            let c = self.peer_id_count_node_pk(p0).await?;
+            if c > 0 {
+                self.remove_peer_id(&p).await?;
+            }
+
+        }
+        Ok(())
+    }
+
+    pub async fn query_public_key_node(
+        &self,
+        public: &PublicKey,
+    ) -> Result<Option<Transaction>, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+
+        let vec = public.validate()?.bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT tx FROM nodes WHERE public_key = ?1"#,
+            vec
+        )
+            .fetch_optional(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        if let Some(rows) = rows_m {
+            return Ok(Some(Transaction::proto_deserialize(rows.tx)?));
+        }
+        Ok(None)
+    }
+
+    pub async fn query_nodes_peer_node_info(
+        &self,
+        public: &PublicKey,
+    ) -> Result<Option<PeerNodeInfo>, ErrorInfo> {
+        let tx = self.query_public_key_node(public).await?;
+        let pid = tx.as_ref()
+            .and_then(|tx| tx.node_metadata().ok().and_then(|n| n.peer_id));
+        if let (Some(tx), Some(pid)) = (tx, pid) {
+            if let Some(p) = self.query_peer_id_tx(&pid).await? {
+                return Ok(Some(PeerNodeInfo{
+                    latest_peer_transaction: Some(p),
+                    latest_node_transaction: Some(tx),
+                    dynamic_node_metadata: None,
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn insert_node(&self, tx: &Transaction) -> Result<i64, ErrorInfo> {
+        let time = util::current_time_millis();
+        let mut pool = self.ctx.pool().await?;
+        let nmd = tx.node_metadata()?;
+        let public_key = nmd.public_key.safe_get()?;
+        public_key.validate()?;
+        let pk_bytes = public_key.bytes()?;
+        let pid = nmd.peer_id.safe_get()?.peer_id.safe_get()?.bytes.safe_bytes()?;
+        let ser_nmd = nmd.proto_serialize();
+        let tx_ser = tx.proto_serialize();
+        let rows = sqlx::query!(
+            r#"INSERT OR REPLACE INTO nodes (public_key, peer_id, status, last_seen, tx) VALUES (?1, ?2, ?3, ?4, ?5)"#,
+            pk_bytes,
+            pid,
+            "",
+            time,
+            tx_ser
+            )
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.last_insert_rowid())
+    }
+
+
 
 }
 

@@ -65,7 +65,7 @@ impl IntervalFold for Discovery {
                 .and_then(|t| t.public_key){
                 if pk != self.relay.node_config.public_key() {
 
-                    let known = self.relay.ds.peer_store.query_public_key_node(pk.clone()).await?.is_some();
+                    let known = self.relay.ds.peer_store.query_public_key_node(&pk).await?.is_some();
                     if !known {
                         debug!("Discovery invoking database add for new peer {}", pk.hex().expect("hex"));
                         // TODO: we need to validate this peerNodeInfo first BEFORE adding it to peer store

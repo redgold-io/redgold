@@ -323,12 +323,11 @@ impl Node {
 
             // ensure peer added successfully
             let key = pk1.clone();
-            let qry_result = relay.ds.peer_store.query_public_key_node(key).await;
+            let qry_result = relay.ds.peer_store.query_public_key_node(&key).await;
             qry_result.log_error().ok();
             let opt_info = qry_result.expect("query public key node");
             let pk_store = opt_info
                 .expect("query public key node")
-                .latest_node_transaction.expect("")
                 .node_metadata().expect("node metadata")
                 .public_key.expect("pk");
             assert_eq!(&pk_store, pk1);

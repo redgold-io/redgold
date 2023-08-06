@@ -461,7 +461,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             let relay3 = p_relay.clone();
             async move {
                 // TODO: Make this a standard request way easier
-                let ps = relay3.ds.peer_store.all_peers_nodes().await;
+                let ps = relay3.ds.peer_store.all_peers_tx().await;
                 let res: Result<Json, warp::reject::Rejection> = as_warp_json_response(ps);
                 res
             }
