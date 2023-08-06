@@ -1,11 +1,7 @@
-CREATE TABLE IF NOT EXISTS peer_key (
+CREATE TABLE IF NOT EXISTS nodes (
                                         public_key    BLOB PRIMARY KEY,
-                                        id    BLOB,
-                                        multi_hash    BLOB,
-                                        address    TEXT,
-                                        status    TEXT,
+                                        peer_id    BLOB NOT NULL,
+                                        status    TEXT NOT NULL,
                                         last_seen    INTEGER DEFAULT 0,
-                                        tx BLOB,
-                                        node_metadata BLOB,
-                                        peer_node_info BLOB
+                                        tx BLOB NOT NULL
 );

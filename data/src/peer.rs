@@ -514,6 +514,11 @@ impl PeerStore {
 
 }
 
+// Peer Node Key Store Functions
+impl PeerStore {
+
+}
+
 #[test]
 fn distance_check(){
     let tc = TestConstants::new();

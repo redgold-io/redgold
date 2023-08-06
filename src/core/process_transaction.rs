@@ -716,7 +716,7 @@ impl TransactionProcessContext {
     }
     async fn process_peer_transaction(&self, tx: &Transaction) -> RgResult<()> {
         if let Some(nmd) = tx.node_metadata().ok() {
-            // self.relay.ds.peer_store.
+            self.relay.ds.peer_store.add_peer_new()
         } else if let Some(pd) = tx.peer_data().ok() {
 
         }
