@@ -58,12 +58,16 @@ pub async fn setup_server_redgold(
     let path = format!("/root/.rg/{}", network.to_std_string());
     let all_path = format!("/root/.rg/{}", NetworkEnvironment::All.to_std_string());
 
+    ssh.exes(format!("rm -f {}/mnemonic", path.clone()), p).await?;
+
      // Copy mnemonic / peer_id
      if let Some(words) = words {
-         ssh.copy_p(words, format!("{}/mnemonic", all_path), p)?;
+         let remote = format!("{}/mnemonic", all_path);
+         ssh.copy_p(words, remote, p).await?;
      }
      if let Some(peer_id_hex) = peer_id_hex {
-         ssh.copy_p(peer_id_hex, format!("{}/peer_id", path), p)?;
+         let remote = format!("{}/peer_id", path);
+         ssh.copy_p(peer_id_hex, remote, p).await?;
      }
 
 
@@ -73,7 +77,7 @@ pub async fn setup_server_redgold(
     // TODO: Also wget from github directly depending on security concerns -- not verified from checksum hash
     // Only should be done to override if the given exe is outdated.
     ssh.exes(format!("mkdir -p {}", path), p).await?;
-    ssh.copy_p(r.redgold_docker_compose, format!("{}/redgold-only.yml", path), p)?;
+    ssh.copy_p(r.redgold_docker_compose, format!("{}/redgold-only.yml", path), p).await?;
 
     let port = network.default_port_offset();
     let mut env = additional_env.unwrap_or(Default::default());
@@ -92,16 +96,17 @@ pub async fn setup_server_redgold(
     }
 
      // TODO: Lol not this
-     let port_range = vec![-1, 0, 1, 4, 5, 6];
-     for port in port_range {
-         ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port), p).await?;
+     let port_range: Vec<i64> = vec![-1, 0, 1, 4, 5, 6];
+     for port_i in port_range {
+         let port_o = (port as i64) + port_i;
+         ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port_o), p).await?;
      }
 
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
     }).join("\n");
-    ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p)?;
-    ssh.copy_p(env_contents, format!("{}/.env", path), p)?;
+    ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
+    ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
 
     sleep(Duration::from_secs(4));
 
@@ -231,15 +236,16 @@ pub async fn setup_ops_services(
 
 
 pub async fn derive_mnemonic_and_peer_id(
-    mnemonic: String, server_index: usize, cold: bool, passphrase: Option<String>,
-    opt_peer_id: Option<String>
+    mnemonic: String, peer_id_index: usize, cold: bool, passphrase: Option<String>,
+    opt_peer_id: Option<String>,
+    server_id_index: i64
 )
- -> RgResult<(String, String)> {
+    -> RgResult<(String, String)> {
 
     let w = WordsPass::new(mnemonic, passphrase);
-    let new = w.hash_derive_words(server_index.to_string())?;
+    let new = w.hash_derive_words(server_id_index.to_string())?;
     let server_mnemonic = new.words;
-    let account = (99 - server_index) as u32;
+    let account = (99 - peer_id_index) as u32;
     let mut pid_hex = "".to_string();
     if let Some(pid) = opt_peer_id {
         pid_hex = pid;
@@ -264,8 +270,16 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResu
     let buf = df.all().servers_path();
     let m = df.all().mnemonic().await.expect("");
     let passphrase = if deploy.ask_pass {
-        let passphrase = get_input("Enter passphrase for mnemonic: ").await?;
-        passphrase
+        let passphrase = rpassword::prompt_password("Enter passphrase for mnemonic: ").unwrap();
+        let passphrase2 = rpassword::prompt_password("Re-enter passphrase for mnemonic: ").unwrap();
+        if passphrase != passphrase2 {
+            panic!("Passphrases do not match");
+        }
+        if passphrase.is_empty() {
+            None
+        } else {
+            Some(passphrase)
+        }
     } else {
         None
     };
@@ -307,7 +321,8 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResu
 
         let opt_peer_id: Option<String> = peer_id_index.get(&ss.peer_id_index).cloned();
         let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
-            m.clone(), ss.peer_id_index as usize, deploy.cold, passphrase.clone(), opt_peer_id
+            m.clone(), ss.peer_id_index as usize, deploy.cold, passphrase.clone(), opt_peer_id,
+            ss.index
         ).await?;
         let words_opt = if deploy.words || deploy.words_and_id {
             Some(words.clone())
