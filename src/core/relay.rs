@@ -207,7 +207,9 @@ impl Relay {
         tx_b.with_output_node_metadata(&address, node_metadata.clone(), h+1);
         let updated = tx_b.build()?;
         self.ds.config_store.set_node_tx(&updated).await?;
-        let _ = self.submit_transaction_with(&updated, false).await?;
+        // TODO:
+        // Really we should just gossip the transaction here.. or rely on discovery
+        // let _ = self.submit_transaction_with(&updated, false).await?;
         Ok(())
     }
 
