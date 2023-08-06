@@ -1,6 +1,6 @@
 use std::time::Duration;
 use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, NodeMetadata, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
-use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
+use redgold_schema::{ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use itertools::Itertools;
@@ -21,6 +21,66 @@ pub struct PeerTrustQueryResult {
 
 
 impl PeerStore {
+
+
+    pub async fn peer_id_for_node_pk(&self, public_key: &PublicKey) -> RgResult<Option<PeerId>> {
+        let mut pool = self.ctx.pool().await?;
+        let vec = public_key.validate()?.bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT id FROM peer_key WHERE public_key = ?1"#,
+            vec
+        )
+            .fetch_optional(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        if let Some(r) = rows_m {
+            let id = r.id.safe_get_msg("Missing id")?;
+            Ok(Some(PeerId::from_bytes(id.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn peer_id_count_node_pk(&self, public_key: &PublicKey) -> RgResult<i32> {
+        let mut pool = self.ctx.pool().await?;
+        let vec = public_key.validate()?.bytes()?;
+        let rows = sqlx::query!(
+            r#"SELECT count(id) as count FROM peer_key WHERE public_key = ?1"#,
+            vec
+        )
+            .fetch_one(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.count)
+    }
+
+    pub async fn remove_peer_id(&self, p: &PeerId) -> RgResult<()> {
+        let mut pool = self.ctx.pool().await?;
+        let vec = p.peer_id.safe_bytes()?;
+        let rows = sqlx::query!("DELETE FROM peers WHERE id = ?1", vec)
+            .execute(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(())
+    }
+
+    pub async fn remove_node(&self, p0: &PublicKey) -> RgResult<()> {
+        let pid = self.peer_id_for_node_pk(p0).await?;
+        if let Some(p) = pid {
+            let mut pool = self.ctx.pool().await?;
+            let vec = p0.validate()?.bytes()?;
+            let rows = sqlx::query!("DELETE FROM peer_key WHERE public_key = ?1", vec)
+                .execute(&mut pool)
+                .await;
+            let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+            let c = self.peer_id_count_node_pk(p0).await?;
+            if c > 0 {
+                self.remove_peer_id(&p).await?;
+            }
+
+        }
+        Ok(())
+    }
 
     pub async fn node_peer_id_trust(
         &self,

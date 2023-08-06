@@ -38,19 +38,21 @@ impl IntervalFold for Discovery {
 
         let mut req = structs::Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-        for r in self.relay.broadcast_async(peers.clone(), req, None).await? {
+        for (r, pk) in self.relay.broadcast_async(
+            peers.clone(), req, None).await?.iter().zip(peers.clone()) {
             match r {
                 Ok(o) => {
-                    if let Some(o) = o.get_peers_info_response {
+                    if let Some(o) = &o.get_peers_info_response {
                         // TODO: There's probably a better way to merge peer info here.
                         // Problem here is we might have slightly different but almost same based
                         // on observation ordinal
                         // o.peer_info
-                        results.extend(o.peer_info)
+                        results.extend(o.peer_info.clone())
                     }
                 }
                 Err(e) => {
-                    error!("Error in discovery: {}", e.json_or())
+                    error!("Error in discovery: {}", e.json_or());
+                    self.relay.ds.peer_store.remove_node(&pk).await?;
                 }
             }
         }
