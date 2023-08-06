@@ -1,5 +1,6 @@
 use redgold_schema::{error_info, from_hex};
 use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, PeerId, PublicKey, Transaction, TransactionInfo, TransactionState};
+use redgold_schema::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::core::relay::Relay;
 use crate::data::data_store::DataStore;
 
@@ -11,7 +12,15 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
         peer_node_info: None,
         peer_id_info: None
     };
-    if let Ok(a) = Address::parse(hash_input.clone()) {
+
+    let mut addr = None;
+
+    if let Ok(a) = SingleKeyBitcoinWallet::parse_address(&hash_input) {
+        addr = Some(Address::from_bitcoin(&hash_input));
+    } else if let Ok(a) = Address::parse(hash_input.clone()) {
+        addr = Some(a);
+    }
+    if let Some(a) = addr {
         let res = relay.ds.transaction_store.query_utxo_address(&a).await?;
         let mut info = AddressInfo::from_utxo_entries(a.clone(), res);
         let limit = limit.unwrap_or(10);

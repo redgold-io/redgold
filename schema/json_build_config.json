@@ -102,6 +102,8 @@
         "structs.ControlMultipartySigningResponse",
         "structs.ControlMultipartyKeygenResponse",
         "structs.MultipartyAuthenticationRequest",
+        "structs.HealthRequest",
+        "structs.HealthResponse",
         "structs.VersionInfo"
       ]
     },

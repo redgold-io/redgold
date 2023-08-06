@@ -525,15 +525,16 @@ async fn tx_debug() {
     // MnemonicWords::from_mnemonic_words()
     let pkey = test_pkey_hex().expect("");
     let public = test_pubk().expect("");
+    println!("Public key rg address {}", public.address().expect("").render_string().expect(""));
     let mut w = SingleKeyBitcoinWallet
     ::new_wallet(public, NetworkEnvironment::Test, true).expect("worx");
     let balance = w.get_wallet_balance().expect("");
     println!("balance: {:?}", balance);
     println!("address: {:?}", w.address().expect(""));
-    w.send_local("tb1qaq8de62av8xkcnwfrgjmvatsl56hmpc4q6m3uz".to_string(), 2500, pkey).expect("");
+    // w.send_local("tb1qaq8de62av8xkcnwfrgjmvatsl56hmpc4q6m3uz".to_string(), 2500, pkey).expect("");
     // w.send_local("tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4".to_string(), 3500, pkey).expect("");
-    let txid = w.transaction_details.expect("d").txid.to_string();
-    println!("txid: {}", txid);
+    // let txid = w.transaction_details.expect("d").txid.to_string();
+    // println!("txid: {}", txid);
     // 2485227b319650fcd689009ca8b5fb2a02e556098f7c568e832ae72ac07ab8e8
 }
 
