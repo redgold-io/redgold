@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use crate::{bytes_data, constants, from_hex, Hash, HashFormatType, SafeBytesAccess};
+use crate::{bytes_data, constants, from_hex, Hash, HashFormatType, RgResult, SafeBytesAccess};
 use crate::structs::{ErrorInfo, HashType};
 
 use sha3::{Digest, Sha3_256};
@@ -65,6 +65,23 @@ impl Hash {
 
     pub fn checksum_hex(&self) -> Result<String, ErrorInfo> {
         Ok(hex::encode(self.checksum()?))
+    }
+
+    pub fn xor_vec(&self, other: Hash) -> RgResult<Vec<u8>> {
+        let v1 = self.safe_bytes()?;
+        let v2 = other.safe_bytes()?;
+        let xor_value: Vec<u8> = v1
+            .iter()
+            .zip(v2.iter())
+            .map(|(&x1, &x2)| x1 ^ x2)
+            .collect();
+        Ok(xor_value)
+    }
+
+    pub fn xor_distance(&self, other: Hash) -> RgResult<u64> {
+        let xor_value = self.xor_vec(other)?;
+        let distance: u64 = xor_value.iter().map(|&byte| u64::from(byte)).sum();
+        Ok(distance)
     }
 
 }

@@ -115,6 +115,7 @@ pub mod bitcoin_message_signer;
 pub mod btc_wallet;
 pub mod keys;
 pub mod mnemonic_support;
+pub mod xor_distance;
 
 pub fn sha256(s: &[u8]) -> [u8; 32] {
     let mut hash = [0u8; 32];
