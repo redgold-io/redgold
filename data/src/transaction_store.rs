@@ -635,9 +635,29 @@ impl TransactionStore {
         increment_gauge!("redgold.transaction.accepted.total", 1.0);
         return Ok(i);
     }
+    //
+    // // This doesn't seem to work correctly, not returning proper xor
+    // pub async fn xor_transaction_order(&self, hash: &Hash) -> RgResult<Vec<(Vec<u8>, Vec<u8>)>> {
+    //     let mut pool = self.ctx.pool().await?;
+    //     let hash_vec = hash.safe_bytes()?;
+    //     let rows = sqlx::query!(
+    //         r#"SELECT hash, COALESCE( (hash | ?1) - (hash & ?1), X'0000') as xor FROM transactions"#,
+    //        hash_vec //
+    //     )
+    //         .fetch_all(&mut pool)
+    //         .await;
+    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+    //     let mut res = vec![];
+    //     for row in rows_m {
+    //         let xor: Vec<u8> = row.xor;
+    //         res.push((row.hash.expect(""), xor));
+    //     }
+    //     Ok(res)
+    // }
+
+
 }
 
 #[test]
 fn debug() {
-
 }
