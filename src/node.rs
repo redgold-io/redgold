@@ -36,7 +36,7 @@ use crate::genesis::{create_genesis_transaction, genesis_tx_from, GenesisDistrib
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
-use crate::trust::rewards::Rewards;
+// use crate::trust::rewards::Rewards;
 use crate::{e2e, util};
 // use crate::mparty::mp_server::{Db, MultipartyHandler};
 use crate::e2e::tx_gen::SpendableUTXO;
@@ -502,7 +502,8 @@ impl LocalNodes {
                 .node
                 .relay
                 .ds
-                .query_time_transaction(0, end_time)
+                .transaction_store
+                .query_time_transaction(0, end_time as i64).await
                 .unwrap()
                 .into_iter()
                 .map(|x| x.transaction.unwrap().hash_vec())
@@ -601,7 +602,8 @@ impl LocalNodes {
                 .node
                 .relay
                 .ds
-                .query_time_transaction(0, util::current_time_millis())
+                .transaction_store
+                .query_time_transaction(0, util::current_time_millis_i64()).await
                 .unwrap()
                 .len()
         );

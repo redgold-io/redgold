@@ -23,6 +23,7 @@ serde = { version = "1.0.130", features = ["default", "derive"] }
 itertools = "0.10.5"
 tracing = "0.1"
 metrics = "0.18.1"
+hex = "0.4.3"
 
 
 [build-dependencies]

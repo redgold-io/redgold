@@ -203,6 +203,8 @@ pub struct Deploy {
     pub peer_id: bool,
     #[clap(long)]
     pub words_and_id: bool,
+    #[clap(long)]
+    pub dry_run: bool,
 
 
 }

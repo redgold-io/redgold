@@ -590,6 +590,16 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
         }
     }
 
+    let mut bad_index = vec![];
+    for (i, p) in active_peers_abridged.iter().enumerate() {
+        if p.nodes.is_empty() {
+            bad_index.push(i);
+        }
+    }
+    for b in bad_index {
+        active_peers_abridged.remove(b);
+    }
+
 
     let obs = r.ds.observation.recent_observation(
         Some(10),

@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
-// use libp2p::PeerId;
 use log::info;
 use metrics::{gauge, increment_counter};
 use rusqlite::{params, Connection, Error, Result};
@@ -124,269 +123,39 @@ impl DataStore {
         DataStore::map_err_sqlx(self.pool.acquire().await)
     }
 
-    pub async fn query_last_block(&self) -> result::Result<Option<Block>, ErrorInfo> {
-        let mut pool = self.pool().await?;
-
-        // TODO change this to a fetch all in case nothing is returned on initialization.
-        let rows = sqlx::query!("SELECT raw FROM block ORDER BY height DESC LIMIT 1")
-            .fetch_one(&mut pool)
-            .await;
-        let rows_m = DataStore::map_err_sqlx(rows)?;
-        match rows_m.raw {
-            None => Ok(None),
-            Some(b) => Ok(Some(Block::proto_deserialize(b)?)),
-        }
-    }
-
-    pub async fn query_last_balance_address(
-        &self,
-        address: &Vec<u8>,
-    ) -> result::Result<Option<i64>, ErrorInfo> {
-        let mut pool = self.pool().await?;
-        let rows = sqlx::query!(
-            r#"SELECT balance FROM address_block WHERE address = ?1 ORDER BY height DESC LIMIT 1"#,
-            address
-        )
-        .fetch_all(&mut pool)
-        .await;
-        let rows_m = DataStore::map_err_sqlx(rows)?;
-        for row in rows_m {
-            return Ok(row.balance)
-        }
-        Ok(None)
-    }
-
-    pub async fn insert_address_block(
-        &self,
-        address_block: AddressBlock,
-    ) -> result::Result<i64, ErrorInfo> {
-        let mut pool = self.pool().await?;
-
-        let rows = sqlx::query!(
-            r#"
-        INSERT INTO address_block ( address, balance, height, hash )
-        VALUES ( ?1, ?2, ?3, ?4)
-                "#,
-            address_block.address,
-            address_block.balance,
-            address_block.height,
-            address_block.hash
-        )
-        .execute(&mut pool)
-        .await;
-        let rows_m = DataStore::map_err_sqlx(rows)?;
-        Ok(rows_m.last_insert_rowid())
-    }
-
-    pub async fn query_address_balance_by_height(
-        &self,
-        address: Address,
-        height: i64,
-    ) -> result::Result<Option<i64>, ErrorInfo> {
-        // select address balance
-        let address_bytes = address.address.safe_bytes()?;
-        let mut pool = self.pool().await?;
-        let rows = sqlx::query!(
-            r#"SELECT balance FROM address_block WHERE address = ?1 AND height <= ?2 ORDER BY height DESC LIMIT 1"#,
-            address_bytes,
-            height
-        )
-        .fetch_all(&mut pool)
-        .await;
-        let rows_m = DataStore::map_err_sqlx(rows)?;
-        for row in rows_m {
-            return Ok(row.balance);
-        }
-        Ok(None)
-    }
-
-    // TODO: Just resolve the hash to a height, way easier.
-    pub async fn query_block_hash_height(
-        &self,
-        hash: Option<Vec<u8>>,
-        height: Option<i64>,
-    ) -> result::Result<Option<Block>, ErrorInfo> {
-        if hash.is_none() && height.is_none() {
-            return Err(error_message(
-                RGError::MissingField,
-                "Block hash and height both empty",
-            ));
-        }
-        let mut pool = self.pool().await?;
-        let mut clause_str: String = "WHERE ".to_string();
-        if hash.is_some() {
-            clause_str += "hash = ?1";
-            if height.is_some() {
-                clause_str += " AND height = ?2";
-            }
-        } else {
-            clause_str += "height = ?1";
-        }
-
-        let query_str = format!("SELECT raw FROM block {} LIMIT 2", clause_str);
-        let mut query = sqlx::query(&query_str);
-        if let Some(h) = hash.clone() {
-            query = query.bind(h);
-            if let Some(hh) = height {
-                query = query.bind(hh);
-            }
-        } else {
-            query = query.bind(height.expect("Height shouldn't be empty with earlier validator"));
-        }
-
-        let rows = query.fetch_all(&mut pool).await;
-
-        let rows_m: Vec<_> = DataStore::map_err_sqlx(rows)?;
-        if rows_m.is_empty() {
-            return Ok(None);
-        }
-        if rows_m.len() > 1 {
-            return Err(error_message(
-                RGError::DataStoreInternalCorruption,
-                format!(
-                    "More than 1 block returned on query for hash {} height {}",
-                    hash.map(|h| hex::encode(h)).unwrap_or("none".to_string()),
-                    height.map(|h| h.to_string()).unwrap_or("none".to_string())
-                ),
-            ));
-        }
-        for row in rows_m {
-            let raw: Vec<u8> = DataStore::map_err_sqlx(row.try_get("raw"))?;
-            return Ok(Some(Block::proto_deserialize(raw)?));
-        }
-        return Ok(None);
-    }
-
-
-    pub async fn insert_block_update_historicals(&self, block: &Block) -> Result<(), ErrorInfo> {
-        let vec = block.transactions.clone();
-        let height = block.height.clone();
-        let block_hash = block.hash_bytes()?;
-
-
-        let mut deltas: HashMap<Vec<u8>, i64> = HashMap::new();
-
-        for tx in vec {
-            for o in tx.outputs {
-                for a in &o.address.clone() {
-                    for d in &o.data {
-                        for amount in d.amount {
-                            let address_bytes = a.address.safe_bytes()?;
-                            let a1 = address_bytes.clone();
-                            let maybe_amount = deltas.get(&a1);
-                            deltas.insert(
-                                address_bytes,
-                                maybe_amount.map(|m| m.clone() + amount).unwrap_or(amount),
-                            );
-                        }
-                    }
-                }
-            }
-            for i in tx.inputs {
-                // TODO: There's a better way to persist these than querying transaction
-                let tx_hash = i.transaction_hash.safe_bytes()?;
-                let tx_input =
-                    DataStore::map_err(self.query_transaction(&tx_hash))?
-                        .expect("change later");
-                let prev_output: Output = tx_input
-                    .outputs
-                    .get(i.output_index as usize)
-                    .expect("change later")
-                    .clone();
-                for a in prev_output.clone().address {
-                    for d in &prev_output.data {
-                        for amount in d.amount {
-                            let address_bytes = a.address.safe_bytes()?;
-                            let a1 = address_bytes.clone();
-                            let maybe_amount = deltas.get(&a1);
-                            deltas.insert(
-                                address_bytes,
-                                maybe_amount
-                                    .map(|m| m.clone() - amount)
-                                    .unwrap_or(-1 * amount),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        for (k, v) in deltas.iter() {
-            let vec1 = k.clone();
-            let res = self.query_last_balance_address(&vec1).await?;
-            let new_balance = match res {
-                None => v.clone(),
-                Some(rr) => v + rr,
-            };
-            self.insert_address_block(AddressBlock {
-                    address: k.clone(),
-                    balance: new_balance,
-                    height,
-                    hash: block_hash.clone(),
-                })
-                .await?;
-        }
-        self.insert_block(&block).await?;
-        Ok(())
-    }
-
-    pub async fn insert_block(&self, block: &Block) -> Result<i64, ErrorInfo> {
-        let mut pool = self.pool().await?;
-
-        let hash = block.hash_bytes()?;
-        let height = block.height as i64;
-        let raw = block.proto_serialize();
-        let time = block.time()? as i64;
-
-        let rows = sqlx::query!(
-            r#"
-        INSERT INTO block ( hash, height, raw, time )
-        VALUES ( ?1, ?2, ?3, ?4)
-                "#,
-            hash,
-            height,
-            raw,
-            time
-        )
-        .execute(&mut pool)
-        .await;
-        let rows_m = DataStore::map_err_sqlx(rows)?;
-        Ok(rows_m.last_insert_rowid())
-    }
-
     // TODO: Move to utxoStore
     pub async fn get_address_string_info(&self, address: String) -> Result<AddressInfo, ErrorInfo> {
         let addr = Address::parse(address)?;
         let res = self.transaction_store.query_utxo_address(&addr).await?;
         Ok(AddressInfo::from_utxo_entries(addr.clone(), res))
     }
-
-    pub fn select_latest_reward_hash(&self) -> Result<Vec<u8>, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare("SELECT hash FROM rewards ORDER BY time DESC LIMIT 1")?;
-        let mut rows = statement.query_map(params![], |row| {
-            let hash: Vec<u8> = row.get(0)?;
-            Ok(hash)
-        })?;
-        Ok(rows.next().unwrap().unwrap())
-    }
-
-    pub fn select_reward_weights(&self) -> Result<Vec<RewardQueryResult>, Error> {
-        let conn = self.connection()?;
-        let mut statement =
-            conn.prepare("SELECT reward_address, deterministic_trust FROM peers")?;
-        let rows = statement.query_map(params![], |row| {
-            let result = RewardQueryResult {
-                reward_address: row.get(0)?,
-                deterministic_trust: row.get(1)?,
-            };
-            Ok(result)
-        })?;
-        Ok(rows
-            .filter(|x| x.is_ok())
-            .map(|x| x.unwrap())
-            .collect::<Vec<RewardQueryResult>>())
-    }
+    //
+    // pub fn select_latest_reward_hash(&self) -> Result<Vec<u8>, Error> {
+    //     let conn = self.connection()?;
+    //     let mut statement = conn.prepare("SELECT hash FROM rewards ORDER BY time DESC LIMIT 1")?;
+    //     let mut rows = statement.query_map(params![], |row| {
+    //         let hash: Vec<u8> = row.get(0)?;
+    //         Ok(hash)
+    //     })?;
+    //     Ok(rows.next().unwrap().unwrap())
+    // }
+    //
+    // pub fn select_reward_weights(&self) -> Result<Vec<RewardQueryResult>, Error> {
+    //     let conn = self.connection()?;
+    //     let mut statement =
+    //         conn.prepare("SELECT reward_address, deterministic_trust FROM peers")?;
+    //     let rows = statement.query_map(params![], |row| {
+    //         let result = RewardQueryResult {
+    //             reward_address: row.get(0)?,
+    //             deterministic_trust: row.get(1)?,
+    //         };
+    //         Ok(result)
+    //     })?;
+    //     Ok(rows
+    //         .filter(|x| x.is_ok())
+    //         .map(|x| x.unwrap())
+    //         .collect::<Vec<RewardQueryResult>>())
+    // }
     // pub fn select_peer_trust(
     //     &self,
     //     peer_ids: &Vec<Vec<u8>>,
@@ -424,49 +193,6 @@ impl DataStore {
     }
 
 
-
-    pub fn query_transaction(
-        &self,
-        transaction_hash: &Vec<u8>,
-    ) -> rusqlite::Result<Option<Transaction>, Error> {
-        let conn = self.connection()?;
-
-        let mut statement =
-            conn.prepare("SELECT raw_transaction FROM transactions WHERE hash = ?1")?;
-
-        let rows = statement.query_map(params![transaction_hash], |row| {
-            let vec = row.get(0)?;
-            let output = Transaction::proto_deserialize(vec).unwrap();
-            Ok(output)
-        })?;
-        for row in rows {
-            let row_q = row?;
-            return Ok(Some(row_q));
-        }
-        return Ok(None);
-    }
-
-    pub fn query_time_transaction(
-        &self,
-        start_time: u64,
-        end_time: u64,
-    ) -> rusqlite::Result<Vec<TransactionEntry>, Error> {
-        let conn = self.connection()?;
-
-        let mut statement = conn.prepare(
-            "SELECT raw_transaction, time FROM transactions WHERE time >= ?1 AND time < ?2",
-        )?;
-
-        let rows = statement.query_map(params![start_time, end_time], |row| {
-            let vec = row.get(0)?;
-            let time: u64 = row.get(1)?;
-            let transaction = Some(Transaction::proto_deserialize(vec).unwrap());
-            Ok(TransactionEntry { transaction, time })
-        })?;
-        return Ok(rows.filter(|x| x.is_ok()).map(|x| x.unwrap()).collect_vec());
-    }
-
-
     pub fn select_all_tables(&self) -> rusqlite::Result<Vec<String>, Error> {
         let conn = self.connection()?;
 
@@ -486,40 +212,41 @@ WHERE
         })?;
         return Ok(rows.map(|r| r.unwrap()).collect_vec());
     }
+    //
+    // pub fn get_max_time_old(&self, table: &str) -> rusqlite::Result<i64, Error> {
+    //     let conn = self.connection()?;
+    //     let query = "SELECT max(time) FROM ".to_owned() + table;
+    //     let mut statement = conn.prepare(&*query)?;
+    //     let mut rows = statement.query_map(params![], |r| {
+    //         let data: i64 = r.get(0)?;
+    //         Ok(data)
+    //     })?;
+    //     let row = rows.next().unwrap().unwrap_or(0 as i64);
+    //     Ok(row)
+    // }
+    //
+    // pub async fn get_max_time(&self, table: &str) -> RgResult<i64> {
+    //     let mut pool = self.ctx.pool().await?;
+    //     let query = "SELECT max(time) as max_time FROM ".to_owned() + table;
+    //     let mut query = sqlx::query(&query);
+    //     let rows = query.fetch_all(&mut pool).await;
+    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+    //     for row in rows_m {
+    //         let raw: i64 = DataStoreContext::map_err_sqlx(row.try_get("max_time"))?;
+    //         return Ok(raw)
+    //     }
+    //     return Err(error_info("No max time found"))
+    // }
+    //
+    // pub fn query_download_times(&self) -> DownloadMaxTimes {
+    //     DownloadMaxTimes {
+    //         utxo: self.get_max_time("utxo").await.unwrap(),
+    //         transaction: self.get_max_time("transactions").await.unwrap(),
+    //         observation: self.get_max_time("observation").await.unwrap(),
+    //         observation_edge: self.get_max_time("observation_edge").await.unwrap(),
+    //     }
+    // }
 
-    pub fn get_max_time(&self, table: &str) -> rusqlite::Result<i64, Error> {
-        let conn = self.connection()?;
-        let query = "SELECT max(time) FROM ".to_owned() + table;
-        let mut statement = conn.prepare(&*query)?;
-        let mut rows = statement.query_map(params![], |r| {
-            let data: i64 = r.get(0)?;
-            Ok(data)
-        })?;
-        let row = rows.next().unwrap().unwrap_or(0 as i64);
-        Ok(row)
-    }
-
-    pub fn query_download_times(&self) -> DownloadMaxTimes {
-        DownloadMaxTimes {
-            utxo: self.get_max_time("utxo").unwrap(),
-            transaction: self.get_max_time("transactions").unwrap(),
-            observation: self.get_max_time("observation").unwrap(),
-            observation_edge: self.get_max_time("observation_edge").unwrap(),
-        }
-    }
-
-    pub fn delete_utxo(
-        &self,
-        transaction_hash: &Vec<u8>,
-        output_index: u32,
-    ) -> rusqlite::Result<usize, Error> {
-        let conn = self.connection()?;
-        let mut statement = conn.prepare(
-            "DELETE FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2",
-        )?;
-        let rows = statement.execute(params![transaction_hash, output_index])?;
-        return Ok(rows);
-    }
 
     pub async fn from_path(path: String) -> DataStore {
         info!("Starting datastore with path {}", path.clone());
@@ -547,14 +274,6 @@ WHERE
         }
     }
 
-    pub async fn in_memory() -> DataStore {
-        DataStore::from_path("file:memdb1?mode=memory&cache=shared".parse().unwrap()).await
-    }
-
-    pub async fn in_memory_idx(id: u16) -> DataStore {
-        let path = "file:memdb1_id".to_owned() + &*id.to_string() + "?mode=memory&cache=shared";
-        DataStore::from_path(path).await
-    }
 
     pub async fn from_config(node_config: &NodeConfig) -> DataStore {
         DataStore::from_path(format!("{}{}", "file:", node_config.env_data_folder().data_store_path().to_str().expect("").to_string())).await
@@ -589,132 +308,6 @@ WHERE
 
 }
 
-// "file:memdb1?mode=memory&cache=shared"
-// #[tokio::test]
-// async fn better_example_sqlite() {
-//     // let tc = TestConstants::new();
-//
-//     let ds = DataStore::in_memory().await;
-//     // ds.create_mnemonic().unwrap();
-//     ds.create_transactions().unwrap();
-//     let _c = ds
-//         .create_all_err()
-//         //.await
-//         .unwrap();
-//     ds.create_utxo().expect("ignore");
-//     let ex = utxo::get_example_utxo_entry();
-//     ds.insert_utxo(&ex).unwrap();
-//     let result = ds.query_utxo(&ex.transaction_hash, ex.output_index as u32);
-//     let entry = result.unwrap().unwrap();
-//     assert_eq!(ex, entry);
-//
-//     println!("{:?}", ds.query_download_times());
-// }
-//
-// #[tokio::test]
-// async fn example_insert_transaction() {
-//     // let tc = TestConstants::new();
-//     let ds = DataStore::in_memory().await;
-//     let _c = ds
-//         .create_all_err()
-//         //.await
-//         .unwrap();
-//     println!("wtf: {:?}", ds.select_all_tables());
-//     let g = create_genesis_transaction();
-//     ds.insert_transaction(&g.clone(), EARLIEST_TIME).unwrap();
-//     let q = ds.query_transaction(&g.hash_vec());
-//     assert_eq!(q.unwrap().unwrap(), g);
-//     // let result = ds.query_utxo(&g.transaction_hash, ex.output_index);
-//     // let entry = result.unwrap().unwrap();
-// }
-//
-// #[tokio::test]
-// async fn peers_example() {
-//     let tc = TestConstants::new();
-//     let ds = DataStore::in_memory().await;
-//     let _c = ds
-//         .create_all_err_info()
-//         // .await
-//         .expect("work");
-//     for i in 0..10 {
-//         ds.insert_peer(tc.peer_ids.get(i).unwrap(), *tc.peer_trusts.get(i).unwrap())
-//             .expect("fix");
-//         // println!("res {:?}", res)
-//     }
-//
-//     let res = ds.select_peer_trust(&tc.peer_ids[0..3].to_vec()).unwrap();
-//     for i in 0..3 {
-//         let id = tc.peer_ids.get(i).unwrap();
-//         let trust = tc.peer_trusts.get(i).unwrap();
-//         assert_eq!(res.get(id).unwrap(), trust)
-//     }
-// }
-//
-// // "file:memdb1?mode=memory&cache=shared"
-// #[test]
-// fn example_sqlite() -> Result<()> {
-//     let conn = Connection::open("file:memdb1_test?mode=memory&cache=shared")?;
-//     // let conn = Connection::open_in_memory()?;
-//     /*
-//        id: Vec<u8>,
-//        address: Vec<u8>,
-//        amount: u64,
-//        weights: Vec<f64>,
-//        threshold: Option<f64>
-//     */
-//     conn.execute(
-//         "CREATE TABLE IF NOT EXISTS utxo (
-//                   id    BLOB PRIMARY KEY,
-//                   address            BLOB,
-//                   data            BLOB,
-//                   contract            BLOB,
-//                   weights            BLOB,
-//                   threshold            DOUBLE
-//                   )",
-//         [],
-//     )?;
-//
-//     let me = UtxoEntry {
-//         id: UtxoEntry::id_from_fixed(&FixedIdConvert::from_values(&util::sha256_str("asdf"), 500)),
-//         address: address(&TestConstants::new().public).to_vec(),
-//         data: CurrencyData { amount: 100 }.proto_serialize(),
-//         weights: vec![],
-//         threshold: None,
-//         contract: Transaction::currency_contract_hash(),
-//     };
-//     conn.execute(
-//         "INSERT INTO utxo (id, address, data, contract, weights, threshold) VALUES (?1, ?2, ?3, ?4, ?5)",
-//         params![me.id, me.address, me.data, me.contract, me.weights, me.threshold],
-//     )?;
-//
-//     let mut stmt =
-//         conn.prepare("SELECT id, address, data, contract, weights, threshold FROM utxo")?;
-//     let person_iter = stmt.query_map([], |row| {
-//         Ok(UtxoEntry {
-//             id: row.get(0)?,
-//             address: row.get(1)?,
-//             data: row.get(2)?,
-//             contract: row.get(3)?,
-//             weights: row.get(4)?,
-//             threshold: row.get(5)?,
-//         })
-//     })?;
-//
-//     for person in person_iter {
-//         let result = person.unwrap();
-//         println!("Found person {:?}", result.id);
-//         println!("Found person {:?}", result.address);
-//         println!("Found person {:?}", result.data);
-//     }
-//     Ok(())
-// }
-
-// https://stackoverflow.com/questions/64420765/how-can-i-deserialize-a-prost-enum-with-serde
-
-// #[test]
-// fn enum_ser_test() {
-//     // let ht = HashType::Transaction;
-// }
 
 #[allow(dead_code)]
 #[derive(sqlx::FromRow)]
@@ -724,157 +317,3 @@ pub struct MnemonicEntry {
     pub(crate) peer_id: Vec<u8>,
 }
 
-//
-// async fn add_todo(pool: &SqlitePool, description: String) -> anyhow::Result<i64> {
-//
-//     Ok(id)
-// }
-
-// Fix later
-#[ignore]
-#[tokio::test]
-async fn test_sqlx() {
-    // use sqlx::Connection;
-    // DATABASE_URL=sqlite:///Users/test_sqlite.sqlite
-    let path = DataStore::in_memory().await.connection_path;
-    //std::env::set_var("DATABASE_URL", path.clone());
-    let tbl = "CREATE TABLE IF NOT EXISTS mnemonic (
-                  words    STRING PRIMARY KEY,
-                  time INTEGER,
-                  peer_id BLOB
-                  )";
-
-    let pool = SqlitePool::connect(&*path.clone())
-        .await
-        .expect("Connection failure");
-    let mut conn = pool.acquire().await.expect("acquire failure");
-    // conn.
-    let _res = sqlx::query(tbl)
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-
-    let _res2 = sqlx::query("INSERT INTO mnemonic (words, time, peer_id) VALUES (?, ?, ?)")
-        .bind("yo")
-        .bind(0 as i64)
-        .bind(util::sha256_str("sadf").to_vec())
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-
-    let res3 = sqlx::query("select words, time, peer_id from mnemonic")
-        .fetch_all(&mut conn)
-        .await
-        .expect("create failure");
-    let res4 = res3.get(0).expect("something");
-
-    let wordss: &str = res4.try_get("words").expect("yes");
-    println!("{:?}", wordss);
-    assert_eq!(wordss, "yo");
-    // Insert the task, then obtain the ID of this row
-    //     let vecu8 = util::sha256_str("sadf").to_vec();
-    //     let id = sqlx::query!(
-    //         r#"
-    // INSERT INTO mnemonic ( words, time, peer_id )
-    // VALUES ( ?1, ?2, ?3)
-    //         "#,
-    //         "yo",
-    //         0 as u64,
-    //     )
-    //     .execute(&mut conn)
-    //     .await?
-    //     .last_insert_rowid();
-    //     println!("{:?}", id);
-
-    // let conn = sqlx::SqliteConnection::connect(&*path)
-    //     .await
-    //     .expect("Gimme");
-
-    //
-    // let mut stream = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = ? OR name = ?")
-    //     .bind(user_email)
-    //     .bind(user_name)
-    //     .fetch(&mut conn);
-
-    /*
-
-    */
-}
-
-#[derive(Debug)]
-struct Todo {
-    id: i64,
-    description: String,
-    done: bool,
-}
-
-// TODO Move to data module
-//
-// #[tokio::test]
-// async fn test_sqlx_migrations() {
-//     // TODO: Delete file at beginning.
-//     dotenv::dotenv().ok().expect("worked");
-//     // util::init_logger();
-//     println!("{:?}", std::env::var("DATABASE_URL"));
-//     let mut node_config = NodeConfig::default();
-//     let mut args = empty_args();
-//     args.network = Some("debug".to_string());
-//     let mut at = ArgTranslate::new(&args, &node_config);
-//     let _ = at.translate_args().await.expect("");
-//
-//     println!(
-//         "{:?}",
-//         std::fs::remove_file(Path::new(&node_config.data_store_path())).is_ok()
-//     );
-//
-//     // node_config = NodeConfig::new(&(0 as u16));
-//     println!("{:?}", node_config.data_store_path());
-//
-//     let ds = // "sqlite:///Users//.rg/debug/data_store.sqlite".to_string()
-//         // DataStore::from_path(&node_config).await;
-//         DataStore::from_config(&node_config).await;
-//     // let pool = SqlitePool::connect("sqlite:///Users//.rg/debug/data_store.sqlite")
-//     //     .await
-//     //     .expect("Connection failure");
-//     let mut conn = ds.pool.acquire().await.expect("connection");
-//
-//     // this works
-//     sqlx::migrate!("./data/migrations")
-//         .run(&*ds.pool)
-//         .await
-//         .expect("Wtf");
-//
-//     let _res2 = sqlx::query("INSERT INTO todos (id, description, done) VALUES (?, ?, ?)")
-//         .bind(1)
-//         .bind("whoa some description here")
-//         .bind(true)
-//         .fetch_all(&mut conn)
-//         .await
-//         .expect("create failure");
-//
-//     let res3 = sqlx::query("select id, description, done from todos")
-//         .fetch_all(&mut conn)
-//         .await
-//         .expect("create failure");
-//     let res4 = res3.get(0).expect("something");
-//
-//     let wordss: &str = res4.try_get("description").expect("yes");
-//     println!("{:?}", wordss);
-//     assert_eq!(wordss, "whoa some description here");
-//
-//     let ress: Vec<Todo> = sqlx::query_as!(Todo, "select id, description, done from todos")
-//         .fetch_all(&*ds.pool) // -> Vec<Country>
-//         .await
-//         .expect("worx");
-//
-//     println!("{:?}", ress);
-//
-//     /*
-//              r#"
-//     UPDATE todos
-//     SET done = TRUE
-//     WHERE id = ?1
-//             "#,
-//             id
-//          */
-// }

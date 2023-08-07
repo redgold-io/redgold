@@ -254,12 +254,13 @@ impl ArgTranslate {
             self.node_config.mnemonic_words = words;
         };
 
-        // Then override with optional found file
-        // TODO: Should we just change this to an ALL folder?
-        let mnemonic_disk_path = self.node_config.env_data_folder().mnemonic_path();
-        if let Some(words) = fs::read_to_string(mnemonic_disk_path.clone()).ok() {
-            self.node_config.mnemonic_words = words;
-        };
+        // TODO: This is overwriting /all
+        // // Then override with optional found file
+        // // TODO: Should we just change this to an ALL folder?
+        // let mnemonic_disk_path = self.node_config.env_data_folder().mnemonic_path();
+        // if let Some(words) = fs::read_to_string(mnemonic_disk_path.clone()).ok() {
+        //     self.node_config.mnemonic_words = words;
+        // };
 
         // Then override with command line
         if let Some(words) = &self.opts.words {
