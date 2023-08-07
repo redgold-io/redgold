@@ -51,6 +51,7 @@ pub async fn account_balance(r: Rosetta, request: AccountBalanceRequest,) -> Res
     let latest_balance = r
         .relay
         .ds
+        .address_block_store
         .query_address_balance_by_height(address, block.height)
         .await?;
     let bal = match latest_balance {
@@ -129,6 +130,7 @@ pub async fn block(r: Rosetta, request: BlockRequest) -> Result<BlockResponse, E
     let maybe_block = r
         .relay
         .ds
+        .address_block_store
         .query_block_hash_height(maybe_hash, partial_block_identifier.index)
         .await?;
     Ok(BlockResponse {

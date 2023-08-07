@@ -3,7 +3,7 @@ use metrics::{decrement_gauge, increment_gauge};
 use sqlx::query::Map;
 use sqlx::{Error, Sqlite};
 use sqlx::sqlite::{SqliteArguments, SqliteRow};
-use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, PeerData, Transaction, UtxoEntry};
+use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, PeerData, Transaction, TransactionEntry, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants, WithMetadataHashable};
 use redgold_schema::transaction::AddressBalance;
 use crate::DataStoreContext;
@@ -49,6 +49,37 @@ impl TransactionStore {
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
+    }
+
+    pub async fn query_time_transaction(
+        &self,
+        start: i64,
+        end: i64
+    ) -> RgResult<Vec<TransactionEntry>> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT raw_transaction, time FROM transactions WHERE time >= ?1 AND time < ?2"#,
+            start,
+            end
+        )
+            .fetch_all(&mut pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            let option1 = row.raw_transaction;
+            let t = row.time;
+            if let (Some(time), Some(o)) = (t, option1) {
+                let deser = Transaction::proto_deserialize(o)?;
+                let te = TransactionEntry{
+                    time: time as u64,
+                    transaction: Some(deser),
+                };
+                res.push(te);
+            }
+        }
+        Ok(res)
     }
 
     pub async fn query_accepted_transaction(

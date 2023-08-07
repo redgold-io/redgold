@@ -33,16 +33,17 @@ impl BlockFormationProcess {
                 .relay
                 .ds
                 // TODO: No
-                .query_time_transaction(i as u64, util::current_time_millis())
-                .map_err(|e| error!("Error query_time_transaction {}", e.to_string()))
+                .transaction_store
+                .query_time_transaction(i as i64, util::current_time_millis_i64()).await
+                // .map_err(|e| error!("Error query_time_transaction {}", e.to_string()))
                 .ok();
             if let Some(txa) = txs {
                 // TODO: re-query observation edge here.
-                let last_time = txa.clone().iter().map(|t| t.time).max().expect("max");
+                let last_time = txa.iter().map(|t| t.time.clone()).max().expect("max");
                 let vec = txa
                     .clone()
                     .iter()
-                    .map(|e| e.transaction.as_ref().unwrap().clone())
+                    .map(|e| e.transaction.as_ref().expect("").clone())
                     .collect_vec();
                 let leafs = vec
                     .clone()
@@ -56,7 +57,7 @@ impl BlockFormationProcess {
                     transactions: vec.clone(), // TODO: can leave this blank and enforce it properly
                     // to remove the clone on hash calculation? That's clever do it as part
                     // of a constructor function.
-                    struct_metadata: struct_metadata(last_time as i64),
+                    struct_metadata: struct_metadata(last_time.clone() as i64),
                     previous_block_hash: self.last_block.hash.clone(),
                     metadata: None,
                     hash: None,
@@ -66,7 +67,8 @@ impl BlockFormationProcess {
                 .clone();
 
                 // todo: based on node config
-                self.relay.ds.insert_block_update_historicals(&block).await?;
+                // TODO: Re-enable
+                // self.relay.ds.insert_block_update_historicals(&block).await?;
                 self.last_block = block.clone();
                 metrics::increment_counter!("redgold.blocks.created");
                 debug!("Formed block with hash {}", block.hash_hex())
@@ -77,6 +79,7 @@ impl BlockFormationProcess {
     pub async fn default(relay: Relay) -> Result<Self, ErrorInfo> {
         let last_block_opt = relay
             .ds
+            .address_block_store
             .query_last_block()
             .await?;
             // .expect("Datastore failure on last block query")
@@ -86,7 +89,7 @@ impl BlockFormationProcess {
             None => {
                 let block = create_genesis_block();
                 // TODO: only if historical balance tracking enabled
-                relay.ds.insert_block_update_historicals(&block).await?;
+                // relay.ds.insert_block_update_historicals(&block).await?;
                 block
             }
             Some(b) => {b}
