@@ -6,7 +6,7 @@ env:
   S3_EXPLORER_PREFIX: "s3://redgold-explorer"
   S3_DOCS_PREFIX: "s3://redgold-docs"
   DOCKER_USER: "redgoldio"
-  TOOLCHAIN: "nightly"
+  TOOLCHAIN: "stable"
   DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
 on: push
 jobs:
@@ -42,11 +42,11 @@ jobs:
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
       - run: rustup toolchain list
-      - run: rustup default nightly
+#      - run: rustup default nightly
       - run: rustup update
       - run: rustup -V
-#      - run: cargo clean
-#      - run: cargo build --release
+      - run: cargo clean
+      - run: cargo build --release
 #      - run: cargo build --release
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: ./bin/local_test.sh
