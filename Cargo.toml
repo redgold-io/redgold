@@ -128,7 +128,7 @@ csv = "1.1"
 rpassword = "7.2.0"
 
 [dependencies.bitcoin]
-version = "0.21"
+version = "0.30"
 features = ["serde", "bitcoinconsensus"]
 
 #[build-dependencies]
