@@ -49,9 +49,9 @@ impl IntervalFold for Discovery {
                         // o.peer_info
                         results.extend(o.peer_info.clone())
                     }
-                    let current_key = o.node_metadata.and_then(|n| n.public_key);
+                    let current_key = o.node_metadata.as_ref().and_then(|n| n.public_key.as_ref());
                     if let Some(ck) = current_key {
-                        if ck != pk {
+                        if ck != &pk {
                             error!("Discovery response public key does not match request public key");
                             self.relay.ds.peer_store.remove_node(&pk).await?;
                         }
