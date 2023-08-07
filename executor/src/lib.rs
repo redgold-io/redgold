@@ -1,6 +1,7 @@
 
 mod hello_world;
-mod extism_debug;
+pub mod extism_debug;
+pub mod evm_wrapper;
 
 pub fn debug() {
 

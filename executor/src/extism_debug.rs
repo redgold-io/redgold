@@ -1,6 +1,6 @@
 use extism::{Context, Plugin};
 
-#[ignore]
+// #[ignore]
 #[test]
 fn debug_test() {
 
