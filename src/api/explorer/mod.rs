@@ -590,6 +590,12 @@ pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardRespons
         }
     }
 
+    for (i, p) in active_peers_abridged.iter().enumerate() {
+        if p.nodes.is_empty() {
+            active_peers_abridged.remove(i);
+        }
+    }
+
 
     let obs = r.ds.observation.recent_observation(
         Some(10),
