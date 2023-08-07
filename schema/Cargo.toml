@@ -16,7 +16,7 @@ categories = ["cryptography::cryptocurrencies"]
 sha3 = "0.10.8"
 prost = "0.8"
 serde_json = "1.0.59"
-serde_with = { version = "1.10.0", features = ["hex"] }
+serde_with = { version = "3.2.0", features = ["hex"] }
 hdpath = { version = "0.6.2"}
 hex = "0.4.3"
 bitcoin-wallet = "1.1.0"
