@@ -121,7 +121,7 @@ async fn test() {
 
     relay.ds.transaction_store.insert_transaction(&create_genesis_transaction(), 0, true, None)
         .await.expect("a");
-    relay.ds.insert_block_update_historicals(&create_genesis_block()).await.expect("a");
+    // relay.ds.insert_block_update_historicals(&create_genesis_block()).await.expect("a");
     // let res = relay.ds.address_block_store.all_address_balance_by_height(0).await.expect("qry");
     // for b in res {
     //     log::info!("Historical balance: {} address: {} ", b.balance, b.address.render_string().expect("r"));

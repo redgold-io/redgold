@@ -12,7 +12,7 @@ use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
 use redgold_schema::{SafeOption, structs};
-use redgold_schema::structs::ErrorInfo;
+use redgold_schema::structs::{ErrorInfo, FixedUtxoId};
 use redgold_schema::EasyJson;
 
 #[derive(Clone, Debug)]
@@ -100,10 +100,10 @@ pub async fn download_all(
             .await?;
         // TODO return this error
         // .expect("fix");
-        for (i, j) in x.transaction.as_ref().unwrap().iter_utxo_inputs() {
+        for f in x.transaction.as_ref().unwrap().fixed_utxo_ids_of_inputs().expect("") {
             // todo probably distinguish between empty or not ?
             if clean_up_utxo {
-                relay.ds.delete_utxo(&i, j as u32).expect("fix");
+                relay.ds.transaction_store.delete_utxo(&f).await.expect("fix");
             }
         }
     }
@@ -180,7 +180,8 @@ pub async fn download(relay: Relay, key: structs::PublicKey) {
         "Number of transactions after download {}",
         relay
             .ds
-            .query_time_transaction(0, util::current_time_millis())
+            .transaction_store
+            .query_time_transaction(0, util::current_time_millis_i64()).await
             .unwrap()
             .len()
     );
@@ -245,10 +246,10 @@ pub async fn process_download_request(
             if download_request.data_type != DownloadDataType::TransactionEntry as i32 {
                 vec![]
             } else {
-                relay.ds.query_time_transaction(
-                    download_request.start_time,
-                    download_request.end_time,
-                )?
+                relay.ds.transaction_store.query_time_transaction(
+                    download_request.start_time as i64,
+                    download_request.end_time as i64,
+                ).await.expect("")
             }
         },
         observations: {

@@ -97,6 +97,7 @@ impl Rosetta {
         let maybe_block = self
             .relay
             .ds
+            .address_block_store
             .query_block_hash_height(maybe_hash, height)
             .await?;
         Ok(maybe_block)
@@ -122,7 +123,7 @@ impl Rosetta {
     }
 
     pub async fn latest_block(&self) -> Result<crate::schema::structs::Block, ErrorInfo> {
-        self.relay.ds.query_last_block().await?.ok_or(error_message(
+        self.relay.ds.address_block_store.query_last_block().await?.ok_or(error_message(
             RGError::DataStoreInternalCorruption,
             "Missing latest block",
         ))
