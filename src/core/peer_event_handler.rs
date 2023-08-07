@@ -43,9 +43,7 @@ impl PeerOutgoingEventHandler {
         let ser_msgp = json_or(&message.request.clone());
         // tracing::info!("PeerOutgoingEventHandler send message {}", ser_msgp);
         if let Some(pk) = &message.public_key {
-            let res = relay.ds.peer_store.query_public_key_node(pk.clone()).await?
-                .and_then(|pd| pd.latest_node_transaction)
-                .and_then(|nt| nt.node_metadata().ok());
+            let res = relay.ds.peer_store.query_public_key_metadata(&pk).await?;
             // TODO if metadata known, check if udp is required
             if let Some(nmd) = res {
                 Self::send_message_rest(message.clone(), nmd, &relay).await?;

@@ -102,7 +102,6 @@ message PartitionInfo {
 message NodeMetadata {
   // Primary address used to reference the node, can be anything that is parsable.
   string external_address = 1;
-  bytes multi_hash = 2;
   // May not be to store public key if we merkle the multi_hashes too.
   PublicKey public_key = 3;
   MerkleProof proof = 4;

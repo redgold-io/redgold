@@ -191,7 +191,8 @@ pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
         num_success: 0,
     };
 
-    // See if we should start at all
+    tokio::time::sleep(Duration::from_secs(100)).await;
+    // See if we should start at all, but with a retry for genesis stuff
     c.build_tx().await?;
 
     let interval1 = tokio::time::interval(relay.node_config.clone().live_e2e_interval.clone());

@@ -323,12 +323,11 @@ impl Node {
 
             // ensure peer added successfully
             let key = pk1.clone();
-            let qry_result = relay.ds.peer_store.query_public_key_node(key).await;
+            let qry_result = relay.ds.peer_store.query_public_key_node(&key).await;
             qry_result.log_error().ok();
             let opt_info = qry_result.expect("query public key node");
             let pk_store = opt_info
                 .expect("query public key node")
-                .latest_node_transaction.expect("")
                 .node_metadata().expect("node metadata")
                 .public_key.expect("pk");
             assert_eq!(&pk_store, pk1);
@@ -817,5 +816,43 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 fn env_var_parse_test() {
 
     println!("Env var test")
+
+}
+
+#[tokio::test]
+async fn data_store_test() {
+    let nc = NodeConfig::from_test_id(&(100 as u16));
+    let relay = Relay::new(nc.clone()).await;
+    Node::prelim_setup(relay.clone()).await.expect("");
+    let tx_0_hash = nc.peer_tx_fixed().hash_or();
+    let hash_vec = tx_0_hash.vec();
+    let mut txs = vec![];
+    for i in 0..10 {
+        let nci = NodeConfig::from_test_id(&(i + 200 as u16));
+        let tx = nci.peer_tx_fixed();
+        relay.ds.transaction_store.insert_transaction(&tx, 0,true, None).await.expect("");
+        txs.push(tx.clone());
+    }
+
+    println!("original tx hash: {}", hex::encode(hash_vec.clone()));
+
+    for tx in txs {
+        let h = tx.hash_or();
+        let v1 = hash_vec.clone();
+        let v2 = h.vec();
+        let xor_value: Vec<u8> = v1
+            .iter()
+            .zip(v2.iter())
+            .map(|(&x1, &x2)| x1 ^ x2)
+            .collect();
+        let distance: u64 = xor_value.iter().map(|&byte| u64::from(byte)).sum();
+        println!("hash distance {} xor_value: {} tx_hash {}", distance, hex::encode(xor_value.clone()), h.hex());
+    }
+
+    // let ds_ret = relay.ds.transaction_store.xor_transaction_order(&tx_0_hash).await.expect("");
+    //
+    // for (tx, xor_value) in ds_ret {
+    //     println!("xor_value: {} tx_hash: {}", hex::encode(xor_value), hex::encode(tx));
+    // }
 
 }
