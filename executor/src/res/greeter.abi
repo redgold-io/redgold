@@ -1,0 +1,1 @@
+[{"inputs":[],"name":"sayHelloWorld","outputs":[{"internalType":"uint32","name":"test","type":"uint32"}],"stateMutability":"view","type":"function"}]
