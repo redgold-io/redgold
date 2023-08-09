@@ -32,7 +32,7 @@ async fn tse() -> Result<()> {
     let contract = c.clone();
     let f_actual = contract.function(fname_get).expect("");
     // encode abi into Bytes
-    let encoded = abi.encode(fname, "isetthename".to_string())?;
+    let encoded = abi.encode(fname, "name".to_string())?;
     let encoded_get = abi.encode(fname_get, ())?;
     let mut cache_db = CacheDB::new(EmptyDB::default());
     let caller_address = B160::from_str("0x0000000000000000000000000000000000000000")?;
