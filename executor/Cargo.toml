@@ -17,4 +17,36 @@ edition = "2021"
 #wasmer-compiler-llvm = "2.3.0"
 ##llvmenv = "0.3.2"
 ##llvm-sys = "120"
-#extism = "0.4.0"
+
+#Extism related
+extism = "0.4.0"
+
+# Parity EVM crate related
+evm = {"version" = "0.39.1", features = ["with-codec"]}
+primitive-types = "0.12.1"
+parity-scale-codec = "3.6.4"
+#serde = { version = "1.0.130"}
+sp-io = "24.0.0"
+#hex = "0.4.3"
+
+
+# REVM related
+revm = {version = "3.3.0", features = ["ethersdb", "dev"]}
+auto_impl = { version = "1.1", default-features = false }
+# Optional
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+# ethersdb
+tokio = { version = "1.28", features = ["rt-multi-thread", "macros"] }
+ethers-providers = { version = "2.0" }
+ethers-core = { version = "2.0" }
+futures = { version = "0.3.27" }
+hex-literal = "0.4"
+ethers-contract = { version = "2.0.3", default-features = true }
+hex = "0.4.3"
+bytes = "1.4.0"
+anyhow = "1.0.71"
+criterion = "0.5"
+
+
+
