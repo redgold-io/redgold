@@ -56,6 +56,12 @@ async fn tse() -> Result<()> {
     // query value of storage slot at account address
     let value = ethersdb.storage(pool_address, slot).unwrap();
 
+    let byte_vec = value.clone().as_le_slice().to_vec();
+    let mut first_part: [u8; 4] = [0u8; 4];
+    first_part.copy_from_slice(&byte_vec[28..32]);
+    let reserve0 = u32::from_le_bytes(first_part);
+    println!("slot Reserve0: {:#?}", reserve0);
+
     // initialise empty in-memory-db
     let mut cache_db = CacheDB::new(EmptyDB::default());
 
