@@ -124,7 +124,9 @@ impl PeerRxEventHandler {
         if let Some(_) = request.get_peers_info_request {
             let mut get_peers_info_response = GetPeersInfoResponse::default();
             let vec = relay.ds.peer_store.all_peers_info().await?;
+            let self_info = relay.peer_node_info().await?;
             get_peers_info_response.peer_info = vec;
+            get_peers_info_response.self_info = Some(self_info);
             response.get_peers_info_response = Some(get_peers_info_response);
             // response.get_peers_info_response = Some(relay.get_peers_info(r).await?);
         }

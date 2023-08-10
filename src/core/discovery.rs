@@ -8,9 +8,9 @@ use metrics::increment_counter;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error};
-use redgold_schema::{RgResult, SafeOption, structs};
+use redgold_schema::{RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, Response};
+use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo, Response};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::{IntervalFold, RecvForEachConcurrent};
 use crate::e2e::run;
@@ -47,15 +47,36 @@ impl IntervalFold for Discovery {
                         // Problem here is we might have slightly different but almost same based
                         // on observation ordinal
                         // o.peer_info
-                        results.extend(o.peer_info.clone())
-                    }
-                    let current_key = o.node_metadata.as_ref().and_then(|n| n.public_key.as_ref());
-                    if let Some(ck) = current_key {
-                        if ck != &pk {
-                            error!("Discovery response public key does not match request public key");
-                            self.relay.ds.peer_store.remove_node(&pk).await?;
+                        results.extend(o.peer_info.clone());
+                        let info: Option<&PeerNodeInfo> = o.self_info.as_ref();
+                        if let Some(info) = info {
+                            let latest_tx = info.latest_node_transaction.as_ref();
+                            let nmd = latest_tx.and_then(|t| {
+                                t.node_metadata().ok()
+                            });
+                            let current_key = nmd.as_ref().and_then(|n| n.public_key.as_ref());
+                            if let Some(ck) = current_key {
+                                if ck != &pk {
+                                    error!("Discovery response public key does not match request public key");
+                                    self.relay.ds.peer_store.remove_node(&pk).await?;
+                                } else {
+                                    // TODO: Move this to peer store, also do this for peer_tx
+                                    // Do the entire update thing as on_received_update_peer_node_info
+                                    // ...after validating it.
+                                    let tx = self.relay.ds.peer_store.query_public_key_node(&pk).await?;
+                                    if let Some(tx) = tx {
+                                        if let Some(tx_latest) = latest_tx {
+                                            if tx.hash_or() != tx_latest.hash_or() {
+                                                self.relay.ds.peer_store.insert_node(&tx_latest).await?;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
+
+
                 }
                 Err(e) => {
                     error!("Error in discovery: {}", e.json_or());

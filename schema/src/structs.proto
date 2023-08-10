@@ -653,6 +653,7 @@ message PeerIdInfo {
 }
 
 message GetPeersInfoResponse {
+  PeerNodeInfo self_info = 1;
   repeated PeerNodeInfo peer_info = 2;
 }
 
@@ -710,6 +711,10 @@ message HealthRequest {
 
 }
 
+message GetNodeTransactionRequest {
+
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -730,6 +735,7 @@ message Request {
   optional bool trace = 16;
   MultipartyAuthenticationRequest multiparty_authentication_request = 18;
   HealthRequest health_request = 19;
+  GetNodeTransactionRequest get_node_transaction_request = 20;
 }
 
 message HealthResponse {
