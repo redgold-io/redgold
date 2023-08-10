@@ -20,7 +20,6 @@ use redgold_data::transaction_store::TransactionStore;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::structs::AddressInfo;
 
-use crate::node_config::NodeConfig;
 use crate::schema::structs::{
     Address, ErrorInfo,
 };
@@ -114,9 +113,9 @@ WHERE
         }
     }
 
-
-    pub async fn from_config(node_config: &NodeConfig) -> DataStore {
-        DataStore::from_path(format!("{}{}", "file:", node_config.env_data_folder().data_store_path().to_str().expect("").to_string())).await
+    // node_config.env_data_folder().data_store_path()
+    pub async fn from_config_path(path: &PathBuf) -> DataStore {
+        DataStore::from_path(format!("{}{}", "file:", path.to_str().expect("").to_string())).await
     }
 
     pub async fn from_file_path(path: String) -> DataStore {

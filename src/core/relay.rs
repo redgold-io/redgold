@@ -496,7 +496,7 @@ impl Relay {
     }
     pub async fn new(node_config: NodeConfig) -> Self {
         // Inter thread processes
-        let ds = DataStore::from_config(&node_config.clone()).await;
+        let ds = node_config.data_store().await;
         Self {
             node_config,
             transaction: internal_message::new_channel::<TransactionMessage>(),
