@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::result;
 use std::sync::Arc;
@@ -6,45 +5,25 @@ use std::sync::Arc;
 use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::info;
-use metrics::{gauge, increment_counter};
-use rusqlite::{params, Connection, Error, Result};
-use sqlx::migrate::MigrateError;
-use sqlx::pool::PoolConnection;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteRow};
-use sqlx::{Row, Sqlite, SqlitePool};
+use metrics::gauge;
+use rusqlite::Result;
+use sqlx::SqlitePool;
+use sqlx::sqlite::SqliteConnectOptions;
+
 use redgold_data::address_block::AddressBlockStore;
-use redgold_data::DataStoreContext;
-use redgold_data::peer::PeerStore;
 use redgold_data::config::ConfigStore;
+use redgold_data::DataStoreContext;
 use redgold_data::mp_store::MultipartyStore;
 use redgold_data::observation_store::ObservationStore;
-use redgold_data::servers::ServerStore;
+use redgold_data::peer::PeerStore;
 use redgold_data::transaction_store::TransactionStore;
+use redgold_schema::{error_info, RgResult};
+use redgold_schema::structs::AddressInfo;
 
-use crate::data::download::DownloadMaxTimes;
-use crate::data::utxo;
-use crate::genesis::create_genesis_transaction;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{
-    Address, AddressBlock, Block, ErrorInfo, ObservationEdge, ObservationEntry, ObservationProof,
-    TransactionEntry,
+    Address, ErrorInfo,
 };
-use crate::schema::structs::{Error as RGError, Hash};
-use crate::schema::structs::{MerkleProof, Output};
-use crate::schema::structs::{Observation, UtxoEntry};
-use crate::schema::structs::{ObservationMetadata, Proof, Transaction};
-use crate::schema::TestConstants;
-use crate::schema::{ProtoHashable, SafeBytesAccess, WithMetadataHashable};
-use crate::util::cli::args::{empty_args, RgArgs};
-use crate::util::keys::public_key_from_bytes;
-// use crate::util::to_libp2p_peer_id;
-use crate::{schema, util};
-use crate::schema::structs;
-use redgold_schema::constants::EARLIEST_TIME;
-use redgold_schema::{error_info, error_message, ProtoSerde, RgResult, SafeOption};
-use redgold_schema::structs::{AddressInfo, NetworkEnvironment};
-use redgold_schema::transaction::AddressBalance;
-use crate::util::cli::arg_parse_config::ArgTranslate;
 
 #[derive(Clone)]
 pub struct DataStore {
@@ -82,7 +61,7 @@ impl DataStore {
     pub async fn count_gauges(&self) -> RgResult<()> {
         let tx_count = self.transaction_store.count_total_accepted_transactions().await?;
         gauge!("redgold.transaction.accepted.total", tx_count as f64);
-        let obs_count = self.observation.count_total_observations().await?;˚
+        let obs_count = self.observation.count_total_observations().await?;
         gauge!("redgold.observation.total", obs_count as f64);
         let utxo_total = self.transaction_store.count_total_utxos().await?;
         gauge!("redgold.utxo.total", utxo_total as f64);
