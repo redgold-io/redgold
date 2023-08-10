@@ -84,6 +84,10 @@ impl Hash {
         Ok(distance)
     }
 
+    pub fn new_checksum(s: &Vec<u8>) -> RgResult<String> {
+        Self::digest(s.clone()).checksum_hex()
+    }
+
 }
 
 #[test]

@@ -12,7 +12,7 @@ use bitcoin_wallet::account::MasterKeyEntropy;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
-use crate::structs::NetworkEnvironment;
+use crate::structs::{Hash, NetworkEnvironment};
 use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
 use crate::util::mnemonic_words::MnemonicWords;
 
@@ -22,7 +22,22 @@ pub struct WordsPass {
     pub passphrase: Option<String>,
 }
 
+trait MnemonicSupport {
+
+}
+
 impl WordsPass {
+
+    pub fn checksum(&self) -> RgResult<String> {
+        Hash::new_checksum(&self.seed()?.to_vec())
+    }
+
+    pub fn checksum_words(&self) -> RgResult<String> {
+        let mut s2 = self.clone();
+        s2.passphrase = None;
+        let s = s2.seed()?.to_vec();
+        Hash::new_checksum(&s)
+    }
 
     pub fn seed(&self) -> RgResult<[u8; 64]> {
         Ok(self.mnemonic()?.to_seed(self.passphrase.clone().unwrap_or("".to_string())))
@@ -43,6 +58,12 @@ impl WordsPass {
         Self {
             words,
             passphrase,
+        }
+    }
+    pub fn words(words: String) -> Self {
+        Self {
+            words,
+            passphrase: None
         }
     }
     pub fn generate() -> RgResult<Self> {
@@ -95,6 +116,10 @@ impl WordsPass {
         let key = self.key_from_path_str(path)?;
         let pkhex = hex::encode(key.private_key.secret_bytes().to_vec());
         Ok(pkhex)
+    }
+
+    pub fn keypair_at(&self, path: String) -> RgResult<KeyPair> {
+        KeyPair::from_private_hex(self.private_at(path)?)
     }
 
     pub fn public_at(&self, path: String) -> RgResult<structs::PublicKey> {

@@ -1,17 +1,16 @@
 use bitcoin_wallet::mnemonic::Mnemonic;
 use eframe::egui;
-use eframe::egui::{Context, ScrollArea, Separator, TextEdit, Ui, Widget};
+use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
 use redgold_schema::util::mnemonic_builder;
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
-use crate::gui::util::valid_label;
-use crate::gui::wallet_tab::{copy_to_clipboard, data_item, medium_data_item};
+use crate::gui::common::{copy_to_clipboard, medium_data_item, valid_label};
 use crate::util;
 use crate::util::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::argon_kdf::argon2d_hash;
-use crate::util::cli::commands::{generate_mnemonic, generate_random_mnemonic};
+use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
 
 

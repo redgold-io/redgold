@@ -95,6 +95,13 @@ pub struct NodeConfig {
 impl NodeConfig {
 
 
+    pub fn secure_or(&self) -> &DataFolder {
+        match &self.secure_data_folder {
+            Some(folder) => folder,
+            None => &self.data_folder
+        }
+    }
+
     pub fn default_peer_id(&self) -> RgResult<PeerId> {
         let pk = self.words().public_at(default_node_internal_derivation_path(1))?;
         let pid = PeerId::from_pk(pk);
