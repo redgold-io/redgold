@@ -17,7 +17,10 @@ pub mod server_tab;
 pub mod home;
 pub mod wallet_tab;
 pub mod keys_tab;
-pub mod util;
+pub mod common;
+pub mod hot_wallet;
+pub mod local_stored_state;
+pub mod cold_wallet;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
