@@ -118,13 +118,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v1
-      - name: Cache Rust dependencies
-        uses: actions/cache@v1.0.1
-        with:
-          path: target
-          key: ${{ runner.OS }}-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.OS }}-build-
+#      - name: Cache Rust dependencies
+#        uses: actions/cache@v1.0.1
+#        with:
+#          path: target
+#          key: ${{ runner.OS }}-build-${{ hashFiles('**/Cargo.lock') }}
+#          restore-keys: |
+#            ${{ runner.OS }}-build-
       - name: Install latest rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -132,17 +132,14 @@ jobs:
           target: x86_64-apple-darwin
           default: true
           override: true
-      # is this still necessary?
-      - run: brew install llvm@12
-      - run: echo 'export PATH="/usr/local/opt/llvm@12/bin:$PATH"' >> /Users/runner/.bash_profile
-      - run: echo $(llvm-config --version)
+      - name: Check branch
+        id: check-branch
+        run: ./bin/release_branches.sh
 
-      - run: rustup default nightly
-      - run: rustup toolchain list
-      - run: brew install openssl@3
-      - run: cargo clean
-      - run: cargo build --all --release
-      - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+      - if: steps.check-branch.match == '1'
+        run: cargo clean; cargo build --all --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+      - if: steps.check-branch.match == '0'
+        run: echo "Not a release branch, not building mac"; touch ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
@@ -150,7 +147,7 @@ jobs:
           path: ./redgold_mac
 
   release:
-    needs: [build-linux] #, build-mac]
+    needs: [build-linux, build-mac]
     if:
         contains('
           refs/heads/predev
@@ -202,8 +199,10 @@ jobs:
           ./bin/cargo_publish.sh
 
 
+
       - run: ls -lA .
       - run: ls -lA ./redgold_linux
+      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
@@ -295,7 +294,6 @@ jobs:
         if: github.ref == 'refs/heads/dev'
         run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
 
-      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
 # TODO: Need tags associated with staging versions for changelog.
 #      - name: "Build Changelog"
