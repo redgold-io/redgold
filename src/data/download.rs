@@ -11,7 +11,7 @@ use bitcoin::secp256k1::PublicKey;
 use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
-use redgold_schema::{SafeOption, structs};
+use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::structs::{ErrorInfo, FixedUtxoId};
 use redgold_schema::EasyJson;
 
@@ -229,7 +229,7 @@ pub async fn download(relay: Relay, key: structs::PublicKey) {
 pub async fn process_download_request(
     relay: &Relay,
     download_request: DownloadRequest,
-) -> Result<DownloadResponse, rusqlite::Error> {
+) -> RgResult<DownloadResponse> {
     Ok(DownloadResponse {
         utxo_entries: {
             if download_request.data_type != DownloadDataType::UtxoEntry as i32 {
@@ -239,7 +239,7 @@ pub async fn process_download_request(
                     .ds
                     .transaction_store
                     .utxo_filter_time(download_request.start_time as i64, download_request.end_time as i64).await
-                    .expect("")
+                    ?
             }
         },
         transactions: {
@@ -249,7 +249,7 @@ pub async fn process_download_request(
                 relay.ds.transaction_store.query_time_transaction(
                     download_request.start_time as i64,
                     download_request.end_time as i64,
-                ).await.expect("")
+                ).await?
             }
         },
         observations: {
@@ -259,7 +259,7 @@ pub async fn process_download_request(
                 relay.ds.observation.query_time_observation(
                     download_request.start_time as i64,
                     download_request.end_time as i64,
-                ).await.expect("")
+                ).await?
             }
         },
         observation_edges: {
@@ -269,7 +269,7 @@ pub async fn process_download_request(
                 relay.ds.observation.query_time_observation_edge(
                     download_request.start_time as i64,
                     download_request.end_time as i64,
-                ).await.expect("")
+                ).await?
             }
         },
         // TODO: not this

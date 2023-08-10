@@ -1,4 +1,4 @@
-use crate::data::data_store::{DataStore, MnemonicEntry};
+use crate::data::data_store::{DataStore};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::NetworkEnvironment;
 use crate::{e2e, gui, util};

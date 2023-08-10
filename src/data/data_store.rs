@@ -46,14 +46,6 @@ use redgold_schema::structs::{AddressInfo, NetworkEnvironment};
 use redgold_schema::transaction::AddressBalance;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 
-/*
-
-   "CREATE TABLE IF NOT EXISTS utxos (value INTEGER, keychain TEXT, vout INTEGER, txid BLOB, script BLOB);",
-   "CREATE INDEX idx_txid_vout ON utxos(txid, vout);",
-
-   should we remove the utxo id direct key and just use two separate values?
-*/
-//https://github.com/launchbadge/sqlx should use this instead?
 #[derive(Clone)]
 pub struct DataStore {
     pub connection_path: String,
@@ -85,42 +77,16 @@ impl DataStore {
     }
 }
 
-
-#[derive(Clone)]
-pub struct RewardQueryResult {
-    pub reward_address: Vec<u8>,
-    pub deterministic_trust: f64,
-}
-#[derive(Clone)]
-pub struct PeerQueryResult {
-    pub public_key: Vec<u8>,
-    pub trust: f64,
-}
-//
-// impl PeerQueryResult {
-//     pub fn to_peer_id(&self) -> PeerId {
-//         to_libp2p_peer_id(&public_key_from_bytes(&self.public_key).unwrap())
-//     }
-// }
-
 impl DataStore {
 
     pub async fn count_gauges(&self) -> RgResult<()> {
         let tx_count = self.transaction_store.count_total_accepted_transactions().await?;
         gauge!("redgold.transaction.accepted.total", tx_count as f64);
-        let obs_count = self.observation.count_total_observations().await?;
+        let obs_count = self.observation.count_total_observations().await?;˚
         gauge!("redgold.observation.total", obs_count as f64);
         let utxo_total = self.transaction_store.count_total_utxos().await?;
         gauge!("redgold.utxo.total", utxo_total as f64);
         Ok(())
-    }
-
-    pub fn connection(&self) -> rusqlite::Result<Connection, Error> {
-        return Connection::open(self.connection_path.clone());
-    }
-
-    pub async fn pool(&self) -> std::result::Result<PoolConnection<Sqlite>, ErrorInfo> {
-        DataStore::map_err_sqlx(self.pool.acquire().await)
     }
 
     // TODO: Move to utxoStore
@@ -129,124 +95,19 @@ impl DataStore {
         let res = self.transaction_store.query_utxo_address(&addr).await?;
         Ok(AddressInfo::from_utxo_entries(addr.clone(), res))
     }
-    //
-    // pub fn select_latest_reward_hash(&self) -> Result<Vec<u8>, Error> {
-    //     let conn = self.connection()?;
-    //     let mut statement = conn.prepare("SELECT hash FROM rewards ORDER BY time DESC LIMIT 1")?;
-    //     let mut rows = statement.query_map(params![], |row| {
-    //         let hash: Vec<u8> = row.get(0)?;
-    //         Ok(hash)
-    //     })?;
-    //     Ok(rows.next().unwrap().unwrap())
-    // }
-    //
-    // pub fn select_reward_weights(&self) -> Result<Vec<RewardQueryResult>, Error> {
-    //     let conn = self.connection()?;
-    //     let mut statement =
-    //         conn.prepare("SELECT reward_address, deterministic_trust FROM peers")?;
-    //     let rows = statement.query_map(params![], |row| {
-    //         let result = RewardQueryResult {
-    //             reward_address: row.get(0)?,
-    //             deterministic_trust: row.get(1)?,
-    //         };
-    //         Ok(result)
-    //     })?;
-    //     Ok(rows
-    //         .filter(|x| x.is_ok())
-    //         .map(|x| x.unwrap())
-    //         .collect::<Vec<RewardQueryResult>>())
-    // }
-    // pub fn select_peer_trust(
-    //     &self,
-    //     peer_ids: &Vec<Vec<u8>>,
-    // ) -> Result<HashMap<Vec<u8>, f64>, Error> {
-    //     let conn = self.connection()?;
-    //     let mut map: HashMap<Vec<u8>, f64> = HashMap::new();
-    //
-    //     for peer_id in peer_ids {
-    //         let mut statement = conn.prepare("SELECT id, trust FROM peers WHERE id = ?1")?;
-    //         //.raw_bind_parameter();
-    //         // Try this ^ for iterating over peer ids.
-    //         let rows = statement.query_map(params![peer_id], |row| {
-    //             Ok(PeerTrustQueryResult {
-    //                 peer_id: row.get(0)?,
-    //                 trust: row.get(1)?,
-    //             })
-    //         })?;
-    //         // // TODO error handling for multiple rows
-    //
-    //         for row in rows {
-    //             let row_q = row?;
-    //             map.insert(row_q.peer_id, row_q.trust);
-    //         }
-    //     }
-    //     return Ok(map);
-    // }
 
 
-    pub fn map_err<A>(error: rusqlite::Result<A, rusqlite::Error>) -> result::Result<A, ErrorInfo> {
-        error.map_err(|e| error_info(e.to_string()))
-    }
+    /*
+        pub fn select_all_tables(&self) -> rusqlite::Result<Vec<String>, Error> {
 
-    pub fn map_err_sqlx<A>(error: result::Result<A, sqlx::Error>) -> result::Result<A, ErrorInfo> {
-        error.map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
-    }
-
-
-    pub fn select_all_tables(&self) -> rusqlite::Result<Vec<String>, Error> {
-        let conn = self.connection()?;
-
-        let mut statement = conn.prepare(
-            "SELECT
+                "SELECT
     name
 FROM
     sqlite_master
 WHERE
     type ='table' AND
     name NOT LIKE 'sqlite_%';",
-        )?;
-
-        let rows = statement.query_map([], |row| {
-            let str: String = row.get(0)?;
-            Ok(str)
-        })?;
-        return Ok(rows.map(|r| r.unwrap()).collect_vec());
-    }
-    //
-    // pub fn get_max_time_old(&self, table: &str) -> rusqlite::Result<i64, Error> {
-    //     let conn = self.connection()?;
-    //     let query = "SELECT max(time) FROM ".to_owned() + table;
-    //     let mut statement = conn.prepare(&*query)?;
-    //     let mut rows = statement.query_map(params![], |r| {
-    //         let data: i64 = r.get(0)?;
-    //         Ok(data)
-    //     })?;
-    //     let row = rows.next().unwrap().unwrap_or(0 as i64);
-    //     Ok(row)
-    // }
-    //
-    // pub async fn get_max_time(&self, table: &str) -> RgResult<i64> {
-    //     let mut pool = self.ctx.pool().await?;
-    //     let query = "SELECT max(time) as max_time FROM ".to_owned() + table;
-    //     let mut query = sqlx::query(&query);
-    //     let rows = query.fetch_all(&mut pool).await;
-    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-    //     for row in rows_m {
-    //         let raw: i64 = DataStoreContext::map_err_sqlx(row.try_get("max_time"))?;
-    //         return Ok(raw)
-    //     }
-    //     return Err(error_info("No max time found"))
-    // }
-    //
-    // pub fn query_download_times(&self) -> DownloadMaxTimes {
-    //     DownloadMaxTimes {
-    //         utxo: self.get_max_time("utxo").await.unwrap(),
-    //         transaction: self.get_max_time("transactions").await.unwrap(),
-    //         observation: self.get_max_time("observation").await.unwrap(),
-    //         observation_edge: self.get_max_time("observation_edge").await.unwrap(),
-    //     }
-    // }
-
+     */
 
     pub async fn from_path(path: String) -> DataStore {
         info!("Starting datastore with path {}", path.clone());
@@ -306,14 +167,5 @@ WHERE
         Ok(())
     }
 
-}
-
-
-#[allow(dead_code)]
-#[derive(sqlx::FromRow)]
-pub struct MnemonicEntry {
-    pub(crate) words: String,
-    pub(crate) time: i64,
-    pub(crate) peer_id: Vec<u8>,
 }
 

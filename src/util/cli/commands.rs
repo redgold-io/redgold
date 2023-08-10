@@ -17,7 +17,7 @@ use redgold_schema::servers::Server;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
-use crate::data::data_store::{DataStore, MnemonicEntry};
+use crate::data::data_store::{DataStore};
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;

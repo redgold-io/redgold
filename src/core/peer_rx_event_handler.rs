@@ -151,7 +151,7 @@ impl PeerRxEventHandler {
 
         if let Some(download_request) = request.download_request {
             // info!("Received download request");
-            let result = DataStore::map_err(process_download_request(&relay, download_request).await)?;
+            let result = process_download_request(&relay, download_request).await?;
             response.download_response = Some(result);
         }
 
