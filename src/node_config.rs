@@ -264,7 +264,7 @@ impl NodeConfig {
     }
 
     pub fn control_port(&self) -> u16 {
-        self.control_port.unwrap_or(self.port_offset - 2)
+        self.control_port.unwrap_or(self.port_offset - 3)
     }
     pub fn p2p_port(&self) -> u16 {
         self.p2p_port.unwrap_or(self.port_offset + 0)
