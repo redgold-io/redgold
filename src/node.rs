@@ -37,7 +37,7 @@ use crate::node_config::NodeConfig;
 use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
 // use crate::trust::rewards::Rewards;
-use crate::{e2e, util};
+use crate::{api, e2e, util};
 // use crate::mparty::mp_server::{Db, MultipartyHandler};
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
@@ -56,6 +56,7 @@ use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::Watcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
+use crate::shuffle::shuffle_interval::Shuffle;
 use crate::util::logging::Loggable;
 
 #[derive(Clone)]
@@ -186,6 +187,13 @@ impl Node {
 
         join_handles.push(stream_handlers::run_recv(
             discovery, relay.discovery.receiver.clone(), 100
+        ).await);
+
+
+        join_handles.push(tokio::spawn(api::rosetta::server::run_server(relay.clone())));
+
+        join_handles.push(stream_handlers::run_interval_fold(
+            Shuffle::new(&relay), relay.node_config.shuffle_interval, false
         ).await);
 
         join_handles

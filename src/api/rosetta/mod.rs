@@ -19,7 +19,7 @@ use warp::http::StatusCode;
 use warp::path::Exact;
 use warp::reply::{Json, WithStatus};
 
-use redgold_schema::{constants, TestConstants};
+use redgold_schema::{constants, RgResult, TestConstants};
 
 use crate::{schema, util};
 use crate::api::rosetta::models::*;
@@ -50,7 +50,7 @@ pub mod spec;
 
 
 pub async fn run_test_request<Req, Resp, F>(
-    req: Req, f: F, relay: Relay, endpoint: String, server: impl Future<Output=()>)
+    req: Req, f: F, relay: Relay, endpoint: String, server: impl Future<Output=RgResult<()>>)
 where
       Req: Serialize + Sized,
       Resp: DeserializeOwned,
@@ -105,7 +105,7 @@ async fn test() {
         assert_eq!(resp.code, 18)
     }, relay.clone(), "account/balance".to_string(), srv.clone()).await;
 
-    req.network_identifier.network = "debug".into();
+    req.network_identifier.network = "debug".to_string();
     run_test_request(req.clone(), |resp: Error| {
         assert_eq!(resp.code, 18)
     }, relay.clone(), "account/balance".to_string(), srv.clone()).await;

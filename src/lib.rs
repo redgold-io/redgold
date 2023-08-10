@@ -21,6 +21,7 @@ pub mod hardware;
 pub mod wallet;
 pub mod observability;
 pub mod integrations;
+pub mod shuffle;
 
 pub use redgold_schema as schema;
 pub use redgold_data as datas;
