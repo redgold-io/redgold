@@ -87,6 +87,7 @@ pub struct NodeConfig {
     pub enable_logging: bool,
     pub discovery_interval: Duration,
     pub watcher_interval: Duration,
+    pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
     pub opts: RgArgs
@@ -262,6 +263,9 @@ impl NodeConfig {
             .clone()
     }
 
+    pub fn control_port(&self) -> u16 {
+        self.control_port.unwrap_or(self.port_offset - 2)
+    }
     pub fn p2p_port(&self) -> u16 {
         self.p2p_port.unwrap_or(self.port_offset + 0)
     }
@@ -270,9 +274,10 @@ impl NodeConfig {
         self.public_port.unwrap_or(self.port_offset + 1)
     }
 
-    pub fn control_port(&self) -> u16 {
-        self.control_port.unwrap_or(self.port_offset + 2)
+    pub fn placeholder_port(&self) -> u16 {
+        self.port_offset + 2
     }
+
 
     pub fn rosetta_port(&self) -> u16 {
         self.rosetta_port.unwrap_or(self.port_offset + 3)
@@ -333,6 +338,7 @@ impl NodeConfig {
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
             watcher_interval: Duration::from_secs(200),
+            shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60),
             genesis: false,
             opts: RgArgs::default(),

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use warp::path::FullPath;
-use redgold_schema::{error_message, error_msg, ErrorInfoContext, structs};
+use redgold_schema::{error_message, error_msg, ErrorInfoContext, RgResult, structs};
 use crate::api::{RgHttpClient, easy_post, rosetta, with_response_logger, with_response_logger_error};
 use crate::api::rosetta::models::{AccountBalanceRequest, AccountBalanceResponse, AccountCoinsRequest, AccountIdentifier, Error};
 use crate::api::rosetta::spec::Rosetta;
@@ -184,7 +184,7 @@ pub async fn handle_warp_request(path: String, r: Rosetta, b: Bytes) -> Result<W
     Ok(res)
 }
 
-pub async fn run_server(relay: Relay) {
+pub async fn run_server(relay: Relay) -> RgResult<()> {
     let relay2 = relay.clone();
 
     let hello = warp::get().and_then(|| async {
@@ -213,6 +213,7 @@ pub async fn run_server(relay: Relay) {
     warp::serve(endpoints.or(hello))
         .run(([0, 0, 0, 0], port))
         .await;
+    Ok(())
 }
 
 
