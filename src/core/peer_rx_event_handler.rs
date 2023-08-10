@@ -23,7 +23,7 @@ use crate::core::discovery::DiscoveryMessage;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::{ Relay};
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::data::download::process_download_request;
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;

@@ -8,7 +8,6 @@ use itertools::Itertools;
 
 use log::info;
 use metrics::increment_counter;
-use rusqlite::Connection;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -30,7 +29,7 @@ use crate::core::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::peer_rx_event_handler::{PeerRxEventHandler, rest_peer};
 use crate::core::process_transaction::TransactionProcessContext;
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::data::download;
 use crate::genesis::{create_genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::node_config::NodeConfig;
@@ -437,7 +436,6 @@ async fn throw_panic() {
 
 struct LocalNodes {
     nodes: Vec<LocalTestNodeContext>,
-    connections: Vec<Connection>,
     current_seed: Seed,
 }
 
@@ -474,7 +472,6 @@ impl LocalNodes {
         //     .expect("test failure create tables");
         let start = LocalTestNodeContext::new(0, port_offset, None).await;
         LocalNodes {
-            connections: vec![], //connection],
             current_seed: start.node.relay.node_config.self_seed(),
             nodes: vec![start],
         }

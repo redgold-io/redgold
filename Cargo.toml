@@ -31,20 +31,14 @@ redgold-data = { path = "data", version = "0.1.5"}
 redgold-schema = { path = "schema", version = "0.1.5"}
 #redgold-executor = { path = "executor", version = "0.1.5"}
 tempfile = "3.3.0"
-#web3 = { version = "0.18.0", default-features = false, features = ["http-rustls-tls"] }
 sha3 = "0.10.8"
 argon2 = "0.5.0"
-#filepath = "0.1.2"
-#svg = "0.10.0"
-#noise = "0.7.0"
-#bs58 = "0.4.0"
+
 dirs = "4.0.0"
-sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
-#error-chain = "0.12.4"
-backtrace = "0.3.65"
-#btc-transaction-utils = "0.9.0" # build conflict, out of date anyways
-# todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
-#swagger = "2.2" # breaks openssl?
+#sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
+# Is this only used in schema now?
+#backtrace = "0.3.65"
+
 flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
 dotenv = "0.15.0"
 futures = "0.3.1"
@@ -52,16 +46,16 @@ futures = "0.3.1"
 bitcoin-wallet = "1.1.0"
 # Used for Sha256 but can be deprecated
 rust-crypto = "0.2.36"
+# only used in schema?
 prost = "0.8"
-#hdpath = { version = "0.5.0", features = ["with-bitcoin"] }
+prost-helper = "0.5.0"
+
 dashmap = "4.0.2"
 # Deprecate after moving into data module -- only for build
-rusqlite = "0.25.3"
 
-#default-args = "1.0.0"
-#crossbeam-channel = "0.5.1"
 crossbeam = "0.8.1"
 uuid = { version = "1.3.3", features = ["serde", "v4", "v1"] }
+# GUI Alone
 eframe = "0.21.0" # Gives us egui, epi and web+native backends
 egui_extras = {version = "0.21.0", features = ["default", "image"]}
 strum = "0.25"
@@ -73,13 +67,13 @@ clap = { version = "3.1.17", features = ["derive"] }
 log = "0.4.14"
 hex = "0.4.3"
 #void = "1.0.2"
+# Is this used anymore?
 async-std = { version = "1.6.2", features = ["attributes"] }
 async-trait = "0.1.56"
 env_logger = "0.10.0"
 #structopt = "0.3.21"
 warp = {version = "0.3", features = ["tls", "default"]}
 reqwest = { version = "0.11", features = ["json"] }
-prost-helper = "0.5.0"
 serde = "1.0.130"
 serde_json = "1.0.59"
 base64 = "0.21.2"
@@ -94,12 +88,10 @@ config = "0.11.0"
 
 itertools = "0.10.1"
 bytes = "1.1.0"
-#bitcoin = {version = "0.29.1", features = ["serde", "bitcoinconsensus"]}
 #Dependencies for email sending
 aws-config = "0.55.1"
 aws-sdk-sesv2 = "0.28.0"
 dns-lookup = "2.0.2"
-#tracing-subscriber = "0.3.17"
 
 #Dependencies for multiparty threshold ecdsa
 multi-party-ecdsa = "0.8.1"
@@ -116,14 +108,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 metrics-exporter-prometheus = "0.9.0"
 # conflict with multi-party-ecdsa
-#libp2p = "0.44.0"
 tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
 tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
 tokio-stream = "0.1.14"
 
-#cleora = "1.2.3"
-#graphembed =  {version = "0.0.7", features = ["default"]}
-#annembed = "0.0.10"
 csv = "1.1"
 rpassword = "7.2.0"
 
@@ -131,33 +119,45 @@ rpassword = "7.2.0"
 version = "0.21"
 features = ["serde", "bitcoinconsensus"]
 
-#[build-dependencies]
-#sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
-#prost-build = "0.8"
-#prost-serde = "0.2.0"
-#serde = "1.0.130"
-#serde_json = "1.0.59"
-#tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
-#rusqlite = "0.25.3"
-
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
-# Only enable for debugging performance with heap dumps of remote cluster,
-# Bloats the binary size a lot
-#[profile.release]
-#debug = true
-#
 [dependencies.openssl-sys]
 version = "0.9.88"
 features = ["vendored"]
+
+
+[profile.release]
+codegen-units=1
+lto = true
+opt-level = 1
+# Only enable for debugging performance with heap dumps of remote cluster,
+# Bloats the binary size a lot
+#debug = true
+
+# Potentially useful libraries / debug tools
+#web3 = { version = "0.18.0", default-features = false, features = ["http-rustls-tls"] }
 
 #[dependencies.simdeez]
 #version = "1.0"  # Use the latest version available
 #default-features = false
 #features = ["simdeez_f"]  # scalar for no SIMD, you can also use "sse2", "sse41", "avx2", "avx", "neon"
 
-[profile.release]
-codegen-units=1
-lto = true
-opt-level = 1
+#cleora = "1.2.3"
+#graphembed =  {version = "0.0.7", features = ["default"]}
+#annembed = "0.0.10"
+
+#libp2p = "0.44.0"
+#bitcoin = {version = "0.29.1", features = ["serde", "bitcoinconsensus"]}
+
+#default-args = "1.0.0"
+#crossbeam-channel = "0.5.1"
+#filepath = "0.1.2"
+#svg = "0.10.0"
+#noise = "0.7.0"
+#bs58 = "0.4.0"
+#error-chain = "0.12.4"
+#btc-transaction-utils = "0.9.0" # build conflict, out of date anyways
+# todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
+#swagger = "2.2" # breaks openssl?
+#hdpath = { version = "0.5.0", features = ["with-bitcoin"] }

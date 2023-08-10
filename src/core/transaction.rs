@@ -3,12 +3,11 @@ use curv::arithmetic::Zero;
 use itertools::Itertools;
 use log::{debug, info};
 use prost::{DecodeError, Message as msg};
-use rusqlite::Connection;
 use serde_json;
 
 use crate::e2e::tx_gen::TransactionGenerator;
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::schema::structs::{Error as RGError, Hash};
 use crate::schema::structs::{ErrorInfo, StructMetadata};
 use crate::schema::structs::{
@@ -43,7 +42,6 @@ use crate::schema::transaction::rounded_balance;
 pub struct TransactionTestContext {
     pub tc: TestConstants,
     pub ds: DataStore,
-    pub c: Connection,
     pub g: Transaction,
     pub t: Transaction,
     pub t2: Transaction,

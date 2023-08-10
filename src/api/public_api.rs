@@ -23,7 +23,7 @@ use redgold_schema::transaction::rounded_balance_i64;
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::genesis::create_genesis_transaction;
 use crate::schema::structs::{
     Address, AddressType, ErrorInfo, QueryAddressesRequest, QueryTransactionResponse,

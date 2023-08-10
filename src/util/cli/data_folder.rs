@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use env_logger::Env;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 
 // TODO: Move everything to use this
 

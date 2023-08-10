@@ -25,7 +25,7 @@ use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::{ProtoHashable, SafeOption, WithMetadataHashable};

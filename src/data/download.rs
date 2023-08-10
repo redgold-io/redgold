@@ -1,7 +1,7 @@
 use crate::core::internal_message::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::genesis::create_genesis_transaction;
 use crate::schema::structs::{
     DownloadDataType, DownloadRequest, DownloadResponse, NodeState, Request, Response,

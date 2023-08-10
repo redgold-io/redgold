@@ -24,6 +24,7 @@ itertools = "0.10.5"
 tracing = "0.1"
 metrics = "0.18.1"
 hex = "0.4.3"
+log = "0.4.19"
 
 
 [build-dependencies]

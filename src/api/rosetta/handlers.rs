@@ -7,7 +7,7 @@ use redgold_schema::{constants, ProtoSerde, SafeOption, struct_metadata_new};
 
 use crate::{schema, util};
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::schema::{bytes_data, error_message};
 use crate::schema::{
     from_hex, i64_from_string, ProtoHashable, SafeBytesAccess, WithMetadataHashable,

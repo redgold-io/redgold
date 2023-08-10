@@ -1,6 +1,6 @@
 use redgold_schema::util::mnemonic_words::MnemonicWords;
 use crate::api::RgHttpClient;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 
 #[derive(Clone)]
 struct Wallet {

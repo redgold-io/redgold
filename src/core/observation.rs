@@ -29,7 +29,7 @@ use crate::api::rosetta::models::Error;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::schema::json;
 use crate::schema::json_or;
 use crate::schema::structs::{Observation, ObservationMetadata, Proof};
