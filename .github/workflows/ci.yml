@@ -212,6 +212,7 @@ jobs:
       # Checksums
       - run: echo "BUILD_CHECKSUM=$(md5sum ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
       - run: echo "BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
+      - run: echo "BUILD_SHORT_CHECKSUM=$(echo ${{env.BUILD_CHECKSUM_SHA256}} | tail -c 9)" >> $GITHUB_ENV
       - run: echo "BUILD_CHECKSUM_SHA512=$(shasum -a 512 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
 
       # TODO Change on branch release?
@@ -310,7 +311,7 @@ jobs:
         run: sleep 5
       # https://github.com/marketplace/actions/rust-release-binary these steps came from below
       # TODO: Duplicate this release step with 'version' tagged releases
-      - name: Release
+      - name: Release Env
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -319,16 +320,66 @@ jobs:
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
+          # TODO: Make this body a step output
           body: "
-          Redgold ${{ env.BRANCH }} Release
-                    
-          COMMIT_HASH=${{ github.sha }}
+          Redgold Release
           
-          DOCKER_SHA256=${{ env.DOCKER_SHA256 }}
+          env=${{ env.BRANCH }}
+          
+          version=${{ env.VERSION }}
+                    
+          commit=${{ github.sha }}
+          
+          docker=${{ env.DOCKER_SHA256 }}
 
-          LINUX_SHA256=${{ env.BUILD_CHECKSUM_SHA256 }}
+          linux_sha256=${{ env.BUILD_SHORT_CHECKSUM }}
+          
+          linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM_SHA256 }}
                      
-          MAC_SHA256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          
+          build_number=${{ github.run_number }}
+          
+          "
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: steps.check-branch.match == '1'
+        uses: dev-drprasad/delete-tag-and-release@v0.2.1
+        with:
+          delete_release: true # default: false
+          tag_name: release/${{ env.VERSION }} # tag name to delete
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sleep for 5 seconds
+        run: sleep 5
+      # https://github.com/marketplace/actions/rust-release-binary these steps came from below
+      # TODO: Duplicate this release step with 'version' tagged releases
+      - if: steps.check-branch.match == '1'
+        name: Release Versioned
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            redgold_linux
+            redgold_mac
+          tag_name: "release/${{ env.VERSION }}"
+          name: ${{ env.VERSION }}
+          #           ${{steps.build_changelog.outputs.changelog}}
+          body: "
+          Redgold Release
+                    
+          version=${{ env.VERSION }}
+                    
+          commit=${{ github.sha }}
+          
+          docker=${{ env.DOCKER_SHA256 }}
+
+          linux_sha256=${{ env.BUILD_SHORT_CHECKSUM }}
+          
+          linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM_SHA256 }}
+                     
+          mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          
+          build_number=${{ github.run_number }}
           
           "
           token: ${{ secrets.GITHUB_TOKEN }}
