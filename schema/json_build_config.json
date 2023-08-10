@@ -104,6 +104,7 @@
         "structs.MultipartyAuthenticationRequest",
         "structs.HealthRequest",
         "structs.HealthResponse",
+        "structs.GetNodeTransactionRequest",
         "structs.VersionInfo"
       ]
     },
