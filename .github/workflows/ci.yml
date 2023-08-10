@@ -106,6 +106,8 @@ jobs:
 #    needs: [test]
     if:
       contains('
+      refs/heads/predev
+      refs/heads/dev
       refs/heads/staging
       refs/heads/test
       refs/heads/main
