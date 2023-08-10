@@ -1,5 +1,5 @@
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::genesis::create_genesis_block;
 use crate::schema::error_message;
 use crate::schema::structs::{Address, AddressBlock, Block, Error, ErrorInfo, Output};

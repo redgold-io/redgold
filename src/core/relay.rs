@@ -25,7 +25,7 @@ use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::{ProtoHashable, SafeOption, WithMetadataHashable};
@@ -496,7 +496,7 @@ impl Relay {
     }
     pub async fn new(node_config: NodeConfig) -> Self {
         // Inter thread processes
-        let ds = DataStore::from_config(&node_config.clone()).await;
+        let ds = node_config.data_store().await;
         Self {
             node_config,
             transaction: internal_message::new_channel::<TransactionMessage>(),

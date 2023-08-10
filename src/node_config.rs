@@ -1,6 +1,6 @@
 use std::fs;
 use std::hash::Hash;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::{genesis, util};
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
 use bitcoin::secp256k1::PublicKey;
@@ -378,7 +378,7 @@ impl NodeConfig {
     }
 
     pub async fn data_store(&self) -> DataStore {
-        DataStore::from_config(self).await
+        DataStore::from_config_path(&self.env_data_folder().data_store_path()).await
     }
 
     pub async fn data_store_all(&self) -> DataStore {

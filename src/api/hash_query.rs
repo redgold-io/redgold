@@ -2,7 +2,7 @@ use redgold_schema::{error_info, from_hex};
 use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, PeerId, PublicKey, Transaction, TransactionInfo, TransactionState};
 use redgold_schema::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 
 pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, offset: Option<i64>) -> Result<HashSearchResponse, ErrorInfo> {
     let mut response = HashSearchResponse {

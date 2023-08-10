@@ -2,7 +2,7 @@ use redgold_schema::{bytes_data, constants, error_message, from_hex, SafeBytesAc
 use redgold_schema::structs::{Address, Error as RGError, ErrorInfo, Proof, State};
 use crate::api::rosetta::models::{AccountIdentifier, Amount, Block, BlockIdentifier, CoinAction, CoinChange, CoinIdentifier, Currency, NetworkIdentifier, Operation, OperationIdentifier, PublicKey, Signature, Transaction, TransactionIdentifier};
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::schema;
 
 #[derive(Clone)]

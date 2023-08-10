@@ -25,7 +25,7 @@ use crate::{schema, util};
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 use crate::core::relay::Relay;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::genesis::{create_genesis_block, create_genesis_transaction};
 use crate::node_config::NodeConfig;
 use crate::schema::{bytes_data, error_message};

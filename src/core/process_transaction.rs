@@ -19,7 +19,7 @@ use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, Publi
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::transaction::{TransactionTestContext};
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::schema::structs::{Error, ResponseMetadata};
 use crate::schema::structs::{HashType, ObservationMetadata, State, Transaction};
 use crate::schema::structs::{QueryTransactionResponse, SubmitTransactionResponse};

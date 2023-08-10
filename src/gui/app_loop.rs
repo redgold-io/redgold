@@ -205,7 +205,7 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 // }
 use egui_extras::{Column, TableBuilder};
 use surf::http::headers::ToHeaderValues;
-use crate::data::data_store::DataStore;
+use redgold_data::data_store::DataStore;
 use crate::gui::home::{gui_status_networks, HomeState, NetworkStatusInfo};
 use crate::gui::keys_tab::KeygenState;
 use crate::gui::wallet_tab::{wallet_screen, WalletState};
