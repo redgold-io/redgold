@@ -40,7 +40,7 @@ fn write_csv() {
 
     let edges = gen_test_data();
 
-    let file = File::create("graph_data.csv").expect("Could not create file");
+    let file = File::create("../../resources/graph_data.csv").expect("Could not create file");
     let mut wtr = csv::Writer::from_writer(file);
 
     for edge in edges {
