@@ -1,25 +1,23 @@
 use std::fs;
 use std::hash::Hash;
 use redgold_data::data_store::DataStore;
-use crate::{genesis, util};
+use crate::genesis;
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
-use bitcoin::secp256k1::PublicKey;
-use eframe::egui::TextBuffer;
 use redgold_schema::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, default_node_internal_derivation_path, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
-use redgold_schema::util::mnemonic_words::MnemonicWords;
-use std::path::{Path, PathBuf};
+use redgold_keys::util::mnemonic_words::MnemonicWords;
+use std::path::PathBuf;
 use std::time::Duration;
 use itertools::Itertools;
-use log::{debug, info};
+use log::info;
+use redgold_keys::transaction_support::TransactionBuilderSupport;
 use redgold_schema::servers::Server;
-use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, PeerIdInfo, PeerNodeInfo, Request, Response, Seed, TrustData, VersionInfo};
+use redgold_schema::{RgResult, ShortString, structs};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, Seed, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::{dhash_vec, merkle};
+use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
-use redgold_schema::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::api::public_api::PublicClient;
-use crate::core::seeds::SeedNode;
 use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
@@ -251,7 +249,7 @@ impl NodeConfig {
     }
 
     pub fn address(&self) -> Address {
-        Address::from_public(&self.internal_mnemonic().active_keypair().public_key).expect("address")
+        self.public_key().address().expect("address")
     }
 
     pub fn genesis_transaction(&self) -> Transaction {
@@ -350,7 +348,7 @@ impl NodeConfig {
     }
 
     pub fn from_test_id(seed_id: &u16) -> Self {
-        let words = redgold_schema::util::mnemonic_builder::from_str_rounds(
+        let words = redgold_keys::util::mnemonic_builder::from_str_rounds(
             &*seed_id.clone().to_string(),
             0,
         )

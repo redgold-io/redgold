@@ -1,0 +1,36 @@
+[package]
+name = "redgold-keys"
+version = "0.1.6"
+edition = "2021"
+#edition = { worspace = true }
+#authors = { worspace = true }
+#description = { worspace = true }
+#documentation = { worspace = true }
+#readme = { worspace = true }
+#homepage = { worspace = true }
+#repository = { worspace = true }
+#license = { worspace = true }
+#keywords = { worspace = true }
+#categories = { worspace = true }
+
+[dependencies]
+# workspace = true caused an error here? maybe
+redgold-schema = { path = "../schema", version = "0.1.6"}
+
+# Make all the non-WASM dependencies optional
+tokio = { version = "1.0.0", features = ["rt"]}
+bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
+bitcoin-wallet = { version = "1.1.0"}
+hdpath = { version = "0.6.2"}
+rust-crypto = { version = "0.2.36"}
+hex = {workspace = true}
+serde = {workspace = true}
+serde_json = {workspace = true}
+serde_with = {workspace = true}
+itertools = {workspace = true}
+
+
+[dependencies.bitcoin]
+version = "0.21"
+features = ["serde", "bitcoinconsensus"]
+

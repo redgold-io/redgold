@@ -2,7 +2,7 @@ use crate::node_config::NodeConfig;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::cmd::run_cmd;
 // use crate::util::init_logger;
-use crate::util::lang_util::remove_whitespace;
+use redgold_schema::util::lang_util::remove_whitespace;
 use log::{error, info};
 use std::time::Duration;
 use reqwest::ClientBuilder;

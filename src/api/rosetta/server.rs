@@ -15,7 +15,7 @@ use crate::api::{RgHttpClient, easy_post, rosetta, with_response_logger, with_re
 use crate::api::rosetta::models::{AccountBalanceRequest, AccountBalanceResponse, AccountCoinsRequest, AccountIdentifier, Error};
 use crate::api::rosetta::spec::Rosetta;
 use crate::core::relay::Relay;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 use crate::api::rosetta::handlers::*;
 use crate::api::rosetta::models;
 use crate::util::random_port;

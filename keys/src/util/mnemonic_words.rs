@@ -16,9 +16,10 @@ use bitcoin_wallet::account::Seed;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use hdpath::{Purpose, StandardHDPath};
 
-use crate::constants::REDGOLD_KEY_DERIVATION_PATH;
-use crate::{error_info, ErrorInfoContext, KeyPair, RgResult};
-use crate::structs::{Address, ErrorInfo, Hash};
+use redgold_schema::constants::REDGOLD_KEY_DERIVATION_PATH;
+use redgold_schema::{error_info, ErrorInfoContext, RgResult};
+use redgold_schema::structs::{Address, ErrorInfo, Hash};
+use crate::KeyPair;
 use crate::util::mnemonic_builder;
 
 // use libp2p::identity::{secp256k1, Keypair};

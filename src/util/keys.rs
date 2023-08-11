@@ -1,8 +1,8 @@
-use bitcoin::secp256k1::{Error, PublicKey, Signature};
+use bitcoin::secp256k1::{Error, PublicKey};
 use bitcoin::hashes::hex::ToHex;
-use redgold_schema::{error_info, SafeBytesAccess, structs, TestConstants};
+use redgold_keys::TestConstants;
+use redgold_schema::{error_info, SafeBytesAccess, structs};
 use redgold_schema::structs::ErrorInfo;
-use redgold_schema::util::sign;
 
 pub trait ToPublicKey {
     fn to_public_key(&self) -> Result<PublicKey, ErrorInfo>;

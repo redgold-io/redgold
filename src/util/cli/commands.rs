@@ -1,30 +1,22 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
-use clap::command;
-use log::info;
 use rocket::form::FromForm;
-use serde_json::error::Category::Data;
-use tokio::io::AsyncReadExt;
-use tokio::runtime::Runtime;
-use redgold_data::DataStoreContext;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
-use redgold_schema::structs::HashType::Transaction;
-use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, KeyPair, RgResult, SafeBytesAccess, SafeOption, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
 use redgold_schema::servers::Server;
-use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
+use redgold_schema::transaction::rounded_balance_i64;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use redgold_data::data_store::DataStore;
+use redgold_keys::KeyPair;
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
 use crate::infra::deploy::default_deploy;
-// use crate::util::init_logger;
-use crate::util::runtimes::build_runtime;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
     let ds = config.data_store().await;

@@ -26,7 +26,7 @@ use crate::util;
 // use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
 use redgold_schema::EasyJson;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 use crate::util::logging::Loggable;
 
 #[derive(Clone)]

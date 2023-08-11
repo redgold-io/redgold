@@ -9,6 +9,9 @@ edition = "2021"
 #sudo apt update
 #sudo apt install llvm-12
 [dependencies]
+redgold-schema = {workspace = true}
+
+
 #wasmer = { version="2.3.0", features = ['dylib']} #, default-features=true, features = ["compiler", "cranelift", "universal"]}
 #anyhow = "1.0.58"
 ##wasmer-compiler-singlepass = "2.3.0"

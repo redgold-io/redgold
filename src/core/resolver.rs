@@ -3,16 +3,14 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use redgold_schema::structs::{ErrorInfo, Hash, Input, ObservationProof, Output, PublicKey, Request, ResolveHashRequest, Response, Transaction};
-use redgold_schema::utxo_id::UtxoId;
 use crate::core::relay::Relay;
 
 use async_trait::async_trait;
 use futures::{future, TryFutureExt};
 use itertools::Itertools;
-use rocket::http::ext::IntoCollection;
-use tokio::join;
 use tokio::runtime::Runtime;
-use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, structs, TestConstants, WithMetadataHashable};
+use redgold_keys::transaction_support::InputSupport;
+use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, WithMetadataHashable};
 use crate::genesis::create_genesis_transaction;
 
 #[async_trait]

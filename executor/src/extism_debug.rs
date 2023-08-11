@@ -1,4 +1,44 @@
+use std::ops::Add;
 use extism::{Context, Plugin};
+use redgold_schema::{error_info, ErrorInfoContext, ProtoSerde, RgResult, structs};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{ExecutionInput, ExecutionResult};
+
+pub async fn invoke_wasm(
+    wasm_bytes: &[u8],
+    function_name: impl Into<String>,
+    args: structs::ExecutionInput
+) -> RgResult<ExecutionResult> {
+    let context = Context::new();
+    let mut plugin = Plugin::new(
+        &context,
+        wasm_bytes,
+        vec![],
+        false
+    ).map_err(|e|
+        error_info(
+            format!("Unable to build plugin while invoking wasm {}", e.to_string())))?;
+
+    let fname = function_name.into();
+    let has = plugin.has_function(fname.clone());
+    if !has {
+        return Err(error_info(format!("Function not found {}", fname.clone())))?
+    }
+    let data = plugin.call(fname.clone(), args.proto_serialize())
+        .map_err(|e|
+            error_info(
+                format!("Error calling function {}", e.to_string())))
+        .add(fname.clone())?;
+    ExecutionResult::proto_deserialize(data.to_vec())
+}
+
+#[tokio::test]
+async fn proto_test() {
+    let wasm = include_bytes!("../../sdk/test_contract_guest.wasm");
+    let input = ExecutionInput::default();
+    let res = invoke_wasm(wasm, "proto_example", input).await.unwrap();
+    assert!(res.valid);
+}
 
 // #[ignore]
 #[test]

@@ -44,3 +44,11 @@ cd ..
 cd executor
 bump_patch_version
 cd ..
+
+cd keys
+bump_patch_version
+cd ..
+
+cd sdk
+bump_patch_version
+cd ..

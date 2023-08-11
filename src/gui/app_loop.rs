@@ -1,14 +1,10 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Once};
-use std::time::Duration;
-use crossbeam::atomic::AtomicCell;
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, TextStyle, Ui};
 use eframe::egui;
-use itertools::Itertools;
-use log::{error, info};
+use log::info;
 
 use crate::util::sym_crypt;
 // 0.8
@@ -16,8 +12,7 @@ use crate::util::sym_crypt;
 use crate::gui::{ClientApp, home, keys_tab, tables};
 use crate::util;
 use rand::Rng;
-use rocket::http::ext::IntoCollection;
-use redgold_schema::util::{dhash_vec, mnemonic_builder};
+use redgold_keys::util::mnemonic_builder;
 
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
@@ -146,10 +141,9 @@ fn random_bytes() -> [u8; 32] {
 
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
-use tokio::runtime::Runtime;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
-use crate::infra::{deploy, SSH};
+use redgold_schema::structs::ErrorInfo;
+use crate::infra::SSH;
 use crate::node_config::NodeConfig; // 0.17.1
 
 
@@ -199,14 +193,9 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
     });
 }
 
-// #[tokio::test]
-// pub fn debug_about {
-//
-// }
-use egui_extras::{Column, TableBuilder};
-use surf::http::headers::ToHeaderValues;
 use redgold_data::data_store::DataStore;
-use crate::gui::home::{gui_status_networks, HomeState, NetworkStatusInfo};
+use redgold_keys::util::dhash_vec;
+use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
 use crate::gui::wallet_tab::{wallet_screen, WalletState};
 

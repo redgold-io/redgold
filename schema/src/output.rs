@@ -1,7 +1,6 @@
 use crate::structs::{ErrorInfo, Output, StandardContractType, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, SafeOption};
-use bitcoin::secp256k1::PublicKey;
 
 pub fn output_data(address: Vec<u8>, amount: u64) -> Output {
     Output {
@@ -28,15 +27,6 @@ impl HashClear for Output {
 }
 
 impl Output {
-    pub fn from_public_amount(public: &PublicKey, amount: u64) -> Output {
-        Output {
-            address: Address::address_data(Address::address(public).to_vec()),
-            data: amount_data(amount),
-            product_id: None,
-            counter_party_proofs: vec![],
-            contract: None,
-        }
-    }
 
     pub fn is_swap(&self) -> bool {
         self.contract.as_ref().and_then(|c| c.standard_contract_type)

@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::ptr::hash;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
-use crate::{EasyJson, error_info, HashClear, KeyPair, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
+use crate::{EasyJson, error_info, HashClear, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
 use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, NodeMetadata, Proof, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse};
 
 impl AboutNodeResponse {
@@ -39,13 +38,6 @@ impl Response {
         rm.error_info = Some(error_info);
         r.response_metadata = Some(rm);
         return r.clone();
-    }
-
-    pub fn with_auth(&mut self, key_pair: &KeyPair) -> &mut Response {
-        let hash = self.calculate_hash();
-        let proof = Proof::from_keypair_hash(&hash, &key_pair);
-        self.proof = Some(proof);
-        self
     }
 
     pub fn with_metadata(&mut self, node_metadata: NodeMetadata) -> &mut Response {
@@ -139,5 +131,14 @@ impl SubmitTransactionResponse {
     pub fn at_least_n(&self, n: usize) -> Result<(), ErrorInfo> {
         self.accepted(n)?;
         self.pending(n)
+    }
+}
+
+impl ResponseMetadata {
+    pub fn from_error(error: ErrorInfo) -> Self {
+        let mut rm = response_metadata().expect("m");
+        rm.success = false;
+        rm.error_info = Some(error);
+        rm
     }
 }

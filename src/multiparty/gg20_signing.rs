@@ -19,7 +19,7 @@ use round_based::async_runtime::AsyncProtocol;
 use round_based::Msg;
 use redgold_schema::{error_info, json, json_from, structs};
 use redgold_schema::structs::{ErrorInfo, Proof};
-use redgold_schema::util::verify;
+use redgold_keys::util::verify;
 use crate::multiparty::gg20_keygen::external_address_to_surf_url;
 
 use crate::multiparty::gg20_sm_client::join_computation;

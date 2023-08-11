@@ -19,7 +19,7 @@ use crate::schema::structs::{
 };
 use crate::schema::structs::{ErrorInfo, Hash};
 use crate::schema::transaction::amount_data;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 
 
 // TODO: What is a better way to handle this?

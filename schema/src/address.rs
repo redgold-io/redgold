@@ -1,8 +1,6 @@
 use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, UtxoEntry};
 use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, SafeBytesAccess};
 use crate::{error_message, structs};
-use bitcoin::secp256k1::{PublicKey};
-use bitcoin::util::base58;
 use std::io::Write;
 use sha3::Sha3_224;
 
@@ -68,10 +66,6 @@ impl Address {
         Ok(addr)
     }
 
-    pub fn from_public(pk: &PublicKey) -> Result<Address, ErrorInfo> {
-        Self::from_bytes(Self::address_function(pk))
-    }
-
     pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
         Self::from_bytes(Self::hash(&pk.bytes.safe_bytes()?))
     }
@@ -106,18 +100,6 @@ impl Address {
         Ok(())
     }
 
-    pub fn address_function(pk: &PublicKey) -> Vec<u8> {
-        return Self::hash(pk.serialize().as_ref());
-    }
-
-    pub fn multi_address_function(pk: &Vec<PublicKey>) -> Vec<u8> {
-        let mut v: Vec<u8> = Vec::new();
-        for pki in pk {
-            v.extend(pki.serialize().as_ref())
-        }
-        return Self::hash(&*v);
-    }
-
     pub fn str_to_address(s: String) -> Vec<u8> {
         hex::decode(s).expect("hex")
         // return base58::from_check(&s[3..]).unwrap();
@@ -128,14 +110,6 @@ impl Address {
         // b.insert_str(0, "rg1");
         // return b;
         hex::encode(a)
-    }
-
-    pub fn address(pk: &PublicKey) -> Vec<u8> {
-        return Self::address_function(pk);
-    }
-
-    pub fn multi_address(public_key: &Vec<PublicKey>) -> Vec<u8> {
-        return Self::multi_address_function(public_key);
     }
 
     pub fn address_data(address: Vec<u8>) -> Option<Address> {
@@ -156,26 +130,6 @@ impl Address {
     }
 }
 
-
-//
-// #[test]
-// fn address_hash_test() {
-//     let tc = TestConstants::new();
-//     let a = address_function(&tc.public);
-//     let b = base58::check_encode_slice(&*a);
-//     let c = base58::from_check(&*b).unwrap();
-//     let mut bb = b.clone();
-//     bb.insert_str(0, "rg1");
-//     let cc = address_to_str(&a);
-//     // println!("{:?}", a);
-//     // println!("{:?}", b);
-//     // println!("{:?}", bb);
-//     // println!("{:?}", bb.len());
-//     // println!("{:?}", cc);
-//     assert_eq!(a, c);
-//     assert_eq!(a, str_to_address(cc.clone()));
-//     assert_eq!("rg1M7NTPxADbn4iV1wWPaRg3LYL4ZCLQLfR5", cc);
-// }
 
 
 impl AddressInfo {

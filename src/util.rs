@@ -3,7 +3,6 @@
 pub mod auto_update;
 pub mod base26;
 pub mod cmd;
-pub mod lang_util;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod metrics_registry;
 pub mod rg_merkle;
@@ -19,35 +18,18 @@ pub mod test_util;
 pub mod address_external;
 pub mod argon_kdf;
 
-use std::io::{Cursor, Write};
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::node_config::NodeConfig;
-use crate::schema::structs;
-use crate::schema::structs::{
-    BytesData, BytesDecoder, ErrorInfo, KeyType, PublicKeyType, PublicResponse, SignatureType,
-};
 use crate::schema::SafeBytesAccess;
 use bitcoin::hashes::hex::ToHex;
-use bitcoin::hashes::{Hash, hash160};
-use bitcoin::secp256k1::{Error, Message, PublicKey, Secp256k1, SecretKey, Signature};
-use bitcoin::util::base58;
-use bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
+use bitcoin::hashes::Hash;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
-use eframe::egui::accesskit::Node;
-// use libp2p::core::identity::{Keypair, secp256k1};
-// use libp2p::core::PublicKey as LPublicKey;
-// use libp2p::PeerId;
-use log::SetLoggerError;
-use log4rs::config::Logger;
-use log4rs::encode::pattern::PatternEncoder;
-use log4rs::Handle;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
-use redgold_schema::TestConstants;
-use redgold_schema::util::{dhash_str, sign};
-use redgold_schema::util::mnemonic_words::{generate_key, generate_key_i};
+use redgold_keys::util::dhash_str;
 use crate::util::trace_setup::init_tracing;
 
 pub fn random_salt() -> i64 {

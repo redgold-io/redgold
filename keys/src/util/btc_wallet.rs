@@ -1,33 +1,29 @@
-use std::ops::Mul;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock};
-use bdk::blockchain::{noop_progress, ElectrumBlockchain, Blockchain, GetTx};
-use bdk::database::MemoryDatabase;
-use bdk::{Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, TxBuilder, Wallet};
-use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash, Txid};
-use bdk::bitcoin::blockdata::opcodes;
-use bdk::bitcoin::hashes::Hash;
-use bdk::bitcoin::secp256k1::{All, Secp256k1, Signature};
-use bdk::bitcoin::util::{bip143, psbt, sighash};
-use bdk::bitcoin::util::psbt::PartiallySignedTransaction;
-
-use bdk::electrum_client::Client;
-use bdk::signer::{InputSigner, SignerCommon, SignerContext, SignerError, SignerId, SignerOrdering, TransactionSigner};
-use bdk::wallet::{AddressIndex, AddressInfo};
-use bdk::wallet::coin_selection::DefaultCoinSelectionAlgorithm;
-use bdk::wallet::tx_builder::CreateTx;
-use bdk::wallet::AddressIndex::New;
-use bitcoin::AddressType::P2wpkh;
-
-use bitcoin::consensus::serialize;
-// use crate::util::cli::commands::send;
-use crate::{EasyJson, error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
-use crate::public_key::ToPublicKey;
-use crate::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
-use crate::util::keys::ToPublicKeyFromLib;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Read;
+use std::str::FromStr;
+use std::sync::{Arc, RwLock};
+
+use bdk::{Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
+use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash};
+use bdk::bitcoin::blockdata::opcodes;
+use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
+use bdk::bitcoin::hashes::Hash;
+use bdk::bitcoin::secp256k1::{All, Secp256k1, Signature};
+use bdk::bitcoin::util::{psbt, sighash};
+use bdk::bitcoin::util::psbt::PartiallySignedTransaction;
+use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetTx};
+use bdk::database::MemoryDatabase;
+use bdk::electrum_client::Client;
+use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
+// use crate::util::cli::commands::send;
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
+use serde::{Deserialize, Serialize};
+use crate::{KeyPair, TestConstants};
+use crate::proof_support::ProofSupport;
+
+use crate::util::keys::ToPublicKeyFromLib;
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
 
 #[test]
 fn schnorr_test() {
@@ -51,11 +47,6 @@ pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitco
 }
 
 
-use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
-use bdk::signer::SignerContext::{Segwitv0 as Segwitv0Context};
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
-use serde::{Deserialize, Serialize};
-use crate::util::mnemonic_words::MnemonicWords;
 // use log::error;
 
 fn p2wpkh_script_code(script: &Script) -> Script {

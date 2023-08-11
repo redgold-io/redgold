@@ -10,7 +10,7 @@ use crate::resources::Resources;
 // use filepath::FilePath;
 use itertools::Itertools;
  use redgold_schema::RgResult;
- use redgold_schema::util::mnemonic_support::WordsPass;
+ use redgold_keys::util::mnemonic_support::WordsPass;
  use crate::hardware::trezor;
  use crate::node_config::NodeConfig;
  use crate::util::cli::arg_parse_config::ArgTranslate;

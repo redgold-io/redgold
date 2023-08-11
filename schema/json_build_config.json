@@ -1,6 +1,6 @@
 {
-  "includes": ["src"],
-  "files": ["src/structs.proto"],
+  "includes": ["src/proto"],
+  "files": ["src/proto/structs.proto", "src/proto/execution.proto"],
   "output": "build",
   "opts": [
     {
@@ -105,6 +105,8 @@
         "structs.HealthRequest",
         "structs.HealthResponse",
         "structs.GetNodeTransactionRequest",
+        "execution.ExecutionInput",
+        "execution.ExecutionResult",
         "structs.VersionInfo"
       ]
     },

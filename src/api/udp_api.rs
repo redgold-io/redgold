@@ -20,7 +20,9 @@ use futures::stream::{BoxStream, SplitSink, SplitStream};
 use itertools::Itertools;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
-use redgold_schema::{ErrorInfoContext, json, ProtoHashable, SafeBytesAccess};
+use uuid::Uuid;
+use redgold_keys::request_support::RequestSupport;
+use redgold_schema::{bytes_data, ErrorInfoContext, json, ProtoHashable, SafeBytesAccess};
 use redgold_schema::structs::{ErrorInfo, Request, UdpMessage};
 use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::relay::Relay;
@@ -186,6 +188,23 @@ impl Encoder<UdpMessage> for UdpMessageCodec {
     }
 }
 
+
+
+pub trait UdpMessageSupport {
+    fn new(data: Vec<u8>, part: i64, parts: i64) -> Self;
+}
+impl UdpMessageSupport for UdpMessage {
+    fn new(data: Vec<u8>, part: i64, parts: i64) -> Self {
+        UdpMessage {
+            bytes: bytes_data(data),
+            part,
+            parts,
+            uuid: Uuid::new_v4().to_string(),
+            timestamp: util::current_time_millis_i64(),
+        }
+    }
+}
+
 struct UdpServer {
     // socket: UdpSocket,
     relay: Relay,
@@ -193,6 +212,8 @@ struct UdpServer {
     messages: HashMap<String, (Vec<UdpMessage>, SocketAddr)>,
     sink: SplitSink<UdpFramed<UdpMessageCodec>, (UdpMessage, SocketAddr)>,
 }
+
+
 
 const UDP_CHUNK_SIZE : usize = 1024;
 

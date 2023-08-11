@@ -2,17 +2,12 @@
 // eventually, to deal with avoiding resolving, do 2nd order for observations that have
 // already been resolved. i.e. only known transactions.
 
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-
 use async_std::prelude::FutureExt;
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
 use log::info;
-use metrics::{gauge, increment_counter, increment_gauge};
-use prost::{DecodeError, Message as msg};
-use tokio::runtime::Runtime;
+use metrics::{gauge, increment_counter};
 use tokio::task::JoinHandle;
 // use futures::stream::StreamExt;
 use tokio::time::Interval;
@@ -20,24 +15,20 @@ use tokio::time::Interval;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
+use redgold_keys::proof_support::ProofSupport;
 
 use redgold_schema::{SafeBytesAccess, SafeOption, struct_metadata_new, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::structs::{Hash, ObservationProof};
 
-use crate::api::rosetta::models::Error;
-use crate::core::internal_message::{PeerMessage, SendErrorInfo};
-use crate::core::internal_message::RecvAsyncErrorInfo;
+use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
-use redgold_data::data_store::DataStore;
 use crate::schema::json;
-use crate::schema::json_or;
 use crate::schema::structs::{Observation, ObservationMetadata, Proof};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;
 use crate::schema::structs::Request;
-use crate::util;
-use crate::util::{current_time_millis, random_salt};
+use crate::util::random_salt;
 
 pub struct ObservationBuffer {
     data: Vec<ObservationMetadata>,

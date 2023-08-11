@@ -41,7 +41,7 @@ use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
 use crate::node_config::NodeConfig;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 use crate::util::runtimes::build_runtime;
 
 // https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
@@ -526,7 +526,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 
     let bin_relay2 = relay.clone();
 
-    use prost::Message;
     let request_bin = warp::post()
         .and(warp::path("request_proto"))
         .and(warp::body::bytes())

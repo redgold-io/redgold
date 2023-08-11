@@ -1,25 +1,20 @@
-use crate::api::public_api::PublicClient;
-use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
-use crate::e2e::tx_submit::TransactionSubmitter;
-use crate::node_config::NodeConfig;
-use crate::util::{cli, init_logger};
-use crate::util::{self, auto_update};
+use crate::e2e::tx_gen::SpendableUTXO;
+use crate::util::{self};
 use itertools::Itertools;
 use log::{error, info};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::thread::sleep;
 use std::time::Duration;
 
-use metrics::{gauge, increment_counter, increment_gauge};
-use tokio::runtime::Runtime;
+use metrics::{gauge, increment_counter};
 use tokio_stream::wrappers::IntervalStream;
-use redgold_schema::{KeyPair, RgResult, SafeOption};
-use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
-use redgold_schema::structs::{Address, ErrorInfo, PublicResponse, SubmitTransactionRequest, Transaction, TransactionAmount, UtxoEntry};
+use redgold_schema::{RgResult, SafeOption};
+use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo};
+use redgold_schema::structs::{Address, ErrorInfo, SubmitTransactionRequest, Transaction, TransactionAmount};
 use crate::core::relay::Relay;
-use crate::util::cli::args::{DebugCanary, RgTopLevelSubcommand};
-use tokio_stream::{StreamExt};
+use tokio_stream::StreamExt;
+use redgold_keys::KeyPair;
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;

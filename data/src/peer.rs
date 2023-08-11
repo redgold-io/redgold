@@ -1,10 +1,11 @@
 use std::time::Duration;
-use redgold_schema::structs::{Address, Error, ErrorInfo, Hash, NodeMetadata, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
-use redgold_schema::{ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
+use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
+use redgold_schema::{ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use itertools::Itertools;
-use tracing::info;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_keys::TestConstants;
 use redgold_schema::EasyJson;
 use redgold_schema::structs::PeerIdInfo;
 

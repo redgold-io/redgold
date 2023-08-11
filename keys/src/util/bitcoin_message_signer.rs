@@ -1,4 +1,4 @@
-use crate::structs::Hash;
+use redgold_schema::structs::Hash;
 
 const SIGN_MESSAGE_HEADER: &str = "Redgold: \n";
 

@@ -1,23 +1,20 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::string::ToString;
-use bitcoin::secp256k1;
-use bitcoin::secp256k1::recovery::{RecoverableSignature, RecoveryId};
-use bitcoin::secp256k1::{Message, Secp256k1};
-use bitcoin::util::bip32::{ChildNumber, DerivationPath, ExtendedPubKey};
+use bitcoin::util::bip32::ExtendedPubKey;
 use bitcoin::util::psbt::serialize::Serialize;
 use itertools::Itertools;
-use tracing_subscriber::fmt::format;
-use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, TestConstants, util, WithMetadataHashable};
+use redgold_keys::proof_support::ProofSupport;
+use redgold_keys::TestConstants;
+use redgold_keys::transaction_support::{InputSupport, TransactionBuilderSupport};
+use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, TransactionAmount, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::mnemonic_words::HDPathCursor;
-use redgold_schema::util::sign;
-use crate::genesis::create_genesis_transaction;
+use redgold_keys::util::mnemonic_words::HDPathCursor;
 use crate::util::cmd::run_cmd;
-use crate::util::keys::{public_key_from_bytes, ToPublicKey, ToPublicKeyFromLib};
-use crate::util::{init_logger, init_logger_once, sha256_str};
+use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
+use crate::util::init_logger_once;
 
 const MISSING_DEVICE: &str = "Failed to find a Trezor device";
 const TREZORCTL: &str = "trezorctl";
@@ -269,7 +266,7 @@ pub fn get_standard_public_key(
 /// PublicKey here should ideally be derived from an xpub requested earlier in the process
 /// And needs to match the supplied path
 pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Result<Proof, ErrorInfo> {
-    let msg = util::bitcoin_message_signer::message_from_hash(hash);
+    let msg = redgold_keys::util::bitcoin_message_signer::message_from_hash(hash);
     let signature = sign_message(path, msg)?;
     let sig = signature.signature();
     let proof = Proof::from(public, sig);

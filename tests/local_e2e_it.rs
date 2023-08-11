@@ -13,7 +13,7 @@ use redgold::util::cli::args::RgArgs;
 use redgold::util::runtimes::{build_runtime, build_simple_runtime};
 use redgold_schema::{SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
-use redgold_schema::util::mnemonic_words::MnemonicWords;
+use redgold_keys::util::mnemonic_words::MnemonicWords;
 
 #[tokio::test]
 async fn local_e2e_it() -> Result<(), ErrorInfo> {

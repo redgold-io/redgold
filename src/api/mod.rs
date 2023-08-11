@@ -9,15 +9,15 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use itertools::Itertools;
-use prost::Message;
 use serde::__private::de::Borrowed;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
-use redgold_schema::{error_info, ProtoHashable, SafeOption};
+use redgold_keys::request_support::RequestSupport;
+use redgold_schema::{error_info, ProtoHashable, ProtoSerde, SafeOption};
 use redgold_schema::structs::{GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 
 pub mod control_api;
 #[cfg(not(target_arch = "wasm32"))]
@@ -59,7 +59,7 @@ impl RgHttpClient {
         &self,
         r: &Req,
     ) -> Result<Resp, ErrorInfo> {
-        self.json_post(r, "request".into()).await
+        self.json_post(r, "request".to_string()).await
     }
 
     #[allow(dead_code)]
@@ -87,7 +87,7 @@ impl RgHttpClient {
         }
     }
     #[allow(dead_code)]
-    pub async fn proto_post<Req: Sized + Message>(
+    pub async fn proto_post<Req: Sized + ProtoSerde>(
         &self,
         r: &Req,
         endpoint: String,
@@ -123,7 +123,7 @@ impl RgHttpClient {
         Req: Serialize + ?Sized,
         Resp: DeserializeOwned
     {
-        let client = RgHttpClient::new("localhost".into(), port, None);
+        let client = RgHttpClient::new("localhost".to_string(), port, None);
         tokio::time::sleep(Duration::from_secs(2)).await;
         client.json_post::<Req, Resp>(&req, endpoint).await
     }
@@ -218,7 +218,7 @@ pub fn easy_post<T, ReqT, RespT, Fut, S>(
         .and(warp::body::json::<ReqT>())
         .map(move |x, y: ReqT| {
             let y2 = y.clone();
-            let ser = serde_json::to_string(&y2).unwrap_or("request ser failed".into());
+            let ser = serde_json::to_string(&y2).unwrap_or("request ser failed".to_string());
             log::debug!("Request endpoint: {} {} ", endpoint.clone().into(), ser);
             (x, y)
         })
@@ -239,7 +239,7 @@ pub fn easy_post<T, ReqT, RespT, Fut, S>(
 pub fn with_response_logger<Resp>(resp: Resp, endpoint: String) -> Resp
 where Resp: ?Sized + Serialize + Clone {
     let y2 = resp.clone();
-    let ser = serde_json::to_string(&y2).unwrap_or("response ser failed".into());
+    let ser = serde_json::to_string(&y2).unwrap_or("response ser failed".to_string());
     log::debug!("Response endpoint: {} {} ", endpoint.clone(), ser);
     resp
 }
@@ -251,12 +251,12 @@ ErrT: ?Sized + Serialize + Clone {
     let endpoint2 = endpoint_i.clone();
     resp.map(move |r| {
     let y2 = r.clone();
-    let ser = serde_json::to_string( & y2).unwrap_or("response ser failed".into());
+    let ser = serde_json::to_string( & y2).unwrap_or("response ser failed".to_string());
     log::debug ! ("Response success endpoint: {} {} ", endpoint.clone(), ser);
     r
     }).map_err(move |r| {
     let y2 = r.clone();
-    let ser = serde_json::to_string( & y2).unwrap_or("response ser failed".into());
+    let ser = serde_json::to_string( & y2).unwrap_or("response ser failed".to_string());
     log::debug ! ("Response error endpoint: {} {} ", endpoint2.clone(), ser);
     r
     })

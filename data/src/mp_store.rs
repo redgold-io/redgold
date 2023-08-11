@@ -1,5 +1,6 @@
-use redgold_schema::structs::{Address, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, PeerData, Proof, PublicKey, Transaction};
-use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, WithMetadataHashable};
+use redgold_keys::TestConstants;
+use redgold_schema::structs::{Address, ErrorInfo, ExternalCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, Proof, PublicKey};
+use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use redgold_schema::util;
