@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest-m
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 #    env:
 #      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
     steps:
@@ -39,6 +41,8 @@ jobs:
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - id: version
+        run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
       - run: rustup toolchain list
@@ -117,6 +121,8 @@ jobs:
       contents: write
     env:
       DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    outputs:
+      release_match: ${{ steps.check-branch.outputs.match }}
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -137,10 +143,12 @@ jobs:
       - name: Check branch
         id: check-branch
         run: ./bin/release_branches.sh
+      - run: echo "release branch match output ${{ steps.check-branch.outputs.match }}"
+      - run: echo steps.check-branch.outputs.match
 
-      - if: steps.check-branch.match == '1'
+      - if: steps.check-branch.outputs.match == '1'
         run: cargo clean; cargo build --all --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
-      - if: steps.check-branch.match == '0'
+      - if: steps.check-branch.outputs.match == '0'
         run: echo "Not a release branch, not building mac"; echo "asdf" > ./redgold_mac
 
       - uses: actions/upload-artifact@v3
@@ -194,7 +202,7 @@ jobs:
         run: ./bin/release_branches.sh
         shell: bash
       - name: Cargo Publish
-        if: steps.check-branch.match == '1'
+        if: steps.check-branch.outputs.match == '1'
         run: |
           echo "Branch is release branch, doing cargo publish"
           cargo login ${{ secrets.CARGO_TOKEN }} &&
@@ -241,7 +249,7 @@ jobs:
       - run: docker image push ${{ env.DOCKER_USER }}/redgold:${{ env.BRANCH }}
 
       - name: Push Docker Versioned Image
-        if: steps.check-branch.match == '1'
+        if: steps.check-branch.outputs.match == '1'
         run: docker image push ${{ env.DOCKER_USER }}/redgold:${{env.VERSION}}
 
       # Todo: change to output https://docs.github.com/en/actions/using-jobs/defining-outputs-for-jobs
@@ -258,7 +266,7 @@ jobs:
       - run: echo ${{ env.DOCKER_SHA256 }} > docker_sha256_checksum
       - run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/docker_sha256_checksum
 
-      - if: steps.check-branch.match == '1'
+      - if: steps.check-branch.outputs.match == '1'
         run: aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum
 
       # AWS Linux artifacts
@@ -276,7 +284,7 @@ jobs:
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
 
-      - if: steps.check-branch.match == '1'
+      - if: steps.check-branch.outputs.match == '1'
         run: |
           aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
           aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum &&
@@ -345,7 +353,7 @@ jobs:
           "
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - if: steps.check-branch.match == '1'
+      - if: steps.check-branch.outputs.match == '1'
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
           delete_release: true # default: false
@@ -356,7 +364,7 @@ jobs:
         run: sleep 5
       # https://github.com/marketplace/actions/rust-release-binary these steps came from below
       # TODO: Duplicate this release step with 'version' tagged releases
-      - if: steps.check-branch.match == '1'
+      - if: steps.check-branch.outputs.match == '1'
         name: Release Versioned
         uses: softprops/action-gh-release@v1
         with:
