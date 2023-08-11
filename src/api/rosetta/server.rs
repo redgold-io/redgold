@@ -88,7 +88,7 @@ pub async fn handle_warp_request(path: String, r: Rosetta, b: Bytes) -> Result<W
             );
         },
     };
-    let so2 = so.clone();
+    let so2 = so;
     let s = so2.to_owned();
     log::debug!("Request ENDPOINT={} BODY_TEXT={}", e.clone(), s.clone());
 

@@ -160,7 +160,7 @@ impl NodeConfig {
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
         let pair = self.internal_mnemonic().active_keypair();
-        let pk_vec = pair.public_key_vec();
+        let _pk_vec = pair.public_key_vec();
         NodeMetadata{
             external_address: self.external_ip.clone(),
             public_key: Some(self.public_key()),

@@ -59,7 +59,7 @@ async fn signing_original(
     let number_of_parties = parties.len();
 
     // Ahh here we go.
-    info!("Starting signing join computation offline for room {} on node {}", room.clone(), relay.node_config.short_id().expect(""));
+    info!("Starting signing join computation offline for room {} on node {}", room, relay.node_config.short_id().expect(""));
 
     let (i, incoming, outgoing) =
         join_computation(address.clone(), &format!("{}-offline", room), &relay)
@@ -76,7 +76,7 @@ async fn signing_original(
         .await
         .map_err(|e| anyhow!("protocol execution terminated with error: {}", e))?;
 
-    info!("Starting signing join computation online for room {} on node {}", room.clone(), relay.node_config.short_id().expect(""));
+    info!("Starting signing join computation online for room {} on node {}", room, relay.node_config.short_id().expect(""));
 
     let (i, incoming, outgoing) = join_computation(
         address, &format!("{}-online", room), &relay)

@@ -127,7 +127,7 @@ impl TransactionGenerator {
     pub fn drain_tx(&mut self, addr: &Address) -> Transaction {
         let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
         // TODO: Fee?
-        let mut txb = TransactionBuilder::new()
+        let txb = TransactionBuilder::new()
             .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
             .with_output(addr, &TransactionAmount::from( prev.utxo_entry.amount() as i64))
             .build().expect("Failed to build transaction")

@@ -182,13 +182,13 @@ pub async fn setup_ops_services(
 
     let x = include_str!("../resources/infra/ops_services/dashboards/node-exporter-full_rev31.json");
     ssh.copy(
-        x.clone(),
+        x,
         format!("{}/dashboards/node-exporter.json", remote_path)
     );
 
     let x = include_str!("../resources/infra/ops_services/dashboards/redgold_rev0.json");
     ssh.copy(
-        x.clone(),
+        x,
         format!("{}/dashboards/redgold.json", remote_path)
     );
 
@@ -335,7 +335,7 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResu
             None
         };
         peer_id_index.insert(ss.peer_id_index, peer_id_hex.clone());
-        let mut hm = hm.clone();
+        let hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         if !deploy.ops {

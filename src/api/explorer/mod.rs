@@ -298,7 +298,7 @@ pub fn convert_observation_metadata(om: &ObservationMetadata) -> RgResult<Detail
     })
 }
 
-pub async fn handle_observation(o: &Observation, r: &Relay) -> RgResult<DetailedObservation> {
+pub async fn handle_observation(o: &Observation, _r: &Relay) -> RgResult<DetailedObservation> {
 
     Ok(DetailedObservation {
         merkle_root: o.merkle_root.safe_get()?.hex(),
@@ -341,7 +341,7 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
     })
 }
 
-pub async fn handle_peer_node(p: &PeerNodeInfo, r: &Relay) -> RgResult<DetailedPeerNode> {
+pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<DetailedPeerNode> {
     let nmd = p.latest_node_transaction.safe_get()?.node_metadata()?;
     let vi = nmd.version_info.clone().safe_get()?.clone();
     Ok(DetailedPeerNode{
@@ -411,7 +411,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                     let observation_timestamp = metadata.struct_metadata.safe_get_msg("Missing struct metadata")?.time
                         .safe_get_msg("Missing time")?.clone();
 
-                    let _ = if let Some((peer_id, existing)) = public_to_peer.get_mut(pk) {
+                    let _ = if let Some((_peer_id, _existing)) = public_to_peer.get_mut(pk) {
                         // existing
                     } else {
                         let query_result = r.ds.peer_store
@@ -458,7 +458,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                     let state: State = State::from_i32(metadata.state.safe_get_msg("Missing state")?.clone())
                         .safe_get_msg("state")?.clone();
 
-                    if let Some((pk, ns)) = public_to_peer.get_mut(pk) {
+                    if let Some((_pk, ns)) = public_to_peer.get_mut(pk) {
                         match state {
                             State::Pending => {
                                 ns.signed_pending_time = Some(observation_timestamp);
@@ -475,7 +475,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
 
         let mut map: HashMap<PeerId, PeerSignerDetailed> = HashMap::new();
 
-        for (pk, (pt, ns)) in public_to_peer.iter_mut() {
+        for (_pk, (pt, ns)) in public_to_peer.iter_mut() {
             if let Some(e) = map.get_mut(&pt.peer_id) {
                 e.nodes.push(ns.clone());
             } else {
@@ -527,7 +527,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
 
         let num_pending_signers = counts.get(&(State::Pending as i32)).unwrap_or(&0).clone() as i64;
         let num_accepted_signers = counts.get(&(State::Finalized as i32)).unwrap_or(&0).clone() as i64;
-        let mut detailed = DetailedTransaction{
+        let detailed = DetailedTransaction{
             info: brief_transaction(tx)?,
             confirmation_score: 1.0,
             acceptance_score: 1.0,

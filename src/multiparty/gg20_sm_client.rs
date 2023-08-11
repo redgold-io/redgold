@@ -94,7 +94,7 @@ impl SmClient {
     }
 
     pub async fn issue_index(&self) -> Result<u16> {
-        let mut req = self.request(None).await;
+        let req = self.request(None).await;
         let response = self
             .http_client
             .post("issue_unique_idx")

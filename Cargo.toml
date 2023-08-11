@@ -23,7 +23,7 @@ members = [
     "executor",
     "keys"
 ]
-exclude = ["examples/rust_wasm"] #, "sdk", "sdk/*"]
+exclude = ["examples/experiments/rust_wasm"] #, "sdk", "sdk/*"]
 
 
 [workspace.package]

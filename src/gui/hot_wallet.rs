@@ -10,7 +10,7 @@ use crate::gui::wallet_tab::WalletState;
 
 
 
-pub fn hot_header(state: &mut WalletState, ui: &mut Ui, ctx: &egui::Context) {
+pub fn hot_header(state: &mut WalletState, ui: &mut Ui, _ctx: &egui::Context) {
     let check = state.mnemonic_checksum.clone();
     ui.label(format!("Hot Wallet Checksum: {check}"));
 
