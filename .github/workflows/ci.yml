@@ -172,15 +172,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
-      - name: Download redgold_mac artifact
-        if: contains('
-          refs/heads/staging 
-          refs/heads/test 
-          refs/heads/main', 
-          github.ref)
-        uses: actions/download-artifact@v3
-        with:
-          name: redgold_mac
       - uses: actions/download-artifact@v3
         with:
           name: redgold_linux
@@ -196,6 +187,17 @@ jobs:
 #        with:
 #          name: redgold_mac
 
+      - run: sleep 10
+
+      - name: Download redgold_mac artifact
+        #        if: contains('
+        #          refs/heads/staging
+        #          refs/heads/test
+        #          refs/heads/main',
+        #          github.ref)
+        uses: actions/download-artifact@v3
+        with:
+          name: redgold_mac
 
       - name: Check branch
         id: check-branch
