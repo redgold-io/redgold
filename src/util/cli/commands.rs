@@ -221,12 +221,13 @@ pub fn add_server_prompt() -> Server {
 }
 
 pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
+    let mut deploy = deploy.clone();
     if deploy.wizard {
-        deploy_wizard(deploy, _config).await?;
+        deploy_wizard(&deploy, _config).await?;
         return Ok(());
     }
 
-    default_deploy(deploy, _config).await?;
+    default_deploy(&mut deploy, _config).await?;
 
     Ok(())
 }
