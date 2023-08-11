@@ -141,7 +141,7 @@ jobs:
       - if: steps.check-branch.match == '1'
         run: cargo clean; cargo build --all --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
       - if: steps.check-branch.match == '0'
-        run: echo "Not a release branch, not building mac"; touch ./redgold_mac
+        run: echo "Not a release branch, not building mac"; echo "asdf" > ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
@@ -204,7 +204,6 @@ jobs:
 
       - run: ls -lA .
       - run: ls -lA ./redgold_linux
-      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
@@ -226,6 +225,7 @@ jobs:
           echo "asdf" > redgold_mac
           echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
           fi
+      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
       # Docker Image
       # TODO: This works but need to setup self hosted registry also
