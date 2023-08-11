@@ -24,6 +24,7 @@ use crate::core::discovery::DiscoveryMessage;
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::{ Relay};
 use redgold_data::data_store::DataStore;
+use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use crate::data::download::process_download_request;
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
@@ -31,7 +32,7 @@ use crate::schema::json;
 use crate::schema::response_metadata;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 use crate::util::logging::Loggable;
 
 pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: &mut Request) -> Result<Response, ErrorInfo> {

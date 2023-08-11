@@ -2,7 +2,7 @@ use async_std::prelude::FutureExt;
 use eframe::egui;
 use eframe::egui::Ui;
 use itertools::Itertools;
-use redgold_schema::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{data_item, editable_text_input_copy, valid_label};
 use crate::gui::wallet_tab::WalletState;

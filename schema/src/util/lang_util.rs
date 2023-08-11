@@ -1,6 +1,6 @@
 use serde::Serialize;
-use redgold_schema::json_or;
-use crate::schema::structs::ErrorInfo;
+use crate::json_or;
+use crate::structs::ErrorInfo;
 
 pub trait SameResult<T> {
     fn combine(self) -> T;

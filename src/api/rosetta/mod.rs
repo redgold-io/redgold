@@ -1,45 +1,21 @@
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::sync::Arc;
-
-// use bitcoin_wallet::account::Account;
-use futures::future::AndThen;
 use futures::TryFuture;
 use itertools::Itertools;
-use log::info;
 // use ndarray::s;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use strum_macros::EnumString;
-use tokio::runtime::Runtime;
-use tokio::task::JoinHandle;
-use warp::{Filter, Rejection};
-use warp::http::StatusCode;
-use warp::path::Exact;
-use warp::reply::{Json, WithStatus};
+use warp::Filter;
+use redgold_schema::RgResult;
 
-use redgold_schema::{constants, RgResult, TestConstants};
-
-use crate::{schema, util};
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 use crate::core::relay::Relay;
-use redgold_data::data_store::DataStore;
-use crate::genesis::{create_genesis_block, create_genesis_transaction};
-use crate::node_config::NodeConfig;
-use crate::schema::{bytes_data, error_message};
+use redgold_keys::TestConstants;
+use crate::genesis::create_genesis_transaction;
 use crate::schema::{
-    from_hex, i64_from_string, ProtoHashable, SafeBytesAccess, WithMetadataHashable,
+    ProtoHashable, SafeBytesAccess, WithMetadataHashable,
 };
-use crate::schema::structs;
-use crate::schema::structs::{
-    Address, Error as RGError, Input, Output, Proof, State, StructMetadata,
-    SubmitTransactionRequest, UtxoEntry,
-};
-use crate::schema::structs::{ErrorInfo, Hash};
-use crate::schema::transaction::amount_data;
-use crate::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::SameResult;
 use crate::util::random_port;
 
 pub mod models;

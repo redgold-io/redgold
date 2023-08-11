@@ -1,4 +1,4 @@
-use redgold_schema::util::mnemonic_words::MnemonicWords;
+use redgold_keys::util::mnemonic_words::MnemonicWords;
 use crate::api::RgHttpClient;
 use redgold_data::data_store::DataStore;
 

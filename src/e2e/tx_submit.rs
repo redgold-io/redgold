@@ -9,7 +9,7 @@ use tokio::task::JoinHandle;
 
 use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse};
-use redgold_schema::util::mnemonic_words::MnemonicWords;
+use redgold_keys::util::mnemonic_words::MnemonicWords;
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};

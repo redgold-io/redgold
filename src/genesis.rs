@@ -3,7 +3,7 @@ use crate::core::transaction;
 use crate::schema::output::output_data;
 use crate::schema::structs::{Block, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;
-use crate::schema::TestConstants;
+use redgold_keys::TestConstants;
 use crate::schema::{struct_metadata, WithMetadataHashable};
 use redgold_schema::{constants, ProtoHashable};
 use redgold_schema::constants::{EARLIEST_TIME, REWARD_AMOUNT};

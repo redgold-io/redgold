@@ -7,8 +7,6 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Result};
 use backtrace::Backtrace;
-use bitcoin::secp256k1::Secp256k1;
-use bitcoin::util::psbt::serialize::Deserialize;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
 use serde::Serialize;
@@ -21,8 +19,6 @@ use structs::{
 };
 
 use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, VersionInfo};
-use crate::util::{dhash_str, dhash_vec};
-use crate::util::mnemonic_words::{generate_key, generate_key_i};
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -54,6 +50,7 @@ pub mod trust;
 pub mod input;
 pub mod debug_version;
 pub mod transaction_info;
+pub mod exec;
 
 
 impl BytesData {
@@ -576,69 +573,6 @@ pub fn empty_public_request() -> PublicRequest {
     }
 }
 
-
-pub struct TestConstants {
-    pub secret: bitcoin::secp256k1::SecretKey,
-    pub public: bitcoin::secp256k1::PublicKey,
-    pub public_peer_id: Vec<u8>,
-    pub secret2: bitcoin::secp256k1::SecretKey,
-    pub public2: bitcoin::secp256k1::PublicKey,
-    pub hash: [u8; 32],
-    pub hash_vec: Vec<u8>,
-    pub addr: Vec<u8>,
-    pub addr2: Vec<u8>,
-    pub peer_ids: Vec<Vec<u8>>,
-    pub peer_trusts: Vec<f64>,
-    pub address_1: Address,
-    pub rhash_1: Hash,
-    pub rhash_2: Hash,
-    pub words: String
-}
-impl TestConstants {
-    pub fn key_pair(&self) -> KeyPair {
-        KeyPair {
-            secret_key: self.secret,
-            public_key: self.public,
-        }
-    }
-
-    pub fn new() -> TestConstants {
-        let (secret, public) = crate::util::mnemonic_words::generate_key();
-        let (secret2, public2) = generate_key_i(1);
-        let hash = crate::util::dhash_str("asdf");
-        let hash_vec = hash.to_vec();
-        let addr = Address::address(&public);
-        let addr2 = Address::address(&public2);
-        let mut peer_ids: Vec<Vec<u8>> = Vec::new();
-        let mut peer_trusts: Vec<f64> = Vec::new();
-
-        for i in 0..10 {
-            peer_ids.push(dhash_str(&i.to_string()).to_vec());
-            peer_trusts.push((i as f64) / 10f64);
-        }
-
-        let public_peer_id = dhash_vec(&dhash_vec(&public.serialize().to_vec()).to_vec()).to_vec();
-
-        return TestConstants {
-            secret,
-            public,
-            public_peer_id,
-            secret2,
-            public2,
-            hash,
-            hash_vec,
-            addr: addr.clone(),
-            addr2,
-            peer_ids,
-            peer_trusts,
-            address_1: addr.into(),
-            rhash_1: Hash::from_string_calculate("asdf"),
-            rhash_2: Hash::from_string_calculate("asdf2"),
-            words: "abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string(),
-        };
-    }
-}
-
 pub fn signature_data(data: Vec<u8>) -> Option<crate::structs::Signature> {
     Some(structs::Signature {
         bytes: bytes_data(data),
@@ -648,46 +582,6 @@ pub fn signature_data(data: Vec<u8>) -> Option<crate::structs::Signature> {
 
 pub fn decode_hex(h: String) -> Result<Vec<u8>, ErrorInfo> {
     from_hex(h)
-}
-
-#[derive(Clone, Copy)]
-pub struct KeyPair {
-    pub secret_key: bitcoin::secp256k1::SecretKey,
-    pub public_key: bitcoin::secp256k1::PublicKey,
-}
-
-impl KeyPair {
-    pub fn new(
-        secret_key: &bitcoin::secp256k1::SecretKey,
-        public_key: &bitcoin::secp256k1::PublicKey,
-    ) -> Self {
-        return Self {
-            secret_key: *secret_key,
-            public_key: *public_key,
-        };
-    }
-
-    pub fn address(&self) -> Vec<u8> {
-        Address::address(&self.public_key)
-    }
-
-    pub fn address_typed(&self) -> Address {
-        Address::from_public(&self.public_key).expect("address")
-    }
-
-    pub fn public_key_vec(&self) -> Vec<u8> {
-        self.public_key.serialize().to_vec()
-    }
-
-    pub fn from_private_hex(hex: String) -> RgResult<Self> {
-        let secret_key = bitcoin::secp256k1::SecretKey::from_str(&*hex)
-            .error_info("Unable to parse private key hex")?;
-        let public_key = bitcoin::secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &secret_key);
-        return Ok(Self {
-            secret_key,
-            public_key,
-        });
-    }
 }
 
 
@@ -726,40 +620,13 @@ impl Request {
         self.clone()
     }
 
-    pub fn with_auth(&mut self, key_pair: &KeyPair) -> &mut Request {
-        let hash = self.calculate_hash();
-        // println!("with_auth hash: {:?}", hash.hex());
-        let proof = Proof::from_keypair_hash(&hash, &key_pair);
-        proof.verify(&hash).expect("immediate verify");
-        self.proof = Some(proof);
-        self
-    }
-
     pub fn with_metadata(&mut self, node_metadata: NodeMetadata) -> &mut Request {
         self.node_metadata = Some(node_metadata);
         self
     }
 
-    pub fn verify_auth(&self) -> Result<PublicKey, ErrorInfo> {
-        let hash = self.calculate_hash();
-        let proof = self.proof.safe_get_msg("Missing proof on request authentication verification")?;
-        proof.verify(&hash)?;
-        let pk = proof.public_key.safe_get_msg("Missing public key on request authentication verification")?;
-        Ok(pk.clone())
-    }
-
 }
 
-#[test]
-fn verify_request_auth() {
-    let tc = TestConstants::new();
-    let mut req = Request::empty();
-    req.about();
-    req.with_auth(&tc.key_pair());
-    // println!("after with auth assign proof {}", req.calculate_hash().hex());
-    req.verify_auth().unwrap();
-
-}
 
 
 #[cfg(test)]

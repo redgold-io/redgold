@@ -16,6 +16,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, RwLock};
+use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{EasyJsonDeser, structs};
 use crate::core::relay::Relay;
 use crate::util::logging::Loggable;

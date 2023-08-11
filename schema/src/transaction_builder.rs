@@ -1,8 +1,5 @@
-use bitcoin::secp256k1::rand;
-use bitcoin::secp256k1::rand::Rng;
-use crate::{Address, constants, ErrorInfo, KeyPair, NetworkEnvironment, PeerData, SafeOption, struct_metadata_new, StructMetadata, Transaction, util};
-use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{AddressInfo, NodeMetadata, Output, Proof, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
+use crate::{Address, ErrorInfo, PeerData, SafeOption, struct_metadata_new, Transaction};
+use crate::structs::{AddressInfo, NodeMetadata, Output, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -13,28 +10,6 @@ pub struct TransactionBuilder {
 }
 
 impl TransactionBuilder {
-    pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        Self {
-            transaction: Transaction{
-                inputs: vec![],
-                outputs: vec![],
-                struct_metadata: struct_metadata_new(),
-                options: Some(TransactionOptions{
-                    salt: Some(rng.gen::<i64>()),
-                    // TODO: None here or with setter?
-                    network_type: None,
-                    key_value_options: vec![],
-                    data: None,
-                    contract: None,
-                    offline_time_sponsor: None,
-                }),
-            },
-            balance: 0,
-            utxos: vec![],
-            used_utxos: vec![],
-        }
-    }
 
     pub fn with_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let entry = utxo_entry.clone();

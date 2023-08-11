@@ -9,8 +9,9 @@ use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
 
 use serde::{Serialize, Deserialize};
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
+use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
 use crate::multiparty::initiate_mp::{default_room_id, initiate_mp_keysign};
 use crate::node::Node;
 use crate::util::address_external::ToBitcoinAddress;

@@ -1,35 +1,19 @@
-use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use curv::arithmetic::Zero;
-use itertools::Itertools;
-use log::{debug, info};
-use prost::{DecodeError, Message as msg};
 use serde_json;
 
-use crate::e2e::tx_gen::TransactionGenerator;
-use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
-use crate::schema::structs::{Error as RGError, Hash};
-use crate::schema::structs::{ErrorInfo, StructMetadata};
-use crate::schema::structs::{
-    HashType, Input, ObservationMetadata, Output, Proof, Request, Response, Transaction,
-};
-use crate::schema::structs::{PeerData, ResponseMetadata, StandardData, UtxoEntry};
-use crate::schema::util::{dhash_str, public_key_ser};
-use crate::schema::{error_message};
-use crate::schema::TestConstants;
-use crate::schema::{KeyPair};
-use crate::schema::{response_metadata, SafeOption};
-use crate::schema::{
-    struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable,
-    WithMetadataHashableFields,
-};
-use crate::{genesis, util};
-use redgold_schema::constants::{
-    DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS,
-};
 use redgold_schema::ProtoSerde;
-use redgold_schema::util::mnemonic_words::MnemonicWords;
-use crate::schema::transaction::rounded_balance;
+
+use crate::genesis;
+use crate::core::relay::Relay;
+use crate::e2e::tx_gen::TransactionGenerator;
+use crate::schema::WithMetadataHashable;
+use crate::schema::structs::{
+    ObservationMetadata, Transaction,
+};
+use redgold_keys::TestConstants;
+use redgold_keys::util::dhash_str;
+
 // use crate::schema::transaction::rounded_amount;
 
 

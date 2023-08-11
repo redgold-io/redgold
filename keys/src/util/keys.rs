@@ -1,5 +1,5 @@
 use bitcoin::secp256k1::PublicKey;
-use crate::structs;
+use redgold_schema::structs;
 
 pub trait ToPublicKeyFromLib {
     fn to_struct_public_key(&self) -> structs::PublicKey;

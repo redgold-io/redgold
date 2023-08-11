@@ -8,19 +8,21 @@ use crate::gui::app_loop::LocalState;
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
-use redgold_schema::{RgResult, TestConstants, WithMetadataHashable};
+use redgold_keys::TestConstants;
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_schema::{RgResult, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
 use redgold_schema::transaction_builder::TransactionBuilder;
-use redgold_schema::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::{cold_wallet, common, hot_wallet};
 use crate::gui::common::{data_item, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
-use crate::util::lang_util::JsonCombineResult;
+use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::util::logging::Loggable;
 
 #[derive(Debug, EnumIter, EnumString)]

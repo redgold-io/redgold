@@ -14,7 +14,7 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 use std::path::Path;
 
-use redgold_schema::util::mnemonic_words::MnemonicWords;
+use redgold_keys::util::mnemonic_words::MnemonicWords;
 use ssh2::{Channel, Session};
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::servers::Server;

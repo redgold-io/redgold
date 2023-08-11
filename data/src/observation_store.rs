@@ -1,8 +1,6 @@
-use sqlx::query::Map;
-use sqlx::{Error, Sqlite};
-use sqlx::sqlite::{SqliteArguments, SqliteRow};
-use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PeerData, PublicKey, Transaction, UtxoEntry};
-use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, SafeBytesAccess, TestConstants, util, WithMetadataHashable};
+use redgold_keys::TestConstants;
+use redgold_schema::structs::{ErrorInfo, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PublicKey};
+use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -10,8 +8,6 @@ use crate::schema::SafeOption;
 pub struct ObservationStore {
     pub ctx: DataStoreContext
 }
-
-use crate::schema::json_or;
 
 impl ObservationStore {
 

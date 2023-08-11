@@ -7,6 +7,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // use structopt::StructOpt;
 
 use round_based::Msg;
+use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{EasyJson, RgResult};
 use redgold_schema::structs::Request;
 use crate::core::relay::Relay;

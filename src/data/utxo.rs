@@ -4,7 +4,7 @@ use crate::schema::structs::{Input, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;
 use crate::schema::{SafeBytesAccess, WithMetadataHashable};
 use crate::util;
-use redgold_schema::util::mnemonic_words::generate_key;
+use redgold_keys::util::mnemonic_words::generate_key;
 
 //
 // #[test]

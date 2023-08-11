@@ -1,15 +1,12 @@
 use itertools::Itertools;
-use prost::DecodeError;
+use redgold_keys::util::{dhash, dhash_vec};
 
-use crate::schema::structs::{Hash, HashFormatType, MerkleProof};
-use crate::util;
-use crate::util::vec_to_fixed;
-use crate::schema::{bytes_data};
-
-use prost::Message;
-use redgold_schema::HashClear;
 use redgold_schema::structs::HashType;
-use redgold_schema::util::{dhash, dhash_vec, merge_hash};
+use redgold_keys::util::merge_hash;
+
+use crate::schema::bytes_data;
+use crate::schema::structs::{Hash, HashFormatType};
+use crate::util;
 
 // this is incredibly inefficient but is a placeholder for now.
 #[derive(Debug)]

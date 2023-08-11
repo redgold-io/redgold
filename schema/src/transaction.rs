@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, Output, ProductId, Proof, StandardContractType, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_message, struct_metadata, HashClear, ProtoHashable, SafeBytesAccess, WithMetadataHashable, WithMetadataHashableFields, constants, PeerData, Error, error_code, ErrorInfoContext, KeyPair, SafeOption, error_info, RgResult, structs};
-use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
+use crate::{error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
 
@@ -70,14 +69,6 @@ pub struct AddressBalance {
 
 impl Transaction {
 
-    pub fn validate(&self) -> RgResult<()> {
-        self.prevalidate()?;
-        for i in &self.inputs {
-            i.verify(&self.signable_hash())?;
-        }
-        Ok(())
-    }
-
     pub fn with_signable_hash(&mut self) -> Result<&mut Self, ErrorInfo> {
         self.struct_metadata()?.signable_hash = Some(self.signable_hash());
         Ok(self)
@@ -88,27 +79,6 @@ impl Transaction {
             i.proof.push(proof.clone());
         }
         self
-    }
-
-    pub fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo> {
-        let hash = self.signable_hash();
-        let addr = key_pair.address_typed();
-        let mut signed = false;
-        for i in self.inputs.iter_mut() {
-            let o = i.output.safe_get_msg("Missing enriched output on transaction input during signing")?;
-            let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
-            if &addr == input_addr {
-                let proof = Proof::from_keypair_hash(&hash, &key_pair);
-                i.proof.push(proof);
-                signed = true;
-            }
-        }
-        if !signed {
-            return Err(error_info("Couldn't find appropriate input address to sign"));
-        }
-        let x = self.with_hash();
-        x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
-        Ok(x.clone())
     }
 
 
@@ -218,22 +188,6 @@ impl Transaction {
         ).to_fractional()
     }
 
-    pub fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
-        let input = self
-            .inputs
-            .get(utxo_entry.output_index as usize)
-            .ok_or(error_message(
-                RGError::MissingInputs,
-                format!("missing input index: {}", utxo_entry.output_index),
-            ))?;
-        let address = utxo_entry.address.safe_get_msg("Missing address during verify_utxo_entry_proof")?;
-        Ok(Proof::verify_proofs(
-            &input.proof,
-            &self.signable_hash(),
-            address,
-        )?)
-    }
-
     pub fn output_amounts_by_product(&self) -> HashMap<ProductId, TransactionAmount> {
         let mut map = HashMap::new();
         for output in &self.outputs {
@@ -245,66 +199,6 @@ impl Transaction {
             }
         }
         map
-    }
-
-    pub fn prevalidate(&self) -> Result<(), ErrorInfo> {
-        if self.inputs.is_empty() {
-            Err(error_code(RGError::MissingInputs))?;
-        }
-        if self.outputs.is_empty() {
-            Err(error_code(RGError::MissingOutputs))?;
-        }
-
-        if let Some(o) = &self.options {
-            if let Some(d) = &o.data {
-                if let Some(m) = &d.message {
-                    let i = m.len();
-                    if i > MAX_TRANSACTION_MESSAGE_SIZE {
-                        Err(
-                            error_info(
-                                format!(
-                                    "Message length: {} too large, expected {}", i, MAX_TRANSACTION_MESSAGE_SIZE
-                                )
-                            )
-                        )?;
-                    }
-                }
-            }
-        }
-
-        // if self.fee < MIN_FEE_RAW {
-        //     return Err(RGError::InsufficientFee);
-        // }
-        for input in self.inputs.iter() {
-            if input.output_index > (MAX_INPUTS_OUTPUTS as i64) {
-                Err(error_code(RGError::InvalidAddressInputIndex))?;
-            }
-            // if input.transaction_hash.len() != 32 {
-            //     // println!("transaction id len : {:?}", input.id.len());
-            //     error_code(RGError::InvalidHashLength);
-            // }
-            if input.proof.is_empty() {
-                Err(error_code(RGError::MissingProof))?;
-            }
-            input.verify_signatures_only(&self.signable_hash())?;
-        }
-
-        for _output in self.outputs.iter() {
-            // TODO: Reimplement dust separate from testing?
-            // if output.address.len() != 20 {
-            //     // println!("address id len : {:?}", output.address.len());
-            //     return Err(RGError::InvalidHashLength);
-            // }
-            // if let Some(a) = _output.opt_amount() {
-            //     if a < 10_000 {
-            //         Err(error_info(format!("Insufficient amount output of {a}")))?;
-            //     }
-            // }
-        }
-
-        // TODO: Sum by product Id
-
-        return Ok(());
     }
 
     #[allow(dead_code)]
@@ -398,31 +292,6 @@ impl Transaction {
     // }
 
     // This function seems to halt with a bad amoubnt calll
-
-    // TODO: Move all of this to TransactionBuilder
-    pub fn new(
-        source: &UtxoEntry,
-        destination: &Vec<u8>,
-        amount: u64,
-        secret: &SecretKey,
-        public: &PublicKey,
-    ) -> Self {
-
-        let mut amount_actual = amount;
-        if amount < (MAX_COIN_SUPPLY as u64) {
-            amount_actual = amount * (DECIMAL_MULTIPLIER as u64);
-        }
-        let amount = TransactionAmount::from(amount as i64);
-        // let fee = 0 as u64; //MIN_FEE_RAW;
-        // amount_actual -= fee;
-        let destination = Address::from_bytes(destination.clone()).unwrap();
-        let txb = TransactionBuilder::new()
-            .with_utxo(&source).expect("")
-            .with_output(&destination, &amount)
-            .build().expect("")
-            .sign(&KeyPair::new(&secret.clone(), &public.clone())).expect("");
-        txb
-    }
 
     pub fn peer_data(&self) -> Result<PeerData, ErrorInfo> {
         let mut res = vec![];

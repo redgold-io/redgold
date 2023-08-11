@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package structs;
 
+import "execution.proto";
+
 // TODO: Schema version hash
 
 enum SignatureType {
@@ -1128,3 +1130,20 @@ enum ExternalCurrency {
   Bitcoin = 1;
   Ethereum = 2;
 }
+
+message ExecutionInput {
+  structs.Transaction tx = 1;
+}
+
+message ExecutionResult {
+  bool valid = 1;
+  structs.ResponseMetadata result_metadata = 2;
+  StandardData data = 3;
+}
+
+
+// This doesn't work
+//
+//message TestMessageOuter {
+//  execution.TestMessage inner = 1;
+//}

@@ -11,8 +11,9 @@ use bitcoin::hashes::hex::ToHex;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use crate::{error_info, ErrorInfoContext, KeyPair, RgResult, SafeBytesAccess, SafeOption, structs, TestConstants};
-use crate::structs::{Hash, NetworkEnvironment};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::structs::{Hash, NetworkEnvironment};
+use crate::KeyPair;
 use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
 use crate::util::mnemonic_words::MnemonicWords;
 

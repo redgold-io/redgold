@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use bitcoin::{Address, Network};
-use redgold_schema::public_key::ToPublicKey;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey};
 use bitcoin::util::key;
 use hex::ToHex;
 // use web3::types::H160;
 use redgold_schema::ErrorInfoContext;
 use sha3::{Digest, Keccak256};
+use redgold_keys::util::ToPublicKey;
 
 pub trait ToBitcoinAddress {
     fn to_bitcoin_address(&self) -> Result<String, ErrorInfo>;
