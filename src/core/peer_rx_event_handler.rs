@@ -79,8 +79,8 @@ impl PeerRxEventHandler {
         response.with_metadata(relay.node_config.node_metadata_fixed());
         response.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
         if let Some(c) = pm.response {
-            let ser = response.clone().json_or();
-            let peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
+            let _ser = response.clone().json_or();
+            let _peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
             // debug!("Sending response to peer {} contents {}", peer, ser);
             c.send_err(response).add("Send message to response channel failed in handle incoming message")
                 .log_error().ok();
@@ -91,7 +91,7 @@ impl PeerRxEventHandler {
     }
 
 
-    pub async fn request_response(relay: Relay, request: Request, verified: RgResult<PublicKey>
+    pub async fn request_response(relay: Relay, request: Request, _verified: RgResult<PublicKey>
                                   // , arc: Arc<Runtime>
     ) -> Result<Response, ErrorInfo> {
 

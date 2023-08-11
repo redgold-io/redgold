@@ -241,7 +241,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
     }
 
     if !key.generate_mnemonic_state.toggle_show_metadata {
-        for mut m in &mut key.generate_mnemonic_state.metadata_fields {
+        for m in &mut key.generate_mnemonic_state.metadata_fields {
             m.clear();
         }
     }
@@ -282,7 +282,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
     // TODO: Only validate on update.
 
     if key.generate_mnemonic_state.toggle_concat_password {
-        ui.horizontal(|ui| {
+        ui.horizontal(|_ui| {
 
             if let Some(mut i) = key.generate_mnemonic_state.num_modular_passwords_input.clone().parse::<u32>().ok() {
                 if i >= 10 {

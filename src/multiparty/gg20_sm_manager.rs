@@ -66,7 +66,7 @@ fn verify_message(room_id: &str, message: String, db: &State<Db>) -> Option<(usi
                     // db.get_room_or_create_empty(room_id).await;
                     ret = Some((a, m.message.clone()));
                 } else {
-                    info!("Failed to verify internal lock mp authorized on room_id {}", room_id.clone());
+                    info!("Failed to verify internal lock mp authorized on room_id {}", room_id);
                 }
             } else {
                 info!("Failed to verify auth");
@@ -93,7 +93,7 @@ async fn issue_idx(db: &State<Db>, room_id: &str, message: String) -> Json<Issue
 #[rocket::post("/rooms/<room_id>/broadcast", data = "<message>")]
 async fn broadcast(db: &State<Db>, room_id: &str, message: String) -> Status {
     println!("room broadcast");
-    if let Some((i, Some(msg))) = verify_message(room_id, message, db) {
+    if let Some((_i, Some(msg))) = verify_message(room_id, message, db) {
         let room = db.get_room_or_create_empty(room_id).await;
         room.publish(msg).await;
     }

@@ -716,10 +716,10 @@ impl TransactionProcessContext {
         Ok(is_peer_tx)
     }
     async fn process_peer_transaction(&self, tx: &Transaction) -> RgResult<()> {
-        if let Some(nmd) = tx.node_metadata().ok() {
+        if let Some(_nmd) = tx.node_metadata().ok() {
             // TODO: Validate this update
             // self.relay.ds.peer_store.insert_node(tx).await?;
-        } else if let Some(pd) = tx.peer_data().ok() {
+        } else if let Some(_pd) = tx.peer_data().ok() {
             // self.relay.ds.peer_store.insert_peer(tx).await?;
         }
         Ok(())
