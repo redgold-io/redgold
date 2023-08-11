@@ -146,10 +146,14 @@ jobs:
       - run: echo "release branch match output ${{ steps.check-branch.outputs.match }}"
       - run: echo steps.check-branch.outputs.match
 
-      - if: steps.check-branch.outputs.match == '1'
+      - run: echo "asdf" > ./redgold_mac
+      - if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: cargo clean; cargo build --all --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
-      - if: steps.check-branch.outputs.match == '0'
-        run: echo "Not a release branch, not building mac"; echo "asdf" > ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
@@ -204,7 +208,12 @@ jobs:
         run: ./bin/release_branches.sh
         shell: bash
       - name: Cargo Publish
-        if: steps.check-branch.outputs.match == '1'
+        if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: |
           echo "Branch is release branch, doing cargo publish"
           cargo login ${{ secrets.CARGO_TOKEN }} &&
@@ -228,13 +237,20 @@ jobs:
 
       # TODO Change on branch release?
       - name: Calculate Mac SHA256 Checksum
-        run: |
-          if [ -f "./redgold_mac" ]; then
-          echo "MAC_BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
-          else
-          echo "asdf" > redgold_mac
-          echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
-          fi
+        if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
+        run: echo "MAC_BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_mac | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
+      - if:
+          contains('
+          refs/heads/predev
+          refs/heads/dev
+          ', github.ref)
+        run: echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
+
       - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
 
       # Docker Image
@@ -286,7 +302,12 @@ jobs:
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
 
-      - if: steps.check-branch.outputs.match == '1'
+      - if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: |
           aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
           aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum &&
@@ -355,7 +376,12 @@ jobs:
           "
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - if: steps.check-branch.outputs.match == '1'
+      - if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
           delete_release: true # default: false
@@ -366,7 +392,12 @@ jobs:
         run: sleep 5
       # https://github.com/marketplace/actions/rust-release-binary these steps came from below
       # TODO: Duplicate this release step with 'version' tagged releases
-      - if: steps.check-branch.outputs.match == '1'
+      - if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         name: Release Versioned
         uses: softprops/action-gh-release@v1
         with:

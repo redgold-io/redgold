@@ -52,3 +52,7 @@ cd ..
 cd sdk
 bump_patch_version
 cd ..
+
+cd sdk-client
+bump_patch_version
+cd ..

@@ -6,6 +6,18 @@ cd schema
 cargo publish
 cd ..
 
+cd keys
+cargo publish
+cd ..
+
+cd sdk-client
+cargo publish
+cd ..
+
+cd sdk
+cargo publish
+cd ..
+
 cd data
 cargo publish
 cd ..
