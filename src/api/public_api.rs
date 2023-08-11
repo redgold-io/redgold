@@ -63,7 +63,7 @@ impl PublicClient {
         api::RgHttpClient::new(self.url.clone(), self.port as u16, self.relay.clone())
     }
 
-    pub fn local(port: u16, relay: Option<Relay>) -> Self {
+    pub fn local(port: u16, _relay: Option<Relay>) -> Self {
         Self {
             url: "localhost".to_string(),
             port,
@@ -361,7 +361,7 @@ pub async fn as_warp_proto_bytes<T: ProtoSerde>(response: Result<T, ErrorInfo>) 
     Response::builder().body(vec).expect("a")
 }
 
-pub async fn handle_proto_post(reqb: Bytes, address: Option<SocketAddr>, relay: Relay) -> Result<RResponse, ErrorInfo> {
+pub async fn handle_proto_post(reqb: Bytes, _address: Option<SocketAddr>, relay: Relay) -> Result<RResponse, ErrorInfo> {
     let vec_b = reqb.to_vec();
     let request = Request::proto_deserialize(vec_b)?;
     // info!{"Warp request from {:?}", address};
@@ -506,7 +506,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and(warp::path("request_peer"))
         .and(warp::body::json::<Request>())
         .and(warp::addr::remote())
-        .and_then(move |request: Request, address: Option<SocketAddr>| {
+        .and_then(move |request: Request, _address: Option<SocketAddr>| {
             let relay3 = bin_relay.clone();
             async move {
                 // TODO: Isn't this supposed to go to peerRX event handler?

@@ -74,7 +74,7 @@ impl LocalState {
         let ds_all_default = node_config.data_store_all().await;
         let ds_secure = node_config.data_store_all_secure().await;
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
-        let mut ls = LocalState {
+        let ls = LocalState {
             active_tab: Tab::Home,
             session_salt: random_bytes(),
             session_password_hashed: None,

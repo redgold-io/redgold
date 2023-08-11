@@ -1,19 +1,19 @@
-use std::borrow::Borrow;
-use std::thread::sleep;
-use std::time::Duration;
-use itertools::Itertools;
+
+
+
+
 use rocket::form::validate::Len;
-use redgold::api::control_api::ControlClient;
+
 use redgold::api::public_api::PublicClient;
-use redgold::e2e::tx_gen::{SpendableUTXO, TransactionGenerator};
+
 use redgold::e2e::tx_submit::TransactionSubmitter;
-use redgold::core::run_main::main_from_args;
-use redgold::util;
-use redgold::util::cli::args::RgArgs;
-use redgold::util::runtimes::{build_runtime, build_simple_runtime};
-use redgold_schema::{SafeBytesAccess, SafeOption};
+
+
+
+
+use redgold_schema::{SafeOption};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
-use redgold_keys::util::mnemonic_words::MnemonicWords;
+
 
 #[tokio::test]
 async fn local_e2e_it() -> Result<(), ErrorInfo> {
@@ -29,7 +29,7 @@ async fn local_e2e_it() -> Result<(), ErrorInfo> {
     assert_eq!(pc.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc2.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc3.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
-    let mut tx_sub = TransactionSubmitter::default(pc, vec![]);
+    let tx_sub = TransactionSubmitter::default(pc, vec![]);
     tx_sub.with_faucet().await.expect("");
 
     let res = tx_sub.submit().await.expect("");

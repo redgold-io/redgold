@@ -128,7 +128,7 @@ pub async fn initiate_mp_keygen_authed(
         let res = result.clone()
             .and_then(|r| r.as_error_info());
         match res {
-            Ok(r) => {
+            Ok(_r) => {
                 successful += 1
             }
             Err(e) => {
@@ -158,7 +158,7 @@ pub async fn initiate_mp_keygen_authed(
         query_check.safe_get_msg("Unable to query local store for room_id on keygen")?;
         info!("Local share confirmed");
     }
-    let mut response1 = SelfInitiateKeygenResult{
+    let response1 = SelfInitiateKeygenResult{
         local_share,
         identifier: ident,
         request: base_request,
@@ -172,8 +172,8 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
                                 -> Result<InitiateMultipartyKeygenResponse, ErrorInfo> {
 
     let ident = mp_req.identifier.safe_get()?;
-    let index = ident.party_keys.iter().enumerate().find(|(idx, x)| x == &&relay.node_config.public_key())
-        .map(|(idx, x)| (idx as u16) + 1)
+    let index = ident.party_keys.iter().enumerate().find(|(_idx, x)| x == &&relay.node_config.public_key())
+        .map(|(idx, _x)| (idx as u16) + 1)
         .ok_or(error_info("Not a participant"))?;
     // TODO: Verify address matches host key
     // let key = mp_req.host_key.safe_get()?.clone();
@@ -329,7 +329,7 @@ pub async fn initiate_mp_keysign_authed(
 ) -> RgResult<SelfInitiateKeysignResult> {
 
     let ident = mp_req.identifier.safe_get_msg("Missing identifier")?.clone();
-    let data_to_sign = mp_req.data_to_sign.safe_get_msg("Missing data")?.clone();
+    let _data_to_sign = mp_req.data_to_sign.safe_get_msg("Missing data")?.clone();
     let parties = mp_req.signing_party_keys.clone();
     let signing_room_id = mp_req.signing_room_id.clone();
 
@@ -346,7 +346,7 @@ pub async fn initiate_mp_keysign_authed(
         }
     }).collect_vec();
 
-    let (local_share, init_) = relay.ds.multiparty_store
+    let (local_share, _init_) = relay.ds.multiparty_store
         .local_share_and_initiate(init_keygen_req_room_id.clone()).await?
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches

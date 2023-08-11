@@ -292,7 +292,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 ls.wallet_state.signing_flow_transaction_box_msg = Some(
                     result.clone().json_or_combine()
                 );
-                let status = result.map(|x| "Transaction Prepared".to_string())
+                let status = result.map(|_x| "Transaction Prepared".to_string())
                     .unwrap_or("Preparation Failed".to_string());
                 ls.wallet_state.signing_flow_status = Some(status);
             }
@@ -469,7 +469,7 @@ fn broadcast_transaction(nc: NodeConfig, tx: Transaction, ne: NetworkEnvironment
         let st = Some(res.clone());
         let st_msg = Some(res.clone().json_or_combine());
         let ss = Some(res
-            .map(|x| "Transaction Accepted".to_string())
+            .map(|_x| "Transaction Accepted".to_string())
             .unwrap_or("Rejected Transaction".to_string()));
 
         let fun = move |ls: &mut LocalState| {
@@ -497,7 +497,7 @@ fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, public: 
         let st = Some(res.clone());
         let st_msg = Some(res.clone().json_or_combine());
         let ss = Some(res
-            .map(|x| "Signed Successfully".to_string())
+            .map(|_x| "Signed Successfully".to_string())
             .unwrap_or("Signing error".to_string()));
 
         let fun = move |ls: &mut LocalState| {

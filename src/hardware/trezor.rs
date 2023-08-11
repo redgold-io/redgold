@@ -192,7 +192,7 @@ pub fn sign_message(path: String, input_message: String) -> Result<SignMessageRe
     let res = trezor_cmd(vec!["sign-message", "-n", &path, &input_message])?;
     let (_, vec) = parse_output(res);
 
-    let message = vec.get(0).safe_get_msg("no message")?.1.clone();
+    let _message = vec.get(0).safe_get_msg("no message")?.1.clone();
     let address = vec.get(1).safe_get_msg("no address")?.1.clone();
     let sig = vec.get(2).safe_get_msg("no signature")?.1.clone();
     // Strange error here happens when attempting to use hashmap keys, they match but it doesn't work
@@ -301,10 +301,10 @@ pub async fn sign_transaction(transaction: &mut Transaction, public: structs::Pu
 #[tokio::test]
 async fn debug_sign_tx () {
     init_logger_once();
-    let tc = TestConstants::new();
+    let _tc = TestConstants::new();
     let pk = default_pubkey().expect("pk");
     let address = pk.address().expect("a");
-    let addr = address.clone().address.safe_bytes().expect("");
+    let _addr = address.clone().address.safe_bytes().expect("");
     let utxo = UtxoEntry{
         transaction_hash: Some(Hash::from_string_calculate("test")),
         output_index: 0,

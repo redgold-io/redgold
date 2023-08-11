@@ -244,7 +244,7 @@ pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {
 }
 
 // Move to own file
-pub async fn deploy_wizard(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
+pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
 
         println!("Welcome to the Redgold deployment wizard!");
         let mut data_dir = _config.data_folder.all().path;
@@ -282,7 +282,7 @@ pub async fn deploy_wizard(deploy: &Deploy, _config: &NodeConfig) -> Result<(), 
 
         // Query to find if any existing servers
         let store_path = data_dir.join("data_store.sqlite").to_str().expect("str").to_string();
-        let ds = DataStore::from_path(store_path).await;
+        let _ds = DataStore::from_path(store_path).await;
 
         // Check to see if we have a mnemonic stored in backup for generating a random seed
 

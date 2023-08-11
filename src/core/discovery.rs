@@ -29,7 +29,7 @@ Probably both.
 #[async_trait]
 impl IntervalFold for Discovery {
     async fn interval_fold(&mut self) -> RgResult<()> {
-        let mut peers = self.relay.ds.peer_store
+        let peers = self.relay.ds.peer_store
             .active_nodes(None).await
             .add("Active nodes query in discovery failure")?;
 
@@ -86,7 +86,7 @@ impl IntervalFold for Discovery {
         }
 
         // debug!("Discovery found {} total peers", results.len());
-        let mut new_peers_count = 0;
+        let _new_peers_count = 0;
         for r in &results {
             if let Some(pk) = r.latest_node_transaction.clone()
                 .and_then(|t| t.node_metadata().ok())
@@ -171,7 +171,7 @@ impl Discovery {
         }
     }
 
-    async fn process(&mut self, message: DiscoveryMessage, result: Response) -> RgResult<()> {
+    async fn process(&mut self, _message: DiscoveryMessage, result: Response) -> RgResult<()> {
 
         let result = result.about_node_response.safe_get_msg(
             "Missing about node response during peer discovery"

@@ -169,7 +169,7 @@ impl Node {
         let c_config = relay.clone();
         if node_config.e2e_enabled {
             // TODO: Distinguish errors here
-            let cwh = tokio::spawn(e2e::run(c_config));
+            let _cwh = tokio::spawn(e2e::run(c_config));
             // join_handles.push(cwh);
         }
 
@@ -303,7 +303,7 @@ impl Node {
                 let tx = a.latest_metadata.safe_get_msg("Missing latest metadata from seed node")?;
                 let pd = tx.outputs.get(0).expect("a").data.as_ref().expect("d").peer_data.as_ref().expect("pd");
                 let nmd = pd.node_metadata.get(0).expect("nmd");
-                let vec = nmd.public_key_bytes().expect("ok");
+                let _vec = nmd.public_key_bytes().expect("ok");
                 let vec1 = pd.peer_id.safe_get()?.clone().peer_id.safe_bytes()?.clone();
                 // TODO: Derive from NodeMetadata?
                 Seed{
@@ -681,7 +681,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     let _tc = TestConstants::new();
 
     let mut local_nodes = LocalNodes::new(None).await;
-    let start_node = local_nodes.start().clone();
+    let start_node = local_nodes.start();
     // info!("Started initial node");
     let client1 = start_node.control_client.clone();
     // let ds = start_node.node.relay.ds.clone();

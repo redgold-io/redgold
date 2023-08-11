@@ -234,7 +234,7 @@ impl ArgTranslate {
 
         use std::process::Command;
 
-        let shasum = calc_sha_sum(path_str.clone().to_string());
+        let shasum = calc_sha_sum(path_str.to_string());
 
         self.node_config.executable_checksum = Some(shasum.clone());
         info!("Sha256 checksum from shell script: {}", shasum);
@@ -537,7 +537,6 @@ fn calc_sha_sum(path: String) -> String {
         .split_whitespace()
         .next()
         .expect("first output")
-        .clone()
         .to_string()
 }
 
@@ -578,7 +577,7 @@ fn test_shasum() {
 
 #[test]
 fn load_ds_path() {
-    let config = NodeConfig::default();
+    let _config = NodeConfig::default();
     // let res = load_node_config_initial(args::empty_args(), config);
     // println!("{}", res.data_store_path());
 }

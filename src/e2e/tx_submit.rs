@@ -128,7 +128,7 @@ impl TransactionSubmitter {
         let pc = &self.client;
         let w = MnemonicWords::from_iterated_phrase("random").key_at(0);
         let a = w.address_typed();
-        let vec_a = a.address.safe_bytes()?;
+        let _vec_a = a.address.safe_bytes()?;
         let res = //self.runtime.block_on(
             pc.faucet(&a).await?;
         let submit_r = res.submit_transaction_response.safe_get()?;

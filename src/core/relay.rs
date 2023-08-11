@@ -193,14 +193,14 @@ impl Relay {
 
 
     pub async fn update_dynamic_node_metadata(&self, d: &DynamicNodeMetadata) -> RgResult<()> {
-        let mut d2 = d.clone();
+        let d2 = d.clone();
         // TODO: Sign here, increment height.
         self.ds.config_store.set_dynamic_md(&d2).await?;
         Ok(())
     }
 
     pub async fn update_node_metadata(&self, node_metadata: &NodeMetadata) -> RgResult<()> {
-        let mut tx = self.node_tx().await?;
+        let tx = self.node_tx().await?;
         let mut tx_b = TransactionBuilder::new();
         let utxo = tx.head_utxo()?;
         let h = utxo.height()?;
@@ -237,7 +237,7 @@ impl Relay {
         Ok(())
     }
     pub fn check_signing_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
-        let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        let l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         Ok(l.get(room_id).safe_get_msg("missing room_id")
             .and_then(|x| x.identifier.safe_get_msg("missing identifier")
             ).map(|p| p.party_index(public_key)).unwrap_or(None))
@@ -254,7 +254,7 @@ impl Relay {
         Ok(())
     }
     pub fn check_keygen_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
-        let mut l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
+        let l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         Ok(l.get(room_id).safe_get_msg("missing room_id")
             .and_then(|x| x.identifier.safe_get_msg("missing identifier")
             ).map(|p| p.party_index(public_key)).unwrap_or(None))
@@ -350,7 +350,7 @@ impl Relay {
     ) -> RgResult<Vec<RgResult<Response>>> {
         let mut results = vec![];
         for p in nodes {
-            let mut req = request.clone();
+            let req = request.clone();
             let timeout = Some(timeout.unwrap_or(Duration::from_secs(20)));
             let res = self.send_message_async(req, p, timeout).await?;
             results.push(res);
@@ -420,7 +420,7 @@ impl Relay {
     }
 
     pub async fn send_message_async_pm(&self, pm: PeerMessage) -> Result<flume::Receiver<Response>, ErrorInfo> {
-        let (s, r) = flume::bounded(1);
+        let (_s, r) = flume::bounded(1);
         self.peer_message_tx.send(pm).await?;
         Ok(r)
     }

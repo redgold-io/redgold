@@ -69,7 +69,7 @@ impl PriceVolume {
 
         if total_volume != available_volume {
             let delta = total_volume as i64 - available_volume as i64;
-            let mut last = price_volumes.last_mut().unwrap();
+            let last = price_volumes.last_mut().unwrap();
             if delta > 0 && (last.volume as u64) > delta as u64 {
                 last.volume = ((last.volume as i64) - delta) as u64;
             } else if delta < 0 {
@@ -291,7 +291,7 @@ impl Watcher {
     // }
 
     // TODO: From oracle or api
-    pub async fn convert_btc_amount_usd(timestamp: u64, amount: u64) -> f64 {
+    pub async fn convert_btc_amount_usd(_timestamp: u64, _amount: u64) -> f64 {
         0.
     }
 
@@ -566,7 +566,7 @@ impl IntervalFold for Watcher {
         let ds = self.relay.ds.clone();
         // TODO: Change to query to include trust information re: deposit score
         // How best to represent this to user? As trustData?
-        let nodes = ds.peer_store.active_nodes(None).await?;
+        let _nodes = ds.peer_store.active_nodes(None).await?;
 
         // Fund from genesis for test purposes
         // self.genesis_funding().await?;
@@ -595,7 +595,7 @@ impl IntervalFold for Watcher {
                     let w = SingleKeyBitcoinWallet::new_wallet(key.clone(), self.relay.node_config.network, true)?;
                     self.wallet.push(Arc::new(Mutex::new(w)));
                 }
-                let mut w = self.wallet.get(0).cloned();
+                let w = self.wallet.get(0).cloned();
                 if let Some(w) = w {
                     let btc_starting_balance = w.lock()
                         .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
@@ -668,7 +668,7 @@ impl IntervalFold for Watcher {
 async fn debug_local_ds_utxo_balance() {
     let mut opts = RgArgs::default();
     opts.network = Some("dev".to_string());
-    let mut node_config = NodeConfig::default();
+    let node_config = NodeConfig::default();
     let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
     arg_translate.translate_args().await.unwrap();
     let nc = arg_translate.node_config;
@@ -677,7 +677,7 @@ async fn debug_local_ds_utxo_balance() {
     let utxos = r.ds.transaction_store.query_utxo_address(&a).await.unwrap();
     println!("UTXOS: {}", utxos.json_or());
     println!("{}", nc.mnemonic_words.clone());
-    let (tx, gutxos) = Node::genesis_from(nc.clone());
+    let (tx, _gutxos) = Node::genesis_from(nc.clone());
     // let res = r.ds.transaction_store.query_utxo_output_index(&tx.hash_or()).await.unwrap();
     // println!("UTXO: {}", res.json_or());
     println!("Genesis hash {}", tx.hash_or().hex());

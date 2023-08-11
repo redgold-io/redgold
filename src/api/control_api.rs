@@ -109,7 +109,7 @@ impl ControlServer {
             }
             resp.multiparty_identifier = Some(result.identifier);
             response.control_multiparty_keygen_response = Some(resp);
-        } else if let Some(mut req) = request.control_multiparty_signing_request {
+        } else if let Some(req) = request.control_multiparty_signing_request {
 
             let req = req.signing_request.safe_get_msg("Missing signing request")?;
             let result = initiate_mp_keysign(

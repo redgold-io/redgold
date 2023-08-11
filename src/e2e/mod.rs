@@ -196,14 +196,14 @@ pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
         .map(|x| Ok(x))
         .try_fold(c, |mut c, _| async {
             e2e_tick(&mut c).await.map(|_| c)
-    }).await.map(|x| ())
+    }).await.map(|_x| ())
 }
 
 async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
     let result1 = c.build_tx().await;
     let result = result1.log_error().clone();
     match result {
-        Err(e) => {}
+        Err(_e) => {}
         Ok(transaction) => {
             let transaction = transaction.clone();
             let res = c.relay.submit_transaction(SubmitTransactionRequest {
