@@ -52,6 +52,7 @@ fn write_csv() {
 }
 
 
+#[ignore]
 #[test]
 fn debug() {
     write_csv();
