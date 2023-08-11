@@ -334,9 +334,9 @@ jobs:
           
           docker=${{ env.DOCKER_SHA256 }}
 
-          linux_sha256=${{ env.BUILD_SHORT_CHECKSUM }}
+          linux_sha256=${{ env.BUILD_CHECKSUM_SHA256 }}
           
-          linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM_SHA256 }}
+          linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM }}
                      
           mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
           
@@ -375,9 +375,9 @@ jobs:
           
           docker=${{ env.DOCKER_SHA256 }}
 
-          linux_sha256=${{ env.BUILD_SHORT_CHECKSUM }}
+          linux_sha256=${{ env.BUILD_CHECKSUM_SHA256 }}
           
-          linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM_SHA256 }}
+          linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM }}
                      
           mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
           
