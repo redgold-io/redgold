@@ -7,7 +7,7 @@ use redgold_schema::structs::{ExecutionInput, ExecutionResult};
 pub async fn invoke_wasm(
     wasm_bytes: &[u8],
     function_name: impl Into<String>,
-    args: structs::ExecutionInput
+    args: ExecutionInput
 ) -> RgResult<ExecutionResult> {
     let context = Context::new();
     let mut plugin = Plugin::new(
