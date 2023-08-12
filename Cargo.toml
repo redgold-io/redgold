@@ -45,6 +45,7 @@ categories = ["cryptography::cryptocurrencies"]
 redgold-schema = { path = "schema", version = "0.1.6"}
 redgold-data = { path = "data", version = "0.1.6"}
 redgold-keys = { path = "keys", version = "0.1.6"}
+redgold-executor = { path = "executor", version = "0.1.6"}
 redgold-sdk-client = { path = "sdk-client", version = "0.1.6"}
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
@@ -58,7 +59,8 @@ redgold-schema = {workspace = true}
 [target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
 redgold-data = {workspace = true}
 redgold-keys = {workspace = true}
-#redgold-executor = { path = "executor", version = "0.1.5"}
+redgold-executor = {workspace = true}
+redgold-sdk-client = {workspace = true}
 tempfile = "3.3.0"
 sha3 = "0.10.8"
 argon2 = "0.5.0"
