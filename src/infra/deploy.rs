@@ -262,8 +262,12 @@ pub async fn derive_mnemonic_and_peer_id(
     Ok((server_mnemonic, pid_hex))
 }
 
-pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<()> {
+pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> RgResult<()> {
 
+    let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
+    if primary_gen {
+        deploy.skip_ops = true;
+    }
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -294,7 +298,7 @@ pub async fn default_deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResu
     // let mut gen = true;
     let purge = deploy.purge;
     let mut gen = deploy.genesis;
-    if std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok() {
+    if primary_gen {
         gen = true;
     }
     let mut hm = HashMap::new();
