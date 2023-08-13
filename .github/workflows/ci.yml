@@ -153,7 +153,7 @@ jobs:
           refs/heads/test
           refs/heads/main
           ', github.ref)
-        run: cargo clean; cargo build --all --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+        run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
