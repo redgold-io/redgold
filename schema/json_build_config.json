@@ -105,6 +105,7 @@
         "structs.HealthRequest",
         "structs.HealthResponse",
         "structs.GetNodeTransactionRequest",
+        "structs.AddressSelector",
         "execution.ExecutionInput",
         "execution.ExecutionResult",
         "structs.VersionInfo"
@@ -128,6 +129,8 @@
         "structs.SignatureType",
         "structs.PublicKeyType",
         "structs.HashFormatType",
+        "structs.ExecutorBackend",
+        "structs.OutputType",
         "structs.AddressType"
       ]
     },

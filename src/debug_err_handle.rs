@@ -1,6 +1,5 @@
 use std::thread::sleep;
 use std::time::Duration;
-use async_std::prelude::FutureExt;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use tokio::task::JoinError;

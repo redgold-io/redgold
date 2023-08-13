@@ -51,72 +51,85 @@ hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"
 serde_with = { version = "3.2.0", features = ["hex"] }
-itertools = "0.10.1"
+itertools = "0.11.0"
+sha3 = "0.10.8"
+log = "0.4.14"
+reqwest = { version = "0.11", features = ["json"] }
+metrics = "0.21.1"
+strum = "0.25"
+strum_macros = "0.25"
 
 
 [dependencies]
+
 redgold-schema = {workspace = true}
 [target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
 redgold-data = {workspace = true}
 redgold-keys = {workspace = true}
 redgold-executor = {workspace = true}
 redgold-sdk-client = {workspace = true}
-tempfile = "3.3.0"
-sha3 = "0.10.8"
-argon2 = "0.5.0"
 
-dirs = "4.0.0"
-#sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
-# Is this only used in schema now?
-#backtrace = "0.3.65"
+sha3 = { workspace = true }
+log = { workspace = true }
+hex = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+metrics = { workspace = true }
+itertools = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+
+
+tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
+tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
+tokio-stream = "0.1.14"
+async-trait = "0.1.56"
+futures = "0.3.1"
 
 flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
-dotenv = "0.15.0"
-futures = "0.3.1"
-# TODO: This needs to be replaced
-bitcoin-wallet = "1.1.0"
-# Used for Sha256 but can be deprecated
-rust-crypto = "0.2.36"
-# only used in schema?
-
-dashmap = "4.0.2"
-# Deprecate after moving into data module -- only for build
-
 crossbeam = "0.8.1"
+
+warp = {version = "0.3", features = ["tls", "default"]}
+dashmap = "5.5.0"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+csv = "1.1"
+rpassword = "7.2.0"
+metrics-exporter-prometheus = "0.9.0"
+tempfile = "3.3.0"
+argon2 = "0.5.0"
+dirs = "5.0.1"
+dotenv = "0.15.0"
+
+
+rand = '0.8.4'
 uuid = { version = "1.3.3", features = ["serde", "v4", "v1"] }
+
 # GUI Alone
 eframe = "0.21.0" # Gives us egui, epi and web+native backends
 egui_extras = {version = "0.21.0", features = ["default", "image"]}
-strum = "0.25"
-strum_macros = "0.25"
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
-#zxcvbn = '2.1.1'
-rand = '0.8.4'
+
 clap = { version = "3.1.17", features = ["derive"] }
-log = "0.4.14"
-hex = "0.4.3"
+
 #void = "1.0.2"
 # Is this used anymore?
-async-std = { version = "1.6.2", features = ["attributes"] }
-async-trait = "0.1.56"
-env_logger = "0.10.0"
 #structopt = "0.3.21"
-warp = {version = "0.3", features = ["tls", "default"]}
-reqwest = { version = "0.11", features = ["json"] }
-serde = "1.0.130"
-serde_json = "1.0.59"
+
 base64 = "0.21.2"
-serde_with = { version = "3.2.0", features = ["hex"] }
-log4rs = "1.0.0"
-metrics = "0.18.1"
 ssh2 = "0.9.1"
 # Move to trust module
 ndarray = "0.15.3"
 chrono = "0.4.19"
 config = "0.11.0"
 
-itertools = "0.10.1"
 bytes = "1.1.0"
+
+
+
 #Dependencies for email sending
 aws-config = "0.55.1"
 aws-sdk-sesv2 = "0.28.0"
@@ -132,17 +145,13 @@ thiserror = "1.0.23"
 surf = "2"
 curv-kzen = { version = "0.9", default-features = false }
 
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-metrics-exporter-prometheus = "0.9.0"
-# conflict with multi-party-ecdsa
-tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
-tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
-tokio-stream = "0.1.14"
 
-csv = "1.1"
-rpassword = "7.2.0"
+# TODO: This needs to be replaced
+bitcoin-wallet = "1.1.0"
+# Used for Sha256 but can be deprecated
+rust-crypto = "0.2.36"
+# only used in schema?
 
 [dependencies.bitcoin]
 version = "0.21"
@@ -190,3 +199,5 @@ opt-level = 1
 # todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
 #swagger = "2.2" # breaks openssl?
 #hdpath = { version = "0.5.0", features = ["with-bitcoin"] }
+
+#zxcvbn = '2.1.1'

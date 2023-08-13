@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use env_logger::Env;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use redgold_data::data_store::DataStore;

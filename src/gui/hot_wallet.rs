@@ -1,4 +1,3 @@
-use async_std::prelude::FutureExt;
 use eframe::egui;
 use eframe::egui::Ui;
 use itertools::Itertools;

@@ -2,7 +2,6 @@
 // eventually, to deal with avoiding resolving, do 2nd order for observations that have
 // already been resolved. i.e. only known transactions.
 
-use async_std::prelude::FutureExt;
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
@@ -15,8 +14,8 @@ use tokio::time::Interval;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
-use redgold_keys::proof_support::ProofSupport;
 
+use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::{SafeBytesAccess, SafeOption, struct_metadata_new, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::structs::{Hash, ObservationProof};

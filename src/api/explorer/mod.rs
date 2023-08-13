@@ -498,9 +498,10 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
 
         let mut inputs = vec![];
         for i in &tx.inputs {
+            let u = i.utxo_id.safe_get()?;
             let input = DetailedInput{
-                transaction_hash: i.transaction_hash.clone().map(|t| t.hex()).safe_get_msg("Missing transaction hash?")?.clone(),
-                output_index: i.output_index.clone(),
+                transaction_hash: u.transaction_hash.clone().map(|t| t.hex()).safe_get_msg("Missing transaction hash?")?.clone(),
+                output_index: u.output_index.clone(),
                 address: i.address()?.render_string()?,
             };
             inputs.push(input);

@@ -309,13 +309,7 @@ async fn debug_sign_tx () {
         transaction_hash: Some(Hash::from_string_calculate("test")),
         output_index: 0,
         address: Some(address.clone()),
-        output: Some(Output{
-            address: Some(address.clone()),
-            product_id: None,
-            counter_party_proofs: vec![],
-            data: amount_data(100),
-            contract: None,
-        }),
+        output: Some(Output::new(&address, 100)),
         time: 0,
     };
     let ai = AddressInfo{

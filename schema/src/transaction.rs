@@ -94,6 +94,7 @@ impl Transaction {
     pub fn iter_utxo_inputs(&self) -> Vec<(Vec<u8>, i64)> {
         self.inputs
             .iter()
+            .filter_map(|y| y.utxo_id.as_ref())
             .map(|y| {
                 (
                     y.transaction_hash.safe_bytes().expect("a").clone(),
@@ -103,24 +104,13 @@ impl Transaction {
             .collect_vec()
     }
 
-    pub fn utxo_ids_of_inputs(&self) -> Result<Vec<UtxoId>, ErrorInfo> {
-        let mut utxo_ids = Vec::new();
-        for input in &self.inputs {
-            utxo_ids.push(UtxoId {
-                transaction_hash: input.transaction_hash.safe_bytes()?,
-                output_index: input.output_index as i64,
-            });
-        }
-        Ok(utxo_ids)
-    }
 
     pub fn fixed_utxo_ids_of_inputs(&self) -> Result<Vec<FixedUtxoId>, ErrorInfo> {
         let mut utxo_ids = Vec::new();
         for input in &self.inputs {
-            utxo_ids.push(FixedUtxoId {
-                transaction_hash: input.transaction_hash.clone(),
-                output_index: input.output_index as i64,
-            });
+            if let Some(f) = &input.utxo_id {
+                utxo_ids.push(f.clone());
+            }
         }
         Ok(utxo_ids)
     }
@@ -180,6 +170,13 @@ impl Transaction {
             }
         }
         total
+    }
+
+    pub fn total_input_amount(&self) -> i64 {
+        self.inputs.iter()
+            .filter_map(|i| i.output.as_ref())
+            .filter_map(|o| o.opt_amount())
+            .sum()
     }
 
     pub fn total_output_amount_float(&self) -> f64 {

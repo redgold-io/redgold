@@ -5,7 +5,7 @@ use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::constants::MIN_FEE_RAW;
 use redgold_schema::structs::{Address, ErrorInfo, TransactionAmount};
-use redgold_schema::SafeOption;
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 
@@ -34,6 +34,7 @@ pub struct TransactionGenerator {
 }
 
 impl TransactionGenerator {
+
     pub fn with_genesis(&mut self) -> TransactionGenerator {
         let vec = create_genesis_transaction()
             .to_utxo_entries(0 as u64)
@@ -97,6 +98,28 @@ impl TransactionGenerator {
         }
     }
 
+
+    pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
+        let prev = self.finished_pool.pop().safe_get()?.clone();
+        let bytes = tokio::fs::read("test_contract_guest.wasm").await.error_info("Read failure")?;
+        let mut tb = TransactionBuilder::new();
+        let x = &prev.utxo_entry;
+        tb.with_unsigned_input(x.clone())?;
+        let a = x.opt_amount().expect("a");
+        let c_amount = TransactionAmount::from(a.amount / 2);
+        // TODO: Add fees / fee address, use genesis utxos or something?
+        // let fee_amount = TransactionAmount::from(a.amount / 10);
+        tb.with_contract_output(bytes, c_amount, true)?;
+        // tb.with_fee(fee_amount);
+        tb.with_remainder();
+        let tx= tb.transaction.sign(&prev.key_pair)?;
+        let tk = TransactionWithKey {
+            transaction: tx,
+            key_pairs: vec![prev.key_pair.clone()],
+        };
+        Ok(tk)
+    }
+
     pub fn split_value_transaction(&mut self, prev: &SpendableUTXO) -> TransactionWithKey {
         let kp = self.next_kp();
         let kp2 = kp.clone();
@@ -158,7 +181,7 @@ impl TransactionGenerator {
     pub fn completed(&mut self, tx: TransactionWithKey) {
         let vec = tx.transaction.to_utxo_entries(0 as u64);
         for (i, v) in vec.iter().enumerate() {
-            if v.amount() > (MIN_FEE_RAW as u64) {
+            if v.opt_amount().map(|a| a.amount > (MIN_FEE_RAW)).unwrap_or(false) {
                 self.finished_pool.push(SpendableUTXO {
                     utxo_entry: v.clone(),
                     key_pair: tx.key_pairs.get(i).unwrap().clone(),

@@ -183,7 +183,8 @@ impl Rosetta {
     pub async fn input_output(&self, input: structs::Input) -> Result<structs::Output, ErrorInfo> {
         let output = match input.output {
             None => {
-                let hash = input.transaction_hash.safe_get()?;
+                let utxo = input.utxo_id.safe_get()?;
+                let hash = utxo.transaction_hash.safe_get()?;
                 let result = self.relay.ds.transaction_store
                     .query_maybe_transaction(&hash).await?;
                 // TODO: Translate result to error here
@@ -192,7 +193,7 @@ impl Rosetta {
                     .expect("a")
                     .0
                     .outputs
-                    .get(input.output_index as usize)
+                    .get(utxo.output_index as usize)
                     .expect("a");
                 out.clone()
             }

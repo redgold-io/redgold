@@ -62,7 +62,7 @@ impl TransactionSupport for Transaction {
         let amount = TransactionAmount::from(amount as i64);
         // let fee = 0 as u64; //MIN_FEE_RAW;
         // amount_actual -= fee;
-        let destination = Address::from_bytes(destination.clone()).unwrap();
+        let destination = Address::calculate_from_bytes(destination.clone()).unwrap();
         let txb = TransactionBuilder::new()
             .with_utxo(&source).expect("")
             .with_output(&destination, &amount)
@@ -125,8 +125,10 @@ impl TransactionSupport for Transaction {
         //     return Err(RGError::InsufficientFee);
         // }
         for input in self.inputs.iter() {
-            if input.output_index > (MAX_INPUTS_OUTPUTS as i64) {
-                Err(error_code(structs::Error::InvalidAddressInputIndex))?;
+            if let Some(utxo) = input.utxo_id.as_ref() {
+                if utxo.output_index > (MAX_INPUTS_OUTPUTS as i64) {
+                    Err(error_code(structs::Error::InvalidAddressInputIndex))?;
+                }
             }
             // if input.transaction_hash.len() != 32 {
             //     // println!("transaction id len : {:?}", input.id.len());
@@ -212,7 +214,6 @@ impl TransactionBuilderSupport for TransactionBuilder {
                     offline_time_sponsor: None,
                 }),
             },
-            balance: 0,
             utxos: vec![],
             used_utxos: vec![],
         }

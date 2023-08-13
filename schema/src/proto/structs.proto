@@ -50,12 +50,20 @@ message ProductId {
 // TODO: Support other output extraction operations, a function that processes a transaction and results ?
 
 message FixedUtxoId {
+  //  // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
   Hash transaction_hash = 1;
+  //  // The index of the output in the parent transaction which is being spent.
   int64 output_index = 2;
 }
 
-message FloatingUtxoId {
+message AddressSelector {
+  Address address = 1;
+  // Some type of query predicate here -- or a bool such that the input's output marks this contract address
+  optional bool requires_output_contract_predicate_match = 2;
+}
 
+message FloatingUtxoId {
+  AddressSelector address_selector = 1;
 }
 
 message OutputIndex {
@@ -63,16 +71,16 @@ message OutputIndex {
 }
 
 message Input {
-  // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
-  Hash transaction_hash = 1;
-  // The index of the output in the parent transaction which is being spent.
-  int64 output_index = 2;
+
+  FixedUtxoId utxo_id = 1;
   // The signed proof that this input is a valid reference to the previous output.
   repeated Proof proof = 3;
   // The identifier associated with the currency or product being used, for multi-currency support.
   ProductId product_id = 4;
   // Hydration purposes only! Not used for hashes
   Output output = 5;
+
+  FloatingUtxoId floating_utxo_id = 6;
 }
 
 message TrustData {
@@ -262,9 +270,15 @@ message KeyValueOption {
   string value = 2;
 }
 
+enum ExecutorBackend {
+  Extism = 0;
+  Evm = 1;
+}
+
 message CodeExecutionContract {
-  optional BytesData hash_contract_reference = 1;
-  optional BytesData raw_dynamic_contract = 2;
+  Address address = 1;
+  BytesData code = 2;
+  optional ExecutorBackend executor = 3;
 }
 
 message OutputContract {
@@ -273,6 +287,11 @@ message OutputContract {
   CodeExecutionContract code_execution_contract = 2;
   optional int64 threshold = 3;
   repeated int64 weights = 4;
+  Address filter_predicate_destination = 5;
+}
+
+enum OutputType {
+  Fee = 0;
 }
 
 message Output {
@@ -282,6 +301,7 @@ message Output {
   // change to outputData?
   StandardData data = 7;
   OutputContract contract = 8;
+  optional OutputType output_type = 9;
 }
 
 // monthly / daily / window size + window center
@@ -823,6 +843,7 @@ enum AddressType {
   ETHEREUM_COMPAT_ADDRESS = 3;
   PUBLIC_KEY_DIRECT_ADDRESS = 4;
   UNKNOWN_ADDRESS_TYPE = 5;
+  SCRIPT_HASH = 6;
 }
 
 message Address {

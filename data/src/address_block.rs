@@ -35,7 +35,7 @@ impl AddressBlockStore {
         let mut res = vec![];
         for row in rows_m {
             res.push(AddressHistoricalBalance{
-                address: Address::from_bytes(row.address.safe_get_msg("Row missing address")?.clone())?,
+                address: Address::calculate_from_bytes(row.address.safe_get_msg("Row missing address")?.clone())?,
                 balance: row.balance.safe_get_msg("Row missing balance")?.clone(),
                 height: height.clone()
             });

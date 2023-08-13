@@ -44,7 +44,7 @@ impl Proof {
             addresses.extend(proof.public_key_bytes()?);
         }
         let vec = Address::hash(&addresses);
-        let addr = Address::from_bytes(vec)?;
+        let addr = Address::calculate_from_bytes(vec)?;
         return Ok(addr);
     }
 
