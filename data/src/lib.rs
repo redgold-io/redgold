@@ -44,21 +44,21 @@ impl DataStoreContext {
     }
 
     // This doesn't seem to work due to the Record type here
-    pub async fn run_query<'a, T: Send + Unpin, J>(
-        &self,
-        sqlx_macro_query: Map<'a, Sqlite, fn(SqliteRow) -> Result<T, Error>, SqliteArguments<'a>>,
-        handle_result: fn(T) -> Result<J, ErrorInfo>
-    )
-    -> Result<Vec<J>, ErrorInfo> {
-        let mut pool = self.pool().await?;
-        let rows = sqlx_macro_query.fetch_all(&mut pool).await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            res.push(handle_result(row)?);
-        }
-        Ok(res)
-    }
+    // pub async fn run_query<'a, T: Send + Unpin, J>(
+    //     &self,
+    //     sqlx_macro_query: Map<'a, Sqlite, fn(SqliteRow) -> Result<T, Error>, SqliteArguments<'a>>,
+    //     handle_result: fn(T) -> Result<J, ErrorInfo>
+    // )
+    // -> Result<Vec<J>, ErrorInfo> {
+    //     let mut pool = self.pool().await?;
+    //     let rows = sqlx_macro_query.fetch_all(&mut pool).await;
+    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+    //     let mut res = vec![];
+    //     for row in rows_m {
+    //         res.push(handle_result(row)?);
+    //     }
+    //     Ok(res)
+    // }
 
 }
 
