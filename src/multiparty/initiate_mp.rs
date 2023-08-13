@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::time::Duration;
-use async_std::prelude::FutureExt;
 use log::{error, info};
 
 use redgold_schema::{error_info, ErrorInfoContext, json_pretty, RgResult, SafeBytesAccess, SafeOption, structs};

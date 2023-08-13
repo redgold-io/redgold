@@ -1,7 +1,7 @@
 use bdk::bitcoin::secp256k1::rand;
 use bdk::bitcoin::secp256k1::rand::Rng;
 use bitcoin::secp256k1::{PublicKey, SecretKey};
-use redgold_schema::{error_code, error_info, error_message, RgResult, SafeOption, struct_metadata_new, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, struct_metadata_new, structs, WithMetadataHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, TransactionAmount, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
@@ -30,12 +30,13 @@ impl TransactionSupport for Transaction {
         let addr = key_pair.address_typed();
         let mut signed = false;
         for i in self.inputs.iter_mut() {
-            let o = i.output.safe_get_msg("Missing enriched output on transaction input during signing")?;
-            let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
-            if &addr == input_addr {
-                let proof = Proof::from_keypair_hash(&hash, &key_pair);
-                i.proof.push(proof);
-                signed = true;
+            if let Some(o) = i.output.as_ref() {
+                let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
+                if &addr == input_addr {
+                    let proof = Proof::from_keypair_hash(&hash, &key_pair);
+                    i.proof.push(proof);
+                    signed = true;
+                }
             }
         }
         if !signed {
@@ -125,15 +126,22 @@ impl TransactionSupport for Transaction {
         //     return Err(RGError::InsufficientFee);
         // }
         for input in self.inputs.iter() {
-            if input.output_index > (MAX_INPUTS_OUTPUTS as i64) {
-                Err(error_code(structs::Error::InvalidAddressInputIndex))?;
+            if let Some(utxo) = input.utxo_id.as_ref() {
+                if utxo.output_index > (MAX_INPUTS_OUTPUTS as i64) {
+                    Err(error_code(structs::Error::InvalidAddressInputIndex))?;
+                }
             }
             // if input.transaction_hash.len() != 32 {
             //     // println!("transaction id len : {:?}", input.id.len());
             //     error_code(RGError::InvalidHashLength);
             // }
             if input.proof.is_empty() {
-                Err(error_code(structs::Error::MissingProof))?;
+                let floating_non_consume_input = input.utxo_id.is_none() && input.floating_utxo_id.is_some();
+                if !floating_non_consume_input {
+                    Err(error_message(structs::Error::MissingProof,
+                                      format!("Input proof is missing on input {}", input.json_or()
+                                      )))?;
+                }
             }
             input.verify_signatures_only(&self.signable_hash())?;
         }
@@ -212,7 +220,6 @@ impl TransactionBuilderSupport for TransactionBuilder {
                     offline_time_sponsor: None,
                 }),
             },
-            balance: 0,
             utxos: vec![],
             used_utxos: vec![],
         }

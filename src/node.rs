@@ -708,6 +708,8 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     submit.submit().await.expect("submit");
 
+    // submit.submit_test_contract().await.expect("submit test contract");
+
 
 
     // let utxos = ds.query_time_utxo(0, util::current_time_millis())

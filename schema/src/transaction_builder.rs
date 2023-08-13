@@ -1,16 +1,22 @@
-use crate::{Address, ErrorInfo, PeerData, SafeOption, struct_metadata_new, Transaction};
-use crate::structs::{AddressInfo, NodeMetadata, Output, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
+use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, Transaction};
+use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
     pub transaction: Transaction,
-    pub balance: i64,
     pub utxos: Vec<UtxoEntry>,
     pub used_utxos: Vec<UtxoEntry>
 }
 
-impl TransactionBuilder {
 
+impl TransactionBuilder {
+    pub fn with_fee(&mut self, destination: &Address, amount: &TransactionAmount) -> RgResult<&mut Self> {
+        self.with_output(destination, amount);
+        let option = self.transaction.outputs.last_mut();
+        let mut o = option.ok_or(error_info("Missing output"))?;
+        o.output_type = Some(OutputType::Fee as i32);
+        Ok(self)
+    }
     pub fn with_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let entry = utxo_entry.clone();
         let o = utxo_entry.output.safe_get_msg("Missing output")?;
@@ -53,16 +59,38 @@ impl TransactionBuilder {
     }
 
     pub fn with_output(&mut self, destination: &Address, amount: &TransactionAmount) -> &mut Self {
-        self.balance -= amount.amount;
         let output = Output {
             address: Some(destination.clone()),
             data: amount_data(amount.amount as u64),
             product_id: None,
             counter_party_proofs: vec![],
             contract: None,
+            output_type: None,
         };
         self.transaction.outputs.push(output);
         self
+    }
+
+    // TODO: Do we need to deal with contract state here?
+    pub fn with_contract_output(
+        &mut self, code: impl AsRef<[u8]>, c_amount: TransactionAmount, use_predicate_input: bool) -> RgResult<&mut Self> {
+        let destination = Address::script_hash(code.as_ref())?;
+        let mut o = Output::default();
+        o.address = Some(destination.clone());
+        let mut contract = OutputContract::default();
+        let mut code_exec = CodeExecutionContract::default();
+        code_exec.code = bytes_data(code.as_ref().to_vec().clone());
+        code_exec.executor = Some(ExecutorBackend::Extism as i32);
+        contract.code_execution_contract = Some(code_exec);
+        o.contract = Some(contract);
+        o.data = amount_data(c_amount.amount as u64);
+        self.transaction.outputs.push(o);
+        if use_predicate_input {
+            let input = Input::predicate_filter(&destination);
+            self.transaction.inputs.push(input);
+        }
+
+        Ok(self)
     }
 
     // Should this be hex or bytes data?
@@ -79,15 +107,18 @@ impl TransactionBuilder {
     // Remove this assumption elsewhere
     pub fn with_unsigned_input(&mut self, utxo: UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let mut input = utxo.to_input();
-
         let output = utxo.output.safe_get()?;
         let data = output.data.safe_get()?;
-        if let Some(a) = data.amount {
-            self.balance += a;
-        }
+        // if let Some(a) = data.amount {
+        //     self.balance += a;
+        // }
         self.used_utxos.push(utxo.clone());
         self.transaction.inputs.push(input);
         Ok(self)
+    }
+
+    pub fn balance(&self) -> i64 {
+        self.transaction.total_input_amount() - self.transaction.total_output_amount()
     }
 
     pub fn build(&mut self) -> Result<Transaction, ErrorInfo> {
@@ -98,15 +129,16 @@ impl TransactionBuilder {
 
         for u in self.utxos.clone() {
             self.with_unsigned_input(u.clone())?;
-            if self.balance > 0 {
+            if self.balance() > 0 {
                 break
             }
         }
-        if self.balance < 0 {
+
+        if self.balance() < 0 {
             return Err(ErrorInfo::error_info("Insufficient funds"));
         }
 
-        if self.balance > 0 {
+        if self.balance() > 0 {
             self.with_remainder();
         }
 
@@ -117,13 +149,9 @@ impl TransactionBuilder {
     pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerData, height: i64) -> &mut Self {
         let mut option = StandardData::peer_data(pd).expect("o");
         option.height = Some(height);
-        let output = Output {
-            address: Some(destination.clone()),
-            data: Some(option),
-            product_id: None,
-            counter_party_proofs: vec![],
-            contract: None,
-        };
+        let mut output = Output::default();
+        output.address = Some(destination.clone());
+        output.data = Some(option);
         self.transaction.outputs.push(output);
         self
     }
@@ -133,13 +161,10 @@ impl TransactionBuilder {
         data.node_metadata = Some(pd);
         data.height = Some(height);
         let data = Some(data);
-        let output = Output {
-            address: Some(destination.clone()),
-            data,
-            product_id: None,
-            counter_party_proofs: vec![],
-            contract: None,
-        };
+        let mut output = Output::default();
+        output.address= Some(destination.clone());
+        output.data = data;
+
         self.transaction.outputs.push(output);
         self
     }
@@ -158,10 +183,11 @@ impl TransactionBuilder {
 
         let output = Output {
             address: Some(address),
-            data: amount_data(self.balance as u64),
+            data: amount_data(self.balance() as u64),
             product_id: None,
             counter_party_proofs: vec![],
             contract: None,
+            output_type: None,
         };
         self.transaction.outputs.push(output);
         self

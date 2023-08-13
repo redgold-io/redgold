@@ -41,7 +41,7 @@ pub struct ResolvedInput {
 impl ResolvedInput {
 
     pub fn prior_output(&self) -> Result<&Output, ErrorInfo> {
-        self.parent_transaction.outputs.get(self.input.output_index as usize)
+        self.parent_transaction.outputs.get(self.input.utxo_id.safe_get_msg("missing utxoid")?.output_index as usize)
             .ok_or(ErrorInfo::error_info("Output index out of bounds"))
     }
 
@@ -82,7 +82,8 @@ pub fn validate_single_result(hash: &Hash, response: Result<Response, ErrorInfo>
 pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, signable_hash: Hash)
                            -> Result<ResolvedInput, ErrorInfo> {
     metrics::increment_counter!("redgold.transaction.resolve.input");
-    let hash = input.transaction_hash.safe_get_msg("Missing transaction hash on input")?;
+    let u = input.utxo_id.safe_get_msg("Missing utxo id")?;
+    let hash = u.transaction_hash.safe_get_msg("Missing transaction hash on input")?;
 
     // TODO this check can be skipped if we check our XOR distance first.
     // Check if we have the parent transaction stored locally
@@ -101,7 +102,7 @@ pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, si
     // Check if the UTXO is still valid (even if the transaction is known, it's output may have been used already)
     let internal_valid_index = relay.ds.transaction_store.query_utxo_id_valid(
         hash,
-        input.output_index
+        u.output_index
     ).await?;
 
     // We have the transaction accepted locally
@@ -127,7 +128,7 @@ pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, si
         let mut request = Request::default();
         let mut resolve_request = ResolveHashRequest::default();
         resolve_request.hash = Some(hash.clone());
-        resolve_request.output_index = Some(input.output_index);
+        resolve_request.output_index = Some(u.output_index);
         request.resolve_hash_request = Some(resolve_request);
         let results = Relay::broadcast(relay,
             sorted_peers, request,
@@ -253,7 +254,9 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     let mut vec = vec![];
 
     // TODO: Have we verified this input contains all the signatures?
-    for result in future::join_all(tx.inputs.iter().map(|input|
+    for result in future::join_all(tx.inputs.iter()
+        .filter(|i| i.floating_utxo_id.is_none())
+        .map(|input|
         async{tokio::spawn(resolve_input(input.clone(), relay.clone(),
                                         // runtime.clone(),
                                          peers.clone(), tx.signable_hash().clone()))

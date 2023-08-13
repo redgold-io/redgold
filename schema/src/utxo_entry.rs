@@ -25,7 +25,7 @@
 //     }
 // }
 
-use crate::structs::{Address, Hash, Input, Output, UtxoEntry};
+use crate::structs::{Address, FixedUtxoId, Hash, Input, Output, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{RgResult, SafeBytesAccess, SafeOption, Transaction, WithMetadataHashable};
 
@@ -39,6 +39,10 @@ impl UtxoEntry {
 
     pub fn amount(&self) -> u64 {
         return self.output.as_ref().unwrap().amount();
+    }
+
+    pub fn opt_amount(&self) -> Option<TransactionAmount> {
+        self.output.as_ref().and_then(|o| o.opt_amount_typed())
     }
 
     pub fn height(&self) -> RgResult<i64> {
@@ -79,12 +83,16 @@ impl UtxoEntry {
     //
     pub fn to_input(&self) -> Input {
         // let (id, idx) = self.to_values();
-        return Input {
+        let utxo_id = FixedUtxoId{
             transaction_hash: self.transaction_hash.clone(),
+            output_index: self.output_index,
+        };
+        return Input {
+            utxo_id: Some(utxo_id),
             proof: vec![],
             product_id: None,
-            output_index: self.output_index,
             output: self.output.clone(),
+            floating_utxo_id: None,
         };
     }
 
@@ -113,7 +121,7 @@ impl UtxoEntry {
         return UtxoEntry {
             transaction_hash: Some(Hash::new(transaction_hash.clone())).clone(),
             output_index,
-            address: Some(Address::new(output.address.safe_bytes().expect("bytes"))),
+            address: Some(Address::new_raw(output.address.safe_bytes().expect("bytes"))),
             output: Some(output.clone()),
             time,
         };

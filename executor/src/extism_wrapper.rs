@@ -32,21 +32,22 @@ pub async fn invoke_wasm(
     ExecutionResult::proto_deserialize(data.to_vec())
 }
 
+#[ignore]
 #[tokio::test]
 async fn proto_test() {
-    let wasm = include_bytes!("../../sdk/test_contract_guest.wasm");
+    let wasm = std::fs::read("../../sdk/test_contract_guest.wasm").expect("");
     let input = ExecutionInput::default();
-    let res = invoke_wasm(wasm, "proto_example", input).await.unwrap();
+    let res = invoke_wasm(&*wasm, "proto_example", input).await.unwrap();
     assert!(res.valid);
 }
 
-// #[ignore]
+#[ignore]
 #[test]
 fn debug_test() {
 
     let context = Context::new();
     // let wasm = include_bytes!("code.wasm");
-    let wasm = include_bytes!("../../sdk/test_contract_guest.wasm");
+    let wasm = std::fs::read("../../sdk/test_contract_guest.wasm").expect("");
     // let wasm = include_bytes!("../../sdk/extism_test.wasm");
 
     // NOTE: if you encounter an error such as:

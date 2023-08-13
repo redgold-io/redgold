@@ -191,7 +191,7 @@ pub async fn construction_combine(
         let pay = signature.signing_payload;
         let pay_b = from_hex(pay.hex_bytes)?;
         for i in tx.inputs.iter_mut() {
-            if i.transaction_hash.safe_bytes()? == pay_b {
+            if i.utxo_id.safe_get()?.transaction_hash.safe_bytes()? == pay_b {
                 i.proof.push(proof.clone());
             }
         }
@@ -323,13 +323,7 @@ pub async fn construction_payloads(
                 let addr: Address = addr_bytes.clone().into();
                 let ai64 = i64_from_string(a.clone().value)?;
                 if ai64 >= 0 {
-                    tx.outputs.push(Output {
-                        address: addr.into(),
-                        product_id: None,
-                        counter_party_proofs: vec![],
-                        data: crate::schema::transaction::amount_data(ai64 as u64),
-                        contract: None,
-                    });
+                    tx.outputs.push(Output::new(&addr.into(), ai64));
                 } else {
                     let utxos =
                         input_address_utxo_map
@@ -339,13 +333,8 @@ pub async fn construction_payloads(
                                 "Missing metadata for input",
                             ))?;
                     for utxo in utxos {
-                        tx.inputs.push(Input {
-                            transaction_hash: utxo.transaction_hash.clone(),
-                            output_index: utxo.output_index,
-                            proof: vec![],
-                            product_id: None,
-                            output: utxo.output.clone(),
-                        });
+                        let inp = utxo.to_input();
+                        tx.inputs.push(inp);
                         payloads.push(SigningPayload {
                             address: Some(acc.address.clone()),
                             account_identifier: Some(acc.clone()),
