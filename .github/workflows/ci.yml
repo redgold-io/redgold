@@ -66,6 +66,7 @@ jobs:
       refs/heads/main
       ', github.ref)
     runs-on: ubuntu-latest-m
+    timeout-minutes: 100
     permissions:
       contents: write
 #    env:
@@ -118,6 +119,7 @@ jobs:
       refs/heads/main
       ', github.ref)
     runs-on: macos-latest
+    timeout-minutes: 100
     permissions:
       contents: write
     env:
@@ -172,6 +174,7 @@ jobs:
           refs/heads/main
           ', github.ref)
     runs-on: ubuntu-latest-m
+    timeout-minutes: 100
     permissions:
       contents: write
     steps:

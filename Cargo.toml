@@ -67,7 +67,7 @@ redgold-schema = {workspace = true}
 redgold-data = {workspace = true}
 redgold-keys = {workspace = true}
 #redgold-executor = {workspace = true}
-redgold-sdk-client = {workspace = true}
+#redgold-sdk-client = {workspace = true}
 
 sha3 = { workspace = true }
 log = { workspace = true }
