@@ -20,6 +20,7 @@ jobs:
       refs/heads/main
       ', github.ref) }}
     runs-on: ubuntu-latest-m
+    timeout-minutes: 60
     permissions:
       contents: write
     outputs:
