@@ -43,6 +43,7 @@ pub async fn setup_server_redgold(
          Ok::<(), ErrorInfo>(())
      });
 
+    ssh.exes("docker system prune -a -f", p).await?;
     ssh.exes("apt install -y ufw", p).await?;
     ssh.exes("sudo ufw allow ssh", p).await?;
     ssh.exes("sudo ufw allow in on tailscale0", p).await?;
