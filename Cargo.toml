@@ -66,7 +66,7 @@ redgold-schema = {workspace = true}
 [target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
 redgold-data = {workspace = true}
 redgold-keys = {workspace = true}
-redgold-executor = {workspace = true}
+#redgold-executor = {workspace = true}
 redgold-sdk-client = {workspace = true}
 
 sha3 = { workspace = true }
