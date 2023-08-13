@@ -1,6 +1,6 @@
 [package]
 name = "redgold-executor"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 
 # https://askubuntu.com/questions/1332666/how-to-install-llvm-12-for-ubuntu-16-04
