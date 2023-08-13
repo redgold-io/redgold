@@ -8,12 +8,12 @@ use flume::TryRecvError;
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
-use metrics::increment_counter;
+use metrics::{histogram, increment_counter};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::{json_or, ProtoHashable, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
+use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
 use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -238,6 +238,7 @@ impl TransactionProcessContext {
         node_id: String
     ) -> Result<(), ErrorInfo> {
 
+
         if self.check_peer_message(&transaction_message.transaction).await? {
             return self.process_peer_transaction(&transaction_message.transaction).await;
         }
@@ -328,6 +329,12 @@ impl TransactionProcessContext {
         increment_counter!("redgold.transaction.received");
         let hash = transaction.hash_or();
         self.transaction_hash = Some(hash.clone());
+
+        histogram!("redgold.transaction.size_bytes", transaction.proto_serialize().len() as f64);
+        histogram!("redgold.transaction.total_output_amount", transaction.total_output_amount_float());
+        histogram!("redgold.transaction.floating_inputs", transaction.floating_inputs().count() as f64);
+        histogram!("redgold.transaction.num_inputs", transaction.inputs.len() as f64);
+        histogram!("redgold.transaction.num_outputs", transaction.outputs.len() as f64);
 
         // Establish channels for other transaction threads to communicate conflicts with this one.
         let request_processor = self.create_receiver_or_err(&hash, request_uuid, &transaction)?;

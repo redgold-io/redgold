@@ -708,7 +708,7 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     submit.submit().await.expect("submit");
 
-    // submit.submit_test_contract().await.expect("submit test contract");
+    submit.submit_test_contract().await.expect("submit test contract");
 
 
 

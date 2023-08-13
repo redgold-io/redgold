@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::iter::FilterMap;
+use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, Hash, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
@@ -170,6 +172,10 @@ impl Transaction {
             }
         }
         total
+    }
+
+    pub fn floating_inputs(&self) -> impl Iterator<Item = &FloatingUtxoId> {
+        self.inputs.iter().filter_map(|i| i.floating_utxo_id.as_ref())
     }
 
     pub fn total_input_amount(&self) -> i64 {

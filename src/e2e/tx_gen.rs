@@ -4,7 +4,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, ErrorInfo, TransactionAmount};
+use redgold_schema::structs::{Address, AddressType, ErrorInfo, TransactionAmount};
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
@@ -180,13 +180,15 @@ impl TransactionGenerator {
 
     pub fn completed(&mut self, tx: TransactionWithKey) {
         let vec = tx.transaction.to_utxo_entries(0 as u64);
-        for (i, v) in vec.iter().enumerate() {
-            if v.opt_amount().map(|a| a.amount > (MIN_FEE_RAW)).unwrap_or(false) {
-                self.finished_pool.push(SpendableUTXO {
-                    utxo_entry: v.clone(),
-                    key_pair: tx.key_pairs.get(i).unwrap().clone(),
-                });
-            }
+        let iter = vec.iter().filter(|v| {
+            v.opt_amount().map(|a| a.amount > (MIN_FEE_RAW)).unwrap_or(false)
+                && !(v.address.clone().expect("a").address_type == AddressType::ScriptHash as i32)
+        });
+        for (i, v) in iter.enumerate() {
+            self.finished_pool.push(SpendableUTXO {
+                utxo_entry: v.clone(),
+                key_pair: tx.key_pairs.get(i).or(tx.key_pairs.get(0)).unwrap().clone(),
+            });
         }
     }
 }

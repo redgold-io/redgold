@@ -254,7 +254,9 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     let mut vec = vec![];
 
     // TODO: Have we verified this input contains all the signatures?
-    for result in future::join_all(tx.inputs.iter().map(|input|
+    for result in future::join_all(tx.inputs.iter()
+        .filter(|i| i.floating_utxo_id.is_none())
+        .map(|input|
         async{tokio::spawn(resolve_input(input.clone(), relay.clone(),
                                         // runtime.clone(),
                                          peers.clone(), tx.signable_hash().clone()))

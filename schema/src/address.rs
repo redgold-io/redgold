@@ -42,9 +42,10 @@ impl Address {
         // Ok(address_vec.into())
     }
 
+
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
-        let mut new = Self::calculate_from_bytes(input.as_ref().to_vec())?;
-        new.address_type = AddressType::PublicKeyDirectAddress as i32;
+        let mut new = Self::from_bytes(Self::hash(input.as_ref()))?;
+        new.address_type = AddressType::ScriptHash as i32;
         Ok(new)
     }
 
@@ -65,7 +66,7 @@ impl Address {
         }
         Ok(Self::address_to_str(&result))
     }
-    pub fn calculate_from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
         let addr = Self::new_raw(bytes);
         addr.verify_checksum()?;
 
@@ -73,7 +74,7 @@ impl Address {
     }
 
     pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
-        Self::calculate_from_bytes(Self::hash(&pk.bytes.safe_bytes()?))
+        Self::from_bytes(Self::hash(&pk.bytes.safe_bytes()?))
     }
 
     pub fn with_checksum(bytes: Vec<u8>) -> Vec<u8> {
@@ -132,7 +133,7 @@ impl Address {
 
     fn from_hex(p0: String) -> Result<Address, ErrorInfo> {
         let bytes = from_hex(p0)?;
-        Address::calculate_from_bytes(bytes)
+        Address::from_bytes(bytes)
     }
 }
 

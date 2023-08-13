@@ -1,14 +1,23 @@
 [package]
 name = "redgold-sdk"
-version = "0.1.6"
+version = "0.1.8"
 edition = "2021"
+authors = ["Redgold"]
+description = "p2p database / compute engine & portfolio target models"
+documentation = "https://dev.docs.redgold.io/"
+readme = "README.md"
+homepage = "https://redgold.io"
+repository = "https://github.com/redgold-io/redgold"
+license = "MIT"
+keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
+categories = ["cryptography::cryptocurrencies"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 extism-pdk = "0.3.3"
 serde = "1.0.163"
-redgold-schema = { path = "../schema", version = "0.1.6" }
+redgold-schema = { path = "../schema", version = "0.1.8" }
 #redgold-schema = {workspace = true, features = []}
 
 [lib]
