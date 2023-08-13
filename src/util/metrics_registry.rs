@@ -107,7 +107,7 @@ impl HistogramFn for PrintHandle {
 struct PrintRecorder;
 
 impl Recorder for PrintRecorder {
-    fn describe_counter(&self, key_name: KeyName, unit: Option<Unit>, description: SharedString) {
+    fn describe_counter(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
         println!(
             "(counter) registered key {} with unit {:?} and description {:?}",
             key_name.as_str(),
@@ -116,7 +116,7 @@ impl Recorder for PrintRecorder {
         );
     }
 
-    fn describe_gauge(&self, key_name: KeyName, unit: Option<Unit>, description: SharedString) {
+    fn describe_gauge(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
         println!(
             "(gauge) registered key {} with unit {:?} and description {:?}",
             key_name.as_str(),
@@ -125,7 +125,7 @@ impl Recorder for PrintRecorder {
         );
     }
 
-    fn describe_histogram(&self, key_name: KeyName, unit: Option<Unit>, description: SharedString) {
+    fn describe_histogram(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
         println!(
             "(histogram) registered key {} with unit {:?} and description {:?}",
             key_name.as_str(),
