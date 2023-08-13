@@ -2,7 +2,6 @@ use crate::util;
 
 use std::{error::Error, io};
 use std::collections::HashMap;
-use async_std::prelude::FutureExt;
 use tokio::task_local;
 use tracing::{debug, error, info, span, warn, Level, Span};
 use tracing_subscriber::fmt::format::Format;

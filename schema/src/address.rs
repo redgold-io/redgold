@@ -1,5 +1,5 @@
 use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, UtxoEntry};
-use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, SafeBytesAccess};
+use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess};
 use crate::{error_message, structs};
 use std::io::Write;
 use sha3::Sha3_224;
@@ -42,6 +42,13 @@ impl Address {
         // Ok(address_vec.into())
     }
 
+
+    pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
+        let mut new = Self::from_bytes(Self::hash(input.as_ref()))?;
+        new.address_type = AddressType::ScriptHash as i32;
+        Ok(new)
+    }
+
     // Maybe consider checking here to see if the address is valid?
     // Or before this actually, we should potentially not do 'into bytes'
     // but instead change this to a vec and decode it.
@@ -60,7 +67,7 @@ impl Address {
         Ok(Self::address_to_str(&result))
     }
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
-        let addr = Self::new(bytes);
+        let addr = Self::new_raw(bytes);
         addr.verify_checksum()?;
 
         Ok(addr)
@@ -113,10 +120,10 @@ impl Address {
     }
 
     pub fn address_data(address: Vec<u8>) -> Option<Address> {
-        Some(Self::new(address))
+        Some(Self::new_raw(address))
     }
 
-    pub fn new(address: Vec<u8>) -> Address {
+    pub fn new_raw(address: Vec<u8>) -> Address {
         Address {
             address: bytes_data(address),
             address_type: AddressType::Sha3224ChecksumPublic as i32,

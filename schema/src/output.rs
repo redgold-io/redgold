@@ -1,4 +1,4 @@
-use crate::structs::{ErrorInfo, Output, StandardContractType, UtxoEntry};
+use crate::structs::{ErrorInfo, Output, StandardContractType, TransactionAmount, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, SafeOption};
 
@@ -9,6 +9,7 @@ pub fn output_data(address: Vec<u8>, amount: u64) -> Output {
         counter_party_proofs: vec![],
         data: amount_data(crate::transaction::amount_to_raw_amount(amount)),
         contract: None,
+        output_type: None,
     }
 }
 
@@ -19,6 +20,7 @@ pub fn tx_output_data(address: Address, amount: u64) -> Output {
         counter_party_proofs: vec![],
         data: amount_data(crate::transaction::amount_to_raw_amount(amount)),
         contract: None,
+        output_type: None,
     }
 }
 
@@ -27,6 +29,17 @@ impl HashClear for Output {
 }
 
 impl Output {
+
+    pub fn new(address: &Address, amount: i64) -> Output {
+        Output {
+            address: Some(address.clone()),
+            product_id: None,
+            counter_party_proofs: vec![],
+            data: amount_data(amount as u64),
+            contract: None,
+            output_type: None,
+        }
+    }
 
     pub fn is_swap(&self) -> bool {
         self.contract.as_ref().and_then(|c| c.standard_contract_type)
@@ -53,6 +66,11 @@ impl Output {
 
     pub fn opt_amount(&self) -> Option<i64> {
         self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
+    }
+
+    pub fn opt_amount_typed(&self) -> Option<TransactionAmount> {
+        self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
+            .map(|a| TransactionAmount::from(a))
     }
 
     pub fn rounded_amount(&self) -> f64 {

@@ -7,7 +7,7 @@ use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, SafeBytesAccess, SafeOption};
+use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse};
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 
@@ -23,6 +23,7 @@ pub struct TransactionSubmitter {
     // runtime: Arc<Runtime>,
     client: PublicClient,
 }
+
 
 impl TransactionSubmitter {
     pub fn default(
@@ -117,6 +118,14 @@ impl TransactionSubmitter {
         res.at_least_1()?;
         Ok(res)
     }
+    pub async fn submit_test_contract(&self) -> RgResult<SubmitTransactionResponse> {
+        let tk = self.generator.lock().unwrap().generate_deploy_test_contract().await?;
+        let res = self.client.clone().send_transaction(&tk.transaction, true).await?;
+        self.generator.lock().unwrap().completed(tk);
+        res.at_least_1()?;
+        Ok(res)
+    }
+
 
     pub async fn drain(&self, to: Address) -> Result<SubmitTransactionResponse, ErrorInfo> {
         let transaction = self.generator.lock().unwrap().drain_tx(&to).clone();

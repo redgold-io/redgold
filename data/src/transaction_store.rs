@@ -317,7 +317,7 @@ impl TransactionStore {
             let entry = UtxoEntry {
                 transaction_hash: Some(Hash::new(transaction_hash)),
                 output_index,
-                address: Some(Address::new(address)),
+                address: Some(Address::new_raw(address)),
                 output,
                 time,
             };
