@@ -1,9 +1,9 @@
 [package]
 name = "redgold-data"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 authors = ["Redgold"]
-description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
+description = "p2p database / compute engine & portfolio target models"
 documentation = "https://dev.docs.redgold.io/"
 readme = "README.md"
 homepage = "https://redgold.io"
