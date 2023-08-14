@@ -131,9 +131,9 @@ WHERE
     pub async fn run_migrations_fallback_delete(&self, allow_delete: bool, data_store_file_path: PathBuf) -> result::Result<(), ErrorInfo> {
         let migration_result = self.run_migrations().await;
         if let Err(e) = migration_result {
-            tracing::error!("Migration related failure, attempting to handle");
+            log::error!("Migration related failure, attempting to handle");
             if e.message.contains("was previously applied") && allow_delete {
-                tracing::error!("Found prior conflicting schema -- but ok to remove; removing existing datastore and exiting");
+                log::error!("Found prior conflicting schema -- but ok to remove; removing existing datastore and exiting");
                 std::fs::remove_file(data_store_file_path.clone())
                     .map_err(|e| error_info(format!("Couldn't remove existing datastore: {}", e.to_string())))?;
                 // panic!("Exiting due to ds removal, should work on retry");

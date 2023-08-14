@@ -19,7 +19,7 @@ impl ObservationStore {
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM observation"#
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -38,7 +38,7 @@ impl ObservationStore {
             r#"SELECT raw_observation FROM observation WHERE public_key = ?1 ORDER BY height DESC LIMIT 1"#,
             bytes
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -69,7 +69,7 @@ impl ObservationStore {
             time,
             height
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -82,7 +82,7 @@ impl ObservationStore {
             start_time,
             end_time
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -107,7 +107,7 @@ impl ObservationStore {
             r#"SELECT raw_observation, time FROM observation WHERE hash = ?1"#,
             hash
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         for row in rows_m {
@@ -130,7 +130,7 @@ impl ObservationStore {
             r#"SELECT raw_observation FROM observation ORDER BY time DESC LIMIT ?1"#,
             limit
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -162,7 +162,7 @@ impl ObservationStore {
             start,
             end
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -184,7 +184,7 @@ impl ObservationStore {
             r#"SELECT edge FROM observation_edge WHERE observed_hash = ?1"#,
             bytes
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -216,7 +216,7 @@ impl ObservationStore {
             edge,
             time
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
