@@ -14,7 +14,7 @@ use itertools::Itertools;
  use crate::hardware::trezor;
  use crate::node_config::NodeConfig;
  use crate::util::cli::arg_parse_config::ArgTranslate;
- use crate::util::cli::args::Deploy;
+ use crate::util::cli::args::{Deploy, RgTopLevelSubcommand};
  use crate::util::cli::commands::get_input;
  use crate::util::cli::data_folder::DataFolder;
 
@@ -43,6 +43,7 @@ pub async fn setup_server_redgold(
          Ok::<(), ErrorInfo>(())
      });
 
+    ssh.exes("docker system prune -a -f", p).await?;
     ssh.exes("apt install -y ufw", p).await?;
     ssh.exes("sudo ufw allow ssh", p).await?;
     ssh.exes("sudo ufw allow in on tailscale0", p).await?;
@@ -57,8 +58,6 @@ pub async fn setup_server_redgold(
 
     let path = format!("/root/.rg/{}", network.to_std_string());
     let all_path = format!("/root/.rg/{}", NetworkEnvironment::All.to_std_string());
-
-    ssh.exes(format!("rm -f {}/mnemonic", path.clone()), p).await?;
 
      // Copy mnemonic / peer_id
      if let Some(words) = words {
@@ -266,6 +265,7 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
 
     let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
     if primary_gen {
+        // Also set environment here to dev if not main
         deploy.skip_ops = true;
     }
     let sd = ArgTranslate::secure_data_path_buf().expect("");
@@ -307,6 +307,16 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
     let mut net = node_config.network;
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
+    } else {
+        if node_config.opts.network.is_none() {
+            if primary_gen {
+                net = NetworkEnvironment::Dev;
+            } else {
+                // TODO Enable this when mainnet
+                // net = NetworkEnvironment::Main;
+            }
+        }
+        // Get node_config arg translate and set to dev if arg not supplied.
     }
     let mut servers = s.to_vec();
     if let Some(i) = deploy.server_index {
