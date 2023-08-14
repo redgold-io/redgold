@@ -14,6 +14,9 @@ pub struct Server {
     pub network_environment: NetworkEnvironment,
     pub username: Option<String>,
     pub key_path: Option<String>,
+    pub ipv4: Option<String>,
+    pub alias: Option<String>,
+    pub external_host: Option<String>,
 }
 
 impl Server {
@@ -22,10 +25,13 @@ impl Server {
             host,
             username: None,
             key_path: None,
+            ipv4: None,
+            alias: None,
             index: 0,
             peer_id_index: 0,
             // TODO: Change to mainnet later
             network_environment: NetworkEnvironment::All,
+            external_host: None,
         }
     }
 
@@ -47,6 +53,10 @@ impl Server {
             let mut network_environment = NetworkEnvironment::All;
             let mut username = None;
             let mut key_path = None;
+            let mut ipv4 = None;
+            let mut alias = None;
+            let mut external_host = None;
+
 
             if let Some(x) = split.next() {
                 if x.trim().len() > 0 {
@@ -74,6 +84,21 @@ impl Server {
                     key_path = Some(x.trim().to_string())
                 }
             }
+            if let Some(x) = split.next() {
+                if x.trim().len() > 0 {
+                    ipv4 = Some(x.trim().to_string())
+                }
+            }
+            if let Some(x) = split.next() {
+                if x.trim().len() > 0 {
+                    alias = Some(x.trim().to_string())
+                }
+            }
+            if let Some(x) = split.next() {
+                if x.trim().len() > 0 {
+                    external_host = Some(x.trim().to_string())
+                }
+            }
 
             default_index += 1;
 
@@ -84,6 +109,9 @@ impl Server {
                 network_environment,
                 username,
                 key_path,
+                ipv4,
+                alias,
+                external_host,
             })
 
         }

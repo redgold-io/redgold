@@ -1,7 +1,7 @@
  use std::collections::HashMap;
  use std::env::VarError;
  use std::fs::File;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerData, PeerId};
 use std::io::{Write, Read, Seek, SeekFrom};
 use std::thread::sleep;
 use std::time::Duration;
@@ -9,14 +9,19 @@ use crate::infra::SSH;
 use crate::resources::Resources;
 // use filepath::FilePath;
 use itertools::Itertools;
- use redgold_schema::RgResult;
+ use redgold_keys::transaction_support::TransactionBuilderSupport;
+ use redgold_schema::{ProtoSerde, RgResult, structs};
  use redgold_keys::util::mnemonic_support::WordsPass;
+ use redgold_schema::servers::Server;
+ use redgold_schema::structs::DownloadDataType::UtxoEntry;
+ use redgold_schema::transaction_builder::TransactionBuilder;
  use crate::hardware::trezor;
  use crate::node_config::NodeConfig;
  use crate::util::cli::arg_parse_config::ArgTranslate;
  use crate::util::cli::args::Deploy;
  use crate::util::cli::commands::get_input;
  use crate::util::cli::data_folder::DataFolder;
+ use crate::util::keys::ToPublicKeyFromLib;
 
  /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
@@ -32,6 +37,9 @@ pub async fn setup_server_redgold(
      purge_data: bool,
      words: Option<String>,
      peer_id_hex: Option<String>,
+     // TODO we could actually just get this from the pid transaction
+     alias: Option<String>,
+     ser_pid_tx: Option<String>
  ) -> Result<(), ErrorInfo> {
 
     ssh.verify()?;
@@ -69,6 +77,10 @@ pub async fn setup_server_redgold(
          let remote = format!("{}/peer_id", path);
          ssh.copy_p(peer_id_hex, remote, p).await?;
      }
+     if let Some(ser) = ser_pid_tx {
+         let remote = format!("{}/peer_id_tx", path);
+         ssh.copy_p(ser, remote, p).await?;
+     }
 
 
     // TODO: Investigate issue with tmpfile, not working
@@ -87,7 +99,9 @@ pub async fn setup_server_redgold(
     env.insert("REDGOLD_P2P_PORT".to_string(), format!("{}", port));
     env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
     env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
-
+     if let Some(a) = alias {
+         env.insert("REDGOLD_ALIAS".to_string(), a);
+     }
     let copy_env = vec!["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
     for e in copy_env {
         for i in std::env::var(e).ok() {
@@ -238,15 +252,18 @@ pub async fn setup_ops_services(
 pub async fn derive_mnemonic_and_peer_id(
     mnemonic: String, peer_id_index: usize, cold: bool, passphrase: Option<String>,
     opt_peer_id: Option<String>,
-    server_id_index: i64
+    server_id_index: i64,
+    servers: Vec<Server>
 )
-    -> RgResult<(String, String)> {
+    -> RgResult<(String, String, String)> {
 
+    // TODO: Make peer id transaction here using details.
     let w = WordsPass::new(mnemonic, passphrase);
     let new = w.hash_derive_words(server_id_index.to_string())?;
-    let server_mnemonic = new.words;
+    let server_mnemonic = new.words.clone();
     let account = (99 - peer_id_index) as u32;
     let mut pid_hex = "".to_string();
+    let mut ser_pid_tx = "".to_string();
     if let Some(pid) = opt_peer_id {
         pid_hex = pid;
     } else {
@@ -254,12 +271,29 @@ pub async fn derive_mnemonic_and_peer_id(
             trezor::get_standard_public_key(
                 account, None, 0, 0)?
         } else {
-            w.public_at(format!("m/44'/0'/{}/0/0", account))?
+            w.public_at(WordsPass::default_rg_path(account as usize))?
         };
         pid_hex = pk.hex()?;
+        let pid = PeerId::from_hex(pid_hex.clone()).expect("");
+        let mut tb = TransactionBuilder::new();
+        let mut pd = PeerData::default();
+        let nmd_pk = new.default_kp().expect("").public_key.to_struct_public_key();
+        let nmd_vec = servers.iter().map(|s| {
+            let mut nmd = NodeMetadata::default();
+            nmd.peer_id = Some(pid.clone());
+            nmd.alias = s.alias.clone();
+            nmd.external_address = s.host.clone();
+            nmd.public_key = Some(nmd_pk.clone());
+            nmd
+        }).collect_vec();
+        pd.peer_id = Some(pid);
+        pd.node_metadata = nmd_vec;
+        // TODO: Need funding utxo? bypass if seed.
+        tb.with_output_peer_data(&pk.address().expect("a"), pd, 0);
+        ser_pid_tx =  hex::encode(tb.transaction.proto_serialize());
     }
 
-    Ok((server_mnemonic, pid_hex))
+    Ok((server_mnemonic, pid_hex, ser_pid_tx))
 }
 
 pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> RgResult<()> {
@@ -324,9 +358,10 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
         }
 
         let opt_peer_id: Option<String> = peer_id_index.get(&ss.peer_id_index).cloned();
-        let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
+        let (words, peer_id_hex, pid_tx) = derive_mnemonic_and_peer_id(
             m.clone(), ss.peer_id_index as usize, deploy.cold, passphrase.clone(), opt_peer_id,
-            ss.index
+            ss.index,
+            s.clone()
         ).await?;
         let words_opt = if deploy.words || deploy.words_and_id {
             Some(words.clone())
@@ -335,6 +370,11 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
         };
         let peer_id_hex_opt = if deploy.peer_id  || deploy.words_and_id {
             Some(peer_id_hex.clone())
+        } else {
+            None
+        };
+        let pid_tx_ser = if deploy.peer_id  || deploy.words_and_id {
+            Some(pid_tx.clone())
         } else {
             None
         };
@@ -347,6 +387,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
                 ssh, net, gen, Some(hm), purge,
                 words_opt,
                 peer_id_hex_opt,
+                ss.alias.clone(),
+                None,
             ).await.expect("worx");
         }
         gen = false;

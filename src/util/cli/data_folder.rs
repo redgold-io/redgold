@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::{ErrorInfoContext, from_hex, ProtoSerde, RgResult, structs};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use redgold_data::data_store::DataStore;
 
@@ -26,6 +26,17 @@ impl EnvDataFolder {
 
     pub fn peer_id_path(&self) -> PathBuf {
         self.path.join("peer_id")
+    }
+
+    pub fn peer_id_tx_path(&self) -> PathBuf {
+        self.path.join("peer_id_tx")
+    }
+
+    pub fn peer_id_tx(&self) -> RgResult<structs::Transaction> {
+        let h = std::fs::read_to_string(self.peer_id_tx_path()).error_info("Bad peer_id_tx read")?;
+        let b = from_hex(h)?;
+        let result = structs::Transaction::proto_deserialize(b)?;
+        Ok(result)
     }
 
     pub fn metrics_list(&self) -> PathBuf {

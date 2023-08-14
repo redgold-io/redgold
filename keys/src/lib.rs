@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use bitcoin::secp256k1::Secp256k1;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeBytesAccess};
+use redgold_schema::{ErrorInfoContext, RgResult, SafeBytesAccess, structs};
 use redgold_schema::structs::{Address, Hash};
 use crate::util::{dhash_str, dhash_vec};
 use crate::util::keys::ToPublicKeyFromLib;
@@ -103,6 +103,10 @@ impl KeyPair {
 
     pub fn public_key_vec(&self) -> Vec<u8> {
         self.public_key.serialize().to_vec()
+    }
+
+    pub fn public_key(&self) -> structs::PublicKey {
+        self.public_key.to_struct_public_key()
     }
 
     pub fn from_private_hex(hex: String) -> RgResult<Self> {

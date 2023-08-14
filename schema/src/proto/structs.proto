@@ -164,6 +164,7 @@ message PeerData {
   // Also we need to store model outputs on NMD dynamic?
   repeated TrustLabel labels = 5;
   optional VersionInfo version_info = 6;
+  repeated Address addresses = 7;
 }
 
 //// should i use kv pairs here to capture other features?

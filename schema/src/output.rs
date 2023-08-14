@@ -1,4 +1,4 @@
-use crate::structs::{ErrorInfo, Output, StandardContractType, TransactionAmount, UtxoEntry};
+use crate::structs::{ErrorInfo, Hash, Output, StandardContractType, TransactionAmount, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, SafeOption};
 
@@ -53,6 +53,18 @@ impl Output {
         time: u64,
     ) -> UtxoEntry {
         return UtxoEntry::from_output(self, transaction_hash, output_index as i64, time as i64);
+    }
+
+    pub fn utxo_entry(
+        &self,
+        transaction_hash: &Hash,
+        output_index: u32,
+        time: u64,
+    ) -> UtxoEntry {
+        return UtxoEntry::from_output(
+            self, &transaction_hash.vec(),
+            output_index as i64, time as i64
+        );
     }
 
     pub fn amount(&self) -> u64 {

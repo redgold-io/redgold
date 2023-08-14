@@ -31,9 +31,12 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
         host: add_server.host.clone(),
         username: add_server.user.clone(),
         key_path: add_server.key_path.clone(),
+        ipv4: None,
+        alias: None,
         index: this_index,
         peer_id_index: add_server.peer_id_index.unwrap_or(this_index),
         network_environment: NetworkEnvironment::All,
+        external_host: None,
     });
     ds.config_store.insert_update("servers".to_string(), json(&servers)?).await?;
     Ok(())
@@ -213,10 +216,13 @@ pub fn add_server_prompt() -> Server {
     Server{
         host,
         key_path: Some(key_path),
+        ipv4: None,
+        alias: None,
         index: 0,
         username: Some(username),
         peer_id_index: 0,
         network_environment: NetworkEnvironment::All,
+        external_host: None,
     }
 }
 

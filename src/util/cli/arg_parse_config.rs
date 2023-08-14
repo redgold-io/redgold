@@ -141,6 +141,7 @@ impl ArgTranslate {
         self.set_discovery_interval();
         self.apply_node_opts();
         self.genesis();
+        self.alias();
 
         self.abort = immediate_commands(&self.opts, &self.node_config).await;
         if self.abort {
@@ -519,6 +520,13 @@ impl ArgTranslate {
     fn secure_data_folder(&mut self) {
         if let Some(pb) = Self::secure_data_path_buf() {
             self.node_config.secure_data_folder = Some(DataFolder::from_path(pb));
+        }
+    }
+    fn alias(&mut self) {
+        if let Ok(a) = std::env::var("REDGOLD_ALIAS") {
+            if !a.trim().is_empty() {
+                self.node_config.node_info.alias = Some(a.trim().to_string());
+            }
         }
     }
 }

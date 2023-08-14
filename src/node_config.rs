@@ -21,6 +21,7 @@ use crate::api::public_api::PublicClient;
 use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
+use crate::util::keys::ToPublicKeyFromLib;
 
 pub struct CanaryConfig {}
 
@@ -85,6 +86,19 @@ pub struct ObservationConfig {
     pub channel_bound: usize,
 }
 
+#[derive(Clone, Debug)]
+pub struct NodeInfoConfig {
+    pub alias: Option<String>,
+}
+
+impl Default for NodeInfoConfig {
+    fn default() -> Self {
+        Self {
+            alias: None,
+        }
+    }
+}
+
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
@@ -139,7 +153,8 @@ pub struct NodeConfig {
     pub opts: RgArgs,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
-    pub observation: ObservationConfig
+    pub observation: ObservationConfig,
+    pub node_info: NodeInfoConfig
 }
 
 impl NodeConfig {
@@ -153,7 +168,7 @@ impl NodeConfig {
     }
 
     pub fn default_peer_id(&self) -> RgResult<PeerId> {
-        let pk = self.words().public_at(default_node_internal_derivation_path(1))?;
+        let pk = self.words().default_pid_kp().expect("").public_key();
         let pid = PeerId::from_pk(pk);
         Ok(pid)
     }
@@ -191,9 +206,7 @@ impl NodeConfig {
 
     // TODO: this can be fixed at arg parse time
     pub fn public_key(&self) -> structs::PublicKey {
-        let pair = self.internal_mnemonic().active_keypair();
-        let pk_vec = pair.public_key_vec();
-        structs::PublicKey::from_bytes(pk_vec)
+        self.words().default_kp().expect("").public_key()
     }
 
     pub fn short_id(&self) -> Result<String, ErrorInfo> {
@@ -210,7 +223,7 @@ impl NodeConfig {
     }
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
-        let pair = self.internal_mnemonic().active_keypair();
+        let pair = self.words().default_kp().expect("words");
         let _pk_vec = pair.public_key_vec();
         NodeMetadata{
             external_address: self.external_ip.clone(),
@@ -232,22 +245,20 @@ impl NodeConfig {
         }
     }
 
+    //
     pub fn peer_tx_fixed(&self) -> Transaction {
-        let pair = self.internal_mnemonic().active_keypair();
 
-        let pd = PeerData {
-            peer_id: Some(self.peer_id()),
-            merkle_proof: None,
-            proof: None,
-            node_metadata: vec![self.node_metadata_fixed()],
-            labels: vec![],
-            version_info: Some(self.version_info())
-        };
+        let pair = self.words().default_pid_kp().expect("");
+        let mut pd = PeerData::default();
+        pd.peer_id = Some(self.peer_id());
+        pd.node_metadata = vec![self.node_metadata_fixed()];
+        pd.version_info = Some(self.version_info());
 
         let tx = TransactionBuilder::new().with_output_peer_data(
             &pair.address_typed(), pd, 0
         ).transaction.clone();
-        tx
+
+        self.env_data_folder().peer_id_tx().unwrap_or(tx)
     }
 
     pub fn dynamic_node_metadata_fixed(&self) -> DynamicNodeMetadata {
@@ -260,7 +271,7 @@ impl NodeConfig {
     }
 
     pub fn node_tx_fixed(&self) -> Transaction {
-        let pair = self.internal_mnemonic().active_keypair();
+        let pair = self.words().default_kp().expect("");
         let tx = TransactionBuilder::new().with_output_node_metadata(
             &pair.address_typed(), self.node_metadata_fixed(), 0
         ).transaction.clone();
@@ -394,6 +405,7 @@ impl NodeConfig {
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),
+            node_info: NodeInfoConfig::default(),
         }
     }
 
