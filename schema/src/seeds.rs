@@ -1,5 +1,6 @@
 use itertools::Itertools;
-use crate::structs::{NetworkEnvironment, Seed, TrustData, TrustLabel};
+use crate::from_hex;
+use crate::structs::{NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, TrustLabel};
 use crate::util::current_time_millis;
 
 
@@ -24,8 +25,30 @@ fn parse_seeds_csv_resource(str: &str) -> Vec<SeedCsvRecord> {
     res
 }
 
+// TODO: Use csv parser for CLI args
+
+pub fn seed(addr: impl Into<String>) -> Seed {
+    let mut s = Seed::default();
+    s.external_address = addr.into();
+    let t = TrustData::from_label(0.9);
+    s.trust = vec![t];
+    s.environments = vec![NetworkEnvironment::All as i32];
+    s
+}
+
+pub fn s(addr: impl Into<String>, pid: String, pk: String) -> Seed {
+    let mut ss = seed(addr);
+    ss.peer_id = Some(PeerId::from_hex(pid).expect("hex"));
+    ss.public_key = Some(PublicKey::from_hex(pk).expect("hex"));
+    ss
+}
+
 pub fn get_seeds() -> Vec<Seed> {
-    // Use this for triggering upgrades to the seed list
+    (1..5).map(|i| seed(format!("n{}.redgold.io", i))).collect_vec()
+}
+
+fn get_seeds_csv() -> Vec<Seed> {
+// Use this for triggering upgrades to the seed list
     let activation_time = 0;
     let contents = if current_time_millis() < activation_time {
         include_str!("resources/seeds/seeds-old.csv")

@@ -170,7 +170,7 @@ impl TransactionProcessContext {
         increment_counter!("redgold.node.async_started");
         // let mut fut = FutLoopPoll::new();
         // TODO: Change to queue
-        let receiver = self.relay.transaction.receiver.clone();
+        let receiver = self.relay.transaction_process.receiver.clone();
         // TODO this accomplishes queue, we can also move the spawn function into FutLoopPoll so that
         // the only function we have here is to call one function
         // do that later
@@ -181,7 +181,7 @@ impl TransactionProcessContext {
             // info!("Transaction receiver map stream");
             Ok(x)
         })
-            .try_for_each_concurrent(100, |transaction| {
+            .try_for_each_concurrent(self.relay.node_config.tx_config.concurrency, |transaction| {
             // info!("Transaction receiver try for each stream");
             let mut x = self.clone();
             async move {

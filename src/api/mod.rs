@@ -13,8 +13,8 @@ use serde::__private::de::Borrowed;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{error_info, ProtoHashable, ProtoSerde, SafeOption};
-use redgold_schema::structs::{GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
+use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -109,7 +109,7 @@ impl RgHttpClient {
     }
 
     pub async fn proto_post_request(&self, r: &mut Request, nc: Option<&Relay>) -> Result<Response, ErrorInfo> {
-        if let Some(relay) = nc {
+        if let Some(relay) = nc.or(self.relay.as_ref()) {
             r.with_metadata(relay.node_metadata().await?);
             r.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
         }
@@ -133,6 +133,13 @@ impl RgHttpClient {
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
         let response = self.proto_post_request(&mut req, None).await?;
         Ok(response)
+    }
+
+    pub async fn about(&self) -> RgResult<AboutNodeResponse> {
+        let mut req = Request::default();
+        req.about_node_request = Some(AboutNodeRequest::default());
+        let response = self.proto_post_request(&mut req, None).await?;
+        Ok(response.about_node_response.ok_or(error_info("Missing about node response"))?)
     }
 
 }
