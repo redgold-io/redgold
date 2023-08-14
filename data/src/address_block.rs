@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::result;
-use sqlx::Row;
+use sqlx::{Executor, Row, Sqlite};
 use redgold_schema::{error_message, ProtoSerde, RgResult, SafeBytesAccess};
 use redgold_schema::structs::{Address, AddressBlock, Block, Error, ErrorInfo, Output};
 use crate::DataStoreContext;
@@ -29,7 +29,7 @@ impl AddressBlockStore {
             r#"SELECT address, balance FROM address_block WHERE height = ?1"#,
             height
         )
-            .fetch_all(&mut pool)
+            .fetch_all( &mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -48,7 +48,7 @@ impl AddressBlockStore {
 
         // TODO change this to a fetch all in case nothing is returned on initialization.
         let rows = sqlx::query!("SELECT raw FROM block ORDER BY height DESC LIMIT 1")
-            .fetch_one(&mut pool)
+            .fetch_one(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         match rows_m.raw {
@@ -66,7 +66,7 @@ impl AddressBlockStore {
             r#"SELECT balance FROM address_block WHERE address = ?1 ORDER BY height DESC LIMIT 1"#,
             address
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         for row in rows_m {
@@ -91,7 +91,7 @@ impl AddressBlockStore {
             address_block.height,
             address_block.hash
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -110,7 +110,7 @@ impl AddressBlockStore {
             address_bytes,
             height
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         for row in rows_m {
@@ -153,7 +153,7 @@ impl AddressBlockStore {
             query = query.bind(height.expect("Height shouldn't be empty with earlier validator"));
         }
 
-        let rows = query.fetch_all(&mut pool).await;
+        let rows = query.fetch_all(&mut *pool).await;
 
         let rows_m: Vec<_> = DataStoreContext::map_err_sqlx(rows)?;
         if rows_m.is_empty() {
@@ -268,7 +268,7 @@ impl AddressBlockStore {
             raw,
             time
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())

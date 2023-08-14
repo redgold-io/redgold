@@ -18,7 +18,7 @@ impl MultipartyStore {
             r#"SELECT local_share, initiate_keygen FROM multiparty WHERE room_id = ?1"#,
             room_id
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         // TODO: Check for collissions
@@ -61,7 +61,7 @@ impl MultipartyStore {
             self_initiated,
             pkb
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -77,7 +77,7 @@ impl MultipartyStore {
             pkb,
             room_id,
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
@@ -106,7 +106,7 @@ impl MultipartyStore {
             time,
             init
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let _ = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
@@ -118,7 +118,7 @@ impl MultipartyStore {
             r#"SELECT COUNT(txid) as count FROM multiparty_bridge WHERE txid = ?1"#,
             txid
         )
-            .fetch_one(&mut pool)
+            .fetch_one(&mut *pool)
             .await;
         let r = DataStoreContext::map_err_sqlx(rows)?;
         Ok(r.count > 0)
@@ -152,7 +152,7 @@ impl MultipartyStore {
             timestamp,
             amount
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let r = DataStoreContext::map_err_sqlx(rows)?;
         Ok(r.last_insert_rowid())
@@ -177,7 +177,7 @@ impl MultipartyStore {
     //         r#"SELECT raw_transaction FROM transactions WHERE hash = ?1"#,
     //         transaction_hash
     //     )
-    //         .fetch_all(&mut pool)
+    //         .fetch_all(&mut *pool)
     //         .await;
     //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
     //     let mut res = vec![];

@@ -33,7 +33,7 @@ impl TransactionStore {
             r#"SELECT raw_transaction FROM transactions WHERE hash = ?1"#,
             transaction_hash
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -60,7 +60,7 @@ impl TransactionStore {
             start,
             end
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -91,7 +91,7 @@ impl TransactionStore {
             r#"SELECT raw_transaction FROM transactions WHERE hash = ?1 AND rejection_reason IS NULL AND accepted = 1"#,
             bytes
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -118,7 +118,7 @@ impl TransactionStore {
             ORDER BY time DESC LIMIT ?1"#,
             limit
         );
-        let rows = map.fetch_all(&mut pool).await;
+        let rows = map.fetch_all(&mut *pool).await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
@@ -139,7 +139,7 @@ impl TransactionStore {
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM transactions WHERE rejection_reason IS NULL AND accepted = 1"#
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -158,7 +158,7 @@ impl TransactionStore {
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM utxo"#
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -195,7 +195,7 @@ impl TransactionStore {
             r#"SELECT raw_transaction, rejection_reason FROM transactions WHERE hash = ?1"#,
             bytes
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -229,7 +229,7 @@ impl TransactionStore {
             r#"SELECT output_index FROM utxo WHERE transaction_hash = ?1"#,
             bytes
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -253,7 +253,7 @@ impl TransactionStore {
             bytes,
             output_index
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -302,7 +302,7 @@ impl TransactionStore {
             r#"SELECT transaction_hash, output_index, address, output, time FROM utxo WHERE address = ?1"#,
             bytes
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -334,7 +334,7 @@ impl TransactionStore {
         let rows = sqlx::query!(
             r#"SELECT raw FROM utxo"#,
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -354,7 +354,7 @@ impl TransactionStore {
             limit,
             offset
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -376,7 +376,7 @@ impl TransactionStore {
             start,
             end
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -400,7 +400,7 @@ impl TransactionStore {
             bytes,
             output_index
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         decrement_gauge!("redgold.utxo.total", 1.0);
@@ -433,7 +433,7 @@ impl TransactionStore {
             amount,
             raw
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         increment_gauge!("redgold.utxo.total", 1.0);
@@ -462,7 +462,7 @@ impl TransactionStore {
     //         child_input_index,
     //         utxo_entry.time
     //     )
-    //         .execute(&mut pool)
+    //         .execute(&mut *pool)
     //         .await;
     //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
     //     Ok(rows_m.last_insert_rowid())
@@ -482,7 +482,7 @@ impl TransactionStore {
     //         bytes,
     //         output_index
     //     )
-    //         .fetch_all(&mut pool)
+    //         .fetch_all(&mut *pool)
     //         .await;
     //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
     //     let mut res = vec![];
@@ -517,7 +517,7 @@ impl TransactionStore {
         (hash, raw_transaction, time, rejection_reason, accepted) VALUES (?1, ?2, ?3, ?4, ?5)"#,
            hash_vec, ser, time, rejection_ser, accepted
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -540,7 +540,7 @@ impl TransactionStore {
         (address, tx_hash, time, incoming) VALUES (?1, ?2, ?3, ?4)"#,
            address_vec, hash_vec, time, incoming
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -559,7 +559,7 @@ impl TransactionStore {
             r#"SELECT tx_hash FROM address_transaction WHERE address = ?1 ORDER BY time DESC LIMIT ?2 OFFSET ?3"#,
             bytes, limit, offset
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -588,7 +588,7 @@ impl TransactionStore {
             r#"SELECT tx_hash FROM address_transaction WHERE address = ?1 AND incoming=?4 ORDER BY time DESC LIMIT ?2 OFFSET ?3"#,
             bytes, limit, offset, incoming
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -615,7 +615,7 @@ impl TransactionStore {
             r#"SELECT COUNT(tx_hash) as count FROM address_transaction WHERE address = ?1 AND incoming=?2"#,
             bytes, incoming
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         for row in rows_m {
@@ -672,7 +672,7 @@ impl TransactionStore {
     //         r#"SELECT hash, COALESCE( (hash | ?1) - (hash & ?1), X'0000') as xor FROM transactions"#,
     //        hash_vec //
     //     )
-    //         .fetch_all(&mut pool)
+    //         .fetch_all(&mut *pool)
     //         .await;
     //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
     //     let mut res = vec![];

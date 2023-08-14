@@ -31,7 +31,7 @@ impl ConfigStore {
                 "#,
             key, value
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -50,7 +50,7 @@ impl ConfigStore {
                 "#,
             key, value
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -70,7 +70,7 @@ impl ConfigStore {
                 "#,
             key, val
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -84,7 +84,7 @@ impl ConfigStore {
 
         let rows = sqlx::query(
             "SELECT value_data FROM config WHERE key_name = ?1",
-        ).bind(key).fetch_optional(&mut pool).await;
+        ).bind(key).fetch_optional(&mut *pool).await;
 
         let rows2 = DataStoreContext::map_err_sqlx(rows)?;
         let ret = if let Some(row) = rows2 {
@@ -105,7 +105,7 @@ impl ConfigStore {
         let rows = sqlx::query!(
             r#"SELECT value_bytes FROM config WHERE key_name = ?1"#,
             key
-         ).fetch_optional(&mut pool).await;
+         ).fetch_optional(&mut *pool).await;
 
         let rows2 = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows2.and_then(|row| row.value_bytes))

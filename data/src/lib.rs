@@ -51,7 +51,7 @@ impl DataStoreContext {
     // )
     // -> Result<Vec<J>, ErrorInfo> {
     //     let mut pool = self.pool().await?;
-    //     let rows = sqlx_macro_query.fetch_all(&mut pool).await;
+    //     let rows = sqlx_macro_query.fetch_all(&mut *pool).await;
     //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
     //     let mut res = vec![];
     //     for row in rows_m {

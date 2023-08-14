@@ -17,7 +17,7 @@ pub struct ServerStore {
 //     ) -> Result<Vec<Server>, ErrorInfo> {
 //         let mut pool = self.ctx.pool().await?;
 //         let rows = sqlx::query!("SELECT host, username, key_path FROM servers")
-//             .fetch_all(&mut pool)
+//             .fetch_all(&mut *pool)
 //             .await;
 //         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
 //         let mut res: Vec<Server> = vec![];
@@ -43,7 +43,7 @@ pub struct ServerStore {
 //                 "#,
 //             server.host, server.username, server.key_path
 //         )
-//             .execute(&mut pool)
+//             .execute(&mut *pool)
 //             .await;
 //         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
 //         Ok(rows_m.last_insert_rowid())
