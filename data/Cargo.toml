@@ -1,11 +1,11 @@
 [package]
 name = "redgold-data"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
 documentation = "https://dev.docs.redgold.io/"
-readme = "README.md"
+readme = "../README.md"
 homepage = "https://redgold.io"
 repository = "https://github.com/redgold-io/redgold"
 license = "MIT"
