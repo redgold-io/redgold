@@ -85,7 +85,8 @@ pub struct Relay {
     /// Internal configuration
     pub node_config: NodeConfig,
     /// Incoming transactions
-    pub transaction: Channel<TransactionMessage>,
+    pub mempool: Channel<TransactionMessage>,
+    pub transaction_process: Channel<TransactionMessage>,
     /// Externally received observations TODO: Merge this into transaction
     pub observation: Channel<Observation>,
     /// Threshold encryption multiparty signing flow
@@ -472,7 +473,7 @@ impl Relay {
             .safe_get_msg("Missing transaction field on submit request")?;
         tx.calculate_hash();
         // info!("Relay submitting transaction");
-        self.transaction
+        self.mempool
             .send(TransactionMessage {
                 transaction: tx.clone(),
                 response_channel,
@@ -500,8 +501,9 @@ impl Relay {
         // Inter thread processes
         let ds = node_config.data_store().await;
         Self {
-            node_config,
-            transaction: internal_message::new_channel::<TransactionMessage>(),
+            node_config: node_config.clone(),
+            mempool: internal_message::new_bounded_channel::<TransactionMessage>(node_config.mempool.channel_bound),
+            transaction_process: internal_message::new_bounded_channel(node_config.tx_config.channel_bound),
             observation: internal_message::new_channel::<Observation>(),
             // multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
             observation_metadata: internal_message::new_channel::<ObservationMetadataInternalSigning>(),

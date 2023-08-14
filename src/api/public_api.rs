@@ -634,7 +634,7 @@ pub fn start_server(relay: Relay
 #[allow(dead_code)]
 async fn mock_relay(relay: Relay) {
     loop {
-        let tm = relay.transaction.receiver.recv().unwrap();
+        let tm = relay.mempool.receiver.recv().unwrap();
         let mut response = structs::Response::default();
         response.submit_transaction_response = Some(SubmitTransactionResponse {
                 transaction_hash: create_genesis_transaction().hash_or().into(),

@@ -71,7 +71,7 @@ impl PeerMessage {
 }
 
 // Some other field was needed here but I can't remember what it was
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TransactionMessage {
     pub transaction: Transaction,
     pub response_channel: Option<flume::Sender<Response>>,
