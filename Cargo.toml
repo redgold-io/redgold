@@ -93,7 +93,7 @@ strum_macros = "0.25"
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
 #zxcvbn = '2.1.1'
 rand = '0.8.4'
-clap = { version = "3.1.17", features = ["derive"] }
+clap = { version = "4.3.21", features = ["derive"] }
 log = "0.4.14"
 hex = "0.4.3"
 #void = "1.0.2"
