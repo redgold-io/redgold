@@ -47,7 +47,7 @@ impl PeerStore {
         let mut pool = self.ctx.pool().await?;
         let vec = p.peer_id.safe_bytes()?;
         let rows = sqlx::query!("DELETE FROM peers WHERE id = ?1", vec)
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
@@ -65,7 +65,7 @@ impl PeerStore {
             r#"SELECT peers.id, peers.trust FROM nodes JOIN peers on nodes.peer_id = peers.id WHERE public_key = ?1"#,
             vec
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
 
@@ -142,7 +142,7 @@ impl PeerStore {
             r#"SELECT tx FROM peers WHERE id = ?1"#,
             vec
         )
-            .fetch_optional(&mut pool)
+            .fetch_optional(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
 
@@ -168,7 +168,7 @@ impl PeerStore {
             time,
             bytes
         ) // Execute instead of fetch
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let _ = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
@@ -192,7 +192,7 @@ impl PeerStore {
     //         trust,
     //         tx_hash
     //     )
-    //         .fetch_all(&mut pool)
+    //         .fetch_all(&mut *pool)
     //         .await;
     //     let _ = DataStoreContext::map_err_sqlx(rows)?;
     //     let time = util::current_time_millis();
@@ -209,7 +209,7 @@ impl PeerStore {
     //             time,
     //             ser
     //         )
-    //             .fetch_all(&mut pool)
+    //             .fetch_all(&mut *pool)
     //             .await;
     //         let _ = DataStoreContext::map_err_sqlx(rows)?;
     //
@@ -234,7 +234,7 @@ impl PeerStore {
             trust,
             tx_hash
         )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -265,7 +265,7 @@ impl PeerStore {
         let rows = sqlx::query!(
             r#"SELECT tx FROM peers"#
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -295,7 +295,7 @@ impl PeerStore {
             r#"SELECT public_key FROM nodes WHERE last_seen > ?1"#,
             cutoff
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -333,7 +333,7 @@ impl PeerStore {
         let rows = sqlx::query!(
             r#"SELECT tx FROM nodes"#
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -357,7 +357,7 @@ impl PeerStore {
             r#"SELECT tx FROM nodes WHERE last_seen > ?1"#,
             cutoff
         )
-            .fetch_all(&mut pool)
+            .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
@@ -375,7 +375,7 @@ impl PeerStore {
             r#"SELECT peer_id FROM nodes WHERE public_key = ?1"#,
             vec
         )
-            .fetch_optional(&mut pool)
+            .fetch_optional(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         if let Some(r) = rows_m {
@@ -392,7 +392,7 @@ impl PeerStore {
             r#"SELECT count(peer_id) as count FROM nodes WHERE public_key = ?1"#,
             vec
         )
-            .fetch_one(&mut pool)
+            .fetch_one(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.count)
@@ -405,7 +405,7 @@ impl PeerStore {
             let mut pool = self.ctx.pool().await?;
             let vec = p0.validate()?.bytes()?;
             let rows = sqlx::query!("DELETE FROM nodes WHERE public_key = ?1", vec)
-                .execute(&mut pool)
+                .execute(&mut *pool)
                 .await;
             let rows_m = DataStoreContext::map_err_sqlx(rows)?;
             let c = self.peer_id_count_node_pk(p0).await?;
@@ -428,7 +428,7 @@ impl PeerStore {
             r#"SELECT tx FROM nodes WHERE public_key = ?1"#,
             vec
         )
-            .fetch_optional(&mut pool)
+            .fetch_optional(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         if let Some(rows) = rows_m {
@@ -474,7 +474,7 @@ impl PeerStore {
             time,
             tx_ser
             )
-            .execute(&mut pool)
+            .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
