@@ -295,6 +295,7 @@ enum OutputType {
 }
 
 message Output {
+  // Basic unlock condition for using this as a consumable input. Script hash or hash of a public key.
   Address address = 1;
   ProductId product_id = 5;
   repeated Proof counter_party_proofs = 6;
@@ -302,6 +303,8 @@ message Output {
   StandardData data = 7;
   OutputContract contract = 8;
   optional OutputType output_type = 9;
+  // Used for specifying UTXO contract reference as well as address.
+  FixedUtxoId utxo_id = 10;
 }
 
 // monthly / daily / window size + window center
@@ -737,6 +740,13 @@ message GetNodeTransactionRequest {
 
 }
 
+message GetContractStateMarkerRequest {
+  Address address = 1;
+  // for ordering
+  StateSelector selector = 2;
+  FixedUtxoId utxo_id = 3;
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -758,6 +768,7 @@ message Request {
   MultipartyAuthenticationRequest multiparty_authentication_request = 18;
   HealthRequest health_request = 19;
   GetNodeTransactionRequest get_node_transaction_request = 20;
+  GetContractStateMarkerRequest get_contract_state_marker_request = 21;
 }
 
 message HealthResponse {
@@ -782,6 +793,7 @@ message Response {
   QueryObservationProofResponse query_observation_proof_response = 11;
   HashSearchResponse hash_search_response = 12;
   HealthResponse health_response = 14;
+  ContractStateMarker get_contract_state_marker_response = 15;
 }
 
 message QueryTransactionRequest {
@@ -1160,6 +1172,38 @@ message ExecutionResult {
   bool valid = 1;
   structs.ResponseMetadata result_metadata = 2;
   StandardData data = 3;
+}
+
+message StateSelector {
+  // TODO: query selector
+}
+
+message ContractStateMarker {
+  Address address = 1;
+  BytesData state = 2;
+  StateSelector selector = 3;
+  Hash transaction_marker = 4;
+  int64 nonce = 5;
+  int64 time = 6;
+}
+
+message TestContractUpdate {
+  string key = 1;
+  string value = 2;
+}
+
+message TestContractUpdate2 {
+  string value = 2;
+}
+
+message TestContractInternalState {
+  repeated TestContractUpdate test_map = 1;
+  optional string latest_value = 2;
+}
+
+message TestContractRequest {
+  TestContractUpdate test_contract_update = 1;
+  TestContractUpdate2 test_contract_update2 = 2;
 }
 
 

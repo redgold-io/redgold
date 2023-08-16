@@ -26,6 +26,9 @@ metrics = { workspace = true }
 hex = { workspace = true }
 log = { workspace = true }
 
+# requires nightly.
+#polars = "0.28.0"
+
 
 [build-dependencies]
 sqlx = { version = "0.7.1", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:

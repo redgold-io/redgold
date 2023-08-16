@@ -106,8 +106,15 @@
         "structs.HealthResponse",
         "structs.GetNodeTransactionRequest",
         "structs.AddressSelector",
-        "execution.ExecutionInput",
-        "execution.ExecutionResult",
+        "structs.ExecutionInput",
+        "structs.ExecutionResult",
+        "structs.TestContractRequest",
+        "structs.TestContractUpdate",
+        "structs.TestContractUpdate2",
+        "structs.TestContractInternalState",
+        "structs.ContractStateMarker",
+        "structs.StateSelector",
+        "structs.GetContractStateMarkerRequest",
         "structs.VersionInfo"
       ]
     },

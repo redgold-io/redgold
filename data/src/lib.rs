@@ -19,6 +19,7 @@ pub mod transaction_store;
 pub mod mp_store;
 pub mod observation_store;
 pub mod data_store;
+pub mod state_store;
 
 #[derive(Clone)]
 pub struct DataStoreContext {

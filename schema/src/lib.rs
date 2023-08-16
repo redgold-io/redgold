@@ -51,6 +51,7 @@ pub mod input;
 pub mod debug_version;
 pub mod transaction_info;
 pub mod exec;
+pub mod contract;
 
 
 impl BytesData {
@@ -831,3 +832,10 @@ impl ShortString for String {
 }
 
 pub type RgResult<T> = Result<T, ErrorInfo>;
+
+
+impl HashClear for BytesData {
+    fn hash_clear(&mut self) {
+        todo!()
+    }
+}

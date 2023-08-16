@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, TypedValue, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
+use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
 
@@ -404,5 +404,20 @@ impl StandardData {
         let mut mt = Self::empty();
         mt.amount = Some(amount as i64);
         Some(mt)
+    }
+
+    pub fn bytes_data(bytes: &Vec<u8>) -> Self {
+        let mut mt = Self::empty();
+        mt.typed_value = Some(TypedValue::bytes(bytes));
+        mt
+    }
+
+}
+
+impl TypedValue {
+    pub fn bytes(bytes: &Vec<u8>) -> Self {
+        let mut s = Self::default();
+        s.bytes_value = bytes_data(bytes.clone());
+        s
     }
 }
