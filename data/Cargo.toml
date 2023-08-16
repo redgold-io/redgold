@@ -26,8 +26,8 @@ metrics = { workspace = true }
 hex = { workspace = true }
 log = { workspace = true }
 
-# requires nightly.
-#polars = "0.28.0"
+
+polars = "0.32.1"
 
 
 [build-dependencies]
