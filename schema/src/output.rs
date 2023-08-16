@@ -3,25 +3,11 @@ use crate::transaction::amount_data;
 use crate::{Address, HashClear, SafeOption};
 
 pub fn output_data(address: Vec<u8>, amount: u64) -> Output {
-    Output {
-        address: Address::address_data(address),
-        product_id: None,
-        counter_party_proofs: vec![],
-        data: amount_data(crate::transaction::amount_to_raw_amount(amount)),
-        contract: None,
-        output_type: None,
-    }
+    Output::new(&Address::address_data(address).expect(""), amount as i64)
 }
 
 pub fn tx_output_data(address: Address, amount: u64) -> Output {
-    Output {
-        address: Some(address),
-        product_id: None,
-        counter_party_proofs: vec![],
-        data: amount_data(crate::transaction::amount_to_raw_amount(amount)),
-        contract: None,
-        output_type: None,
-    }
+    Output::new(&address, amount as i64)
 }
 
 impl HashClear for Output {
@@ -38,6 +24,7 @@ impl Output {
             data: amount_data(amount as u64),
             contract: None,
             output_type: None,
+            utxo_id: None
         }
     }
 

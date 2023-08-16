@@ -13,8 +13,8 @@ use serde::__private::de::Borrowed;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
+use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, FixedUtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -133,6 +133,16 @@ impl RgHttpClient {
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
         let response = self.proto_post_request(&mut req, None).await?;
         Ok(response)
+    }
+
+    pub async fn contract_state(&self, address: &Address, utxo_id: &FixedUtxoId) -> RgResult<structs::ContractStateMarker> {
+        let mut req = Request::default();
+        let mut cmr = structs::GetContractStateMarkerRequest::default();
+        cmr.utxo_id = Some(utxo_id.clone());
+        cmr.address = Some(address.clone());
+        req.get_contract_state_marker_request = Some(cmr);
+        let response = self.proto_post_request(&mut req, None).await?;
+        Ok(response.get_contract_state_marker_response.ok_or(error_info("Missing get_contract_state_marker_response"))?)
     }
 
     pub async fn about(&self) -> RgResult<AboutNodeResponse> {

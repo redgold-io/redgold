@@ -671,13 +671,13 @@ impl LocalNodes {
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[tokio::test]
 async fn e2e() {
-    e2e_async().await.expect("");
+    e2e_async(false).await.expect("");
     // let runtime = build_runtime(8, "e2e");
     // runtime.block_on(e2e_async()).expect("e2e");
 }
 
 
-async fn e2e_async() -> Result<(), ErrorInfo> {
+async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     util::init_logger_once();
     metrics_registry::register_metric_names();
     // metrics_registry::init_print_logger();
@@ -712,8 +712,16 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     submit.submit().await.expect("submit");
 
-    // submit.submit_test_contract().await.expect("submit test contract");
-
+    if contract_tests {
+        let res = submit.submit_test_contract().await.expect("submit test contract");
+        let ct = res.transaction.expect("tx");
+        let contract_address = ct.first_output_address().expect("cont");
+        let o = ct.outputs.get(0).expect("O");
+        let utxo_id = o.utxo_id.clone().expect("a");
+        client.client_wrapper().contract_state(&contract_address, &utxo_id).await.expect("res");
+        submit.submit_test_contract_call(&contract_address, &utxo_id).await.expect("worx");
+        return Ok(());
+    }
 
 
     // let utxos = ds.query_time_utxo(0, util::current_time_millis())
@@ -876,4 +884,12 @@ async fn data_store_test() {
     //     println!("xor_value: {} tx_hash: {}", hex::encode(xor_value), hex::encode(tx));
     // }
 
+}
+
+#[ignore]
+#[tokio::test]
+async fn e2e_dbg() {
+    e2e_async(true).await.expect("");
+    // let runtime = build_runtime(8, "e2e");
+    // runtime.block_on(e2e_async()).expect("e2e");
 }
