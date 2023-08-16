@@ -26,7 +26,6 @@ use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::seeds::get_seeds;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
-use crate::core::seeds::SeedNode;
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand};
 use crate::util::cli::commands::mnemonic_fingerprint;

@@ -37,6 +37,54 @@ impl Default for GenesisConfig {
     }
 }
 
+
+#[derive(Clone, Debug)]
+pub struct MempoolConfig {
+    pub channel_bound: usize,
+    pub max_mempool_size: usize,
+    pub max_mempool_age: Duration,
+    pub allow_bypass: bool,
+    pub interval: Duration
+}
+
+impl Default for MempoolConfig {
+    fn default() -> Self {
+        Self {
+            channel_bound: 1000,
+            max_mempool_size: 100000,
+            max_mempool_age: Duration::from_secs(3600),
+            allow_bypass: true,
+            interval: Duration::from_secs(1),
+        }
+    }
+}
+
+impl Default for TransactionProcessingConfig {
+    fn default() -> Self {
+        Self {
+            channel_bound: 1000,
+            concurrency: 100,
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct TransactionProcessingConfig {
+    pub channel_bound: usize,
+    pub concurrency: usize,
+}
+
+impl Default for ObservationConfig {
+    fn default() -> Self {
+        Self {
+            channel_bound: 1000
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct ObservationConfig {
+    pub channel_bound: usize,
+}
+
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
@@ -88,7 +136,10 @@ pub struct NodeConfig {
     pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
-    pub opts: RgArgs
+    pub opts: RgArgs,
+    pub mempool: MempoolConfig,
+    pub tx_config: TransactionProcessingConfig,
+    pub observation: ObservationConfig
 }
 
 impl NodeConfig {
@@ -340,6 +391,9 @@ impl NodeConfig {
             live_e2e_interval: Duration::from_secs(60),
             genesis: false,
             opts: RgArgs::default(),
+            mempool: Default::default(),
+            tx_config: Default::default(),
+            observation: Default::default(),
         }
     }
 

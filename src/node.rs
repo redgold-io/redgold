@@ -40,7 +40,6 @@ use crate::{api, e2e, util};
 // use crate::mparty::mp_server::{Db, MultipartyHandler};
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
-use crate::core::seeds::SeedNode;
 use crate::multiparty::gg20_sm_manager;
 use crate::util::runtimes::build_runtime;
 use crate::util::{auto_update, keys, metrics_registry};
@@ -50,6 +49,7 @@ use crate::util::trace_setup::init_tracing;
 use tokio::task::spawn_blocking;
 use tracing::Span;
 use redgold_keys::proof_support::ProofSupport;
+use redgold_schema::structs::TransactionState::Mempool;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::stream_handlers::IntervalFold;
@@ -194,6 +194,10 @@ impl Node {
 
         join_handles.push(stream_handlers::run_interval_fold(
             Shuffle::new(&relay), relay.node_config.shuffle_interval, false
+        ).await);
+
+        join_handles.push(stream_handlers::run_interval_fold(
+            crate::core::mempool::Mempool::new(&relay), relay.node_config.mempool.interval.clone(), false
         ).await);
 
         join_handles

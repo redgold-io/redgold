@@ -1,40 +1,24 @@
 use bitcoin::secp256k1::PublicKey;
+use redgold_schema::seeds::get_seeds;
 use redgold_schema::structs::{NetworkEnvironment, TrustData};
+use crate::api::public_api::PublicClient;
+use crate::api::RgHttpClient;
+use crate::node_config::NodeConfig;
 
-#[derive(Clone, Debug)]
-pub struct SeedNode {
-    pub peer_id: Option<Vec<u8>>,
-    pub trust: Vec<TrustData>,
-    pub public_key: Option<PublicKey>,
-    pub external_address: String,
-    pub port_offset: Option<u16>,
-    pub environments: Vec<NetworkEnvironment>,
+#[ignore]
+#[tokio::test]
+pub async fn debug_get_seeds_info() {
+    let s = get_seeds();
+    let mut nc = NodeConfig::default();
+    nc.network = NetworkEnvironment::Dev;
+    for si in s {
+        let pc = PublicClient::from(si.external_address.clone(), nc.public_port(), None);
+        let a = pc.about().await.expect("about");
+        let pni = a.peer_node_info.expect("pni");
+        let nmd = pni.latest_node_transaction.expect("node").node_metadata().expect("");
+        let res = nmd.public_key.expect("").hex_or();
+        let pidhex = nmd.peer_id.expect("").peer_id.expect("").hex_or();
+        println!("s({}, {}, {});", si.external_address, pidhex, res);
+    }
+
 }
-//
-// impl SeedNode {
-//     fn from_environment(network_environment: NetworkEnvironment) {
-//         match network_environment {
-//             _ => {
-//                 vec![
-//                     SeedNode{
-//                         peer_id: vec![],
-//                         trust: 0.0,
-//                         public_key: None,
-//                         external_address: "".to_string(),
-//                         port: 0,
-//                     }
-//                 ]
-//             }
-//             // NetworkEnvironment::Main => {}
-//             // NetworkEnvironment::Test => {}
-//             // NetworkEnvironment::Dev => {}
-//             // NetworkEnvironment::Staging => {}
-//             // NetworkEnvironment::Perf => {}
-//             // NetworkEnvironment::Integration => {}
-//             // NetworkEnvironment::Local => {}
-//             // NetworkEnvironment::Debug => {}
-//             // NetworkEnvironment::All => {}
-//             // NetworkEnvironment::Predev => {}
-//         }
-//     }
-// }
