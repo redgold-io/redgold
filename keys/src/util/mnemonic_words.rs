@@ -161,7 +161,7 @@ impl MnemonicWords {
 
     /// Note, ledger and trezor won't support keys loaded from a non-standard coin type
     fn default_cursor() -> StandardHDPath {
-        let cursor = StandardHDPath::new(Purpose::Witness, REDGOLD_KEY_DERIVATION_PATH as u32, 0, 0, 0);
+        let cursor = StandardHDPath::new(Purpose::Pubkey, REDGOLD_KEY_DERIVATION_PATH as u32, 0, 0, 0);
         return cursor;
     }
 
