@@ -26,7 +26,9 @@ metrics = { workspace = true }
 hex = { workspace = true }
 log = { workspace = true }
 
+
 polars = "0.32.1"
+
 
 [build-dependencies]
 sqlx = { version = "0.7.1", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:

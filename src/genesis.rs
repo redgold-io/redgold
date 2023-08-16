@@ -42,7 +42,9 @@ pub struct GenesisDistribution{
 
 pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>) -> Transaction {
     let outputs = distribution
-        .iter().map(|d| tx_output_data(d.address.clone(), d.amount))
+        .iter().map(|d| tx_output_data(d.address.clone(),
+                                       d.amount * constants::DECIMAL_MULTIPLIER as u64)
+    )
         .collect_vec();
     Transaction {
         inputs: vec![],
