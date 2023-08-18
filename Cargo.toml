@@ -114,7 +114,7 @@ ssh2 = "0.9.1"
 # Move to trust module
 ndarray = "0.15.3"
 chrono = "0.4.19"
-config = "0.11.0"
+config = "0.13.3"
 
 #priority-queue = "1.2.0"
 
