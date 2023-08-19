@@ -5,6 +5,10 @@ impl ErrorInfo {
     pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
         crate::error_info(message)
     }
+    pub fn new(message: impl Into<String>) -> ErrorInfo {
+        crate::error_info(message.into())
+    }
+
     pub fn response_metadata(self) -> ResponseMetadata {
         ResponseMetadata {
             success: false,

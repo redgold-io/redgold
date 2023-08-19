@@ -541,6 +541,7 @@ pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_
         retriable: false,
         stacktrace: stack,
         lib_message: lib_message.into(),
+        abort: false
     }
 }
 

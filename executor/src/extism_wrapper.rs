@@ -1,6 +1,6 @@
-use std::ops::Add;
 use extism::{Context, Plugin};
-use redgold_schema::{error_info, ErrorInfoContext, ProtoSerde, RgResult, structs};
+
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, ProtoSerde, RgResult};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ExecutionInput, ExecutionResult};
 
@@ -32,12 +32,15 @@ pub async fn invoke_wasm(
     ExecutionResult::proto_deserialize(data.to_vec())
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn proto_test() {
-    let wasm = std::fs::read("../../sdk/test_contract_guest.wasm").expect("");
+    // println!()
+    let wasm = std::fs::read("../sdk/test_contract_guest.wasm").expect("");
     let input = ExecutionInput::default();
-    let res = invoke_wasm(&*wasm, "proto_example", input).await.unwrap();
+    let res = invoke_wasm(&*wasm, "extism_entrypoint", input).await.unwrap();
+    println!("Exec result: {}", res.json_or());
+    // let res = invoke_wasm(&*wasm, "entrypoint", input).await.unwrap();
     assert!(res.valid);
 }
 

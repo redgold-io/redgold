@@ -135,10 +135,12 @@ impl RgHttpClient {
         Ok(response)
     }
 
-    pub async fn contract_state(&self, address: &Address, utxo_id: &FixedUtxoId) -> RgResult<structs::ContractStateMarker> {
+    pub async fn contract_state(&self, address: &Address
+                                // , utxo_id: &FixedUtxoId
+    ) -> RgResult<structs::ContractStateMarker> {
         let mut req = Request::default();
         let mut cmr = structs::GetContractStateMarkerRequest::default();
-        cmr.utxo_id = Some(utxo_id.clone());
+        // cmr.utxo_id = Some(utxo_id.clone());
         cmr.address = Some(address.clone());
         req.get_contract_state_marker_request = Some(cmr);
         let response = self.proto_post_request(&mut req, None).await?;
@@ -150,6 +152,13 @@ impl RgHttpClient {
         req.about_node_request = Some(AboutNodeRequest::default());
         let response = self.proto_post_request(&mut req, None).await?;
         Ok(response.about_node_response.ok_or(error_info("Missing about node response"))?)
+    }
+
+    pub async fn resolve_code(&self, address: &Address) -> RgResult<structs::ResolveCodeResponse> {
+        let mut req = Request::default();
+        req.resolve_code_request = Some(address.clone());
+        let response = self.proto_post_request(&mut req, None).await?;
+        Ok(response.resolve_code_response.ok_or(error_info("Missing resolve code response"))?)
     }
 
 }

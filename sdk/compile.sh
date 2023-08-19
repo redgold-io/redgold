@@ -19,8 +19,9 @@ export CARGO_TARGET_DIR="./target"
 #	cp $CARGO_TARGET_DIR/wasm32-wasi/release/$NAME ./test_contract_guest.wasi.wasm
 #echo "Compiled using module memory"
 
-#cargo build --package redgold-sdk --release --target wasm32-unknown-unknown
-cargo build --package redgold-sdk --release --target wasm32-wasi
+cargo build --package redgold-sdk --release --target wasm32-unknown-unknown
+#cargo build --package redgold-sdk --release --target wasm32-wasi
 cp $CARGO_TARGET_DIR/wasm32-unknown-unknown/release/$NAME ./test_contract_guest.wasm
+#cp $CARGO_TARGET_DIR/wasm32-wasi/release/$NAME ./test_contract_guest.wasm
 
 

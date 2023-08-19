@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, TypedValue, UtxoEntry};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, TypedValue, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
@@ -133,6 +133,13 @@ impl Transaction {
             .iter()
             .filter_map(|o| o.address.as_ref().filter(|&a| a == address).and_then(|_| o.opt_amount()))
             .sum::<i64>()
+    }
+
+    pub fn output_of(&self, address: &Address) -> Vec<&structs::Output> {
+        self.outputs
+            .iter()
+            .filter_map(|o| o.address.as_ref().filter(|&a| a == address).map(|_| o))
+            .collect_vec()
     }
 
     pub fn output_swap_amount_of(&self, address: &Address) -> i64 {
@@ -410,6 +417,10 @@ impl StandardData {
         let mut mt = Self::empty();
         mt.typed_value = Some(TypedValue::bytes(bytes));
         mt
+    }
+
+    pub fn bytes(&self) -> Option<&BytesData> {
+        self.typed_value.as_ref().and_then(|t| t.bytes_value.as_ref())
     }
 
 }

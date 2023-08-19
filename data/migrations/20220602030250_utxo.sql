@@ -3,8 +3,9 @@ CREATE TABLE IF NOT EXISTS utxo (
                                     output_index INTEGER NOT NULL,
                                     address    BLOB NOT NULL,
                                     output    BLOB NOT NULL,
-                                    time INTEGER,
+                                    time INTEGER NOT NULL,
                                     amount INTEGER,
                                     raw BLOB NOT NULL,
+                                    has_code INTEGER NOT NULL,
                                     PRIMARY KEY (transaction_hash, output_index)
 )

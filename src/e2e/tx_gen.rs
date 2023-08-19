@@ -109,7 +109,7 @@ impl TransactionGenerator {
         let c_amount = TransactionAmount::from(a.amount / 2);
         // TODO: Add fees / fee address, use genesis utxos or something?
         // let fee_amount = TransactionAmount::from(a.amount / 10);
-        tb.with_contract_deploy_output(bytes, c_amount, true)?;
+        tb.with_contract_deploy_output_and_predicate_input(bytes, c_amount, true)?;
         // tb.with_fee(fee_amount);
         tb.with_remainder();
         let tx= tb.transaction.sign(&prev.key_pair)?;
@@ -136,7 +136,7 @@ impl TransactionGenerator {
         update.value = "original update".to_string();
         req.test_contract_update = Some(update);
 
-        tb.with_contract_request_output(&address, &id, &req.proto_serialize())?;
+        tb.with_contract_request_output(&address, &req.proto_serialize())?;
         // tb.with_fee(fee_amount);
         tb.with_remainder();
         let tx= tb.transaction.sign(&prev.key_pair)?;

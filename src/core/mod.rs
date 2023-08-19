@@ -17,3 +17,5 @@ pub mod transact;
 pub mod discovery;
 pub mod stream_handlers;
 pub mod mempool;
+pub mod resolve;
+pub mod contract;

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use metrics::{decrement_gauge, increment_gauge};
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
-use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, WithMetadataHashable};
+use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -310,7 +310,7 @@ impl TransactionStore {
             let address = row.address;
             let transaction_hash = row.transaction_hash;
             let output_index = row.output_index;
-            let time = row.time.safe_get_msg("Missing time")?.clone();
+            let time = row.time.clone();
             let output = Some(
                 Output::proto_deserialize(row.output)?
             );
@@ -410,35 +410,7 @@ impl TransactionStore {
 
 
 // TODO: Add productId to utxo amount
-    pub async fn insert_utxo(
-        &self,
-        utxo_entry: &UtxoEntry
-    ) -> Result<i64, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let hash = utxo_entry.transaction_hash.safe_bytes()?;
-        let output_index = utxo_entry.output_index;
-        let output = utxo_entry.output.safe_get_msg("UTxo entry insert missing output")?;
-        let amount = output.opt_amount().clone();
-        let output = output.proto_serialize();
-        let raw = utxo_entry.proto_serialize();
-        let address = utxo_entry.address.safe_bytes()?;
-        let rows = sqlx::query!(
-            r#"
-        INSERT OR REPLACE INTO utxo (transaction_hash, output_index, address, output, time, amount, raw) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
-            hash,
-            output_index,
-            address,
-            output,
-            utxo_entry.time,
-            amount,
-            raw
-        )
-            .execute(&mut *pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        increment_gauge!("redgold.utxo.total", 1.0);
-        Ok(rows_m.last_insert_rowid())
-    }
+
     //
     // pub async fn insert_transaction_edge(
     //     &self,
@@ -685,6 +657,46 @@ impl TransactionStore {
 
 
 }
+
+
+// Move to UTXO store.
+impl TransactionStore {
+    pub async fn insert_utxo(
+        &self,
+        utxo_entry: &UtxoEntry
+    ) -> Result<i64, ErrorInfo> {
+        let mut pool = self.ctx.pool().await?;
+        let hash = utxo_entry.transaction_hash.safe_bytes()?;
+        let output_index = utxo_entry.output_index;
+        let output = utxo_entry.output.safe_get_msg("UTxo entry insert missing output")?;
+        let amount = output.opt_amount().clone();
+        let output_ser = output.proto_serialize();
+        let raw = utxo_entry.proto_serialize();
+        let address = utxo_entry.address.safe_bytes()?;
+
+        let has_code = output.validate_deploy_code().is_ok();
+        let rows = sqlx::query!(
+            r#"
+        INSERT OR REPLACE INTO utxo (transaction_hash, output_index,
+        address, output, time, amount, raw, has_code) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+            hash,
+            output_index,
+            address,
+            output_ser,
+            utxo_entry.time,
+            amount,
+            raw,
+            has_code
+        )
+            .execute(&mut *pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        increment_gauge!("redgold.utxo.total", 1.0);
+        Ok(rows_m.last_insert_rowid())
+    }
+
+}
+
 
 #[test]
 fn debug() {

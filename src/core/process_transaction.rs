@@ -14,7 +14,7 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
+use redgold_schema::structs::{ContractStateMarker, ExecutionInput, ExecutorBackend, FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -31,6 +31,7 @@ use crate::schema::structs::ObservationProof;
 use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
+use redgold_executor::extism_wrapper;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
@@ -584,6 +585,39 @@ impl TransactionProcessContext {
         submit_response.query_transaction_response = Some(query_transaction_response);
         submit_response.transaction = Some(transaction.clone());
         submit_response.transaction_hash = Some(hash.clone());
+
+        // Here now we need to send this transaction to a contract state manager if it's appropriate
+
+        // For now this is the 'deploy' operation -- but it's not correct / validated yet.
+        for o in &transaction.outputs {
+            if let Some(c) = o.contract
+                .as_ref().and_then(|c| c.code_execution_contract.as_ref()) {
+                if let Some(b) = c.executor {
+                    if b == (ExecutorBackend::Extism as i32) {
+                        if let Some(code) = &c.code {
+                            let mut input = ExecutionInput::default();
+                            input.tx = Some(transaction.clone());
+                            debug!("Invoking deploy contract call");
+                            let er = extism_wrapper::invoke_wasm(
+                                &*code.value,
+                                "extism_entrypoint",
+                                input
+                            ).await?;
+                            let mut csm = ContractStateMarker::default();
+                            csm.state = er.data.as_ref()
+                                .and_then(|d| d.bytes()).cloned();
+                            csm.address = o.address.clone();
+                            csm.time = transaction.time()?.clone();
+                            csm.nonce = 0;
+                            csm.transaction_marker = Some(transaction.hash_or());
+                            self.relay.ds.state.insert_state(csm).await?;
+                            // TODO: ^ save the error above and return it to the user for processing this?
+                            // we should know about this error well before we accept the transaction.
+                        }
+                    }
+                }
+            }
+        }
 
         // TODO: Task local metrics update here
         // let hm: HashMap<String, String> = HashMap::new();
