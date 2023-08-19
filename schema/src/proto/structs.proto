@@ -106,6 +106,7 @@ message PartitionInfo {
   // TODO: Change to UtxoDistance
   // so we can preserve PartialEq and convert explicitly
   optional int64 utxo_distance = 1;
+  optional int64 contract_address = 2;
 }
 
 // This also needs a proof maybe?
@@ -204,6 +205,11 @@ message DynamicNodeMetadata {
   int64 height = 4;
 }
 
+
+message StandardRequest {
+
+}
+
 // Where to store parquet schema, avro schema, etc. etc.
 
 // Generic data structure designed to hold arbitrary data in a common format.
@@ -233,6 +239,9 @@ message StandardData {
   Observation observation = 14;
   optional string bitcoin_address = 15;
   optional string bitcoin_txid = 16;
+  BytesData state = 17;
+  BytesData request = 18;
+  StandardRequest standard_request = 19;
 }
 
 message KeyedTypedValue {
@@ -287,11 +296,15 @@ message OutputContract {
   CodeExecutionContract code_execution_contract = 2;
   optional int64 threshold = 3;
   repeated int64 weights = 4;
-  Address filter_predicate_destination = 5;
+  // What was this for? Are we ever gonna send to an address filter predicate that is different from the output address?
+//  Address filter_predicate_destination = 5;
+  bool pay_update_descendents = 6;
 }
 
 enum OutputType {
   Fee = 0;
+  Deploy = 1;
+  RequestCall = 2;
 }
 
 message Output {
@@ -741,10 +754,9 @@ message GetNodeTransactionRequest {
 }
 
 message GetContractStateMarkerRequest {
+  // TODO: should this be its own id class?
   Address address = 1;
-  // for ordering
   StateSelector selector = 2;
-  FixedUtxoId utxo_id = 3;
 }
 
 message Request {
@@ -769,10 +781,17 @@ message Request {
   HealthRequest health_request = 19;
   GetNodeTransactionRequest get_node_transaction_request = 20;
   GetContractStateMarkerRequest get_contract_state_marker_request = 21;
+  Address resolve_code_request = 22;
 }
 
 message HealthResponse {
 
+}
+
+message ResolveCodeResponse {
+  UtxoEntry utxo_entry = 1;
+  TransactionInfo transaction = 2;
+  ContractStateMarker contract_state_marker = 3;
 }
 
 message Response {
@@ -794,6 +813,7 @@ message Response {
   HashSearchResponse hash_search_response = 12;
   HealthResponse health_response = 14;
   ContractStateMarker get_contract_state_marker_response = 15;
+  ResolveCodeResponse resolve_code_response = 16;
 }
 
 message QueryTransactionRequest {
@@ -960,6 +980,7 @@ message ErrorInfo {
   bool retriable = 6;
   string stacktrace = 7;
   string lib_message = 8;
+  bool abort = 9;
 }
 
 message TaskLocalDetails {
@@ -1164,13 +1185,16 @@ enum ExternalCurrency {
   Ethereum = 2;
 }
 
+
 message ExecutionInput {
-  structs.Transaction tx = 1;
+  Transaction tx = 1;
+  BytesData input = 2;
+  BytesData state = 3;
 }
 
 message ExecutionResult {
   bool valid = 1;
-  structs.ResponseMetadata result_metadata = 2;
+  ResponseMetadata result_metadata = 2;
   StandardData data = 3;
 }
 

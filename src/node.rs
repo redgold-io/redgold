@@ -718,7 +718,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let contract_address = ct.first_output_address().expect("cont");
         let o = ct.outputs.get(0).expect("O");
         let utxo_id = o.utxo_id.clone().expect("a");
-        client.client_wrapper().contract_state(&contract_address, &utxo_id).await.expect("res");
+        client.client_wrapper().contract_state(&contract_address).await.expect("res");
         submit.submit_test_contract_call(&contract_address, &utxo_id).await.expect("worx");
         return Ok(());
     }

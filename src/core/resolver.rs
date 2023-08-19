@@ -11,6 +11,7 @@ use itertools::Itertools;
 use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, WithMetadataHashable};
+use crate::core::resolve::resolve_output::ResolvedOutputChild;
 use crate::genesis::create_genesis_transaction;
 
 #[async_trait]
@@ -37,6 +38,7 @@ pub struct ResolvedInput {
     peer_invalid_index: HashSet<PublicKey>,
     pub signable_hash: Hash,
 }
+
 
 impl ResolvedInput {
 
@@ -210,15 +212,16 @@ pub struct ResolvedTransaction {
     /// child transaction of the resolved parents.
     transaction: Transaction,
     /// Already undergone localized validation (i.e. proofs, peer queries, etc.)
-    resolutions: Vec<ResolvedInput>,
-    pub(crate) resolved_internally: bool,
+    fixed_resolutions: Vec<ResolvedInput>,
+    pub resolved_internally: bool,
+    pub descendents: Vec<ResolvedOutputChild>
 }
 
 impl ResolvedTransaction {
 
     pub fn total_parent_amount_available(&self) -> Result<i64, ErrorInfo> {
         let mut total = 0;
-        for r in &self.resolutions {
+        for r in &self.fixed_resolutions {
             let result = r.amount()?;
             if let Some(a) = result {
                 total += a;
@@ -270,8 +273,9 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     }
     let resolved = ResolvedTransaction {
         transaction: tx.clone(),
-        resolutions: vec,
+        fixed_resolutions: vec,
         resolved_internally,
+        descendents: vec![],
     };
     Ok(resolved)
     }

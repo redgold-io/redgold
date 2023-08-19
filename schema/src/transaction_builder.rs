@@ -68,24 +68,28 @@ impl TransactionBuilder {
 
     pub fn with_contract_request_output(&mut self,
                                         destination: &Address,
-                                        destination_utxo_id: &FixedUtxoId,
                                         serialized_request: &Vec<u8>
     ) -> RgResult<&mut Self> {
         let mut o = Output::default();
         o.address = Some(destination.clone());
-        let mut d = StandardData::bytes_data(serialized_request);
+        let mut c = OutputContract::default();
+        c.pay_update_descendents = true;
+        o.contract = Some(c);
+        let mut d = StandardData::default();
+        d.request = bytes_data(serialized_request.clone());
         o.data = Some(d);
-        o.utxo_id = Some(destination_utxo_id.clone());
+        o.output_type = Some(OutputType::RequestCall as i32);
         Ok(self)
 
     }
 
     // TODO: Do we need to deal with contract state here?
-    pub fn with_contract_deploy_output(
+    pub fn with_contract_deploy_output_and_predicate_input(
         &mut self, code: impl AsRef<[u8]>, c_amount: TransactionAmount, use_predicate_input: bool) -> RgResult<&mut Self> {
         let destination = Address::script_hash(code.as_ref())?;
         let mut o = Output::default();
         o.address = Some(destination.clone());
+        o.output_type = Some(OutputType::Deploy as i32);
         let mut contract = OutputContract::default();
         let mut code_exec = CodeExecutionContract::default();
         code_exec.code = bytes_data(code.as_ref().to_vec().clone());

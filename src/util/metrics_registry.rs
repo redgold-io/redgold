@@ -37,7 +37,9 @@ pub fn register_metric_names() {
     register_counter!("redgold.transaction.received");
     register_counter!("redgold.transaction.missing_response_channel");
     register_counter!("redgold.transaction.resolve.input");
+    register_counter!("redgold.transaction.resolve.output");
     register_counter!("redgold.transaction.resolve.input.errors");
+    register_counter!("redgold.transaction.resolve.output.errors");
     register_gauge!("redgold.transaction.total");
     register_histogram!("redgold.transaction.size_bytes");
     register_histogram!("redgold.transaction.floating_inputs");

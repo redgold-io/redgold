@@ -80,9 +80,23 @@ impl Default for ObservationConfig {
         }
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct ObservationConfig {
     pub channel_bound: usize,
+}
+
+impl Default for ContractConfig {
+    fn default() -> Self {
+        Self {
+            contract_state_channel_bound: 1000
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ContractConfig {
+    pub contract_state_channel_bound: usize,
 }
 
 // TODO: put the default node configs here
@@ -139,7 +153,8 @@ pub struct NodeConfig {
     pub opts: RgArgs,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
-    pub observation: ObservationConfig
+    pub observation: ObservationConfig,
+    pub contract: ContractConfig
 }
 
 impl NodeConfig {
@@ -394,6 +409,7 @@ impl NodeConfig {
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),
+            contract: Default::default(),
         }
     }
 

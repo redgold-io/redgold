@@ -16,12 +16,14 @@ use crate::mp_store::MultipartyStore;
 use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
-use redgold_schema::{error_info, RgResult};
-use redgold_schema::structs::AddressInfo;
+use redgold_schema::{error_info, RgResult, structs};
+use redgold_schema::structs::{AddressInfo, Hash, TransactionInfo, TransactionState};
 
 use crate::schema::structs::{
     Address, ErrorInfo,
 };
+use crate::state_store::StateStore;
+use crate::utxo_store::UtxoStore;
 
 #[derive(Clone)]
 pub struct DataStore {
@@ -35,6 +37,64 @@ pub struct DataStore {
     //pub server_store: ServerStore
     pub observation: ObservationStore,
     pub ctx: DataStoreContext,
+    pub state: StateStore,
+    pub utxo: UtxoStore,
+}
+
+impl DataStore {
+    pub async fn resolve_code(&self, address: &Address) -> RgResult<structs::ResolveCodeResponse> {
+        let res = self.utxo.code_utxo(address, true).await?;
+        let mut resp = structs::ResolveCodeResponse::default();
+        resp.utxo_entry = res.clone();
+
+        if let Some(u) = res.as_ref().and_then(|r| r.transaction_hash.as_ref()) {
+            let tx_res = self.resolve_transaction_hash(u).await?;
+            resp.transaction = tx_res;
+            resp.contract_state_marker = self.state.query_recent_state(
+                address, None, Some(1)).await?.get(0).cloned();
+        }
+        Ok(resp)
+    }
+
+    pub async fn resolve_transaction_hash(&self, hash: &Hash) -> RgResult<Option<TransactionInfo>> {
+        let maybe_transaction = self.transaction_store.query_maybe_transaction(&hash).await?;
+        let mut observation_proofs = vec![];
+        let mut transaction = None;
+        let mut rejection_reason = None;
+        let mut state = TransactionState::Pending;
+        let mut transaction_info: Option<TransactionInfo> = None;
+
+        if let Some((t, e)) = maybe_transaction.clone() {
+            observation_proofs = self.observation.select_observation_edge(&hash.clone()).await?;
+            transaction = Some(t);
+            rejection_reason = e;
+            // Query UTXO by hash only for all valid outputs.
+            let valid_utxo_output_ids = self.transaction_store
+                .query_utxo_output_index(&hash)
+                .await?;
+
+            let accepted = rejection_reason.is_none();
+
+            if accepted {
+                state = TransactionState::Accepted;
+            } else {
+                state = TransactionState::Rejected
+            }
+
+            let mut tx_info = TransactionInfo::default();
+            tx_info.transaction = transaction.clone();
+            tx_info.observation_proofs = observation_proofs.clone();
+            tx_info.valid_utxo_index = valid_utxo_output_ids.clone();
+            tx_info.used_outputs = vec![];
+            tx_info.accepted = accepted;
+            tx_info.rejection_reason = rejection_reason.clone();
+            tx_info.queried_output_index_valid = None;
+            tx_info.state = state as i32;
+            transaction_info = Some(tx_info);
+        }
+        Ok(transaction_info)
+    }
+
 }
 
 impl DataStore {
@@ -107,8 +167,10 @@ WHERE
             config_store: ConfigStore{ ctx: ctx.clone() },
             // server_store: ServerStore{ ctx: ctx.clone() },
             transaction_store: TransactionStore{ ctx: ctx.clone() },
+            utxo: UtxoStore{ ctx: ctx.clone() },
             multiparty_store: MultipartyStore { ctx: ctx.clone() },
             observation: ObservationStore { ctx: ctx.clone() },
+            state: StateStore { ctx: ctx.clone() },
         }
     }
 

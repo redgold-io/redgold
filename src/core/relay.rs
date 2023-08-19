@@ -17,7 +17,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, Address, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -28,6 +28,7 @@ use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::RequestSupport;
 use redgold_keys::transaction_support::TransactionBuilderSupport;
+use crate::core::contract::contract_state_manager::{ContractStateManagerEntry, ContractStateManager};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::{ProtoHashable, SafeOption, WithMetadataHashable};
@@ -119,7 +120,8 @@ pub struct Relay {
     pub discovery: Channel<DiscoveryMessage>,
     /// Authorization channel for multiparty keygen to determine room_id and participating keys
     pub mp_keygen_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartyKeygenRequest>>>,
-    pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>
+    pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>,
+    pub contract_state_manager: ContractStateManager
 }
 
 
@@ -518,6 +520,7 @@ impl Relay {
             discovery: internal_message::new_bounded_channel(100),
             mp_keygen_authorizations: Arc::new(Mutex::new(Default::default())),
             mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
+            contract_state_manager: ContractStateManager::new(),
         }
     }
 }
