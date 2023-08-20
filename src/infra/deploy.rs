@@ -32,6 +32,7 @@ pub async fn setup_server_redgold(
      purge_data: bool,
      words: Option<String>,
      peer_id_hex: Option<String>,
+     start_node: bool,
  ) -> Result<(), ErrorInfo> {
 
     ssh.verify()?;
@@ -115,10 +116,11 @@ pub async fn setup_server_redgold(
         println!("Purging data");
         ssh.exes(format!("rm -rf {}/{}", path, "data_store.sqlite"), p).await?;
     }
-
-    ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
-    ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
     ssh.exes("sudo ufw reload", p).await?;
+    ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
+    if start_node {
+        ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+    }
 
     Ok(())
 }
@@ -243,7 +245,7 @@ pub async fn derive_mnemonic_and_peer_id(
 
     let w = WordsPass::new(mnemonic, passphrase);
     let new = w.hash_derive_words(server_id_index.to_string())?;
-    let server_mnemonic = new.words;
+    let server_mnemonic = new.words.clone();
     let account = (99 - peer_id_index) as u32;
     let mut pid_hex = "".to_string();
     if let Some(pid) = opt_peer_id {
@@ -253,7 +255,8 @@ pub async fn derive_mnemonic_and_peer_id(
             trezor::get_standard_public_key(
                 account, None, 0, 0)?
         } else {
-            w.public_at(format!("m/44'/0'/{}/0/0", account))?
+            let result = new.default_peer_id();
+            result?.peer_id.expect("pid")
         };
         pid_hex = pk.hex()?;
     }
@@ -357,6 +360,7 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
                 ssh, net, gen, Some(hm), purge,
                 words_opt,
                 peer_id_hex_opt,
+                !deploy.debug_skip_start
             ).await.expect("worx");
         }
         gen = false;
