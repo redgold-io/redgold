@@ -54,6 +54,7 @@ serde_with = { version = "3.2.0", features = ["hex"] }
 itertools = "0.10.1"
 log = "0.4.14"
 metrics = "0.18.1"
+dirs = "5.0.1"
 
 [dependencies]
 redgold-schema = {workspace = true}
