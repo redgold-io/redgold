@@ -205,6 +205,8 @@ pub struct Deploy {
     pub words_and_id: bool,
     #[clap(long)]
     pub dry_run: bool,
+    #[clap(long)]
+    pub debug_skip_start: bool,
 
 
 }
