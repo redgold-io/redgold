@@ -325,11 +325,21 @@ jobs:
       - run: cd docs; npm install && npm run generate
 
       - name: Upload Explorer Distribution to S3
-        if: github.ref == 'refs/heads/dev'
+        if: contains('
+          refs/heads/dev
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
 
       - name: Upload Docs Distribution to S3
-        if: github.ref == 'refs/heads/dev'
+        if: contains('
+          refs/heads/dev
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
 
 
