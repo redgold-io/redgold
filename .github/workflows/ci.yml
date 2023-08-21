@@ -107,6 +107,47 @@ jobs:
         with:
           name: redgold_linux
           path: ./redgold_linux
+  build-windows:
+    #    needs: [test]
+#    if:
+#      contains('
+#      refs/heads/predev
+#      refs/heads/dev
+#      refs/heads/staging
+#      refs/heads/test
+#      refs/heads/main
+#      ', github.ref)
+    runs-on: windows-latest
+    timeout-minutes: 100
+    permissions:
+      contents: write
+    env:
+      DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    outputs:
+      release_match: ${{ steps.check-branch.outputs.match }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+          target: x86_64-pc-windows-gnu
+          default: true
+          override: true
+#      - run: echo "asdf" > ./redgold_mac
+#      - if:
+#          contains('
+#          refs/heads/staging
+#          refs/heads/test
+#          refs/heads/main
+#          ', github.ref)
+      - run: echo %cd%
+      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
+      - uses: actions/upload-artifact@v3
+        with:
+          name: redgold_windows
+          path: ./redgold_windows
 
   build-mac:
 #    needs: [test]
