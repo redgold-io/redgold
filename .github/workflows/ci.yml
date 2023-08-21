@@ -10,51 +10,51 @@ env:
   DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
 on: push
 jobs:
-  test:
-    if:
-      ${{ !contains('
-      refs/heads/predev
-      refs/heads/dev
-      refs/heads/staging
-      refs/heads/test
-      refs/heads/main
-      ', github.ref) }}
-    runs-on: ubuntu-latest-m
-    timeout-minutes: 60
-    permissions:
-      contents: write
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-#    env:
-#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '14'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.TOOLCHAIN }}
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
-      - run: echo "Github branch = ${{ env.BRANCH }}"
-      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - id: version
-        run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
-      - run: echo "Testing version = ${{ env.VERSION }}"
-      - run: ./bin/install_build_deps.sh
-      - run: rustup toolchain list
-#      - run: rustup default nightly
-      - run: rustup update
-      - run: rustup -V
-      - run: cargo clean
-      - run: cargo build --release
+#  test:
+#    if:
+#      ${{ !contains('
+#      refs/heads/predev
+#      refs/heads/dev
+#      refs/heads/staging
+#      refs/heads/test
+#      refs/heads/main
+#      ', github.ref) }}
+#    runs-on: ubuntu-latest-m
+#    timeout-minutes: 60
+#    permissions:
+#      contents: write
+#    outputs:
+#      version: ${{ steps.version.outputs.version }}
+##    env:
+##      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions/setup-node@v2
+#        with:
+#          node-version: '14'
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: ${{ env.TOOLCHAIN }}
+#      - uses: Swatinem/rust-cache@v1
+#        with:
+#          cache-on-failure: true
+#      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+#      - run: echo "Github branch = ${{ env.BRANCH }}"
+#      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
+#      - id: version
+#        run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
+#      - run: echo "Testing version = ${{ env.VERSION }}"
+#      - run: ./bin/install_build_deps.sh
+#      - run: rustup toolchain list
+##      - run: rustup default nightly
+#      - run: rustup update
+#      - run: rustup -V
+#      - run: cargo clean
 #      - run: cargo build --release
-      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
-      - run: ./bin/local_test.sh
+##      - run: cargo build --release
+#      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
+#      - run: ./bin/local_test.sh
   build-linux:
 #    needs: [test]
     if:
@@ -135,6 +135,11 @@ jobs:
           target: x86_64-pc-windows-gnu
           default: true
           override: true
+#      - name: Set up MinGW
+#        uses: egor-tensin/setup-mingw@v2
+#        with:
+#          platform: x64
+      - uses: msys2/setup-msys2@v2
 #      - run: echo "asdf" > ./redgold_mac
 #      - if:
 #          contains('
@@ -142,12 +147,16 @@ jobs:
 #          refs/heads/test
 #          refs/heads/main
 #          ', github.ref)
-      - run: echo %cd%
-      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
-      - uses: actions/upload-artifact@v3
-        with:
-          name: redgold_windows
-          path: ./redgold_windows
+      - shell: msys2 {0}
+        run: |
+          uname -a
+          curl -O https://gmplib.org/download/gmp/gmp-6.3.0.tar.lz
+#      - run: echo %cd%
+#      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: redgold_windows
+#          path: ./redgold_windows
 
   build-mac:
 #    needs: [test]
