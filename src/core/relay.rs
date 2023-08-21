@@ -17,7 +17,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -28,7 +28,7 @@ use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::RequestSupport;
 use redgold_keys::transaction_support::TransactionBuilderSupport;
-use crate::core::contract::contract_state_manager::{ContractStateManagerEntry, ContractStateManager};
+use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::{ProtoHashable, SafeOption, WithMetadataHashable};
@@ -121,7 +121,7 @@ pub struct Relay {
     /// Authorization channel for multiparty keygen to determine room_id and participating keys
     pub mp_keygen_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartyKeygenRequest>>>,
     pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>,
-    pub contract_state_manager: ContractStateManager
+    pub contract_state_manager_channels: Vec<Channel<ContractStateMessage>>,
 }
 
 
@@ -143,6 +143,20 @@ pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
 // as the other 'half' here.
 impl Relay {
+
+    pub async fn send_contract_ordering_message(&self, tx: &Transaction, output: &Output) -> RgResult<ContractStateMarker> {
+        let ck = output.request_contention_key()?;
+        let h = ck.div_mod(self.node_config.contract.bucket_parallelism.clone());
+        let c = self.contract_state_manager_channels.get(h as usize).expect("missing channel");
+        let (s,r) = flume::bounded::<RgResult<ContractStateMarker>>(1);
+        let msg = ContractStateMessage::ProcessTransaction {
+                transaction: tx.clone(),
+                output: output.clone(),
+                response: s
+        };
+        c.sender.send_err(msg)?;
+        r.recv_async_err().await?
+    }
 
     pub async fn node_tx(&self) -> RgResult<Transaction> {
         let tx = self.ds.config_store.get_node_tx().await?;
@@ -502,6 +516,15 @@ impl Relay {
     pub async fn new(node_config: NodeConfig) -> Self {
         // Inter thread processes
         let ds = node_config.data_store().await;
+        let mut contract_state_manager_channels = vec![];
+        for _ in 0..node_config.contract.bucket_parallelism {
+            contract_state_manager_channels.push(
+                internal_message::new_bounded_channel::<ContractStateMessage>(
+                    node_config.contract.contract_state_channel_bound.clone()
+                )
+            );
+        }
+
         Self {
             node_config: node_config.clone(),
             mempool: internal_message::new_bounded_channel::<TransactionMessage>(node_config.mempool.channel_bound),
@@ -520,7 +543,7 @@ impl Relay {
             discovery: internal_message::new_bounded_channel(100),
             mp_keygen_authorizations: Arc::new(Mutex::new(Default::default())),
             mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
-            contract_state_manager: ContractStateManager::new(),
+            contract_state_manager_channels
         }
     }
 }

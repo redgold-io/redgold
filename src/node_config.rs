@@ -89,7 +89,10 @@ pub struct ObservationConfig {
 impl Default for ContractConfig {
     fn default() -> Self {
         Self {
-            contract_state_channel_bound: 1000
+            contract_state_channel_bound: 1000,
+            bucket_parallelism: 10,
+            interval: Duration::from_secs(1),
+            ordering_delay: Duration::from_secs(1)
         }
     }
 }
@@ -97,6 +100,9 @@ impl Default for ContractConfig {
 #[derive(Clone, Debug)]
 pub struct ContractConfig {
     pub contract_state_channel_bound: usize,
+    pub bucket_parallelism: usize,
+    pub interval: Duration,
+    pub ordering_delay: Duration,
 }
 
 // TODO: put the default node configs here

@@ -5,6 +5,10 @@ services:
     image: redgoldio/redgold:${REDGOLD_NETWORK:-dev}
     container_name: redgold-${REDGOLD_NETWORK:-dev}
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "3"
     env_file:
       - ./var.env
 #    environment:

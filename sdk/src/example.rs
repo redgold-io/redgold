@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use extism_pdk::{FnResult, plugin_fn};
 
-use redgold_schema::{ProtoSerde, RgResult};
+use redgold_schema::{bytes_data, ProtoSerde, RgResult};
 use redgold_schema::structs::{ExecutionInput, ExecutionResult, StandardData, TestContractInternalState, TestContractRequest};
 
 use crate::entry::with_entry_decoder;
@@ -11,11 +12,16 @@ pub fn example_request_response(
 ) -> TestContractInternalState {
     let mut updated_state = existing_state.clone();
     if let Some(update) = request.test_contract_update {
-        updated_state.test_map.iter_mut().for_each(|state| {
+        let mut updated = false;
+        for state in updated_state.test_map.iter_mut() {
             if state.key == update.key {
                 state.value = update.value.clone();
+                updated = true;
             }
-        });
+        }
+        if !updated {
+            updated_state.test_map.push(update.clone());
+        }
     }
     if let Some(update) = request.test_contract_update2 {
         updated_state.latest_value = Some(update.value);
@@ -45,7 +51,8 @@ pub fn example_contract_main(input: ExecutionInput) -> RgResult<ExecutionResult>
 
     let mut res = ExecutionResult::default();
     let ser_state = state.proto_serialize();
-    let data = StandardData::bytes_data(&ser_state);
+    let mut data = StandardData::default();
+    data.state = bytes_data(ser_state);
     res.data = Some(data);
     res.valid = true;
     Ok(res)

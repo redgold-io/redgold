@@ -207,7 +207,7 @@ message DynamicNodeMetadata {
 
 
 message StandardRequest {
-
+  StateSelector selector = 1;
 }
 
 // Where to store parquet schema, avro schema, etc. etc.
@@ -1210,6 +1210,14 @@ message ContractStateMarker {
   int64 nonce = 5;
   int64 time = 6;
 }
+
+message ContentionKey {
+  FixedUtxoId utxo_id = 1;
+  Address address = 2;
+  StateSelector selector = 3;
+}
+
+
 
 message TestContractUpdate {
   string key = 1;

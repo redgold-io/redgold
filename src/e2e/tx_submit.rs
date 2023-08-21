@@ -127,10 +127,9 @@ impl TransactionSubmitter {
     }
 
     // Direct output contract invocation call.
-    pub async fn submit_test_contract_call(&self, contract_address: &Address, contract_utxo: &FixedUtxoId) -> RgResult<SubmitTransactionResponse> {
+    pub async fn submit_test_contract_call(&self, contract_address: &Address) -> RgResult<SubmitTransactionResponse> {
         let tk = self.generator.lock().unwrap().generate_deploy_test_contract_request(
-            contract_address.clone(),
-            contract_utxo.clone(),
+            contract_address.clone()
         ).await?;
         let res = self.client.clone().send_transaction(&tk.transaction, true).await?;
         self.generator.lock().unwrap().completed(tk);
