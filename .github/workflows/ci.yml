@@ -147,14 +147,22 @@ jobs:
 #          refs/heads/test
 #          refs/heads/main
 #          ', github.ref)
-      - run: Invoke-WebRequest -Uri https://gmplib.org/download/gmp/gmp-6.3.0.tar.lz -OutFile gmp-6.3.0.tar.lz
+#      - run: Invoke-WebRequest -Uri https://gmplib.org/download/gmp/gmp-6.3.0.tar.lz -OutFile gmp-6.3.0.tar.lz
       - shell: msys2 {0}
         run: |
           uname -a
           ls -lA
           pwd
+          curl -O https://redgold-public.s3.us-west-1.amazonaws.com/gmp63
+          tar xf gmp63
+          mv gmp-6.3.0 D:/gmp
+          cd D:/gmp
+          ./configure
+          make
+          make check
+          make install
 #      - run: echo %cd%
-#      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
+      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
 #      - uses: actions/upload-artifact@v3
 #        with:
 #          name: redgold_windows
