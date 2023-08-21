@@ -135,39 +135,42 @@ jobs:
           target: x86_64-pc-windows-gnu
           default: true
           override: true
-#      - name: Set up MinGW
-#        uses: egor-tensin/setup-mingw@v2
-#        with:
-#          platform: x64
       - uses: msys2/setup-msys2@v2
-#      - run: echo "asdf" > ./redgold_mac
-#      - if:
-#          contains('
-#          refs/heads/staging
-#          refs/heads/test
-#          refs/heads/main
-#          ', github.ref)
-#      - run: Invoke-WebRequest -Uri https://gmplib.org/download/gmp/gmp-6.3.0.tar.lz -OutFile gmp-6.3.0.tar.lz
       - shell: msys2 {0}
         run: |
           uname -a
           ls -lA
           pwd
-          curl -O https://redgold-public.s3.us-west-1.amazonaws.com/gmp63
-          tar xf gmp63
-          mv gmp-6.3.0 D:/gmp
-          cd D:/gmp
-          ./configure
-          make
-          make check
-          make install
-#      - run: echo %cd%
-      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
+          pacman -S --noconfirm mingw-w64-x86_64-gmp
+          cargo clean
+          cargo build --release --target x86_64-pc-windows-gnu
+          cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
+#      - run:  ;
+        #      - name: Set up MinGW
+        #        uses: egor-tensin/setup-mingw@v2
+        #        with:
+        #          platform: x64
+        #      - run: echo "asdf" > ./redgold_mac
+        #      - if:
+        #          contains('
+        #          refs/heads/staging
+        #          refs/heads/test
+        #          refs/heads/main
+        #          ', github.ref)
+        #      - run: Invoke-WebRequest -Uri https://gmplib.org/download/gmp/gmp-6.3.0.tar.lz -OutFile gmp-6.3.0.tar.lz
 #      - uses: actions/upload-artifact@v3
 #        with:
 #          name: redgold_windows
 #          path: ./redgold_windows
-
+      #          curl -O https://redgold-public.s3.us-west-1.amazonaws.com/gmp63
+  #          tar xf gmp63
+  #          mv gmp-6.3.0 D:/gmp
+  #          cd D:/gmp
+  #          ./configure
+  #          make
+  #          make check
+  #          make install
+  #      - run: echo %cd%
   build-mac:
 #    needs: [test]
     if:
