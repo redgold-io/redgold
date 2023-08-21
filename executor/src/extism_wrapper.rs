@@ -1,8 +1,8 @@
 use extism::{Context, Plugin};
 
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, ProtoSerde, RgResult};
+use redgold_schema::{bytes_data, EasyJson, error_info, ErrorInfoContext, ProtoSerde, RgResult};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{ExecutionInput, ExecutionResult};
+use redgold_schema::structs::{ExecutionInput, ExecutionResult, TestContractInternalState, TestContractRequest, TestContractUpdate2};
 
 pub async fn invoke_wasm(
     wasm_bytes: &[u8],
@@ -32,7 +32,64 @@ pub async fn invoke_wasm(
     ExecutionResult::proto_deserialize(data.to_vec())
 }
 
-// #[ignore]
+pub async fn invoke_extism_wasm(
+    wasm_bytes: &[u8],
+    args: ExecutionInput
+) -> RgResult<ExecutionResult> {
+    invoke_wasm(wasm_bytes, "extism_entrypoint", args).await
+}
+
+// TODO: impl AsRef<u8>
+pub async fn invoke_extism_wasm_direct(
+    wasm_bytes: impl AsRef<[u8]>,
+    input: &Vec<u8>,
+    state: &Vec<u8>
+) -> RgResult<ExecutionResult> {
+    let mut args = ExecutionInput::default();
+    args.input = bytes_data(input.clone());
+    args.state = bytes_data(state.clone());
+    invoke_wasm(wasm_bytes.as_ref(), "extism_entrypoint", args).await
+}
+
+
+#[ignore]
+#[tokio::test]
+async fn extism_direct_test() {
+    // println!()
+    let wasm = std::fs::read("../sdk/test_contract_guest.wasm").expect("");
+
+    let res_g = invoke_wasm(
+        &*wasm, "extism_entrypoint", ExecutionInput::default()
+    ).await.unwrap();
+    let gen_state = res_g.data.expect("d").state;
+    let gen_state_deser = TestContractInternalState::proto_deserialize
+        (gen_state.clone().expect("s").value).expect("");
+    let res = gen_state_deser.json_or();
+    println!("initial result genesis: {}", res);
+
+    let mut input = ExecutionInput::default();
+    let mut req = TestContractRequest::default();
+    let mut update2 = TestContractUpdate2::default();
+    update2.value = "UPDATED".to_string();
+    req.test_contract_update2 = Some(update2);
+    input.input = bytes_data(req.proto_serialize());
+    input.state = gen_state.clone();
+
+    let res = invoke_wasm(&*wasm, "extism_entrypoint", input).await.unwrap();
+    println!("Exec result: {}", res.json_or());
+
+    let done_state = res.data.clone().expect("d").state;
+    let done_state_deser = TestContractInternalState::proto_deserialize
+        (done_state.clone().expect("s").value).expect("");
+    let resr = done_state_deser.json_or();
+    println!("final result after: {}", resr);
+
+    // let res = invoke_wasm(&*wasm, "entrypoint", input).await.unwrap();
+    assert!(res.valid);
+}
+
+
+#[ignore]
 #[tokio::test]
 async fn proto_test() {
     // println!()

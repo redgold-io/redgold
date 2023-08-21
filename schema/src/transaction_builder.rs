@@ -79,6 +79,7 @@ impl TransactionBuilder {
         d.request = bytes_data(serialized_request.clone());
         o.data = Some(d);
         o.output_type = Some(OutputType::RequestCall as i32);
+        self.transaction.outputs.push(o);
         Ok(self)
 
     }

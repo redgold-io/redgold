@@ -4,10 +4,12 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio::task::JoinHandle;
 use async_trait::async_trait;
 use std::collections::HashSet;
+use std::future::Future;
 use flume::Receiver;
+use futures::future::Either;
 use futures::TryStreamExt;
 use tokio_stream::StreamExt;
-use redgold_schema::structs::GetPeersInfoRequest;
+use redgold_schema::structs::{ErrorInfo, GetPeersInfoRequest};
 use tracing::error;
 use redgold_schema::errors::EnhanceErrorInfo;
 use crate::util::logging::Loggable;
@@ -57,4 +59,42 @@ pub async fn run_recv<T: 'static + Send>(recv_impl: impl RecvForEachConcurrent<T
             }
         });
     tokio::spawn(fut)
+}
+
+
+
+
+#[async_trait]
+pub trait IntervalFoldOrReceive<T> where T: Send + 'static  {
+    async fn interval_fold_or_recv(&mut self, message: Either<T, ()>) -> RgResult<()>;
+}
+
+pub async fn run_interval_fold_or_recv<T>(
+    interval_f: impl IntervalFoldOrReceive<T> + Send + 'static,
+    interval_duration: Duration, run_at_start: bool, recv: flume::Receiver<T>
+) -> JoinHandle<RgResult<()>> where T: Send + 'static {
+    tokio::spawn(run_interval_inner_or_recv::<T>(interval_f, interval_duration, run_at_start, recv))
+}
+
+pub async fn run_interval_inner_or_recv<T>(
+    interval_f: impl IntervalFoldOrReceive<T>, interval_duration: Duration, run_at_start: bool,
+    receiver: Receiver<T>
+) -> RgResult<()> where T: Send + 'static {
+    let mut cs = interval_f;
+    if run_at_start {
+        cs.interval_fold_or_recv(Either::Right(())).await?;
+    }
+
+    let recv = receiver.clone();
+    let stream = recv
+        .into_stream()
+        .map(|x| Ok(Either::Left(x)));
+    let interval = tokio::time::interval(interval_duration);
+    let interval_stream = IntervalStream::new(interval).map(|_| Ok(Either::Right(())));
+
+    stream.merge(interval_stream).try_fold(
+        cs, |mut ob, o| async {
+            ob.interval_fold_or_recv(o).await.map(|_| ob)
+        }
+    ).await.map(|_| ())
 }

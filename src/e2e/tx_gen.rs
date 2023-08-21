@@ -101,7 +101,7 @@ impl TransactionGenerator {
 
     pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
         let prev = self.finished_pool.pop().safe_get()?.clone();
-        let bytes = tokio::fs::read("test_contract_guest.wasm").await.error_info("Read failure")?;
+        let bytes = tokio::fs::read("./sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
         let mut tb = TransactionBuilder::new();
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
@@ -120,7 +120,7 @@ impl TransactionGenerator {
         Ok(tk)
     }
 
-    pub async fn generate_deploy_test_contract_request(&mut self, address: Address, id: FixedUtxoId) -> RgResult<TransactionWithKey> {
+    pub async fn generate_deploy_test_contract_request(&mut self, address: Address) -> RgResult<TransactionWithKey> {
         let prev = self.finished_pool.pop().safe_get()?.clone();
         let mut tb = TransactionBuilder::new();
         let x = &prev.utxo_entry;
@@ -132,9 +132,12 @@ impl TransactionGenerator {
 
         let mut req = TestContractRequest::default();
         let mut update = structs::TestContractUpdate::default();
-        update.key = "asdf".to_string();
-        update.value = "original update".to_string();
+        update.key = "ASDF".to_string();
+        update.value = "omg".to_string();
+        let mut update2 = structs::TestContractUpdate2::default();
+        update2.value = "TEST UPDATED".to_string();
         req.test_contract_update = Some(update);
+        req.test_contract_update2 = Some(update2);
 
         tb.with_contract_request_output(&address, &req.proto_serialize())?;
         // tb.with_fee(fee_amount);

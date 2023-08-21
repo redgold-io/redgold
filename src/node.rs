@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, Transaction, TrustData};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, TestContractInternalState, Transaction, TrustData};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -50,6 +50,7 @@ use tokio::task::spawn_blocking;
 use tracing::Span;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::structs::TransactionState::Mempool;
+use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::stream_handlers::IntervalFold;
@@ -199,6 +200,19 @@ impl Node {
         join_handles.push(stream_handlers::run_interval_fold(
             crate::core::mempool::Mempool::new(&relay), relay.node_config.mempool.interval.clone(), false
         ).await);
+
+        for i in 0..relay.node_config.contract.bucket_parallelism {
+            let opt_c = relay.contract_state_manager_channels.get(i);
+            let c = opt_c.expect("bucket partition creation error");
+            let handle = stream_handlers::run_interval_fold_or_recv(
+                ContractStateManager::new(relay.clone()),
+                relay.node_config.contract.interval.clone(),
+                false,
+                c.receiver.clone()
+            ).await;
+            join_handles.push(handle);
+        }
+
 
         join_handles
     }
@@ -717,9 +731,14 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let ct = res.transaction.expect("tx");
         let contract_address = ct.first_output_address().expect("cont");
         let o = ct.outputs.get(0).expect("O");
-        let utxo_id = o.utxo_id.clone().expect("a");
-        client.client_wrapper().contract_state(&contract_address).await.expect("res");
-        submit.submit_test_contract_call(&contract_address, &utxo_id).await.expect("worx");
+        let state = client.client_wrapper().contract_state(&contract_address).await.expect("res");
+        let state_json = TestContractInternalState::proto_deserialize(state.state.clone().expect("").value).expect("").json_or();
+        info!("First contract state marker: {} {}", state.json_or(), state_json);
+
+        submit.submit_test_contract_call(&contract_address ).await.expect("worx");
+        let state = client.client_wrapper().contract_state(&contract_address).await.expect("res");
+        let state_json = TestContractInternalState::proto_deserialize(state.state.clone().expect("").value).expect("").json_or();
+        info!("Second contract state marker: {} {}", state.json_or(), state_json);
         return Ok(());
     }
 

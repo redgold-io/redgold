@@ -605,7 +605,7 @@ impl TransactionProcessContext {
                             ).await?;
                             let mut csm = ContractStateMarker::default();
                             csm.state = er.data.as_ref()
-                                .and_then(|d| d.bytes()).cloned();
+                                .and_then(|d| d.state.clone());
                             csm.address = o.address.clone();
                             csm.time = transaction.time()?.clone();
                             csm.nonce = 0;
@@ -616,6 +616,10 @@ impl TransactionProcessContext {
                         }
                     }
                 }
+            }
+            if o.is_request() {
+                let csm = self.relay.send_contract_ordering_message(&transaction, &o).await?;
+                info!("Accepted CSM: {}", csm.json_or())
             }
         }
 

@@ -21,7 +21,11 @@ impl StateStore {
 
         let mut pool = self.ctx.pool().await?;
         let address = state.address.safe_bytes()?;
-        let selector_hash = state.selector.safe_get()?.calculate_hash().safe_bytes()?;
+        let selector_hash = if let Some(s) = &state.selector {
+            Some(s.calculate_hash().safe_bytes()?)
+        } else {
+            None
+        };
         let state_hash = state.state.safe_get()?.calculate_hash().safe_bytes()?;
         let marker = state.transaction_marker.safe_get()?.bytes.safe_bytes()?;
         let nonce = state.nonce.clone();

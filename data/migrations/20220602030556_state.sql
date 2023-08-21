@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS state (
                                     address    BLOB NOT NULL,
-                                    selector_hash  BLOB NOT NULL,
+                                    selector_hash  BLOB,
                                     state_hash BLOB NOT NULL,
                                     transaction_marker BLOB NOT NULL,
                                     time INTEGER NOT NULL,
