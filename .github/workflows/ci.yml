@@ -306,11 +306,10 @@ jobs:
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
 
+      # Upload versioned artifacts
       - if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         run: |
           aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
@@ -393,8 +392,6 @@ jobs:
       - if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
@@ -409,8 +406,6 @@ jobs:
       - if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         name: Release Versioned
         uses: softprops/action-gh-release@v1
