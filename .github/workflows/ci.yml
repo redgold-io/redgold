@@ -144,6 +144,9 @@ jobs:
           pwd
           pacman -S --noconfirm mingw-w64-x86_64-gmp
           pacman -S --noconfirm mingw-w64-x86_64-rust
+          pacman -S --noconfirm mingw-w64-x86_64-openssl
+          echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
           cargo build --release --target x86_64-pc-windows-gnu
           cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
 #      - run:  ;
