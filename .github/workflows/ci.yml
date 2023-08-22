@@ -194,6 +194,14 @@ jobs:
           echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
           echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
           cargo build --release --target x86_64-pc-windows-gnu
+          ls -la
+          ls -la target/
+          ls -la target/x86_64-pc-windows-gnu/
+          ls -la target/x86_64-pc-windows-gnu/release/
+      - run: ls -la
+      - run: ls -la target/
+      - run: ls -la target/x86_64-pc-windows-gnu/
+      - run: cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold_windows.exe
           cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
 
 #      - run:  ;
