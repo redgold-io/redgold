@@ -143,7 +143,7 @@ jobs:
           ls -lA
           pwd
           pacman -S --noconfirm mingw-w64-x86_64-gmp
-          cargo clean
+          pacman -S --noconfirm mingw-w64-x86_64-rust
           cargo build --release --target x86_64-pc-windows-gnu
           cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
 #      - run:  ;
