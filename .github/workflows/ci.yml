@@ -138,8 +138,7 @@ jobs:
       - uses: msys2/setup-msys2@v2
       - shell: msys2 {0}
         run: |
-          export PATH="/c/Users/runneradmin/.cargo/bin:$PATH"
-          source /mingw64/bin/activate
+          export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
           ls -lA
           pwd
