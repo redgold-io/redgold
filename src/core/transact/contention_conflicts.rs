@@ -90,7 +90,7 @@ impl ContentionConflictManager {
         Ok(ContentionInfo{})
     }
     async fn interval(&mut self) -> RgResult<()> {
-        todo!()
+        Ok(())
     }
 
 }
