@@ -3,7 +3,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use redgold_schema::{error_info, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NodeMetadata, ObservationProof, Output, PublicKey, Request, ResolveCodeResponse, Response, Transaction};
-use redgold_schema::util::xor_distance::XorConvDistanceSubset;
+use redgold_schema::util::xor_distance::XorfConvDistanceSubset;
 use crate::core::relay::Relay;
 
 pub struct ResolvedOutputChild {
@@ -47,7 +47,7 @@ pub async fn resolve_output(
 
     if internal_resolve.transaction.is_none() {
 
-        let peer_subset: Vec<&NodeMetadata> = peers.xor_conv_distance_subset(
+        let peer_subset: Vec<&NodeMetadata> = peers.xorf_conv_distance_subset(
             &addr.address.safe_bytes()?, |i| i.contract_address
         );
         let peer_keys = peer_subset.iter().filter_map(|n| n.public_key.clone()).collect_vec();

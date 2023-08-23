@@ -4,55 +4,73 @@ package structs;
 
 import "execution.proto";
 
-// TODO: Schema version hash
-
+// The verification type associated with a signature. Denotes common patterns, i.e. the default common ECDSA curve
+// and parameters, or a custom curve denoted by a particular enum, or a particular signing algorithm.
+// Each specific curve type or signing algorithm should be assigned it's own enum here, so that the signing
+// flow can be recreated from a single reference.
 enum SignatureType {
+  // The most common secp256k1 curve used for Bitcoin and Ethereum, corresponds to the standard ECDSA signature
+  // used by most hardware / software wallets
   ECDSA = 0;
+  // The same curve as above, but following the Bitcoin Message signing strategy in order to make use of existing
+  // hardware cold wallets, can be deprecated once hardware wallet support is added for native signatures matching
+  // Redgold schema.
   EcdsaBitcoinSignMessageHardware = 1;
 }
 
+// The raw data associated with a signature, along with type information for how to verify it. Does not include
+// the public key associated with the signature, which is stored separately (unless the signature type contains
+// recovery id within the bytes.)
 message Signature {
   BytesData bytes = 1;
   SignatureType signature_type = 2;
 }
 
+// Future placeholder in the event of use of different public key types, will eventually cover ed25519 etc.
 enum PublicKeyType {
+  // ECDSA Standard key type matching ECDSA signature type above
   secp256k1 = 0;
 }
 
+// Compressed public key byte data (33 bytes for standard ECDSA)
 message PublicKey {
+  // Encoded data form of the public key, requires a library for decoding to appropriate key instance
   BytesData bytes = 1;
+  // The type of public key, used to determine how to decode the bytes into a key instance
   PublicKeyType key_type = 2;
 }
 
-// TODO: BytesData for signature?
-// Multiple public key types
-// TODO: Move the 'repeated' into this so that we encompass multi-sig proofs inside a single class
+// Witness data for a particular signing event, does not include the hash required to re-verify the information.
 message Proof {
+  // Raw signing data, associated with the signature of a particular, individual hash, typically a transaction hash
   Signature signature = 1;
+  // The public key of the key that produced this signature, required to verify the signature in the event the
+  // signature type does not implement a recovery id.
   PublicKey public_key = 2;
 }
 
-// TODO: refactor
+// TODO: Refactor types here.
+// Currently unused, but an optional anti-spam proof included in a transaction for increased mem-pool priority
 message PoWProof {
   uint32 proof_type = 1;
   bytes proof = 2;
 }
 
+// Equivalent to a chainId identifier. Used as a marker for contracts or simplicity to indicate information
+// associated with the origin of a particular amount. Useful for schema-represented ERC-20 equivalent products.
 message ProductId {
   Hash network = 1;
   Hash product = 2;
 }
 
-// TODO: We need to handle case where UtxoId is missing, a floating dependency or input based on code execution.
 
-// TODO: Should we unify transaction hash / output_index into UtxoId?
 // TODO: Support other output extraction operations, a function that processes a transaction and results ?
 
+// Standard UTXO identifier similar to Bitcoin schema.
 message FixedUtxoId {
-  //  // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
+  // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
   Hash transaction_hash = 1;
-  //  // The index of the output in the parent transaction which is being spent.
+  // The index of the output in the parent transaction which is being spent / consumed.
   int64 output_index = 2;
 }
 
@@ -107,6 +125,7 @@ message PartitionInfo {
   // so we can preserve PartialEq and convert explicitly
   optional int64 utxo_distance = 1;
   optional int64 contract_address = 2;
+  optional int64 transaction_hash = 3;
 }
 
 // This also needs a proof maybe?
@@ -299,6 +318,7 @@ message OutputContract {
   // What was this for? Are we ever gonna send to an address filter predicate that is different from the output address?
 //  Address filter_predicate_destination = 5;
   bool pay_update_descendents = 6;
+  bool consumable = 7;
 }
 
 enum OutputType {
@@ -327,7 +347,7 @@ message TimeLockWindow {
   uint64 window_size = 3;
 }
 
-message TransactionAmount {
+message CurrencyAmount {
   int64 amount = 1;
 }
 
@@ -1211,12 +1231,19 @@ message ContractStateMarker {
   int64 time = 6;
 }
 
+// Any value which can cause a conflict or collision among nodes due to disagreements in ordering.
 message ContentionKey {
+  // Classical conflict condition associated with double spends, two transactions which share a common parent
+  // causing a conflict or contention.
   FixedUtxoId utxo_id = 1;
+  // Conflict conditions associated with deployed single-address contracts
   Address address = 2;
+  // Combined with above address -- imposes a conflict ordering condition among a state subset denoted by a key index
   StateSelector selector = 3;
+  // Duplicate transaction hash conflict condition -- associated with duplicate processing of same data.
+  // Primarily used internally for tracking internal contentions.
+  Hash transaction_hash = 4;
 }
-
 
 
 message TestContractUpdate {

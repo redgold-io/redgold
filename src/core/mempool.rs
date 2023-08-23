@@ -5,7 +5,7 @@ use flume::{SendError, TrySendError};
 use itertools::Itertools;
 use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
 use redgold_schema::seeds::get_seeds;
-use redgold_schema::structs::Address;
+use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse};
 use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
@@ -61,6 +61,18 @@ impl IntervalFold for Mempool {
             .filter_map(|s| s.address().ok())
             .collect_vec();
         for message in messages {
+            let h = message.transaction.hash_or();
+            let in_process = self.relay.transaction_channels.contains_key(&h);
+            let known = self.relay.ds.transaction_store.query_maybe_transaction(&h).await?.is_some();
+            if in_process || known {
+                if let Some(r) = message.response_channel {
+                    r.send_err(Response::from_error_info(error_info("Transaction already in process or known")))?;
+                }
+                // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
+                // Notify subscribers for transaction channel rather than just dropping and returning error
+                continue
+            }
+
             let entry = MempoolEntry {
                 transaction: message,
                 fee_acceptable_address: addrs.clone()

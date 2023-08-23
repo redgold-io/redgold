@@ -65,9 +65,22 @@ pub async fn run_recv<T: 'static + Send>(recv_impl: impl RecvForEachConcurrent<T
 
 
 #[async_trait]
-pub trait IntervalFoldOrReceive<T> where T: Send + 'static  {
+pub trait IntervalFoldOrReceive<T> where T: Send + 'static {
     async fn interval_fold_or_recv(&mut self, message: Either<T, ()>) -> RgResult<()>;
+    // async fn interval(&mut self) -> RgResult<()>;
+    // async fn process_message(&mut self, message: T) -> RgResult<()>;
+
 }
+
+
+//
+// #[async_trait]
+// impl<T> OperationThing for dyn IntervalFoldOrReceive<T> where T: Send + 'static {
+//     async fn interval_fold_or_recv(&mut self, message: Either<T, ()>) -> RgResult<()> {
+//
+//     }
+//
+// }
 
 pub async fn run_interval_fold_or_recv<T>(
     interval_f: impl IntervalFoldOrReceive<T> + Send + 'static,

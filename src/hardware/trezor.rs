@@ -8,7 +8,7 @@ use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{InputSupport, TransactionBuilderSupport};
 use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, TransactionAmount, UtxoEntry};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, CurrencyAmount, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::HDPathCursor;
@@ -321,7 +321,7 @@ async fn debug_sign_tx () {
     let mut tb = TransactionBuilder::new();
     tb.with_address_info(ai);
     let destination = address.clone();
-    let amount = TransactionAmount::from(5);
+    let amount = CurrencyAmount::from(5);
     tb.with_output(&destination, &amount);
     let res = tb.build().expect("tx");
     sign_transaction(&mut res.clone(), pk, default_pubkey_path())

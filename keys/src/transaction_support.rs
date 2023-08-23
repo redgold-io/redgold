@@ -3,7 +3,7 @@ use bdk::bitcoin::secp256k1::rand::Rng;
 use bitcoin::secp256k1::{PublicKey, SecretKey};
 use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, struct_metadata_new, structs, WithMetadataHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, TransactionAmount, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, CurrencyAmount, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::KeyPair;
@@ -60,7 +60,7 @@ impl TransactionSupport for Transaction {
         if amount < (MAX_COIN_SUPPLY as u64) {
             amount_actual = amount * (DECIMAL_MULTIPLIER as u64);
         }
-        let amount = TransactionAmount::from(amount as i64);
+        let amount = CurrencyAmount::from(amount as i64);
         // let fee = 0 as u64; //MIN_FEE_RAW;
         // amount_actual -= fee;
         let destination = Address::from_bytes(destination.clone()).unwrap();

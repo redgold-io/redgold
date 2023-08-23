@@ -4,7 +4,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, ErrorInfo, FixedUtxoId, TestContractRequest, TransactionAmount};
+use redgold_schema::structs::{Address, AddressType, ErrorInfo, FixedUtxoId, TestContractRequest, CurrencyAmount};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
@@ -106,9 +106,9 @@ impl TransactionGenerator {
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
         let a = x.opt_amount().expect("a");
-        let c_amount = TransactionAmount::from(a.amount / 2);
+        let c_amount = CurrencyAmount::from(a.amount / 2);
         // TODO: Add fees / fee address, use genesis utxos or something?
-        // let fee_amount = TransactionAmount::from(a.amount / 10);
+        // let fee_amount = CurrencyAmount::from(a.amount / 10);
         tb.with_contract_deploy_output_and_predicate_input(bytes, c_amount, true)?;
         // tb.with_fee(fee_amount);
         tb.with_remainder();
@@ -126,9 +126,9 @@ impl TransactionGenerator {
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
         let a = x.opt_amount().expect("a");
-        let c_amount = TransactionAmount::from(a.amount / 2);
+        let c_amount = CurrencyAmount::from(a.amount / 2);
         // TODO: Add fees / fee address, use genesis utxos or something?
-        // let fee_amount = TransactionAmount::from(a.amount / 10);
+        // let fee_amount = CurrencyAmount::from(a.amount / 10);
 
         let mut req = TestContractRequest::default();
         let mut update = structs::TestContractUpdate::default();
@@ -182,7 +182,7 @@ impl TransactionGenerator {
         // TODO: Fee?
         let txb = TransactionBuilder::new()
             .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
-            .with_output(addr, &TransactionAmount::from( prev.utxo_entry.amount() as i64))
+            .with_output(addr, &CurrencyAmount::from( prev.utxo_entry.amount() as i64))
             .build().expect("Failed to build transaction")
             .sign(&prev.key_pair).expect("signed");
         txb

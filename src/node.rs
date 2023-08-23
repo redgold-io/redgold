@@ -54,6 +54,7 @@ use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::stream_handlers::IntervalFold;
+use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::Watcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
@@ -211,6 +212,18 @@ impl Node {
                 c.receiver.clone()
             ).await;
             join_handles.push(handle);
+
+            let opt_c = relay.contention.get(i);
+            let c = opt_c.expect("bucket partition creation error");
+            let handle = stream_handlers::run_interval_fold_or_recv(
+                ContentionConflictManager::new(relay.clone()),
+                relay.node_config.contention.interval.clone(),
+                false,
+                c.receiver.clone()
+            ).await;
+            join_handles.push(handle);
+
+
         }
 
 

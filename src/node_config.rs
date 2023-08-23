@@ -105,6 +105,23 @@ pub struct ContractConfig {
     pub ordering_delay: Duration,
 }
 
+impl Default for ContentionConfig {
+    fn default() -> Self {
+        Self {
+            channel_bound: 1000,
+            bucket_parallelism: 10,
+            interval: Duration::from_secs(1),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ContentionConfig {
+    pub channel_bound: usize,
+    pub bucket_parallelism: usize,
+    pub interval: Duration
+}
+
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
@@ -160,7 +177,8 @@ pub struct NodeConfig {
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
-    pub contract: ContractConfig
+    pub contract: ContractConfig,
+    pub contention: ContentionConfig
 }
 
 impl NodeConfig {
@@ -416,6 +434,7 @@ impl NodeConfig {
             tx_config: Default::default(),
             observation: Default::default(),
             contract: Default::default(),
+            contention: Default::default(),
         }
     }
 
