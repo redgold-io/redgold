@@ -107,7 +107,65 @@ jobs:
         with:
           name: redgold_linux
           path: ./redgold_linux
-
+  build-windows:
+    #    needs: [test]
+    if:
+      contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref)
+    runs-on: windows-latest
+    timeout-minutes: 100
+    permissions:
+      contents: write
+    env:
+      DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    outputs:
+      release_match: ${{ steps.check-branch.outputs.match }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+          target: x86_64-pc-windows-gnu
+          default: true
+          override: true
+      - uses: msys2/setup-msys2@v2
+      - run: echo "asdf" > ./redgold.exe
+      - shell: msys2 {0}
+        name: "Msys2 cargo build with dependencies"
+        if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          uname -a
+          ls -lA
+          pwd
+          pacman -S --noconfirm mingw-w64-x86_64-gmp
+          pacman -S --noconfirm mingw-w64-x86_64-rust
+          pacman -S --noconfirm mingw-w64-x86_64-openssl
+          pacman -S --noconfirm make 
+          echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
+          cargo build --release --target x86_64-pc-windows-gnu
+          ls 
+          ls target/
+          ls target/x86_64-pc-windows-gnu/
+          ls target/x86_64-pc-windows-gnu/release/
+          cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold.exe
+      - uses: actions/upload-artifact@v3
+        with:
+          name: redgold.exe
+          path: ./redgold.exe
   build-mac:
 #    needs: [test]
     if:
@@ -206,6 +264,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: redgold_mac
+      - name: Download redgold.exe windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: redgold.exe
 
       - name: Check branch
         id: check-branch
@@ -236,6 +298,7 @@ jobs:
       - run: echo "BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
       - run: echo "BUILD_SHORT_CHECKSUM=$(echo ${{env.BUILD_CHECKSUM_SHA256}} | tail -c 9)" >> $GITHUB_ENV
       - run: echo "BUILD_CHECKSUM_SHA512=$(shasum -a 512 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
+      - run: echo "WINDOWS_CHECKSUM=$(shasum -a 256 ./redgold.exe | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
 
       # TODO Change on branch release?
       - name: Calculate Mac SHA256 Checksum
@@ -253,7 +316,7 @@ jobs:
           ', github.ref)
         run: echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
 
-      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
+      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac; chmod +X ./redgold.exe
 
       # Docker Image
       # TODO: This works but need to setup self hosted registry also
@@ -303,6 +366,11 @@ jobs:
       # Mac
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
+      - run: aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac
+      # Windows
+      - run: echo ${{ env.WINDOWS_CHECKSUM }} > windows_checksum
+      - run: aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_windows_checksum
+      - run: aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold.exe
 
       # Upload versioned artifacts
       - if:
@@ -316,7 +384,9 @@ jobs:
           aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum &&
           aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum && 
           aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha256_checksum &&
+          aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/windows_checksum &&
           aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac
+          aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold.exe
 #      - run: cd .; echo 'Intended upload path: s3://${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}'
       - run: cd vue-explorer; npm install && npm run build
       - run: cd docs; npm install && npm run generate
@@ -361,6 +431,7 @@ jobs:
           files: |
             redgold_linux
             redgold_mac
+            redgold.exe
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
@@ -380,7 +451,9 @@ jobs:
           
           linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM }}
                      
-          mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}
+          
+          windows_sha256=${{ env.WINDOWS_CHECKSUM }}  
           
           build_number=${{ github.run_number }}
           
@@ -411,6 +484,7 @@ jobs:
           files: |
             redgold_linux
             redgold_mac
+            redgold.exe
           tag_name: "release/${{ env.VERSION }}"
           name: ${{ env.VERSION }}
           #           ${{steps.build_changelog.outputs.changelog}}
@@ -428,6 +502,8 @@ jobs:
           linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM }}
                      
           mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          
+          windows_sha256=${{ env.WINDOWS_CHECKSUM }}  
           
           build_number=${{ github.run_number }}
           
