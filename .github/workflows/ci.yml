@@ -202,7 +202,6 @@ jobs:
       - run: ls target/
       - run: ls target/x86_64-pc-windows-gnu/
       - run: cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold_windows.exe
-          cp ${{ env.BUILD_OUTPUT }} ./redgold_windows
 
 #      - run:  ;
         #      - name: Set up MinGW
