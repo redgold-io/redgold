@@ -277,8 +277,6 @@ jobs:
         if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         run: |
           echo "Branch is release branch, doing cargo publish"
@@ -374,12 +372,10 @@ jobs:
       - run: aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_windows_checksum
       - run: aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold.exe
 
-      # Versioned artifacts
+      # Upload versioned artifacts
       - if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         run: |
           aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
@@ -467,8 +463,6 @@ jobs:
       - if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
@@ -483,8 +477,6 @@ jobs:
       - if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         name: Release Versioned
         uses: softprops/action-gh-release@v1
