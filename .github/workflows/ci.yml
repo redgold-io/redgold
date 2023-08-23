@@ -10,51 +10,51 @@ env:
   DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
 on: push
 jobs:
-#  test:
-#    if:
-#      ${{ !contains('
-#      refs/heads/predev
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref) }}
-#    runs-on: ubuntu-latest-m
-#    timeout-minutes: 60
-#    permissions:
-#      contents: write
-#    outputs:
-#      version: ${{ steps.version.outputs.version }}
-##    env:
-##      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-#    steps:
-#      - uses: actions/checkout@v2
-#      - uses: actions/setup-node@v2
-#        with:
-#          node-version: '14'
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: ${{ env.TOOLCHAIN }}
-#      - uses: Swatinem/rust-cache@v1
-#        with:
-#          cache-on-failure: true
-#      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
-#      - run: echo "Github branch = ${{ env.BRANCH }}"
-#      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
-#      - id: version
-#        run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
-#      - run: echo "Testing version = ${{ env.VERSION }}"
-#      - run: ./bin/install_build_deps.sh
-#      - run: rustup toolchain list
-##      - run: rustup default nightly
-#      - run: rustup update
-#      - run: rustup -V
-#      - run: cargo clean
+  test:
+    if:
+      ${{ !contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref) }}
+    runs-on: ubuntu-latest-m
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+#    env:
+#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - run: echo "Github branch = ${{ env.BRANCH }}"
+      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - id: version
+        run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
+      - run: echo "Testing version = ${{ env.VERSION }}"
+      - run: ./bin/install_build_deps.sh
+      - run: rustup toolchain list
+#      - run: rustup default nightly
+      - run: rustup update
+      - run: rustup -V
+      - run: cargo clean
+      - run: cargo build --release
 #      - run: cargo build --release
-##      - run: cargo build --release
-#      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
-#      - run: ./bin/local_test.sh
+      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
+      - run: ./bin/local_test.sh
   build-linux:
 #    needs: [test]
     if:
@@ -107,61 +107,16 @@ jobs:
         with:
           name: redgold_linux
           path: ./redgold_linux
-#  build-linux-windows:
-#    runs-on: ubuntu-latest-m
-#    timeout-minutes: 100
-#    permissions:
-#      contents: write
-#    #    env:
-#    #      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-#    steps:
-#      - uses: actions/checkout@v2
-#      - uses: actions/setup-node@v2
-#        with:
-#          node-version: '14'
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          toolchain: ${{ env.TOOLCHAIN }}
-#          target: x86_64-pc-windows-gnu
-#          default: true
-#          override: true
-#      - uses: Swatinem/rust-cache@v1
-#        with:
-#          cache-on-failure: true
-#        # TODO: Update to use release plugin
-#        #      - run: cargo install cargo-release
-#        #      - run: cargo release # --execute --no-confirm --token ${{ secrets.GITHUB_TOKEN }}
-#      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
-#      - run: echo "Github branch = ${{ env.BRANCH }}"
-#      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
-#      - run: echo "Testing version = ${{ env.VERSION }}"
-#      - run: ./bin/install_build_deps.sh
-#      - run: rustup toolchain list
-##      - run: rustup default nightly
-#      - run: rustup update
-#      - run: rustup -V
-#      - run: cargo clean
-##      - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
-#      - run: cargo build --release --target x86_64-pc-windows-gnu
-#        # try CWD?
-#      #      - run: ./bin/local_test.sh "./target/release/redgold"
-#
-#      - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux
-#
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: redgold_windows
-#          path: ./redgold_windows
   build-windows:
     #    needs: [test]
-#    if:
-#      contains('
-#      refs/heads/predev
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref)
+    if:
+      contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref)
     runs-on: windows-latest
     timeout-minutes: 100
     permissions:
@@ -181,7 +136,15 @@ jobs:
           default: true
           override: true
       - uses: msys2/setup-msys2@v2
+      - run: echo "asdf" > ./redgold.exe
       - shell: msys2 {0}
+        name: "Msys2 cargo build with dependencies"
+        if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
@@ -198,37 +161,11 @@ jobs:
           ls target/
           ls target/x86_64-pc-windows-gnu/
           ls target/x86_64-pc-windows-gnu/release/
-      - run: ls 
-      - run: ls target/
-      - run: ls target/x86_64-pc-windows-gnu/
-      - run: cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold_windows.exe
-
-#      - run:  ;
-        #      - name: Set up MinGW
-        #        uses: egor-tensin/setup-mingw@v2
-        #        with:
-        #          platform: x64
-        #      - run: echo "asdf" > ./redgold_mac
-        #      - if:
-        #          contains('
-        #          refs/heads/staging
-        #          refs/heads/test
-        #          refs/heads/main
-        #          ', github.ref)
-        #      - run: Invoke-WebRequest -Uri https://gmplib.org/download/gmp/gmp-6.3.0.tar.lz -OutFile gmp-6.3.0.tar.lz
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: redgold_windows
-#          path: ./redgold_windows
-      #          curl -O https://redgold-public.s3.us-west-1.amazonaws.com/gmp63
-  #          tar xf gmp63
-  #          mv gmp-6.3.0 D:/gmp
-  #          cd D:/gmp
-  #          ./configure
-  #          make
-  #          make check
-  #          make install
-  #      - run: echo %cd%
+          cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold.exe
+      - uses: actions/upload-artifact@v3
+        with:
+          name: redgold.exe
+          path: ./redgold.exe
   build-mac:
 #    needs: [test]
     if:
@@ -327,6 +264,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: redgold_mac
+      - name: Download redgold.exe windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: redgold.exe
 
       - name: Check branch
         id: check-branch
@@ -359,6 +300,7 @@ jobs:
       - run: echo "BUILD_CHECKSUM_SHA256=$(shasum -a 256 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
       - run: echo "BUILD_SHORT_CHECKSUM=$(echo ${{env.BUILD_CHECKSUM_SHA256}} | tail -c 9)" >> $GITHUB_ENV
       - run: echo "BUILD_CHECKSUM_SHA512=$(shasum -a 512 ./redgold_linux | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
+      - run: echo "WINDOWS_CHECKSUM=$(shasum -a 256 ./redgold.exe | cut -d ' ' -f 1 | tr -d ' ')" >> $GITHUB_ENV
 
       # TODO Change on branch release?
       - name: Calculate Mac SHA256 Checksum
@@ -376,7 +318,7 @@ jobs:
           ', github.ref)
         run: echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
 
-      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac;
+      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac; chmod +X ./redgold.exe
 
       # Docker Image
       # TODO: This works but need to setup self hosted registry also
@@ -426,7 +368,13 @@ jobs:
       # Mac
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
+      - run: aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac
+      # Windows
+      - run: echo ${{ env.WINDOWS_CHECKSUM }} > windows_checksum
+      - run: aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_windows_checksum
+      - run: aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold.exe
 
+      # Versioned artifacts
       - if:
           contains('
           refs/heads/staging
@@ -440,7 +388,9 @@ jobs:
           aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum &&
           aws s3 cp docker_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/docker_sha256_checksum && 
           aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha256_checksum &&
+          aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/windows_checksum &&
           aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac
+          aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold.exe
 #      - run: cd .; echo 'Intended upload path: s3://${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}'
       - run: cd vue-explorer; npm install && npm run build
       - run: cd docs; npm install && npm run generate
@@ -485,6 +435,7 @@ jobs:
           files: |
             redgold_linux
             redgold_mac
+            redgold.exe
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
@@ -504,7 +455,9 @@ jobs:
           
           linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM }}
                      
-          mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}
+          
+          windows_sha256=${{ env.WINDOWS_CHECKSUM }}  
           
           build_number=${{ github.run_number }}
           
@@ -539,6 +492,7 @@ jobs:
           files: |
             redgold_linux
             redgold_mac
+            redgold.exe
           tag_name: "release/${{ env.VERSION }}"
           name: ${{ env.VERSION }}
           #           ${{steps.build_changelog.outputs.changelog}}
@@ -556,6 +510,8 @@ jobs:
           linux_sha256_end=${{ env.BUILD_SHORT_CHECKSUM }}
                      
           mac_sha256=${{ env.MAC_BUILD_CHECKSUM_SHA256 }}  
+          
+          windows_sha256=${{ env.WINDOWS_CHECKSUM }}  
           
           build_number=${{ github.run_number }}
           
