@@ -215,8 +215,6 @@ jobs:
         if:
           contains('
           refs/heads/staging
-          refs/heads/test
-          refs/heads/main
           ', github.ref)
         run: |
           echo "Branch is release branch, doing cargo publish"
