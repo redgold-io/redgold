@@ -67,7 +67,7 @@
         "structs.HashSearchRequest",
         "structs.HashSearchResponse",
         "structs.TransactionInfo",
-        "structs.TransactionAmount",
+        "structs.CurrencyAmount",
         "structs.AddressInfo",
         "structs.GetPeersInfoResponse",
         "structs.GetPeersInfoRequest",

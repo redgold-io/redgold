@@ -9,7 +9,7 @@ use metrics::{gauge, increment_counter};
 use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::{RgResult, SafeOption};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo};
-use redgold_schema::structs::{Address, ErrorInfo, SubmitTransactionRequest, Transaction, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, SubmitTransactionRequest, Transaction, CurrencyAmount};
 use crate::core::relay::Relay;
 use tokio_stream::StreamExt;
 use redgold_keys::KeyPair;
@@ -163,7 +163,7 @@ impl LiveE2E {
         let destination = addresses.iter()
             .find(|a| u.key_pair.address_typed() != a.clone().clone())
             .safe_get_msg("No destination address")?.clone().clone();
-        let amount = TransactionAmount::from_fractional(1f64).expect("");
+        let amount = CurrencyAmount::from_fractional(1f64).expect("");
         let tx = tx_b
             .with_output(&destination, &amount)
             .with_unsigned_input(u.utxo_entry.clone())?

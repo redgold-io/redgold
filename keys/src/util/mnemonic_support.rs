@@ -135,6 +135,10 @@ impl WordsPass {
         let pid = PeerId::from_pk(pk);
         Ok(pid)
     }
+    pub fn default_public_key(&self) -> RgResult<structs::PublicKey> {
+        let pk = self.public_at(default_node_internal_derivation_path(0))?;
+        Ok(pk)
+    }
 
     /*
     let k1 = Secp256k1::new();

@@ -25,7 +25,7 @@
 //     }
 // }
 
-use crate::structs::{Address, FixedUtxoId, Hash, Input, Output, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, FixedUtxoId, Hash, Input, Output, CurrencyAmount, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{RgResult, SafeBytesAccess, SafeOption, Transaction, WithMetadataHashable};
 
@@ -41,7 +41,7 @@ impl UtxoEntry {
         return self.output.as_ref().unwrap().amount();
     }
 
-    pub fn opt_amount(&self) -> Option<TransactionAmount> {
+    pub fn opt_amount(&self) -> Option<CurrencyAmount> {
         self.output.as_ref().and_then(|o| o.opt_amount_typed())
     }
 

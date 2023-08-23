@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, TypedValue, UtxoEntry};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry};
 use crate::utxo_id::UtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
@@ -193,18 +193,18 @@ impl Transaction {
     }
 
     pub fn total_output_amount_float(&self) -> f64 {
-        TransactionAmount::from(
+        CurrencyAmount::from(
         self.total_output_amount()
         ).to_fractional()
     }
 
-    pub fn output_amounts_by_product(&self) -> HashMap<ProductId, TransactionAmount> {
+    pub fn output_amounts_by_product(&self) -> HashMap<ProductId, CurrencyAmount> {
         let mut map = HashMap::new();
         for output in &self.outputs {
             if let Some(product_id) = output.product_id.as_ref() {
                 if let Some(a) = output.opt_amount() {
-                    let aa = map.get(product_id).map(|x: &TransactionAmount| x.amount + a).unwrap_or(a);
-                    map.insert(product_id.clone(), TransactionAmount::from(aa));
+                    let aa = map.get(product_id).map(|x: &CurrencyAmount| x.amount + a).unwrap_or(a);
+                    map.insert(product_id.clone(), CurrencyAmount::from(aa));
                 }
             }
         }
@@ -363,7 +363,7 @@ impl Transaction {
 
 }
 
-impl TransactionAmount {
+impl CurrencyAmount {
     pub fn from_fractional(a: f64) -> Result<Self, ErrorInfo> {
         if a <= 0 as f64 {
             Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
@@ -372,7 +372,7 @@ impl TransactionAmount {
             Err(ErrorInfo::error_info("Invalid transaction amount"))?
         }
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
-        Ok(TransactionAmount{
+        Ok(CurrencyAmount{
             amount
         })
     }

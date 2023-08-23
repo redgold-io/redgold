@@ -17,7 +17,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -122,6 +122,7 @@ pub struct Relay {
     pub mp_keygen_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartyKeygenRequest>>>,
     pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>,
     pub contract_state_manager_channels: Vec<Channel<ContractStateMessage>>,
+    pub contention: Vec<Channel<ContentionMessage>>,
 }
 
 
@@ -138,11 +139,20 @@ are instantiated by the node
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::core::transact::contention_conflicts::{ContentionInfo, ContentionMessage, ContentionMessageInner};
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
 // as the other 'half' here.
 impl Relay {
+
+    pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> RgResult<ContentionInfo> {
+        let (s, r) = flume::bounded::<RgResult<ContentionInfo>>(1);
+        let msg = ContentionMessage::new(&key, msg, s);
+        let index = key.div_mod(self.node_config.contention.bucket_parallelism.clone());
+        self.contention[index as usize].sender.send_err(msg)?;
+        r.recv_async_err().await?
+    }
 
     pub async fn send_contract_ordering_message(&self, tx: &Transaction, output: &Output) -> RgResult<ContractStateMarker> {
         let ck = output.request_contention_key()?;
@@ -524,6 +534,14 @@ impl Relay {
                 )
             );
         }
+        let mut contention = vec![];
+        for _ in 0..node_config.contention.bucket_parallelism {
+            contention.push(
+                internal_message::new_bounded_channel::<ContentionMessage>(
+                    node_config.contention.channel_bound.clone()
+                )
+            );
+        }
 
         Self {
             node_config: node_config.clone(),
@@ -543,7 +561,8 @@ impl Relay {
             discovery: internal_message::new_bounded_channel(100),
             mp_keygen_authorizations: Arc::new(Mutex::new(Default::default())),
             mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
-            contract_state_manager_channels
+            contract_state_manager_channels,
+            contention,
         }
     }
 }

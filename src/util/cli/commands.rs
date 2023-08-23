@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use rocket::form::FromForm;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, CurrencyAmount};
 use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::rounded_balance_i64;
@@ -125,7 +125,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new()
         .with_utxo(&utxo)?
-        .with_output(&destination, &TransactionAmount::from_fractional(p0.amount)?)
+        .with_output(&destination, &CurrencyAmount::from_fractional(p0.amount)?)
         .build()?
         .sign(&kp)?;
 

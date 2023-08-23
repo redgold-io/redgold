@@ -36,8 +36,8 @@ use redgold_schema::structs::{Address, BlockMetadata};
 // }
 
 pub struct GenesisDistribution{
-    pub(crate) address: Address,
-    pub(crate) amount: u64,
+    pub address: Address,
+    pub amount: u64,
 }
 
 pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>) -> Transaction {

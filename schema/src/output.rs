@@ -1,4 +1,4 @@
-use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, TransactionAmount, UtxoEntry};
+use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, RgResult, SafeOption};
 
@@ -113,9 +113,9 @@ impl Output {
         self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
     }
 
-    pub fn opt_amount_typed(&self) -> Option<TransactionAmount> {
+    pub fn opt_amount_typed(&self) -> Option<CurrencyAmount> {
         self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
-            .map(|a| TransactionAmount::from(a))
+            .map(|a| CurrencyAmount::from(a))
     }
 
     pub fn rounded_amount(&self) -> f64 {

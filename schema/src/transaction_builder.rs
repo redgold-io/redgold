@@ -1,5 +1,5 @@
 use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, Transaction};
-use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
+use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -10,7 +10,7 @@ pub struct TransactionBuilder {
 
 
 impl TransactionBuilder {
-    pub fn with_fee(&mut self, destination: &Address, amount: &TransactionAmount) -> RgResult<&mut Self> {
+    pub fn with_fee(&mut self, destination: &Address, amount: &CurrencyAmount) -> RgResult<&mut Self> {
         self.with_output(destination, amount);
         let option = self.transaction.outputs.last_mut();
         let mut o = option.ok_or(error_info("Missing output"))?;
@@ -58,7 +58,7 @@ impl TransactionBuilder {
         Ok(self)
     }
 
-    pub fn with_output(&mut self, destination: &Address, amount: &TransactionAmount) -> &mut Self {
+    pub fn with_output(&mut self, destination: &Address, amount: &CurrencyAmount) -> &mut Self {
         let output = Output::new(destination, amount.amount);
         self.transaction.outputs.push(output);
         self
@@ -86,7 +86,7 @@ impl TransactionBuilder {
 
     // TODO: Do we need to deal with contract state here?
     pub fn with_contract_deploy_output_and_predicate_input(
-        &mut self, code: impl AsRef<[u8]>, c_amount: TransactionAmount, use_predicate_input: bool) -> RgResult<&mut Self> {
+        &mut self, code: impl AsRef<[u8]>, c_amount: CurrencyAmount, use_predicate_input: bool) -> RgResult<&mut Self> {
         let destination = Address::script_hash(code.as_ref())?;
         let mut o = Output::default();
         o.address = Some(destination.clone());
