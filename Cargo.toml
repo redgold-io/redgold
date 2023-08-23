@@ -81,7 +81,7 @@ bitcoin-wallet = "1.1.0"
 rust-crypto = "0.2.36"
 # only used in schema?
 
-dashmap = "4.0.2"
+dashmap = "5.5.0"
 # Deprecate after moving into data module -- only for build
 
 crossbeam = "0.8.1"
