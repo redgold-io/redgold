@@ -278,9 +278,10 @@ impl NodeConfig {
         pd.node_metadata = vec![self.node_metadata_fixed()];
         pd.version_info = Some(self.version_info());
 
-        let tx = TransactionBuilder::new().with_output_peer_data(
-            &pair.address_typed(), pd, 0
-        ).transaction.clone();
+        let tx = TransactionBuilder::new()
+            .with_output_peer_data(&pair.address_typed(), pd, 0)
+            .with_peer_genesis_input(&pair.address_typed())
+            .transaction.sign(&pair).expect("Failed signing?").clone();
         tx
     }
 
