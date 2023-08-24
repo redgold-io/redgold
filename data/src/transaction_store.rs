@@ -30,7 +30,7 @@ impl TransactionStore {
 
         let mut pool = self.ctx.pool().await?;
         let rows = sqlx::query!(
-            r#"SELECT raw_transaction FROM transactions WHERE hash = ?1"#,
+            r#"SELECT raw FROM transactions WHERE hash = ?1"#,
             transaction_hash
         )
             .fetch_all(&mut *pool)
@@ -38,11 +38,8 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_transaction;
-            if let Some(o) = option1 {
-                let deser = Transaction::proto_deserialize(o)?;
-                res.push(deser);
-            }
+            let deser = Transaction::proto_deserialize(row.raw)?;
+            res.push(deser);
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
@@ -56,7 +53,7 @@ impl TransactionStore {
 
         let mut pool = self.ctx.pool().await?;
         let rows = sqlx::query!(
-            r#"SELECT raw_transaction, time FROM transactions WHERE time >= ?1 AND time < ?2"#,
+            r#"SELECT raw, time FROM transactions WHERE time >= ?1 AND time < ?2"#,
             start,
             end
         )
@@ -65,16 +62,12 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_transaction;
-            let t = row.time;
-            if let (Some(time), Some(o)) = (t, option1) {
-                let deser = Transaction::proto_deserialize(o)?;
-                let te = TransactionEntry{
-                    time: time as u64,
-                    transaction: Some(deser),
-                };
-                res.push(te);
-            }
+            let deser = Transaction::proto_deserialize(row.raw)?;
+            let te = TransactionEntry{
+                time: row.time as u64,
+                transaction: Some(deser),
+            };
+            res.push(te);
         }
         Ok(res)
     }
@@ -84,23 +77,19 @@ impl TransactionStore {
         transaction_hash: &Hash,
     ) -> Result<Option<Transaction>, ErrorInfo> {
 
-        let mut pool = self.ctx.pool().await?;
-
         let bytes = transaction_hash.safe_bytes()?;
         let rows = sqlx::query!(
-            r#"SELECT raw_transaction FROM transactions WHERE hash = ?1 AND rejection_reason IS NULL AND accepted = 1"#,
+            r#"SELECT raw FROM transactions WHERE hash = ?1 AND rejection_reason IS NULL AND accepted = 1"#,
             bytes
         )
-            .fetch_all(&mut *pool)
+            .fetch_all(&mut *self.ctx.pool().await?)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_transaction;
-            if let Some(o) = option1 {
-                let deser = Transaction::proto_deserialize(o)?;
-                res.push(deser);
-            }
+            let option1 = row.raw;
+            let deser = Transaction::proto_deserialize(option1)?;
+            res.push(deser);
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
@@ -114,7 +103,7 @@ impl TransactionStore {
 
         // : Map<Sqlite, fn(SqliteRow) -> Result<Record, Error>, SqliteArguments>
         let map = sqlx::query!(
-            r#"SELECT raw_transaction FROM transactions WHERE rejection_reason IS NULL AND accepted = 1
+            r#"SELECT raw FROM transactions WHERE rejection_reason IS NULL AND accepted = 1
             ORDER BY time DESC LIMIT ?1"#,
             limit
         );
@@ -122,11 +111,8 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_transaction;
-            if let Some(o) = option1 {
-                let deser = Transaction::proto_deserialize(o)?;
-                res.push(deser);
-            }
+            let deser = Transaction::proto_deserialize(row.raw)?;
+            res.push(deser);
         }
         Ok(res)
     }
@@ -192,7 +178,7 @@ impl TransactionStore {
 
         let bytes = transaction_hash.safe_bytes()?;
         let rows = sqlx::query!(
-            r#"SELECT raw_transaction, rejection_reason FROM transactions WHERE hash = ?1"#,
+            r#"SELECT raw, rejection_reason FROM transactions WHERE hash = ?1"#,
             bytes
         )
             .fetch_all(&mut *pool)
@@ -200,18 +186,15 @@ impl TransactionStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_transaction;
+            let option1 = row.raw;
             let rejection = row.rejection_reason;
-            if let Some(o) = option1 {
-                let deser = Transaction::proto_deserialize(o)?;
-                let mut rej = None;
-                if let Some(r) = rejection {
-                    let rr = ErrorInfo::proto_deserialize(r)?;
-                    rej = Some(rr);
-
-                }
-                res.push((deser, rej ))
+            let deser = Transaction::proto_deserialize(option1)?;
+            let mut rej = None;
+            if let Some(r) = rejection {
+                let rr = ErrorInfo::proto_deserialize(r)?;
+                rej = Some(rr);
             }
+            res.push((deser, rej ))
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
@@ -486,7 +469,7 @@ impl TransactionStore {
         let rows = sqlx::query!(
             r#"
         INSERT OR REPLACE INTO transactions
-        (hash, raw_transaction, time, rejection_reason, accepted) VALUES (?1, ?2, ?3, ?4, ?5)"#,
+        (hash, raw, time, rejection_reason, accepted) VALUES (?1, ?2, ?3, ?4, ?5)"#,
            hash_vec, ser, time, rejection_ser, accepted
         )
             .execute(&mut *pool)

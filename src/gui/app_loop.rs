@@ -250,7 +250,7 @@ pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut Local
             server.index.to_string(),
             server.peer_id_index.to_string(),
             server.username.clone().unwrap_or("".to_string()).clone(),
-            server.key_path.clone().unwrap_or("".to_string()).clone()
+            "".to_string()
         ]
         );
     }

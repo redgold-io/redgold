@@ -11,7 +11,7 @@ use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Serialize, Deserialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, ErrorInfo, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, Transaction, TrustLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, Transaction, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use warp::get;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
@@ -316,9 +316,11 @@ pub async fn handle_observation(o: &Observation, _r: &Relay) -> RgResult<Detaile
     })
 }
 
-pub fn convert_trust(trust: &TrustLabel) -> RgResult<DetailedTrust> {
+pub fn convert_trust(trust: &TrustRatingLabel) -> RgResult<DetailedTrust> {
+    let pid: Option<PeerId> = trust.peer_id.clone();
+    let h = pid.and_then(|p| p.peer_id).and_then(|h| h.hex().ok()).unwrap_or("".to_string());
     Ok(DetailedTrust{
-        peer_id: hex::encode(&trust.peer_id),
+        peer_id: h,
         trust: trust.trust_data.get(0).safe_get()?.label(),
     })
 }
@@ -353,7 +355,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<Detailed
         next_executable_checksum: vi.next_executable_checksum.clone().unwrap_or("".to_string()),
         next_upgrade_time: vi.next_upgrade_time.clone(),
         utxo_distance: nmd.partition_info.as_ref()
-            .and_then(|p| p.utxo_distance)
+            .and_then(|p| p.utxo)
             .map(|d| (d as f64) / 1000 as f64) // TODO: use a function for this
             .unwrap_or(1.0),
         port_offset: nmd.port_offset.unwrap_or(0),
@@ -414,8 +416,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                     let _ = if let Some((_peer_id, _existing)) = public_to_peer.get_mut(pk) {
                         // existing
                     } else {
-                        let query_result = r.ds.peer_store
-                            .node_peer_id_trust(pk).await?
+                        let query_result = r.get_trust_of_node_as_query(pk).await?
                             .unwrap_or({
                                 let empty = PeerTrustQueryResult {
                                     peer_id: PeerId::from_bytes(vec![]),

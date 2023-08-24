@@ -1,5 +1,5 @@
-use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, Transaction};
-use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry};
+use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, structs, Transaction};
+use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -170,6 +170,7 @@ impl TransactionBuilder {
         self
     }
 
+
     pub fn with_output_node_metadata(&mut self, destination: &Address, pd: NodeMetadata, height: i64) -> &mut Self {
         let mut data = StandardData::default();
         data.node_metadata = Some(pd);
@@ -180,6 +181,16 @@ impl TransactionBuilder {
         output.data = data;
 
         self.transaction.outputs.push(output);
+        self
+    }
+
+    pub fn with_peer_genesis_input(&mut self, address: &Address) -> &mut Self {
+        let mut input = Input::default();
+        input.input_type = Some(structs::InputType::PeerGenesis as i32);
+        let mut o = Output::default();
+        o.address = Some(address.clone());
+        input.output = Some(o);
+        self.transaction.inputs.push(input);
         self
     }
 

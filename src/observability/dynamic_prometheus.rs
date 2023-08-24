@@ -107,6 +107,6 @@ async fn debug_targets() {
     let relay2 = Relay::new(nc2.clone()).await;
     Node::prelim_setup(relay.clone()).await.unwrap();
     // Need to update peer node info to genesis peer node info maybe?
-    relay.ds.peer_store.add_peer_new(&relay2.peer_node_info().await.expect(""), 1f64, &nc.public_key()).await.unwrap();
+    relay.ds.peer_store.add_peer_new(&relay2.peer_node_info().await.expect(""), &nc.public_key()).await.unwrap();
     update_tick(&relay).await.unwrap();
 }

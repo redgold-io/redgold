@@ -87,13 +87,10 @@ impl UtxoEntry {
             transaction_hash: self.transaction_hash.clone(),
             output_index: self.output_index,
         };
-        return Input {
-            utxo_id: Some(utxo_id),
-            proof: vec![],
-            product_id: None,
-            output: self.output.clone(),
-            floating_utxo_id: None,
-        };
+        let mut input = Input::default();
+        input.utxo_id =  Some(utxo_id);
+        input.output = self.output.clone();
+        input
     }
 
     // pub fn address_index(&self) -> u32 {

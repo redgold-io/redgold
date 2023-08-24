@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
-use redgold_keys::transaction_support::TransactionBuilderSupport;
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::servers::Server;
 use redgold_schema::{RgResult, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, Seed, TrustData, VersionInfo};
@@ -254,7 +254,6 @@ impl NodeConfig {
         NodeMetadata{
             external_address: self.external_ip.clone(),
             public_key: Some(self.public_key()),
-            proof: None,
             node_type: Some(NodeType::Static as i32),
             version_info: Some(self.version_info()),
             partition_info: None,
@@ -273,15 +272,11 @@ impl NodeConfig {
 
     pub fn peer_tx_fixed(&self) -> Transaction {
         let pair = self.internal_mnemonic().active_keypair();
+        let mut pd = PeerData::default();
 
-        let pd = PeerData {
-            peer_id: Some(self.peer_id()),
-            merkle_proof: None,
-            proof: None,
-            node_metadata: vec![self.node_metadata_fixed()],
-            labels: vec![],
-            version_info: Some(self.version_info())
-        };
+        pd.peer_id = Some(self.peer_id());
+        pd.node_metadata = vec![self.node_metadata_fixed()];
+        pd.version_info = Some(self.version_info());
 
         let tx = TransactionBuilder::new().with_output_peer_data(
             &pair.address_typed(), pd, 0
@@ -298,12 +293,13 @@ impl NodeConfig {
         }
     }
 
-    pub fn node_tx_fixed(&self) -> Transaction {
+    pub fn node_tx_fixed(&self, opt: Option<&NodeMetadata>) -> Transaction {
         let pair = self.internal_mnemonic().active_keypair();
-        let tx = TransactionBuilder::new().with_output_node_metadata(
-            &pair.address_typed(), self.node_metadata_fixed(), 0
-        ).transaction.clone();
-        tx
+        let mut tx = TransactionBuilder::new().with_output_node_metadata(
+            &pair.address_typed(), opt.cloned().unwrap_or(self.node_metadata_fixed()), 0
+        ).with_peer_genesis_input(&pair.address_typed())
+            .transaction.clone();
+        tx.sign(&pair).expect("sign")
     }
 
     pub fn lb_client(&self) -> PublicClient {
