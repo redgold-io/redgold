@@ -15,9 +15,9 @@ use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, Transaction, TrustData};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -368,6 +368,25 @@ impl Relay {
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
+    }
+
+    pub async fn observe_tx(
+        &self,
+        tx_hash: &Hash,
+        state: State,
+        validation_type: ValidationType,
+        liveness: structs::ValidationLiveness
+    ) -> Result<ObservationProof, ErrorInfo> {
+        let mut hash = tx_hash.clone();
+        hash.hash_type = HashType::Transaction as i32;
+        let mut om = structs::ObservationMetadata::default();
+        om.observed_hash = Some(hash);
+        om.state = state as i32;
+        om.struct_metadata = struct_metadata_new();
+        om.observation_type = validation_type as i32;
+        om.validation_liveness = liveness as i32;
+            // TODO: It might be nice to grab the proof of a signature here?
+        self.observe(om).await
     }
 
     // TODO: add timeout

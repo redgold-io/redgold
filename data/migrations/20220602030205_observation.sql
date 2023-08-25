@@ -6,11 +6,11 @@ CREATE TABLE IF NOT EXISTS observation (
                                            height INTEGER NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS observation_height
+CREATE INDEX IF NOT EXISTS observation_height
     ON observation (height DESC );
 
-CREATE UNIQUE INDEX IF NOT EXISTS observation_time
+CREATE INDEX IF NOT EXISTS observation_time
     ON observation (time DESC );
 
-CREATE UNIQUE INDEX IF NOT EXISTS observation_key
+CREATE INDEX IF NOT EXISTS observation_key
     ON observation (public_key ASC);

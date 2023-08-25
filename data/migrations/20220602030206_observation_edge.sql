@@ -8,5 +8,5 @@ CREATE TABLE IF NOT EXISTS observation_edge (
                                                 PRIMARY KEY(observation_hash, leaf_hash, root, observed_hash)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS observation_edge_observed_hash
+CREATE INDEX IF NOT EXISTS observation_edge_observed_hash
     ON observation_edge (observed_hash DESC);

@@ -300,14 +300,8 @@ impl TransactionProcessContext {
 
     async fn observe(&self, validation_type: ValidationType, state: State) -> Result<ObservationProof, ErrorInfo> {
         let mut hash: Hash = self.transaction_hash.safe_get()?.clone();
-        hash.hash_type = HashType::Transaction as i32;
-        let mut om = structs::ObservationMetadata::default();
-        om.observed_hash = Some(hash);
-        om.state = Some(state as i32);
-        om.struct_metadata = struct_metadata_new();
-        om.observation_type = validation_type as i32;
         // TODO: It might be nice to grab the proof of a signature here?
-        self.relay.observe(om).await
+        self.relay.observe_tx(&hash, state, validation_type, structs::ValidationLiveness::Live).await
     }
 
     async fn immediate_validation(&mut self, transaction: &Transaction) -> Result<(), ErrorInfo> {

@@ -10,12 +10,11 @@ CREATE TABLE IF NOT EXISTS utxo (
                                     PRIMARY KEY (transaction_hash, output_index)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS utxo_address
+CREATE INDEX IF NOT EXISTS utxo_address
     ON utxo (address DESC);
 
-
-CREATE UNIQUE INDEX IF NOT EXISTS utxo_transaction_hash
+CREATE INDEX IF NOT EXISTS utxo_transaction_hash
     ON utxo (transaction_hash DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS utxo_time
+CREATE INDEX IF NOT EXISTS utxo_time
     ON utxo (time DESC);

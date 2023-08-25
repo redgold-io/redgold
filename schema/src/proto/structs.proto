@@ -470,6 +470,7 @@ enum State {
   FINALIZED = 1;
   // Does this belong here?
   REJECTED = 2;
+  Ordered = 3;
 }
 
 enum HashType {
@@ -497,6 +498,10 @@ enum ValidationType {
   PARTIAL = 1;
 }
 
+enum ValidationLiveness {
+  Live = 0;
+  PostConfirmation = 1;
+}
 
 // Metadata associated with some node observing and validating data associated with some hash
 message ObservationMetadata {
@@ -505,12 +510,14 @@ message ObservationMetadata {
   // Whether or not we have fully resolved all prior dependencies associated with the data internally
   ValidationType observation_type = 2;
   // How much we have accepted this data, whether or not sufficient time has passed to consider it confirmed
-  optional State state = 3;
+  State state = 3;
   // The degree of certainty associated with our validation, based on trustworthiness of information received from
   // other peers
   TrustData validation_confidence = 4;
   // Information about this object itself, such as time produced and hash representations of it
   StructMetadata struct_metadata = 5;
+  ValidationLiveness validation_liveness = 6;
+  TrustData liveness_confidence = 7;
 }
 
 

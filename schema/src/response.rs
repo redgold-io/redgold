@@ -98,7 +98,7 @@ impl SubmitTransactionResponse {
         self.check_by_state(expected_count, State::Pending)
     }
     pub fn check_by_state(&self, expected_count: usize, state: State) -> Result<(), ErrorInfo> {
-        let accepted_count = self.unique_by_state()?.iter().filter(|(_, s)| **s == state as i32).count();
+        let accepted_count = self.unique_by_state()?.iter().filter(|(_, s)| *s == state as i32).count();
         if accepted_count >= expected_count {
             Ok(())
         } else {
@@ -106,12 +106,12 @@ impl SubmitTransactionResponse {
                                    state.json_or(), expected_count, accepted_count)))
         }
     }
-    pub fn unique_by_state(&self) -> Result<HashSet<(&PublicKey, &i32)>, ErrorInfo> {
+    pub fn unique_by_state(&self) -> Result<HashSet<(&PublicKey, i32)>, ErrorInfo> {
         let mut results = HashSet::new();
         for p in &self.query_transaction_response
             .safe_get()?
             .observation_proofs {
-            let state = p.metadata.safe_get()?.state.safe_get()?;
+            let state = p.metadata.safe_get()?.state;
             let pk = p.proof.safe_get()?.public_key.safe_get()?;
             results.insert((pk, state));
         }
@@ -119,7 +119,7 @@ impl SubmitTransactionResponse {
     }
 
     pub fn count_unique_by_state(&self) -> Result<HashMap<i32, usize>, ErrorInfo> {
-        let map: HashMap<i32, usize> = self.unique_by_state()?.iter().map(|(_, y)| *y.clone()).counts();
+        let map: HashMap<i32, usize> = self.unique_by_state()?.iter().map(|(_, y)| y.clone()).counts();
         Ok(map)
     }
 

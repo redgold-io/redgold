@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS nodes (
 );
 
 
-CREATE UNIQUE INDEX IF NOT EXISTS nodes_peer_id
+CREATE INDEX IF NOT EXISTS nodes_peer_id
     ON nodes (peer_id DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS nodes_last_seen
+CREATE INDEX IF NOT EXISTS nodes_last_seen
     ON nodes (last_seen DESC);

@@ -289,7 +289,7 @@ pub fn convert_observation_metadata(om: &ObservationMetadata) -> RgResult<Detail
         validation_type:
         format!("{:?}", ValidationType::from_i32(om.observation_type.clone()).safe_get()?.clone()),
         state:
-        format!("{:?}", State::from_i32(om.state.safe_get()?.clone()).safe_get()?.clone()),
+        format!("{:?}", State::from_i32(om.state.clone()).safe_get()?.clone()),
         validation_confidence: om.validation_confidence.as_ref()
             .map(|l| l.label() * 10.0)
             .unwrap_or(10.0),
@@ -456,7 +456,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                         public_to_peer.insert(pk.clone(), (query_result.clone(), ns.clone()));
                     };
 
-                    let state: State = State::from_i32(metadata.state.safe_get_msg("Missing state")?.clone())
+                    let state: State = State::from_i32(metadata.state.clone())
                         .safe_get_msg("state")?.clone();
 
                     if let Some((_pk, ns)) = public_to_peer.get_mut(pk) {

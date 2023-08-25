@@ -611,7 +611,8 @@ impl TransactionStore {
         rejection_reason: Option<ErrorInfo>,
     ) -> Result<i64, ErrorInfo> {
         let i = self.insert_transaction_raw(tx, time.clone(), accepted, rejection_reason).await?;
-        for entry in UtxoEntry::from_transaction(tx, time.clone() as i64) {
+        let vec = UtxoEntry::from_transaction(tx, time.clone() as i64);
+        for entry in vec {
             self.insert_utxo(&entry).await?;
         }
         self.insert_address_transaction(tx).await?;
@@ -660,7 +661,7 @@ impl TransactionStore {
         let has_code = output.validate_deploy_code().is_ok();
         let rows = sqlx::query!(
             r#"
-        INSERT OR REPLACE INTO utxo (transaction_hash, output_index,
+        INSERT INTO utxo (transaction_hash, output_index,
         address, output, time, amount, raw, has_code) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
             hash,
             output_index,

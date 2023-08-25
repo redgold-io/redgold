@@ -10,14 +10,14 @@ CREATE TABLE IF NOT EXISTS transaction_edge
 );
 
 
-CREATE UNIQUE INDEX IF NOT EXISTS transaction_edge_transaction_hash
+CREATE INDEX IF NOT EXISTS transaction_edge_transaction_hash
     ON transaction_edge (transaction_hash DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS transaction_edge_child_transaction_hash
+CREATE INDEX IF NOT EXISTS transaction_edge_child_transaction_hash
     ON transaction_edge (child_transaction_hash DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS transaction_edge_time
+CREATE INDEX IF NOT EXISTS transaction_edge_time
     ON transaction_edge (time DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS transaction_edge_address
+CREATE INDEX IF NOT EXISTS transaction_edge_address
     ON transaction_edge (address DESC);

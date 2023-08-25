@@ -7,5 +7,5 @@ CREATE TABLE IF NOT EXISTS transactions
     accepted INTEGER NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS transaction_time_desc
+CREATE INDEX IF NOT EXISTS transaction_time_desc
     ON transactions (time DESC );
