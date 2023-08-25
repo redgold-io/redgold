@@ -1,4 +1,4 @@
-host, index, peer_id_index, network_environment, username, key_path
-some_host, 0, 0, all, root, /home/user1/.ssh/id_rsa
-20.1.2.1, 1, 0, all, root, /home/user1/.ssh/id_rsa
-your_hostname_url.com, 2, 0, all, root, /home/user1/.ssh/id_rsa
+name,host,index,peer_id_index,network_environment,username,ipv4,alias,external_host
+name1,some_host,0,0,all,root,1.1.1.1,rando,asdf.com
+name2,20.1.2.1,1,0,main,ubuntu,2.2.2.2,wow,omg.com
+name3,yours.com,2,0,dev,admin,3.3.3.3,yep,n1.itsawebsite.com

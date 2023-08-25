@@ -130,7 +130,7 @@ pub struct NodeCli {
 pub struct AddServer {
     /// SSH compatible host name, either raw IP or CNAME
     #[clap(short, long)]
-    pub host: String,
+    pub ssh_host: String,
     /// SSH compatible user name for login, default root
     #[clap(short, long)]
     pub user: Option<String>,
@@ -161,7 +161,7 @@ pub struct SetServersCsv {
 #[derive(Args, Debug, Clone)]
 pub struct RemoveServer {
     /// SSH compatible host name, either raw IP or CNAME
-    #[clap(short, long)]
+    #[clap(long)]
     host: String
 }
 
@@ -286,7 +286,7 @@ pub struct GenerateMnemonic {
 #[derive(Args, Debug, Clone)]
 pub struct GenerateRandomWords {
     /// Source for hardware randomness, not required unless advanced user
-    #[clap(short, long)]
+    #[clap(long)]
     hardware: Option<String>,
 }
 
