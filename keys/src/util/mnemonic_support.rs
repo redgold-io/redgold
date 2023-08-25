@@ -13,7 +13,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH};
-use redgold_schema::structs::{Hash, NetworkEnvironment};
+use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 use crate::KeyPair;
 use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
 use crate::util::mnemonic_words::MnemonicWords;
@@ -144,6 +144,16 @@ impl WordsPass {
         let key = self.key_from_path_str(path)?;
         let vec = key.private_key.public_key(&Secp256k1::new()).serialize().to_vec();
         Ok(structs::PublicKey::from_bytes(vec))
+    }
+
+    pub fn default_peer_id(&self) -> RgResult<PeerId> {
+        let pk = self.public_at(default_node_internal_derivation_path(1))?;
+        let pid = PeerId::from_pk(pk);
+        Ok(pid)
+    }
+    pub fn default_public_key(&self) -> RgResult<structs::PublicKey> {
+        let pk = self.public_at(default_node_internal_derivation_path(0))?;
+        Ok(pk)
     }
 
     /*

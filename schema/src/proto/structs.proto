@@ -4,55 +4,73 @@ package structs;
 
 import "execution.proto";
 
-// TODO: Schema version hash
-
+// The verification type associated with a signature. Denotes common patterns, i.e. the default common ECDSA curve
+// and parameters, or a custom curve denoted by a particular enum, or a particular signing algorithm.
+// Each specific curve type or signing algorithm should be assigned it's own enum here, so that the signing
+// flow can be recreated from a single reference.
 enum SignatureType {
+  // The most common secp256k1 curve used for Bitcoin and Ethereum, corresponds to the standard ECDSA signature
+  // used by most hardware / software wallets
   ECDSA = 0;
+  // The same curve as above, but following the Bitcoin Message signing strategy in order to make use of existing
+  // hardware cold wallets, can be deprecated once hardware wallet support is added for native signatures matching
+  // Redgold schema.
   EcdsaBitcoinSignMessageHardware = 1;
 }
 
+// The raw data associated with a signature, along with type information for how to verify it. Does not include
+// the public key associated with the signature, which is stored separately (unless the signature type contains
+// recovery id within the bytes.)
 message Signature {
   BytesData bytes = 1;
   SignatureType signature_type = 2;
 }
 
+// Future placeholder in the event of use of different public key types, will eventually cover ed25519 etc.
 enum PublicKeyType {
+  // ECDSA Standard key type matching ECDSA signature type above
   secp256k1 = 0;
 }
 
+// Compressed public key byte data (33 bytes for standard ECDSA)
 message PublicKey {
+  // Encoded data form of the public key, requires a library for decoding to appropriate key instance
   BytesData bytes = 1;
+  // The type of public key, used to determine how to decode the bytes into a key instance
   PublicKeyType key_type = 2;
 }
 
-// TODO: BytesData for signature?
-// Multiple public key types
-// TODO: Move the 'repeated' into this so that we encompass multi-sig proofs inside a single class
+// Witness data for a particular signing event, does not include the hash required to re-verify the information.
 message Proof {
+  // Raw signing data, associated with the signature of a particular, individual hash, typically a transaction hash
   Signature signature = 1;
+  // The public key of the key that produced this signature, required to verify the signature in the event the
+  // signature type does not implement a recovery id.
   PublicKey public_key = 2;
 }
 
-// TODO: refactor
+// TODO: Refactor types here.
+// Currently unused, but an optional anti-spam proof included in a transaction for increased mem-pool priority
 message PoWProof {
   uint32 proof_type = 1;
   bytes proof = 2;
 }
 
+// Equivalent to a chainId identifier. Used as a marker for contracts or simplicity to indicate information
+// associated with the origin of a particular amount. Useful for schema-represented ERC-20 equivalent products.
 message ProductId {
   Hash network = 1;
   Hash product = 2;
 }
 
-// TODO: We need to handle case where UtxoId is missing, a floating dependency or input based on code execution.
 
-// TODO: Should we unify transaction hash / output_index into UtxoId?
 // TODO: Support other output extraction operations, a function that processes a transaction and results ?
 
+// Standard UTXO identifier similar to Bitcoin schema.
 message FixedUtxoId {
-  //  // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
+  // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
   Hash transaction_hash = 1;
-  //  // The index of the output in the parent transaction which is being spent.
+  // The index of the output in the parent transaction which is being spent / consumed.
   int64 output_index = 2;
 }
 
@@ -70,6 +88,10 @@ message OutputIndex {
   int64 output_index = 1;
 }
 
+enum InputType {
+  PeerGenesis = 0;
+}
+
 message Input {
 
   FixedUtxoId utxo_id = 1;
@@ -81,31 +103,32 @@ message Input {
   Output output = 5;
 
   FloatingUtxoId floating_utxo_id = 6;
+
+  optional InputType input_type = 7;
 }
 
 message TrustData {
   // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
   // Otherwise equivalent to a rounded float
-  int64 label = 2;
+  optional int64 label_rating = 2;
   // Confidence level associated with the label, how certain is this value?
   optional int64 confidence = 3;
   // Variance associated with the confidence estimate, sigma / stddev
   optional int64 hardness = 5;
   // Additional unstructured or otherwise custom label data
   optional StandardData data = 6;
+  bool allow_model_override = 7;
 }
 
-message TrustLabel {
-  // TODO: Should this be bytesData?
-  bytes peer_id = 1;
+message TrustRatingLabel {
+  PeerId peer_id = 1;
   repeated TrustData trust_data = 2;
 }
 
 message PartitionInfo {
-  // Times 1000
-  // TODO: Change to UtxoDistance
-  // so we can preserve PartialEq and convert explicitly
-  optional int64 utxo_distance = 1;
+  optional int64 utxo = 1;
+  optional int64 contract_address = 2;
+  optional int64 transaction_hash = 3;
 }
 
 // This also needs a proof maybe?
@@ -114,7 +137,6 @@ message NodeMetadata {
   string external_address = 1;
   // May not be to store public key if we merkle the multi_hashes too.
   PublicKey public_key = 3;
-  MerkleProof proof = 4;
   optional NodeType node_type = 5;
   optional VersionInfo version_info = 6;
   optional PartitionInfo partition_info = 7;
@@ -155,28 +177,12 @@ message PeerId {
 
 message PeerData {
   optional PeerId peer_id = 1;
-  optional MerkleProof merkle_proof = 2;
-  // This proof should be removed in favor of the one
-  // on the transaction itself
-  optional Proof proof = 3;
   repeated NodeMetadata node_metadata = 4;
-  // Rename as RatingLabel
-  // Also we need to store model outputs on NMD dynamic?
-  repeated TrustLabel labels = 5;
+  repeated TrustRatingLabel labels = 5;
   optional VersionInfo version_info = 6;
-  repeated Address addresses = 7;
+  Address reward_address = 7;
+  repeated Address sponsored_address = 8;
 }
-
-//// should i use kv pairs here to capture other features?
-//// or a typedValue or something?
-//message StoredPeerData {
-//  PeerData peer_data = 1;
-//  uint64 time = 2;
-//  optional TrustLabel secret_label = 3;
-//  optional double deterministic_trust = 4;
-//  optional double trust_score = 5;
-//  optional StandardData data = 6;
-//}
 
 enum BytesDecoder {
   STANDARD = 0;
@@ -203,6 +209,11 @@ message DynamicNodeMetadata {
   Proof proof = 2;
   PeerId peer_id = 3;
   int64 height = 4;
+}
+
+
+message StandardRequest {
+  StateSelector selector = 1;
 }
 
 // Where to store parquet schema, avro schema, etc. etc.
@@ -234,6 +245,9 @@ message StandardData {
   Observation observation = 14;
   optional string bitcoin_address = 15;
   optional string bitcoin_txid = 16;
+  BytesData state = 17;
+  BytesData request = 18;
+  StandardRequest standard_request = 19;
 }
 
 message KeyedTypedValue {
@@ -288,14 +302,20 @@ message OutputContract {
   CodeExecutionContract code_execution_contract = 2;
   optional int64 threshold = 3;
   repeated int64 weights = 4;
-  Address filter_predicate_destination = 5;
+  // What was this for? Are we ever gonna send to an address filter predicate that is different from the output address?
+//  Address filter_predicate_destination = 5;
+  bool pay_update_descendents = 6;
+  bool consumable = 7;
 }
 
 enum OutputType {
   Fee = 0;
+  Deploy = 1;
+  RequestCall = 2;
 }
 
 message Output {
+  // Basic unlock condition for using this as a consumable input. Script hash or hash of a public key.
   Address address = 1;
   ProductId product_id = 5;
   repeated Proof counter_party_proofs = 6;
@@ -303,6 +323,8 @@ message Output {
   StandardData data = 7;
   OutputContract contract = 8;
   optional OutputType output_type = 9;
+  // Used for specifying UTXO contract reference as well as address.
+  FixedUtxoId utxo_id = 10;
 }
 
 // monthly / daily / window size + window center
@@ -312,7 +334,7 @@ message TimeLockWindow {
   uint64 window_size = 3;
 }
 
-message TransactionAmount {
+message CurrencyAmount {
   int64 amount = 1;
 }
 
@@ -448,6 +470,7 @@ enum State {
   FINALIZED = 1;
   // Does this belong here?
   REJECTED = 2;
+  Ordered = 3;
 }
 
 enum HashType {
@@ -475,6 +498,10 @@ enum ValidationType {
   PARTIAL = 1;
 }
 
+enum ValidationLiveness {
+  Live = 0;
+  PostConfirmation = 1;
+}
 
 // Metadata associated with some node observing and validating data associated with some hash
 message ObservationMetadata {
@@ -483,12 +510,14 @@ message ObservationMetadata {
   // Whether or not we have fully resolved all prior dependencies associated with the data internally
   ValidationType observation_type = 2;
   // How much we have accepted this data, whether or not sufficient time has passed to consider it confirmed
-  optional State state = 3;
+  State state = 3;
   // The degree of certainty associated with our validation, based on trustworthiness of information received from
   // other peers
   TrustData validation_confidence = 4;
   // Information about this object itself, such as time produced and hash representations of it
   StructMetadata struct_metadata = 5;
+  ValidationLiveness validation_liveness = 6;
+  TrustData liveness_confidence = 7;
 }
 
 
@@ -738,6 +767,12 @@ message GetNodeTransactionRequest {
 
 }
 
+message GetContractStateMarkerRequest {
+  // TODO: should this be its own id class?
+  Address address = 1;
+  StateSelector selector = 2;
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -759,10 +794,18 @@ message Request {
   MultipartyAuthenticationRequest multiparty_authentication_request = 18;
   HealthRequest health_request = 19;
   GetNodeTransactionRequest get_node_transaction_request = 20;
+  GetContractStateMarkerRequest get_contract_state_marker_request = 21;
+  Address resolve_code_request = 22;
 }
 
 message HealthResponse {
 
+}
+
+message ResolveCodeResponse {
+  UtxoEntry utxo_entry = 1;
+  TransactionInfo transaction = 2;
+  ContractStateMarker contract_state_marker = 3;
 }
 
 message Response {
@@ -783,6 +826,8 @@ message Response {
   QueryObservationProofResponse query_observation_proof_response = 11;
   HashSearchResponse hash_search_response = 12;
   HealthResponse health_response = 14;
+  ContractStateMarker get_contract_state_marker_response = 15;
+  ResolveCodeResponse resolve_code_response = 16;
 }
 
 message QueryTransactionRequest {
@@ -949,6 +994,7 @@ message ErrorInfo {
   bool retriable = 6;
   string stacktrace = 7;
   string lib_message = 8;
+  bool abort = 9;
 }
 
 message TaskLocalDetails {
@@ -1153,14 +1199,64 @@ enum ExternalCurrency {
   Ethereum = 2;
 }
 
+
 message ExecutionInput {
-  structs.Transaction tx = 1;
+  Transaction tx = 1;
+  BytesData input = 2;
+  BytesData state = 3;
 }
 
 message ExecutionResult {
   bool valid = 1;
-  structs.ResponseMetadata result_metadata = 2;
+  ResponseMetadata result_metadata = 2;
   StandardData data = 3;
+}
+
+message StateSelector {
+  // TODO: query selector
+}
+
+message ContractStateMarker {
+  Address address = 1;
+  BytesData state = 2;
+  StateSelector selector = 3;
+  Hash transaction_marker = 4;
+  int64 nonce = 5;
+  int64 time = 6;
+}
+
+// Any value which can cause a conflict or collision among nodes due to disagreements in ordering.
+message ContentionKey {
+  // Classical conflict condition associated with double spends, two transactions which share a common parent
+  // causing a conflict or contention.
+  FixedUtxoId utxo_id = 1;
+  // Conflict conditions associated with deployed single-address contracts
+  Address address = 2;
+  // Combined with above address -- imposes a conflict ordering condition among a state subset denoted by a key index
+  StateSelector selector = 3;
+  // Duplicate transaction hash conflict condition -- associated with duplicate processing of same data.
+  // Primarily used internally for tracking internal contentions.
+  Hash transaction_hash = 4;
+}
+
+
+message TestContractUpdate {
+  string key = 1;
+  string value = 2;
+}
+
+message TestContractUpdate2 {
+  string value = 2;
+}
+
+message TestContractInternalState {
+  repeated TestContractUpdate test_map = 1;
+  optional string latest_value = 2;
+}
+
+message TestContractRequest {
+  TestContractUpdate test_contract_update = 1;
+  TestContractUpdate2 test_contract_update2 = 2;
 }
 
 

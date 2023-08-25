@@ -7,7 +7,11 @@ export default {
 
             if (hostname.includes('staging')) {
                 port = "16386";
-            } else {
+            } else if (hostname.includes('test')) {
+                port = "16286";
+            } else if (hostname.includes('main')) {
+                port = "16186";
+            } else { // default dev
                 port = "16486"
             }
             url += ":" + port

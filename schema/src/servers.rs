@@ -1,121 +1,70 @@
 use std::fs;
+use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
 use serde::Serialize;
 use serde::Deserialize;
-use crate::{error_info, ErrorInfoContext, json_or, json_pretty};
+use crate::{error_info, ErrorInfoContext, json_or, json_pretty, RgResult};
+use crate::errors::EnhanceErrorInfo;
 use crate::structs::{ErrorInfo, NetworkEnvironment};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
+    pub name: String,
     pub host: String,
     pub index: i64,
     pub peer_id_index: i64,
-    pub network_environment: NetworkEnvironment,
+    pub network_environment: String,
     pub username: Option<String>,
-    pub key_path: Option<String>,
     pub ipv4: Option<String>,
     pub alias: Option<String>,
-    pub external_host: Option<String>,
+    pub external_host: Option<String>
+}
+
+impl Server {
+    pub fn network_environment(&self) -> NetworkEnvironment {
+        NetworkEnvironment::parse(self.network_environment.clone())
+    }
+}
+
+fn parse_servers(str: &str) -> RgResult<Vec<Server>> {
+    let mut rdr = csv::Reader::from_reader(str.as_bytes());
+    let mut res = vec![];
+    for result in rdr.deserialize() {
+        // Notice that we need to provide a type hint for automatic
+        // deserialization.
+        let record: Server = result.error_info("server line parse failure")?;
+        res.push(record);
+    }
+    Ok(res)
 }
 
 impl Server {
     pub fn new(host: String) -> Self {
         Self {
-            host,
+            name: "".to_string(),
+            host: host.clone(),
             username: None,
-            key_path: None,
+            ipv4: None,
+            alias: None,
             ipv4: None,
             alias: None,
             index: 0,
             peer_id_index: 0,
             // TODO: Change to mainnet later
-            network_environment: NetworkEnvironment::All,
+            network_environment: NetworkEnvironment::All.to_std_string(),
+            external_host: Some(host),
             external_host: None,
         }
     }
 
-    pub fn parse_from_file(path: String)  -> Result<Vec<Self>, ErrorInfo> {
+    pub fn parse_from_file(path: PathBuf)  -> Result<Vec<Self>, ErrorInfo> {
         let contents = fs::read_to_string(path).error_info("file read failure")?;
-        Self::parse(contents)
+        Self::parse(contents).add("Servers file load path")
     }
 
     pub fn parse(contents: String) -> Result<Vec<Self>, ErrorInfo> {
-        let mut servers = Vec::new();
-        let mut default_index = 0;
-        for line in contents.lines().dropping(1) {
-            let mut split = line.split(",");
-            let host = split.next()
-                .ok_or(error_info("missing host line in servers file"))?
-                .trim().to_string();
-            let mut index = default_index;
-            let mut peer_id_index = 0;
-            let mut network_environment = NetworkEnvironment::All;
-            let mut username = None;
-            let mut key_path = None;
-            let mut ipv4 = None;
-            let mut alias = None;
-            let mut external_host = None;
-
-
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    index = i64::from_str(x.trim()).error_info(format!("invalid index: {}", x))?;
-                }
-            }
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    peer_id_index = i64::from_str(x.trim()).error_info(format!("invalid peer_id_index: {}", x))?;
-                }
-            }
-
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    network_environment = NetworkEnvironment::parse_safe(x.trim().to_string())?;
-                }
-            }
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    username = Some(x.trim().to_string())
-                }
-            }
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    key_path = Some(x.trim().to_string())
-                }
-            }
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    ipv4 = Some(x.trim().to_string())
-                }
-            }
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    alias = Some(x.trim().to_string())
-                }
-            }
-            if let Some(x) = split.next() {
-                if x.trim().len() > 0 {
-                    external_host = Some(x.trim().to_string())
-                }
-            }
-
-            default_index += 1;
-
-            servers.push(Server{
-                host,
-                index,
-                peer_id_index,
-                network_environment,
-                username,
-                key_path,
-                ipv4,
-                alias,
-                external_host,
-            })
-
-        }
-        Ok(servers)
+        parse_servers(&contents)
     }
 }
 

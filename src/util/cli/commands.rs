@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use rocket::form::FromForm;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, CurrencyAmount};
 use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::rounded_balance_i64;
@@ -28,14 +28,17 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
     let max_index = servers.iter().map(|s| s.index).max().unwrap_or(-1);
     let this_index = add_server.index.unwrap_or(max_index + 1);
     servers.push(Server{
-        host: add_server.host.clone(),
+        name: "".to_string(),
+        host: add_server.ssh_host.clone(),
         username: add_server.user.clone(),
-        key_path: add_server.key_path.clone(),
+        ipv4: None,
+        alias: None,
         ipv4: None,
         alias: None,
         index: this_index,
         peer_id_index: add_server.peer_id_index.unwrap_or(this_index),
-        network_environment: NetworkEnvironment::All,
+        network_environment: NetworkEnvironment::All.to_std_string(),
+        external_host: None,
         external_host: None,
     });
     ds.config_store.insert_update("servers".to_string(), json(&servers)?).await?;
@@ -128,7 +131,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new()
         .with_utxo(&utxo)?
-        .with_output(&destination, &TransactionAmount::from_fractional(p0.amount)?)
+        .with_output(&destination, &CurrencyAmount::from_fractional(p0.amount)?)
         .build()?
         .sign(&kp)?;
 
@@ -214,14 +217,15 @@ pub fn add_server_prompt() -> Server {
     let mut key_path = dirs::home_dir().expect("Home").join(".ssh/id_rsa").to_str().expect("str").to_string();
     std::io::stdin().read_line(&mut key_path).expect("Failed to read line");
     Server{
+        name: "".to_string(),
         host,
-        key_path: Some(key_path),
-        ipv4: None,
-        alias: None,
         index: 0,
         username: Some(username),
+        ipv4: None,
+        alias: None,
         peer_id_index: 0,
-        network_environment: NetworkEnvironment::All,
+        network_environment: NetworkEnvironment::All.to_std_string(),
+        external_host: None,
         external_host: None,
     }
 }

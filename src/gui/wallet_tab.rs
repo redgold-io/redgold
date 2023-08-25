@@ -11,7 +11,7 @@ use tracing::{error, info};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::{RgResult, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, TransactionAmount};
+use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, CurrencyAmount};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
@@ -515,7 +515,7 @@ fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, public: 
 pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String)
     -> Result<Transaction, ErrorInfo> {
     let destination = Address::parse(destination.clone())?;
-    let amount = TransactionAmount::from_float_string(amount)?;
+    let amount = CurrencyAmount::from_float_string(amount)?;
     let mut tb = TransactionBuilder::new();
     tb.with_address_info(ai.clone());
     tb.with_output(&destination, &amount);

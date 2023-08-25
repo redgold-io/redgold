@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, TransactionAmount, UtxoEntry};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry};
 use crate::utxo_id::UtxoId;
-use crate::{error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
+use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
 
@@ -135,6 +135,13 @@ impl Transaction {
             .sum::<i64>()
     }
 
+    pub fn output_of(&self, address: &Address) -> Vec<&structs::Output> {
+        self.outputs
+            .iter()
+            .filter_map(|o| o.address.as_ref().filter(|&a| a == address).map(|_| o))
+            .collect_vec()
+    }
+
     pub fn output_swap_amount_of(&self, address: &Address) -> i64 {
         self.outputs
             .iter()
@@ -186,18 +193,18 @@ impl Transaction {
     }
 
     pub fn total_output_amount_float(&self) -> f64 {
-        TransactionAmount::from(
+        CurrencyAmount::from(
         self.total_output_amount()
         ).to_fractional()
     }
 
-    pub fn output_amounts_by_product(&self) -> HashMap<ProductId, TransactionAmount> {
+    pub fn output_amounts_by_product(&self) -> HashMap<ProductId, CurrencyAmount> {
         let mut map = HashMap::new();
         for output in &self.outputs {
             if let Some(product_id) = output.product_id.as_ref() {
                 if let Some(a) = output.opt_amount() {
-                    let aa = map.get(product_id).map(|x: &TransactionAmount| x.amount + a).unwrap_or(a);
-                    map.insert(product_id.clone(), TransactionAmount::from(aa));
+                    let aa = map.get(product_id).map(|x: &CurrencyAmount| x.amount + a).unwrap_or(a);
+                    map.insert(product_id.clone(), CurrencyAmount::from(aa));
                 }
             }
         }
@@ -356,7 +363,7 @@ impl Transaction {
 
 }
 
-impl TransactionAmount {
+impl CurrencyAmount {
     pub fn from_fractional(a: f64) -> Result<Self, ErrorInfo> {
         if a <= 0 as f64 {
             Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
@@ -365,7 +372,7 @@ impl TransactionAmount {
             Err(ErrorInfo::error_info("Invalid transaction amount"))?
         }
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
-        Ok(TransactionAmount{
+        Ok(CurrencyAmount{
             amount
         })
     }
@@ -404,5 +411,24 @@ impl StandardData {
         let mut mt = Self::empty();
         mt.amount = Some(amount as i64);
         Some(mt)
+    }
+
+    pub fn bytes_data(bytes: &Vec<u8>) -> Self {
+        let mut mt = Self::empty();
+        mt.typed_value = Some(TypedValue::bytes(bytes));
+        mt
+    }
+
+    pub fn bytes(&self) -> Option<&BytesData> {
+        self.typed_value.as_ref().and_then(|t| t.bytes_value.as_ref())
+    }
+
+}
+
+impl TypedValue {
+    pub fn bytes(bytes: &Vec<u8>) -> Self {
+        let mut s = Self::default();
+        s.bytes_value = bytes_data(bytes.clone());
+        s
     }
 }

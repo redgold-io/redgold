@@ -9,6 +9,7 @@ pub mod proof_support;
 pub mod request_support;
 pub mod transaction_support;
 pub mod util;
+pub mod debug;
 
 use crate::util::mnemonic_words::generate_key_i;
 

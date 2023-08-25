@@ -6,15 +6,13 @@ use crate::schema::SafeOption;
 
 #[derive(Clone)]
 pub struct ObservationStore {
-    pub ctx: DataStoreContext
+    pub ctx: DataStoreContext,
 }
 
 impl ObservationStore {
-
     pub async fn count_total_observations(
         &self
     ) -> Result<i64, ErrorInfo> {
-
         let mut pool = self.ctx.pool().await?;
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM observation"#
@@ -31,11 +29,10 @@ impl ObservationStore {
     }
 
     pub async fn select_latest_observation(&self, peer_key: PublicKey) -> Result<Option<Observation>, ErrorInfo> {
-
         let mut pool = self.ctx.pool().await?;
         let bytes = peer_key.bytes()?;
         let rows = sqlx::query!(
-            r#"SELECT raw_observation FROM observation WHERE public_key = ?1 ORDER BY height DESC LIMIT 1"#,
+            r#"SELECT raw FROM observation WHERE public_key = ?1 ORDER BY height DESC LIMIT 1"#,
             bytes
         )
             .fetch_all(&mut *pool)
@@ -43,11 +40,9 @@ impl ObservationStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_observation;
-            if let Some(o) = option1 {
-                let deser = Observation::proto_deserialize(o)?;
-                res.push(deser);
-            }
+            let option1 = row.raw;
+            let deser = Observation::proto_deserialize(option1)?;
+            res.push(deser);
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
@@ -55,13 +50,13 @@ impl ObservationStore {
 
     pub async fn insert_observation(&self, observation: &Observation, time: i64) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-        let hash =  observation.hash_or().safe_bytes()?;
+        let hash = observation.hash_or().safe_bytes()?;
         let ser = observation.proto_serialize();
         let public_key = observation.proof.safe_get()?.public_key_bytes()?.clone();
         let height = observation.height;
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO observation
-            (hash, raw_observation, public_key, time, height) VALUES
+            (hash, raw, public_key, time, height) VALUES
             (?1, ?2, ?3, ?4, ?5)"#,
             hash,
             ser,
@@ -78,7 +73,7 @@ impl ObservationStore {
     pub async fn query_time_observation(&self, start_time: i64, end_time: i64) -> Result<Vec<ObservationEntry>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
         let rows = sqlx::query!(
-            r#"SELECT raw_observation, time FROM observation WHERE time >= ?1 AND time <= ?2"#,
+            r#"SELECT raw, time FROM observation WHERE time >= ?1 AND time <= ?2"#,
             start_time,
             end_time
         )
@@ -87,15 +82,13 @@ impl ObservationStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let option1 = row.raw_observation;
-            if let Some(o) = option1 {
-                let deser = Observation::proto_deserialize(o)?;
-                let time = row.time.safe_get()?.clone();
-                let mut entry = ObservationEntry::default();
-                entry.observation = Some(deser);
-                entry.time = time as u64;
-                res.push(entry);
-            }
+            let option1 = row.raw;
+            let deser = Observation::proto_deserialize(option1)?;
+            let time = row.time.clone();
+            let mut entry = ObservationEntry::default();
+            entry.observation = Some(deser);
+            entry.time = time as u64;
+            res.push(entry);
         }
         Ok(res)
     }
@@ -104,17 +97,17 @@ impl ObservationStore {
         let mut pool = self.ctx.pool().await?;
         let hash = hash.safe_bytes()?;
         let rows = sqlx::query!(
-            r#"SELECT raw_observation, time FROM observation WHERE hash = ?1"#,
+            r#"SELECT raw, time FROM observation WHERE hash = ?1"#,
             hash
         )
             .fetch_all(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         for row in rows_m {
-            let option1 = row.raw_observation;
-            let o = option1.safe_get()?;
+            let option1 = row.raw;
+            let o = option1;
             let deser = Observation::proto_deserialize(o.clone())?;
-            let time = row.time.safe_get()?.clone();
+            let time = row.time.clone();
             let mut entry = ObservationEntry::default();
             entry.observation = Some(deser);
             entry.time = time as u64;
@@ -127,7 +120,7 @@ impl ObservationStore {
         let mut pool = self.ctx.pool().await?;
         let limit = limit.unwrap_or(10);
         let rows = sqlx::query!(
-            r#"SELECT raw_observation FROM observation ORDER BY time DESC LIMIT ?1"#,
+            r#"SELECT raw FROM observation ORDER BY time DESC LIMIT ?1"#,
             limit
         )
             .fetch_all(&mut *pool)
@@ -135,7 +128,7 @@ impl ObservationStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = vec![];
         for row in rows_m {
-            let o = row.raw_observation.safe_get()?.clone();
+            let o = row.raw;
             let deser = Observation::proto_deserialize(o)?;
             res.push(deser);
         }
@@ -168,7 +161,7 @@ impl ObservationStore {
         let mut res = vec![];
         for row in rows_m {
             let proof = ObservationProof::proto_deserialize(row.edge)?;
-            let time = row.time.safe_get()?.clone();
+            let time = row.time.clone();
             let mut edge = ObservationEdge::default();
             edge.observation_proof = Some(proof);
             edge.time = time;
@@ -199,7 +192,7 @@ impl ObservationStore {
         let mut pool = self.ctx.pool().await?;
         let proof = observation_edge.observation_proof.safe_get()?;
         let merkle = proof.merkle_proof.clone();
-        let root =  merkle.clone().and_then(|m| m.root.clone()).safe_get()?.safe_bytes()?;
+        let root = merkle.clone().and_then(|m| m.root.clone()).safe_get()?.safe_bytes()?;
         let edge = proof.proto_serialize();
         let leaf_hash = merkle.and_then(|m| m.leaf.clone()).safe_bytes()?;
         let obs_hash = proof.observation_hash.safe_bytes()?;
@@ -221,6 +214,4 @@ impl ObservationStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
     }
-
-
 }

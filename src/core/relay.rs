@@ -9,15 +9,15 @@ use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerData, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
-use futures::future;
+use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -26,8 +26,11 @@ use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
+use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::request_support::RequestSupport;
 use redgold_keys::transaction_support::TransactionBuilderSupport;
+use redgold_schema::seeds::get_seeds;
+use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::{ProtoHashable, SafeOption, WithMetadataHashable};
@@ -119,7 +122,10 @@ pub struct Relay {
     pub discovery: Channel<DiscoveryMessage>,
     /// Authorization channel for multiparty keygen to determine room_id and participating keys
     pub mp_keygen_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartyKeygenRequest>>>,
-    pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>
+    pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>,
+    pub contract_state_manager_channels: Vec<Channel<ContractStateMessage>>,
+    pub contention: Vec<Channel<ContentionMessage>>,
+    pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
 }
 
 
@@ -136,18 +142,100 @@ are instantiated by the node
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::core::transact::contention_conflicts::{ContentionInfo, ContentionMessage, ContentionMessageInner};
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
 // as the other 'half' here.
 impl Relay {
 
+    pub async fn get_trust(&self) -> RgResult<HashMap<PeerId, f64>> {
+        let seeds = get_seeds().iter().filter_map(|s|
+            s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
+        ).collect::<HashMap<PeerId, f64>>();
+        let peer_tx = self.peer_tx().await?;
+        let pd = peer_tx.peer_data()?;
+
+        let mut hm = self.predicted_trust_overall_rating_score.lock().map_err(
+            |e| error_info(format!(
+                "Failed to lock predicted_trust_overall_rating_score {}", e.to_string()))
+        )?.clone();
+
+        for label in pd.labels {
+            let peer_id: Option<PeerId> = label.peer_id;
+            if let Some(peer_id) = peer_id {
+                for d in label.trust_data {
+                    if !d.allow_model_override {
+                        if let Some(r) = d.maybe_label() {
+                            hm.insert(peer_id.clone(), r);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(hm)
+        // Err(error_info("test"))
+    }
+
+    // Refactor this and below later to optimize lookup.
+    pub async fn get_trust_of_peer(&self, peer_id: &PeerId) -> RgResult<Option<f64>> {
+        let hm = self.get_trust().await?;
+        Ok(hm.get(peer_id).cloned())
+    }
+
+    pub async fn get_trust_of_node(&self, public_key: &PublicKey) -> RgResult<Option<f64>> {
+        let hm = self.get_trust().await?;
+        Ok(self.ds.peer_store.peer_id_for_node_pk(public_key).await?
+            .and_then(|p| hm.get(&p).cloned()))
+    }
+
+    pub async fn get_trust_of_node_as_query(&self, public_key: &PublicKey) -> RgResult<Option<PeerTrustQueryResult>> {
+        let hm = self.get_trust().await?;
+        let pid = self.ds.peer_store.peer_id_for_node_pk(public_key).await?;
+        if let Some(pid) = pid {
+            if let Some(t) = hm.get(&pid).cloned() {
+                return Ok(Some(PeerTrustQueryResult {
+                    peer_id: pid,
+                    trust: t,
+                }))
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> RgResult<ContentionInfo> {
+        let (s, r) = flume::bounded::<RgResult<ContentionInfo>>(1);
+        let msg = ContentionMessage::new(&key, msg, s);
+        let index = key.div_mod(self.node_config.contention.bucket_parallelism.clone());
+        self.contention[index as usize].sender.send_err(msg)?;
+        r.recv_async_err().await?
+    }
+
+    pub async fn send_contract_ordering_message(&self, tx: &Transaction, output: &Output) -> RgResult<ContractStateMarker> {
+        let ck = output.request_contention_key()?;
+        let h = ck.div_mod(self.node_config.contract.bucket_parallelism.clone());
+        let c = self.contract_state_manager_channels.get(h as usize).expect("missing channel");
+        let (s,r) = flume::bounded::<RgResult<ContractStateMarker>>(1);
+        let msg = ContractStateMessage::ProcessTransaction {
+                transaction: tx.clone(),
+                output: output.clone(),
+                response: s
+        };
+        c.sender.send_err(msg)?;
+        r.recv_async_err().await?
+    }
+
     pub async fn node_tx(&self) -> RgResult<Transaction> {
         let tx = self.ds.config_store.get_node_tx().await?;
         if let Some(tx) = tx {
             Ok(tx)
         } else {
-            let tx = self.node_config.node_tx_fixed();
+            let pd = self.peer_tx().await?.peer_data()?;
+            let matching_peer_tx = pd.node_metadata.iter().filter(
+                |nmd| nmd.public_key == Some(self.node_config.public_key())
+            ).collect_vec();
+            let opt = matching_peer_tx.get(0).cloned();
+            let tx = self.node_config.node_tx_fixed(opt);
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)
         }
@@ -158,7 +246,7 @@ impl Relay {
         if let Some(tx) = tx {
             Ok(tx)
         } else {
-            let tx = self.node_config.peer_tx_fixed();
+            let tx = self.node_config.env_data_folder().peer_tx().await.ok().unwrap_or(self.node_config.peer_tx_fixed());
             self.ds.config_store.set_peer_tx(&tx).await?;
             Ok(tx)
         }
@@ -280,6 +368,25 @@ impl Relay {
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
+    }
+
+    pub async fn observe_tx(
+        &self,
+        tx_hash: &Hash,
+        state: State,
+        validation_type: ValidationType,
+        liveness: structs::ValidationLiveness
+    ) -> Result<ObservationProof, ErrorInfo> {
+        let mut hash = tx_hash.clone();
+        hash.hash_type = HashType::Transaction as i32;
+        let mut om = structs::ObservationMetadata::default();
+        om.observed_hash = Some(hash);
+        om.state = state as i32;
+        om.struct_metadata = struct_metadata_new();
+        om.observation_type = validation_type as i32;
+        om.validation_liveness = liveness as i32;
+            // TODO: It might be nice to grab the proof of a signature here?
+        self.observe(om).await
     }
 
     // TODO: add timeout
@@ -500,6 +607,23 @@ impl Relay {
     pub async fn new(node_config: NodeConfig) -> Self {
         // Inter thread processes
         let ds = node_config.data_store().await;
+        let mut contract_state_manager_channels = vec![];
+        for _ in 0..node_config.contract.bucket_parallelism {
+            contract_state_manager_channels.push(
+                internal_message::new_bounded_channel::<ContractStateMessage>(
+                    node_config.contract.contract_state_channel_bound.clone()
+                )
+            );
+        }
+        let mut contention = vec![];
+        for _ in 0..node_config.contention.bucket_parallelism {
+            contention.push(
+                internal_message::new_bounded_channel::<ContentionMessage>(
+                    node_config.contention.channel_bound.clone()
+                )
+            );
+        }
+
         Self {
             node_config: node_config.clone(),
             mempool: internal_message::new_bounded_channel::<TransactionMessage>(node_config.mempool.channel_bound),
@@ -518,6 +642,9 @@ impl Relay {
             discovery: internal_message::new_bounded_channel(100),
             mp_keygen_authorizations: Arc::new(Mutex::new(Default::default())),
             mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
+            contract_state_manager_channels,
+            contention,
+            predicted_trust_overall_rating_score: Arc::new(Mutex::new(Default::default())),
         }
     }
 }

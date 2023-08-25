@@ -32,40 +32,9 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
     } else {
         let h = from_hex(hash_input.clone())?;
         let hash = Hash::new(h.clone());
-        let maybe_transaction = relay.ds.transaction_store.query_maybe_transaction(&hash).await?;
-        let mut observation_proofs = vec![];
-        let mut transaction = None;
-        let mut rejection_reason = None;
-        let mut state = TransactionState::Pending;
-
-        if let Some((t, e)) = maybe_transaction.clone() {
-            observation_proofs = relay.ds.observation.select_observation_edge(&hash.clone()).await?;
-            transaction = Some(t);
-            rejection_reason = e;
-            // Query UTXO by hash only for all valid outputs.
-            let valid_utxo_output_ids = relay.ds.transaction_store
-                .query_utxo_output_index(&hash)
-                .await?;
-
-            let accepted = rejection_reason.is_none();
-
-
-            if accepted {
-                state = TransactionState::Accepted;
-            } else {
-                state = TransactionState::Rejected
-            }
-
-            response.transaction_info = Some(TransactionInfo {
-                transaction,
-                observation_proofs,
-                valid_utxo_index: valid_utxo_output_ids,
-                used_outputs: vec![],
-                accepted: accepted,
-                rejection_reason,
-                queried_output_index_valid: None,
-                state: state as i32,
-            });
+        let maybe_tx_info = relay.ds.resolve_transaction_hash(&hash).await?;
+        if let Some(tx_info) = maybe_tx_info {
+            response.transaction_info = Some(tx_info);
             return Ok(response)
         }
     }

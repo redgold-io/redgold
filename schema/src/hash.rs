@@ -53,6 +53,10 @@ impl Hash {
         Self::new(Sha3_256::digest(&s).to_vec())
     }
 
+    pub fn div_mod(&self, bucket: usize) -> i64 {
+        self.vec().iter().map(|i| i64::from(i.clone())).sum::<i64>() % (bucket as i64)
+    }
+
     pub fn merkle_combine(&self, right: Hash) -> Self {
         let mut vec = self.vec();
         vec.extend(right.vec());

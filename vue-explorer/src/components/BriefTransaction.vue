@@ -28,6 +28,7 @@
         <td>
           {{ transaction.bytes }}
         </td>
+        <td>{{ transaction.amount }}</td>
         <td>
           <RenderTime :timestamp="transaction.timestamp" />
         </td>
@@ -57,7 +58,7 @@ export default {
         {key: 'amount'},
         {key: 'fee'},
         {key: 'bytes'},
-        {key: 'amount'},
+        {key: 'total'},
         {
           key: 'timestamp', formatter: (value) => {
             return new Date(value).toLocaleString(); // This line is assuming the timestamp is in milliseconds

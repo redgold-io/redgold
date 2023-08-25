@@ -4,7 +4,7 @@ use log::info;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::{error_info, SafeOption, WithMetadataHashable};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, TransactionAmount};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, CurrencyAmount};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::relay::Relay;
@@ -66,6 +66,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
     for i in min_offset..max_offset {
         let key = node_config.internal_mnemonic().key_at(i);
         let address = key.address_typed();
+        info!("Querying faucet address: {}", &address.json_or());
         map.insert(address, key);
     }
 
@@ -98,7 +99,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         let mut builder = TransactionBuilder::new();
         let transaction = builder
             .with_utxo(&utxo.utxo_entry)?
-            .with_output(&addr, &TransactionAmount::from_fractional(5 as f64)?)
+            .with_output(&addr, &CurrencyAmount::from_fractional(5 as f64)?)
             .with_message("faucet")?
             .build()?
             .sign(&utxo.key_pair)?;

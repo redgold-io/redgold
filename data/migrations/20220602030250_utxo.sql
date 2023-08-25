@@ -3,8 +3,18 @@ CREATE TABLE IF NOT EXISTS utxo (
                                     output_index INTEGER NOT NULL,
                                     address    BLOB NOT NULL,
                                     output    BLOB NOT NULL,
-                                    time INTEGER,
+                                    time INTEGER NOT NULL,
                                     amount INTEGER,
                                     raw BLOB NOT NULL,
+                                    has_code INTEGER NOT NULL,
                                     PRIMARY KEY (transaction_hash, output_index)
-)
+);
+
+CREATE INDEX IF NOT EXISTS utxo_address
+    ON utxo (address DESC);
+
+CREATE INDEX IF NOT EXISTS utxo_transaction_hash
+    ON utxo (transaction_hash DESC);
+
+CREATE INDEX IF NOT EXISTS utxo_time
+    ON utxo (time DESC);

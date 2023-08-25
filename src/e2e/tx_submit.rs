@@ -8,7 +8,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
 use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, FixedUtxoId, SubmitTransactionResponse};
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 
 use crate::api::public_api::PublicClient;
@@ -120,6 +120,17 @@ impl TransactionSubmitter {
     }
     pub async fn submit_test_contract(&self) -> RgResult<SubmitTransactionResponse> {
         let tk = self.generator.lock().unwrap().generate_deploy_test_contract().await?;
+        let res = self.client.clone().send_transaction(&tk.transaction, true).await?;
+        self.generator.lock().unwrap().completed(tk);
+        res.at_least_1()?;
+        Ok(res)
+    }
+
+    // Direct output contract invocation call.
+    pub async fn submit_test_contract_call(&self, contract_address: &Address) -> RgResult<SubmitTransactionResponse> {
+        let tk = self.generator.lock().unwrap().generate_deploy_test_contract_request(
+            contract_address.clone()
+        ).await?;
         let res = self.client.clone().send_transaction(&tk.transaction, true).await?;
         self.generator.lock().unwrap().completed(tk);
         res.at_least_1()?;

@@ -18,7 +18,7 @@ use structs::{
     StructMetadata, Transaction,
 };
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, VersionInfo};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -51,6 +51,7 @@ pub mod input;
 pub mod debug_version;
 pub mod transaction_info;
 pub mod exec;
+pub mod contract;
 
 
 impl BytesData {
@@ -256,6 +257,7 @@ where
     // fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
     fn calculate_hash(&self) -> Hash;
     fn from_hex(hex_value: String) -> Result<Self, ErrorInfo>;
+    fn div_mod(&self, bucket: usize) -> i64;
 }
 
 impl<T> ProtoHashable for T
@@ -281,6 +283,10 @@ where
         clone.hash_clear();
         let input = clone.proto_serialize();
         Hash::digest(input)
+    }
+
+    fn div_mod(&self, bucket: usize) -> i64 {
+        self.calculate_hash().div_mod(bucket)
     }
 }
 
@@ -540,6 +546,7 @@ pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_
         retriable: false,
         stacktrace: stack,
         lib_message: lib_message.into(),
+        abort: false
     }
 }
 
@@ -831,3 +838,21 @@ impl ShortString for String {
 }
 
 pub type RgResult<T> = Result<T, ErrorInfo>;
+
+
+impl HashClear for BytesData {
+    fn hash_clear(&mut self) {}
+}
+
+impl HashClear for structs::ContentionKey {
+    fn hash_clear(&mut self) {}
+}
+
+impl ContentionKey {
+    pub fn contract_request(address: &Address, selector: Option<&StateSelector>) -> ContentionKey {
+        let mut s = Self::default();
+        s.address = Some(address.clone());
+        s.selector = selector.cloned();
+        s
+    }
+}

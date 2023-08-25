@@ -4,8 +4,8 @@ use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, ErrorInfo, TransactionAmount};
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::structs::{Address, AddressType, ErrorInfo, FixedUtxoId, TestContractRequest, CurrencyAmount};
+use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 
@@ -101,15 +101,45 @@ impl TransactionGenerator {
 
     pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
         let prev = self.finished_pool.pop().safe_get()?.clone();
-        let bytes = tokio::fs::read("test_contract_guest.wasm").await.error_info("Read failure")?;
+        let bytes = tokio::fs::read("./sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
         let mut tb = TransactionBuilder::new();
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
         let a = x.opt_amount().expect("a");
-        let c_amount = TransactionAmount::from(a.amount / 2);
+        let c_amount = CurrencyAmount::from(a.amount / 2);
         // TODO: Add fees / fee address, use genesis utxos or something?
-        // let fee_amount = TransactionAmount::from(a.amount / 10);
-        tb.with_contract_output(bytes, c_amount, true)?;
+        // let fee_amount = CurrencyAmount::from(a.amount / 10);
+        tb.with_contract_deploy_output_and_predicate_input(bytes, c_amount, true)?;
+        // tb.with_fee(fee_amount);
+        tb.with_remainder();
+        let tx= tb.transaction.sign(&prev.key_pair)?;
+        let tk = TransactionWithKey {
+            transaction: tx,
+            key_pairs: vec![prev.key_pair.clone()],
+        };
+        Ok(tk)
+    }
+
+    pub async fn generate_deploy_test_contract_request(&mut self, address: Address) -> RgResult<TransactionWithKey> {
+        let prev = self.finished_pool.pop().safe_get()?.clone();
+        let mut tb = TransactionBuilder::new();
+        let x = &prev.utxo_entry;
+        tb.with_unsigned_input(x.clone())?;
+        let a = x.opt_amount().expect("a");
+        let c_amount = CurrencyAmount::from(a.amount / 2);
+        // TODO: Add fees / fee address, use genesis utxos or something?
+        // let fee_amount = CurrencyAmount::from(a.amount / 10);
+
+        let mut req = TestContractRequest::default();
+        let mut update = structs::TestContractUpdate::default();
+        update.key = "ASDF".to_string();
+        update.value = "omg".to_string();
+        let mut update2 = structs::TestContractUpdate2::default();
+        update2.value = "TEST UPDATED".to_string();
+        req.test_contract_update = Some(update);
+        req.test_contract_update2 = Some(update2);
+
+        tb.with_contract_request_output(&address, &req.proto_serialize())?;
         // tb.with_fee(fee_amount);
         tb.with_remainder();
         let tx= tb.transaction.sign(&prev.key_pair)?;
@@ -152,7 +182,7 @@ impl TransactionGenerator {
         // TODO: Fee?
         let txb = TransactionBuilder::new()
             .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
-            .with_output(addr, &TransactionAmount::from( prev.utxo_entry.amount() as i64))
+            .with_output(addr, &CurrencyAmount::from( prev.utxo_entry.amount() as i64))
             .build().expect("Failed to build transaction")
             .sign(&prev.key_pair).expect("signed");
         txb

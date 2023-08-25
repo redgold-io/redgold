@@ -41,6 +41,7 @@ import BriefTransaction from "@/components/BriefTransaction.vue";
 // import ObservationDetail from "@/components/ObservationDetail.vue";
 import BriefObservation from "@/components/BriefObservation.vue";
 import BriefPeer from "@/components/BriefPeer.vue";
+import fetchHashInfo from "@/components/mixins/fetchHashInfo";
 
 export default {
   name: 'DashboardScreen',
@@ -56,6 +57,7 @@ export default {
     // HashLink
     // BTable
   },
+  mixins: [fetchHashInfo],
   data() {
     return {
       transactions: [
@@ -78,11 +80,11 @@ export default {
   },
   mounted() {
 
-    let url = process.env.VUE_APP_API_URL;
-    let port = "16486";
-
-    url += ":" + port
-
+    let url = this.getUrl()
+    // let url = process.env.VUE_APP_API_URL;
+    // let port = "16486";
+    //
+    // url += ":" + port
 
     axios.get(`${url}/explorer`)
         .then(response => {

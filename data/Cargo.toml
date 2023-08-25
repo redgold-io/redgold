@@ -1,6 +1,6 @@
 [package]
 name = "redgold-data"
-version = "0.1.9"
+version = "0.1.12"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -27,7 +27,11 @@ hex = { workspace = true }
 log = { workspace = true }
 
 
+polars = "0.32.1"
+
+
 [build-dependencies]
 sqlx = { version = "0.7.1", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
 tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
 rusqlite = "0.29.0"
+dirs = {workspace = true}

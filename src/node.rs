@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, Transaction, TrustData};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -50,9 +50,11 @@ use tokio::task::spawn_blocking;
 use tracing::Span;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::structs::TransactionState::Mempool;
+use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::stream_handlers::IntervalFold;
+use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::Watcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
@@ -200,6 +202,31 @@ impl Node {
             crate::core::mempool::Mempool::new(&relay), relay.node_config.mempool.interval.clone(), false
         ).await);
 
+        for i in 0..relay.node_config.contract.bucket_parallelism {
+            let opt_c = relay.contract_state_manager_channels.get(i);
+            let c = opt_c.expect("bucket partition creation error");
+            let handle = stream_handlers::run_interval_fold_or_recv(
+                ContractStateManager::new(relay.clone()),
+                relay.node_config.contract.interval.clone(),
+                false,
+                c.receiver.clone()
+            ).await;
+            join_handles.push(handle);
+
+            let opt_c = relay.contention.get(i);
+            let c = opt_c.expect("bucket partition creation error");
+            let handle = stream_handlers::run_interval_fold_or_recv(
+                ContentionConflictManager::new(relay.clone()),
+                relay.node_config.contention.interval.clone(),
+                false,
+                c.receiver.clone()
+            ).await;
+            join_handles.push(handle);
+
+
+        }
+
+
         join_handles
     }
 
@@ -244,6 +271,9 @@ impl Node {
                 address: node_config.internal_mnemonic().key_at(i as usize).address_typed(), amount: 10000
             }
         ).collect_vec();
+        for o in &outputs {
+            info!("genesis address: {}", o.address.json_or());
+        }
         let tx = genesis_tx_from(outputs); //EARLIEST_TIME
         let res = tx.to_utxo_entries(EARLIEST_TIME as u64).iter().zip(0..50).map(|(o, i)| {
             let kp = node_config.internal_mnemonic().key_at(i as usize);
@@ -281,6 +311,7 @@ impl Node {
             let existing = relay.ds.config_store.get_maybe_proto::<Transaction>("genesis").await?;
 
             if existing.is_none() {
+                info!("No genesis transaction found, generating new one");
                 let tx = Node::genesis_from(node_config.clone()).0;
                 // runtimes.auxiliary.block_on(
                 relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
@@ -290,8 +321,13 @@ impl Node {
                         .ds
                         .transaction_store
                         .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None)
-                        .await?;
+                        .await.expect("insert failed");
                 // }
+                let genesis_hash = tx.hash_or();
+                info!("Genesis hash {}", genesis_hash.json_or());
+                let obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+                let obs = relay.observe_tx(&genesis_hash, State::Finalized, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+                assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);
                 // .expect("Genesis inserted or already exists");
             }
 
@@ -331,8 +367,7 @@ impl Node {
             info!("Got LB node info {}, adding peer", result.json_or());
 
             // TODO: How do we handle situation where we get self peer id here other than an error?
-            relay.ds.peer_store.add_peer_new(result, 1f64,
-                                             &relay.node_config.public_key()).await?;
+            relay.ds.peer_store.add_peer_new(result, &relay.node_config.public_key()).await?;
 
             info!("Added peer, attempting download");
 
@@ -671,13 +706,13 @@ impl LocalNodes {
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[tokio::test]
 async fn e2e() {
-    e2e_async().await.expect("");
+    e2e_async(false).await.expect("");
     // let runtime = build_runtime(8, "e2e");
     // runtime.block_on(e2e_async()).expect("e2e");
 }
 
 
-async fn e2e_async() -> Result<(), ErrorInfo> {
+async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     util::init_logger_once();
     metrics_registry::register_metric_names();
     // metrics_registry::init_print_logger();
@@ -699,12 +734,17 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
     // show_balances();
 
     let client = start_node.public_client.clone();
+
+    for u in start_node.node.relay.ds.transaction_store.utxo_all_debug().await.expect("utxo all debug") {
+        info!("utxo at start: {}", u.json_or());
+    }
     //
     // let utxos = ds.query_time_utxo(0, util::current_time_millis())
     //     .unwrap();
     // info!("Num utxos from genesis {:?}", utxos.len());
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
+
     let submit = TransactionSubmitter::default(client.clone(),
                                                // runtime.clone(),
                                                spend_utxos
@@ -712,8 +752,21 @@ async fn e2e_async() -> Result<(), ErrorInfo> {
 
     submit.submit().await.expect("submit");
 
-    // submit.submit_test_contract().await.expect("submit test contract");
+    if contract_tests {
+        let res = submit.submit_test_contract().await.expect("submit test contract");
+        let ct = res.transaction.expect("tx");
+        let contract_address = ct.first_output_address().expect("cont");
+        let o = ct.outputs.get(0).expect("O");
+        let state = client.client_wrapper().contract_state(&contract_address).await.expect("res");
+        let state_json = TestContractInternalState::proto_deserialize(state.state.clone().expect("").value).expect("").json_or();
+        info!("First contract state marker: {} {}", state.json_or(), state_json);
 
+        submit.submit_test_contract_call(&contract_address ).await.expect("worx");
+        let state = client.client_wrapper().contract_state(&contract_address).await.expect("res");
+        let state_json = TestContractInternalState::proto_deserialize(state.state.clone().expect("").value).expect("").json_or();
+        info!("Second contract state marker: {} {}", state.json_or(), state_json);
+        return Ok(());
+    }
 
 
     // let utxos = ds.query_time_utxo(0, util::current_time_millis())
@@ -876,4 +929,12 @@ async fn data_store_test() {
     //     println!("xor_value: {} tx_hash: {}", hex::encode(xor_value), hex::encode(tx));
     // }
 
+}
+
+#[ignore]
+#[tokio::test]
+async fn e2e_dbg() {
+    e2e_async(true).await.expect("");
+    // let runtime = build_runtime(8, "e2e");
+    // runtime.block_on(e2e_async()).expect("e2e");
 }

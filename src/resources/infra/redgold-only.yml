@@ -5,6 +5,10 @@ services:
     image: redgoldio/redgold:${REDGOLD_NETWORK:-dev}
     container_name: redgold-${REDGOLD_NETWORK:-dev}
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "3"
     env_file:
       - ./var.env
 #    environment:
@@ -33,6 +37,6 @@ services:
     container_name: watchtower-${REDGOLD_NETWORK:-dev}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 120 --scope redgold-${REDGOLD_NETWORK:-dev}
+    command: --interval 120 --scope redgold-${REDGOLD_NETWORK:-dev} --cleanup
     labels:
       - "com.centurylinklabs.watchtower.scope=redgold-${REDGOLD_NETWORK:-dev}"

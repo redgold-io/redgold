@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
-use redgold_schema::{ErrorInfoContext, from_hex, ProtoSerde, RgResult, structs};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use redgold_schema::{ErrorInfoContext, json_from, RgResult, structs};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Transaction};
 use redgold_data::data_store::DataStore;
+use redgold_schema::servers::Server;
 
 // TODO: Move everything to use this
 
@@ -24,19 +25,17 @@ impl EnvDataFolder {
         tokio::fs::read_to_string(self.mnemonic_path()).await.error_info("Bad mnemonic read")
     }
 
+    pub async fn peer_tx(&self) -> RgResult<Transaction> {
+        let contents = tokio::fs::read_to_string(self.peer_tx_path()).await.error_info("Bad mnemonic read")?;
+        json_from(&*contents)
+    }
+
     pub fn peer_id_path(&self) -> PathBuf {
         self.path.join("peer_id")
     }
 
-    pub fn peer_id_tx_path(&self) -> PathBuf {
-        self.path.join("peer_id_tx")
-    }
-
-    pub fn peer_id_tx(&self) -> RgResult<structs::Transaction> {
-        let h = std::fs::read_to_string(self.peer_id_tx_path()).error_info("Bad peer_id_tx read")?;
-        let b = from_hex(h)?;
-        let result = structs::Transaction::proto_deserialize(b)?;
-        Ok(result)
+    pub fn peer_tx_path(&self) -> PathBuf {
+        self.path.join("peer_tx")
     }
 
     pub fn metrics_list(&self) -> PathBuf {
@@ -49,6 +48,10 @@ impl EnvDataFolder {
 
     pub fn servers_path(&self) -> PathBuf {
         self.path.join("servers")
+    }
+
+    pub fn servers(&self) -> RgResult<Vec<Server>> {
+        Server::parse_from_file(self.servers_path())
     }
 
     // Change to cert.pem

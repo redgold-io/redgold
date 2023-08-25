@@ -1,5 +1,5 @@
-use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, Transaction, WithMetadataHashable};
-use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, TransactionAmount, TransactionData, TransactionOptions, UtxoEntry};
+use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, structs, Transaction, WithMetadataHashable};
+use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -10,7 +10,7 @@ pub struct TransactionBuilder {
 
 
 impl TransactionBuilder {
-    pub fn with_fee(&mut self, destination: &Address, amount: &TransactionAmount) -> RgResult<&mut Self> {
+    pub fn with_fee(&mut self, destination: &Address, amount: &CurrencyAmount) -> RgResult<&mut Self> {
         self.with_output(destination, amount);
         let option = self.transaction.outputs.last_mut();
         let mut o = option.ok_or(error_info("Missing output"))?;
@@ -58,25 +58,39 @@ impl TransactionBuilder {
         Ok(self)
     }
 
-    pub fn with_output(&mut self, destination: &Address, amount: &TransactionAmount) -> &mut Self {
-        let output = Output {
-            address: Some(destination.clone()),
-            data: amount_data(amount.amount as u64),
-            product_id: None,
-            counter_party_proofs: vec![],
-            contract: None,
-            output_type: None,
-        };
+    pub fn with_output(&mut self, destination: &Address, amount: &CurrencyAmount) -> &mut Self {
+        let output = Output::new(destination, amount.amount);
         self.transaction.outputs.push(output);
         self
     }
 
+
+
+    pub fn with_contract_request_output(&mut self,
+                                        destination: &Address,
+                                        serialized_request: &Vec<u8>
+    ) -> RgResult<&mut Self> {
+        let mut o = Output::default();
+        o.address = Some(destination.clone());
+        let mut c = OutputContract::default();
+        c.pay_update_descendents = true;
+        o.contract = Some(c);
+        let mut d = StandardData::default();
+        d.request = bytes_data(serialized_request.clone());
+        o.data = Some(d);
+        o.output_type = Some(OutputType::RequestCall as i32);
+        self.transaction.outputs.push(o);
+        Ok(self)
+
+    }
+
     // TODO: Do we need to deal with contract state here?
-    pub fn with_contract_output(
-        &mut self, code: impl AsRef<[u8]>, c_amount: TransactionAmount, use_predicate_input: bool) -> RgResult<&mut Self> {
+    pub fn with_contract_deploy_output_and_predicate_input(
+        &mut self, code: impl AsRef<[u8]>, c_amount: CurrencyAmount, use_predicate_input: bool) -> RgResult<&mut Self> {
         let destination = Address::script_hash(code.as_ref())?;
         let mut o = Output::default();
         o.address = Some(destination.clone());
+        o.output_type = Some(OutputType::Deploy as i32);
         let mut contract = OutputContract::default();
         let mut code_exec = CodeExecutionContract::default();
         code_exec.code = bytes_data(code.as_ref().to_vec().clone());
@@ -167,6 +181,7 @@ impl TransactionBuilder {
         self
     }
 
+
     pub fn with_output_node_metadata(&mut self, destination: &Address, pd: NodeMetadata, height: i64) -> &mut Self {
         let mut data = StandardData::default();
         data.node_metadata = Some(pd);
@@ -177,6 +192,16 @@ impl TransactionBuilder {
         output.data = data;
 
         self.transaction.outputs.push(output);
+        self
+    }
+
+    pub fn with_peer_genesis_input(&mut self, address: &Address) -> &mut Self {
+        let mut input = Input::default();
+        input.input_type = Some(structs::InputType::PeerGenesis as i32);
+        let mut o = Output::default();
+        o.address = Some(address.clone());
+        input.output = Some(o);
+        self.transaction.inputs.push(input);
         self
     }
 
@@ -192,14 +217,7 @@ impl TransactionBuilder {
             .expect("address")
             .clone();
 
-        let output = Output {
-            address: Some(address),
-            data: amount_data(self.balance() as u64),
-            product_id: None,
-            counter_party_proofs: vec![],
-            contract: None,
-            output_type: None,
-        };
+        let output = Output::new(&address, self.balance());
         self.transaction.outputs.push(output);
         self
     }

@@ -14,7 +14,7 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
+use redgold_schema::structs::{ContractStateMarker, ExecutionInput, ExecutorBackend, FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -31,6 +31,7 @@ use crate::schema::structs::ObservationProof;
 use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
+use redgold_executor::extism_wrapper;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
@@ -108,7 +109,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     // let peer_publics = relay.ds.select_broadcast_peers().unwrap();
     let mut map = HashMap::<Vec<u8>, f64>::new();
     for peer in &an {
-        let t = relay.ds.peer_store.node_peer_id_trust(peer).await?.map(|q| q.trust).unwrap_or(0.0);
+        let t = relay.get_trust_of_node(peer).await?.unwrap_or(0.0);
         map.insert(peer.bytes.safe_bytes()?, t);
     }
 
@@ -291,22 +292,16 @@ impl TransactionProcessContext {
         if let Some(request_processor) = &self.request_processor {
             if let Some(utxo_ids) = &self.utxo_ids {
                 self.clean_utxo(&request_processor, utxo_ids, ii);
-                self.relay.transaction_channels.remove(self.transaction_hash.safe_get()?);
             }
         }
+        self.relay.transaction_channels.remove(self.transaction_hash.safe_get()?);
         Ok(())
     }
 
     async fn observe(&self, validation_type: ValidationType, state: State) -> Result<ObservationProof, ErrorInfo> {
         let mut hash: Hash = self.transaction_hash.safe_get()?.clone();
-        hash.hash_type = HashType::Transaction as i32;
-        let mut om = structs::ObservationMetadata::default();
-        om.observed_hash = Some(hash);
-        om.state = Some(state as i32);
-        om.struct_metadata = struct_metadata_new();
-        om.observation_type = validation_type as i32;
         // TODO: It might be nice to grab the proof of a signature here?
-        self.relay.observe(om).await
+        self.relay.observe_tx(&hash, state, validation_type, structs::ValidationLiveness::Live).await
     }
 
     async fn immediate_validation(&mut self, transaction: &Transaction) -> Result<(), ErrorInfo> {
@@ -584,6 +579,43 @@ impl TransactionProcessContext {
         submit_response.query_transaction_response = Some(query_transaction_response);
         submit_response.transaction = Some(transaction.clone());
         submit_response.transaction_hash = Some(hash.clone());
+
+        // Here now we need to send this transaction to a contract state manager if it's appropriate
+
+        // For now this is the 'deploy' operation -- but it's not correct / validated yet.
+        for o in &transaction.outputs {
+            if let Some(c) = o.contract
+                .as_ref().and_then(|c| c.code_execution_contract.as_ref()) {
+                if let Some(b) = c.executor {
+                    if b == (ExecutorBackend::Extism as i32) {
+                        if let Some(code) = &c.code {
+                            let mut input = ExecutionInput::default();
+                            input.tx = Some(transaction.clone());
+                            debug!("Invoking deploy contract call");
+                            let er = extism_wrapper::invoke_wasm(
+                                &*code.value,
+                                "extism_entrypoint",
+                                input
+                            ).await?;
+                            let mut csm = ContractStateMarker::default();
+                            csm.state = er.data.as_ref()
+                                .and_then(|d| d.state.clone());
+                            csm.address = o.address.clone();
+                            csm.time = transaction.time()?.clone();
+                            csm.nonce = 0;
+                            csm.transaction_marker = Some(transaction.hash_or());
+                            self.relay.ds.state.insert_state(csm).await?;
+                            // TODO: ^ save the error above and return it to the user for processing this?
+                            // we should know about this error well before we accept the transaction.
+                        }
+                    }
+                }
+            }
+            if o.is_request() {
+                let csm = self.relay.send_contract_ordering_message(&transaction, &o).await?;
+                info!("Accepted CSM: {}", csm.json_or())
+            }
+        }
 
         // TODO: Task local metrics update here
         // let hm: HashMap<String, String> = HashMap::new();

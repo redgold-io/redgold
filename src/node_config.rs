@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
-use redgold_keys::transaction_support::TransactionBuilderSupport;
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::servers::Server;
 use redgold_schema::{RgResult, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, Seed, TrustData, VersionInfo};
@@ -81,9 +81,46 @@ impl Default for ObservationConfig {
         }
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct ObservationConfig {
     pub channel_bound: usize,
+}
+
+impl Default for ContractConfig {
+    fn default() -> Self {
+        Self {
+            contract_state_channel_bound: 1000,
+            bucket_parallelism: 10,
+            interval: Duration::from_secs(1),
+            ordering_delay: Duration::from_secs(1)
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ContractConfig {
+    pub contract_state_channel_bound: usize,
+    pub bucket_parallelism: usize,
+    pub interval: Duration,
+    pub ordering_delay: Duration,
+}
+
+impl Default for ContentionConfig {
+    fn default() -> Self {
+        Self {
+            channel_bound: 1000,
+            bucket_parallelism: 10,
+            interval: Duration::from_secs(1),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ContentionConfig {
+    pub channel_bound: usize,
+    pub bucket_parallelism: usize,
+    pub interval: Duration
 }
 
 #[derive(Clone, Debug)]
@@ -154,6 +191,8 @@ pub struct NodeConfig {
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
+    pub contract: ContractConfig,
+    pub contention: ContentionConfig
     pub node_info: NodeInfoConfig
 }
 
@@ -228,7 +267,6 @@ impl NodeConfig {
         NodeMetadata{
             external_address: self.external_ip.clone(),
             public_key: Some(self.public_key()),
-            proof: None,
             node_type: Some(NodeType::Static as i32),
             version_info: Some(self.version_info()),
             partition_info: None,
@@ -254,9 +292,10 @@ impl NodeConfig {
         pd.node_metadata = vec![self.node_metadata_fixed()];
         pd.version_info = Some(self.version_info());
 
-        let tx = TransactionBuilder::new().with_output_peer_data(
-            &pair.address_typed(), pd, 0
-        ).transaction.clone();
+        let tx = TransactionBuilder::new()
+            .with_output_peer_data(&pair.address_typed(), pd, 0)
+            .with_peer_genesis_input(&pair.address_typed())
+            .transaction.sign(&pair).expect("Failed signing?").clone();
 
         self.env_data_folder().peer_id_tx().unwrap_or(tx)
     }
@@ -270,12 +309,13 @@ impl NodeConfig {
         }
     }
 
-    pub fn node_tx_fixed(&self) -> Transaction {
+    pub fn node_tx_fixed(&self, opt: Option<&NodeMetadata>) -> Transaction {
         let pair = self.words().default_kp().expect("");
-        let tx = TransactionBuilder::new().with_output_node_metadata(
-            &pair.address_typed(), self.node_metadata_fixed(), 0
-        ).transaction.clone();
-        tx
+        let mut tx = TransactionBuilder::new().with_output_node_metadata(
+            &pair.address_typed(), opt.cloned().unwrap_or(self.node_metadata_fixed()), 0
+        ).with_peer_genesis_input(&pair.address_typed())
+            .transaction.clone();
+        tx.sign(&pair).expect("sign")
     }
 
     pub fn lb_client(&self) -> PublicClient {
@@ -406,6 +446,8 @@ impl NodeConfig {
             tx_config: Default::default(),
             observation: Default::default(),
             node_info: NodeInfoConfig::default(),
+            contract: Default::default(),
+            contention: Default::default(),
         }
     }
 

@@ -25,5 +25,6 @@ with Kademlia distances. [ACCEPT](https://arxiv.org/pdf/2108.05236.pdf) consensu
 to the demonstrated primary optimization technique. For a full technical description and motivation of this project 
 please refer above to the [whitepaper](https://dev.docs.redgold.io/whitepaper/whitepaper).
 
+* This project is in experimental development and is not a production release / not yet on mainnet
 
 

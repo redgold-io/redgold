@@ -6,7 +6,14 @@ use std::path::Path;
 use tokio::runtime::Builder;
 
 async fn init_db() {
+
+    let home_fallback = dirs::home_dir()
+        .map(|d| d.join(".rg/sqlx/data_store.sqlite"))
+        .and_then(|d| d.to_str().map(|s| s.clone().to_string()))
+        .map(|d| format!("sqlite://{}", d));
+
     let path = std::env::var("DATABASE_URL")
+        .ok().or(home_fallback)
         .expect("database url not set")
         .replace("sqlite://", "file://");
 

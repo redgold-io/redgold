@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 use async_trait::async_trait;
 use futures::TryFutureExt;
+use itertools::Itertools;
 // use libp2p::request_response::RequestResponseMessage::Request;
 use log::info;
 use metrics::increment_counter;
@@ -23,23 +24,32 @@ Big question here is should discovery happen as eager push on Observation buffer
 or both?
 
 Probably both.
-*/
-
-
+ */
 #[async_trait]
 impl IntervalFold for Discovery {
     async fn interval_fold(&mut self) -> RgResult<()> {
-        let peers = self.relay.ds.peer_store
-            .active_nodes(None).await
+
+        // What happens if the peer is non-responsive?
+        let node_tx_all = self.relay.ds.peer_store.active_peer_node_info(None)
+            .await
             .add("Active nodes query in discovery failure")?;
 
+        let peers = node_tx_all.iter()
+            .filter_map(|x| x.node_metadata().ok())
+            .filter_map(|n| n.public_key)
+            .collect_vec();
+
+        assert_eq!(node_tx_all.len(), peers.len());
         // debug!("Running discovery for {} stored peers", peers.len());
         let mut results = HashSet::new();
 
+        // Should we first query to make sure this node is still valid?
+        // We need to make sure this hostname is unique, i.e. the stored peer we know about
+        // Compare the data store against the actual node.
         let mut req = structs::Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-        for (r, pk) in self.relay.broadcast_async(
-            peers.clone(), req, None).await?.iter().zip(peers.clone()) {
+        for (r, node_tx_original) in self.relay.broadcast_async(
+            peers.clone(), req, None).await?.iter().zip(node_tx_all.clone()) {
             match r {
                 Ok(o) => {
                     if let Some(o) = &o.get_peers_info_response {
@@ -50,37 +60,24 @@ impl IntervalFold for Discovery {
                         results.extend(o.peer_info.clone());
                         let info: Option<&PeerNodeInfo> = o.self_info.as_ref();
                         if let Some(info) = info {
-                            let latest_tx = info.latest_node_transaction.as_ref();
-                            let nmd = latest_tx.and_then(|t| {
-                                t.node_metadata().ok()
-                            });
-                            let current_key = nmd.as_ref().and_then(|n| n.public_key.as_ref());
-                            if let Some(ck) = current_key {
-                                if ck != &pk {
-                                    error!("Discovery response public key does not match request public key");
-                                    self.relay.ds.peer_store.remove_node(&pk).await?;
-                                } else {
-                                    // TODO: Move this to peer store, also do this for peer_tx
-                                    // Do the entire update thing as on_received_update_peer_node_info
-                                    // ...after validating it.
-                                    let tx = self.relay.ds.peer_store.query_public_key_node(&pk).await?;
-                                    if let Some(tx) = tx {
-                                        if let Some(tx_latest) = latest_tx {
-                                            if tx.hash_or() != tx_latest.hash_or() {
-                                                self.relay.ds.peer_store.insert_node(&tx_latest).await?;
-                                            }
-                                        }
-                                    }
+                            if let Some(latest_node_tx) = info.latest_node_transaction.as_ref() {
+                                if latest_node_tx != &node_tx_original {
+                                    error!("Discovery response node transaction does not match original");
+                                    let pk_o = node_tx_original.node_metadata().expect("nmd").public_key.expect("pk");
+                                    self.relay.ds.peer_store.remove_node(&pk_o).await?;
                                 }
                             }
+                            self.relay.ds.peer_store.add_peer_new(info,
+                                                                  &self.relay.node_config.public_key()
+                            ).await?;
                         }
                     }
-
-
                 }
                 Err(e) => {
                     error!("Error in discovery: {}", e.json_or());
-                    self.relay.ds.peer_store.remove_node(&pk).await?;
+                    self.relay.ds.peer_store.remove_node(
+                        &node_tx_original.node_metadata().expect("nmd").public_key.expect("")
+                    ).await?;
                 }
             }
         }
@@ -90,9 +87,8 @@ impl IntervalFold for Discovery {
         for r in &results {
             if let Some(pk) = r.latest_node_transaction.clone()
                 .and_then(|t| t.node_metadata().ok())
-                .and_then(|t| t.public_key){
+                .and_then(|t| t.public_key) {
                 if pk != self.relay.node_config.public_key() {
-
                     let known = self.relay.ds.peer_store.query_public_key_node(&pk).await?.is_some();
                     if !known {
                         debug!("Discovery invoking database add for new peer {}", pk.hex().expect("hex"));
@@ -100,7 +96,7 @@ impl IntervalFold for Discovery {
                         // For now just dropping errors to log
                         // TODO: Query trust for this peerId first, before updating trust score.
                         // Security thing here needs to be fixed later.
-                        self.relay.ds.peer_store.add_peer_new(r, 1f64, &self.relay.node_config.public_key()).await.log_error().ok();
+                        self.relay.ds.peer_store.add_peer_new(r, &self.relay.node_config.public_key()).await.log_error().ok();
                     }
                 }
             } else {
@@ -114,21 +110,20 @@ impl IntervalFold for Discovery {
 #[derive(Clone)]
 pub struct DiscoveryMessage {
     pub node_metadata: NodeMetadata,
-    pub dynamic_node_metadata: Option<DynamicNodeMetadata>
+    pub dynamic_node_metadata: Option<DynamicNodeMetadata>,
 }
 
 impl DiscoveryMessage {
     pub fn new(node_metadata: NodeMetadata, dynamic_node_metadata: Option<DynamicNodeMetadata>) -> Self {
         Self {
             node_metadata,
-            dynamic_node_metadata
+            dynamic_node_metadata,
         }
     }
 }
 
 #[async_trait]
 impl RecvForEachConcurrent<DiscoveryMessage> for Discovery {
-
     // TODO: Ensure discovery message is not for self
     async fn recv_for_each(&mut self, message: DiscoveryMessage) -> RgResult<()> {
         increment_counter!("redgold.peer.discovery.recv_for_each");
@@ -148,7 +143,7 @@ impl RecvForEachConcurrent<DiscoveryMessage> for Discovery {
                 tracing::debug!("Got discovery response for peer: {}", message.node_metadata.long_identifier());
                 res
             }
-            Err(e) => {Err(e)}
+            Err(e) => { Err(e) }
         };
         done.log_error().ok();
         if done.is_ok() {
@@ -161,7 +156,7 @@ impl RecvForEachConcurrent<DiscoveryMessage> for Discovery {
 
 #[derive(Clone)]
 pub struct Discovery {
-    relay: Relay
+    relay: Relay,
 }
 
 impl Discovery {
@@ -172,7 +167,6 @@ impl Discovery {
     }
 
     async fn process(&mut self, _message: DiscoveryMessage, result: Response) -> RgResult<()> {
-
         let result = result.about_node_response.safe_get_msg(
             "Missing about node response during peer discovery"
         );
@@ -189,10 +183,9 @@ impl Discovery {
 
         // TODO: Validate message and so on here.
         // Are we verifying auth on the response somewhere else?
-        self.relay.ds.peer_store.add_peer_new(res, 1f64, &self.relay.node_config.public_key()).await?;
+        self.relay.ds.peer_store.add_peer_new(res, &self.relay.node_config.public_key()).await?;
         tracing::debug!("Added new peer from immediate discovery: {}", short_peer_id);
 
         Ok(())
     }
-
 }

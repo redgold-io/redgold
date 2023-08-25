@@ -358,7 +358,7 @@ impl SSH {
         SSH{
             host: format!("{}:22", server.host.clone()),
             user: server.username.clone(),
-            private_key_path: server.key_path.clone(),
+            private_key_path: None,
             session: None,
         }
     }

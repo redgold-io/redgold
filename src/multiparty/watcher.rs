@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use log::{error, info};
 
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, TransactionAmount};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -261,7 +261,7 @@ impl Watcher {
             info!("Sending genesis funding to multiparty address from origin {a} using utxo {uu}");
             let mut tb = TransactionBuilder::new();
             tb.with_utxo(&u.utxo_entry)?;
-            tb.with_output(&destination, &TransactionAmount::from(u.utxo_entry.amount() as i64));
+            tb.with_output(&destination, &CurrencyAmount::from(u.utxo_entry.amount() as i64));
             let mut tx = tb.build()?;
             tx.sign(&u.key_pair)?;
             self.relay.submit_transaction_sync(&tx).await?;
@@ -352,7 +352,7 @@ impl Watcher {
             let destination_amount = ask_fulfillment.fulfilled_amount;
 
             tb.with_output(&destination_address,
-                           &TransactionAmount::from(destination_amount as i64)
+                           &CurrencyAmount::from(destination_amount as i64)
             );
             tb.with_last_output_deposit_swap(tx.tx_id.clone());
 

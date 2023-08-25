@@ -4,11 +4,13 @@ use crate::schema::output::output_data;
 use crate::schema::structs::{Block, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;
 use redgold_keys::TestConstants;
+use redgold_keys::transaction_support::TransactionBuilderSupport;
 use crate::schema::{struct_metadata, WithMetadataHashable};
 use redgold_schema::{constants, ProtoHashable};
 use redgold_schema::constants::{EARLIEST_TIME, REWARD_AMOUNT};
 use redgold_schema::output::tx_output_data;
-use redgold_schema::structs::{Address, BlockMetadata};
+use redgold_schema::structs::{Address, BlockMetadata, CurrencyAmount};
+use redgold_schema::transaction_builder::TransactionBuilder;
 //
 // pub fn genesis_from_values_amount(hash: &Vec<u8>, amount: u64) -> UtxoEntry {
 //     return UtxoEntry {
@@ -36,22 +38,20 @@ use redgold_schema::structs::{Address, BlockMetadata};
 // }
 
 pub struct GenesisDistribution{
-    pub(crate) address: Address,
-    pub(crate) amount: u64,
+    pub address: Address,
+    pub amount: u64,
 }
 
 pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>) -> Transaction {
-    let outputs = distribution
-        .iter().map(|d| tx_output_data(d.address.clone(), d.amount))
-        .collect_vec();
-    Transaction {
-        inputs: vec![],
-        outputs,
-        struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
-        options: None
+    let mut txb = TransactionBuilder::new();
+    for x in distribution {
+        txb.with_output(&x.address, &CurrencyAmount::from_fractional(x.amount as f64).expect("works"));
     }
-        .with_hash()
-        .clone()
+    let mut options = txb.transaction.options.as_mut().expect("");
+    options.salt = None;
+    let mut sm = txb.transaction.struct_metadata.as_mut().expect("smd");
+    sm.time = Some(EARLIEST_TIME);
+    txb.transaction.with_hash().clone()
 }
 
 pub fn create_genesis_transaction() -> Transaction {

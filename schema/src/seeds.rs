@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use crate::from_hex;
-use crate::structs::{NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, TrustLabel};
+use crate::structs::{NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, TrustRatingLabel};
 use crate::util::current_time_millis;
 
 

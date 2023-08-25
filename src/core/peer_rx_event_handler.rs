@@ -13,10 +13,10 @@ use metrics::increment_counter;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use redgold_schema::{json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{error_info, json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, Request, SubmitTransactionRequest};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, Request, ResolveCodeResponse, SubmitTransactionRequest};
 
 use crate::api::about;
 use crate::core::discovery::DiscoveryMessage;
@@ -93,13 +93,28 @@ impl PeerRxEventHandler {
 
     pub async fn request_response(relay: Relay, request: Request, _verified: RgResult<PublicKey>
                                   // , arc: Arc<Runtime>
-    ) -> Result<Response, ErrorInfo> {
+    ) -> RgResult<Response> {
 
 
         // TODO: Rate limiting here
 
         // TODO: add a uuid here
         let mut response = Response::empty_success();
+
+        if let Some(addr) = &request.resolve_code_request {
+            response.resolve_code_response = Some(relay.ds.resolve_code(addr).await?);
+        }
+
+        if let Some(r) = &request.get_contract_state_marker_request {
+            if let (Some(a), s) = (&r.address, r.selector.as_ref()) {
+                let res = relay.ds.state.query_recent_state(a, s, Some(1)).await?;
+                if let Some(csm) = res.get(0) {
+                    response.get_contract_state_marker_response = Some(csm.clone());
+                }
+            } else {
+                return Err(error_info("Missing address or utxo id"));
+            }
+        }
 
         // TODO: Check for auth info and use for rate limiting
         // oooh need a request id, 2 of them
