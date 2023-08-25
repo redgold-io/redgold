@@ -418,10 +418,10 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                         // existing
                     } else {
                         let pid = r.ds.peer_store.peer_id_for_node_pk(pk).await.ok().and_then(identity);
-                        let query_result = r.get_trust_of_node_as_query(pk).await?;
+                        let query_result = r.get_trust_of_node_as_query(pk).await?.clone();
                         let q = query_result.or(pid.map(|p| PeerTrustQueryResult{ peer_id: p, trust: 1.0 }));
 
-                        if let Some(query_result) = query_result {
+                        if let Some(query_result) = q {
                             let validation: f64 = metadata.validation_confidence
                                 .clone()
                                 .map(|v| v.label())
