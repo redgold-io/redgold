@@ -47,14 +47,11 @@ impl Server {
             username: None,
             ipv4: None,
             alias: None,
-            ipv4: None,
-            alias: None,
             index: 0,
             peer_id_index: 0,
             // TODO: Change to mainnet later
             network_environment: NetworkEnvironment::All.to_std_string(),
             external_host: Some(host),
-            external_host: None,
         }
     }
 

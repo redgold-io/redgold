@@ -268,7 +268,7 @@ pub async fn derive_mnemonic_and_peer_id(
     trust: Vec<TrustRatingLabel>,
     peer_id_tx: &mut HashMap<String, structs::Transaction>
 )
-    -> RgResult<(String, String, String)> {
+    -> RgResult<(String, String)> {
 
     // TODO: Make peer id transaction here using details.
     let w = WordsPass::new(mnemonic, passphrase);
@@ -289,23 +289,6 @@ pub async fn derive_mnemonic_and_peer_id(
         };
         pubkey = Some(pk.clone());
         pid_hex = pk.hex()?;
-        let pid = PeerId::from_hex(pid_hex.clone()).expect("");
-        let mut tb = TransactionBuilder::new();
-        let mut pd = PeerData::default();
-        let nmd_pk = new.default_kp().expect("").public_key.to_struct_public_key();
-        let nmd_vec = servers.iter().map(|s| {
-            let mut nmd = NodeMetadata::default();
-            nmd.peer_id = Some(pid.clone());
-            nmd.alias = s.alias.clone();
-            nmd.external_address = s.host.clone();
-            nmd.public_key = Some(nmd_pk.clone());
-            nmd
-        }).collect_vec();
-        pd.peer_id = Some(pid);
-        pd.node_metadata = nmd_vec;
-        // TODO: Need funding utxo? bypass if seed.
-        tb.with_output_peer_data(&pk.address().expect("a"), pd, 0);
-        ser_pid_tx =  hex::encode(tb.transaction.proto_serialize());
     }
     if !peer_id_tx.contains_key(&pid_hex) {
 
@@ -349,7 +332,7 @@ pub async fn derive_mnemonic_and_peer_id(
         };
         peer_id_tx.insert(pid_hex.clone(), tb.transaction.clone());
     }
-    Ok((server_mnemonic, pid_hex, ser_pid_tx))
+    Ok((server_mnemonic, pid_hex))
 }
 
 pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> RgResult<()> {
@@ -359,6 +342,24 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
         // Also set environment here to dev if not main
         deploy.skip_ops = true;
     }
+    let mut net = node_config.network;
+    if net == NetworkEnvironment::Local {
+        net = NetworkEnvironment::Dev;
+    } else {
+        if node_config.opts.network.is_none() {
+            if primary_gen {
+                net = NetworkEnvironment::Dev;
+            } else {
+                // TODO Enable this when mainnet
+                // net = NetworkEnvironment::Main;
+            }
+        }
+        // Get node_config arg translate and set to dev if arg not supplied.
+    }
+    if net == NetworkEnvironment::Main {
+        deploy.ask_pass = true;
+    }
+
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -395,20 +396,6 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
 
-    let mut net = node_config.network;
-    if net == NetworkEnvironment::Local {
-        net = NetworkEnvironment::Dev;
-    } else {
-        if node_config.opts.network.is_none() {
-            if primary_gen {
-                net = NetworkEnvironment::Dev;
-            } else {
-                // TODO Enable this when mainnet
-                // net = NetworkEnvironment::Main;
-            }
-        }
-        // Get node_config arg translate and set to dev if arg not supplied.
-    }
     let mut servers = s.to_vec();
     if let Some(i) = deploy.server_index {
         let x = servers.get(i as usize).expect("").clone();
@@ -440,14 +427,14 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
             &mut pid_tx
         ).await?;
 
-        let mut peer_tx_opt = None;
+        let mut peer_tx_opt: Option<structs::Transaction> = None;
         let words_opt = if deploy.words || deploy.words_and_id {
             Some(words.clone())
         } else {
             None
         };
         let peer_id_hex_opt = if deploy.peer_id  || deploy.words_and_id {
-            peer_tx_opt = pid_tx.get(&peer_id_hex).clone();
+            peer_tx_opt = pid_tx.get(&peer_id_hex).clone().cloned();
             Some(peer_id_hex.clone())
         } else {
             None
@@ -467,9 +454,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
                 words_opt,
                 peer_id_hex_opt,
                 !deploy.debug_skip_start,
-                peer_tx_opt
                 ss.alias.clone(),
-                None,
+                peer_tx_opt.map(|p| p.json_or())
             ).await.expect("worx");
         }
         gen = false;

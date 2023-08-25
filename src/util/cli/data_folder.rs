@@ -25,8 +25,8 @@ impl EnvDataFolder {
         tokio::fs::read_to_string(self.mnemonic_path()).await.error_info("Bad mnemonic read")
     }
 
-    pub async fn peer_tx(&self) -> RgResult<Transaction> {
-        let contents = tokio::fs::read_to_string(self.peer_tx_path()).await.error_info("Bad mnemonic read")?;
+    pub fn peer_tx(&self) -> RgResult<Transaction> {
+        let contents = std::fs::read_to_string(self.peer_tx_path()).error_info("Bad peer tx read")?;
         json_from(&*contents)
     }
 

@@ -192,7 +192,7 @@ pub struct NodeConfig {
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
     pub contract: ContractConfig,
-    pub contention: ContentionConfig
+    pub contention: ContentionConfig,
     pub node_info: NodeInfoConfig
 }
 
@@ -297,7 +297,7 @@ impl NodeConfig {
             .with_peer_genesis_input(&pair.address_typed())
             .transaction.sign(&pair).expect("Failed signing?").clone();
 
-        self.env_data_folder().peer_id_tx().unwrap_or(tx)
+        self.env_data_folder().peer_tx().unwrap_or(tx)
     }
 
     pub fn dynamic_node_metadata_fixed(&self) -> DynamicNodeMetadata {
