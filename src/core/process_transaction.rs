@@ -109,7 +109,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     // let peer_publics = relay.ds.select_broadcast_peers().unwrap();
     let mut map = HashMap::<Vec<u8>, f64>::new();
     for peer in &an {
-        let t = relay.ds.peer_store.node_peer_id_trust(peer).await?.map(|q| q.trust).unwrap_or(0.0);
+        let t = relay.get_trust_of_node(peer).await?.unwrap_or(0.0);
         map.insert(peer.bytes.safe_bytes()?, t);
     }
 
@@ -300,14 +300,8 @@ impl TransactionProcessContext {
 
     async fn observe(&self, validation_type: ValidationType, state: State) -> Result<ObservationProof, ErrorInfo> {
         let mut hash: Hash = self.transaction_hash.safe_get()?.clone();
-        hash.hash_type = HashType::Transaction as i32;
-        let mut om = structs::ObservationMetadata::default();
-        om.observed_hash = Some(hash);
-        om.state = Some(state as i32);
-        om.struct_metadata = struct_metadata_new();
-        om.observation_type = validation_type as i32;
         // TODO: It might be nice to grab the proof of a signature here?
-        self.relay.observe(om).await
+        self.relay.observe_tx(&hash, state, validation_type, structs::ValidationLiveness::Live).await
     }
 
     async fn immediate_validation(&mut self, transaction: &Transaction) -> Result<(), ErrorInfo> {

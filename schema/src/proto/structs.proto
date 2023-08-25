@@ -88,6 +88,10 @@ message OutputIndex {
   int64 output_index = 1;
 }
 
+enum InputType {
+  PeerGenesis = 0;
+}
+
 message Input {
 
   FixedUtxoId utxo_id = 1;
@@ -99,31 +103,30 @@ message Input {
   Output output = 5;
 
   FloatingUtxoId floating_utxo_id = 6;
+
+  optional InputType input_type = 7;
 }
 
 message TrustData {
   // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
   // Otherwise equivalent to a rounded float
-  int64 label = 2;
+  optional int64 label_rating = 2;
   // Confidence level associated with the label, how certain is this value?
   optional int64 confidence = 3;
   // Variance associated with the confidence estimate, sigma / stddev
   optional int64 hardness = 5;
   // Additional unstructured or otherwise custom label data
   optional StandardData data = 6;
+  bool allow_model_override = 7;
 }
 
-message TrustLabel {
-  // TODO: Should this be bytesData?
-  bytes peer_id = 1;
+message TrustRatingLabel {
+  PeerId peer_id = 1;
   repeated TrustData trust_data = 2;
 }
 
 message PartitionInfo {
-  // Times 1000
-  // TODO: Change to UtxoDistance
-  // so we can preserve PartialEq and convert explicitly
-  optional int64 utxo_distance = 1;
+  optional int64 utxo = 1;
   optional int64 contract_address = 2;
   optional int64 transaction_hash = 3;
 }
@@ -134,7 +137,6 @@ message NodeMetadata {
   string external_address = 1;
   // May not be to store public key if we merkle the multi_hashes too.
   PublicKey public_key = 3;
-  MerkleProof proof = 4;
   optional NodeType node_type = 5;
   optional VersionInfo version_info = 6;
   optional PartitionInfo partition_info = 7;
@@ -175,27 +177,12 @@ message PeerId {
 
 message PeerData {
   optional PeerId peer_id = 1;
-  optional MerkleProof merkle_proof = 2;
-  // This proof should be removed in favor of the one
-  // on the transaction itself
-  optional Proof proof = 3;
   repeated NodeMetadata node_metadata = 4;
-  // Rename as RatingLabel
-  // Also we need to store model outputs on NMD dynamic?
-  repeated TrustLabel labels = 5;
+  repeated TrustRatingLabel labels = 5;
   optional VersionInfo version_info = 6;
+  Address reward_address = 7;
+  repeated Address sponsored_address = 8;
 }
-
-//// should i use kv pairs here to capture other features?
-//// or a typedValue or something?
-//message StoredPeerData {
-//  PeerData peer_data = 1;
-//  uint64 time = 2;
-//  optional TrustLabel secret_label = 3;
-//  optional double deterministic_trust = 4;
-//  optional double trust_score = 5;
-//  optional StandardData data = 6;
-//}
 
 enum BytesDecoder {
   STANDARD = 0;
@@ -483,6 +470,7 @@ enum State {
   FINALIZED = 1;
   // Does this belong here?
   REJECTED = 2;
+  Ordered = 3;
 }
 
 enum HashType {
@@ -510,6 +498,10 @@ enum ValidationType {
   PARTIAL = 1;
 }
 
+enum ValidationLiveness {
+  Live = 0;
+  PostConfirmation = 1;
+}
 
 // Metadata associated with some node observing and validating data associated with some hash
 message ObservationMetadata {
@@ -518,12 +510,14 @@ message ObservationMetadata {
   // Whether or not we have fully resolved all prior dependencies associated with the data internally
   ValidationType observation_type = 2;
   // How much we have accepted this data, whether or not sufficient time has passed to consider it confirmed
-  optional State state = 3;
+  State state = 3;
   // The degree of certainty associated with our validation, based on trustworthiness of information received from
   // other peers
   TrustData validation_confidence = 4;
   // Information about this object itself, such as time produced and hash representations of it
   StructMetadata struct_metadata = 5;
+  ValidationLiveness validation_liveness = 6;
+  TrustData liveness_confidence = 7;
 }
 
 

@@ -8,7 +8,7 @@ use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{InputSupport, TransactionBuilderSupport};
 use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, CurrencyAmount, UtxoEntry};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, CurrencyAmount, UtxoEntry, Input};
 use redgold_schema::transaction::amount_data;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::HDPathCursor;
@@ -249,12 +249,16 @@ pub fn get_standard_public_key(
     change: u32,
     index: u32
 ) -> Result<structs::PublicKey, ErrorInfo> {
-    let path = format!("{}/{}/{}",
-                       standard_xpub_path(account_num, non_standard_coin_type),
-                       change.to_string(),
-                       index.to_string()
-    );
+    let path = trezor_bitcoin_standard_path(account_num, non_standard_coin_type, change, index);
     get_public_node(path)?.public_key()
+}
+
+pub fn trezor_bitcoin_standard_path(account_num: u32, non_standard_coin_type: Option<String>, change: u32, index: u32) -> String {
+    format!("{}/{}/{}",
+            standard_xpub_path(account_num, non_standard_coin_type),
+            change.to_string(),
+            index.to_string()
+    )
 }
 
 //
@@ -294,6 +298,16 @@ pub async fn sign_transaction(transaction: &mut Transaction, public: structs::Pu
         }
     }
     Ok(transaction.clone())
+}
+
+pub async fn sign_input(i: &mut Input, public: &structs::PublicKey, path: String, hash: &Hash)
+    -> Result<Input, ErrorInfo> {
+    let proof = trezor_proof(&hash, public.clone(), path.clone())?;
+    let addr = public.address()?;
+    let proof1 = proof.clone();
+    i.proof.push(proof1);
+    i.verify_proof(&addr, hash)?;
+    Ok(i.clone())
 }
 
 

@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, TestContractInternalState, Transaction, TrustData};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -271,6 +271,9 @@ impl Node {
                 address: node_config.internal_mnemonic().key_at(i as usize).address_typed(), amount: 10000
             }
         ).collect_vec();
+        for o in &outputs {
+            info!("genesis address: {}", o.address.json_or());
+        }
         let tx = genesis_tx_from(outputs); //EARLIEST_TIME
         let res = tx.to_utxo_entries(EARLIEST_TIME as u64).iter().zip(0..50).map(|(o, i)| {
             let kp = node_config.internal_mnemonic().key_at(i as usize);
@@ -308,6 +311,7 @@ impl Node {
             let existing = relay.ds.config_store.get_maybe_proto::<Transaction>("genesis").await?;
 
             if existing.is_none() {
+                info!("No genesis transaction found, generating new one");
                 let tx = Node::genesis_from(node_config.clone()).0;
                 // runtimes.auxiliary.block_on(
                 relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
@@ -317,8 +321,13 @@ impl Node {
                         .ds
                         .transaction_store
                         .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None)
-                        .await?;
+                        .await.expect("insert failed");
                 // }
+                let genesis_hash = tx.hash_or();
+                info!("Genesis hash {}", genesis_hash.json_or());
+                let obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+                let obs = relay.observe_tx(&genesis_hash, State::Finalized, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+                assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);
                 // .expect("Genesis inserted or already exists");
             }
 
@@ -358,8 +367,7 @@ impl Node {
             info!("Got LB node info {}, adding peer", result.json_or());
 
             // TODO: How do we handle situation where we get self peer id here other than an error?
-            relay.ds.peer_store.add_peer_new(result, 1f64,
-                                             &relay.node_config.public_key()).await?;
+            relay.ds.peer_store.add_peer_new(result, &relay.node_config.public_key()).await?;
 
             info!("Added peer, attempting download");
 
@@ -726,12 +734,17 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // show_balances();
 
     let client = start_node.public_client.clone();
+
+    for u in start_node.node.relay.ds.transaction_store.utxo_all_debug().await.expect("utxo all debug") {
+        info!("utxo at start: {}", u.json_or());
+    }
     //
     // let utxos = ds.query_time_utxo(0, util::current_time_millis())
     //     .unwrap();
     // info!("Num utxos from genesis {:?}", utxos.len());
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
+
     let submit = TransactionSubmitter::default(client.clone(),
                                                // runtime.clone(),
                                                spend_utxos

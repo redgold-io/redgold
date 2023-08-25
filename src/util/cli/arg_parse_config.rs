@@ -21,7 +21,8 @@ use bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
-use redgold_schema::{ErrorInfoContext, from_hex, SafeBytesAccess, SafeOption};
+use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::seeds::get_seeds;
 use redgold_schema::servers::Server;
@@ -132,6 +133,7 @@ impl ArgTranslate {
         self.secure_data_folder();
         self.load_mnemonic().await?;
         self.load_peer_id()?;
+        // self.load_peer_tx()?;
         self.set_public_key();
         self.load_internal_servers()?;
         self.calculate_executable_checksum_hash();
@@ -141,6 +143,7 @@ impl ArgTranslate {
         self.set_discovery_interval();
         self.apply_node_opts();
         self.genesis();
+        
 
         self.abort = immediate_commands(&self.opts, &self.node_config).await;
         if self.abort {
@@ -253,13 +256,10 @@ impl ArgTranslate {
             self.node_config.mnemonic_words = words;
         };
 
-        // TODO: This is overwriting /all
-        // // Then override with optional found file
-        // // TODO: Should we just change this to an ALL folder?
-        // let mnemonic_disk_path = self.node_config.env_data_folder().mnemonic_path();
-        // if let Some(words) = fs::read_to_string(mnemonic_disk_path.clone()).ok() {
-        //     self.node_config.mnemonic_words = words;
-        // };
+        // Then override with environment specific mnemonic;
+        if let Ok(words) = self.node_config.env_data_folder().mnemonic().await {
+            self.node_config.mnemonic_words = words;
+        };
 
         // Then override with command line
         if let Some(words) = &self.opts.words {
@@ -280,29 +280,19 @@ impl ArgTranslate {
         if self.node_config.mnemonic_words.is_empty() {
             tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
             tracing::info!("Generating with entropy for 24 words, process may halt if insufficient entropy on system");
-            let mnem = Mnemonic::new_random(MasterKeyEntropy::Double).expect("New mnemonic generation failure");
+            let mnem = WordsPass::generate()?.words;
             tracing::info!("Successfully generated new mnemonic");
-            self.node_config.mnemonic_words = mnem.to_string();
+            self.node_config.mnemonic_words = mnem.clone();
+            let buf = self.node_config.env_data_folder().mnemonic_path();
+            fs::write(
+                buf.clone(),
+                self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
+
+            info!("Wrote mnemonic to path: {}", buf.to_str().expect("Path format failure"));
         };
 
         // Validate that this is loadable
-        let mnemonic = Mnemonic::from_str(&self.node_config.mnemonic_words)
-            .error_info("Failed to parse mnemonic")?;
-
-        // Re-assign as words to avoid coupling class to node config.
-        self.node_config.mnemonic_words = mnemonic.to_string();
-
-
-        // Attempt to write mnemonic to disk for persistence
-            // let insert = store.insert_mnemonic(MnemonicEntry {
-            //     words: node_config.mnemonic_words.clone(),
-            //     time: util::current_time_millis() as i64,
-            //     peer_id: node_config.self_peer_id.clone(),
-        //     // });
-        //     std::fs::create_dir_all(mnemonic_disk_path.clone()).expect("Unable to create data dir");
-        fs::write(self.node_config.data_folder.all().mnemonic_path(),
-                  self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
-
+        let _ = WordsPass::words(self.node_config.mnemonic_words.clone()).mnemonic()?;
 
         Ok(())
     }

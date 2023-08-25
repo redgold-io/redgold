@@ -66,6 +66,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
     for i in min_offset..max_offset {
         let key = node_config.internal_mnemonic().key_at(i);
         let address = key.address_typed();
+        info!("Querying faucet address: {}", &address.json_or());
         map.insert(address, key);
     }
 

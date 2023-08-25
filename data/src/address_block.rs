@@ -48,12 +48,12 @@ impl AddressBlockStore {
 
         // TODO change this to a fetch all in case nothing is returned on initialization.
         let rows = sqlx::query!("SELECT raw FROM block ORDER BY height DESC LIMIT 1")
-            .fetch_one(&mut *pool)
+            .fetch_optional(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        match rows_m.raw {
+        match rows_m {
             None => Ok(None),
-            Some(b) => Ok(Some(Block::proto_deserialize(b)?)),
+            Some(b) => Ok(Some(Block::proto_deserialize(b.raw)?)),
         }
     }
 

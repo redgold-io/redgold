@@ -28,12 +28,15 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
     let max_index = servers.iter().map(|s| s.index).max().unwrap_or(-1);
     let this_index = add_server.index.unwrap_or(max_index + 1);
     servers.push(Server{
+        name: "".to_string(),
         host: add_server.host.clone(),
         username: add_server.user.clone(),
-        key_path: add_server.key_path.clone(),
+        ipv4: None,
+        alias: None,
         index: this_index,
         peer_id_index: add_server.peer_id_index.unwrap_or(this_index),
         network_environment: NetworkEnvironment::All,
+        external_host: None,
     });
     ds.config_store.insert_update("servers".to_string(), json(&servers)?).await?;
     Ok(())
@@ -211,12 +214,15 @@ pub fn add_server_prompt() -> Server {
     let mut key_path = dirs::home_dir().expect("Home").join(".ssh/id_rsa").to_str().expect("str").to_string();
     std::io::stdin().read_line(&mut key_path).expect("Failed to read line");
     Server{
+        name: "".to_string(),
         host,
-        key_path: Some(key_path),
         index: 0,
         username: Some(username),
+        ipv4: None,
+        alias: None,
         peer_id_index: 0,
         network_environment: NetworkEnvironment::All,
+        external_host: None,
     }
 }
 

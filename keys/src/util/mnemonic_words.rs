@@ -339,7 +339,7 @@ impl MnemonicWords {
 
     pub fn next_key(&mut self) -> (SecretKey, PublicKey) {
         self.cursor = StandardHDPath::new(
-            Purpose::Witness,
+            Purpose::Pubkey,
             self.cursor.coin_type(),
             self.cursor.account(),
             self.cursor.change(),
@@ -350,7 +350,7 @@ impl MnemonicWords {
 
     pub fn key_at(&self, index: usize) -> KeyPair {
         let cursor = StandardHDPath::new(
-            Purpose::Witness,
+            Purpose::Pubkey,
             REDGOLD_KEY_DERIVATION_PATH as u32,
             0,
             0,

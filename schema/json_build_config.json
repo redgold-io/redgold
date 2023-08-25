@@ -41,7 +41,7 @@
         "structs.BytesData",
         "structs.TransactionOptions",
         "structs.Tombstone",
-        "structs.TrustLabel",
+        "structs.TrustRatingLabel",
         "structs.NodeMetadata",
         "structs.PeerData",
         "structs.StandardData",
@@ -127,6 +127,8 @@
       "description": "serde support for enum",
       "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString)]",
       "paths": [
+        "structs.InputType",
+        "structs.ValidationLiveness",
         "structs.TransactionState",
         "structs.ValidationType",
         "structs.State",
@@ -155,10 +157,8 @@
         "structs.AddPeerFull.public_key",
         "structs.BytesData.value",
         "structs.Tombstone.hash",
-        "structs.NodeMetadata.multi_hash",
         "structs.AddressBlock.hash",
-        "structs.AddressBlock.address",
-        "structs.TrustLabel.peer_id"
+        "structs.AddressBlock.address"
       ]
     },
     {

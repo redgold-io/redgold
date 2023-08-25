@@ -9,15 +9,15 @@ use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerData, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
-use futures::future;
+use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerIdInfo, PeerNodeInfo, Request, Response, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -26,8 +26,10 @@ use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
+use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::request_support::RequestSupport;
 use redgold_keys::transaction_support::TransactionBuilderSupport;
+use redgold_schema::seeds::get_seeds;
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
@@ -123,6 +125,7 @@ pub struct Relay {
     pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>,
     pub contract_state_manager_channels: Vec<Channel<ContractStateMessage>>,
     pub contention: Vec<Channel<ContentionMessage>>,
+    pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
 }
 
 
@@ -145,6 +148,60 @@ pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
 // as the other 'half' here.
 impl Relay {
+
+    pub async fn get_trust(&self) -> RgResult<HashMap<PeerId, f64>> {
+        let seeds = get_seeds().iter().filter_map(|s|
+            s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
+        ).collect::<HashMap<PeerId, f64>>();
+        let peer_tx = self.peer_tx().await?;
+        let pd = peer_tx.peer_data()?;
+
+        let mut hm = self.predicted_trust_overall_rating_score.lock().map_err(
+            |e| error_info(format!(
+                "Failed to lock predicted_trust_overall_rating_score {}", e.to_string()))
+        )?.clone();
+
+        for label in pd.labels {
+            let peer_id: Option<PeerId> = label.peer_id;
+            if let Some(peer_id) = peer_id {
+                for d in label.trust_data {
+                    if !d.allow_model_override {
+                        if let Some(r) = d.maybe_label() {
+                            hm.insert(peer_id.clone(), r);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(hm)
+        // Err(error_info("test"))
+    }
+
+    // Refactor this and below later to optimize lookup.
+    pub async fn get_trust_of_peer(&self, peer_id: &PeerId) -> RgResult<Option<f64>> {
+        let hm = self.get_trust().await?;
+        Ok(hm.get(peer_id).cloned())
+    }
+
+    pub async fn get_trust_of_node(&self, public_key: &PublicKey) -> RgResult<Option<f64>> {
+        let hm = self.get_trust().await?;
+        Ok(self.ds.peer_store.peer_id_for_node_pk(public_key).await?
+            .and_then(|p| hm.get(&p).cloned()))
+    }
+
+    pub async fn get_trust_of_node_as_query(&self, public_key: &PublicKey) -> RgResult<Option<PeerTrustQueryResult>> {
+        let hm = self.get_trust().await?;
+        let pid = self.ds.peer_store.peer_id_for_node_pk(public_key).await?;
+        if let Some(pid) = pid {
+            if let Some(t) = hm.get(&pid).cloned() {
+                return Ok(Some(PeerTrustQueryResult {
+                    peer_id: pid,
+                    trust: t,
+                }))
+            }
+        }
+        Ok(None)
+    }
 
     pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> RgResult<ContentionInfo> {
         let (s, r) = flume::bounded::<RgResult<ContentionInfo>>(1);
@@ -173,7 +230,12 @@ impl Relay {
         if let Some(tx) = tx {
             Ok(tx)
         } else {
-            let tx = self.node_config.node_tx_fixed();
+            let pd = self.peer_tx().await?.peer_data()?;
+            let matching_peer_tx = pd.node_metadata.iter().filter(
+                |nmd| nmd.public_key == Some(self.node_config.public_key())
+            ).collect_vec();
+            let opt = matching_peer_tx.get(0).cloned();
+            let tx = self.node_config.node_tx_fixed(opt);
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)
         }
@@ -184,7 +246,7 @@ impl Relay {
         if let Some(tx) = tx {
             Ok(tx)
         } else {
-            let tx = self.node_config.peer_tx_fixed();
+            let tx = self.node_config.env_data_folder().peer_tx().await.ok().unwrap_or(self.node_config.peer_tx_fixed());
             self.ds.config_store.set_peer_tx(&tx).await?;
             Ok(tx)
         }
@@ -306,6 +368,25 @@ impl Relay {
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
+    }
+
+    pub async fn observe_tx(
+        &self,
+        tx_hash: &Hash,
+        state: State,
+        validation_type: ValidationType,
+        liveness: structs::ValidationLiveness
+    ) -> Result<ObservationProof, ErrorInfo> {
+        let mut hash = tx_hash.clone();
+        hash.hash_type = HashType::Transaction as i32;
+        let mut om = structs::ObservationMetadata::default();
+        om.observed_hash = Some(hash);
+        om.state = state as i32;
+        om.struct_metadata = struct_metadata_new();
+        om.observation_type = validation_type as i32;
+        om.validation_liveness = liveness as i32;
+            // TODO: It might be nice to grab the proof of a signature here?
+        self.observe(om).await
     }
 
     // TODO: add timeout
@@ -563,6 +644,7 @@ impl Relay {
             mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
             contract_state_manager_channels,
             contention,
+            predicted_trust_overall_rating_score: Arc::new(Mutex::new(Default::default())),
         }
     }
 }

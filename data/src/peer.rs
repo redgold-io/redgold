@@ -53,34 +53,6 @@ impl PeerStore {
         Ok(())
     }
 
-    pub async fn node_peer_id_trust(
-        &self,
-        public: &PublicKey,
-    ) -> Result<Option<PeerTrustQueryResult>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-
-        let vec = public.validate()?.bytes()?;
-
-        let rows = sqlx::query!(
-            r#"SELECT peers.id, peers.trust FROM nodes JOIN peers on nodes.peer_id = peers.id WHERE public_key = ?1"#,
-            vec
-        )
-            .fetch_all(&mut *pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-
-        for rows in rows_m {
-            let pid: Vec<u8> = rows.id.safe_get_msg("Missing peer id from row query")?.clone();
-            let peer_id = PeerId::from_bytes(pid);
-            let trust = rows.trust.safe_get_msg("Missing trust from row query")?.clone() as f64;
-            return Ok(Some(PeerTrustQueryResult {
-                peer_id,
-                trust,
-            }));
-        }
-        Ok(None)
-    }
-
 
     // TODO: Implement XOR distance + fee distance metrics + trust distance metrics
     pub async fn select_gossip_peers(&self, tx: &Transaction) -> Result<Vec<PublicKey>, ErrorInfo> {
@@ -218,7 +190,7 @@ impl PeerStore {
     // }
 
 
-    pub async fn insert_peer(&self, tx: &Transaction, trust: f64) -> Result<i64, ErrorInfo> {
+    pub async fn insert_peer(&self, tx: &Transaction) -> Result<i64, ErrorInfo> {
         let pd = tx.peer_data()?;
         let tx_blob = tx.proto_serialize();
         let pd_blob = pd.proto_serialize();
@@ -227,12 +199,9 @@ impl PeerStore {
         let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().bytes()?;
 
         let rows = sqlx::query!(
-            r#"INSERT OR REPLACE INTO peers (id, peer_data, tx, trust, tx_hash) VALUES (?1, ?2, ?3, ?4, ?5)"#,
+            r#"INSERT OR REPLACE INTO peers (id, tx) VALUES (?1, ?2)"#,
             pid,
-            pd_blob,
             tx_blob,
-            trust,
-            tx_hash
         )
             .execute(&mut *pool)
             .await;
@@ -240,7 +209,7 @@ impl PeerStore {
         Ok(rows_m.last_insert_rowid())
     }
 
-    pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, trust: f64, self_key: &PublicKey) -> Result<(), ErrorInfo> {
+    pub async fn add_peer_new(&self, peer_info: &PeerNodeInfo, self_key: &PublicKey) -> Result<(), ErrorInfo> {
         // return Err(ErrorInfo::error_info("debug error return"));
         // tracing::info!("add_peer_new");
         if peer_info.public_keys().contains(&self_key) {
@@ -251,8 +220,7 @@ impl PeerStore {
         self.insert_peer(
             peer_info
                 .latest_peer_transaction
-                .safe_get_msg("Add peer failed due to missing latest peer transaction")?,
-            trust,
+                .safe_get_msg("Add peer failed due to missing latest peer transaction")?
         ).await?;
         self.insert_node(peer_info.latest_node_transaction.safe_get_msg("Missing peer info latest node tx")?).await?;
         Ok(())
