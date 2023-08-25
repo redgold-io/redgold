@@ -292,9 +292,9 @@ impl TransactionProcessContext {
         if let Some(request_processor) = &self.request_processor {
             if let Some(utxo_ids) = &self.utxo_ids {
                 self.clean_utxo(&request_processor, utxo_ids, ii);
-                self.relay.transaction_channels.remove(self.transaction_hash.safe_get()?);
             }
         }
+        self.relay.transaction_channels.remove(self.transaction_hash.safe_get()?);
         Ok(())
     }
 

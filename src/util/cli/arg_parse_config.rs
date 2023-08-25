@@ -100,12 +100,8 @@ impl ArgTranslate {
         // TODO: From better data folder options
         let data_folder = Self::secure_data_or_cwd();
         let rg = data_folder.join(".rg");
-        let all = rg.join(NetworkEnvironment::All.to_std_string());
-        let servers = all.join("servers");
-        if servers.is_file() {
-            let contents = fs::read_to_string(servers)
-                .error_info("Failed to read servers file")?;
-            let servers = Server::parse(contents)?;
+        let df = DataFolder::from_path(rg);
+        if let Some(servers) = df.all().servers().ok() {
             self.node_config.servers = servers;
         }
         Ok(())

@@ -1,9 +1,11 @@
 use std::fs;
+use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
 use serde::Serialize;
 use serde::Deserialize;
 use crate::{error_info, ErrorInfoContext, json_or, json_pretty, RgResult};
+use crate::errors::EnhanceErrorInfo;
 use crate::structs::{ErrorInfo, NetworkEnvironment};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -47,9 +49,9 @@ impl Server {
         }
     }
 
-    pub fn parse_from_file(path: String)  -> Result<Vec<Self>, ErrorInfo> {
+    pub fn parse_from_file(path: PathBuf)  -> Result<Vec<Self>, ErrorInfo> {
         let contents = fs::read_to_string(path).error_info("file read failure")?;
-        Self::parse(contents)
+        Self::parse(contents).add("Servers file load path")
     }
 
     pub fn parse(contents: String) -> Result<Vec<Self>, ErrorInfo> {
