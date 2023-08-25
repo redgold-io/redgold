@@ -12,11 +12,17 @@ pub struct Server {
     pub host: String,
     pub index: i64,
     pub peer_id_index: i64,
-    pub network_environment: NetworkEnvironment,
+    pub network_environment: String,
     pub username: Option<String>,
     pub ipv4: Option<String>,
     pub alias: Option<String>,
     pub external_host: Option<String>
+}
+
+impl Server {
+    pub fn network_environment(&self) -> NetworkEnvironment {
+        NetworkEnvironment::parse(self.network_environment.clone())
+    }
 }
 
 fn parse_servers(str: &str) -> RgResult<Vec<Server>> {
@@ -42,7 +48,7 @@ impl Server {
             index: 0,
             peer_id_index: 0,
             // TODO: Change to mainnet later
-            network_environment: NetworkEnvironment::All,
+            network_environment: NetworkEnvironment::All.to_std_string(),
             external_host: Some(host),
         }
     }
