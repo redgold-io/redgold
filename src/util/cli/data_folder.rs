@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use redgold_schema::{ErrorInfoContext, json_from, RgResult, structs};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Transaction};
 use redgold_data::data_store::DataStore;
+use redgold_schema::servers::Server;
 
 // TODO: Move everything to use this
 
@@ -47,6 +48,10 @@ impl EnvDataFolder {
 
     pub fn servers_path(&self) -> PathBuf {
         self.path.join("servers")
+    }
+
+    pub fn servers(&self) -> RgResult<Vec<Server>> {
+        Server::parse_from_file(self.servers_path())
     }
 
     // Change to cert.pem
