@@ -583,7 +583,7 @@ fn mnemonic_window(
                         let wp = WordsPass::new(words, pass);
                         let metadata_json = wp.metadata().expect("metadata error")
                             .with_exe_checksum(state.exe_checksum.clone())
-                            .json_or();
+                            .json_pretty_or();
                         std::fs::write("metadata.json", metadata_json)
                             .expect("Unable to write file");
                     }

@@ -2,8 +2,10 @@ use std::future::Future;
 use std::time::Instant;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
+use eframe::egui::WidgetType::TextEdit;
 use flume::Sender;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use crate::gui::app_loop::LocalState;
 
 use strum::IntoEnumIterator;
@@ -12,7 +14,7 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
-use redgold_schema::{RgResult, WithMetadataHashable};
+use redgold_schema::{ErrorInfoContext, RgResult, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, CurrencyAmount};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
@@ -95,8 +97,13 @@ pub struct WalletState {
     pub active_xpub: String,
     pub active_derivation_path: String,
     pub xpub_save_name: String,
+    pub show_xpub_loader_window: bool,
+    pub selected_xpub_name: String,
     pub show_save_xpub_window: bool,
-    pub selected_xpub_name: String
+    pub purge_existing_xpubs_on_save: bool,
+    pub allow_xpub_name_overwrite: bool,
+    pub xpub_loader_rows: String,
+    pub xpub_loader_error_message: String,
 }
 
 
@@ -173,7 +180,12 @@ impl WalletState {
             active_derivation_path: "".to_string(),
             xpub_save_name: "".to_string(),
             show_save_xpub_window: false,
+            purge_existing_xpubs_on_save: false,
+            allow_xpub_name_overwrite: true,
             selected_xpub_name: "Select Xpub".to_string(),
+            show_xpub_loader_window: false,
+            xpub_loader_rows: "".to_string(),
+            xpub_loader_error_message: "".to_string(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -490,8 +502,8 @@ fn window_xpub(
                     let xpub = ls.wallet_state.active_xpub.clone();
                     let named_xpub = NamedXpub {
                         name: ls.wallet_state.xpub_save_name.clone(),
+                        derivation_path: ls.wallet_state.xpub_derivation_path.clone(),
                         xpub,
-                        hardware_id: None,
                     };
                     ls.updates.sender.send(StateUpdate{update: Box::new(
                     move |lss: &mut LocalState| {
@@ -513,9 +525,79 @@ fn window_xpub(
 }
 
 
+fn parse_xpub_rows(str: &str) -> RgResult<Vec<NamedXpub>> {
+    let mut rdr = csv::Reader::from_reader(str.as_bytes());
+    let mut res = vec![];
+    for result in rdr.deserialize() {
+        // Notice that we need to provide a type hint for automatic
+        // deserialization.
+        let record: NamedXpub = result.error_info("server line parse failure")?;
+        res.push(record);
+    }
+    Ok(res)
+}
+
+
+// TODO: This window exceeds the max size bound for some crazy reason??
+fn window_xpub_loader(
+    ui: &mut Ui,
+    ls: &mut LocalState,
+    ctx: &egui::Context
+) {
+    egui::Window::new("Xpub Loader")
+        .open(&mut ls.wallet_state.show_xpub_loader_window)
+        .resizable(false)
+        .collapsible(false)
+        .min_width(300.0)
+        .default_width(300.0)
+        .constrain(true)
+        .fixed_size((300.0, 300.0))
+        .show(ctx, |ui| {
+            // Layout doesn't seem to work here.
+            // let layout = egui::Layout::top_down(egui::Align::Center);
+            // ui.with_layout(layout, |ui| {
+            ui.vertical(|ui| {
+                ui.label("Enter CSV data with format name,derivation_path,xpub");
+                egui::TextEdit::multiline(&mut ls.wallet_state.xpub_loader_rows)
+                    .desired_rows(3)
+                    .desired_width(200.0)
+                    .ui(ui);
+                ui.checkbox(&mut ls.wallet_state.purge_existing_xpubs_on_save, "Purge all existing xpubs on load");
+                ui.checkbox(&mut ls.wallet_state.allow_xpub_name_overwrite, "Allow overwrite of xpub by name");
+                if ui.button("Save Internal").clicked() {
+                    let data = ls.wallet_state.xpub_loader_rows.clone();
+                    let parsed = parse_xpub_rows(&*data).ok();
+                    if let Some(rows) = parsed {
+                        LocalState::send_update(&ls.updates, move |lss| {
+                            let rows2 = rows.clone();
+                            let names = rows2.iter().map(|n| n.name.clone()).collect_vec();
+                            let has_existing = lss.local_stored_state.xpubs.iter().find(|n| names.contains(&n.name)).is_some();
+                            if has_existing && !lss.wallet_state.allow_xpub_name_overwrite {
+                                lss.wallet_state.xpub_loader_error_message = "Existing xpubs found, please enable overwrite".to_string();
+                            } else {
+                                if lss.wallet_state.purge_existing_xpubs_on_save {
+                                    lss.local_stored_state.xpubs = vec![];
+                                }
+                                for p in rows2 {
+                                    lss.add_named_xpub(true, p.clone()).expect("added");
+                                }
+                                lss.persist_local_state_store();
+                                lss.wallet_state.show_xpub_loader_window = false;
+                            }
+                        });
+                    } else {
+                        ls.wallet_state.xpub_loader_error_message = "Failed to parse rows".to_string();
+                    }
+                }
+            });
+        });
+}
+
+
 pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
 
     window_xpub(ui, ls, ctx);
+    window_xpub_loader(ui, ls, ctx);
 
     if ls.wallet_state.tab == WalletTab::Hardware {
         ui.horizontal(|ui| {
@@ -581,6 +663,9 @@ pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
         });
         medium_data_item(ui, "Active Derivation Path:", ls.wallet_state.active_derivation_path.clone());
 
+        if ui.button("Load Xpubs from CSV").clicked() {
+            ls.wallet_state.show_xpub_loader_window = true;
+        }
     }
 }
 

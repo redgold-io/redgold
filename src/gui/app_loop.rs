@@ -4,8 +4,9 @@ use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, TextStyle, Ui};
 use eframe::egui;
+use itertools::Itertools;
 use log::{error, info};
-use redgold_schema::EasyJson;
+use redgold_schema::{EasyJson, error_info, RgResult};
 
 use crate::util::sym_crypt;
 // 0.8
@@ -87,6 +88,30 @@ impl LocalState {
             store.config_store.update_stored_state(state).await
         });
     }
+    pub fn add_named_xpub(&mut self, overwrite_name: bool, new_named: NamedXpub) -> RgResult<()> {
+        let updated_xpubs = if overwrite_name {
+            let mut new_xpubs = self.local_stored_state.xpubs.iter().filter(|x| {
+                x.name != new_named.name
+            }).map(|x| x.clone()).collect_vec();
+            new_xpubs.push(new_named);
+            new_xpubs
+        } else {
+            let mut has_existing = self.local_stored_state.xpubs.iter().find(|x| {
+                x.name == new_named.name
+            }).is_some();
+            if has_existing {
+                return Err(error_info("Xpub with name already exists"));
+            } else {
+                let mut new_xpubs = self.local_stored_state.xpubs.clone();
+                new_xpubs.push(new_named);
+                new_xpubs
+            }
+        };
+        self.local_stored_state.xpubs = updated_xpubs;
+        self.persist_local_state_store();
+        Ok(())
+    }
+
     pub fn process_updates(&mut self) {
         match self.updates.recv_while() {
             Ok(updates) => {
@@ -108,6 +133,7 @@ impl LocalState {
         let ds_all_default = node_config.data_store_all().await;
         let ds_secure = node_config.data_store_all_secure().await;
         let ds_or = ds_secure.clone().unwrap_or(ds_all_default.clone());
+        info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
         DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
         let ls = LocalState {
@@ -238,7 +264,7 @@ use redgold_keys::util::dhash_vec;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
-use redgold_schema::local_stored_state::LocalStoredState;
+use redgold_schema::local_stored_state::{LocalStoredState, NamedXpub};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
