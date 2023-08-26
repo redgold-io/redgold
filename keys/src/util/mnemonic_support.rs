@@ -12,7 +12,7 @@ use bitcoin_wallet::account::MasterKeyEntropy;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::constants::default_node_internal_derivation_path;
+use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH};
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 use crate::KeyPair;
 use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
@@ -29,6 +29,22 @@ trait MnemonicSupport {
 }
 
 impl WordsPass {
+
+    pub fn default_rg_path(account: usize) -> String {
+        default_node_internal_derivation_path(account as i64)
+    }
+
+    pub fn kp_rg_account(&self, account: usize) -> RgResult<KeyPair> {
+        self.keypair_at(Self::default_rg_path(account))
+    }
+
+    pub fn default_kp(&self) -> RgResult<KeyPair> {
+        self.kp_rg_account(0)
+    }
+
+    pub fn default_pid_kp(&self) -> RgResult<KeyPair> {
+        self.kp_rg_account(1)
+    }
 
     pub fn checksum(&self) -> RgResult<String> {
         Hash::new_checksum(&self.seed()?.to_vec())

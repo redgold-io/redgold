@@ -36,7 +36,7 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
         index: this_index,
         peer_id_index: add_server.peer_id_index.unwrap_or(this_index),
         network_environment: NetworkEnvironment::All.to_std_string(),
-        external_host: None,
+        external_host: None
     });
     ds.config_store.insert_update("servers".to_string(), json(&servers)?).await?;
     Ok(())

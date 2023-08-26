@@ -37,7 +37,8 @@ pub async fn setup_server_redgold(
      words: Option<String>,
      peer_id_hex: Option<String>,
      start_node: bool,
-     peer_tx_opt: Option<&structs::Transaction>,
+     alias: Option<String>,
+     ser_pid_tx: Option<String>
  ) -> Result<(), ErrorInfo> {
 
     ssh.verify()?;
@@ -82,7 +83,7 @@ pub async fn setup_server_redgold(
          let remote = format!("{}/peer_id", path);
          ssh.copy_p(peer_id_hex, remote, p).await?;
      }
-     if let Some(tx) = peer_tx_opt {
+     if let Some(tx) = ser_pid_tx {
          let remote = format!("{}/peer_tx", path);
          ssh.copy_p(tx.json_or(), remote, p).await?;
      }
@@ -104,7 +105,9 @@ pub async fn setup_server_redgold(
     env.insert("REDGOLD_P2P_PORT".to_string(), format!("{}", port));
     env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
     env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
-
+     if let Some(a) = alias {
+         env.insert("REDGOLD_ALIAS".to_string(), a);
+     }
     let copy_env = vec!["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
     for e in copy_env {
         for i in std::env::var(e).ok() {
@@ -267,6 +270,7 @@ pub async fn derive_mnemonic_and_peer_id(
 )
     -> RgResult<(String, String)> {
 
+    // TODO: Make peer id transaction here using details.
     let w = WordsPass::new(mnemonic, passphrase);
     let new = w.hash_derive_words(server_id_index.to_string())?;
     let server_mnemonic = new.words.clone();
@@ -338,6 +342,24 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
         // Also set environment here to dev if not main
         deploy.skip_ops = true;
     }
+    let mut net = node_config.network;
+    if net == NetworkEnvironment::Local {
+        net = NetworkEnvironment::Dev;
+    } else {
+        if node_config.opts.network.is_none() {
+            if primary_gen {
+                net = NetworkEnvironment::Dev;
+            } else {
+                // TODO Enable this when mainnet
+                // net = NetworkEnvironment::Main;
+            }
+        }
+        // Get node_config arg translate and set to dev if arg not supplied.
+    }
+    if net == NetworkEnvironment::Main {
+        deploy.ask_pass = true;
+    }
+
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
@@ -374,20 +396,6 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
 
-    let mut net = node_config.network;
-    if net == NetworkEnvironment::Local {
-        net = NetworkEnvironment::Dev;
-    } else {
-        if node_config.opts.network.is_none() {
-            if primary_gen {
-                net = NetworkEnvironment::Dev;
-            } else {
-                // TODO Enable this when mainnet
-                // net = NetworkEnvironment::Main;
-            }
-        }
-        // Get node_config arg translate and set to dev if arg not supplied.
-    }
     let mut servers = s.to_vec();
     if let Some(i) = deploy.server_index {
         let x = servers.get(i as usize).expect("").clone();
@@ -419,15 +427,20 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
             &mut pid_tx
         ).await?;
 
-        let mut peer_tx_opt = None;
+        let mut peer_tx_opt: Option<structs::Transaction> = None;
         let words_opt = if deploy.words || deploy.words_and_id {
             Some(words.clone())
         } else {
             None
         };
         let peer_id_hex_opt = if deploy.peer_id  || deploy.words_and_id {
-            peer_tx_opt = pid_tx.get(&peer_id_hex).clone();
+            peer_tx_opt = pid_tx.get(&peer_id_hex).clone().cloned();
             Some(peer_id_hex.clone())
+        } else {
+            None
+        };
+        let pid_tx_ser = if deploy.peer_id  || deploy.words_and_id {
+            Some(pid_tx.clone())
         } else {
             None
         };
@@ -441,7 +454,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
                 words_opt,
                 peer_id_hex_opt,
                 !deploy.debug_skip_start,
-                peer_tx_opt
+                ss.alias.clone(),
+                peer_tx_opt.map(|p| p.json_or())
             ).await.expect("worx");
         }
         gen = false;

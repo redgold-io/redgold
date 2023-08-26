@@ -246,7 +246,7 @@ impl Relay {
         if let Some(tx) = tx {
             Ok(tx)
         } else {
-            let tx = self.node_config.env_data_folder().peer_tx().await.ok().unwrap_or(self.node_config.peer_tx_fixed());
+            let tx = self.node_config.env_data_folder().peer_tx().ok().unwrap_or(self.node_config.peer_tx_fixed());
             self.ds.config_store.set_peer_tx(&tx).await?;
             Ok(tx)
         }

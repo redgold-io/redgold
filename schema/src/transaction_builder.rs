@@ -1,4 +1,4 @@
-use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, structs, Transaction};
+use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, structs, Transaction, WithMetadataHashable};
 use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof};
 use crate::transaction::amount_data;
 
@@ -167,6 +167,17 @@ impl TransactionBuilder {
         output.address = Some(destination.clone());
         output.data = Some(option);
         self.transaction.outputs.push(output);
+        self
+    }
+
+    // Actually can we just leave this empty?
+    pub fn genesis_peer_data(&mut self) -> &mut Self {
+        let o = self.transaction.outputs.last().expect("o");
+        // let pd = o.data.expect("d").peer_data.expect("").peer_id.expect("").peer_id.expect("pk");
+        o.utxo_entry(
+            &self.transaction.hash_or(), 0,
+            self.transaction.time().expect("").clone() as u64
+        );
         self
     }
 
