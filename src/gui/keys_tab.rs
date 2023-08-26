@@ -14,7 +14,7 @@ use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
 
 
-#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
 // #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum KeyDerivation {
     DoubleSha256,
@@ -22,7 +22,7 @@ enum KeyDerivation {
 }
 
 
-#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
 enum Rounds {
     TenK,
     OneM,
@@ -93,7 +93,7 @@ impl MnemonicWindowState {
         self.set_words_from_passphrase();
     }
 }
-
+#[derive(Clone)]
 pub struct GenerateMnemonicState {
     random_input_mnemonic: String,
     random_input_requested: bool,
@@ -126,7 +126,7 @@ impl GenerateMnemonicState {
         self.concat_password = format!("{}{}", mod_join, metadata_join);
     }
 }
-
+#[derive(Clone)]
 pub struct KeygenState {
     mnemonic_window_state: MnemonicWindowState,
     generate_mnemonic_state: GenerateMnemonicState,

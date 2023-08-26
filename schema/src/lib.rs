@@ -52,6 +52,7 @@ pub mod debug_version;
 pub mod transaction_info;
 pub mod exec;
 pub mod contract;
+pub mod local_stored_state;
 
 
 impl BytesData {

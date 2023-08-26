@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, TextStyle, Ui};
 use eframe::egui;
-use log::info;
+use log::{error, info};
+use redgold_schema::EasyJson;
 
 use crate::util::sym_crypt;
 // 0.8
@@ -25,12 +26,14 @@ pub struct ServerStatus {
     pub ssh_reachable: bool
 }
 
+#[derive(Clone)]
 pub struct ServersState {
     needs_update: bool,
     info: Arc<Mutex<Vec<ServerStatus>>>,
     deployment_result_info_box: Arc<Mutex<String>>
 }
 
+// #[derive(Clone)]
 // #[derive(Clone)]
 pub struct LocalState {
     active_tab: Tab,
@@ -63,6 +66,37 @@ pub struct LocalState {
     pub wallet_state: WalletState,
     pub ds_all_default: DataStore,
     pub ds_secure: Option<DataStore>,
+    pub local_stored_state: LocalStoredState,
+    pub updates: Channel<StateUpdate>
+}
+
+impl LocalState {
+
+    pub fn secure_or(&self) -> DataStore {
+        self.ds_secure.clone().unwrap_or(self.ds_all_default.clone())
+    }
+    pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
+        updates.sender.send(StateUpdate{update: Box::new(p0)}).unwrap();
+    }
+
+    pub fn persist_local_state_store(&self) {
+        let store = self.secure_or();
+        let state = self.local_stored_state.clone();
+        tokio::spawn(async move {
+
+            store.config_store.update_stored_state(state).await
+        });
+    }
+    pub fn process_updates(&mut self) {
+        match self.updates.recv_while() {
+            Ok(updates) => {
+                for mut update in updates {
+                    (update.update)(self);
+                }
+            }
+            Err(e) => { error!("Error receiving updates: {}", e.json_or()) }
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -73,6 +107,8 @@ impl LocalState {
         let iv = sym_crypt::get_iv();
         let ds_all_default = node_config.data_store_all().await;
         let ds_secure = node_config.data_store_all_secure().await;
+        let ds_or = ds_secure.clone().unwrap_or(ds_all_default.clone());
+        DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
         let ls = LocalState {
             active_tab: Tab::Home,
@@ -102,7 +138,9 @@ impl LocalState {
             keygen_state: KeygenState::new(),
             wallet_state: WalletState::new(hot_mnemonic),
             ds_all_default,
-            ds_secure
+            ds_secure,
+            local_stored_state: ds_or.config_store.get_stored_state().await?,
+            updates: new_channel(),
         };
         Ok(ls)
     }
@@ -195,9 +233,11 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::dhash_vec;
+use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
-use crate::gui::wallet_tab::{wallet_screen, WalletState};
+use redgold_schema::local_stored_state::LocalStoredState;
+use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
     let mut results = vec![];
@@ -308,6 +348,8 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     local_state.current_time = util::current_time_millis_i64();
     // Continuous mode
     ctx.request_repaint();
+
+    local_state.process_updates();
 
     // let mut style: egui::Style = (*ctx.style()).clone();
     // style.visuals.widgets.
