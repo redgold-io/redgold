@@ -19,7 +19,7 @@ use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::Pagination;
 use crate::multiparty::watcher::{BidAsk, DepositWatcherConfig};
 use crate::util;
-use crate::util::address_external::ToBitcoinAddress;
+use redgold_keys::address_external::ToBitcoinAddress;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {

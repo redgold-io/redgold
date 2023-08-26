@@ -14,7 +14,7 @@ use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
 use crate::multiparty::initiate_mp::{default_room_id, initiate_mp_keysign};
 use crate::node::Node;
-use crate::util::address_external::ToBitcoinAddress;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
