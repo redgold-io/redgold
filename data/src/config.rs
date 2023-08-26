@@ -6,6 +6,7 @@ use crate::schema::SafeOption;
 use crate::schema::json;
 use serde::{Deserialize, Serialize};
 use redgold_keys::TestConstants;
+use redgold_schema::local_stored_state::LocalStoredState;
 
 #[derive(Clone)]
 pub struct ConfigStore {
@@ -166,5 +167,14 @@ impl ConfigStore {
     pub async fn set_dynamic_md(&self, tx: &DynamicNodeMetadata) -> RgResult<i64> {
         self.store_proto_ref("dynamic_node_metadata", tx).await
     }
+
+    pub async fn get_stored_state(&self) -> RgResult<LocalStoredState> {
+        Ok(self.get_json("local_stored_state").await?.unwrap_or(Default::default()))
+    }
+
+    pub async fn update_stored_state(&self, local_stored_state: LocalStoredState) -> RgResult<()> {
+        self.insert_update_json("local_stored_state", local_stored_state).await.map(|_| ())
+    }
+
 
 }

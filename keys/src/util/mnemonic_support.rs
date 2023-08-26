@@ -177,6 +177,13 @@ pub fn generate_test() {
     assert_eq!(24, w.words.split(" ").collect_vec().len());
 }
 
+#[test]
+pub fn generate_xpub() {
+    let w = WordsPass::generate().expect("words");
+    println!("{}", w.words.clone());
+    w.public_at("m/44'/0'/0'".to_string()).expect("private key");
+}
+
 pub fn test_pkey_hex() -> Option<String> {
     if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
         let w = WordsPass::new(w, None);

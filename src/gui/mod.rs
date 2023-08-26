@@ -1,11 +1,9 @@
-use std::sync::Arc;
 use eframe::{egui, Frame};
 use egui_extras::RetainedImage;
-use tokio::runtime::Runtime;
 use redgold_schema::structs::ErrorInfo;
 // 0.17.1
 // 0.8
-use crate::gui::app_loop::{LocalState, Tab};
+use crate::gui::app_loop::LocalState;
 // use crate::gui::image_load::Image;
 use crate::node_config::NodeConfig;
 
@@ -19,7 +17,6 @@ pub mod wallet_tab;
 pub mod keys_tab;
 pub mod common;
 pub mod hot_wallet;
-pub mod local_stored_state;
 pub mod cold_wallet;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.

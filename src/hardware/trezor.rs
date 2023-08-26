@@ -98,7 +98,7 @@ pub struct PublicNodeResponse {
     node_child_num: u32,
     node_chain_code: String,
     node_public_key: String,
-    xpub: String
+    pub(crate) xpub: String
 }
 
 impl PublicNodeResponse {
@@ -224,8 +224,16 @@ pub fn default_pubkey_path() -> String {
     format!("m/44'/0'/{}'/0/0", DEFAULT_ACCOUNT_NUM)
 }
 
+pub fn default_xpub_path() -> String {
+    format!("m/44'/0'/{}'", DEFAULT_ACCOUNT_NUM)
+}
+
 pub fn default_pubkey() -> Result<structs::PublicKey, ErrorInfo> {
     get_public_node(default_pubkey_path())?.public_key()
+}
+
+pub fn default_xpub() -> Result<String, ErrorInfo> {
+    Ok(get_public_node(default_pubkey_path())?.xpub)
 }
 
 /// This returns a hardened xpub so it doesn't expose other accounts

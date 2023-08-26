@@ -1,11 +1,13 @@
 use std::future::Future;
 use std::time::Instant;
 use eframe::egui;
-use eframe::egui::{Color32, RichText, ScrollArea, TextStyle, Ui, Widget};
+use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
 use flume::Sender;
+use itertools::Itertools;
 use crate::gui::app_loop::LocalState;
 
-use strum::IntoEnumIterator; // 0.17.1
+use strum::IntoEnumIterator;
+// 0.17.1
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
 use redgold_keys::TestConstants;
@@ -18,14 +20,17 @@ use redgold_schema::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::{cold_wallet, common, hot_wallet};
-use crate::gui::common::{data_item, editable_text_input_copy, medium_data_item, valid_label};
+use crate::gui::common::{data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::util::logging::Loggable;
+use redgold_schema::local_stored_state::{LocalStoredState, NamedXpub};
 
-#[derive(Debug, EnumIter, EnumString)]
+
+#[derive(Debug, EnumIter, EnumString, PartialEq)]
 #[repr(i32)]
 pub enum WalletTab {
     Hardware,
@@ -49,7 +54,7 @@ impl DeviceListStatus {
 
 // #[derive(Clone)]
 pub struct StateUpdate {
-    update: Box<dyn FnMut(&mut LocalState) + Send>
+    pub(crate) update: Box<dyn FnMut(&mut LocalState) + Send>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -57,7 +62,7 @@ enum SendReceiveTabs {
     Send,
     Receive,
 }
-
+// #[derive(Clone)]
 pub struct WalletState {
     tab: WalletTab,
     pub(crate) device_list_status: DeviceListStatus,
@@ -81,14 +86,21 @@ pub struct WalletState {
     broadcast_transaction_response: Option<Result<SubmitTransactionResponse, ErrorInfo>>,
     pub hot_mnemonic: String,
     pub derivation_path: String,
+    pub xpub_derivation_path: String,
     pub derivation_path_valid: bool,
+    pub xpub_derivation_path_valid: bool,
     pub derivation_path_last_check: String,
+    pub xpub_derivation_path_last_check: String,
     pub mnemonic_checksum: String,
+    pub active_xpub: String,
+    pub active_derivation_path: String,
+    pub xpub_save_name: String,
+    pub show_save_xpub_window: bool,
+    pub selected_xpub_name: String
 }
 
 
 impl WalletState {
-
     pub fn clear_data(&mut self) {
         self.update_unsigned_tx(None);
         self.update_signed_tx(None);
@@ -151,9 +163,17 @@ impl WalletState {
             broadcast_transaction_response: None,
             hot_mnemonic,
             derivation_path: trezor::default_pubkey_path(),
+            xpub_derivation_path: "m/44'/0'/0'".to_string(),
             derivation_path_valid: true,
+            xpub_derivation_path_valid: false,
             derivation_path_last_check: "".to_string(),
+            xpub_derivation_path_last_check: "".to_string(),
             mnemonic_checksum: "".to_string(),
+            active_xpub: "".to_string(),
+            active_derivation_path: "".to_string(),
+            xpub_save_name: "".to_string(),
+            show_save_xpub_window: false,
+            selected_xpub_name: "Select Xpub".to_string(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -189,8 +209,11 @@ impl ValidateDerivationPath for String {
     fn valid_derivation_path(&self) -> bool {
         WordsPass::words(TestConstants::new().words).public_at(self.clone()).is_ok()
     }
-}
+    // fn valid_xpub_path(&self) -> bool {
+    //     WordsPass::words(TestConstants::new().words).xprv(self.clone()).is_ok()
+    // }
 
+}
 
 
 pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState) {
@@ -225,13 +248,12 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
     }
 
     derivation_path_section(ui, ls);
+    xpub_path_section(ui, ls, ctx);
 
     if let Some(pk) = ls.wallet_state.public_key.clone() {
         proceed_from_pk(ui, ls, &pk);
     }
     ui.spacing();
-
-
 }
 
 fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
@@ -286,7 +308,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 let result = prepare_transaction(
                     ai,
                     &ls.wallet_state.amount_input,
-                    &ls.wallet_state.destination_address
+                    &ls.wallet_state.destination_address,
                 );
                 ls.wallet_state.update_unsigned_tx(Some(result.clone()));
                 ls.wallet_state.signing_flow_transaction_box_msg = Some(
@@ -328,7 +350,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                         initiate_hardware_signing(
                             t.clone(),
                             ls.wallet_state.updates.sender.clone(),
-                            pk.clone().clone()
+                            pk.clone().clone(),
                         );
                         ls.wallet_state.signing_flow_status = Some("Awaiting hardware response...".to_string());
                     }
@@ -347,13 +369,13 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     }
     if let Some(t) = &ls.wallet_state.signed_transaction {
         if let Some(t) = t.as_ref().ok() {
-            medium_data_item(ui,"Signed TX Hash:", ls.wallet_state.signed_transaction_hash.clone().unwrap_or("error".to_string()));
+            medium_data_item(ui, "Signed TX Hash:", ls.wallet_state.signed_transaction_hash.clone().unwrap_or("error".to_string()));
             if ui.button("Broadcast Transaction").clicked() {
                 broadcast_transaction(
                     ls.node_config.clone(),
                     t.clone(),
                     NetworkEnvironment::Dev,
-                    ls.wallet_state.updates.sender.clone()
+                    ls.wallet_state.updates.sender.clone(),
                 );
                 ls.wallet_state.signing_flow_status = Some("Awaiting broadcast response...".to_string());
             }
@@ -391,7 +413,7 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 let address = pk.address().expect("a");
                 handle_faucet(ls.node_config.clone(), address,
                               NetworkEnvironment::Dev,
-                              ls.wallet_state.updates.sender.clone()
+                              ls.wallet_state.updates.sender.clone(),
                 );
             };
             ui.label(ls.wallet_state.faucet_success.clone());
@@ -399,7 +421,7 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 let address = pk.address().expect("a");
                 get_address_info(ls.node_config.clone(), address,
                                  NetworkEnvironment::Dev,
-                                 ls.wallet_state.updates.sender.clone()
+                                 ls.wallet_state.updates.sender.clone(),
                 );
             };
         });
@@ -409,7 +431,6 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
 pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
     ui.horizontal(|ui| {
         ui.horizontal(|ui| {
-
             editable_text_input_copy(ui, "Derivation Path", &mut ls.wallet_state.derivation_path, 150.0);
             if ls.wallet_state.derivation_path != ls.wallet_state.derivation_path_last_check {
                 ls.wallet_state.derivation_path_last_check = ls.wallet_state.derivation_path.clone();
@@ -420,17 +441,17 @@ pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
         ui.spacing();
         match ls.wallet_state.tab {
             WalletTab::Hardware => {
-                if ui.button("Refresh Public Key").clicked() {
+                if ui.button("Request Public Key").clicked() {
                     ls.wallet_state.public_key = None;
                     ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
                     // This blocks the entire UI... ah jeez
-                    match trezor::default_pubkey() {
+                    match trezor::get_public_node(ls.wallet_state.derivation_path.clone()).and_then(|x| x.public_key()) {
                         Ok(pk) => {
                             ls.wallet_state.public_key = Some(pk.clone());
                             ls.wallet_state.public_key_msg = Some("Got public key".to_string());
                             get_address_info(ls.node_config.clone(), pk.address().expect("").clone(),
                                              NetworkEnvironment::Dev,
-                                             ls.wallet_state.updates.sender.clone()
+                                             ls.wallet_state.updates.sender.clone(),
                             );
                         }
                         Err(e) => {
@@ -439,11 +460,128 @@ pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
                         }
                     }
                 }
-                ui.label(ls.wallet_state.public_key_msg.clone().unwrap_or("Refresh to get public".to_string()));
             }
             _ => {}
         }
     });
+}
+
+
+fn window_xpub(
+    ui: &mut Ui,
+    ls: &mut LocalState,
+    ctx: &egui::Context
+) {
+    egui::Window::new("Xpub")
+        .open(&mut ls.wallet_state.show_save_xpub_window)
+        .resizable(false)
+        .collapsible(false)
+        .min_width(500.0)
+        .default_width(500.0)
+        .show(ctx, |ui| {
+            // Layout doesn't seem to work here.
+            // let layout = egui::Layout::top_down(egui::Align::Center);
+            // ui.with_layout(layout, |ui| {
+            ui.vertical(|ui| {
+                data_item_multiline_fixed(ui, "Xpub", ls.wallet_state.active_xpub.clone(), 200.0);
+                medium_data_item(ui, "Derivation Path:", ls.wallet_state.xpub_derivation_path.clone());
+                editable_text_input_copy(ui, "Name", &mut ls.wallet_state.xpub_save_name, 150.0);
+                if ui.button("Save Internal").clicked() {
+                    let xpub = ls.wallet_state.active_xpub.clone();
+                    let named_xpub = NamedXpub {
+                        name: ls.wallet_state.xpub_save_name.clone(),
+                        xpub,
+                        hardware_id: None,
+                    };
+                    ls.updates.sender.send(StateUpdate{update: Box::new(
+                    move |lss: &mut LocalState| {
+                        let new_named = named_xpub.clone();
+                        let mut new_xpubs = lss.local_stored_state.xpubs.iter().filter(|x| {
+                            x.name != new_named.name
+                        }).map(|x| x.clone()).collect_vec();
+                        new_xpubs.push(new_named);
+                        lss.local_stored_state.xpubs = new_xpubs;
+                        lss.persist_local_state_store();
+                    })}).unwrap();;
+                    ls.wallet_state.xpub_save_name = "".to_string();
+                    LocalState::send_update(&ls.updates, |lss| {
+                        lss.wallet_state.show_save_xpub_window = false;
+                    })
+                }
+            });
+        });
+}
+
+
+pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
+
+    window_xpub(ui, ls, ctx);
+
+    if ls.wallet_state.tab == WalletTab::Hardware {
+        ui.horizontal(|ui| {
+            ui.horizontal(|ui| {
+                editable_text_input_copy(
+                    ui, "Xpub Derivation Path",
+                    &mut ls.wallet_state.xpub_derivation_path, 150.0
+                );
+                if ls.wallet_state.xpub_derivation_path != ls.wallet_state.xpub_derivation_path_last_check {
+                    ls.wallet_state.xpub_derivation_path_last_check = ls.wallet_state.xpub_derivation_path.clone();
+                    ls.wallet_state.xpub_derivation_path_valid = ls.wallet_state.xpub_derivation_path.valid_derivation_path();
+                }
+                valid_label(ui, ls.wallet_state.xpub_derivation_path_valid);
+            });
+            ui.spacing();
+
+            if ui.button("Request Xpub").clicked() {
+                ls.wallet_state.public_key = None;
+                ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
+                // This blocks the entire UI... ah jeez
+                match trezor::get_public_node(ls.wallet_state.xpub_derivation_path.clone()).map(|x| x.xpub) {
+                    Ok(xpub) => {
+                        ls.wallet_state.show_save_xpub_window = true;
+                        ls.wallet_state.active_xpub = xpub.clone();
+                        let pk = XpubWrapper::new(xpub).public_at(0,0).expect("xpub failure");
+                        ls.wallet_state.public_key = Some(pk.clone());
+                        ls.wallet_state.public_key_msg = Some("Got public key".to_string());
+                        get_address_info(ls.node_config.clone(), pk.address().expect("").clone(),
+                                         NetworkEnvironment::Dev,
+                                         ls.wallet_state.updates.sender.clone(),
+                        );
+                    }
+                    Err(e) => {
+                        ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
+                        error!("Error getting public key: {}", e.json_or());
+                    }
+                }
+            }
+        });
+        // After main key section, select Xpub section
+        // ls.local_stored_state.xpubs.is
+
+        ui.horizontal(|ui| {
+            ComboBox::from_label("Set Xpub Source")
+                .selected_text(ls.wallet_state.selected_xpub_name.clone())
+                .show_ui(ui, |ui| {
+                    for style in ls.local_stored_state.xpubs.iter().map(|x| x.name.clone()) {
+                        ui.selectable_value(&mut ls.wallet_state.selected_xpub_name, style.clone(), style.to_string());
+                    }
+                    ui.selectable_value(&mut ls.wallet_state.selected_xpub_name,
+                                        "Select Xpub".to_string(), "Select Xpub".to_string());
+                });
+            if ui.button("Load Xpub").clicked() {
+                let xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name)
+                    .map(|n| n.xpub.clone());
+                if let Some(xpub) = xpub {
+                    ls.wallet_state.active_xpub = xpub.clone();
+                    let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
+                    ls.wallet_state.public_key = Some(pk.clone());
+                    ls.wallet_state.active_derivation_path = format!("{}/0/0", ls.wallet_state.xpub_derivation_path.clone());
+                }
+            }
+        });
+        medium_data_item(ui, "Active Derivation Path:", ls.wallet_state.active_derivation_path.clone());
+
+    }
 }
 
 
@@ -513,7 +651,7 @@ fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, public: 
 }
 
 pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String)
-    -> Result<Transaction, ErrorInfo> {
+                           -> Result<Transaction, ErrorInfo> {
     let destination = Address::parse(destination.clone())?;
     let amount = CurrencyAmount::from_float_string(amount)?;
     let mut tb = TransactionBuilder::new();
@@ -526,7 +664,7 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
 
 pub fn get_address_info(
     node_config: NodeConfig, address: Address, network: NetworkEnvironment,
-    update_channel: flume::Sender<StateUpdate>
+    update_channel: flume::Sender<StateUpdate>,
 ) {
     let mut node_config = node_config;
     node_config.network = network;
@@ -557,7 +695,6 @@ pub fn get_address_info(
         };
         update_channel.send_err(up).log_error().ok();
     });
-
 }
 
 
@@ -565,7 +702,7 @@ fn handle_faucet(
     node_config: NodeConfig,
     address: Address,
     network: NetworkEnvironment,
-    update_channel: flume::Sender<StateUpdate>
+    update_channel: flume::Sender<StateUpdate>,
 ) {
     let mut node_config = node_config;
     node_config.network = network;
@@ -591,5 +728,4 @@ fn handle_faucet(
         };
         update_channel.send_err(up).log_error().ok();
     });
-
 }

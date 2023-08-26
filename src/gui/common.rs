@@ -1,5 +1,5 @@
 use eframe::egui;
-use eframe::egui::{Color32, RichText, TextStyle, Ui};
+use eframe::egui::{Color32, RichText, TextEdit, TextStyle, Ui};
 
 pub fn valid_label(ui: &mut Ui, bool: bool) {
     if bool {
@@ -35,6 +35,22 @@ pub fn data_item(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>)
         let string = text.into();
         let text_line = &mut string.clone();
         ui.add(egui::TextEdit::singleline(text_line).clip_text(false));
+        copy_to_clipboard(ui, string.clone());
+    });
+}
+
+pub fn data_item_multiline_fixed(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>, width: impl Into<f32>) {
+    ui.horizontal(|ui| {
+        let style = ui.style_mut();
+        style.override_text_style = Some(TextStyle::Small);
+        ui.label(label.into());
+        let string = text.into();
+        let text_line = &mut string.clone();
+        TextEdit::multiline(text_line)
+            .lock_focus(false)
+            .desired_width(width.into())
+            .desired_rows(2)
+            .show(ui);
         copy_to_clipboard(ui, string.clone());
     });
 }
