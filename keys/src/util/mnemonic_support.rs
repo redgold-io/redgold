@@ -2,7 +2,7 @@ use std::str::FromStr;
 use bdk::bitcoin::{Network, PrivateKey, XpubIdentifier};
 use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::secp256k1::rand::RngCore;
-use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey};
+use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey, ExtendedPubKey};
 use bdk::keys::bip39::{Mnemonic, Language};
 use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
 use bdk::keys::bip39::WordCount::Words24;
@@ -34,7 +34,10 @@ pub struct WordsPassBtcMessageAccountMetadata {
     derivation_path: String,
     account: u32,
     rdg_address: String,
+    rdg_btc_main_address: String,
+    rdg_btc_test_address: String,
     pub xpub: String,
+    pub public_hex: String
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -69,22 +72,26 @@ impl WordsPass {
         for account in sequence {
             let path = format!("m/44'/0'/{}'/0/0", account);
             let xpub_path = format!("m/44'/0'/{}'", account);
+            let pk = self.public_at(path.clone())?;
             res.push(WordsPassBtcMessageAccountMetadata {
                 derivation_path: path.clone(),
-                account: 0,
-                rdg_address: self.public_at(path)?.address()?.render_string()?,
-                xpub: self.xpub(xpub_path)?.to_hex(),
+                account: account.clone(),
+                rdg_address: pk.address()?.render_string()?,
+                rdg_btc_main_address: pk.to_bitcoin_address_network(NetworkEnvironment::Main)?,
+                rdg_btc_test_address: pk.to_bitcoin_address_network(NetworkEnvironment::Test)?,
+                xpub: self.xpub(xpub_path)?.to_string(),
+                public_hex: pk.hex_or(),
             });
         }
         Ok(WordsPassMetadata {
             checksum: self.checksum()?,
             checksum_words: self.checksum_words()?,
             btc_84h_0h_0h_0_0_address: self.public_at("m/84'/0'/0'/0/0")?.to_bitcoin_address()?,
-            btc_84h_0h_0h_0_0_xpub: self.xpub("m/84'/0'/0'")?.to_hex(),
+            btc_84h_0h_0h_0_0_xpub: self.xpub("m/84'/0'/0'")?.to_string(),
             eth_44h_60h_0h_0_0_address: self.public_at("m/44'/60'/0'/0/0")?.to_ethereum_address()?,
-            eth_44h_60h_0h_0_0_xpub: self.xpub("m/44'/60'/0'")?.to_hex(),
+            eth_44h_60h_0h_0_0_xpub: self.xpub("m/44'/60'/0'")?.to_string(),
             rdg_44h_16180h_0h_0_0_address: self.public_at("m/44'/16180'/0'/0/0")?.address()?.render_string()?,
-            rdg_44h_16180h_0h_0_0_xpub: self.xpub("m/44'/16180'/0'")?.to_hex(),
+            rdg_44h_16180h_0h_0_0_xpub: self.xpub("m/44'/16180'/0'")?.to_string(),
             rdg_btc_message_account_metadata: res,
             executable_checksum: "".to_string(),
         })
@@ -183,8 +190,10 @@ impl WordsPass {
             .safe_get_msg("Failed to generate xprv").cloned()
     }
 
-    pub fn xpub(&self, path: impl Into<String>) -> RgResult<XpubIdentifier> {
-        Ok(self.key_from_path_str(path.into())?.identifier(&Secp256k1::new()))
+    pub fn xpub(&self, path: impl Into<String>) -> RgResult<ExtendedPubKey> {
+        let xprv = self.key_from_path_str(path.into())?;
+        let xpub = ExtendedPubKey::from_priv(&Secp256k1::new(), &xprv);
+        Ok(xpub)
     }
 
     pub fn key_from_path_str(&self, path: String) -> RgResult<ExtendedPrivKey> {

@@ -499,9 +499,8 @@ impl NodeConfig {
     }
 
     pub async fn data_store_all_secure(&self) -> Option<DataStore> {
-        // TODO: Move to arg translate
-        if let Some(sd) = std::env::var(commands::REDGOLD_SECURE_DATA_PATH).ok() {
-            Some(Self::data_store_all_from(sd).await)
+        if let Some(df) = &self.secure_data_folder {
+            Some(df.all().data_store().await)
         } else {
             None
         }

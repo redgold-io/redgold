@@ -5,8 +5,8 @@ use crate::structs::{Address, PeerId, TrustRatingLabel};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NamedXpub {
     pub name: String,
+    pub derivation_path: String,
     pub xpub: String,
-    pub hardware_id: Option<String>
 }
 
 #[derive(Serialize, Deserialize, Clone)]

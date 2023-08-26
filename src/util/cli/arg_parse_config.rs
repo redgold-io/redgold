@@ -504,7 +504,8 @@ impl ArgTranslate {
     }
     fn secure_data_folder(&mut self) {
         if let Some(pb) = Self::secure_data_path_buf() {
-            self.node_config.secure_data_folder = Some(DataFolder::from_path(pb));
+            let pb_joined = pb.join(".rg");
+            self.node_config.secure_data_folder = Some(DataFolder::from_path(pb_joined));
         }
     }
     fn alias(&mut self) {
