@@ -245,14 +245,17 @@ impl TransactionProcessContext {
         }
 
         let result_or_error = {
-            match self.immediate_validation(&transaction_message.transaction).await {
+            let result = match self.immediate_validation(&transaction_message.transaction).await {
                 Ok(_) => {
                     let res = self.process(&transaction_message.transaction.clone(), current_time, request_uuid).await;
-                    self.cleanup(None)?;
                     res
                 }
-                Err(e) => {Err(e)}
-            }
+                Err(e) => {
+                    Err(e)
+                }
+            };
+            self.cleanup(None)?;
+            result
         };
 
         // Use this as whether or not the request was successful
@@ -289,12 +292,12 @@ impl TransactionProcessContext {
     // maybe? or not hell not really necessary.
 
     fn cleanup(&mut self, ii: Option<usize>) -> Result<(), ErrorInfo> {
+        self.relay.transaction_channels.remove(self.transaction_hash.safe_get()?);
         if let Some(request_processor) = &self.request_processor {
             if let Some(utxo_ids) = &self.utxo_ids {
                 self.clean_utxo(&request_processor, utxo_ids, ii);
             }
         }
-        self.relay.transaction_channels.remove(self.transaction_hash.safe_get()?);
         Ok(())
     }
 
