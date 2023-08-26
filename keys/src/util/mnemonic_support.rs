@@ -34,6 +34,8 @@ pub struct WordsPassBtcMessageAccountMetadata {
     derivation_path: String,
     account: u32,
     rdg_address: String,
+    rdg_btc_main_address: String,
+    rdg_btc_test_address: String,
     pub xpub: String,
     pub public_hex: String
 }
@@ -75,6 +77,8 @@ impl WordsPass {
                 derivation_path: path.clone(),
                 account: account.clone(),
                 rdg_address: pk.address()?.render_string()?,
+                rdg_btc_main_address: pk.to_bitcoin_address_network(NetworkEnvironment::Main)?,
+                rdg_btc_test_address: pk.to_bitcoin_address_network(NetworkEnvironment::Test)?,
                 xpub: self.xpub(xpub_path)?.to_string(),
                 public_hex: pk.hex_or(),
             });
