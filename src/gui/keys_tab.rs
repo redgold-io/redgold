@@ -3,12 +3,14 @@ use eframe::egui;
 use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
 use redgold_keys::util::mnemonic_builder;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
+use redgold_schema::EasyJson;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
 use crate::gui::common::{copy_to_clipboard, medium_data_item, valid_label};
 use crate::util;
-use crate::util::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
@@ -54,6 +56,7 @@ pub struct MnemonicWindowState {
     private_key_hex: String,
     calc_private_key_hex: bool,
     generation_time_seconds: String,
+    exe_checksum: String
 }
 
 impl MnemonicWindowState {
@@ -67,6 +70,13 @@ impl MnemonicWindowState {
     pub fn mnemonic_words(&self) -> MnemonicWords {
         let w = MnemonicWords::from_mnemonic_words(
             &*self.words.clone(), self.passphrase.clone()
+        );
+        w
+    }
+
+    pub fn words_pass(&self) -> WordsPass {
+        let w = WordsPass::new(
+            self.words.clone(), self.passphrase.clone()
         );
         w
     }
@@ -133,7 +143,7 @@ pub struct KeygenState {
 }
 
 impl KeygenState {
-    pub fn new() -> Self {
+    pub fn new(exe_checksum: String) -> Self {
         Self {
             mnemonic_window_state: MnemonicWindowState {
                 open: false,
@@ -155,6 +165,7 @@ impl KeygenState {
                 private_key_hex: "".to_string(),
                 calc_private_key_hex: false,
                 generation_time_seconds: "".to_string(),
+                exe_checksum: exe_checksum,
             },
             generate_mnemonic_state: GenerateMnemonicState {
                 random_input_mnemonic: "".to_string(),
@@ -566,6 +577,16 @@ fn mnemonic_window(
                         }
                     });
                     medium_data_item(ui, "Private Key Hex", state.private_key_hex.clone());
+                    if ui.button("Save metadata to local ./metadata.json file").clicked() {
+                        let words = state.words.clone();
+                        let pass = state.passphrase.clone();
+                        let wp = WordsPass::new(words, pass);
+                        let metadata_json = wp.metadata().expect("metadata error")
+                            .with_exe_checksum(state.exe_checksum.clone())
+                            .json_or();
+                        std::fs::write("metadata.json", metadata_json)
+                            .expect("Unable to write file");
+                    }
             });
         });
 }

@@ -218,7 +218,7 @@ pub fn sign_message(path: String, input_message: String) -> Result<SignMessageRe
 }
 
 
-const DEFAULT_ACCOUNT_NUM: u32 = 50;
+pub const DEFAULT_ACCOUNT_NUM: u32 = 50;
 
 pub fn default_pubkey_path() -> String {
     format!("m/44'/0'/{}'/0/0", DEFAULT_ACCOUNT_NUM)

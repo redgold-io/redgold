@@ -6,7 +6,7 @@ use hex::ToHex;
 // use web3::types::H160;
 use redgold_schema::ErrorInfoContext;
 use sha3::{Digest, Keccak256};
-use redgold_keys::util::ToPublicKey;
+use crate::util::ToPublicKey;
 
 pub trait ToBitcoinAddress {
     fn to_bitcoin_address(&self) -> Result<String, ErrorInfo>;

@@ -128,14 +128,16 @@ impl LocalState {
             stored_private_key_hexes: vec![],
             iv,
             wallet_first_load_state: true,
-            node_config,
+            node_config: node_config.clone(),
             // runtime,
             home_state: HomeState::from(),
             server_state: ServersState { needs_update: true,
                 info: Arc::new(Mutex::new(vec![])),
                 deployment_result_info_box: Arc::new(Mutex::new("".to_string())) },
             current_time: util::current_time_millis_i64(),
-            keygen_state: KeygenState::new(),
+            keygen_state: KeygenState::new(
+                node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
+            ),
             wallet_state: WalletState::new(hot_mnemonic),
             ds_all_default,
             ds_secure,

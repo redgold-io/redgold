@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use bdk::bitcoin::{Network, PrivateKey};
+use bdk::bitcoin::{Network, PrivateKey, XpubIdentifier};
 use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::secp256k1::rand::RngCore;
 use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey};
@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH};
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
+use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
 use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
 use crate::util::mnemonic_words::MnemonicWords;
@@ -28,7 +29,66 @@ trait MnemonicSupport {
 
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct WordsPassBtcMessageAccountMetadata {
+    derivation_path: String,
+    account: u32,
+    rdg_address: String,
+    pub xpub: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct WordsPassMetadata {
+    checksum: String,
+    checksum_words: String,
+    btc_84h_0h_0h_0_0_address: String,
+    btc_84h_0h_0h_0_0_xpub: String,
+    eth_44h_60h_0h_0_0_address: String,
+    eth_44h_60h_0h_0_0_xpub: String,
+    rdg_44h_16180h_0h_0_0_address: String,
+    rdg_44h_16180h_0h_0_0_xpub: String,
+    rdg_btc_message_account_metadata: Vec<WordsPassBtcMessageAccountMetadata>,
+    executable_checksum: String
+}
+
+impl WordsPassMetadata {
+    pub fn with_exe_checksum(&mut self, sum: impl Into<String>) -> &mut WordsPassMetadata {
+        self.executable_checksum = sum.into();
+        self
+    }
+}
+
 impl WordsPass {
+
+    pub fn metadata(&self) -> RgResult<WordsPassMetadata> {
+        let mut res = vec![];
+        // Default spending keys
+        let mut sequence = (0..10).collect_vec().iter().map(|i| 50 + i).collect_vec();
+        // Default peer ids
+        sequence.extend((0..10).collect_vec().iter().map(|i| 99 - i).collect_vec());
+        for account in sequence {
+            let path = format!("m/44'/0'/{}'/0/0", account);
+            let xpub_path = format!("m/44'/0'/{}'", account);
+            res.push(WordsPassBtcMessageAccountMetadata {
+                derivation_path: path.clone(),
+                account: 0,
+                rdg_address: self.public_at(path)?.address()?.render_string()?,
+                xpub: self.xpub(xpub_path)?.to_hex(),
+            });
+        }
+        Ok(WordsPassMetadata {
+            checksum: self.checksum()?,
+            checksum_words: self.checksum_words()?,
+            btc_84h_0h_0h_0_0_address: self.public_at("m/84'/0'/0'/0/0")?.to_bitcoin_address()?,
+            btc_84h_0h_0h_0_0_xpub: self.xpub("m/84'/0'/0'")?.to_hex(),
+            eth_44h_60h_0h_0_0_address: self.public_at("m/44'/60'/0'/0/0")?.to_ethereum_address()?,
+            eth_44h_60h_0h_0_0_xpub: self.xpub("m/44'/60'/0'")?.to_hex(),
+            rdg_44h_16180h_0h_0_0_address: self.public_at("m/44'/16180'/0'/0/0")?.address()?.render_string()?,
+            rdg_44h_16180h_0h_0_0_xpub: self.xpub("m/44'/16180'/0'")?.to_hex(),
+            rdg_btc_message_account_metadata: res,
+            executable_checksum: "".to_string(),
+        })
+    }
 
     pub fn default_rg_path(account: usize) -> String {
         default_node_internal_derivation_path(account as i64)
@@ -72,9 +132,9 @@ impl WordsPass {
         })
     }
 
-    pub fn new(words: String, passphrase: Option<String>) -> Self {
+    pub fn new(words: impl Into<String>, passphrase: Option<String>) -> Self {
         Self {
-            words,
+            words: words.into(),
             passphrase,
         }
     }
@@ -123,6 +183,10 @@ impl WordsPass {
             .safe_get_msg("Failed to generate xprv").cloned()
     }
 
+    pub fn xpub(&self, path: impl Into<String>) -> RgResult<XpubIdentifier> {
+        Ok(self.key_from_path_str(path.into())?.identifier(&Secp256k1::new()))
+    }
+
     pub fn key_from_path_str(&self, path: String) -> RgResult<ExtendedPrivKey> {
         let dp = DerivationPath::from_str(path.as_str())
             .error_info("Failed to parse derivation path")?;
@@ -140,8 +204,8 @@ impl WordsPass {
         KeyPair::from_private_hex(self.private_at(path)?)
     }
 
-    pub fn public_at(&self, path: String) -> RgResult<structs::PublicKey> {
-        let key = self.key_from_path_str(path)?;
+    pub fn public_at(&self, path: impl Into<String>) -> RgResult<structs::PublicKey> {
+        let key = self.key_from_path_str(path.into())?;
         let vec = key.private_key.public_key(&Secp256k1::new()).serialize().to_vec();
         Ok(structs::PublicKey::from_bytes(vec))
     }
