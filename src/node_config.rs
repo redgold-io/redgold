@@ -22,6 +22,7 @@ use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 use crate::util::keys::ToPublicKeyFromLib;
+use redgold_schema::util::lang_util::JsonCombineResult;
 
 pub struct CanaryConfig {}
 
@@ -297,7 +298,9 @@ impl NodeConfig {
             .with_peer_genesis_input(&pair.address_typed())
             .transaction.sign(&pair).expect("Failed signing?").clone();
 
-        self.env_data_folder().peer_tx().unwrap_or(tx)
+        let result = self.env_data_folder().peer_tx();
+        info!("Peer loaded from env data folder result {:?}", result.clone().json_or_combine());
+        result.unwrap_or(tx)
     }
 
     pub fn dynamic_node_metadata_fixed(&self) -> DynamicNodeMetadata {

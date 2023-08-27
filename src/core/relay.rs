@@ -234,7 +234,11 @@ impl Relay {
             let matching_peer_tx = pd.node_metadata.iter().filter(
                 |nmd| nmd.public_key == Some(self.node_config.public_key())
             ).collect_vec();
+            info!("Node tx node metadata length: {}", pd.node_metadata.len());
             let opt = matching_peer_tx.get(0).cloned();
+            if opt.is_none() {
+                info!("No peer tx found for this node, generating new one");
+            }
             let tx = self.node_config.node_tx_fixed(opt);
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)
@@ -246,10 +250,18 @@ impl Relay {
         if let Some(tx) = tx {
             Ok(tx)
         } else {
-            let tx = self.node_config.env_data_folder().peer_tx().ok().unwrap_or(self.node_config.peer_tx_fixed());
+            let tx = self.node_config.peer_tx_fixed();
             self.ds.config_store.set_peer_tx(&tx).await?;
             Ok(tx)
         }
+    }
+
+    pub async fn peer_id(&self) -> RgResult<PeerId> {
+        let res = self.node_tx()
+            .await
+            .and_then(|n| n.node_metadata())
+            .and_then(|n| n.peer_id.ok_or(error_info("Missing peer_id")));
+        res
     }
 
     pub async fn dynamic_node_metadata(&self) -> RgResult<DynamicNodeMetadata> {
