@@ -106,7 +106,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: redgold_linux
-          path: ./redgold_linux  build-linux:
+          path: ./redgold_linux
 #    needs: [test]
   build-linux-ubuntu-20:
     if:
