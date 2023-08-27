@@ -10,6 +10,21 @@ pub struct TransactionBuilder {
 
 
 impl TransactionBuilder {
+
+    pub fn with_no_salt(&mut self) -> &mut Self {
+        if let Some(x) = self.transaction.options.as_mut() {
+            x.salt = None;
+        }
+        self
+    }
+
+    pub fn with_time(&mut self, time: Option<i64>) -> &mut Self {
+        if let Some(x) = self.transaction.struct_metadata.as_mut() {
+            x.time = time;
+        }
+        self
+    }
+
     pub fn with_fee(&mut self, destination: &Address, amount: &CurrencyAmount) -> RgResult<&mut Self> {
         self.with_output(destination, amount);
         let option = self.transaction.outputs.last_mut();

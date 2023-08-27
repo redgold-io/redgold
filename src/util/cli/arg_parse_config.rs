@@ -24,7 +24,7 @@ use tokio::runtime::Runtime;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
-use redgold_schema::seeds::get_seeds;
+use redgold_schema::seeds::{get_seeds, get_seeds_by_env};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 use crate::util::cli::{args, commands};
@@ -45,6 +45,7 @@ pub fn get_default_data_top_folder() -> PathBuf {
 }
 
 use redgold_schema::EasyJson;
+use crate::api::RgHttpClient;
 
 
 pub struct ArgTranslate {
@@ -439,16 +440,11 @@ impl ArgTranslate {
         //     self.node_config.e2e_enable = true;
         // });
     }
-    fn configure_seeds(&mut self) {
+    async fn configure_seeds(&mut self) {
 
-        let seeds = get_seeds();
+        let seeds = get_seeds_by_env(&self.node_config.network);
         for seed in seeds {
-            let env_match = seed.environments.contains(&(self.node_config.network as i32));
-            let all_env = !self.node_config.is_local_debug() &&
-                seed.environments.contains(&(NetworkEnvironment::All as i32));
-            if env_match || all_env {
-                self.node_config.seeds.push(seed);
-            }
+            self.node_config.seeds.push(seed);
         }
 
         if let Some(a) = &self.opts.seed_address {
@@ -464,6 +460,42 @@ impl ArgTranslate {
                 public_key: Some(self.node_config.public_key()),
             });
         }
+        // Enrich keys for missing seed info
+        for seed in self.node_config.seeds.iter_mut() {
+            if seed.public_key.is_none() {
+                info!("Querying seed: {}", seed.external_address.clone());
+                let response = RgHttpClient::new(seed.external_address.clone(),
+                                  seed.port_offset.map(|p| (p + 1) as u16)
+                                      .unwrap_or(self.node_config.public_port()),
+                    None
+                ).about().await;
+                if let Ok(response) = response {
+                    let nmd = response.peer_node_info.as_ref()
+                        .and_then(|n| n.latest_node_transaction)
+                        .and_then(|n| n.node_metadata().ok());
+                    let pk = nmd.as_ref().and_then(|n| n.public_key);
+                    let pid = nmd.as_ref().and_then(|n| n.peer_id);
+                    if let (Some(pk), Some(pid)) = (pk, pid) {
+                        info!("Enriched seed {} public {} peer id {}", seed.external_address.clone(), pk.json_or(), pid.json_or());
+                        seed.public_key = Some(pk);
+                        seed.peer_id = Some(pid);
+                    }
+                }
+            }
+        }
+        let mut remove_index = vec![];
+        for (i, seed) in self.node_config.seeds.iter().enumerate() {
+            if let Some(pk) = &seed.public_key {
+                if &self.node_config.public_key() == pk {
+                    info!("Removing self from seeds");
+                    remove_index.push(i);
+                }
+            }
+        }
+        for i in remove_index {
+            self.node_config.seeds.remove(i);
+        }
+
     }
     fn apply_node_opts(&mut self) {
         match &self.opts.subcmd {

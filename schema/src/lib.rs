@@ -672,6 +672,16 @@ impl NetworkEnvironment {
         ]
     }
 
+    pub fn local_debug(&self) -> bool {
+        vec![
+            NetworkEnvironment::Debug, NetworkEnvironment::Local
+        ].contains(self)
+    }
+
+    pub fn is_all(&self) -> bool {
+        self == &NetworkEnvironment::All
+    }
+
     pub fn default_port_offset(&self) -> u16 {
         let port = match self {
             NetworkEnvironment::Main => {16180}

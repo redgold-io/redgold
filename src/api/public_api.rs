@@ -24,7 +24,7 @@ use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
-use crate::genesis::create_genesis_transaction;
+use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{
     Address, AddressType, ErrorInfo, QueryAddressesRequest, QueryTransactionResponse,
 };
@@ -703,7 +703,7 @@ async fn mock_relay(relay: Relay) {
         let tm = relay.mempool.receiver.recv().unwrap();
         let mut response = structs::Response::default();
         response.submit_transaction_response = Some(SubmitTransactionResponse {
-                transaction_hash: create_genesis_transaction().hash_or().into(),
+                transaction_hash: create_test_genesis_transaction().hash_or().into(),
                 query_transaction_response: Some(QueryTransactionResponse {
                     observation_proofs: vec![],
                     block_hash: None,

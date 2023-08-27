@@ -13,7 +13,7 @@ use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, WithMetadataHashable};
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
-use crate::genesis::create_genesis_transaction;
+use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::EasyJson;
 #[async_trait]
 trait SingleResolver {
@@ -292,7 +292,7 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
 
 #[test]
 fn test_hashmap() {
-    let tx = create_genesis_transaction();
+    let tx = create_test_genesis_transaction();
     let h = tx.calculate_hash();
     let mut m: HashMap<Hash, Transaction> = HashMap::default();
     m.insert(h.clone(), tx.clone());

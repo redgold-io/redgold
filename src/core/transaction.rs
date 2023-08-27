@@ -100,7 +100,7 @@ pub struct TransactionTestContext {
 
 #[test]
 fn test_decoding() {
-    let t = genesis::create_genesis_transaction();
+    let t = genesis::create_test_genesis_transaction();
     let bytes = t.proto_serialize();
     let t2 = Transaction::proto_deserialize(bytes).unwrap();
     assert_eq!(t, t2);
@@ -130,7 +130,7 @@ fn test_decoding() {
 
 #[test]
 fn test_serialization() {
-    let t = genesis::create_genesis_transaction();
+    let t = genesis::create_test_genesis_transaction();
     let j = serde_json::to_string(&t.clone()).unwrap();
     let j2 = serde_json::to_string_pretty(&t.clone()).unwrap();
     println!("{}", j2);
