@@ -17,8 +17,8 @@ use tokio::time::sleep;
 use warp::reply::Json;
 use warp::{Filter, Server};
 use warp::http::Response;
-use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, ProtoSerde, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse};
+use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse, Seed};
 use redgold_schema::transaction::rounded_balance_i64;
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -506,8 +506,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move || {
             let relay3 = tmp_relay.clone();
             async move {
-                let ps = relay3.node_config.public_key();
-                as_warp_json_response(Ok(ps))
+                let ps: RgResult<structs::PublicKey> = Ok(relay3.node_config.public_key());
+                as_warp_json_response(ps)
             }
         });
 
@@ -561,8 +561,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move || {
             let relay3 = tmp_relay.clone();
             async move {
-                let ps = relay3.node_config.seeds;
-                as_warp_json_response(Ok(ps))
+                let ps: RgResult<Vec<Seed>> = Ok(relay3.node_config.seeds);
+                as_warp_json_response(ps)
             }
         });
 
