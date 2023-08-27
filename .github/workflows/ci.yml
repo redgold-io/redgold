@@ -106,7 +106,37 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: redgold_linux
-          path: ./redgold_linux
+          path: ./redgold_linux  build-linux:
+#    needs: [test]
+  build-linux-ubuntu-20:
+    if:
+      contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref)
+    runs-on: ubuntu-20.04
+    timeout-minutes: 100
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+      - run: ./bin/install_build_deps.sh
+      - run: cargo build --release
+      - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
+      - uses: actions/upload-artifact@v3
+        with:
+          name: redgold_linux_ubuntu20
+          path: ./redgold_linux_ubuntu20
   build-windows:
     #    needs: [test]
     if:
@@ -222,7 +252,7 @@ jobs:
           path: ./redgold_mac
 
   release:
-    needs: [build-linux, build-mac]
+    needs: [build-linux, build-mac, build-linux-ubuntu-20]
     if:
         contains('
           refs/heads/predev
@@ -241,6 +271,9 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: redgold_linux
+      - uses: actions/download-artifact@v3
+        with:
+          name: redgold_linux_ubuntu20
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -316,7 +349,7 @@ jobs:
           ', github.ref)
         run: echo "MAC_BUILD_CHECKSUM_SHA256=" >> $GITHUB_ENV
 
-      - run: chmod +x ./redgold_linux; chmod +x ./redgold_mac; chmod +X ./redgold.exe
+      - run: chmod +x ./redgold_linux && chmod +x ./redgold_mac && chmod +X ./redgold.exe && chmod +x ./redgold_linux_ubuntu20
 
       # Docker Image
       # TODO: This works but need to setup self hosted registry also
@@ -432,6 +465,7 @@ jobs:
             redgold_linux
             redgold_mac
             redgold.exe
+            redgold_linux_ubuntu20
           tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
