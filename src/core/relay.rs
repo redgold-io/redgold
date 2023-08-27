@@ -256,6 +256,14 @@ impl Relay {
         }
     }
 
+    pub async fn peer_id(&self) -> RgResult<PeerId> {
+        let res = self.node_tx()
+            .await
+            .and_then(|n| n.node_metadata())
+            .and_then(|n| n.peer_id.ok_or(error_info("Missing peer_id")));
+        res
+    }
+
     pub async fn dynamic_node_metadata(&self) -> RgResult<DynamicNodeMetadata> {
         let tx = self.ds.config_store.get_dynamic_md().await?;
         if let Some(tx) = tx {

@@ -500,6 +500,72 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             }
         });
 
+    let tmp_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("public"))
+        .and_then(move || {
+            let relay3 = tmp_relay.clone();
+            async move {
+                let ps = relay3.node_config.public_key();
+                as_warp_json_response(Ok(ps))
+            }
+        });
+
+    let tmp_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("peer-id"))
+        .and_then(move || {
+            let relay3 = tmp_relay.clone();
+            async move {
+                let ps = relay3.peer_id().await;
+                as_warp_json_response(ps)
+            }
+        });
+
+    let tmp_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("node-tx"))
+        .and_then(move || {
+            let relay3 = tmp_relay.clone();
+            async move {
+                let ps = relay3.node_tx().await;
+                as_warp_json_response(ps)
+            }
+        });
+
+    let tmp_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("peer-tx"))
+        .and_then(move || {
+            let relay3 = tmp_relay.clone();
+            async move {
+                let ps = relay3.peer_tx().await;
+                as_warp_json_response(ps)
+            }
+        });
+
+    let tmp_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("trust"))
+        .and_then(move || {
+            let relay3 = tmp_relay.clone();
+            async move {
+                let ps = relay3.get_trust().await;
+                as_warp_json_response(ps)
+            }
+        });
+
+    let tmp_relay = relay.clone();
+    let address_lookup = warp::get()
+        .and(warp::path("seeds"))
+        .and_then(move || {
+            let relay3 = tmp_relay.clone();
+            async move {
+                let ps = relay3.node_config.seeds;
+                as_warp_json_response(Ok(ps))
+            }
+        });
+
     let bin_relay = relay.clone();
 
     let request_normal = warp::post()
