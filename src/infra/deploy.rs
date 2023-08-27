@@ -145,7 +145,7 @@ pub async fn setup_server_redgold(
     Ok(())
 }
 
-pub async fn setup_ops_services(
+pub async fn deploy_ops_services(
     mut ssh: SSH,
     _additional_env: Option<HashMap<String, String>>,
     remote_path_prefix: Option<String>,
@@ -169,6 +169,7 @@ pub async fn setup_ops_services(
         include_str!("../resources/infra/ops_services/filebeat.docker.yml"),
         format!("{}/filebeat.docker.yml", remote_path)
     );
+
     let prometheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
 //     match std::env::var("GRAFANA_CLOUD_USER") {
 //         Ok(u) => {
@@ -251,6 +252,17 @@ pub async fn setup_ops_services(
     ssh.exes(format!("chmod -R 777 {}/data/esdata", remote_path), p).await?;
 
     ssh.execs(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), false, p).await?;
+
+    tokio::time::sleep(Duration::from_secs(15)).await;
+
+    let kibana_setup_path = format!("{}/kibana_setup.sh", remote_path);
+    ssh.copy(
+        include_str!("../resources/infra/ops_services/kibana_setup.sh"),
+        kibana_setup_path
+    );
+
+    ssh.exes(format!("chmod +x {}; {}", remote_path, remote_path), p).await?;
+
 
     Ok(())
 }
@@ -461,9 +473,9 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
             ).await.expect("worx");
         }
         gen = false;
-        if !deploy.skip_ops {
+        if !deploy.skip_ops || deploy.ops {
             let ssh = SSH::new_ssh(ss.host.clone(), None);
-            setup_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
+            deploy_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
         }
     }
     Ok(())
