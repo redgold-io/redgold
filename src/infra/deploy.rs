@@ -85,7 +85,7 @@ pub async fn setup_server_redgold(
      }
      if let Some(tx) = ser_pid_tx {
          let remote = format!("{}/peer_tx", path);
-         ssh.copy_p(tx.json_or(), remote, p).await?;
+         ssh.copy_p(tx, remote, p).await?;
      }
 
 
@@ -358,6 +358,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
     }
     if net == NetworkEnvironment::Main {
         deploy.ask_pass = true;
+    } else {
+        deploy.words_and_id = true;
     }
 
     let sd = ArgTranslate::secure_data_path_buf().expect("");
