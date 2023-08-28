@@ -9,6 +9,7 @@ use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerData, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
+use flume::Receiver;
 use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
@@ -142,7 +143,7 @@ are instantiated by the node
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
-use crate::core::transact::contention_conflicts::{ContentionInfo, ContentionMessage, ContentionMessageInner};
+use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -203,12 +204,12 @@ impl Relay {
         Ok(None)
     }
 
-    pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> RgResult<ContentionInfo> {
-        let (s, r) = flume::bounded::<RgResult<ContentionInfo>>(1);
+    pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> Receiver<RgResult<ContentionResult>> {
+        let (s, r) = flume::bounded::<RgResult<ContentionResult>>(1);
         let msg = ContentionMessage::new(&key, msg, s);
         let index = key.div_mod(self.node_config.contention.bucket_parallelism.clone());
         self.contention[index as usize].sender.send_err(msg)?;
-        r.recv_async_err().await?
+        r
     }
 
     pub async fn send_contract_ordering_message(&self, tx: &Transaction, output: &Output) -> RgResult<ContractStateMarker> {

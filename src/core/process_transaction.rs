@@ -14,7 +14,7 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{ContractStateMarker, ExecutionInput, ExecutorBackend, FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
+use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -38,6 +38,7 @@ use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
+use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
 use crate::util::logging::Loggable;
 
 #[derive(Clone)]
@@ -347,6 +348,18 @@ impl TransactionProcessContext {
 
         let fixed_utxo_ids = transaction.fixed_utxo_ids_of_inputs()?;
         self.utxo_ids = Some(fixed_utxo_ids.clone());
+
+        // Enable UTXO contention buckets
+        // let mut contention_responses = vec![];
+        // for u in &fixed_utxo_ids {
+        //     let mut ck = ContentionKey::default();
+        //     ck.utxo_id = Some(u.clone());
+        //     let msg = ContentionMessageInner::RegisterPotentialContention {
+        //         transaction_hash: hash.clone()
+        //     };
+        //     contention_responses.push(self.relay.contention_message(&ck, msg).await?);
+        // }
+
         // TODO: Check for conflicts via peer query -- currently unimplemented
         check_utxo_conflicts(self.relay.clone(), &fixed_utxo_ids, &hash).await?;
 
