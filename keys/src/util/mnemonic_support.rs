@@ -12,7 +12,7 @@ use bitcoin_wallet::account::MasterKeyEntropy;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH};
+use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH, redgold_keypair_change_path};
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
@@ -217,6 +217,11 @@ impl WordsPass {
         let key = self.key_from_path_str(path.into())?;
         let vec = key.private_key.public_key(&Secp256k1::new()).serialize().to_vec();
         Ok(structs::PublicKey::from_bytes(vec))
+    }
+
+    pub fn keypair_at_change(&self, change: impl Into<i64>) -> RgResult<KeyPair> {
+        let key = self.keypair_at(redgold_keypair_change_path(change.into()))?;
+        Ok(key)
     }
 
     pub fn default_peer_id(&self) -> RgResult<PeerId> {

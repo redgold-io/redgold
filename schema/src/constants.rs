@@ -37,3 +37,7 @@ pub const STANDARD_VERSION: i64 = 0;
 pub fn default_node_internal_derivation_path(account: i64) -> String {
     format!("m/{REDGOLD_PURPOSE}'/{REDGOLD_KEY_DERIVATION_PATH}'/{account}'/0/0")
 }
+
+pub fn redgold_keypair_change_path(change: i64) -> String {
+    format!("m/{REDGOLD_PURPOSE}'/{REDGOLD_KEY_DERIVATION_PATH}'/0'/0/{change}")
+}

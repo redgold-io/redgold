@@ -1,5 +1,5 @@
 #!/bin/bash
-wget https://github.com/redgold-io/redgold/releases/download/release%2Fdev/redgold_linux \
+wget https://github.com/redgold-io/redgold/releases/download/release%2Fdev/redgold_linux_ubuntu20 \
 -O redgold
 chmod +x redgold
 # TODO: Pick up usb drive with bash?

@@ -299,7 +299,9 @@ impl NodeConfig {
             .transaction.sign(&pair).expect("Failed signing?").clone();
 
         let result = self.env_data_folder().peer_tx();
-        info!("Peer loaded from env data folder result {:?}", result.clone().json_or_combine());
+        if !self.is_local_debug() {
+            info!("Peer loaded from env data folder result {:?}", result.clone().json_or_combine());
+        }
         result.unwrap_or(tx)
     }
 

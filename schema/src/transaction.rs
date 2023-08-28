@@ -70,6 +70,11 @@ pub struct AddressBalance {
 }
 
 impl Transaction {
+    pub fn with_hashes(&mut self) -> &mut Self {
+        self.with_hash();
+        self.with_signable_hash().expect("signable hash");
+        self
+    }
 
     pub fn with_signable_hash(&mut self) -> Result<&mut Self, ErrorInfo> {
         self.struct_metadata()?.signable_hash = Some(self.signable_hash());
@@ -376,8 +381,12 @@ impl CurrencyAmount {
             amount
         })
     }
-    fn to_fractional(&self) -> f64 {
+    pub fn to_fractional(&self) -> f64 {
         (self.amount as f64) / (DECIMAL_MULTIPLIER as f64)
+    }
+
+    pub fn to_rounded_int(&self) -> i64 {
+        self.to_fractional() as i64
     }
     pub fn from(amount: i64) -> Self {
         Self {
