@@ -24,7 +24,7 @@ pub struct GenesisDistribution{
 fn main_entry(address: impl Into<String>, fraction_pct: impl Into<f64>) -> GenesisDistribution {
     GenesisDistribution {
         address: Address::parse(&address.into()).expect("works"),
-        amount: CurrencyAmount::from_fractional((fraction_pct.into() / 100.0) * MAX_COIN_SUPPLY).expect("works"),
+        amount: CurrencyAmount::from_fractional((fraction_pct.into() / 100.0) * (MAX_COIN_SUPPLY as f64)).expect("works"),
     }
 }
 fn main_distribution() -> Vec<GenesisDistribution> {
@@ -57,20 +57,25 @@ fn main_distribution() -> Vec<GenesisDistribution> {
 }
 
 fn lower_distribution(network: &NetworkEnvironment, words_pass: &WordsPass, seeds: &Vec<Seed>) -> Vec<GenesisDistribution> {
-    let self_pks = (0..50).iter().map(|i| {
-        let kp = words_pass.keypair_at_change(i).expect("works").public_key();
-        kp
-    }).collect_vec();
-    let pks: HashSet<PublicKey> = seeds.iter()
-        .filter_map(|s| s.public_key)
-        .chain(self_pks.iter())
-        .collect();
-    let mut ordered = pks.iter().collect_vec();
-    ordered.sort();
-    let res = ordered.iter().map(|o| {
+    let mut pks = vec![];
+
+    for i in 0..50 {
+        let pk = words_pass.keypair_at_change(i).expect("works").public_key();
+        pks.push(pk);
+    }
+
+    for s in seeds.iter() {
+        if let Some(pk) = &s.public_key {
+            if !pks.contains(pk) {
+                pks.push(pk.clone());
+            }
+        }
+    }
+
+    let res = pks.iter().map(|o| {
         GenesisDistribution {
             address: Address::from_struct_public(o).expect("works"),
-            amount: CurrencyAmount::from_fractional((1.0 / ordered.len() as f64) * MAX_COIN_SUPPLY).expect("works"),
+            amount: CurrencyAmount::from_fractional((1.0 / pks.len() as f64) * (MAX_COIN_SUPPLY as f64)).expect("works"),
         }
     }).collect_vec();
     res
@@ -81,7 +86,7 @@ pub fn genesis_transaction(
     words: &WordsPass,
     seeds: &Vec<Seed>
 ) -> Transaction {
-    let distribution = if network == NetworkEnvironment::Main {
+    let distribution = if network.is_main() {
         main_distribution()
     } else {
         lower_distribution(network, words, seeds)
