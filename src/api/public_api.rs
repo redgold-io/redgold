@@ -501,7 +501,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let tmp_relay = relay.clone();
-    let address_lookup = warp::get()
+    let public = warp::get()
         .and(warp::path("public"))
         .and_then(move || {
             let relay3 = tmp_relay.clone();
@@ -512,7 +512,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let tmp_relay = relay.clone();
-    let address_lookup = warp::get()
+    let peer_id = warp::get()
         .and(warp::path("peer-id"))
         .and_then(move || {
             let relay3 = tmp_relay.clone();
@@ -523,7 +523,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let tmp_relay = relay.clone();
-    let address_lookup = warp::get()
+    let node_tx = warp::get()
         .and(warp::path("node-tx"))
         .and_then(move || {
             let relay3 = tmp_relay.clone();
@@ -534,7 +534,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let tmp_relay = relay.clone();
-    let address_lookup = warp::get()
+    let peer_tx = warp::get()
         .and(warp::path("peer-tx"))
         .and_then(move || {
             let relay3 = tmp_relay.clone();
@@ -545,7 +545,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let tmp_relay = relay.clone();
-    let address_lookup = warp::get()
+    let trust = warp::get()
         .and(warp::path("trust"))
         .and_then(move || {
             let relay3 = tmp_relay.clone();
@@ -556,7 +556,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let tmp_relay = relay.clone();
-    let address_lookup = warp::get()
+    let seeds = warp::get()
         .and(warp::path("seeds"))
         .and_then(move || {
             let relay3 = tmp_relay.clone();
@@ -636,6 +636,12 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     info!("Running public API on port: {:?}", port.clone());
 
     let routes = hello
+        .or(seeds)
+        .or(trust)
+        .or(peer_tx)
+        .or(node_tx)
+        .or(peer_id)
+        .or(public)
         .or(transaction)
         .or(faucet)
         .or(query_hash)
