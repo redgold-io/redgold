@@ -124,7 +124,7 @@ config = "0.13.3"
 itertools = "0.10.1"
 bytes = "1.1.0"
 #Dependencies for email sending
-aws-config = "0.55.1"
+aws-config = "0.56.1"
 aws-sdk-sesv2 = "0.28.0"
 dns-lookup = "2.0.2"
 
