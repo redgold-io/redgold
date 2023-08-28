@@ -136,7 +136,7 @@ impl ArgTranslate {
         self.calculate_executable_checksum_hash();
         self.guard_faucet();
         self.e2e_enable();
-        self.configure_seeds();
+        self.configure_seeds().await;
         self.set_discovery_interval();
         self.apply_node_opts();
         self.genesis();
@@ -447,19 +447,7 @@ impl ArgTranslate {
             self.node_config.seeds.push(seed);
         }
 
-        if let Some(a) = &self.opts.seed_address {
-            let default_port = self.node_config.network.default_port_offset();
-            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
-            // TODO: replace this with the other seed class.
-            self.node_config.seeds.push(Seed {
-                external_address: a.clone(),
-                environments: vec![self.node_config.network as i32],
-                port_offset: Some(port as u32),
-                trust: vec![TrustData::from_label(1.0)],
-                peer_id: Some(self.node_config.peer_id()),
-                public_key: Some(self.node_config.public_key()),
-            });
-        }
+
         let port = self.node_config.public_port();
         // Enrich keys for missing seed info
         for seed in self.node_config.seeds.iter_mut() {
@@ -497,6 +485,24 @@ impl ArgTranslate {
         for i in remove_index {
             self.node_config.seeds.remove(i);
         }
+
+        // TODO: Test config should pass ids so we get ids for local_test
+        if let Some(a) = &self.opts.seed_address {
+
+            let default_port = self.node_config.network.default_port_offset();
+            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            info!("Adding seed from command line arguments {a}:{port}");
+            // TODO: replace this with the other seed class.
+            self.node_config.seeds.push(Seed {
+                external_address: a.clone(),
+                environments: vec![self.node_config.network as i32],
+                port_offset: Some(port as u32),
+                trust: vec![TrustData::from_label(1.0)],
+                peer_id: None, // Some(self.node_config.peer_id()),
+                public_key: None, //Some(self.node_config.public_key()),
+            });
+        }
+
 
     }
     fn apply_node_opts(&mut self) {
