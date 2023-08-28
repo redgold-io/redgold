@@ -266,24 +266,21 @@ impl Node {
     }
 
     pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
-        let outputs = (0..50).map(|i|
-            GenesisDistribution {
-                address: node_config.internal_mnemonic().key_at(i as usize).address_typed(),
-                amount: CurrencyAmount::from_fractional(10000.0).expect("")
-            }
-        ).collect_vec();
-        for o in &outputs {
-            info!("genesis address: {}", o.address.json_or());
-        }
-        let tx = genesis_tx_from(outputs); //EARLIEST_TIME
-        let res = tx.to_utxo_entries(EARLIEST_TIME as u64).iter().zip(0..50).map(|(o, i)| {
-            let kp = node_config.internal_mnemonic().key_at(i as usize);
+        let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
+        let outputs = tx.utxo_outputs().expect("utxos");
+        let mut res = vec![];
+        for i in 0..50 {
+            let kp = node_config.words().keypair_at_change(i).expect("works");
+            let address = kp.address_typed();
+            let o = outputs.iter().find(|o| {
+                o.address.as_ref().expect("a") == &address
+            }).expect("found");
             let s = SpendableUTXO {
                 utxo_entry: o.clone(),
                 key_pair: kp,
             };
-            s
-        }).collect_vec();
+            res.push(s);
+        }
         (tx, res)
     }
 
