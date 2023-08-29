@@ -204,12 +204,12 @@ impl Relay {
         Ok(None)
     }
 
-    pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> Receiver<RgResult<ContentionResult>> {
+    pub async fn contention_message(&self, key: &ContentionKey, msg: ContentionMessageInner) -> RgResult<Receiver<RgResult<ContentionResult>>> {
         let (s, r) = flume::bounded::<RgResult<ContentionResult>>(1);
         let msg = ContentionMessage::new(&key, msg, s);
         let index = key.div_mod(self.node_config.contention.bucket_parallelism.clone());
         self.contention[index as usize].sender.send_err(msg)?;
-        r
+        Ok(r)
     }
 
     pub async fn send_contract_ordering_message(&self, tx: &Transaction, output: &Output) -> RgResult<ContractStateMarker> {
