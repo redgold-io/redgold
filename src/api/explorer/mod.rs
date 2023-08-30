@@ -177,7 +177,7 @@ pub struct DetailedPeer {
     pub trust: Vec<DetailedTrust>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DetailedPeerNode {
     pub external_address: String,
     pub public_key: String,
