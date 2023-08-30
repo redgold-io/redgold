@@ -244,12 +244,6 @@ impl Node {
         relay.ds.count_gauges().await?;
 
         relay.ds.check_consistency_apply_fixes().await?;
-        let prior_node_tx = relay.node_tx().await?;
-        let nmd = prior_node_tx.node_metadata()?;
-        let metadata = relay.node_config.node_metadata_fixed();
-        if nmd != metadata {
-            relay.update_node_metadata(&metadata).await?;
-        }
 
         Ok(())
     }
