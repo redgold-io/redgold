@@ -1,6 +1,6 @@
 [package]
 name = "redgold-sdk-client"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
