@@ -278,7 +278,8 @@ pub async fn derive_mnemonic_and_peer_id(
     server_id_index: i64,
     servers: Vec<Server>,
     trust: Vec<TrustRatingLabel>,
-    peer_id_tx: &mut HashMap<String, structs::Transaction>
+    peer_id_tx: &mut HashMap<String, structs::Transaction>,
+    net: &NetworkEnvironment
 )
     -> RgResult<(String, String)> {
 
@@ -320,7 +321,7 @@ pub async fn derive_mnemonic_and_peer_id(
                 let mut vi = VersionInfo::default();
                 vi.executable_checksum = node_config.executable_checksum.clone().expect("exe");
                 nmd.version_info = Some(vi);
-                nmd.network_environment = node_config.network.clone() as i32;
+                nmd.network_environment = net.clone() as i32;
                 nmds.push(nmd);
             }
         }
@@ -438,7 +439,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
             ss.index,
             servers.clone(),
             vec![],
-            &mut pid_tx
+            &mut pid_tx,
+            &net
         ).await?;
 
         let mut peer_tx_opt: Option<structs::Transaction> = None;
