@@ -20,6 +20,7 @@ use crate::api::public_api::Pagination;
 use crate::multiparty::watcher::{BidAsk, DepositWatcherConfig};
 use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
+use crate::util::logging::Loggable;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {
@@ -330,7 +331,10 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
     let pd = p.latest_peer_transaction.safe_get()?.peer_data()?;
     let mut nodes = vec![];
     for pni in &p.peer_node_info {
-        nodes.push(handle_peer_node(pni, &r).await?);
+        let node = handle_peer_node(pni, &r).await.log_error();
+        if let Ok(node) = node {
+            nodes.push(node);
+        }
     }
     Ok(DetailedPeer {
         peer_id: hex::encode(pd.peer_id.safe_get()?.peer_id.safe_get()?.bytes.safe_bytes()?),
@@ -345,11 +349,11 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
 }
 
 pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<DetailedPeerNode> {
-    let nmd = p.latest_node_transaction.safe_get()?.node_metadata()?;
-    let vi = nmd.version_info.clone().safe_get()?.clone();
+    let nmd = p.latest_node_transaction.safe_get_msg("Missing latest node transaction")?.node_metadata()?;
+    let vi = nmd.version_info.clone().safe_get_msg("Missing version info")?.clone();
     Ok(DetailedPeerNode{
         external_address: nmd.external_address.clone(),
-        public_key: nmd.public_key.safe_get()?.hex()?,
+        public_key: nmd.public_key.safe_get_msg("Missing public key")?.hex()?,
         node_type:  format!("{:?}", NodeType::from_i32(nmd.node_type.safe_get()?.clone()).safe_get()?.clone()),
         executable_checksum: vi.executable_checksum.clone(),
         commit_hash: vi.commit_hash.unwrap_or("".to_string()),
@@ -368,7 +372,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<Detailed
             .map(|p| hex::encode(p)).unwrap_or("".to_string()),
         nat_restricted: nmd.nat_restricted.unwrap_or(false),
         network_environment:
-        format!("{:?}", NetworkEnvironment::from_i32(nmd.network_environment.clone()).safe_get()?.clone()),
+        format!("{:?}", NetworkEnvironment::from_i32(nmd.network_environment.clone()).safe_get_msg("Missing network environment")?.clone()),
     })
 }
 

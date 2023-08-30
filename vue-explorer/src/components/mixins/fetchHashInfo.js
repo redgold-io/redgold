@@ -42,23 +42,10 @@ export default {
                 return null;
             }
         },
-        async fetchData(url= null, port= null, offset = null, limit = null) {
+        async fetchData(offset = null, limit = null) {
             const hash = this.$route.params.param; // get the hash from the route parameter
 
-            if (url == null) {
-                url = process.env.VUE_APP_API_URL
-            }
-
-            if (port == null) {
-                const hostname = window.location.hostname;
-                if (hostname.includes('staging')) {
-                    port = "16386";
-                } else {
-                    port = "16486"
-                }
-            }
-
-            url += ":" + port
+            let url = this.getUrl()
 
 
             let input = `${url}/explorer/hash/${hash}`;

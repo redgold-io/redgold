@@ -336,7 +336,7 @@ impl Transaction {
         if res.len() == 1 {
             return Ok(res[0].clone());
         } else {
-            return Err(ErrorInfo::error_info("Missing peer data in transaction"));
+            return Err(ErrorInfo::error_info("Missing node metadata in transaction"));
         }
     }
 
