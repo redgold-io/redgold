@@ -239,6 +239,7 @@ impl Relay {
             if opt.is_none() {
                 info!("No peer tx found for this node, generating new one");
             }
+            info!("First generation of node tx from peer tx: {:?}", opt.cloned());
             let tx = self.node_config.node_tx_fixed(opt);
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)
