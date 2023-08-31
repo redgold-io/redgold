@@ -10,7 +10,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{EasyJson, RgResult, structs, WithMetadataHashable};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerData, PeerId, TrustRatingLabel, VersionInfo};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerData, PeerId, TrustRatingLabel, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 
 use crate::hardware::trezor;
@@ -278,7 +278,8 @@ pub async fn derive_mnemonic_and_peer_id(
     server_id_index: i64,
     servers: Vec<Server>,
     trust: Vec<TrustRatingLabel>,
-    peer_id_tx: &mut HashMap<String, structs::Transaction>
+    peer_id_tx: &mut HashMap<String, structs::Transaction>,
+    net: &NetworkEnvironment
 )
     -> RgResult<(String, String)> {
 
@@ -320,7 +321,10 @@ pub async fn derive_mnemonic_and_peer_id(
                 let mut vi = VersionInfo::default();
                 vi.executable_checksum = node_config.executable_checksum.clone().expect("exe");
                 nmd.version_info = Some(vi);
-                nmd.network_environment = node_config.network.clone() as i32;
+                nmd.network_environment = net.clone() as i32;
+                nmd.node_type = Some(NodeType::Static as i32);
+                nmd.port_offset = Some(net.default_port_offset() as i64);
+                nmd.nat_restricted = Some(false);
                 nmds.push(nmd);
             }
         }
@@ -438,7 +442,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
             ss.index,
             servers.clone(),
             vec![],
-            &mut pid_tx
+            &mut pid_tx,
+            &net
         ).await?;
 
         let mut peer_tx_opt: Option<structs::Transaction> = None;
