@@ -1,4 +1,4 @@
-use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry};
+use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, RgResult, SafeOption};
 
@@ -85,6 +85,11 @@ impl Output {
             utxo_id: None
         }
     }
+    pub fn from_data(data: StandardData) -> Self {
+        let mut o = Output::default();
+        o.data = Some(data);
+        o
+    }
 
     pub fn is_swap(&self) -> bool {
         self.contract.as_ref().and_then(|c| c.standard_contract_type)
@@ -119,6 +124,11 @@ impl Output {
     pub fn safe_ensure_amount(&self) -> Result<&i64, ErrorInfo> {
         self.data.safe_get_msg("Missing data field on output")?
             .amount.safe_get_msg("Missing amount field on output")
+    }
+
+    pub fn observation(&self) -> RgResult<&Observation> {
+        self.data.safe_get_msg("Missing data field on output")?
+            .observation.safe_get_msg("Missing observation field on output")
     }
 
     pub fn opt_amount(&self) -> Option<i64> {

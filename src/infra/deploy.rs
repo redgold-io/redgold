@@ -333,7 +333,7 @@ pub async fn derive_mnemonic_and_peer_id(
         let mut tb = TransactionBuilder::new();
         let address = pkey.address().expect("a");
         tb.with_output_peer_data(&address, peer_data, 0);
-        tb.with_peer_genesis_input(&address);
+        tb.with_genesis_input(&address);
         let hash = tb.transaction.hash_or();
         let mut input = tb.transaction.inputs.last_mut().expect("");
         if cold {

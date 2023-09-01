@@ -1,9 +1,10 @@
+use std::collections::HashSet;
 use bdk::bitcoin::secp256k1::rand;
 use bdk::bitcoin::secp256k1::rand::Rng;
 use bitcoin::secp256k1::{PublicKey, SecretKey};
 use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, struct_metadata_new, structs, WithMetadataHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, CurrencyAmount, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, CurrencyAmount, TransactionOptions, UtxoEntry, UtxoId};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::KeyPair;
@@ -97,7 +98,17 @@ impl TransactionSupport for Transaction {
         Ok(())
     }
 
-    fn prevalidate(&self) -> Result<(), ErrorInfo> {
+    fn prevalidate(&self) -> RgResult<()> {
+
+        let mut hs: HashSet<UtxoId> = HashSet::new();
+        for i in &self.inputs {
+            if let Some(f) = &i.utxo_id {
+                if hs.contains(f) {
+                    return Err(error_info("Duplicate input UTXO consumption"))?;
+                }
+                hs.insert(f.clone());
+            }
+        }
         if self.inputs.is_empty() {
             Err(error_code(structs::Error::MissingInputs))?;
         }

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, FixedUtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry};
-use crate::utxo_id::UtxoId;
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof};
+use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
@@ -11,9 +11,32 @@ use crate::transaction_builder::TransactionBuilder;
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
 
 
-impl FixedUtxoId {
+impl UtxoId {
     pub fn format_str(&self) -> String {
-        format!("FixedUtxoId: {} output: {}", self.transaction_hash.clone().expect("").hex(), self.output_index)
+        format!("UtxoId: {} output: {}", self.transaction_hash.clone().expect("").hex(), self.output_index)
+    }
+    pub fn from(id: Vec<u8>) -> UtxoId {
+        let len = id.len();
+        let split = len - 8;
+        let mut output_index_array = [0u8; 8];
+        let output_id_vec = &id[split..len];
+        output_index_array.clone_from_slice(&output_id_vec);
+        let output_index = i64::from_le_bytes(output_index_array);
+        let transaction_hash = id[0..split].to_vec();
+        let transaction_hash = Some(Hash::new(transaction_hash));
+        UtxoId {
+            transaction_hash,
+            output_index,
+        }
+    }
+    pub fn utxo_id_vec(&self) -> Vec<u8> {
+        let mut merged: Vec<u8> = vec![];
+        merged.extend(self.transaction_hash.clone().expect("hash").vec());
+        merged.extend(self.output_index.to_le_bytes().to_vec());
+        merged
+    }
+    pub fn utxo_id_hex(&self) -> String {
+        hex::encode(self.utxo_id_vec())
     }
 }
 
@@ -70,6 +93,67 @@ pub struct AddressBalance {
 }
 
 impl Transaction {
+
+    // TODO: Validator should ensure UtxoId only used once
+    // Lets rename all UtxoId just utxoid
+    pub fn input_of(&self, f: &UtxoId) -> Option<&Input> {
+        self.inputs.iter().find(|i| i.utxo_id.as_ref().filter(|&u| u == f).is_some())
+    }
+
+    pub fn observation_output_index(&self) -> RgResult<i64> {
+        self.outputs.iter().enumerate().find(|(i, o)| o.observation().is_ok()
+        ).map(|o| o.0 as i64).ok_or(error_info("Missing observation output"))
+    }
+
+    pub fn observation_as_utxo_id(&self) -> RgResult<UtxoId> {
+        let o = self.observation_output_index();
+        Ok(UtxoId {
+            transaction_hash: Some(self.hash_or()),
+            output_index: o?,
+        })
+    }
+
+    pub fn observation_output(&self) -> RgResult<&Output> {
+        let o = self.observation_output_index()?;
+        let option = self.outputs.get(o as usize);
+        option.safe_get_msg("Missing observation output").cloned()
+    }
+
+    pub fn observation_output_as(&self) -> RgResult<UtxoEntry> {
+        let idx = self.observation_output_index()?;
+        let o = self.observation_output()?;
+        let u = o.utxo_entry(&self.hash_or(), idx as u32,self.time()?.clone() as u64);
+        Ok(u)
+    }
+
+    pub fn observation(&self) -> RgResult<&Observation> {
+        let mut map = self.outputs.iter().filter_map(|o| o.observation().ok());
+        let option = map.next();
+        option.ok_or(error_info("Missing observation"))
+    }
+
+    pub fn observation_proof(&self) -> RgResult<&Proof> {
+        let o = self.observation()?;
+        let p = o.parent_id.safe_get_msg("Missing parent id")?;
+        let input_opt = self.input_of(&p);
+        let input = input_opt.safe_get_msg("Missing input")?;
+        let proof = input.proof.get(0);
+        let proof_act = proof.safe_get_msg("Missing input proof")?;
+        Ok(proof_act.clone())
+    }
+    pub fn observation_public_key(&self) -> RgResult<&PublicKey> {
+        let proof_act = self.observation_proof()?;
+        let pk = proof_act.public_key.safe_get_msg("Missing public key")?;
+        Ok(pk)
+    }
+
+    pub fn build_observation_proofs(&self) -> RgResult<Vec<ObservationProof>> {
+        let h = self.hash_or();
+        let p = self.observation_proof()?;
+        let o = self.observation()?;
+        Ok(o.build_observation_proofs(&h, &p))
+    }
+
     pub fn with_hashes(&mut self) -> &mut Self {
         self.with_hash();
         self.with_signable_hash().expect("signable hash");
@@ -112,7 +196,7 @@ impl Transaction {
     }
 
 
-    pub fn fixed_utxo_ids_of_inputs(&self) -> Result<Vec<FixedUtxoId>, ErrorInfo> {
+    pub fn fixed_utxo_ids_of_inputs(&self) -> Result<Vec<UtxoId>, ErrorInfo> {
         let mut utxo_ids = Vec::new();
         for input in &self.inputs {
             if let Some(f) = &input.utxo_id {
@@ -287,6 +371,14 @@ impl Transaction {
         h.safe_get_msg("Missing height").cloned()
     }
 
+    pub fn options(&self) -> RgResult<&TransactionOptions> {
+        self.options.safe_get_msg("Missing options")
+    }
+    pub fn salt(&self) -> RgResult<i64> {
+        let s = self.options()?.salt;
+        s.safe_get_msg("Missing salt").cloned()
+    }
+
     // pub fn to_utxo_outputs_as_inputs(&self, time: u64) -> Vec<Input> {
     //     return UtxoEntry::from_transaction(self, time as i64)
     //         .iter()
@@ -407,6 +499,12 @@ pub fn amount_data(amount: u64) -> Option<StandardData> {
 }
 
 impl StandardData {
+
+    pub fn observation(o: Observation) -> Self {
+        let mut sd = Self::default();
+        sd.observation = Some(o);
+        sd
+    }
 
     pub fn empty() -> Self {
         Self::default()

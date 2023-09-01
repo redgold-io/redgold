@@ -67,7 +67,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
     if let Some(h) = Hash::from_hex(hash_input.clone()).ok() {
         let r = relay.ds.observation.query_observation(&h).await?;
         if let Some(r) = r {
-            response.observation = r.observation.clone();
+            response.observation = Some(r.clone());
             return Ok(response);
         }
     }

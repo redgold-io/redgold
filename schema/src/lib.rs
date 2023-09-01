@@ -234,6 +234,7 @@ pub trait ProtoSerde
 {
     fn proto_serialize(&self) -> Vec<u8>;
     fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
+    fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo>;
 }
 
 impl<T> ProtoSerde for T
@@ -247,6 +248,12 @@ where T: Message + Default {
             .map_err(|e|
                 error_message(Error::ProtoDecoderFailure, e.to_string()))
     }
+    fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo> {
+        T::decode(&**bytes)
+            .map_err(|e|
+                error_message(Error::ProtoDecoderFailure, e.to_string()))
+    }
+
 }
 
 
@@ -378,14 +385,13 @@ where
 // struct CurrencyTransferTransaction {
 //     transaction: Transaction
 // }
-
 pub trait SafeOption<T> {
     fn safe_get(&self) -> Result<&T, ErrorInfo>;
     fn safe_get_msg<S: Into<String>>(&self, msg: S) -> Result<&T, ErrorInfo>;
     // TODO: put in another trait with a clone bound
     // fn safe_get_clone(&self) -> Result<T, ErrorInfo>;
+    fn ok_msg(self, err: impl Into<String>) -> Result<T, ErrorInfo>;
 }
-
 //
 // pub trait SafeOptionJson<T> {
 //     fn safe_get_or_json(&self) -> Result<&T, ErrorInfo>;
@@ -395,6 +401,16 @@ pub trait SafeOption<T> {
 // impl<T> SafeOptionJson<T> for Option<T> where T: Serialize {
 //     fn safe_get_or_json(&self) -> Result<&T, ErrorInfo> {
 //         self.as_ref().ok_or(error_message(Error::MissingField, serde_json::to_string(&self).unwrap_or("Json serialization error of missing field data".to_string())))
+//     }
+// }
+
+
+// #[inline]
+// #[stable(feature = "rust1", since = "1.0.0")]
+// pub fn ok_or<E>(self, err: E) -> Result<T, E> {
+//     match self {
+//         Some(v) => Ok(v),
+//         None => Err(err),
 //     }
 // }
 
@@ -412,6 +428,12 @@ impl<T> SafeOption<T> for Option<T> {
                 Error::MissingField,
                 format!("{} option empty", msg.into()),
             ))
+    }
+    fn ok_msg(self, err: impl Into<String>) -> RgResult<T> {
+        match self {
+            Some(v) => Ok(v),
+            None => Err(error_info(err.into())),
+        }
     }
 
 }

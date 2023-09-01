@@ -295,7 +295,7 @@ impl NodeConfig {
 
         let tx = TransactionBuilder::new()
             .with_output_peer_data(&pair.address_typed(), pd, 0)
-            .with_peer_genesis_input(&pair.address_typed())
+            .with_genesis_input(&pair.address_typed())
             .transaction.sign(&pair).expect("Failed signing?").clone();
 
         let result = self.env_data_folder().peer_tx();
@@ -319,7 +319,7 @@ impl NodeConfig {
         let metadata = opt.cloned().unwrap_or(self.node_metadata_fixed());
         let mut tx = TransactionBuilder::new().with_output_node_metadata(
             &pair.address_typed(), metadata, 0
-        ).with_peer_genesis_input(&pair.address_typed())
+        ).with_genesis_input(&pair.address_typed())
             .transaction.clone();
         tx.sign(&pair).expect("sign")
     }
