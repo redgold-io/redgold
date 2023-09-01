@@ -137,10 +137,16 @@ impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Transaction> {
 
         let mut map: HashMap<Address, KeyPair> = HashMap::new();
-        let min_offset = 20;
-        let max_offset = 30;
-        for i in min_offset..max_offset {
-            let key = self.relay.node_config.internal_mnemonic().key_at(i);
+        if !self.relay.node_config.network.is_main() {
+            let min_offset = 20;
+            let max_offset = 30;
+            for i in min_offset..max_offset {
+                let key = self.relay.node_config.internal_mnemonic().key_at(i);
+                let address = key.address_typed();
+                map.insert(address, key);
+            }
+        } else {
+            let key = self.relay.node_config.words().default_kp()?;
             let address = key.address_typed();
             map.insert(address, key);
         }

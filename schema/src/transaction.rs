@@ -461,11 +461,12 @@ impl Transaction {
 }
 
 impl CurrencyAmount {
-    pub fn from_fractional(a: f64) -> Result<Self, ErrorInfo> {
-        if a <= 0 as f64 {
+    pub fn from_fractional(a: impl Into<f64>) -> Result<Self, ErrorInfo> {
+        let a = a.into();
+        if a <= 0f64 {
             Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
         }
-        if a > DECIMAL_MULTIPLIER as f64 {
+        if a > MAX_COIN_SUPPLY as f64 {
             Err(ErrorInfo::error_info("Invalid transaction amount"))?
         }
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
