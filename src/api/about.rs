@@ -9,7 +9,7 @@ pub async fn handle_about_node(_p0: AboutNodeRequest, relay: Relay) -> Result<Ab
         relay.ds.transaction_store.count_total_accepted_transactions().await?;
     let pending_transactions = relay.transaction_channels.len() as i64;
     let observation_height = relay.ds.observation.select_latest_observation(
-        relay.node_config.public_key()).await?.map(|o| o.height).unwrap_or(0);
+        relay.node_config.public_key()).await?.and_then(|o| o.height().ok()).unwrap_or(0);
 
     // let mut about = AboutNodeResponse::default();
     // relay.

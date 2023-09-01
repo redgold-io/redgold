@@ -8,6 +8,9 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "structs.IdentityMetadata",
+        "structs.AncestorMerkleRoot",
+        "structs.AbridgedNodeMetadata",
         "structs.ContentionKey",
         "structs.ResolveCodeResponse",
         "structs.StandardRequest",
@@ -89,7 +92,7 @@
         "structs.DynamicNodeMetadata",
         "structs.Seed",
         "structs.FloatingUtxoId",
-        "structs.FixedUtxoId",
+        "structs.UtxoId",
         "structs.UsedOutputs",
         "structs.OfflineTimeSponsor",
         "structs.UtxoConflictResolveRequest",

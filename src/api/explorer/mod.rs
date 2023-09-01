@@ -300,21 +300,23 @@ pub fn convert_observation_metadata(om: &ObservationMetadata) -> RgResult<Detail
     })
 }
 
-pub async fn handle_observation(o: &Observation, _r: &Relay) -> RgResult<DetailedObservation> {
+pub async fn handle_observation(otx: &Transaction, _r: &Relay) -> RgResult<DetailedObservation> {
+
+    let o = otx.observation()?;
 
     Ok(DetailedObservation {
         merkle_root: o.merkle_root.safe_get()?.hex(),
         observations: o.observations.iter()
             .map(|om| convert_observation_metadata(om))
             .collect::<RgResult<Vec<DetailedObservationMetadata>>>()?,
-        public_key: o.proof.safe_get()?.public_key.safe_get()?.hex_or(),
-        signature: hex::encode(o.proof.safe_get()?.signature.safe_get()?.bytes.safe_bytes()?),
-        time: o.struct_metadata.safe_get()?.time.safe_get()?.clone(),
-        hash: o.struct_metadata.safe_get()?.hash.safe_get()?.hex(),
-        signable_hash: o.signable_hash().hex(),
-        salt: o.salt.clone(),
-        height: o.height.clone(),
-        parent_hash: o.parent_hash.as_ref().map(|h| h.hex()).unwrap_or("".to_string()),
+        public_key: otx.observation_public_key()?.hex_or(),
+        signature: otx.observation_proof()?.signature_hex()?,
+        time: otx.time()?.clone(),
+        hash: otx.hash_or().hex(),
+        signable_hash: otx.signable_hash().hex(),
+        salt: otx.salt()?,
+        height: otx.height()?,
+        parent_hash: o.parent_id.as_ref().and_then(|h| h.transaction_hash.as_ref().map(|h| h.hex())).unwrap_or("".to_string()),
     })
 }
 

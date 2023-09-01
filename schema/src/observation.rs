@@ -1,25 +1,25 @@
 use itertools::Itertools;
-use crate::structs::{Observation, ObservationMetadata, ObservationProof};
+use crate::structs::{Observation, ObservationMetadata, ObservationProof, Proof};
 use crate::{Hash, HashClear, ProtoHashable, struct_metadata_new, StructMetadata, util, WithMetadataHashable, WithMetadataHashableFields};
 
-
-impl HashClear for Observation {
-    fn hash_clear(&mut self) {
-        for x in self.struct_metadata_opt() {
-            x.hash_clear();
-        }
-    }
-}
-
-impl WithMetadataHashableFields for Observation {
-    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata> {
-        self.struct_metadata.as_mut()
-    }
-
-    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata> {
-        self.struct_metadata.as_ref()
-    }
-}
+//
+// impl HashClear for Observation {
+//     fn hash_clear(&mut self) {
+//         for x in self.struct_metadata_opt() {
+//             x.hash_clear();
+//         }
+//     }
+// }
+//
+// impl WithMetadataHashableFields for Observation {
+//     fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata> {
+//         self.struct_metadata.as_mut()
+//     }
+//
+//     fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata> {
+//         self.struct_metadata.as_ref()
+//     }
+// }
 
 impl HashClear for ObservationMetadata {
     fn hash_clear(&mut self) {
@@ -67,9 +67,8 @@ impl Observation {
             .collect::<Vec<Vec<u8>>>()
     }
 
-    pub fn build_observation_proofs(&self) -> Vec<ObservationProof> {
+    pub fn build_observation_proofs(&self, obs_tx_hash: &Hash, proof: &Proof) -> Vec<ObservationProof> {
         let mut res = vec![];
-        let proof = &self.proof;
         let leafs = self.leafs_hash();
         let merkle_tree = util::merkle::build_root(leafs.clone()).expect("merkle failure");
         // info!("Store observation leafs len={:?}", leafs.len());
@@ -79,17 +78,17 @@ impl Observation {
             let mut op = ObservationProof::default();
             op.metadata = Some(observation_metadata.clone());
             op.merkle_proof = Some(merkle_proof);
-            op.proof = proof.clone();
-            op.observation_hash = Some(self.hash_or());
+            op.proof = Some(proof.clone());
+            op.observation_hash = Some(obs_tx_hash.clone());
             res.push(op);
         };
         res
     }
-
-    pub fn signable_hash(&self) -> Hash {
-        let mut s = self.clone();
-        s.proof = None;
-        s.calculate_hash()
-    }
+    //
+    // pub fn signable_hash(&self) -> Hash {
+    //     let mut s = self.clone();
+    //     s.proof = None;
+    //     s.calculate_hash()
+    // }
 
 }

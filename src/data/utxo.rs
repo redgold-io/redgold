@@ -1,5 +1,5 @@
 use redgold_schema::structs::Address;
-use crate::schema::utxo_id::UtxoId;
+use crate::schema::utxo_id::OldUtxoId;
 use crate::schema::structs::{Input, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;
 use crate::schema::{SafeBytesAccess, WithMetadataHashable};
