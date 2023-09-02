@@ -198,7 +198,7 @@ impl ObservationBuffer {
         let ancestor_root = if self.ancestors.len() == ANCESTOR_MERKLE_ROOT_LENGTH {
             let tree = build_root(self.ancestors.clone())?;
             self.ancestors.clear();
-            Some(tree.root);
+            Some(tree.root)
         } else {
             None
         };
