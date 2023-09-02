@@ -197,7 +197,8 @@ impl ObservationBuffer {
 
         let ancestor_root = if self.ancestors.len() == ANCESTOR_MERKLE_ROOT_LENGTH {
             let tree = build_root(self.ancestors.clone())?;
-            Some(tree.root)
+            self.ancestors.clear();
+            Some(tree.root);
         } else {
             None
         };
@@ -220,7 +221,8 @@ impl ObservationBuffer {
         self.relay.ds.observation.insert_observation_and_edges(&signed_tx).await?;
         // Verify stored.
         assert!(self.relay.ds.observation.query_observation(&signed_tx.hash_or()).await?.is_some());
-
+        self.latest = signed_tx.clone();
+        self.ancestors.push(signed_tx.hash_or());
 
         // TODO: Use full pattern here
         // let peers = self.relay.ds.peer_store.active_nodes_ids(None).await?;
