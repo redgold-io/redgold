@@ -1,12 +1,12 @@
 // Internal structure. UtxoEntry is not consistent because it maps exactly to database schema, while
 // this is only used for in-memory ID entries
-pub struct UtxoId {
+pub struct OldUtxoId {
     pub transaction_hash: Vec<u8>,
     pub output_index: i64,
 }
 
-impl UtxoId {
-    pub fn from(id: Vec<u8>) -> UtxoId {
+impl OldUtxoId {
+    pub fn from(id: Vec<u8>) -> OldUtxoId {
         let len = id.len();
         let split = len - 8;
         let mut output_index_array = [0u8; 8];
@@ -14,7 +14,7 @@ impl UtxoId {
         output_index_array.clone_from_slice(&output_id_vec);
         let output_index = i64::from_le_bytes(output_index_array);
         let transaction_hash = id[0..split].to_vec();
-        UtxoId {
+        OldUtxoId {
             transaction_hash,
             output_index,
         }

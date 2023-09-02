@@ -67,7 +67,7 @@ message ProductId {
 // TODO: Support other output extraction operations, a function that processes a transaction and results ?
 
 // Standard UTXO identifier similar to Bitcoin schema.
-message FixedUtxoId {
+message UtxoId {
   // The hash associated with a parent / ancestor transaction which has already been accepted as valid.
   Hash transaction_hash = 1;
   // The index of the output in the parent transaction which is being spent / consumed.
@@ -82,6 +82,7 @@ message AddressSelector {
 
 message FloatingUtxoId {
   AddressSelector address_selector = 1;
+  // TODO: Contract execution here.
 }
 
 message OutputIndex {
@@ -89,12 +90,12 @@ message OutputIndex {
 }
 
 enum InputType {
-  PeerGenesis = 0;
+  GenesisInput = 0;
 }
 
 message Input {
 
-  FixedUtxoId utxo_id = 1;
+  UtxoId utxo_id = 1;
   // The signed proof that this input is a valid reference to the previous output.
   repeated Proof proof = 3;
   // The identifier associated with the currency or product being used, for multi-currency support.
@@ -131,9 +132,15 @@ message PartitionInfo {
   optional int64 transaction_hash = 3;
 }
 
+// TODO: Fill this out with data from below∂
+message TransportInfo {
+
+}
+
 // This also needs a proof maybe?
 message NodeMetadata {
   // Primary address used to reference the node, can be anything that is parsable.
+  // TODO: Should this stuff move into networkRelatedMetadata?
   string external_address = 1;
   // May not be to store public key if we merkle the multi_hashes too.
   PublicKey public_key = 3;
@@ -141,7 +148,9 @@ message NodeMetadata {
   optional VersionInfo version_info = 6;
   optional PartitionInfo partition_info = 7;
   optional int64 port_offset = 8;
+  // Rename as node_nickname or something?
   optional string alias = 9;
+  // Rename as full name? or move to peerId
   optional string name = 10;
   PeerId peer_id = 11;
   optional bool nat_restricted = 12;
@@ -175,6 +184,16 @@ message PeerId {
   repeated Proof known_proof = 3;
 }
 
+message IdentityMetadata {
+  optional string github_username = 1;
+  optional string website = 2;
+  optional string full_name = 9;
+  optional string username = 10;
+  optional string email = 11;
+  optional string discord_id = 12;
+  optional string twitter = 13;
+}
+
 message PeerData {
   optional PeerId peer_id = 1;
   repeated NodeMetadata node_metadata = 4;
@@ -182,6 +201,7 @@ message PeerData {
   optional VersionInfo version_info = 6;
   Address reward_address = 7;
   repeated Address sponsored_address = 8;
+  IdentityMetadata identity_metadata = 12;
 }
 
 enum BytesDecoder {
@@ -209,6 +229,11 @@ message DynamicNodeMetadata {
   Proof proof = 2;
   PeerId peer_id = 3;
   int64 height = 4;
+}
+
+message AbridgedNodeMetadata {
+  VersionInfo version_info = 1;
+  PartitionInfo partition_info = 2;
 }
 
 
@@ -239,6 +264,7 @@ message StandardData {
   optional PeerData peer_data = 8;
   optional NodeMetadata node_metadata = 9;
   optional DynamicNodeMetadata dynamic_node_metadata = 10;
+  // Equivalent to 'block height', linear observation counter
   optional int64 height = 11;
   Hash data_hash = 12;
   Hash hash = 13;
@@ -324,7 +350,7 @@ message Output {
   OutputContract contract = 8;
   optional OutputType output_type = 9;
   // Used for specifying UTXO contract reference as well as address.
-  FixedUtxoId utxo_id = 10;
+  UtxoId utxo_id = 10;
 }
 
 // monthly / daily / window size + window center
@@ -516,26 +542,27 @@ message ObservationMetadata {
   TrustData validation_confidence = 4;
   // Information about this object itself, such as time produced and hash representations of it
   StructMetadata struct_metadata = 5;
+  // Whether or not we consider this data already confirmed, or in process.
   ValidationLiveness validation_liveness = 6;
+  // How certain we are of the liveness.
   TrustData liveness_confidence = 7;
 }
 
-
+message AncestorMerkleRoot {
+  Hash root = 1;
+  int64 divmod_height = 2;
+}
 
 // TODO: Salt? Peer identifier? Etc
 message Observation {
   // Merkle root of observations
   Hash merkle_root = 1;
-  // Individual metadata of observations
+  // Individual metadata of observations, contains all metadata associated with the observation, but not the
+  // underlying data of what was observed
   repeated ObservationMetadata observations = 2;
-  // Signature associated with node key
-  Proof proof = 3;
-  StructMetadata struct_metadata = 4;
-  // TODO: These can be removed after unifying to transaction ?
-  int64 salt = 6;
-  int64 height = 7;
-  // Hash of the preceding observation reference
-  Hash parent_hash = 8;
+  // Hash of the preceding observation reference output
+  UtxoId parent_id = 3;
+  repeated Hash ancestor_merkle_roots = 4;
 }
 
 // Derived data structure, not a primary chain data structure
@@ -547,7 +574,7 @@ message ObservationEdge {
 // TODO: Update types here
 // Derived data structure, not a primary chain data structure
 message UtxoEntry {
-  // Changed this to FixedUtxoId, maybe rename FixedUtxoId just to UtxoId?
+  // Changed this to UtxoId, maybe rename UtxoId just to UtxoId?
   Hash transaction_hash = 1;
   // TODO: Change to OutputIndex
   int64 output_index = 2;
@@ -625,9 +652,11 @@ message GossipTransactionRequest {
   Transaction transaction = 1;
 }
 
+// TODO: Might be best to just remove this entirely later and route it through transactions
 message GossipObservationRequest {
-  Observation observation = 1;
+  Transaction observation = 1;
 }
+
 
 message ResolveHashRequest {
   Hash hash = 1;
@@ -669,8 +698,8 @@ message TransactionEntry {
 }
 
 message ObservationEntry {
-  uint64 time = 1;
-  Observation observation = 2;
+  int64 time = 1;
+  Transaction observation = 2;
 }
 
 message DownloadResponse {
@@ -738,7 +767,7 @@ message MultipartySubscribeEvent {
 
 
 message UtxoConflictResolveRequest {
-  repeated FixedUtxoId utxo_ids = 1;
+  repeated UtxoId utxo_ids = 1;
   Hash transaction_hash = 2;
 }
 
@@ -796,6 +825,8 @@ message Request {
   GetNodeTransactionRequest get_node_transaction_request = 20;
   GetContractStateMarkerRequest get_contract_state_marker_request = 21;
   Address resolve_code_request = 22;
+  AbridgedNodeMetadata abridged_node_metadata = 23;
+  repeated ObservationProof gossip_observation_proof = 24;
 }
 
 message HealthResponse {
@@ -842,7 +873,9 @@ message MerkleProof {
 }
 
 message ObservationProof {
+  // Transaction hash associated with the observation
   Hash observation_hash = 1;
+  // Proof of this particular observation within the merkle root of the observation
   MerkleProof merkle_proof = 2;
   ObservationMetadata metadata = 3;
   Proof proof = 4;
@@ -924,7 +957,7 @@ message HashSearchRequest {
 }
 
 message UsedOutputs {
-  FixedUtxoId utxo_id = 1;
+  UtxoId utxo_id = 1;
   repeated ObservationProof proof = 2;
 }
 
@@ -952,7 +985,7 @@ message AddressInfo {
 message HashSearchResponse {
   TransactionInfo transaction_info = 1;
   AddressInfo address_info = 2;
-  Observation observation = 3;
+  Transaction observation = 3;
   PeerNodeInfo peer_node_info = 4;
   PeerIdInfo peer_id_info = 5;
 }
@@ -1229,7 +1262,7 @@ message ContractStateMarker {
 message ContentionKey {
   // Classical conflict condition associated with double spends, two transactions which share a common parent
   // causing a conflict or contention.
-  FixedUtxoId utxo_id = 1;
+  UtxoId utxo_id = 1;
   // Conflict conditions associated with deployed single-address contracts
   Address address = 2;
   // Combined with above address -- imposes a conflict ordering condition among a state subset denoted by a key index

@@ -1,6 +1,6 @@
 use redgold_keys::TestConstants;
-use redgold_schema::structs::{ErrorInfo, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PublicKey};
-use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess, util, WithMetadataHashable};
+use redgold_schema::structs::{ErrorInfo, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction};
+use redgold_schema::{ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -28,7 +28,7 @@ impl ObservationStore {
         Ok(option)
     }
 
-    pub async fn select_latest_observation(&self, peer_key: PublicKey) -> Result<Option<Observation>, ErrorInfo> {
+    pub async fn select_latest_observation(&self, peer_key: PublicKey) -> Result<Option<Transaction>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
         let bytes = peer_key.bytes()?;
         let rows = sqlx::query!(
@@ -41,19 +41,25 @@ impl ObservationStore {
         let mut res = vec![];
         for row in rows_m {
             let option1 = row.raw;
-            let deser = Observation::proto_deserialize(option1)?;
+            let deser = Transaction::proto_deserialize(option1)?;
             res.push(deser);
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
     }
 
-    pub async fn insert_observation(&self, observation: &Observation, time: i64) -> Result<i64, ErrorInfo> {
+    pub async fn insert_observation(
+        &self,
+        observation_tx: &Transaction,
+        time: i64,
+        tx_hash: &Hash,
+        height: i64,
+        public_key: &PublicKey
+    ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-        let hash = observation.hash_or().safe_bytes()?;
-        let ser = observation.proto_serialize();
-        let public_key = observation.proof.safe_get()?.public_key_bytes()?.clone();
-        let height = observation.height;
+        let hash = tx_hash.safe_bytes()?;
+        let ser = observation_tx.proto_serialize();
+        let public_key = public_key.bytes.safe_bytes()?.clone();
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO observation
             (hash, raw, public_key, time, height) VALUES
@@ -83,65 +89,64 @@ impl ObservationStore {
         let mut res = vec![];
         for row in rows_m {
             let option1 = row.raw;
-            let deser = Observation::proto_deserialize(option1)?;
+            let deser = Transaction::proto_deserialize(option1)?;
             let time = row.time.clone();
             let mut entry = ObservationEntry::default();
             entry.observation = Some(deser);
-            entry.time = time as u64;
+            entry.time = time as i64;
             res.push(entry);
         }
         Ok(res)
     }
 
-    pub async fn query_observation(&self, hash: &Hash) -> Result<Option<ObservationEntry>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
+    pub async fn query_observation(&self, hash: &Hash) -> RgResult<Option<Transaction>> {
         let hash = hash.safe_bytes()?;
-        let rows = sqlx::query!(
-            r#"SELECT raw, time FROM observation WHERE hash = ?1"#,
+        let rows =  DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM observation WHERE hash = ?1"#,
             hash
         )
-            .fetch_all(&mut *pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        for row in rows_m {
-            let option1 = row.raw;
-            let o = option1;
-            let deser = Observation::proto_deserialize(o.clone())?;
-            let time = row.time.clone();
-            let mut entry = ObservationEntry::default();
-            entry.observation = Some(deser);
-            entry.time = time as u64;
-            return Ok(Some(entry));
-        }
-        Ok(None)
+            .fetch_optional(&mut *self.ctx.pool().await?)
+            .await
+        )?;
+        let option = rows
+            .map(|row| Transaction::proto_deserialize(row.raw)).transpose();
+        option
     }
 
-    pub async fn recent_observation(&self, limit: Option<i64>) -> Result<Vec<Observation>, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
+    pub async fn recent_observation(&self, limit: Option<i64>) -> Result<Vec<Transaction>, ErrorInfo> {
         let limit = limit.unwrap_or(10);
-        let rows = sqlx::query!(
-            r#"SELECT raw FROM observation ORDER BY time DESC LIMIT ?1"#,
+        let rows =  DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM observation ORDER BY height DESC LIMIT ?1"#,
             limit
         )
-            .fetch_all(&mut *pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            let o = row.raw;
-            let deser = Observation::proto_deserialize(o)?;
-            res.push(deser);
-        }
-        Ok(res)
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?;
+        rows.iter().map(|r| Transaction::proto_deserialize_ref(&r.raw)).collect()
     }
 
-    pub async fn insert_observation_and_edges(&self, observation: &Observation, time: i64) -> Result<i64, ErrorInfo> {
-        let res = self.insert_observation(observation, time).await?;
+    pub async fn insert_observation_and_edges(
+        &self,
+        tx: &structs::Transaction,
+    ) -> Result<i64, ErrorInfo> {
+        let time = tx.time()?;
+        let hash = tx.hash_or();
+        let height = tx.height()?;
+        let observation = tx.observation()?;
+        let utxo_id = observation.parent_id.safe_get_msg("Missing parent id")?;
+        let option1 = tx.input_of(utxo_id);
+        let input = option1.safe_get_msg("Missing input")?;
+        let option = input.proof.get(0);
+        let input_proof = option.safe_get_msg("Missing input proof")?;
+        let pk = input_proof.public_key.safe_get_msg("Missing public key")?;
+
+        let res = self.insert_observation(
+            tx, time.clone(), &hash, height, pk
+        ).await?;
         // TODO: we can actually use the sql derive class here since the class instance is the same
         // as the table -- modify the table slightly to match so we don't have to store the binary
-        for proof in observation.build_observation_proofs() {
+        for proof in observation.build_observation_proofs(&hash, input_proof) {
             let mut edge = ObservationEdge::default();
-            edge.time = time;
+            edge.time = time.clone();
             edge.observation_proof = Some(proof);
             self.insert_observation_edge(&edge).await?;
         }

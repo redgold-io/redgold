@@ -56,6 +56,9 @@ use redgold_schema::EasyJson;
 // }
 
 pub async fn faucet_request(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
+    if relay.node_config.network.is_main() {
+        return Err(error_info("Faucet not supported on mainnet"))
+    }
     info!("Incoming faucet request on {}", address_input);
     let node_config = relay.node_config.clone();
 

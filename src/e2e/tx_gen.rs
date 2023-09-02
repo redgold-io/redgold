@@ -4,7 +4,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, ErrorInfo, FixedUtxoId, TestContractRequest, CurrencyAmount};
+use redgold_schema::structs::{Address, AddressType, ErrorInfo, UtxoId, TestContractRequest, CurrencyAmount};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;

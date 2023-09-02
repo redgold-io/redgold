@@ -8,7 +8,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
 use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, FixedUtxoId, SubmitTransactionResponse};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, UtxoId, SubmitTransactionResponse};
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 
 use crate::api::public_api::PublicClient;

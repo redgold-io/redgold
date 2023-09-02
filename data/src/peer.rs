@@ -20,6 +20,12 @@ pub struct PeerTrustQueryResult {
     pub trust: f64,
 }
 
+#[derive(Clone)]
+pub struct PeerIdNode {
+    pub peer_id: PeerId,
+    pub public_key: PublicKey,
+}
+
 
 impl PeerStore {
 
@@ -269,11 +275,35 @@ impl PeerStore {
         let mut res = vec![];
         for row in rows_m {
             let deser = PublicKey::from_bytes(
-                row.public_key.safe_get_msg("Missing public key in database")?.clone()
+                row.public_key.clone()
             );
             deser.validate()?;
             res.push(deser);
         }
+        Ok(res)
+    }
+
+    pub async fn active_nodes_ids(
+        &self,
+        delay: Option<Duration>
+    ) -> Result<Vec<PeerIdNode>, ErrorInfo> {
+        let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
+        let delay = delay.as_millis() as i64;
+        let cutoff = util::current_time_millis() - delay;
+
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT public_key, peer_id FROM nodes WHERE last_seen > ?1"#,
+            cutoff
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?;
+
+        let res = rows.iter().map(|r|
+            PeerIdNode {
+                peer_id: PeerId::from_bytes(r.peer_id.clone()),
+                public_key: PublicKey::from_bytes(r.public_key.clone())
+            }
+        ).collect_vec();
         Ok(res)
     }
 
