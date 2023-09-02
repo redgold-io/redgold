@@ -16,9 +16,12 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
 
 use redgold_keys::proof_support::ProofSupport;
+use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::{SafeBytesAccess, SafeOption, struct_metadata_new, WithMetadataHashable};
 use redgold_schema::EasyJson;
-use redgold_schema::structs::{Hash, ObservationProof};
+use redgold_schema::structs::{Hash, ObservationProof, Transaction};
+use redgold_schema::transaction_builder::TransactionBuilder;
+use redgold_schema::util::merkle::build_root;
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
@@ -29,10 +32,13 @@ use crate::schema::structs::GossipObservationRequest;
 use crate::schema::structs::Request;
 use crate::util::random_salt;
 
+const ANCESTOR_MERKLE_ROOT_LENGTH: usize = 1000;
+
 pub struct ObservationBuffer {
     data: Vec<ObservationMetadata>,
     relay: Relay,
-    latest: Option<Observation>,
+    latest: Transaction,
+    ancestors: Vec<Hash>,
     subscribers: HashMap<Hash, flume::Sender<ObservationProof>>,
     interval: Interval
 }
@@ -107,11 +113,28 @@ impl ObservationBuffer {
                // arc: Arc<Runtime>
     ) -> JoinHandle<Result<(), ErrorInfo>>{
 
-        let latest =
-            // arc.block_on(
-            relay.ds.observation
-            .select_latest_observation(relay.node_config.public_key())
-                .await.ok().flatten();
+        let latest = if let Some(tx) =
+            relay.ds.observation.select_latest_observation(relay.node_config.public_key())
+                .await.expect("Error loading observation initial") {
+            tx
+        } else {
+            let mut tx = TransactionBuilder::new();
+            let address = relay.node_config.public_key().address().expect("address");
+            tx.with_genesis_input(&address);
+            tx.with_observation(&Observation::default(), 0, &address);
+            let tx = tx.transaction.sign(&relay.node_config.words().default_kp().expect("kp")).expect("sign");
+            tx
+        };
+
+        let cur_height = latest.height().expect("h");
+        // TODO: Verify this calculation is correct.
+        let ancestor_cutoff = cur_height - (cur_height % ANCESTOR_MERKLE_ROOT_LENGTH as i64);
+
+        let ancestors = relay.ds.observation.recent_observation(Some(ANCESTOR_MERKLE_ROOT_LENGTH as i64))
+            .await.expect("Error loading observation initial").iter()
+            .filter(|t| t.height().expect("h") >= ancestor_cutoff)
+            .map(|a| a.hash_or())
+            .collect_vec();
 
         info!("Starting observation buffer with latest observation: {}", latest.json_or());
 
@@ -120,6 +143,7 @@ impl ObservationBuffer {
             data: vec![],
             relay,
             latest,
+            ancestors,
             subscribers: Default::default(),
             interval: interval1
         };
@@ -158,44 +182,63 @@ impl ObservationBuffer {
         // info!("Forming observation");
         increment_counter!("redgold.observation.attempt");
 
-        let clone = self.data.clone();
-        let num_observations = clone.len();
+        let observations = self.data.clone();
+        let num_observations = observations.len();
         self.data.clear();
-        let hashes = clone
+        let hashes = observations
             .iter()
             .map(|r| r.hash_or())
             .collect_vec();
         let root = redgold_schema::util::merkle::build_root(hashes)?.root;
         let vec = root.safe_bytes()?;
-        let parent_hash = self.latest.clone().map(|o| o.hash_or());
-        let height = self.latest.clone().map(|o| o.height + 1).unwrap_or(0);
-        let struct_metadata = struct_metadata_new();
-        let mut o = Observation {
-            merkle_root: Some(vec.clone().into()),
-            observations: clone,
-            proof: Some(Proof::from_keypair(
-                &vec,
-                self.relay.node_config.internal_mnemonic().active_keypair(),
-            )),
-            struct_metadata: struct_metadata.clone(),
-            salt: random_salt(),
-            height,
-            parent_hash,
+        let parent_hash = self.latest.hash_or();
+        let height = self.latest.height().expect("Missing height on internal observation") + 1;
+        let utxo_id = self.latest.observation_as_utxo_id()?;
+
+        let ancestor_root = if self.ancestors.len() == ANCESTOR_MERKLE_ROOT_LENGTH {
+            let tree = build_root(self.ancestors.clone())?;
+            Some(tree.root)
+        } else {
+            None
         };
-        o.with_hash();
-        let proofs = o.build_observation_proofs();
-        self.relay.ds.observation.insert_observation_and_edges(&o, struct_metadata.safe_get()?.time.expect("time")).await?;
 
+        let ancestor_roots = vec![ancestor_root].into_iter().flatten().collect_vec();
+
+        let mut o = Observation {
+            merkle_root: Some(root),
+            observations,
+            parent_id: Some(utxo_id.clone()),
+            ancestor_merkle_roots: ancestor_roots,
+        };
+        let mut tx_b = TransactionBuilder::new();
+        let utxo_e = self.latest.observation_output_as()?;
+        tx_b.with_observation(&o, height, &self.relay.node_config.address());
+        tx_b.with_input(&utxo_e.to_input());
+        let signed_tx = tx_b.transaction.sign(&self.relay.node_config.words().default_kp()?)?;
+
+
+        self.relay.ds.observation.insert_observation_and_edges(&signed_tx).await?;
         // Verify stored.
-        assert!(self.relay.ds.observation.query_observation(&o.hash_or()).await?.is_some());
+        assert!(self.relay.ds.observation.query_observation(&signed_tx.hash_or()).await?.is_some());
 
-        self.latest = Some(o.clone());
+
+        // TODO: Use full pattern here
+        // let peers = self.relay.ds.peer_store.active_nodes_ids(None).await?;
+        // let trust = self.relay.get_trust().await?;
+
+        // Send each proof individually to observed hashes of subscribers by XOR.
+        // Separate distance of UTXO conflict from UTXO store?? Or is it the same?
+        let proofs = o.build_observation_proofs(
+            &signed_tx.hash_or(), &signed_tx.observation_proof()?.clone()
+        );
+        // Important, do not send to peers which have already seen the observation.
+
         // self.relay.ds.transaction_store
         let mut request = Request::empty();
         request.gossip_observation_request = Some(GossipObservationRequest {
-                observation: Some(o.clone()),
+                observation: Some(signed_tx.clone()),
         });
-        self.relay.gossip_req(&request, &o.hash_or()).await?;
+        self.relay.gossip_req(&request, &signed_tx.hash_or()).await?;
         increment_counter!("redgold.observation.created");
         gauge!("redgold.observation.height", height as f64);
         gauge!("redgold.observation.last.size", num_observations as f64);

@@ -18,7 +18,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, FixedUtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -92,7 +92,7 @@ pub struct Relay {
     pub mempool: Channel<TransactionMessage>,
     pub transaction_process: Channel<TransactionMessage>,
     /// Externally received observations TODO: Merge this into transaction
-    pub observation: Channel<Observation>,
+    pub observation: Channel<Transaction>,
     /// Threshold encryption multiparty signing flow
     // pub multiparty: Channel<MultipartyRequestResponse>,
     /// Internal signing stream for handling some validated data that is to be observed and signed
@@ -108,7 +108,7 @@ pub struct Relay {
     /// And be updated to deal with priority queue + persisted processing transactions
     pub transaction_channels: Arc<DashMap<Hash, RequestProcessor>>,
     /// TODO: This really needs to incorporate some kind of UTXO stream handler?
-    pub utxo_channels: Arc<DashMap<FixedUtxoId, UTXOContentionPool>>,
+    pub utxo_channels: Arc<DashMap<UtxoId, UTXOContentionPool>>,
     /// Some update associated with the trust model or change in rating label
     pub trust: Channel<TrustUpdate>,
     /// This isn't really used anywhere, but might be useful for keeping track of some kind of
@@ -240,6 +240,7 @@ impl Relay {
             if opt.is_none() {
                 info!("No peer tx found for this node, generating new one");
             }
+            info!("First generation of node tx from peer tx: {:?}", opt.cloned());
             let tx = self.node_config.node_tx_fixed(opt);
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)
@@ -641,7 +642,8 @@ impl Relay {
             node_config: node_config.clone(),
             mempool: internal_message::new_bounded_channel::<TransactionMessage>(node_config.mempool.channel_bound),
             transaction_process: internal_message::new_bounded_channel(node_config.tx_config.channel_bound),
-            observation: internal_message::new_channel::<Observation>(),
+            // TODO: Remove and merge this into tx
+            observation: internal_message::new_channel::<Transaction>(),
             // multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
             observation_metadata: internal_message::new_channel::<ObservationMetadataInternalSigning>(),
             peer_message_tx: internal_message::new_channel::<PeerMessage>(),

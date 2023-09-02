@@ -47,6 +47,23 @@ pub fn get_seeds() -> Vec<Seed> {
     (1..5).map(|i| seed(format!("n{}.redgold.io", i))).collect_vec()
 }
 
+pub fn get_seeds_by_env(env: &NetworkEnvironment) -> Vec<Seed> {
+    get_seeds().into_iter()
+        .filter(|s| {
+            let env_match = s.environments.contains(&(env.clone() as i32));
+            let all_env = s.environments.iter()
+                .find(|e|
+                    NetworkEnvironment::from_i32(**e)
+                        .map(|e| e.is_all())
+                        .unwrap_or(false
+                        )
+                ).is_some();
+            let allow_all = all_env && !env.local_debug();
+            env_match || allow_all
+        })
+        .collect_vec()
+}
+
 fn get_seeds_csv() -> Vec<Seed> {
 // Use this for triggering upgrades to the seed list
     let activation_time = 0;

@@ -1,6 +1,6 @@
 use crate::structs::{Address, Error as RGError, ErrorInfo, Hash, Proof};
 
-use crate::{error_message, HashClear, signature_data, structs};
+use crate::{error_message, HashClear, RgResult, signature_data, structs};
 
 impl HashClear for Proof {
     // TODO: Separate the hashclear method for those that don't require clears
@@ -8,6 +8,10 @@ impl HashClear for Proof {
 }
 
 impl Proof {
+
+    pub fn signature_hex(&self) -> RgResult<String> {
+        Ok(hex::encode(self.signature_bytes()?))
+    }
     pub fn public_key_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
         // Ok(self.public_key.safe_get_msg("Missing public key")?.bytes()?)
         Ok(self

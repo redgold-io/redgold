@@ -295,11 +295,13 @@ impl NodeConfig {
 
         let tx = TransactionBuilder::new()
             .with_output_peer_data(&pair.address_typed(), pd, 0)
-            .with_peer_genesis_input(&pair.address_typed())
+            .with_genesis_input(&pair.address_typed())
             .transaction.sign(&pair).expect("Failed signing?").clone();
 
         let result = self.env_data_folder().peer_tx();
-        info!("Peer loaded from env data folder result {:?}", result.clone().json_or_combine());
+        if !self.is_local_debug() {
+            info!("Peer loaded from env data folder result {:?}", result.clone().json_or_combine());
+        }
         result.unwrap_or(tx)
     }
 
@@ -314,9 +316,10 @@ impl NodeConfig {
 
     pub fn node_tx_fixed(&self, opt: Option<&NodeMetadata>) -> Transaction {
         let pair = self.words().default_kp().expect("");
+        let metadata = opt.cloned().unwrap_or(self.node_metadata_fixed());
         let mut tx = TransactionBuilder::new().with_output_node_metadata(
-            &pair.address_typed(), opt.cloned().unwrap_or(self.node_metadata_fixed()), 0
-        ).with_peer_genesis_input(&pair.address_typed())
+            &pair.address_typed(), metadata, 0
+        ).with_genesis_input(&pair.address_typed())
             .transaction.clone();
         tx.sign(&pair).expect("sign")
     }

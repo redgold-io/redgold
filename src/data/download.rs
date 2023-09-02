@@ -2,7 +2,7 @@ use crate::core::internal_message::{new_channel, RecvAsyncErrorInfo, SendErrorIn
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
-use crate::genesis::create_genesis_transaction;
+use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{
     DownloadDataType, DownloadRequest, DownloadResponse, NodeState, Request, Response,
 };
@@ -12,7 +12,7 @@ use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
 use redgold_schema::{RgResult, SafeOption, structs};
-use redgold_schema::structs::{ErrorInfo, FixedUtxoId};
+use redgold_schema::structs::{ErrorInfo, UtxoId};
 use redgold_schema::EasyJson;
 
 #[derive(Clone, Debug)]
@@ -119,7 +119,7 @@ pub async fn download_all(
     info!("Downloaded: {} observation entries", dr.observations.len());
     for x in &dr.observations {
         let x2 = x.observation.safe_get()?;
-        relay.ds.observation.insert_observation_and_edges(x2, x.time as i64).await?;
+        relay.ds.observation.insert_observation_and_edges(x2).await?;
     }
 
     let _ = download_msg(

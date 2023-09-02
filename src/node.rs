@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -31,7 +31,7 @@ use crate::core::process_transaction::TransactionProcessContext;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use crate::data::download;
-use crate::genesis::{create_genesis_transaction, genesis_tx_from, GenesisDistribution};
+use crate::genesis::{create_test_genesis_transaction, genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
@@ -244,12 +244,6 @@ impl Node {
         relay.ds.count_gauges().await?;
 
         relay.ds.check_consistency_apply_fixes().await?;
-        let prior_node_tx = relay.node_tx().await?;
-        let nmd = prior_node_tx.node_metadata()?;
-        let metadata = relay.node_config.node_metadata_fixed();
-        if nmd != metadata {
-            relay.update_node_metadata(&metadata).await?;
-        }
 
         Ok(())
     }
@@ -266,23 +260,21 @@ impl Node {
     }
 
     pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
-        let outputs = (0..50).map(|i|
-            GenesisDistribution {
-                address: node_config.internal_mnemonic().key_at(i as usize).address_typed(), amount: 10000
-            }
-        ).collect_vec();
-        for o in &outputs {
-            info!("genesis address: {}", o.address.json_or());
-        }
-        let tx = genesis_tx_from(outputs); //EARLIEST_TIME
-        let res = tx.to_utxo_entries(EARLIEST_TIME as u64).iter().zip(0..50).map(|(o, i)| {
-            let kp = node_config.internal_mnemonic().key_at(i as usize);
+        let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
+        let outputs = tx.utxo_outputs().expect("utxos");
+        let mut res = vec![];
+        for i in 0..50 {
+            let kp = node_config.words().keypair_at_change(i).expect("works");
+            let address = kp.address_typed();
+            let o = outputs.iter().find(|o| {
+                o.address.as_ref().expect("a") == &address
+            }).expect("found");
             let s = SpendableUTXO {
                 utxo_entry: o.clone(),
                 key_pair: kp,
             };
-            s
-        }).collect_vec();
+            res.push(s);
+        }
         (tx, res)
     }
 
@@ -312,7 +304,8 @@ impl Node {
 
             if existing.is_none() {
                 info!("No genesis transaction found, generating new one");
-                let tx = Node::genesis_from(node_config.clone()).0;
+                let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
+                // let tx = Node::genesis_from(node_config.clone()).0;
                 // runtimes.auxiliary.block_on(
                 relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
                 let _res_err =

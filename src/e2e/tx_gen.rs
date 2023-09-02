@@ -1,10 +1,10 @@
-use crate::genesis::create_genesis_transaction;
+use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, ErrorInfo, FixedUtxoId, TestContractRequest, CurrencyAmount};
+use redgold_schema::structs::{Address, AddressType, ErrorInfo, UtxoId, TestContractRequest, CurrencyAmount};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
@@ -36,7 +36,7 @@ pub struct TransactionGenerator {
 impl TransactionGenerator {
 
     pub fn with_genesis(&mut self) -> TransactionGenerator {
-        let vec = create_genesis_transaction()
+        let vec = create_test_genesis_transaction()
             .to_utxo_entries(0 as u64)
             .clone();
         let kp = TestConstants::new().key_pair();
@@ -228,7 +228,7 @@ fn verify_signature() {
     let _tc = TestConstants::new();
     let mut tx_gen = TransactionGenerator::default(vec![]).with_genesis();
     let tx = tx_gen.generate_simple_tx().expect("");
-    let transaction = create_genesis_transaction();
+    let transaction = create_test_genesis_transaction();
     let vec1 = transaction.to_utxo_entries(0);
     let entry = vec1.get(0).expect("entry");
     let result = tx.transaction.verify_utxo_entry_proof(entry);

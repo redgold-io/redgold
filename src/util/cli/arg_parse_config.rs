@@ -24,7 +24,7 @@ use tokio::runtime::Runtime;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
-use redgold_schema::seeds::get_seeds;
+use redgold_schema::seeds::{get_seeds, get_seeds_by_env};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 use crate::util::cli::{args, commands};
@@ -45,6 +45,7 @@ pub fn get_default_data_top_folder() -> PathBuf {
 }
 
 use redgold_schema::EasyJson;
+use crate::api::RgHttpClient;
 
 
 pub struct ArgTranslate {
@@ -135,7 +136,7 @@ impl ArgTranslate {
         self.calculate_executable_checksum_hash();
         self.guard_faucet();
         self.e2e_enable();
-        self.configure_seeds();
+        self.configure_seeds().await;
         self.set_discovery_interval();
         self.apply_node_opts();
         self.genesis();
@@ -439,31 +440,70 @@ impl ArgTranslate {
         //     self.node_config.e2e_enable = true;
         // });
     }
-    fn configure_seeds(&mut self) {
+    async fn configure_seeds(&mut self) {
 
-        let seeds = get_seeds();
+        let seeds = get_seeds_by_env(&self.node_config.network);
         for seed in seeds {
-            let env_match = seed.environments.contains(&(self.node_config.network as i32));
-            let all_env = !self.node_config.is_local_debug() &&
-                seed.environments.contains(&(NetworkEnvironment::All as i32));
-            if env_match || all_env {
-                self.node_config.seeds.push(seed);
-            }
+            self.node_config.seeds.push(seed);
         }
 
+
+        let port = self.node_config.public_port();
+        // Enrich keys for missing seed info
+        for seed in self.node_config.seeds.iter_mut() {
+            if seed.public_key.is_none() {
+                info!("Querying seed: {}", seed.external_address.clone());
+
+                let response = RgHttpClient::new(seed.external_address.clone(),
+                                                 seed.port_offset.map(|p| (p + 1) as u16)
+                                      .unwrap_or(port),
+                                                 None
+                ).about().await;
+                if let Ok(response) = response {
+                    let nmd = response.peer_node_info.as_ref()
+                        .and_then(|n| n.latest_node_transaction.as_ref())
+                        .and_then(|n| n.node_metadata().ok());
+                    let pk = nmd.as_ref().and_then(|n| n.public_key.as_ref());
+                    let pid = nmd.as_ref().and_then(|n| n.peer_id.as_ref());
+                    if let (Some(pk), Some(pid)) = (pk, pid) {
+                        info!("Enriched seed {} public {} peer id {}", seed.external_address.clone(), pk.json_or(), pid.json_or());
+                        seed.public_key = Some(pk.clone());
+                        seed.peer_id = Some(pid.clone());
+                    }
+                }
+            }
+        }
+        let mut remove_index = vec![];
+        for (i, seed) in self.node_config.seeds.iter().enumerate() {
+            if let Some(pk) = &seed.public_key {
+                if &self.node_config.public_key() == pk {
+                    info!("Removing self from seeds");
+                    remove_index.push(i);
+                }
+            }
+        }
+        for i in remove_index {
+            self.node_config.seeds.remove(i);
+        }
+
+        // TODO: Test config should pass ids so we get ids for local_test
         if let Some(a) = &self.opts.seed_address {
+
             let default_port = self.node_config.network.default_port_offset();
             let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            info!("Adding seed from command line arguments {a}:{port}");
             // TODO: replace this with the other seed class.
             self.node_config.seeds.push(Seed {
                 external_address: a.clone(),
                 environments: vec![self.node_config.network as i32],
                 port_offset: Some(port as u32),
                 trust: vec![TrustData::from_label(1.0)],
-                peer_id: Some(self.node_config.peer_id()),
-                public_key: Some(self.node_config.public_key()),
+                peer_id: None, // Some(self.node_config.peer_id()),
+                public_key: None, //Some(self.node_config.public_key()),
             });
         }
+
+
     }
     fn apply_node_opts(&mut self) {
         match &self.opts.subcmd {

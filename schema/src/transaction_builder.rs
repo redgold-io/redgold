@@ -1,5 +1,5 @@
 use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, structs, Transaction, WithMetadataHashable};
-use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, FixedUtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof};
+use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, UtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof, Observation};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -10,6 +10,50 @@ pub struct TransactionBuilder {
 
 
 impl TransactionBuilder {
+    pub fn with_options_height(&mut self, height: i64) -> &mut Self{
+        let mut options = self.transaction.options.clone().unwrap_or(TransactionOptions::default());
+        let mut data = options.data.clone().unwrap_or(TransactionData::default());
+        let mut sd = data.standard_data.clone().unwrap_or(StandardData::default());
+        sd.height = Some(height);
+        data.standard_data = Some(sd);
+        options.data = Some(data);
+        self.transaction.options = Some(options);
+        self
+    }
+    // pub fn with_input_utxo_id(&mut self, input_utxo_id: &UtxoId) -> &mut Self {
+    //     let mut input = Input::default();
+    //     input.utxo_id = Some(input_utxo_id.clone());
+    //     self.transaction.inputs.push(input.clone());
+    //     self
+    // }
+
+    pub fn with_input(&mut self, input: &Input) -> &mut Self {
+        self.transaction.inputs.push(input.clone());
+        self
+    }
+    pub fn with_observation(&mut self, o: &Observation, height: i64, address: &Address) -> &mut Self {
+        self.with_options_height(height);
+        let sd = StandardData::observation(o.clone());
+        let mut output = Output::from_data(sd);
+        output.address = Some(address.clone());
+        self.transaction.outputs.push(output);
+        self
+    }
+
+    pub fn with_no_salt(&mut self) -> &mut Self {
+        if let Some(x) = self.transaction.options.as_mut() {
+            x.salt = None;
+        }
+        self
+    }
+
+    pub fn with_time(&mut self, time: Option<i64>) -> &mut Self {
+        if let Some(x) = self.transaction.struct_metadata.as_mut() {
+            x.time = time;
+        }
+        self
+    }
+
     pub fn with_fee(&mut self, destination: &Address, amount: &CurrencyAmount) -> RgResult<&mut Self> {
         self.with_output(destination, amount);
         let option = self.transaction.outputs.last_mut();
@@ -195,9 +239,9 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn with_peer_genesis_input(&mut self, address: &Address) -> &mut Self {
+    pub fn with_genesis_input(&mut self, address: &Address) -> &mut Self {
         let mut input = Input::default();
-        input.input_type = Some(structs::InputType::PeerGenesis as i32);
+        input.input_type = Some(structs::InputType::GenesisInput as i32);
         let mut o = Output::default();
         o.address = Some(address.clone());
         input.output = Some(o);

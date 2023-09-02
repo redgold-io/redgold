@@ -14,7 +14,7 @@ use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
 use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, FixedUtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
+use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, UtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -90,7 +90,7 @@ pub struct TransactionProcessContext {
     relay: Relay,
     request_processor: Option<RequestProcessor>,
     transaction_hash: Option<Hash>,
-    utxo_ids: Option<Vec<FixedUtxoId>>
+    utxo_ids: Option<Vec<UtxoId>>
 }
 
 
@@ -712,7 +712,7 @@ impl TransactionProcessContext {
     fn clean_utxo(
         &self,
         request_processor: &RequestProcessor,
-        utxo_ids: &Vec<FixedUtxoId>,
+        utxo_ids: &Vec<UtxoId>,
         i: Option<usize>,
     ) {
         // Cleanup all existing locks.

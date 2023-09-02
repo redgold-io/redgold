@@ -14,7 +14,7 @@ use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, FixedUtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -136,7 +136,7 @@ impl RgHttpClient {
     }
 
     pub async fn contract_state(&self, address: &Address
-                                // , utxo_id: &FixedUtxoId
+                                // , utxo_id: &UtxoId
     ) -> RgResult<structs::ContractStateMarker> {
         let mut req = Request::default();
         let mut cmr = structs::GetContractStateMarkerRequest::default();

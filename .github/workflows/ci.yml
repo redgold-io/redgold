@@ -252,7 +252,7 @@ jobs:
           path: ./redgold_mac
 
   release:
-    needs: [build-linux, build-mac, build-linux-ubuntu-20]
+    needs: [build-linux, build-mac, build-linux-ubuntu-20, build-windows]
     if:
         contains('
           refs/heads/predev

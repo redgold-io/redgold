@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use metrics::{decrement_gauge, increment_gauge};
 use redgold_keys::TestConstants;
-use redgold_schema::structs::{Address, ErrorInfo, FixedUtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
+use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -371,7 +371,7 @@ impl TransactionStore {
 
     pub async fn delete_utxo(
         &self,
-        fixed_utxo_id: &FixedUtxoId
+        fixed_utxo_id: &UtxoId
     ) -> Result<u64, ErrorInfo> {
 
         let mut pool = self.ctx.pool().await?;
