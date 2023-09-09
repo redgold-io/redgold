@@ -64,6 +64,7 @@ enum SendReceiveTabs {
     Send,
     Receive,
 }
+
 // #[derive(Clone)]
 pub struct WalletState {
     tab: WalletTab,
@@ -104,6 +105,20 @@ pub struct WalletState {
     pub allow_xpub_name_overwrite: bool,
     pub xpub_loader_rows: String,
     pub xpub_loader_error_message: String,
+    pub hot_passphrase: String,
+    pub hot_offset: String,
+}
+
+impl WalletState {
+    pub(crate) fn update_hot_mnemonic_info(&mut self) {
+        let state = self;
+        let m = state.hot_mnemonic();
+        let check = m.checksum_words().unwrap_or("".to_string());
+        // derivation_path_section(ui, &state, m);
+        let pk = m.public_at(state.derivation_path.clone());
+        state.public_key = pk.ok();
+        state.mnemonic_checksum = check;
+    }
 }
 
 
@@ -144,7 +159,17 @@ impl WalletState {
     }
 
     pub fn hot_mnemonic(&self) -> WordsPass {
-        WordsPass::words(self.hot_mnemonic.clone())
+        let pass = if self.hot_passphrase.is_empty() {
+            None
+        } else {
+            Some(self.hot_passphrase.clone())
+        };
+        let mut w = WordsPass::new(self.hot_mnemonic.clone(), pass.clone());
+        if !self.hot_offset.is_empty() {
+            w = w.hash_derive_words(self.hot_offset.clone()).expect("err");
+            w.passphrase = pass;
+        }
+        w
     }
 
     pub fn new(hot_mnemonic: String) -> Self {
@@ -186,6 +211,8 @@ impl WalletState {
             show_xpub_loader_window: false,
             xpub_loader_rows: "".to_string(),
             xpub_loader_error_message: "".to_string(),
+            hot_passphrase: "".to_string(),
+            hot_offset: "".to_string(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -224,7 +251,6 @@ impl ValidateDerivationPath for String {
     // fn valid_xpub_path(&self) -> bool {
     //     WordsPass::words(TestConstants::new().words).xprv(self.clone()).is_ok()
     // }
-
 }
 
 
@@ -237,6 +263,7 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
         if ui.button("Cold Hardware").clicked() {
             ls.wallet_state.clear_data();
             ls.wallet_state.derivation_path = trezor::default_pubkey_path();
+            ls.wallet_state.xpub_derivation_path = trezor::default_xpub_path();
             ls.wallet_state.public_key = None;
             ls.wallet_state.tab = WalletTab::Hardware;
             // device_list_status = None;
@@ -260,12 +287,31 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
     }
 
     derivation_path_section(ui, ls);
+    hot_passphrase_section(ui, ls);
     xpub_path_section(ui, ls, ctx);
 
     if let Some(pk) = ls.wallet_state.public_key.clone() {
         proceed_from_pk(ui, ls, &pk);
     }
     ui.spacing();
+}
+
+fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) {
+    if ls.wallet_state.tab == WalletTab::Software {
+        ui.horizontal(|ui| {
+            ui.label("Passphrase:");
+            egui::TextEdit::singleline(&mut ls.wallet_state.hot_passphrase)
+                .desired_width(150f32)
+                .password(true).show(ui);
+            ui.label("Offset:");
+            egui::TextEdit::singleline(&mut ls.wallet_state.hot_offset)
+                .desired_width(150f32)
+                .show(ui);
+            if ui.button("Update").clicked() {
+                ls.wallet_state.update_hot_mnemonic_info();
+            };
+        });
+    }
 }
 
 fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
@@ -482,7 +528,7 @@ pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
 fn window_xpub(
     ui: &mut Ui,
     ls: &mut LocalState,
-    ctx: &egui::Context
+    ctx: &egui::Context,
 ) {
     egui::Window::new("Xpub")
         .open(&mut ls.wallet_state.show_save_xpub_window)
@@ -505,16 +551,19 @@ fn window_xpub(
                         derivation_path: ls.wallet_state.xpub_derivation_path.clone(),
                         xpub,
                     };
-                    ls.updates.sender.send(StateUpdate{update: Box::new(
-                    move |lss: &mut LocalState| {
-                        let new_named = named_xpub.clone();
-                        let mut new_xpubs = lss.local_stored_state.xpubs.iter().filter(|x| {
-                            x.name != new_named.name
-                        }).map(|x| x.clone()).collect_vec();
-                        new_xpubs.push(new_named);
-                        lss.local_stored_state.xpubs = new_xpubs;
-                        lss.persist_local_state_store();
-                    })}).unwrap();;
+                    ls.updates.sender.send(StateUpdate {
+                        update: Box::new(
+                            move |lss: &mut LocalState| {
+                                let new_named = named_xpub.clone();
+                                let mut new_xpubs = lss.local_stored_state.xpubs.iter().filter(|x| {
+                                    x.name != new_named.name
+                                }).map(|x| x.clone()).collect_vec();
+                                new_xpubs.push(new_named);
+                                lss.local_stored_state.xpubs = new_xpubs;
+                                lss.persist_local_state_store();
+                            })
+                    }).unwrap();
+                    ;
                     ls.wallet_state.xpub_save_name = "".to_string();
                     LocalState::send_update(&ls.updates, |lss| {
                         lss.wallet_state.show_save_xpub_window = false;
@@ -542,7 +591,7 @@ fn parse_xpub_rows(str: &str) -> RgResult<Vec<NamedXpub>> {
 fn window_xpub_loader(
     ui: &mut Ui,
     ls: &mut LocalState,
-    ctx: &egui::Context
+    ctx: &egui::Context,
 ) {
     egui::Window::new("Xpub Loader")
         .open(&mut ls.wallet_state.show_xpub_loader_window)
@@ -595,77 +644,92 @@ fn window_xpub_loader(
 
 
 pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
-
     window_xpub(ui, ls, ctx);
     window_xpub_loader(ui, ls, ctx);
 
-    if ls.wallet_state.tab == WalletTab::Hardware {
+    ui.horizontal(|ui| {
         ui.horizontal(|ui| {
-            ui.horizontal(|ui| {
-                editable_text_input_copy(
-                    ui, "Xpub Derivation Path",
-                    &mut ls.wallet_state.xpub_derivation_path, 150.0
-                );
-                if ls.wallet_state.xpub_derivation_path != ls.wallet_state.xpub_derivation_path_last_check {
-                    ls.wallet_state.xpub_derivation_path_last_check = ls.wallet_state.xpub_derivation_path.clone();
-                    ls.wallet_state.xpub_derivation_path_valid = ls.wallet_state.xpub_derivation_path.valid_derivation_path();
+            editable_text_input_copy(
+                ui, "Xpub Derivation Path",
+                &mut ls.wallet_state.xpub_derivation_path, 150.0,
+            );
+            if ls.wallet_state.xpub_derivation_path != ls.wallet_state.xpub_derivation_path_last_check {
+                ls.wallet_state.xpub_derivation_path_last_check = ls.wallet_state.xpub_derivation_path.clone();
+                ls.wallet_state.xpub_derivation_path_valid = ls.wallet_state.xpub_derivation_path.valid_derivation_path();
+            }
+            valid_label(ui, ls.wallet_state.xpub_derivation_path_valid);
+
+
+            if ls.wallet_state.tab == WalletTab::Hardware {
+                ui.spacing();
+
+                if ui.button("Request Xpub").clicked() {
+                    ls.wallet_state.public_key = None;
+                    ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
+                    // This blocks the entire UI... ah jeez
+                    match trezor::get_public_node(ls.wallet_state.xpub_derivation_path.clone()).map(|x| x.xpub) {
+                        Ok(xpub) => {
+                            ls.wallet_state.show_save_xpub_window = true;
+                            ls.wallet_state.active_xpub = xpub.clone();
+                            let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
+                            ls.wallet_state.public_key = Some(pk.clone());
+                            ls.wallet_state.public_key_msg = Some("Got public key".to_string());
+                            get_address_info(ls.node_config.clone(), pk.address().expect("").clone(),
+                                             NetworkEnvironment::Dev,
+                                             ls.wallet_state.updates.sender.clone(),
+                            );
+                        }
+                        Err(e) => {
+                            ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
+                            error!("Error getting public key: {}", e.json_or());
+                        }
+                    }
                 }
-                valid_label(ui, ls.wallet_state.xpub_derivation_path_valid);
+            }
+        });
+    });
+
+
+    ui.horizontal(|ui| {
+        ComboBox::from_label("Set Xpub Source")
+            .selected_text(ls.wallet_state.selected_xpub_name.clone())
+            .show_ui(ui, |ui| {
+                for style in ls.local_stored_state.xpubs.iter().map(|x| x.name.clone()) {
+                    ui.selectable_value(&mut ls.wallet_state.selected_xpub_name, style.clone(), style.to_string());
+                }
+                ui.selectable_value(&mut ls.wallet_state.selected_xpub_name,
+                                    "Select Xpub".to_string(), "Select Xpub".to_string());
             });
-            ui.spacing();
-
-            if ui.button("Request Xpub").clicked() {
-                ls.wallet_state.public_key = None;
-                ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
-                // This blocks the entire UI... ah jeez
-                match trezor::get_public_node(ls.wallet_state.xpub_derivation_path.clone()).map(|x| x.xpub) {
-                    Ok(xpub) => {
-                        ls.wallet_state.show_save_xpub_window = true;
-                        ls.wallet_state.active_xpub = xpub.clone();
-                        let pk = XpubWrapper::new(xpub).public_at(0,0).expect("xpub failure");
-                        ls.wallet_state.public_key = Some(pk.clone());
-                        ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                        get_address_info(ls.node_config.clone(), pk.address().expect("").clone(),
-                                         NetworkEnvironment::Dev,
-                                         ls.wallet_state.updates.sender.clone(),
-                        );
-                    }
-                    Err(e) => {
-                        ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
-                        error!("Error getting public key: {}", e.json_or());
-                    }
+        if ui.button("Load Xpub").clicked() {
+            let xpub = ls.local_stored_state.xpubs.iter().find(|x|
+                x.name == ls.wallet_state.selected_xpub_name);
+            if let Some(named_xpub) = xpub {
+                let xpub = named_xpub.clone().xpub.clone();
+                ls.wallet_state.active_xpub = xpub.clone();
+                let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
+                ls.wallet_state.public_key = Some(pk.clone());
+                let dp = format!("{}/0/0", ls.wallet_state.xpub_derivation_path.clone());
+                if ls.wallet_state.tab == WalletTab::Hardware {
+                    ls.wallet_state.active_derivation_path = dp;
+                } else {
+                    ls.wallet_state.derivation_path = dp;
+                    ls.wallet_state.active_derivation_path = named_xpub.derivation_path.clone();
                 }
             }
-        });
-        // After main key section, select Xpub section
-        // ls.local_stored_state.xpubs.is
-
-        ui.horizontal(|ui| {
-            ComboBox::from_label("Set Xpub Source")
-                .selected_text(ls.wallet_state.selected_xpub_name.clone())
-                .show_ui(ui, |ui| {
-                    for style in ls.local_stored_state.xpubs.iter().map(|x| x.name.clone()) {
-                        ui.selectable_value(&mut ls.wallet_state.selected_xpub_name, style.clone(), style.to_string());
-                    }
-                    ui.selectable_value(&mut ls.wallet_state.selected_xpub_name,
-                                        "Select Xpub".to_string(), "Select Xpub".to_string());
-                });
-            if ui.button("Load Xpub").clicked() {
-                let xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name)
-                    .map(|n| n.xpub.clone());
-                if let Some(xpub) = xpub {
-                    ls.wallet_state.active_xpub = xpub.clone();
-                    let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
-                    ls.wallet_state.public_key = Some(pk.clone());
-                    ls.wallet_state.active_derivation_path = format!("{}/0/0", ls.wallet_state.xpub_derivation_path.clone());
-                }
-            }
-        });
-        medium_data_item(ui, "Active Derivation Path:", ls.wallet_state.active_derivation_path.clone());
-
-        if ui.button("Load Xpubs from CSV").clicked() {
-            ls.wallet_state.show_xpub_loader_window = true;
         }
+    });
+    medium_data_item(ui, "Active Derivation Path:", ls.wallet_state.active_derivation_path.clone());
+
+    if ls.wallet_state.tab == WalletTab::Software {
+        if ui.button("Save Xpub").clicked() {
+            let xpub = ls.wallet_state.hot_mnemonic().xpub(ls.wallet_state.xpub_derivation_path.clone()).expect("xpub failure");
+            ls.wallet_state.active_xpub = xpub.to_string();
+            ls.wallet_state.show_save_xpub_window = true;
+        }
+    }
+
+    if ui.button("Load Xpubs from CSV").clicked() {
+        ls.wallet_state.show_xpub_loader_window = true;
     }
 }
 

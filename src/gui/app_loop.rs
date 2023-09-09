@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, TextStyle, Ui};
@@ -11,11 +12,9 @@ use redgold_schema::{EasyJson, error_info, RgResult};
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::{ClientApp, home, keys_tab, tables};
+use crate::gui::{ClientApp, home, keys_tab, tables, top_panel};
 use crate::util;
 use rand::Rng;
-use redgold_keys::util::mnemonic_builder;
-
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
@@ -65,8 +64,9 @@ pub struct LocalState {
     pub current_time: i64,
     pub keygen_state: KeygenState,
     pub wallet_state: WalletState,
-    pub ds_all_default: DataStore,
-    pub ds_secure: Option<DataStore>,
+    pub identity_state: IdentityState,
+    pub ds_env: DataStore,
+    pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
     pub updates: Channel<StateUpdate>
 }
@@ -74,7 +74,7 @@ pub struct LocalState {
 impl LocalState {
 
     pub fn secure_or(&self) -> DataStore {
-        self.ds_secure.clone().unwrap_or(self.ds_all_default.clone())
+        self.ds_env_secure.clone().unwrap_or(self.ds_env.clone())
     }
     pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
         updates.sender.send(StateUpdate{update: Box::new(p0)}).unwrap();
@@ -84,7 +84,6 @@ impl LocalState {
         let store = self.secure_or();
         let state = self.local_stored_state.clone();
         tokio::spawn(async move {
-
             store.config_store.update_stored_state(state).await
         });
     }
@@ -130,11 +129,18 @@ impl LocalState {
         let mut node_config = node_config.clone();
         node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
-        let ds_all_default = node_config.data_store_all().await;
-        let ds_secure = node_config.data_store_all_secure().await;
-        let ds_or = ds_secure.clone().unwrap_or(ds_all_default.clone());
+        let ds_env = node_config.data_store_all().await;
+        let ds_env_secure = node_config.data_store_all_secure().await;
+        let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
         info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
-        DataStore::run_migrations(&ds_or).await.expect("");
+        let string = ds_or.ctx.connection_path.clone().replace("file:", "");
+        info!("ds_or connection path {}", string);
+        ds_or.run_migrations_fallback_delete(
+            true,
+            PathBuf::from(string
+            )
+        ).await.expect("migrations");
+        // DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
         let ls = LocalState {
             active_tab: Tab::Home,
@@ -165,8 +171,9 @@ impl LocalState {
                 node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
             ),
             wallet_state: WalletState::new(hot_mnemonic),
-            ds_all_default,
-            ds_secure,
+            identity_state: IdentityState::new(),
+            ds_env,
+            ds_env_secure,
             local_stored_state: ds_or.config_store.get_stored_state().await?,
             updates: new_channel(),
         };
@@ -265,6 +272,7 @@ use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
 use redgold_schema::local_stored_state::{LocalStoredState, NamedXpub};
+use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
@@ -394,36 +402,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     //     return;
     // }
 
-    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-
-        ui.horizontal( |ui| {
-            let cur = ctx.pixels_per_point();
-            let string = format!("Pixels per point: {}", cur);
-            // ui.text_style_height(&TextStyle::Small);
-            // TODO: Make button smaller
-            if ui.small_button("+Text")
-                .on_hover_text(string.clone()).clicked() {
-            ctx.set_pixels_per_point(cur + 0.25);
-            }
-
-            if ui.small_button("-Text")
-                .on_hover_text(string).clicked() {
-                ctx.set_pixels_per_point(cur - 0.25);
-            }
-
-            });
-
-        // The top panel is often a good place for a menu bar:
-        // egui::menu::bar(ui, |ui| {
-        //     ui.style_mut().override_text_style = Some(TextStyle::Heading);
-        //     egui::menu::menu(ui, "File", |ui| {
-        //         ui.style_mut().override_text_style = Some(TextStyle::Heading);
-        //         if ui.button("Quit").clicked() {
-        //             frame.quit();
-        //         }
-        //     });
-        // });
-    });
+    top_panel::render_top(ctx, local_state);
 
     let img = logo;
     let texture_id = img.texture_id(ctx);
@@ -503,6 +482,9 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             }
             Tab::Wallet => {
                 wallet_screen(ui, ctx, local_state);
+            }
+            Tab::Identity => {
+                crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
             }
             _ => {}
         }

@@ -6,7 +6,7 @@ use crate::structs::{Address, PeerId, TrustRatingLabel};
 pub struct NamedXpub {
     pub name: String,
     pub derivation_path: String,
-    pub xpub: String,
+    pub xpub: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -32,13 +32,21 @@ pub struct ServerTrustRatingLabels {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct Identity {
+    pub name: String,
+    pub peer_id_index: i64,
+    pub xpub_name: String
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct LocalStoredState {
     pub servers: Vec<Server>,
     pub xpubs: Vec<NamedXpub>,
     pub trust: Vec<ServerTrustRatingLabels>,
     pub contacts: Vec<ContactAddress>,
     pub watched_address: Vec<Address>,
-    pub email_alert_config: Option<String>
+    pub email_alert_config: Option<String>,
+    pub identities: Vec<Identity>
 }
 
 impl Default for LocalStoredState {
@@ -49,7 +57,8 @@ impl Default for LocalStoredState {
             trust: vec![],
             contacts: vec![],
             watched_address: vec![],
-            email_alert_config: None
+            email_alert_config: None,
+            identities: vec![],
         }
     }
 }

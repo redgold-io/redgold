@@ -46,6 +46,7 @@ pub fn get_default_data_top_folder() -> PathBuf {
 
 use redgold_schema::EasyJson;
 use crate::api::RgHttpClient;
+use crate::util::logging::Loggable;
 
 
 pub struct ArgTranslate {
@@ -153,6 +154,7 @@ impl ArgTranslate {
         tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
         tracing::info!("Parsed args successfully with args: {:?}", self.args);
         tracing::info!("RgArgs options parsed: {:?}", self.opts);
+        info!("Development mode: {}", self.opts.development_mode);
 
         Ok(())
     }
@@ -233,10 +235,10 @@ impl ArgTranslate {
 
         use std::process::Command;
 
-        let shasum = calc_sha_sum(path_str.to_string());
+        let shasum = calc_sha_sum(path_str.to_string()).log_error().ok();
 
-        self.node_config.executable_checksum = Some(shasum.clone());
-        info!("Sha256 checksum from shell script: {}", shasum);
+        self.node_config.executable_checksum = shasum.clone();
+        info!("Executable checksum Sha256 from shell script: {:?}", shasum);
     }
 
     async fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
@@ -533,9 +535,11 @@ impl ArgTranslate {
     }
     fn set_gui_on_empty(&mut self) {
         // println!("args: {:?}", self.args.clone());
-        if self.args.len() == 1 {
+
+        if self.args.len() == 1 || self.opts.subcmd.is_none() {
             self.opts.subcmd = Some(RgTopLevelSubcommand::GUI(GUI{}));
         }
+
     }
     fn set_public_key(&mut self) {
         let pk = self.node_config.public_key();
@@ -564,13 +568,14 @@ Tried doing this locally, but for some reason it seemed to have a different outp
 There's internal libraries for getting the current exe path and calculating checksum, but they
 seem to produce a different result than the shell script.
 */
-fn calc_sha_sum(path: String) -> String {
-    util::cmd::run_cmd("shasum", vec!["-a", "256", &*path])
-        .0
-        .split_whitespace()
-        .next()
-        .expect("first output")
-        .to_string()
+fn calc_sha_sum(path: String) -> RgResult<String> {
+    util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path]).map(|x| x.0)
+    // util::cmd::run_cmd("shasum", vec!["-a", "256", &*path])
+    //     .0
+    //     .split_whitespace()
+    //     .next()
+    //     .expect("first output")
+    //     .to_string()
 }
 
 // #[tokio::test]
