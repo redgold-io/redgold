@@ -1,4 +1,5 @@
 pub mod server;
+pub mod debug_test;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};

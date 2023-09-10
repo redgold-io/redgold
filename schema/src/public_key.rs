@@ -32,6 +32,7 @@ impl structs::PublicKey {
 
     pub fn from_hex(hex: impl Into<String>) -> Result<Self, ErrorInfo> {
         let bytes = from_hex(hex.into())?;
-        Ok(Self::from_bytes(bytes))
+        let key = Self::from_bytes(bytes);
+        Ok(key)
     }
 }
