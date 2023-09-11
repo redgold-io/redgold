@@ -31,7 +31,7 @@ pub struct ServerTrustRatingLabels {
     labels: Vec<TrustRatingLabel>
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct Identity {
     pub name: String,
     pub peer_id_index: i64,

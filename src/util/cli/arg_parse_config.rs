@@ -610,7 +610,7 @@ fn calc_sha_sum(path: String) -> RgResult<String> {
 
 #[test]
 fn test_shasum() {
-    println!("{}", calc_sha_sum("Cargo.toml".to_string()));
+    println!("{:?}", calc_sha_sum("Cargo.toml".to_string()));
 }
 
 #[test]

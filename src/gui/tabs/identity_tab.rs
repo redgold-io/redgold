@@ -1,24 +1,25 @@
 use eframe::egui::{ComboBox, Context, Ui};
-use redgold_schema::local_stored_state::NamedXpub;
-use redgold_schema::structs::PublicKey;
+use redgold_schema::local_stored_state::{Identity, NamedXpub};
+use redgold_schema::structs::{PublicKey, Transaction};
 use crate::gui::app_loop::LocalState;
+use crate::gui::common::editable_text_input_copy;
 
 
 #[derive(Clone)]
 pub struct IdentityState {
-    selected: String,
-    name: String,
-    peer_id_index: i64,
-    xpubs: Vec<String>,
+    selected_name: String,
+    selected_identity: Option<Identity>,
+    identity_name_edit: String,
+    peer_tx: Option<Transaction>
 }
 
 impl IdentityState {
     pub(crate) fn new() -> IdentityState {
         Self {
-            selected: "Add New Identity".to_string(),
-            name: "".to_string(),
-            peer_id_index: 0,
-            xpubs: vec![],
+            selected_name: "Add New Identity".to_string(),
+            selected_identity: None,
+            identity_name_edit: "".to_string(),
+            peer_tx: None,
         }
     }
 }
@@ -28,14 +29,29 @@ pub fn identity_tab(ui: &mut Ui, ctx: &Context, ls: &mut LocalState) {
     ui.label("WIP TAB -- not yet implemented");
 
     ComboBox::from_label("Select Identity")
-        .selected_text(ls.identity_state.selected.clone())
+        .selected_text(ls.identity_state.selected_name.clone())
         .show_ui(ui, |ui| {
             for style in ls.local_stored_state.identities.iter().map(|x| x.name.clone()) {
-                ui.selectable_value(&mut ls.identity_state.selected, style.clone(), style.to_string());
+                ui.selectable_value(&mut ls.identity_state.selected_name, style.clone(), style.to_string());
             }
         });
 
-    if ui.button("Request Peer Tx").clicked() {
-
-    }
+    ls.local_stored_state.identities.iter().find(|p| p.name == ls.identity_state.selected_name).map(|x| {
+        ls.identity_state.selected_identity = Some(x.clone());
+    });
+    //
+    // match ls.identity_state.selected_identity {
+    //     None => {
+    //
+    //     }
+    //     Some(ident) => {
+    //
+    //     }
+    // }
+    //
+    // editable_text_input_copy(ui, "Identity Name: ", &mut ls.identity_state.selected_name, 200.0);")
+    //
+    // if ui.button("Request Peer Tx").clicked() {
+    //
+    // }
 }
