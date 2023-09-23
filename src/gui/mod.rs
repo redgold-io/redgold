@@ -16,8 +16,6 @@ pub mod home;
 pub mod wallet_tab;
 pub mod keys_tab;
 pub mod common;
-pub mod hot_wallet;
-pub mod cold_wallet;
 pub mod tabs;
 pub mod top_panel;
 

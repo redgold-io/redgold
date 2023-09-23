@@ -2,10 +2,9 @@ use std::future::Future;
 use std::time::Instant;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
-use eframe::egui::WidgetType::TextEdit;
 use flume::Sender;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use crate::gui::app_loop::LocalState;
 
 use strum::IntoEnumIterator;
@@ -15,7 +14,7 @@ use tracing::{error, info};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::{ErrorInfoContext, RgResult, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction, CurrencyAmount};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
@@ -24,12 +23,13 @@ use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
-use crate::gui::{cold_wallet, common, hot_wallet};
+use crate::gui::{common};
 use crate::gui::common::{data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::util::logging::Loggable;
-use redgold_schema::local_stored_state::{LocalStoredState, NamedXpub};
+use redgold_schema::local_stored_state::NamedXpub;
+use crate::gui::tabs::{cold_wallet, hot_wallet};
 
 
 #[derive(Debug, EnumIter, EnumString, PartialEq)]
@@ -385,15 +385,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
         ui.label("Rendered Transaction Information"); //);
         ui.spacing();
         let string1 = &mut p.clone();
-        ui.horizontal(|ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                egui::TextEdit::multiline(string1)
-                    .desired_width(600.0)
-                    .desired_rows(2)
-                    .clip_text(true)
-                    .ui(ui);
-            });
-        });
+        common::bounded_text_area(ui, string1);
     }
     if let Some(res) = &ls.wallet_state.prepared_transaction {
         if let Some(t) = res.as_ref().ok() {
