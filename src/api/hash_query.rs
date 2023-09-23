@@ -40,13 +40,15 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
     }
 
     if let Some(pk) = PublicKey::from_hex(hash_input.clone()).ok() {
-        if relay.node_config.public_key() == pk {
-            response.peer_node_info = Some(relay.peer_node_info().await?);
-            return Ok(response);
-        }
-        if let Some(pni) = relay.ds.peer_store.query_nodes_peer_node_info(&pk).await? {
-            response.peer_node_info = Some(pni);
-            return Ok(response);
+        if pk.validate().is_ok() {
+            if relay.node_config.public_key() == pk {
+                response.peer_node_info = Some(relay.peer_node_info().await?);
+                return Ok(response);
+            }
+            if let Some(pni) = relay.ds.peer_store.query_nodes_peer_node_info(&pk).await? {
+                response.peer_node_info = Some(pni);
+                return Ok(response);
+            }
         }
     }
 
