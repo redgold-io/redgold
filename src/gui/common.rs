@@ -1,5 +1,5 @@
 use eframe::egui;
-use eframe::egui::{Color32, RichText, TextEdit, TextStyle, Ui};
+use eframe::egui::{Color32, RichText, TextEdit, TextStyle, Ui, Widget};
 
 pub fn valid_label(ui: &mut Ui, bool: bool) {
     if bool {
@@ -72,5 +72,17 @@ pub fn big_button<S: Into<String>>(mut ui: Ui, lb: S) {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Heading);
         ui.button(lb.into())
+    });
+}
+
+pub fn bounded_text_area(ui: &mut Ui, string1: &mut String) {
+    ui.horizontal(|ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            egui::TextEdit::multiline(string1)
+                .desired_width(600.0)
+                .desired_rows(2)
+                .clip_text(true)
+                .ui(ui);
+        });
     });
 }

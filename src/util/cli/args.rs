@@ -20,6 +20,7 @@ pub fn empty_args() -> RgArgs {
         enable_e2e: true,
         disable_e2e: false,
         log_level: None,
+        development_mode: false,
     }
 }
 
@@ -79,6 +80,10 @@ pub struct RgArgs {
     /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
     pub log_level: Option<String>,
     // TODO: File logger path
+    /// Use development mode defaults -- only for use by developers, sets defaults to DEV
+    /// Instead of Main for network for instance.
+    #[clap(long, env = "REDGOLD_DEVELOPMENT_MODE")]
+    pub development_mode: bool,
 
 }
 
