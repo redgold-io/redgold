@@ -125,7 +125,7 @@ itertools = "0.10.1"
 bytes = "1.1.0"
 #Dependencies for email sending
 aws-config = "0.55.1"
-aws-sdk-sesv2 = "0.28.0"
+aws-sdk-sesv2 = "0.31.1"
 dns-lookup = "2.0.2"
 
 #Dependencies for multiparty threshold ecdsa
