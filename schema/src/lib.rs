@@ -694,6 +694,16 @@ impl NetworkEnvironment {
         ]
     }
 
+    pub fn gui_networks() -> Vec<NetworkEnvironment> {
+        vec![
+            NetworkEnvironment::Main,
+            NetworkEnvironment::Test,
+            NetworkEnvironment::Staging,
+            NetworkEnvironment::Dev,
+            NetworkEnvironment::Predev,
+        ]
+    }
+
     pub fn local_debug(&self) -> bool {
         vec![
             NetworkEnvironment::Debug, NetworkEnvironment::Local

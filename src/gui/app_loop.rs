@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, TextStyle, Ui};
@@ -11,11 +12,9 @@ use redgold_schema::{EasyJson, error_info, RgResult};
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::{ClientApp, home, keys_tab, tables};
+use crate::gui::{ClientApp, home, keys_tab, tables, top_panel};
 use crate::util;
 use rand::Rng;
-use redgold_keys::util::mnemonic_builder;
-
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
@@ -31,7 +30,9 @@ pub struct ServerStatus {
 pub struct ServersState {
     needs_update: bool,
     info: Arc<Mutex<Vec<ServerStatus>>>,
-    deployment_result_info_box: Arc<Mutex<String>>
+    deployment_result_info_box: Arc<Mutex<String>>,
+    csv_edit_path: String,
+    parse_success: Option<bool>
 }
 
 // #[derive(Clone)]
@@ -61,12 +62,14 @@ pub struct LocalState {
     pub node_config: NodeConfig,
     // pub runtime: Arc<Runtime>,
     pub home_state: HomeState,
-    server_state: ServersState,
+    pub server_state: ServersState,
     pub current_time: i64,
     pub keygen_state: KeygenState,
     pub wallet_state: WalletState,
-    pub ds_all_default: DataStore,
-    pub ds_secure: Option<DataStore>,
+    pub identity_state: IdentityState,
+    pub settings_state: SettingsState,
+    pub ds_env: DataStore,
+    pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
     pub updates: Channel<StateUpdate>
 }
@@ -74,7 +77,7 @@ pub struct LocalState {
 impl LocalState {
 
     pub fn secure_or(&self) -> DataStore {
-        self.ds_secure.clone().unwrap_or(self.ds_all_default.clone())
+        self.ds_env_secure.clone().unwrap_or(self.ds_env.clone())
     }
     pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
         updates.sender.send(StateUpdate{update: Box::new(p0)}).unwrap();
@@ -84,7 +87,6 @@ impl LocalState {
         let store = self.secure_or();
         let state = self.local_stored_state.clone();
         tokio::spawn(async move {
-
             store.config_store.update_stored_state(state).await
         });
     }
@@ -111,6 +113,15 @@ impl LocalState {
         self.persist_local_state_store();
         Ok(())
     }
+    pub fn upsert_identity(&mut self, new_named: Identity) -> () {
+        let mut updated = self.local_stored_state.identities.iter().filter(|x| {
+            x.name != new_named.name
+        }).map(|x| x.clone()).collect_vec();
+        updated.push(new_named);
+
+        self.local_stored_state.identities = updated;
+        self.persist_local_state_store();
+    }
 
     pub fn process_updates(&mut self) {
         match self.updates.recv_while() {
@@ -130,12 +141,20 @@ impl LocalState {
         let mut node_config = node_config.clone();
         node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
-        let ds_all_default = node_config.data_store_all().await;
-        let ds_secure = node_config.data_store_all_secure().await;
-        let ds_or = ds_secure.clone().unwrap_or(ds_all_default.clone());
+        let ds_env = node_config.data_store_all().await;
+        let ds_env_secure = node_config.data_store_all_secure().await;
+        let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
         info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
-        DataStore::run_migrations(&ds_or).await.expect("");
+        let string = ds_or.ctx.connection_path.clone().replace("file:", "");
+        info!("ds_or connection path {}", string);
+        ds_or.run_migrations_fallback_delete(
+            true,
+            PathBuf::from(string
+            )
+        ).await.expect("migrations");
+        // DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
+        let local_stored_state = ds_or.config_store.get_stored_state().await?;
         let ls = LocalState {
             active_tab: Tab::Home,
             session_salt: random_bytes(),
@@ -159,15 +178,21 @@ impl LocalState {
             home_state: HomeState::from(),
             server_state: ServersState { needs_update: true,
                 info: Arc::new(Mutex::new(vec![])),
-                deployment_result_info_box: Arc::new(Mutex::new("".to_string())) },
+                deployment_result_info_box: Arc::new(Mutex::new("".to_string())),
+                csv_edit_path: node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
+                    .all().servers_path().to_str().expect("").to_string(),
+                parse_success: None,
+            },
             current_time: util::current_time_millis_i64(),
             keygen_state: KeygenState::new(
                 node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
             ),
             wallet_state: WalletState::new(hot_mnemonic),
-            ds_all_default,
-            ds_secure,
-            local_stored_state: ds_or.config_store.get_stored_state().await?,
+            identity_state: IdentityState::new(),
+            settings_state: SettingsState::new(local_stored_state.json_or()),
+            ds_env,
+            ds_env_secure,
+            local_stored_state,
             updates: new_channel(),
         };
         Ok(ls)
@@ -264,7 +289,10 @@ use redgold_keys::util::dhash_vec;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
-use redgold_schema::local_stored_state::{LocalStoredState, NamedXpub};
+use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub};
+use crate::gui::common::{editable_text_input_copy, valid_label};
+use crate::gui::tabs::identity_tab::IdentityState;
+use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
@@ -280,7 +308,7 @@ pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<Se
     guard.extend(results);
 }
 
-pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
 
 
     let servers = local_state.node_config.servers.clone();
@@ -351,6 +379,24 @@ pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut Local
     ui.separator();
     tables::text_table(ui, table_rows);
 
+    editable_text_input_copy(
+        ui,"Server CSV Load Path", &mut local_state.server_state.csv_edit_path, 400.0
+    );
+    if ui.button("Load Servers from CSV").clicked() {
+        let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
+        let res = Server::parse_from_file(buf);
+        if let Ok(res) = res {
+            local_state.local_stored_state.servers = res;
+            local_state.persist_local_state_store();
+            local_state.server_state.parse_success = Some(true);
+        } else {
+            local_state.server_state.parse_success = Some(false);
+        }
+    }
+    if let Some(p) = local_state.server_state.parse_success {
+        valid_label(ui, p);
+    }
+
 }
 
 static INIT: Once = Once::new();
@@ -394,36 +440,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     //     return;
     // }
 
-    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-
-        ui.horizontal( |ui| {
-            let cur = ctx.pixels_per_point();
-            let string = format!("Pixels per point: {}", cur);
-            // ui.text_style_height(&TextStyle::Small);
-            // TODO: Make button smaller
-            if ui.small_button("+Text")
-                .on_hover_text(string.clone()).clicked() {
-            ctx.set_pixels_per_point(cur + 0.25);
-            }
-
-            if ui.small_button("-Text")
-                .on_hover_text(string).clicked() {
-                ctx.set_pixels_per_point(cur - 0.25);
-            }
-
-            });
-
-        // The top panel is often a good place for a menu bar:
-        // egui::menu::bar(ui, |ui| {
-        //     ui.style_mut().override_text_style = Some(TextStyle::Heading);
-        //     egui::menu::menu(ui, "File", |ui| {
-        //         ui.style_mut().override_text_style = Some(TextStyle::Heading);
-        //         if ui.button("Quit").clicked() {
-        //             frame.quit();
-        //         }
-        //     });
-        // });
-    });
+    top_panel::render_top(ctx, local_state);
 
     let img = logo;
     let texture_id = img.texture_id(ctx);
@@ -496,14 +513,20 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             Tab::Keys => {
                 keys_tab::keys_screen(ui, ctx, local_state);
             }
-            Tab::Settings => {}
+            Tab::Settings => {
+                settings_tab(ui, ctx, local_state);
+            }
             Tab::Trust => {}
             Tab::Servers => {
-                servers_screen(ui, ctx, local_state);
+                servers_tab(ui, ctx, local_state);
             }
             Tab::Wallet => {
                 wallet_screen(ui, ctx, local_state);
             }
+            Tab::Identity => {
+                crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
+            }
+
             _ => {}
         }
         // ui.hyperlink("https://github.com/emilk/egui_template");
