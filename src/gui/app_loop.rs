@@ -30,7 +30,9 @@ pub struct ServerStatus {
 pub struct ServersState {
     needs_update: bool,
     info: Arc<Mutex<Vec<ServerStatus>>>,
-    deployment_result_info_box: Arc<Mutex<String>>
+    deployment_result_info_box: Arc<Mutex<String>>,
+    csv_edit_path: String,
+    parse_success: Option<bool>
 }
 
 // #[derive(Clone)]
@@ -60,7 +62,7 @@ pub struct LocalState {
     pub node_config: NodeConfig,
     // pub runtime: Arc<Runtime>,
     pub home_state: HomeState,
-    server_state: ServersState,
+    pub server_state: ServersState,
     pub current_time: i64,
     pub keygen_state: KeygenState,
     pub wallet_state: WalletState,
@@ -176,7 +178,11 @@ impl LocalState {
             home_state: HomeState::from(),
             server_state: ServersState { needs_update: true,
                 info: Arc::new(Mutex::new(vec![])),
-                deployment_result_info_box: Arc::new(Mutex::new("".to_string())) },
+                deployment_result_info_box: Arc::new(Mutex::new("".to_string())),
+                csv_edit_path: node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
+                    .all().servers_path().to_str().expect("").to_string(),
+                parse_success: None,
+            },
             current_time: util::current_time_millis_i64(),
             keygen_state: KeygenState::new(
                 node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
@@ -284,6 +290,7 @@ use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub};
+use crate::gui::common::{editable_text_input_copy, valid_label};
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
@@ -301,7 +308,7 @@ pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<Se
     guard.extend(results);
 }
 
-pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
 
 
     let servers = local_state.node_config.servers.clone();
@@ -371,6 +378,24 @@ pub fn servers_screen(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut Local
     });
     ui.separator();
     tables::text_table(ui, table_rows);
+
+    editable_text_input_copy(
+        ui,"Server CSV Load Path", &mut local_state.server_state.csv_edit_path, 400.0
+    );
+    if ui.button("Load Servers from CSV").clicked() {
+        let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
+        let res = Server::parse_from_file(buf);
+        if let Ok(res) = res {
+            local_state.local_stored_state.servers = res;
+            local_state.persist_local_state_store();
+            local_state.server_state.parse_success = Some(true);
+        } else {
+            local_state.server_state.parse_success = Some(false);
+        }
+    }
+    if let Some(p) = local_state.server_state.parse_success {
+        valid_label(ui, p);
+    }
 
 }
 
@@ -493,7 +518,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             }
             Tab::Trust => {}
             Tab::Servers => {
-                servers_screen(ui, ctx, local_state);
+                servers_tab(ui, ctx, local_state);
             }
             Tab::Wallet => {
                 wallet_screen(ui, ctx, local_state);
