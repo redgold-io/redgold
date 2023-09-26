@@ -5,14 +5,14 @@ export default {
             let port = "16186"
             const hostname = window.location.hostname;
 
-            if (hostname.includes('staging')) {
+            if (hostname.includes('dev')) {
+                port = "16486";
+            } else if (hostname.includes('staging')) {
                 port = "16386";
             } else if (hostname.includes('test')) {
                 port = "16286";
-            } else if (hostname.includes('main')) {
-                port = "16186";
-            } else { // default dev
-                port = "16486"
+            } else { // default main
+                port = "16186"
             }
             url += ":" + port
             return url
