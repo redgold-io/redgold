@@ -233,7 +233,12 @@ pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorIn
         return Ok(());
     }
 
-    default_deploy(&mut deploy, _config).await?;
+    let default_fun = Box::new(move |s: String| {
+        println!("output: {}", s);
+        Ok::<(), ErrorInfo>(())
+    });
+
+    default_deploy(&mut deploy, _config, default_fun).await?;
 
     Ok(())
 }

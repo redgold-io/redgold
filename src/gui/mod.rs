@@ -11,7 +11,6 @@ pub mod app_loop;
 pub mod image_load;
 pub mod initialize;
 pub mod tables;
-pub mod server_tab;
 pub mod home;
 pub mod wallet_tab;
 pub mod keys_tab;

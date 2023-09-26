@@ -38,17 +38,20 @@ pub async fn setup_server_redgold(
      peer_id_hex: Option<String>,
      start_node: bool,
      alias: Option<String>,
-     ser_pid_tx: Option<String>
+     ser_pid_tx: Option<String>,
+     p: &Box<impl Fn(String) -> RgResult<()> + 'static>
  ) -> Result<(), ErrorInfo> {
 
     ssh.verify()?;
 
 
      let host = ssh.host.clone();
-     let p= &Box::new(move |s: String| {
-         println!("{} output: {}", host.clone(), s);
-         Ok::<(), ErrorInfo>(())
-     });
+    //
+    // let p= &Box::new(move |s: String| {
+    //     proc_func(format!("{}", host.clone())).expect("");
+    //     proc_func(s).expect("");
+    //     Ok::<(), ErrorInfo>(())
+    // });
 
     ssh.exes("docker system prune -a -f", p).await?;
     ssh.exes("apt install -y ufw", p).await?;
@@ -351,7 +354,10 @@ pub async fn derive_mnemonic_and_peer_id(
     Ok((server_mnemonic, pid_hex))
 }
 
-pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> RgResult<()> {
+
+
+pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
+    deploy: &mut Deploy, node_config: &NodeConfig, fun: Box<F>) -> RgResult<()> {
 
     let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
     if primary_gen {
@@ -474,7 +480,8 @@ pub async fn default_deploy(deploy: &mut Deploy, node_config: &NodeConfig) -> Rg
                 peer_id_hex_opt,
                 !deploy.debug_skip_start,
                 ss.alias.clone(),
-                peer_tx_opt.map(|p| p.json_or())
+                peer_tx_opt.map(|p| p.json_or()),
+                &fun
             ).await.expect("worx");
         }
         gen = false;

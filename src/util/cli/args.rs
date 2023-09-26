@@ -171,7 +171,7 @@ pub struct RemoveServer {
 }
 
 /// Deploy all servers -- will overwrite existing software if present
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Default)]
 pub struct Deploy {
     /// Purge stored data
     #[clap(short, long)]
@@ -212,6 +212,8 @@ pub struct Deploy {
     pub dry_run: bool,
     #[clap(long)]
     pub debug_skip_start: bool,
+    #[clap(long)]
+    pub passphrase: bool,
 
 
 }
