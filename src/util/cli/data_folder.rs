@@ -56,20 +56,31 @@ impl EnvDataFolder {
 
     // Change to cert.pem
     pub fn cert_path(&self) -> PathBuf {
-        self.path.join("certificate.crt")
+        //self.path.join("certificate.crt")
+        PathBuf::from("/etc/letsencrypt/live/lb.redgold.io/fullchain.pem")
     }
 
     pub async fn cert(&self) -> Result<Vec<u8>, ErrorInfo> {
         tokio::fs::read(self.cert_path()).await.error_info("Missing cert")
+            .or(
+                tokio::fs::read(self.path.join("certificate.crt")).await
+                    .error_info("Missing cert")
+            )
     }
 
     pub async fn key(&self) -> Result<Vec<u8>, ErrorInfo> {
-        tokio::fs::read(self.key_path()).await.error_info("Missing key")
+        tokio::fs::read(self.key_path()).await
+            .error_info("Missing key")
+            .or(
+                tokio::fs::read(self.path.join("privkey.pem")).await
+                    .error_info("Missing key")
+            )
     }
 
     // Change to privkey.pem
     pub fn key_path(&self) -> PathBuf {
-        self.path.join("private_key.key")
+        // self.path.join("private_key.key")
+        PathBuf::from("/etc/letsencrypt/live/lb.redgold.io/privkey.pem")
     }
 
     pub fn ensure_exists(&self) -> &Self {
