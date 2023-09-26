@@ -14,6 +14,7 @@ use std::io::Read;
 use std::net::{AddrParseError, IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::process::abort;
+use std::slice::Iter;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -423,6 +424,14 @@ impl ArgTranslate {
             }
         };
 
+        if self.is_gui() && self.node_config.network == NetworkEnvironment::Local {
+            if self.opts.development_mode {
+                self.node_config.network = NetworkEnvironment::Dev;
+            } else {
+                self.node_config.network = NetworkEnvironment::Main;
+            }
+        }
+
         if self.node_config.network == NetworkEnvironment::Local || self.node_config.network == NetworkEnvironment::Debug {
             self.node_config.disable_auto_update = true;
             self.node_config.load_balancer_url = "127.0.0.1".to_string();
@@ -533,6 +542,12 @@ impl ArgTranslate {
             info!("Starting node as genesis node");
         }
     }
+
+    fn args(&self) -> Vec<&String> {
+        // First argument is the executable path
+        self.args.iter().dropping(1).collect_vec()
+    }
+
     fn set_gui_on_empty(&mut self) {
         // println!("args: {:?}", self.args.clone());
 

@@ -32,7 +32,8 @@ pub struct ServersState {
     info: Arc<Mutex<Vec<ServerStatus>>>,
     deployment_result_info_box: Arc<Mutex<String>>,
     csv_edit_path: String,
-    parse_success: Option<bool>
+    parse_success: Option<bool>,
+    purge: bool
 }
 
 // #[derive(Clone)]
@@ -182,6 +183,7 @@ impl LocalState {
                 csv_edit_path: node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
                     .all().servers_path().to_str().expect("").to_string(),
                 parse_success: None,
+                purge: false,
             },
             current_time: util::current_time_millis_i64(),
             keygen_state: KeygenState::new(
@@ -290,10 +292,12 @@ use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub};
-use crate::gui::common::{editable_text_input_copy, valid_label};
+use crate::gui::common::{bounded_text_area, editable_text_input_copy, valid_label};
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
+use crate::infra::deploy::default_deploy;
+use crate::util::cli::args::Deploy;
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
     let mut results = vec![];
@@ -356,25 +360,6 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.spacing();
         ui.separator();
         ui.spacing();
-        if ui.button("Deploy").clicked() {
-            info!("Deploying");
-            // tokio::spawn(async {
-            //     for server in servers {
-            //         let ssh = SSH::from_server(&server);
-            //         let is_genesis = server.index == 0;
-            //         let _result = deploy::setup_server_redgold(
-            //             ssh,
-            //             NetworkEnvironment::Dev,
-            //             is_genesis,
-            //             None,
-            //             true,
-            //             ,
-            //         );
-            //         // local_state.server_state.deployment_result_info_box.lock().expect("").push(result);
-            //     };
-            // });
-            ()
-        }
     });
     ui.separator();
     tables::text_table(ui, table_rows);
@@ -394,8 +379,37 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         }
     }
     if let Some(p) = local_state.server_state.parse_success {
-        valid_label(ui, p);
+        ui.horizontal(|ui| {
+            ui.label("Parse result: ");
+            valid_label(ui, p);
+        });
+
     }
+
+    ui.checkbox(&mut local_state.server_state.purge, "Purge");
+
+    if ui.button("Deploy").clicked() {
+        info!("Deploying");
+        let mut d = Deploy::default();
+        d.purge = local_state.server_state.purge;
+        let config = local_state.node_config.clone();
+        let mut arc = local_state.server_state.deployment_result_info_box.clone();
+        let fun = Box::new(move |s: String| {
+            // Lock the Mutex and get mutable access to the inner String.
+            let mut inner = arc.lock().expect("lock poisoned");
+            *inner = format!("{}\n{}", &*inner, s);
+            info!("Deploy result: {}", s);
+            Ok(())
+        });
+        tokio::spawn(async move {
+            let mut d2 = d.clone();
+            let nc = config.clone();
+            default_deploy(&mut d2, &nc, fun).await
+        });
+    };
+
+    let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
+    bounded_text_area(ui, &mut arc1)
 
 }
 
