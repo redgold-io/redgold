@@ -1,0 +1,42 @@
+
+Guide below for dealing with LetsEncrypt SSL certificate renewal.
+
+```bash
+sudo certbot certonly --standalone
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Please enter the domain name(s) you would like on your certificate (comma and/or
+space separated) (Enter 'c' to cancel): lb.redgold.io
+Certificate not yet due for renewal
+
+You have an existing certificate that has exactly the same domains or certificate name you requested and isn't close to expiry.
+(ref: /etc/letsencrypt/renewal/lb.redgold.io.conf)
+
+What would you like to do?
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+1: Keep the existing certificate for now
+2: Renew & replace the certificate (may be subject to CA rate limits)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Select the appropriate number [1-2] then [enter] (press 'c' to cancel): 2
+Renewing an existing certificate for lb.redgold.io
+
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/lb.redgold.io/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/lb.redgold.io/privkey.pem
+This certificate expires on 2023-12-25.
+These files will be updated when the certificate renews.
+Certbot has set up a scheduled task to automatically renew this certificate in the background.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+If you like Certbot, please consider supporting our work by:
+ * Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+ * Donating to EFF:                    https://eff.org/donate-le
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+
+```
+cp /etc/letsencrypt/live/lb.redgold.io/fullchain.pem ~/.rg/all/certificate.crt
+```
+
+```
+cp /etc/letsencrypt/live/lb.redgold.io/privkey.pem ~/.rg/all/private_key.key`
+```
