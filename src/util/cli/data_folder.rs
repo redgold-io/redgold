@@ -72,7 +72,7 @@ impl EnvDataFolder {
         tokio::fs::read(self.key_path()).await
             .error_info("Missing key")
             .or(
-                tokio::fs::read(self.path.join("privkey.pem")).await
+                tokio::fs::read(self.path.join("private_key.key")).await
                     .error_info("Missing key")
             )
     }
