@@ -96,6 +96,10 @@ impl Output {
             .filter(|&c| c == StandardContractType::Swap as i32).is_some()
     }
 
+    pub fn is_peer_data(&self) -> bool {
+        self.data.as_ref().and_then(|c| c.peer_data.as_ref()).is_some()
+    }
+
     pub fn to_utxo_entry(
         &self,
         transaction_hash: &Vec<u8>,

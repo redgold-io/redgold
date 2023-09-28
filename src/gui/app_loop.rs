@@ -33,8 +33,22 @@ pub struct ServersState {
     deployment_result_info_box: Arc<Mutex<String>>,
     csv_edit_path: String,
     parse_success: Option<bool>,
-    purge: bool
+    purge: bool,
+    deployment_result: Option<String>
 }
+
+pub trait PublicKeyStoredState {
+    fn public_key(&self, xpub_name: String) -> Option<PublicKey>;
+}
+
+impl PublicKeyStoredState for LocalStoredState {
+    fn public_key(&self, xpub_name: String) -> Option<PublicKey> {
+        let pk = self.xpubs.iter().find(|x| x.name == xpub_name)
+            .and_then(|g| XpubWrapper::new(g.xpub.clone()).public_at(0, 0).ok());
+        pk
+    }
+}
+
 
 // #[derive(Clone)]
 // #[derive(Clone)]
@@ -184,6 +198,7 @@ impl LocalState {
                     .all().servers_path().to_str().expect("").to_string(),
                 parse_success: None,
                 purge: false,
+                deployment_result: None,
             },
             current_time: util::current_time_millis_i64(),
             keygen_state: KeygenState::new(
@@ -235,7 +250,7 @@ fn random_bytes() -> [u8; 32] {
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::ErrorInfo;
+use redgold_schema::structs::{ErrorInfo, PublicKey};
 use crate::infra::SSH;
 use crate::node_config::NodeConfig; // 0.17.1
 
@@ -288,11 +303,12 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::dhash_vec;
+use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub};
-use crate::gui::common::{bounded_text_area, editable_text_input_copy, valid_label};
+use crate::gui::common::{bounded_text_area, bounded_text_area_size_focus, editable_text_input_copy, valid_label};
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
@@ -404,12 +420,13 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         tokio::spawn(async move {
             let mut d2 = d.clone();
             let nc = config.clone();
-            default_deploy(&mut d2, &nc, fun).await
+            let res = default_deploy(&mut d2, &nc, fun).await;
+            // Update final deploy result here.
         });
     };
 
     let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
-    bounded_text_area(ui, &mut arc1)
+    bounded_text_area_size_focus(ui, &mut arc1, 600., 6);
 
 }
 

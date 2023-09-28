@@ -44,7 +44,7 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
 
 pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
     //let ds = config.data_store().await;
-    let c = config.lb_client();
+    let c = config.api_client();
     let a = c.about().await?;
     println!("{}", json_pretty(&a)?);
 
@@ -114,7 +114,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
         hm.insert(x, kp.clone());
     }
 
-    let client = p1.lb_client();
+    let client = p1.api_client();
     let result = client.query_address(query_addresses).await?.as_error()?;
     let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response")?
         .utxo_entries.clone();
@@ -140,7 +140,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 
 pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
     let address = Address::parse(p0.to.clone())?;
-    let response = p1.lb_client().faucet(&address).await?;
+    let response = p1.api_client().faucet(&address).await?;
     let tx = response.submit_transaction_response.safe_get()?.transaction.safe_get()?;
     let tx_hex = tx.hash_hex()?;
     println!("{}", tx_hex);
@@ -148,7 +148,7 @@ pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
 }
 
 pub async fn balance_lookup(request: &BalanceCli, nc: &NodeConfig) -> Result<(), ErrorInfo> {
-    let response = nc.lb_client().query_hash(request.address.clone()).await?;
+    let response = nc.api_client().query_hash(request.address.clone()).await?;
     let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
     println!("{}", rounded.to_string());
     Ok(())
@@ -156,7 +156,7 @@ pub async fn balance_lookup(request: &BalanceCli, nc: &NodeConfig) -> Result<(),
 
 
 pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
-    let response = p1.lb_client().query_hash(p0.hash.clone()).await?;
+    let response = p1.api_client().query_hash(p0.hash.clone()).await?;
     println!("{}", json_pretty(&response)?);
     Ok(())
 }
@@ -368,7 +368,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
     if p1.network == NetworkEnvironment::Main {
         return Err(error_info("Cannot test transaction on mainnet unsupported".to_string()));
     }
-    let client = p1.lb_client();
+    let client = p1.api_client();
     let tx_submit = TransactionSubmitter::default(client.clone(),
                                                       // arc.clone(),
                                                       vec![]

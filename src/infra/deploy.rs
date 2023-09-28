@@ -312,26 +312,16 @@ pub async fn derive_mnemonic_and_peer_id(
         let mut peer_data = PeerData::default();
         peer_data.peer_id = Some(PeerId::from_pk(pkey.clone()));
 
-        let mut nmds = vec![];
-        for s in servers {
-            if s.peer_id_index == peer_id_index as i64 {
-                let mut nmd = NodeMetadata::default();
-                nmd.peer_id = peer_data.peer_id.clone();
-                nmd.public_key = Some(new.default_public_key().expect("pk"));
-                nmd.external_address = s.external_host.clone().expect("host").clone();
-                nmd.alias = s.alias.clone();
-                nmd.external_ipv4 = s.ipv4.clone();
-                let mut vi = VersionInfo::default();
-                vi.executable_checksum = node_config.executable_checksum.clone().expect("exe");
-                nmd.version_info = Some(vi);
-                nmd.network_environment = net.clone() as i32;
-                nmd.node_type = Some(NodeType::Static as i32);
-                nmd.port_offset = Some(net.default_port_offset() as i64);
-                nmd.nat_restricted = Some(false);
-                nmds.push(nmd);
-            }
-        }
-        peer_data.node_metadata = nmds;
+        let mut pkmap = HashMap::default();
+        pkmap.insert(server_id_index, new.default_public_key().expect("pk"));
+        Server::peer_data(
+            servers.clone(),
+            &mut peer_data,
+            peer_id_index as i64,
+            pkmap,
+            node_config.executable_checksum.clone().expect("exe"),
+            net.clone()
+        );
         peer_data.labels = trust.clone();
         let mut tb = TransactionBuilder::new();
         let address = pkey.address().expect("a");

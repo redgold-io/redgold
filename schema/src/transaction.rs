@@ -231,6 +231,15 @@ impl Transaction {
             .collect_vec()
     }
 
+    pub fn first_peer_utxo(&self) -> RgResult<UtxoEntry> {
+        let vec = self.utxo_outputs()?;
+        let option = vec.iter()
+            .filter(|f| f.output.as_ref().filter(|o| o.is_peer_data()).is_some())
+            .next();
+        let x = option.ok_or(error_info("Missing peer utxo"))?.clone();
+        Ok(x)
+    }
+
     pub fn output_swap_amount_of(&self, address: &Address) -> i64 {
         self.outputs
             .iter()

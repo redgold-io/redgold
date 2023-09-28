@@ -137,7 +137,7 @@ pub async fn query_network_status(
         // info!("Release exe hash: {}", release_exe_hash);
         let mut config = node_config.clone();
         config.network = x.clone();
-        let mut client = config.lb_client();
+        let mut client = config.api_client();
         client.timeout = Duration::from_secs(2);
         let res = client.about().await;
         let mut peers = None;

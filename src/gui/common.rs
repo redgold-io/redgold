@@ -86,3 +86,29 @@ pub fn bounded_text_area(ui: &mut Ui, string1: &mut String) {
         });
     });
 }
+
+pub fn bounded_text_area_size(ui: &mut Ui, string1: &mut String, width: f32, height: usize) {
+    ui.horizontal(|ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            egui::TextEdit::multiline(string1)
+                .desired_width(width)
+                .desired_rows(height)
+                .clip_text(true)
+                .ui(ui);
+        });
+    });
+}
+
+pub fn bounded_text_area_size_focus(ui: &mut Ui, string1: &mut String, width: f32, height: usize) {
+    ui.horizontal(|ui| {
+        let area = egui::ScrollArea::vertical().stick_to_bottom(true);
+        let res = area.show(ui, |ui| {
+            egui::TextEdit::multiline(string1)
+                .desired_width(width)
+                .desired_rows(height)
+                .clip_text(true)
+                .ui(ui);
+        });
+        res.state
+    });
+}

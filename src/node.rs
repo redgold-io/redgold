@@ -331,7 +331,7 @@ impl Node {
                 info!("Querying LB for node info");
                 let a =
                     // runtimes.auxiliary.block_on(
-                    node_config.lb_client().about().await?;
+                    node_config.api_client().about().await?;
                     // )?;
                 let tx = a.latest_metadata.safe_get_msg("Missing latest metadata from seed node")?;
                 let pd = tx.outputs.get(0).expect("a").data.as_ref().expect("d").peer_data.as_ref().expect("pd");

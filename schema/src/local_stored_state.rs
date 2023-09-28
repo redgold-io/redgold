@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 use crate::servers::Server;
-use crate::structs::{Address, PeerId, TrustRatingLabel};
+use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NamedXpub {
     pub name: String,
     pub derivation_path: String,
-    pub xpub: String
+    pub xpub: String,
+    pub hot_offset: Option<String>
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -27,8 +28,8 @@ pub struct WatchedAddress {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ServerTrustRatingLabels {
-    peer_id_index: i64,
-    labels: Vec<TrustRatingLabel>
+    pub peer_id_index: i64,
+    pub labels: Vec<TrustRatingLabel>
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]

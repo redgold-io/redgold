@@ -324,7 +324,7 @@ impl NodeConfig {
         tx.sign(&pair).expect("sign")
     }
 
-    pub fn lb_client(&self) -> PublicClient {
+    pub fn api_client(&self) -> PublicClient {
         let vec = self.load_balancer_url.split(":").collect_vec();
         let last = vec.get(vec.len() - 1).unwrap().to_string();
         let maybe_port = last.parse::<u16>();
