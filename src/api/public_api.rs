@@ -885,7 +885,7 @@ async fn mock_relay(relay: Relay) {
 fn test_public_api_lb() {
     let mut config = NodeConfig::default();
     config.network = NetworkEnvironment::Dev;
-    let c = config.lb_client();
+    let c = config.api_client();
     let rt = build_runtime(1, "test");
     println!("{:?}", rt.block_on(c.about()));
 }

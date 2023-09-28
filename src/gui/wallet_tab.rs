@@ -13,7 +13,7 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
-use redgold_schema::{ErrorInfoContext, RgResult, WithMetadataHashable};
+use redgold_schema::{EasyJsonDeser, ErrorInfoContext, RgResult, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
@@ -24,7 +24,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::{common};
-use crate::gui::common::{data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
+use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::util::logging::Loggable;
@@ -63,6 +63,7 @@ pub struct StateUpdate {
 enum SendReceiveTabs {
     Send,
     Receive,
+    CustomTx,
 }
 
 // #[derive(Clone)]
@@ -107,6 +108,7 @@ pub struct WalletState {
     pub xpub_loader_error_message: String,
     pub hot_passphrase: String,
     pub hot_offset: String,
+    pub custom_tx_json: String
 }
 
 impl WalletState {
@@ -213,6 +215,7 @@ impl WalletState {
             xpub_loader_error_message: "".to_string(),
             hot_passphrase: "".to_string(),
             hot_offset: "".to_string(),
+            custom_tx_json: "".to_string(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -330,11 +333,22 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     ui.spacing();
 
     if let Some(srt) = &ls.wallet_state.send_receive.clone() {
+        let mut show_prepared = true;
         match srt {
             SendReceiveTabs::Send => {
                 send_view(ui, ls, pk);
             }
-            SendReceiveTabs::Receive => {}
+            SendReceiveTabs::Receive => {
+                show_prepared = false;
+            }
+            SendReceiveTabs::CustomTx => {
+                ui.label("Enter custom transaction JSON:");
+                ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet_state.custom_tx_json));
+
+            }
+        }
+        if show_prepared {
+            prepared_view(ui, ls, pk);
         }
     }
 }
@@ -358,6 +372,10 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
         let string = &mut ls.wallet_state.amount_input;
         ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
     });
+}
+
+pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+
 
     if ui.button("Prepare Transaction").clicked() {
         match &ls.wallet_state.address_info {
@@ -376,6 +394,11 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                     .unwrap_or("Preparation Failed".to_string());
                 ls.wallet_state.signing_flow_status = Some(status);
             }
+        }
+        if ls.wallet_state.send_receive == Some(SendReceiveTabs::CustomTx) {
+            ls.wallet_state.prepared_transaction = Some(
+                ls.wallet_state.custom_tx_json.json_from::<Transaction>()
+            )
         }
     }
     if let Some(p) = &ls.wallet_state.signing_flow_transaction_box_msg {
@@ -447,6 +470,14 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
         }
         if ui.button("Receive").clicked() {
             let some = Some(SendReceiveTabs::Receive);
+            if ls.wallet_state.send_receive == some.clone() {
+                ls.wallet_state.send_receive = None;
+            } else {
+                ls.wallet_state.send_receive = some;
+            }
+        }
+        if ui.button("Custom Tx").clicked() {
+            let some = Some(SendReceiveTabs::CustomTx);
             if ls.wallet_state.send_receive == some.clone() {
                 ls.wallet_state.send_receive = None;
             } else {
@@ -542,6 +573,15 @@ fn window_xpub(
                         name: ls.wallet_state.xpub_save_name.clone(),
                         derivation_path: ls.wallet_state.xpub_derivation_path.clone(),
                         xpub,
+                        hot_offset: if ls.wallet_state.tab == WalletTab::Software {
+                            if ls.wallet_state.hot_offset != "" {
+                                Some(ls.wallet_state.hot_offset.clone())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        },
                     };
                     ls.updates.sender.send(StateUpdate {
                         update: Box::new(
@@ -700,11 +740,12 @@ pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
                 ls.wallet_state.active_xpub = xpub.clone();
                 let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
                 ls.wallet_state.public_key = Some(pk.clone());
-                let dp = format!("{}/0/0", ls.wallet_state.xpub_derivation_path.clone());
+                let dp = format!("{}/0/0", named_xpub.derivation_path.clone());
                 if ls.wallet_state.tab == WalletTab::Hardware {
                     ls.wallet_state.active_derivation_path = dp;
                 } else {
                     ls.wallet_state.derivation_path = dp;
+                    ls.wallet_state.xpub_derivation_path = named_xpub.derivation_path.clone();
                     ls.wallet_state.active_derivation_path = named_xpub.derivation_path.clone();
                 }
             }
@@ -743,7 +784,7 @@ fn broadcast_transaction(nc: NodeConfig, tx: Transaction, ne: NetworkEnvironment
     tokio::spawn(async move {
         let mut nc = nc.clone();
         nc.network = ne;
-        let res = nc.clone().lb_client().send_transaction(&tx.clone(), true).await;
+        let res = nc.clone().api_client().send_transaction(&tx.clone(), true).await;
 
         let st = Some(res.clone());
         let st_msg = Some(res.clone().json_or_combine());
@@ -810,7 +851,7 @@ pub fn get_address_info(
     let mut node_config = node_config;
     node_config.network = network;
     let _ = tokio::spawn(async move {
-        let client = node_config.lb_client();
+        let client = node_config.api_client();
         let response = client
             .address_info(address).await;
         let fun: Box<dyn FnMut(&mut LocalState) + Send> = match response {
@@ -848,7 +889,7 @@ fn handle_faucet(
     let mut node_config = node_config;
     node_config.network = network;
     let _ = tokio::spawn(async move {
-        let client = node_config.lb_client();
+        let client = node_config.api_client();
         let fun = match client.faucet(&address).await {
             Ok(o) => {
                 info!("Faucet success: {}", o.json_or());

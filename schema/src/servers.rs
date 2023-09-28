@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -6,7 +7,7 @@ use serde::Serialize;
 use serde::Deserialize;
 use crate::{error_info, ErrorInfoContext, json_or, json_pretty, RgResult};
 use crate::errors::EnhanceErrorInfo;
-use crate::structs::{ErrorInfo, NetworkEnvironment};
+use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerData, PeerId, PublicKey, VersionInfo};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
@@ -24,6 +25,46 @@ pub struct Server {
 impl Server {
     pub fn network_environment(&self) -> NetworkEnvironment {
         NetworkEnvironment::parse(self.network_environment.clone())
+    }
+
+    pub fn node_metadata(
+        &self,
+        nmd: &mut NodeMetadata
+    ) -> RgResult<()> {
+        let s = self;
+        nmd.external_address = s.external_host.clone().expect("host").clone();
+        nmd.alias = s.alias.clone();
+        nmd.external_ipv4 = s.ipv4.clone();
+        nmd.nat_restricted = Some(false);
+        Ok(())
+    }
+
+    pub fn peer_data(
+        servers: Vec<Server>,
+        peer_data: &mut PeerData,
+        peer_id_index: i64,
+        pk: HashMap<i64, PublicKey>,
+        checksum: String,
+        net: NetworkEnvironment
+    ) -> &mut PeerData {
+        let mut nmds = vec![];
+        for s in servers {
+            if s.peer_id_index == peer_id_index {
+                let mut nmd = NodeMetadata::default();
+                s.node_metadata(&mut nmd).expect("works");
+                nmd.peer_id = peer_data.peer_id.clone();
+                nmd.public_key = pk.get(&s.index).cloned();
+                let mut vi = VersionInfo::default();
+                vi.executable_checksum = checksum.clone();
+                nmd.version_info = Some(vi);
+                nmd.network_environment = net.clone() as i32;
+                nmd.node_type = Some(NodeType::Static as i32);
+                nmd.port_offset = Some(net.default_port_offset() as i64);
+                nmds.push(nmd);
+            }
+        }
+        peer_data.node_metadata = nmds;
+        peer_data
     }
 }
 

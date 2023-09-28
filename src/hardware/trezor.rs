@@ -20,9 +20,9 @@ const MISSING_DEVICE: &str = "Failed to find a Trezor device";
 const TREZORCTL: &str = "trezorctl";
 
 pub fn trezor_cmd(args: Vec<&str>) -> Result<String, ErrorInfo> {
-    tracing::debug!("Running trezor cmd with args {:?}", args.clone());
+    // tracing::debug!("Running trezor cmd with args {:?}", args.clone());
     let res = run_cmd(TREZORCTL, args);
-    tracing::debug!("Trezor command raw output: {:?}", res.clone());
+    // tracing::debug!("Trezor command raw output: {:?}", res.clone());
     if res.0.contains(MISSING_DEVICE) {
         Err(error_info("Failed to find a Trezor device".to_string()))?;
     }

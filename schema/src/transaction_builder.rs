@@ -207,6 +207,7 @@ impl TransactionBuilder {
     pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerData, height: i64) -> &mut Self {
         let mut option = StandardData::peer_data(pd).expect("o");
         option.height = Some(height);
+        self.with_options_height(height);
         let mut output = Output::default();
         output.address = Some(destination.clone());
         output.data = Some(option);
