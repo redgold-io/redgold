@@ -167,31 +167,32 @@ jobs:
           override: true
       - uses: msys2/setup-msys2@v2
       - run: echo "asdf" > ./redgold.exe
-      - shell: msys2 {0}
-        name: "Msys2 cargo build with dependencies"
-        if:
-          contains('
-          refs/heads/staging
-          refs/heads/test
-          refs/heads/main
-          ', github.ref)
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          uname -a
-          ls -lA
-          pwd
-          pacman -S --noconfirm mingw-w64-x86_64-gmp
-          pacman -S --noconfirm mingw-w64-x86_64-rust
-          pacman -S --noconfirm mingw-w64-x86_64-openssl
-          pacman -S --noconfirm make 
-          echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
-          echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
-          cargo build --release --target x86_64-pc-windows-gnu
-          ls 
-          ls target/
-          ls target/x86_64-pc-windows-gnu/
-          ls target/x86_64-pc-windows-gnu/release/
-          cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold.exe
+        # Currently broken due to external change.
+#      - shell: msys2 {0}
+#        name: "Msys2 cargo build with dependencies"
+#        if:
+#          contains('
+#          refs/heads/staging
+#          refs/heads/test
+#          refs/heads/main
+#          ', github.ref)
+#        run: |
+#          export PATH="$HOME/.cargo/bin:$PATH"
+#          uname -a
+#          ls -lA
+#          pwd
+#          pacman -S --noconfirm mingw-w64-x86_64-gmp
+#          pacman -S --noconfirm mingw-w64-x86_64-rust
+#          pacman -S --noconfirm mingw-w64-x86_64-openssl
+#          pacman -S --noconfirm make
+#          echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
+#          echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
+#          cargo build --release --target x86_64-pc-windows-gnu
+#          ls
+#          ls target/
+#          ls target/x86_64-pc-windows-gnu/
+#          ls target/x86_64-pc-windows-gnu/release/
+#          cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold.exe
       - uses: actions/upload-artifact@v3
         with:
           name: redgold.exe
