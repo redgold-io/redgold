@@ -109,20 +109,9 @@ impl PeerOutgoingEventHandler {
         Ok(())
     }
     pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<Response, ErrorInfo> {
-
-        let option = NetworkEnvironment::from_i32(nmd.network_environment);
-        let peer_env = option
-            .safe_get_msg("Missing network environment in node metadata on attempt to send peer message")?;
-        if peer_env != &relay.node_config.network {
-            return Err(error_info(format!("\
-            Attempted to send message to peer {} with network {} while this node is on network {} contents: {}",
-                                          nmd.long_identifier(), peer_env.to_std_string(), relay.node_config.network.to_std_string(),
-                                          json_or(&message.request.clone())
-            )));
-        }
         let port = nmd.port_or(relay.node_config.network) + 1;
         let res = rest_peer(
-            relay, nmd.external_address.clone(), port as i64, &mut message.request
+            relay, nmd.external_address()?.clone(), port as i64, &mut message.request
         ).await;
         res
     }

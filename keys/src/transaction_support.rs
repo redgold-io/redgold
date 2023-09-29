@@ -75,14 +75,15 @@ impl TransactionSupport for Transaction {
 
 
     fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
+        let id = utxo_entry.utxo_id.safe_get_msg("Missing utxo id during verify_utxo_entry_proof")?;
         let input = self
             .inputs
-            .get(utxo_entry.output_index as usize)
+            .get(id.output_index as usize)
             .ok_or(error_message(
                 structs::Error::MissingInputs,
-                format!("missing input index: {}", utxo_entry.output_index),
+                format!("missing input index: {}", id.output_index),
             ))?;
-        let address = utxo_entry.address.safe_get_msg("Missing address during verify_utxo_entry_proof")?;
+        let address = utxo_entry.address()?;
         Ok(Proof::verify_proofs(
             &input.proof,
             &self.signable_hash(),

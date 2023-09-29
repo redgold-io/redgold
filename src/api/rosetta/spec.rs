@@ -106,7 +106,7 @@ impl Rosetta {
     pub fn block_identifier(block: &structs::Block) -> BlockIdentifier {
         BlockIdentifier {
             index: block.height,
-            hash: block.hash_hex(),
+            hash: block.hash_hex().expect("hash"),
         }
     }
 
@@ -252,10 +252,8 @@ impl Rosetta {
         let parent_hash = block
             .clone()
             .previous_block_hash
-            .or(block.hash.clone()) // for genesis only
-            .expect("hash")
-            .safe_bytes()
-            .map(|h| hex::encode(h))?;
+            .unwrap_or(block.hash_or()) // for genesis only
+            .hex();
 
         let mut translated = vec![];
         for t in &block.transactions {

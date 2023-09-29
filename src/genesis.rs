@@ -135,10 +135,9 @@ pub fn create_genesis_block() -> Block {
         struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
         previous_block_hash: None,
         metadata: None,
-        hash: None,
         height: 0,
     };
     b.with_hash();
-    b.previous_block_hash = b.hash.clone();
+    b.previous_block_hash = Some(b.hash_or());
     b.clone()
 }

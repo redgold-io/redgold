@@ -80,9 +80,12 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
     // info!("Result here: {:?}", result);
     let utxos = result
         .iter()
-        .map(|u| SpendableUTXO {
-            utxo_entry: u.clone(),
-            key_pair: map.get(&u.address.clone().expect("a")).expect("Map missing entry").clone(),
+        .map(|u| {
+            let address = &u.address().expect("a");
+            SpendableUTXO {
+                utxo_entry: u.clone(),
+                key_pair: map.get(address).expect("Map missing entry").clone(),
+            }
         })
         .collect_vec();
     //

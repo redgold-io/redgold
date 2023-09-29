@@ -92,7 +92,7 @@ impl QueryTransactionResponse {
 
 impl SubmitTransactionResponse {
     pub fn accepted(&self, expected_count: usize) -> Result<(), ErrorInfo> {
-        self.check_by_state(expected_count, State::Finalized)
+        self.check_by_state(expected_count, State::Accepted)
     }
     pub fn pending(&self, expected_count: usize) -> Result<(), ErrorInfo> {
         self.check_by_state(expected_count, State::Pending)

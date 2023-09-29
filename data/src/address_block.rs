@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::result;
 use sqlx::{Executor, Row, Sqlite};
-use redgold_schema::{error_message, ProtoSerde, RgResult, SafeBytesAccess};
+use redgold_schema::{error_message, ProtoSerde, RgResult, SafeBytesAccess, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressBlock, Block, Error, ErrorInfo, Output};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
+
 
 #[derive(Clone)]
 pub struct AddressBlockStore {
@@ -81,15 +82,18 @@ impl AddressBlockStore {
     ) -> result::Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
+        let a = address_block.address.safe_bytes()?;
+        let b = address_block.balance.safe_get_msg("balance")?.amount;
+        let h = address_block.height;
+        let hash = address_block.hash.safe_get_msg("hash")?.vec();
+
         let rows = sqlx::query!(
             r#"
         INSERT INTO address_block ( address, balance, height, hash )
         VALUES ( ?1, ?2, ?3, ?4)
                 "#,
-            address_block.address,
-            address_block.balance,
-            address_block.height,
-            address_block.hash
+            a,b,h,hash
+
         )
             .execute(&mut *pool)
             .await;

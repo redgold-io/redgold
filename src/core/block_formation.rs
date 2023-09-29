@@ -58,9 +58,8 @@ impl BlockFormationProcess {
                     // to remove the clone on hash calculation? That's clever do it as part
                     // of a constructor function.
                     struct_metadata: struct_metadata(last_time.clone() as i64),
-                    previous_block_hash: self.last_block.hash.clone(),
+                    previous_block_hash: Some(self.last_block.hash_or()),
                     metadata: None,
-                    hash: None,
                     height,
                 }
                 .with_hash()
@@ -71,7 +70,7 @@ impl BlockFormationProcess {
                 // self.relay.ds.insert_block_update_historicals(&block).await?;
                 self.last_block = block.clone();
                 metrics::increment_counter!("redgold.blocks.created");
-                debug!("Formed block with hash {}", block.hash_hex())
+                debug!("Formed block with hash {}", block.hash_hex_or_missing())
             }
         }
     }

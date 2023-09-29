@@ -7,7 +7,7 @@ use serde::Serialize;
 use serde::Deserialize;
 use crate::{error_info, ErrorInfoContext, json_or, json_pretty, RgResult};
 use crate::errors::EnhanceErrorInfo;
-use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerData, PeerId, PublicKey, VersionInfo};
+use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerData, PeerId, PublicKey, TransportInfo, VersionInfo};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
@@ -18,7 +18,7 @@ pub struct Server {
     pub network_environment: String,
     pub username: Option<String>,
     pub ipv4: Option<String>,
-    pub alias: Option<String>,
+    pub node_name: Option<String>,
     pub external_host: Option<String>
 }
 
@@ -32,10 +32,13 @@ impl Server {
         nmd: &mut NodeMetadata
     ) -> RgResult<()> {
         let s = self;
-        nmd.external_address = s.external_host.clone().expect("host").clone();
-        nmd.alias = s.alias.clone();
-        nmd.external_ipv4 = s.ipv4.clone();
-        nmd.nat_restricted = Some(false);
+        nmd.node_name = s.node_name.clone();
+        let mut info = TransportInfo::default();
+        let ti = nmd.transport_info.as_mut().unwrap_or(&mut info);
+        ti.external_host = s.external_host.clone();
+        ti.external_ipv4 = s.ipv4.clone();
+        ti.nat_restricted = Some(false);
+        nmd.transport_info = Some(ti.clone());
         Ok(())
     }
 
@@ -48,6 +51,7 @@ impl Server {
         net: NetworkEnvironment
     ) -> &mut PeerData {
         let mut nmds = vec![];
+        peer_data.network_environment = net.clone() as i32;
         for s in servers {
             if s.peer_id_index == peer_id_index {
                 let mut nmd = NodeMetadata::default();
@@ -57,9 +61,9 @@ impl Server {
                 let mut vi = VersionInfo::default();
                 vi.executable_checksum = checksum.clone();
                 nmd.version_info = Some(vi);
-                nmd.network_environment = net.clone() as i32;
                 nmd.node_type = Some(NodeType::Static as i32);
-                nmd.port_offset = Some(net.default_port_offset() as i64);
+                let option = nmd.transport_info.as_mut();
+                option.expect("ti").port_offset = Some(net.default_port_offset() as i64);
                 nmds.push(nmd);
             }
         }
@@ -87,7 +91,7 @@ impl Server {
             host: host.clone(),
             username: None,
             ipv4: None,
-            alias: None,
+            node_name: None,
             index: 0,
             peer_id_index: 0,
             // TODO: Change to mainnet later

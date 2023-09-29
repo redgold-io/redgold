@@ -26,11 +26,8 @@
           <div><strong>XOR Distance</strong></div>
           <div>{{hashDataInitial.utxo_distance}}</div>
 
-          <div><strong>Alias</strong></div>
-          <div>{{hashDataInitial.alias}}</div>
-
-          <div><strong>Name</strong></div>
-          <div>{{hashDataInitial.name}}</div>
+          <div><strong>Node Name</strong></div>
+          <div>{{hashDataInitial.node_name}}</div>
 
           <div><strong>Peer Id</strong></div>
           <div><HashLink :data="hashDataInitial.peer_id" :shorten="false" /></div>

@@ -47,7 +47,9 @@ impl DataStore {
         let mut resp = structs::ResolveCodeResponse::default();
         resp.utxo_entry = res.clone();
 
-        if let Some(u) = res.as_ref().and_then(|r| r.transaction_hash.as_ref()) {
+        if let Some(u) = res.as_ref()
+            .and_then(|r| r.utxo_id.as_ref())
+            .and_then(|r| r.transaction_hash.as_ref()) {
             let tx_res = self.resolve_transaction_hash(u).await?;
             resp.transaction = tx_res;
             resp.contract_state_marker = self.state.query_recent_state(
@@ -61,7 +63,7 @@ impl DataStore {
         let mut observation_proofs = vec![];
         let mut transaction = None;
         let mut rejection_reason = None;
-        let mut state = TransactionState::Pending;
+        let mut state = TransactionState::ObservedPending;
         let mut transaction_info: Option<TransactionInfo> = None;
 
         if let Some((t, e)) = maybe_transaction.clone() {
@@ -76,7 +78,7 @@ impl DataStore {
             let accepted = rejection_reason.is_none();
 
             if accepted {
-                state = TransactionState::Accepted;
+                state = TransactionState::ObservedAccepted;
             } else {
                 state = TransactionState::Rejected
             }

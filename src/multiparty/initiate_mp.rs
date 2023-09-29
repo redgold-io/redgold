@@ -184,8 +184,8 @@ pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipart
     let host_key = host_key.safe_get_msg("No host key")?;
     let metadata = relay.ds.peer_store.query_public_key_metadata(host_key).await?;
     let metadata = metadata.safe_get_msg("No host key metadata")?;
-    let address = metadata.external_address.clone();
-    let port = metadata.port_offset.map(|o| (o+4) as u16).unwrap_or(relay.node_config.mparty_port());
+    let address = metadata.external_address()?;
+    let port = metadata.port_or(relay.node_config.network) + 4u16;
 
     let timeout = Duration::from_secs(100); // mp_req.timeout_seconds.unwrap_or(100) as u64);
 
@@ -436,8 +436,8 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
     let host_key = host_key.safe_get_msg("No host key")?;
     let metadata = relay.ds.peer_store.query_public_key_metadata(host_key).await?;
     let metadata = metadata.safe_get_msg("No host key metadata")?;
-    let address = metadata.external_address.clone();
-    let port = metadata.port_offset.map(|o| (o+4) as u16).unwrap_or(relay.node_config.mparty_port());
+    let address = metadata.external_address()?;
+    let port = metadata.port_or(relay.node_config.network) + 4u16;
 
     let timeout = Duration::from_secs(100);
 

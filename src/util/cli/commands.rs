@@ -32,7 +32,7 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
         host: add_server.ssh_host.clone(),
         username: add_server.user.clone(),
         ipv4: None,
-        alias: None,
+        node_name: None,
         index: this_index,
         peer_id_index: add_server.peer_id_index.unwrap_or(this_index),
         network_environment: NetworkEnvironment::All.to_std_string(),
@@ -122,7 +122,10 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     if utxos.len() == 0 {
         return Err(ErrorInfo::error_info("No UTXOs found for this address"));
     }
-    let option = hm.get(&utxos.get(0).safe_get_msg("first")?.address.safe_bytes()?);
+    let option1 = utxos.get(0);
+    let first_uto = option1.safe_get_msg("first")?;
+    let first_addr = first_uto.address()?;
+    let option = hm.get(&first_addr.address.safe_bytes()?);
     let kp = option.safe_get_msg("keypair")?.clone().clone();
 
     let utxo = utxos.get(0).expect("first").clone();
@@ -219,7 +222,7 @@ pub fn add_server_prompt() -> Server {
         index: 0,
         username: Some(username),
         ipv4: None,
-        alias: None,
+        node_name: None,
         peer_id_index: 0,
         network_environment: NetworkEnvironment::All.to_std_string(),
         external_host: None,

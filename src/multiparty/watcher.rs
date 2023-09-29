@@ -254,7 +254,8 @@ impl Watcher {
         let u = utxos.get(15).safe_get_msg("Missing utxo")?.clone();
         let a = u.key_pair.address_typed().render_string().expect("a");
         let res = self.relay.ds.transaction_store.query_utxo_id_valid(
-            &u.utxo_entry.transaction_hash.clone().expect("hash"), u.utxo_entry.output_index.clone()
+            &u.utxo_entry.utxo_id()?.transaction_hash.clone().expect("hash"),
+            u.utxo_entry.utxo_id()?.output_index.clone()
         ).await?;
         let uu = u.utxo_entry.clone().json_or();
         if res {

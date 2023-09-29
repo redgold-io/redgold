@@ -535,7 +535,7 @@ impl TransactionProcessContext {
 
         // tracing::info!("Finalizing transaction stage started");
 
-        let prf = self.observe(validation_type, State::Finalized).await?;
+        let prf = self.observe(validation_type, State::Accepted).await?;
         observation_proofs.insert(prf);
         self.insert_transaction(&transaction).await?;
         increment_counter!("redgold.transaction.accepted");
@@ -641,7 +641,7 @@ impl TransactionProcessContext {
         tracing::info!("Finished processing transaction \
         num_observation_proofs {} self_signed_pending {:?} num_pending: {:?} num_accepted: {:?}",
             observation_proofs.len(), self_signed_pending, counts.get(&(State::Pending as i32)).unwrap_or(&0),
-            counts.get(&(State::Finalized as i32)).unwrap_or(&0),
+            counts.get(&(State::Accepted as i32)).unwrap_or(&0),
         );
         // TODO: Rename Finalized to Accepted
 

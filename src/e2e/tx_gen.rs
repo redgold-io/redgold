@@ -212,7 +212,7 @@ impl TransactionGenerator {
         let vec = tx.transaction.to_utxo_entries(0 as u64);
         let iter = vec.iter().filter(|v| {
             v.opt_amount().map(|a| a.amount > (MIN_FEE_RAW)).unwrap_or(false)
-                && !(v.address.clone().expect("a").address_type == AddressType::ScriptHash as i32)
+                && !(v.address().expect("a").address_type == AddressType::ScriptHash as i32)
         });
         for (i, v) in iter.enumerate() {
             self.finished_pool.push(SpendableUTXO {

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package structs;
 
-import "execution.proto";
-
 // The verification type associated with a signature. Denotes common patterns, i.e. the default common ECDSA curve
 // and parameters, or a custom curve denoted by a particular enum, or a particular signing algorithm.
 // Each specific curve type or signing algorithm should be assigned it's own enum here, so that the signing
@@ -49,17 +47,24 @@ message Proof {
   PublicKey public_key = 2;
 }
 
-// TODO: Refactor types here.
+enum PoWProofType {
+  // The standard sha3-256 hash of the transaction
+  Sha3_256_Nonce = 0;
+}
+
 // Currently unused, but an optional anti-spam proof included in a transaction for increased mem-pool priority
 message PoWProof {
-  uint32 proof_type = 1;
-  bytes proof = 2;
+  PoWProofType proof_type = 1;
+  BytesData nonce = 2;
 }
 
 // Equivalent to a chainId identifier. Used as a marker for contracts or simplicity to indicate information
 // associated with the origin of a particular amount. Useful for schema-represented ERC-20 equivalent products.
+// Or other schema-driven contract definitions.
 message ProductId {
+  // Used to represent off-chain products
   Hash network = 1;
+  // Used to represent on-chain products
   Hash product = 2;
 }
 
@@ -130,38 +135,44 @@ message PartitionInfo {
   optional int64 utxo = 1;
   optional int64 contract_address = 2;
   optional int64 transaction_hash = 3;
+  optional int64 address = 4;
 }
 
-// TODO: Fill this out with data from below∂
+// How to contact the node
 message TransportInfo {
-
-}
-
-// This also needs a proof maybe?
-message NodeMetadata {
-  // Primary address used to reference the node, can be anything that is parsable.
-  // TODO: Should this stuff move into networkRelatedMetadata?
-  string external_address = 1;
-  // May not be to store public key if we merkle the multi_hashes too.
-  PublicKey public_key = 3;
-  optional NodeType node_type = 5;
-  optional VersionInfo version_info = 6;
-  optional PartitionInfo partition_info = 7;
-  optional int64 port_offset = 8;
-  // Rename as node_nickname or something?
-  optional string alias = 9;
-  // Rename as full name? or move to peerId
-  optional string name = 10;
-  PeerId peer_id = 11;
-  optional bool nat_restricted = 12;
-  NetworkEnvironment network_environment = 13;
   // Exact IPv4 address
   optional string external_ipv4 = 14;
   // Exact IPv6 address
   optional string external_ipv6 = 15;
   // CNAME like reference i.e. node.example.com
   optional string external_host = 16;
+  // Base port reference for the node, i.e. 16180 -- offsets are used for each API
+  // Defaults to network standard ports
+  optional int64 port_offset = 8;
+  optional bool nat_restricted = 12;
 }
+
+// This also needs a proof maybe?
+message NodeMetadata {
+  // Information about how to contact the node
+  TransportInfo transport_info = 1;
+  // Public key associated with the node signatures for real-time signatures, such as observations
+  PublicKey public_key = 2;
+  // What type of node this is, in terms of whether it stays online consistently or is ephemeral
+  // and can't be relied upon to be continuously online.
+  optional NodeType node_type = 5;
+  // Information about the executable and other checksums, also used for coordinating upgrades
+  optional VersionInfo version_info = 6;
+  // Distances to various types of hashes for partitioning and storage of data. Used for optimizing gossip
+  // and long term storage.
+  optional PartitionInfo partition_info = 7;
+  // Identifier for the particular machine, not guaranteed to be unique across network.
+  // Public key should be used primarily, this is only for convenience.
+  optional string node_name = 8;
+  // Corresponding public key of the overall identity controlling this, and other nodes
+  PeerId peer_id = 9;
+}
+
 /**
 Used to store the version of the executable and the commit hash of the source code used to build it.
 Security verifications associated with the node software should be done with this message.
@@ -184,6 +195,7 @@ message PeerId {
   repeated Proof known_proof = 3;
 }
 
+// All of this is optional, used for external verifications
 message IdentityMetadata {
   optional string github_username = 1;
   optional string website = 2;
@@ -202,6 +214,7 @@ message PeerData {
   Address reward_address = 7;
   repeated Address sponsored_address = 8;
   IdentityMetadata identity_metadata = 12;
+  NetworkEnvironment network_environment = 13;
 }
 
 enum BytesDecoder {
@@ -228,7 +241,7 @@ message DynamicNodeMetadata {
   optional int64 udp_port = 1;
   Proof proof = 2;
   PeerId peer_id = 3;
-  int64 height = 4;
+  int64 sequence = 4;
 }
 
 message AbridgedNodeMetadata {
@@ -470,32 +483,31 @@ message StructMetadata {
 }
 
 message AddressBlock {
-  bytes address = 1;
-  int64 balance = 2;
+  Address address = 1;
+  CurrencyAmount balance = 2;
   int64 height = 3;
-  bytes hash = 4;
+  Hash hash = 4;
 }
 
+
+// Only used for building deterministic blocks for legacy compatibility
+// NOT used for authoritative proof, instead rely on merkle proofs
+// NOT guaranteed to be globally unique
 message Block {
   Hash merkle_root = 1;
   // These are dropped for the hash calculation as the merkle root is present.
   repeated Transaction transactions = 2;
   StructMetadata struct_metadata = 3;
   Hash previous_block_hash = 4;
-  optional BlockMetadata metadata = 5;
-  // This is dropped for hash calculation as it represents the calculation after the fact,
-  // Only stored for ease of preventing excess recalculations.
-  Hash hash = 6;
+  BlockMetadata metadata = 5;
   // Not really needed for hash calc, but harmless to include
   int64 height = 7;
 }
 
 enum State {
-  PENDING = 0;
-  // TODO: Change to accepted
-  FINALIZED = 1;
-  // Does this belong here?
-  REJECTED = 2;
+  Pending = 0;
+  Accepted = 1;
+  Reverted = 2;
   Ordered = 3;
 }
 
@@ -509,7 +521,7 @@ enum HashType {
 }
 
 message Tombstone {
-  bytes hash = 1;
+  Hash hash = 1;
   // TODO: Other fields for the reason 'why'
 }
 
@@ -571,70 +583,13 @@ message ObservationEdge {
     int64 time = 2;
 }
 
-// TODO: Update types here
+
 // Derived data structure, not a primary chain data structure
 message UtxoEntry {
-  // Changed this to UtxoId, maybe rename UtxoId just to UtxoId?
-  Hash transaction_hash = 1;
-  // TODO: Change to OutputIndex
-  int64 output_index = 2;
-  // This is duplicated, but used for indexing.
-  Address address = 3;
+  UtxoId utxo_id = 1;
   Output output = 4;
   int64 time = 5;
-  // Consider adding additional fields to index here? amount? etc. for now just de-ser
 }
-
-//}
-// should we add longer confirmation windows to transactions for fee?
-// let's just assume the deposit addresses are well known?
-// assume addresses are well known enough -- but network still needs to confirm that address is usable. ?? or does it
-// or should we issue a unique deposit address per input?
-
-// should we even have a deposit request??
-// Should we just move this out of the schema entirely and use it as rest api call ? or leave it?
-// Should a deposit just be a regular transaction?
-// This type doesn't have a double spending issue, only requires single finalization.
-// DepositRequest does not need to be observed. It only needs to be signed.
-// how the hell do we collect the fee?
-// just collect a fee from a redgold input to deposit.
-//message DepositMulti {
-//  repeated DepositInput inputs = 1;
-//  repeated DepositOutput outputs = 2;
-//  optional uint32 version = 6;
-//  optional PoWProof anti_spam_proof = 7;
-//  optional uint64 request_ttl_seconds = 8; // default 1 day
-//}
-
-// Let's assume deposit has already happened and this is the 'claim' of it.
-// Deposit address is currently just requested from active nodes.
-// They must agree on the main deposit address, and maintain old ones periodically.
-// Deposit should be rejected if not confirmed -- but it can later be re-attempted.
-// Once a deposit has been claimed it's 'used' in same way UTXO's are.
-// How do we map from a deposit to an amount??
-
-// screw it just use transaction?
-//
-//message Deposit {
-//  bytes source_address = 1;
-//  uint32 network = 2;
-//  bytes destination_address = 3;
-//  repeated Proof source_proof = 4;
-//  OperationMetadata metadata =  5;
-//}
-
-// when the deposit is finalized, how do we determine the actual amount?
-//
-//message Deposit {
-//  bytes deposit_request_hash = 1;
-//  Proof control_proof = 2;
-//  optional uint32 version = 3;
-//}
-
-// maybe a deposit should just be to a wrapped coin?
-// that adds tons of complication..
-
-// actually, wrapped bitcoin is fine, that's easily composible actually? maybe
 
 // TODO: unify types here
 message EagerFullGossipPush {
@@ -643,8 +598,6 @@ message EagerFullGossipPush {
   repeated ObservationEdge observation_edges = 3;
   repeated PeerData peer_data = 7;
 }
-
-
 
 // These should both be broadcasts at some point
 // Consider using a response here if needed.
@@ -709,14 +662,6 @@ message DownloadResponse {
   repeated ObservationEdge observation_edges = 4;
   bool complete_response = 5;
 }
-//
-//message DownloadMetadataRequest {
-//  optional bool debug = 1;
-//}
-//
-//message DownloadMetadataResponse {
-//
-//}
 
 message GetPeersInfoRequest {
 
@@ -763,8 +708,6 @@ message MultipartySubscribeEvent {
   string id = 2;
   string message = 3;
 }
-
-
 
 message UtxoConflictResolveRequest {
   repeated UtxoId utxo_ids = 1;
@@ -1042,14 +985,6 @@ message ResponseMetadata {
   optional string request_id = 4;
   optional string trace_id = 5;
 }
-//
-//message AddPeerFullRequest {
-//  bytes id = 1;
-//  double trust = 2;
-//  bytes public_key = 3;
-//  string address = 4;
-//  bool connect_to_peer = 5;
-//}
 
 message MultipartyIdentifier {
   repeated PublicKey party_keys = 1;
@@ -1220,10 +1155,11 @@ enum TransactionState {
   Rejected = 0;
   Mempool = 1;
   Validated = 2;
-  Pending = 3;
-  Finalized = 4;
-  Accepted = 5;
+  ObservedPending = 3;
+  ObservedAccepted = 4;
+  Finalized = 5;
   Unknown = 6;
+  ObservedReverted = 7;
 }
 
 enum ExternalCurrency {
@@ -1293,7 +1229,10 @@ message TestContractRequest {
 }
 
 
-// This doesn't work
+// Imports not working properly due to issue with prost
+import "execution.proto";
+
+// This doesn't work due to prost import issue, important to fix later
 //
 //message TestMessageOuter {
 //  execution.TestMessage inner = 1;

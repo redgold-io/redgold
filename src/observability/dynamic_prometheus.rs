@@ -42,8 +42,9 @@ async fn update_tick(relay: &Relay) -> Result<(), ErrorInfo> {
 
     let mut updated = vec![];
     for n in nmd {
+        let ti = n.transport_info.clone();
         let scr = PrometheusScrapeConfig {
-            ip: n.external_address.clone(),
+            ip: ti.expect("t").external_host.clone().expect("h"),
             port: n.port_or(relay.node_config.network) - 1,
             network: relay.node_config.network,
         };

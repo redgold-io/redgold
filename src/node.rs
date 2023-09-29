@@ -267,7 +267,8 @@ impl Node {
             let kp = node_config.words().keypair_at_change(i).expect("works");
             let address = kp.address_typed();
             let o = outputs.iter().find(|o| {
-                o.address.as_ref().expect("a") == &address
+                let address = o.address().as_ref().expect("a").clone().clone();
+                address == address
             }).expect("found");
             let s = SpendableUTXO {
                 utxo_entry: o.clone(),
@@ -319,7 +320,7 @@ impl Node {
                 let genesis_hash = tx.hash_or();
                 info!("Genesis hash {}", genesis_hash.json_or());
                 let obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
-                let obs = relay.observe_tx(&genesis_hash, State::Finalized, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+                let obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
                 assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);
                 // .expect("Genesis inserted or already exists");
             }
@@ -343,8 +344,8 @@ impl Node {
                     peer_id: Some(PeerId::from_bytes(vec1)),
                     trust: vec![TrustData::from_label(1.0)],
                     public_key: Some(nmd.public_key.safe_get_msg("Missing pk on about").cloned()?),
-                    external_address: nmd.external_address.clone(),
-                    port_offset: Some(nmd.port_offset.unwrap_or(node_config.network.default_port_offset() as i64) as u32),
+                    external_address: nmd.external_address()?.clone(),
+                    port_offset: Some(nmd.port_or(node_config.network) as u32),
                     environments: vec![node_config.network as i32],
                 }
             } else {
