@@ -34,6 +34,10 @@ pub struct ServersState {
     csv_edit_path: String,
     parse_success: Option<bool>,
     purge: bool,
+    server_index_edit: String,
+    skip_start: bool,
+    ops: bool,
+    purge_ops: bool,
     deployment_result: Option<String>
 }
 
@@ -198,6 +202,10 @@ impl LocalState {
                     .all().servers_path().to_str().expect("").to_string(),
                 parse_success: None,
                 purge: false,
+                server_index_edit: "".to_string(),
+                skip_start: false,
+                ops: false,
+                purge_ops: false,
                 deployment_result: None,
             },
             current_time: util::current_time_millis_i64(),
@@ -402,12 +410,26 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
 
     }
 
-    ui.checkbox(&mut local_state.server_state.purge, "Purge");
+    ui.label("Deploy Options");
+
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut local_state.server_state.purge, "Purge");
+        ui.checkbox(&mut local_state.server_state.ops, "ops");
+        ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
+        ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
+        ui.label("Single Server Index:");
+        TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
+    });
 
     if ui.button("Deploy").clicked() {
+        local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
         info!("Deploying");
         let mut d = Deploy::default();
+        d.ops = local_state.server_state.ops;
+        d.purge_ops = local_state.server_state.purge_ops;
+        d.debug_skip_start = local_state.server_state.skip_start;
         d.purge = local_state.server_state.purge;
+        d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
         let config = local_state.node_config.clone();
         let mut arc = local_state.server_state.deployment_result_info_box.clone();
         let fun = Box::new(move |s: String| {
@@ -426,7 +448,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     };
 
     let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
-    bounded_text_area_size_focus(ui, &mut arc1, 600., 6);
+    bounded_text_area_size_focus(ui, &mut arc1, 600., 15);
 
 }
 
