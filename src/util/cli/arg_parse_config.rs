@@ -85,6 +85,18 @@ impl ArgTranslate {
         false
     }
 
+    pub fn is_node(&self) -> bool {
+        if let Some(sc) = &self.opts.subcmd {
+            match sc {
+                RgTopLevelSubcommand::Node(_) => {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
     pub fn secure_data_path_string() -> Option<String> {
         std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
     }
@@ -461,25 +473,27 @@ impl ArgTranslate {
 
         let port = self.node_config.public_port();
         // Enrich keys for missing seed info
-        for seed in self.node_config.seeds.iter_mut() {
-            if seed.public_key.is_none() {
-                info!("Querying seed: {}", seed.external_address.clone());
+        if self.is_node() {
+            for seed in self.node_config.seeds.iter_mut() {
+                if seed.public_key.is_none() {
+                    info!("Querying seed: {}", seed.external_address.clone());
 
-                let response = RgHttpClient::new(seed.external_address.clone(),
-                                                 seed.port_offset.map(|p| (p + 1) as u16)
-                                      .unwrap_or(port),
-                                                 None
-                ).about().await;
-                if let Ok(response) = response {
-                    let nmd = response.peer_node_info.as_ref()
-                        .and_then(|n| n.latest_node_transaction.as_ref())
-                        .and_then(|n| n.node_metadata().ok());
-                    let pk = nmd.as_ref().and_then(|n| n.public_key.as_ref());
-                    let pid = nmd.as_ref().and_then(|n| n.peer_id.as_ref());
-                    if let (Some(pk), Some(pid)) = (pk, pid) {
-                        info!("Enriched seed {} public {} peer id {}", seed.external_address.clone(), pk.json_or(), pid.json_or());
-                        seed.public_key = Some(pk.clone());
-                        seed.peer_id = Some(pid.clone());
+                    let response = RgHttpClient::new(seed.external_address.clone(),
+                                                     seed.port_offset.map(|p| (p + 1) as u16)
+                                                         .unwrap_or(port),
+                                                     None
+                    ).about().await;
+                    if let Ok(response) = response {
+                        let nmd = response.peer_node_info.as_ref()
+                            .and_then(|n| n.latest_node_transaction.as_ref())
+                            .and_then(|n| n.node_metadata().ok());
+                        let pk = nmd.as_ref().and_then(|n| n.public_key.as_ref());
+                        let pid = nmd.as_ref().and_then(|n| n.peer_id.as_ref());
+                        if let (Some(pk), Some(pid)) = (pk, pid) {
+                            info!("Enriched seed {} public {} peer id {}", seed.external_address.clone(), pk.json_or(), pid.json_or());
+                            seed.public_key = Some(pk.clone());
+                            seed.peer_id = Some(pid.clone());
+                        }
                     }
                 }
             }
