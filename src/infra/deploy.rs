@@ -350,10 +350,10 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
     deploy: &mut Deploy, node_config: &NodeConfig, fun: Box<F>) -> RgResult<()> {
 
     // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
-    // if primary_gen {
-    //     // Also set environment here to dev if not main
-    //     deploy.skip_ops = true;
-    // }
+    if node_config.opts.development_mode {
+        // Also set environment here to dev if not main
+        deploy.skip_ops = true;
+    }
     let mut net = node_config.network;
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;

@@ -11,10 +11,10 @@ pub struct NamedXpub {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ContactAddress {
+pub struct SavedAddress {
     name: String,
     address: Address,
-    peer_id: Option<PeerId>,
+    contact_name: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -39,12 +39,20 @@ pub struct Identity {
     pub xpub_name: String
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct Contact {
+    pub name: String,
+    pub peer_id: Option<PeerId>,
+}
+
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalStoredState {
     pub servers: Vec<Server>,
     pub xpubs: Vec<NamedXpub>,
     pub trust: Vec<ServerTrustRatingLabels>,
-    pub contacts: Vec<ContactAddress>,
+    pub saved_addresses: Option<Vec<SavedAddress>>,
+    pub contacts: Vec<Contact>,
     pub watched_address: Vec<Address>,
     pub email_alert_config: Option<String>,
     pub identities: Vec<Identity>
@@ -56,6 +64,7 @@ impl Default for LocalStoredState {
             servers: vec![],
             xpubs: vec![],
             trust: vec![],
+            saved_addresses: None,
             contacts: vec![],
             watched_address: vec![],
             email_alert_config: None,

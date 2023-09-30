@@ -1162,10 +1162,11 @@ enum TransactionState {
   ObservedReverted = 7;
 }
 
-enum ExternalCurrency {
+enum SupportedCurrency {
   USD = 0;
   Bitcoin = 1;
   Ethereum = 2;
+  Redgold = 3;
 }
 
 

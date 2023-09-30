@@ -1,5 +1,5 @@
 use redgold_keys::TestConstants;
-use redgold_schema::structs::{Address, ErrorInfo, ExternalCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, Proof, PublicKey};
+use redgold_schema::structs::{Address, ErrorInfo, SupportedCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, Proof, PublicKey};
 use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -129,7 +129,7 @@ impl MultipartyStore {
         txid: &Vec<u8>,
         secondary_txid: &Vec<u8>,
         outgoing: bool,
-        network: ExternalCurrency,
+        network: SupportedCurrency,
         source_address: &Address,
         destination_address: &Address,
         timestamp: i64,
