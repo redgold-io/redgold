@@ -31,8 +31,14 @@
 
           <div><strong>Peer Id</strong></div>
           <div><HashLink :data="hashDataInitial.peer_id" :shorten="false" /></div>
-<!-- TODO: Observations from this PK paginated / latest observation-->
+
+          <!-- TODO: Observations from this PK paginated / latest observation-->
         </div>
+
+        <h4>Recent Observations</h4>
+        <BriefObservation :data="hashDataInitial.recent_observations"/>
+
+
       </div>
       <!-- Buffer div -->
       <div class="col-1"></div>
@@ -44,9 +50,11 @@ import HashLink from "@/components/util/HashLink.vue";
 // import CopyClipboard from "@/components/util/CopyClipboard.vue";
 // import PeerNodeInfo from "@/components/hash_types/PeerNodeInfo.vue";
 import {toTitleCase} from "@/utils";
+import BriefObservation from "@/components/BriefObservation.vue";
 export default {
   name: "PeerInfo",
   components: {
+    BriefObservation,
     // CopyClipboard,
     HashLink,
     // PeerNodeInfo

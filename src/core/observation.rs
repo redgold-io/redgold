@@ -221,6 +221,7 @@ impl ObservationBuffer {
         self.relay.ds.observation.insert_observation_and_edges(&signed_tx).await?;
         // Verify stored.
         assert!(self.relay.ds.observation.query_observation(&signed_tx.hash_or()).await?.is_some());
+        // TODO: Test to see if one of the transactions was stored correctly.
         self.latest = signed_tx.clone();
         self.ancestors.push(signed_tx.hash_or());
 
