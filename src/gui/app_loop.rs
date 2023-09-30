@@ -434,6 +434,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         info!("Deploying");
         let mut d = Deploy::default();
         d.ops = local_state.server_state.ops;
+        if d.ops == false {
+            d.skip_ops = true;
+        }
         d.purge_ops = local_state.server_state.purge_ops;
         d.debug_skip_start = local_state.server_state.skip_start;
         d.purge = local_state.server_state.purge;
