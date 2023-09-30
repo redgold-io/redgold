@@ -84,7 +84,7 @@ pub async fn account_coins(
     let entries = r.relay.ds.transaction_store.query_utxo_address(&address).await?;
     let mut map: HashMap<Vec<u8>, UtxoEntry> = HashMap::new();
     for e in entries {
-        map.insert(e.to_utxo_id().coin_id(), e);
+        map.insert(e.to_old_utxo_id().coin_id(), e);
     }
     // TODO: Collect all transactions which have been accepted but which are not yet in a block.
     // Then, for those, filter on the address being queried, roll back any changes here
@@ -135,7 +135,7 @@ pub async fn block(r: Rosetta, request: BlockRequest) -> Result<BlockResponse, E
         .await?;
     Ok(BlockResponse {
         block: match maybe_block {
-            Some(b) => r.translate_block(b, State::Finalized).await?.into(),
+            Some(b) => r.translate_block(b, State::Accepted).await?.into(),
             None => None,
         },
         other_transactions: None,
@@ -160,7 +160,7 @@ pub async fn block_transaction(
 
     for t in block.transactions {
         if t.hash_hex()? == request.transaction_identifier.hash {
-            let transaction = r.translate_transaction(t.clone(), State::Finalized).await?;
+            let transaction = r.translate_transaction(t.clone(), State::Accepted).await?;
             return Ok(BlockTransactionResponse { transaction });
         }
     }
@@ -305,13 +305,13 @@ pub async fn construction_payloads(
         .ok_or(error_message(RGError::MissingField, "Missing metadata"))?;
     let mut input_address_utxo_map: HashMap<Address, Vec<UtxoEntry>> = HashMap::new();
     for x in meta.utxos {
-        let entry = input_address_utxo_map.get_mut(&x.address.safe_get()?.clone());
+        let entry = input_address_utxo_map.get_mut(&x.address()?.clone());
         match entry {
             Some(e) => {
                 e.push(x.clone());
             }
             None => {
-                input_address_utxo_map.insert(x.address.clone().expect("a"), vec![x.clone()]);
+                input_address_utxo_map.insert(x.address()?.clone(), vec![x.clone()]);
             }
         }
     }
@@ -335,10 +335,12 @@ pub async fn construction_payloads(
                     for utxo in utxos {
                         let inp = utxo.to_input();
                         tx.inputs.push(inp);
+                        let id = utxo.utxo_id.safe_get()?;
+                        let option = id.transaction_hash.safe_get()?;
                         payloads.push(SigningPayload {
                             address: Some(acc.address.clone()),
                             account_identifier: Some(acc.clone()),
-                            hex_bytes: utxo.transaction_hash.safe_get()?.hex(),
+                            hex_bytes: option.hex(),
                             signature_type: Some(SignatureType::ECDSA),
                         });
                     }
@@ -481,7 +483,7 @@ pub async fn network_options(
                     successful: false
                 },
                 OperationStatus{
-                    status: format!("{:?}", State::Finalized),
+                    status: format!("{:?}", State::Accepted),
                     successful: true
                 }],
             operation_types: vec![Rosetta::operation_type()],

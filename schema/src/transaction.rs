@@ -12,6 +12,13 @@ pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
 
 
 impl UtxoId {
+
+    pub fn new(hash: &Hash, output_index: i64) -> Self {
+        Self {
+            transaction_hash: Some(hash.clone()),
+            output_index,
+        }
+    }
     pub fn format_str(&self) -> String {
         format!("UtxoId: {} output: {}", self.transaction_hash.clone().expect("").hex(), self.output_index)
     }
@@ -122,7 +129,7 @@ impl Transaction {
     pub fn observation_output_as(&self) -> RgResult<UtxoEntry> {
         let idx = self.observation_output_index()?;
         let o = self.observation_output()?;
-        let u = o.utxo_entry(&self.hash_or(), idx as u32,self.time()?.clone() as u64);
+        let u = o.utxo_entry(&self.hash_or(), idx as i64, self.time()?.clone());
         Ok(u)
     }
 

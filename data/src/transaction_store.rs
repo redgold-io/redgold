@@ -279,34 +279,14 @@ impl TransactionStore {
         address: &Address
     ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
 
-        let mut pool = self.ctx.pool().await?;
         let bytes = address.address.safe_bytes()?;
-        let rows = sqlx::query!(
-            r#"SELECT transaction_hash, output_index, address, output, time FROM utxo WHERE address = ?1"#,
+        DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM utxo WHERE address = ?1"#,
             bytes
         )
-            .fetch_all(&mut *pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            let address = row.address;
-            let transaction_hash = row.transaction_hash;
-            let output_index = row.output_index;
-            let time = row.time.clone();
-            let output = Some(
-                Output::proto_deserialize(row.output)?
-            );
-            let entry = UtxoEntry {
-                transaction_hash: Some(Hash::new(transaction_hash)),
-                output_index,
-                address: Some(Address::new_raw(address)),
-                output,
-                time,
-            };
-            res.push(entry)
-        }
-        Ok(res)
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?
+            .iter().map(|row| UtxoEntry::proto_deserialize_ref(&row.raw)).collect()
     }
 
     pub async fn utxo_all_debug(
@@ -650,13 +630,15 @@ impl TransactionStore {
         utxo_entry: &UtxoEntry
     ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
-        let hash = utxo_entry.transaction_hash.safe_bytes()?;
-        let output_index = utxo_entry.output_index;
+        let id = utxo_entry.utxo_id.safe_get_msg("missing utxo id")?;
+        let hash = id.transaction_hash.safe_bytes()?;
+        let output_index = id.output_index;
         let output = utxo_entry.output.safe_get_msg("UTxo entry insert missing output")?;
         let amount = output.opt_amount().clone();
         let output_ser = output.proto_serialize();
         let raw = utxo_entry.proto_serialize();
-        let address = utxo_entry.address.safe_bytes()?;
+        let addr = utxo_entry.address()?;
+        let address = addr.address.safe_bytes()?;
 
         let has_code = output.validate_deploy_code().is_ok();
         let rows = sqlx::query!(

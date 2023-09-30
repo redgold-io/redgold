@@ -189,11 +189,9 @@ pub struct DetailedPeerNode {
     pub next_upgrade_time: Option<i64>,
     pub utxo_distance: f64,
     pub port_offset: i64,
-    pub alias: String,
-    pub name: String,
+    pub node_name: String,
     pub peer_id: String,
     pub nat_restricted: bool,
-    pub network_environment: String,
 }
 
 
@@ -216,9 +214,10 @@ pub struct RecentDashboardResponse {
 }
 
 pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
+    let id = u.utxo_id.safe_get_msg("missing utxo id")?;
     Ok(BriefUtxoEntry {
-        transaction_hash: u.transaction_hash.safe_get_msg("Missing transaction hash")?.hex(),
-        output_index: u.output_index.clone(),
+        transaction_hash: id.transaction_hash.safe_get_msg("Missing transaction hash")?.hex(),
+        output_index: id.output_index.clone(),
         amount: rounded_balance(u.amount()),
         time: u.time.clone(),
     })
@@ -357,7 +356,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<Detailed
     let nmd = p.latest_node_transaction.safe_get_msg("Missing latest node transaction")?.node_metadata()?;
     let vi = nmd.version_info.clone().safe_get_msg("Missing version info")?.clone();
     Ok(DetailedPeerNode{
-        external_address: nmd.external_address.clone(),
+        external_address: nmd.external_address()?,
         public_key: nmd.public_key.safe_get_msg("Missing public key")?.hex()?,
         node_type:  format!("{:?}", NodeType::from_i32(nmd.node_type.unwrap_or(0)).unwrap_or(NodeType::Static)),
         executable_checksum: vi.executable_checksum.clone(),
@@ -368,16 +367,13 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<Detailed
             .and_then(|p| p.utxo)
             .map(|d| (d as f64) / 1000 as f64) // TODO: use a function for this
             .unwrap_or(1.0),
-        port_offset: nmd.port_offset.unwrap_or(0),
-        alias: nmd.alias.unwrap_or("".to_string()),
-        name: nmd.name.unwrap_or("".to_string()),
+        port_offset: nmd.port_or(_r.node_config.network) as i64,
+        node_name: nmd.node_name.unwrap_or("".to_string()),
         peer_id: nmd.peer_id.as_ref()
             .and_then(|p| p.peer_id.safe_get().ok())
             .and_then(|p| p.bytes.safe_bytes().ok())
             .map(|p| hex::encode(p)).unwrap_or("".to_string()),
-        nat_restricted: nmd.nat_restricted.unwrap_or(false),
-        network_environment:
-        format!("{:?}", NetworkEnvironment::from_i32(nmd.network_environment.clone()).unwrap_or(_r.node_config.network.clone())),
+        nat_restricted: nmd.transport_info.as_ref().and_then(|t| t.nat_restricted).unwrap_or(false),
     })
 }
 
@@ -463,7 +459,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                             State::Pending => {
                                 ns.signed_pending_time = Some(observation_timestamp);
                             }
-                            State::Finalized => {
+                            State::Accepted => {
                                 ns.signed_finalized_time = Some(observation_timestamp);
                             }
                             _ => {}
@@ -527,7 +523,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
         let counts = submit_response.count_unique_by_state()?;
 
         let num_pending_signers = counts.get(&(State::Pending as i32)).unwrap_or(&0).clone() as i64;
-        let num_accepted_signers = counts.get(&(State::Finalized as i32)).unwrap_or(&0).clone() as i64;
+        let num_accepted_signers = counts.get(&(State::Accepted as i32)).unwrap_or(&0).clone() as i64;
         let detailed = DetailedTransaction{
             info: brief_transaction(tx)?,
             confirmation_score: 1.0,

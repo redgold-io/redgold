@@ -349,21 +349,20 @@ pub async fn derive_mnemonic_and_peer_id(
 pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
     deploy: &mut Deploy, node_config: &NodeConfig, fun: Box<F>) -> RgResult<()> {
 
-    let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
-    if primary_gen {
-        // Also set environment here to dev if not main
-        deploy.skip_ops = true;
-    }
+    // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
+    // if primary_gen {
+    //     // Also set environment here to dev if not main
+    //     deploy.skip_ops = true;
+    // }
     let mut net = node_config.network;
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
     } else {
         if node_config.opts.network.is_none() {
-            if primary_gen {
+            if node_config.opts.development_mode {
                 net = NetworkEnvironment::Dev;
             } else {
-                // TODO Enable this when mainnet
-                // net = NetworkEnvironment::Main;
+                net = NetworkEnvironment::Main;
             }
         }
         // Get node_config arg translate and set to dev if arg not supplied.
@@ -404,9 +403,9 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
     // let mut gen = true;
     let purge = deploy.purge;
     let mut gen = deploy.genesis;
-    if primary_gen {
-        gen = true;
-    }
+    // if primary_gen {
+    //     gen = true;
+    // }
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
 
@@ -469,7 +468,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
                 words_opt,
                 peer_id_hex_opt,
                 !deploy.debug_skip_start,
-                ss.alias.clone(),
+                ss.node_name.clone(),
                 peer_tx_opt.map(|p| p.json_or()),
                 &fun
             ).await.expect("worx");

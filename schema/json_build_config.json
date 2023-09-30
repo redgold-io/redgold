@@ -8,6 +8,7 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "structs.TransportInfo",
         "structs.IdentityMetadata",
         "structs.AncestorMerkleRoot",
         "structs.AbridgedNodeMetadata",
@@ -130,6 +131,7 @@
       "description": "serde support for enum",
       "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString)]",
       "paths": [
+        "structs.PowProofType",
         "structs.InputType",
         "structs.ValidationLiveness",
         "structs.TransactionState",
@@ -155,13 +157,7 @@
       "description": "hex bytes",
       "attr": "#[serde_as(as = \"serde_with::hex::Hex\")]",
       "paths": [
-        "structs.PoWProof.proof",
-        "structs.AddPeerFull.id",
-        "structs.AddPeerFull.public_key",
-        "structs.BytesData.value",
-        "structs.Tombstone.hash",
-        "structs.AddressBlock.hash",
-        "structs.AddressBlock.address"
+        "structs.BytesData.value"
       ]
     },
     {

@@ -1,3 +1,4 @@
+
 use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, RgResult, SafeOption};
@@ -100,24 +101,15 @@ impl Output {
         self.data.as_ref().and_then(|c| c.peer_data.as_ref()).is_some()
     }
 
-    pub fn to_utxo_entry(
-        &self,
-        transaction_hash: &Vec<u8>,
-        output_index: u32,
-        time: u64,
-    ) -> UtxoEntry {
-        return UtxoEntry::from_output(self, transaction_hash, output_index as i64, time as i64);
-    }
-
     pub fn utxo_entry(
         &self,
         transaction_hash: &Hash,
-        output_index: u32,
-        time: u64,
+        output_index: i64,
+        time: i64,
     ) -> UtxoEntry {
-        return UtxoEntry::from_output(
-            self, &transaction_hash.vec(),
-            output_index as i64, time as i64
+        return UtxoEntry::from_output_new(
+            self, &transaction_hash,
+            output_index, time
         );
     }
 

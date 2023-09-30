@@ -27,13 +27,22 @@
 
 use crate::structs::{Address, UtxoId, Hash, Input, Output, CurrencyAmount, UtxoEntry};
 use crate::utxo_id::OldUtxoId;
-use crate::{RgResult, SafeBytesAccess, SafeOption, Transaction, WithMetadataHashable};
+use crate::{error_info, RgResult, SafeBytesAccess, SafeOption, Transaction, WithMetadataHashable};
 
 impl UtxoEntry {
-    pub fn to_utxo_id(&self) -> OldUtxoId {
+
+    pub fn address(&self) -> RgResult<&Address> {
+        let o = self.output.safe_get_msg("Missing address from utxo entry")?;
+        o.address.safe_get_msg("Missing address from utxo entry")
+    }
+    pub fn utxo_id(&self) -> RgResult<&UtxoId> {
+        self.utxo_id.safe_get_msg("Missing id from utxo entry")
+    }
+    pub fn to_old_utxo_id(&self) -> OldUtxoId {
+        let id = self.utxo_id.clone().expect("");
         OldUtxoId {
-            transaction_hash: self.transaction_hash.safe_bytes().expect(""),
-            output_index: self.output_index,
+            transaction_hash: id.transaction_hash.safe_bytes().expect(""),
+            output_index: id.output_index,
         }
     }
 
@@ -82,13 +91,8 @@ impl UtxoEntry {
     // }
     //
     pub fn to_input(&self) -> Input {
-        // let (id, idx) = self.to_values();
-        let utxo_id = UtxoId{
-            transaction_hash: self.transaction_hash.clone(),
-            output_index: self.output_index,
-        };
         let mut input = Input::default();
-        input.utxo_id =  Some(utxo_id);
+        input.utxo_id =  self.utxo_id.clone();
         input.output = self.output.clone();
         input
     }
@@ -109,16 +113,14 @@ impl UtxoEntry {
     //     return bytes;
     // }
 
-    pub fn from_output(
+    pub fn from_output_new(
         output: &Output,
-        transaction_hash: &Vec<u8>,
+        transaction_hash: &Hash,
         output_index: i64,
         time: i64,
     ) -> UtxoEntry {
         return UtxoEntry {
-            transaction_hash: Some(Hash::new(transaction_hash.clone())).clone(),
-            output_index,
-            address: Some(Address::new_raw(output.address.safe_bytes().expect("bytes"))),
+            utxo_id: Some(UtxoId::new(transaction_hash, output_index)),
             output: Some(output.clone()),
             time,
         };
@@ -129,7 +131,7 @@ impl UtxoEntry {
             .outputs
             .iter()
             .enumerate()
-            .map(|(i, output)| Self::from_output(output, &transaction.hash_vec(), i as i64, time))
+            .map(|(i, output)| Self::from_output_new(output, &transaction.hash_or(), i as i64, time))
             .collect();
         return map;
     }

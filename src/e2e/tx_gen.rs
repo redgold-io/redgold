@@ -1,3 +1,4 @@
+use log::info;
 use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
@@ -8,6 +9,7 @@ use redgold_schema::structs::{Address, AddressType, ErrorInfo, UtxoId, TestContr
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
+use redgold_schema::EasyJson;
 
 #[derive(Clone)]
 pub struct SpendableUTXO {
@@ -212,7 +214,7 @@ impl TransactionGenerator {
         let vec = tx.transaction.to_utxo_entries(0 as u64);
         let iter = vec.iter().filter(|v| {
             v.opt_amount().map(|a| a.amount > (MIN_FEE_RAW)).unwrap_or(false)
-                && !(v.address.clone().expect("a").address_type == AddressType::ScriptHash as i32)
+                && !(v.address().expect("a").address_type == AddressType::ScriptHash as i32)
         });
         for (i, v) in iter.enumerate() {
             self.finished_pool.push(SpendableUTXO {

@@ -166,7 +166,7 @@ impl TransactionSubmitter {
         let tx = submit_r.transaction.as_ref().expect("tx");
         let vec = tx.to_utxo_entries(0);
         let vec1 = vec.iter().filter(|u|
-            u.address == Some(a.clone())).collect_vec();
+            u.address().ok() == Some(&a)).collect_vec();
         let matching_entries = vec1.get(0);
         let utxos = matching_entries.expect("utxo").clone().clone();
 

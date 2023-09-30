@@ -36,6 +36,7 @@ pub struct ServersState {
     purge: bool,
     server_index_edit: String,
     skip_start: bool,
+    genesis: bool,
     ops: bool,
     purge_ops: bool,
     deployment_result: Option<String>
@@ -204,6 +205,7 @@ impl LocalState {
                 purge: false,
                 server_index_edit: "".to_string(),
                 skip_start: false,
+                genesis: node_config.opts.development_mode,
                 ops: false,
                 purge_ops: false,
                 deployment_result: None,
@@ -417,6 +419,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.checkbox(&mut local_state.server_state.ops, "ops");
         ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
         ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
+        if local_state.node_config.opts.development_mode {
+            ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
+        }
         ui.label("Single Server Index:");
         TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
     });
@@ -430,6 +435,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         d.debug_skip_start = local_state.server_state.skip_start;
         d.purge = local_state.server_state.purge;
         d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
+        d.genesis = local_state.server_state.genesis;
         let config = local_state.node_config.clone();
         let mut arc = local_state.server_state.deployment_result_info_box.clone();
         let fun = Box::new(move |s: String| {

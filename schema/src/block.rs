@@ -6,7 +6,9 @@ use crate::{ProtoHashable, WithMetadataHashableFields};
 impl HashClear for Block {
     fn hash_clear(&mut self) {
         self.transactions.clear();
-        self.hash = None;
+        if let Some(sm) = self.struct_metadata.as_mut() {
+            sm.hash_clear()
+        }
     }
 }
 
@@ -21,40 +23,6 @@ impl WithMetadataHashableFields for Block {
 }
 
 impl Block {
-    // Change this to something off of prost message
-    // pub fn proto_serialize(&self) -> Vec<u8> {
-    //     return self.encode_to_vec();
-    // }
-    //
-    // pub fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
-    //     // TODO: Automap this error with a generic _.to_string() trait implicit?
-    //     return Block::decode(&*bytes)
-    //         .map_err(|e| error_message(Error::ProtoDecoderFailure, e.to_string()));
-    // }
-    //
-    // pub fn hash_clear(&mut self) {
-    //     self.transactions.clear();
-    //     self.hash = None;
-    // }
-
-    pub fn with_hash(&mut self) -> &mut Block {
-        let hash = self.calculate_hash();
-        self.hash = Some(hash);
-        self
-    }
-    //
-    // pub fn calculate_hash(&self) -> Hash {
-    //     let mut clone = self.clone();
-    //     clone.hash_clear();
-    //     let input = clone.proto_serialize();
-    //     let multihash = constants::HASHER.digest(&input);
-    //     return multihash.into();
-    // }
-
-    // TODO: Move to trait
-    pub fn hash_hex(&self) -> String {
-        return hex::encode(self.calculate_hash().bytes.expect("Bytes").value);
-    }
 
     pub fn time(&self) -> Result<i64, ErrorInfo> {
         Ok(self
@@ -64,15 +32,6 @@ impl Block {
             .safe_get()?
             .clone()
         )
-    }
-
-    pub fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self
-            .hash
-            .as_ref()
-            .ok_or(error_message(Error::MissingField, "hash"))?
-            .bytes
-            .safe_bytes()?)
     }
 
     // pub fn from(transactions: Vec<Transaction>, last_time: i64, ) {

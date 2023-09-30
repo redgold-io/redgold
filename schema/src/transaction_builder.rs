@@ -221,7 +221,7 @@ impl TransactionBuilder {
         // let pd = o.data.expect("d").peer_data.expect("").peer_id.expect("").peer_id.expect("pk");
         o.utxo_entry(
             &self.transaction.hash_or(), 0,
-            self.transaction.time().expect("").clone() as u64
+            self.transaction.time().expect("").clone()
         );
         self
     }

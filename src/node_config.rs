@@ -12,7 +12,7 @@ use log::info;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::servers::Server;
 use redgold_schema::{RgResult, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, Seed, TrustData, VersionInfo};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, Seed, TransportInfo, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
@@ -266,21 +266,19 @@ impl NodeConfig {
         let pair = self.words().default_kp().expect("words");
         let _pk_vec = pair.public_key_vec();
         NodeMetadata{
-            external_address: self.external_ip.clone(),
+            transport_info: Some(TransportInfo{
+                external_ipv4: Some(self.external_ip.clone()),
+                external_ipv6: None,
+                external_host: Some(self.external_host.clone()),
+                port_offset: Some(self.port_offset as i64),
+                nat_restricted: None,
+            }),
             public_key: Some(self.public_key()),
             node_type: Some(NodeType::Static as i32),
             version_info: Some(self.version_info()),
             partition_info: None,
-            port_offset: Some(self.port_offset as i64),
-            alias: None,
-            name: None,
             peer_id: Some(self.peer_id.clone()),
-            nat_restricted: None,
-            // network_environment: self.network as i32,
-            network_environment: self.network.clone() as i32,
-            external_ipv4: None,
-            external_ipv6: None,
-            external_host: None
+            node_name: None,
         }
     }
 
@@ -310,7 +308,7 @@ impl NodeConfig {
             udp_port: None,
             proof: None,
             peer_id: None,
-            height: 0,
+            sequence: 0,
         }
     }
 

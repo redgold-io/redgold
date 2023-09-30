@@ -172,7 +172,7 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
     let h = tx.height().ok().or(d.height).safe_get_msg("Missing height")?.clone();
     tb.with_unsigned_input(utxo.clone()).expect("");
     tb.with_output_peer_data(
-        &utxo.address.expect(""),
+        &utxo.address().expect(""),
         peer_data,
         h + 1
     );
