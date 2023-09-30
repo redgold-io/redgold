@@ -10,8 +10,9 @@
       </thead>
       <tbody>
       <tr v-for="(d, index) in data" :key="index">
-        <td><HashLink :data="d.public_key" /></td>
         <td><HashLink :data="d.hash" /></td>
+        <td><HashLink :data="d.peer_id" /></td>
+        <td><HashLink :data="d.public_key" /></td>
         <td> {{d.observations.length}} </td>
         <td> {{d.height}} </td>
         <td><HashLink :data="d.parent_hash" /></td>
@@ -47,8 +48,9 @@ export default {
   data() {
     return {
       fields: [
-        {key: 'public_key'},
         {key: 'observation_hash'},
+        {key: 'peer_id'},
+        {key: 'public_key'},
         {key: 'count'},
         {key: 'height'},
         {key: 'parent_hash'},

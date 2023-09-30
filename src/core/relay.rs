@@ -190,6 +190,13 @@ impl Relay {
             .and_then(|p| hm.get(&p).cloned()))
     }
 
+    pub async fn peer_id_for_node_pk(&self, public_key: &PublicKey) -> RgResult<Option<PeerId>> {
+        if &self.node_config.public_key == public_key {
+            return Ok(Some(self.peer_id().await?))
+        }
+        self.ds.peer_store.peer_id_for_node_pk(public_key).await
+    }
+
     pub async fn get_trust_of_node_as_query(&self, public_key: &PublicKey) -> RgResult<Option<PeerTrustQueryResult>> {
         let hm = self.get_trust().await?;
         let pid = self.ds.peer_store.peer_id_for_node_pk(public_key).await?;

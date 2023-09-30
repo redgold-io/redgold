@@ -14,17 +14,18 @@
           <div><strong>Peer Id</strong></div>
           <div><HashLink :data="hashDataInitial.peer_id" :shorten="false" /></div>
 
-          <div><strong>Public Key</strong></div>
-          <div class="hash-container">
-            {{ hashDataInitial.public_key }}
-            <div><CopyClipboard :data="hashDataInitial.public_key" /></div>
-          </div>
+<!--          <div><strong>Public Key</strong></div>-->
+<!--          <div class="hash-container">-->
+<!--            {{ hashDataInitial.public_key }}-->
+<!--            <div><CopyClipboard :data="hashDataInitial.public_key" /></div>-->
+<!--          </div>-->
 
-          <div><strong>Signature</strong></div>
-          <div class="signature">{{hashDataInitial.signature}}</div>
+<!--          <div><strong>Signature</strong></div>-->
+<!--          <div class="signature">{{hashDataInitial.signature}}</div>-->
 
           <div><strong>Nodes</strong></div>
           <div><PeerNodeInfo :hashDataInitial="hashDataInitial.nodes" /></div>
+
 
         </div>
       </div>
@@ -35,12 +36,14 @@
 </template>
 <script>
 import HashLink from "@/components/util/HashLink.vue";
-import CopyClipboard from "@/components/util/CopyClipboard.vue";
+// import CopyClipboard from "@/components/util/CopyClipboard.vue";
 import PeerNodeInfo from "@/components/hash_types/PeerNodeInfo.vue";
+// import BriefObservation from "@/components/BriefObservation.vue";
 export default {
   name: "PeerInfo",
   components: {
-    CopyClipboard,
+    // BriefObservation,
+    // CopyClipboard,
     HashLink,
     PeerNodeInfo
   },

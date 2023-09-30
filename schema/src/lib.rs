@@ -850,6 +850,10 @@ impl PeerId {
         }
     }
 
+    pub fn hex_or(&self) -> String {
+        self.peer_id.as_ref().map(|x| x.hex_or()).unwrap_or("missing peer id".to_string())
+    }
+
 
 }
 

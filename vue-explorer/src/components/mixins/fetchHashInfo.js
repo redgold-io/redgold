@@ -5,7 +5,7 @@ export default {
             let port = "16186"
             const hostname = window.location.hostname;
 
-            if (hostname.includes('dev')) {
+            if (hostname.includes('dev') || hostname.includes('localhost')) {
                 port = "16486";
             } else if (hostname.includes('staging')) {
                 port = "16386";
@@ -14,6 +14,7 @@ export default {
             } else { // default main
                 port = "16186"
             }
+
             url += ":" + port
             return url
         },

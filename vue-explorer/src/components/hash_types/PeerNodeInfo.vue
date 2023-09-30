@@ -15,10 +15,9 @@
           <td> {{peerNode.port_offset}} </td>
           <td> {{shortenExeChecksum(peerNode.executable_checksum)}} </td>
           <td> {{peerNode.utxo_distance}} </td>
-          <td> {{peerNode.alias}} </td>
-          <td> {{peerNode.name}} </td>
+          <td> {{peerNode.node_name}} </td>
           <td><HashLink :data="peerNode.peer_id" /></td>
-          <td> {{peerNode.network_environment}} </td>
+<!--          <td> {{peerNode.network_environment}} </td>-->
         </tr>
         </tbody>
       </table>
@@ -53,10 +52,9 @@ export default {
         {key: 'port_offset'},
         {key: 'executable_checksum'},
         {key: 'utxo_distance'},
-        {key: 'alias'},
-        {key: 'name'},
+        {key: 'node_name'},
         {key: 'peer_id'},
-        {key: 'network_environment'},
+        // {key: 'network_environment'},
       ],
     };
   }

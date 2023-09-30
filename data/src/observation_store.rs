@@ -48,6 +48,16 @@ impl ObservationStore {
         Ok(option)
     }
 
+    pub async fn get_pk_observations(&self, node_pk: &PublicKey, limit: i64) -> Result<Vec<Transaction>, ErrorInfo> {
+        let bytes = node_pk.bytes()?;
+        DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM observation WHERE public_key = ?1 ORDER BY height DESC LIMIT ?2"#,
+            bytes,
+            limit
+        ).fetch_all(&mut *self.ctx.pool().await?).await)?
+            .iter().map(|o| Transaction::proto_deserialize_ref(&o.raw)).collect()
+    }
+
     pub async fn insert_observation(
         &self,
         observation_tx: &Transaction,

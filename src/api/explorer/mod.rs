@@ -8,7 +8,7 @@ use std::hash::Hash;
 use eframe::egui::accesskit::Role::Math;
 use itertools::Itertools;
 use rocket::form::FromForm;
-use redgold_schema::{ProtoSerde, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use redgold_schema::{EasyJson, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
 use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Serialize, Deserialize};
@@ -135,7 +135,7 @@ pub struct BriefUtxoEntry {
 
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DetailedObservationMetadata {
     pub observed_hash: String,
     pub observed_hash_type: String,
@@ -146,7 +146,7 @@ pub struct DetailedObservationMetadata {
     pub metadata_hash: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DetailedObservation {
     pub merkle_root: String,
     pub observations: Vec<DetailedObservationMetadata>,
@@ -157,7 +157,8 @@ pub struct DetailedObservation {
     pub signable_hash: String,
     pub salt: i64,
     pub height: i64,
-    pub parent_hash: String
+    pub parent_hash: String,
+    pub peer_id: String
 }
 
 
@@ -172,10 +173,8 @@ pub struct DetailedTrust {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DetailedPeer {
     pub peer_id: String,
-    pub public_key: String,
-    pub signature: String,
     pub nodes: Vec<DetailedPeerNode>,
-    pub trust: Vec<DetailedTrust>
+    pub trust: Vec<DetailedTrust>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -192,6 +191,7 @@ pub struct DetailedPeerNode {
     pub node_name: String,
     pub peer_id: String,
     pub nat_restricted: bool,
+    pub recent_observations: Vec<DetailedObservation>
 }
 
 
@@ -304,12 +304,13 @@ pub async fn handle_observation(otx: &Transaction, _r: &Relay) -> RgResult<Detai
 
     let o = otx.observation()?;
 
+    let pbs_pk = otx.observation_public_key()?;
     Ok(DetailedObservation {
         merkle_root: o.merkle_root.safe_get()?.hex(),
         observations: o.observations.iter()
             .map(|om| convert_observation_metadata(om))
             .collect::<RgResult<Vec<DetailedObservationMetadata>>>()?,
-        public_key: otx.observation_public_key()?.hex_or(),
+        public_key: pbs_pk.hex_or(),
         signature: otx.observation_proof()?.signature_hex()?,
         time: otx.time()?.clone(),
         hash: otx.hash_or().hex(),
@@ -317,6 +318,8 @@ pub async fn handle_observation(otx: &Transaction, _r: &Relay) -> RgResult<Detai
         salt: otx.salt()?,
         height: otx.height()?,
         parent_hash: o.parent_id.as_ref().and_then(|h| h.transaction_hash.as_ref().map(|h| h.hex())).unwrap_or("".to_string()),
+        peer_id: _r.peer_id_for_node_pk(pbs_pk).await.ok().flatten()
+            .map(|p| p.hex_or()).unwrap_or("".to_string()),
     })
 }
 
@@ -342,22 +345,26 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
     Ok(DetailedPeer {
         peer_id: hex::encode(pd.peer_id.safe_get_msg("Missing peer id")?.peer_id
             .safe_get_msg("Missing peer id public key info")?.bytes.safe_bytes()?),
-        // TODO: From transaction, should include address and latest input pk?
-        // or do the merkle proofs contain this?
-        public_key: "".to_string(), //pd.proof.safe_get()?.public_key.safe_get()?.hex_or(),
-        signature: "".to_string(), // hex::encode(pd.proof.safe_get()?.signature.safe_get()?.bytes.safe_bytes()?),
         nodes,
         trust: pd.labels.iter().map(|l| convert_trust(l))
-            .collect::<RgResult<Vec<DetailedTrust>>>()?,
+            .collect::<RgResult<Vec<DetailedTrust>>>()?
     })
 }
 
 pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<DetailedPeerNode> {
     let nmd = p.latest_node_transaction.safe_get_msg("Missing latest node transaction")?.node_metadata()?;
     let vi = nmd.version_info.clone().safe_get_msg("Missing version info")?.clone();
+    let pk = nmd.public_key.safe_get_msg("Missing public key")?;
+    let mut obs = vec![];
+
+    for o in _r.ds.observation.get_pk_observations(pk, 10).await? {
+        let oo = handle_observation(&o, _r).await?;
+        obs.push(oo);
+    }
+
     Ok(DetailedPeerNode{
         external_address: nmd.external_address()?,
-        public_key: nmd.public_key.safe_get_msg("Missing public key")?.hex()?,
+        public_key: pk.hex()?,
         node_type:  format!("{:?}", NodeType::from_i32(nmd.node_type.unwrap_or(0)).unwrap_or(NodeType::Static)),
         executable_checksum: vi.executable_checksum.clone(),
         commit_hash: vi.commit_hash.unwrap_or("".to_string()),
@@ -374,6 +381,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<Detailed
             .and_then(|p| p.bytes.safe_bytes().ok())
             .map(|p| hex::encode(p)).unwrap_or("".to_string()),
         nat_restricted: nmd.transport_info.as_ref().and_then(|t| t.nat_restricted).unwrap_or(false),
+        recent_observations: obs,
     })
 }
 
