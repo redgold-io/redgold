@@ -8,7 +8,7 @@ use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{InputSupport, TransactionBuilderSupport};
 use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, CurrencyAmount, UtxoEntry, Input};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, Hash, Output, Proof, Signature, Transaction, CurrencyAmount, UtxoEntry, Input, UtxoId};
 use redgold_schema::transaction::amount_data;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::HDPathCursor;
@@ -327,10 +327,9 @@ async fn debug_sign_tx () {
     let pk = default_pubkey().expect("pk");
     let address = pk.address().expect("a");
     let _addr = address.clone().address.safe_bytes().expect("");
+    let hash = Hash::from_string_calculate("test");
     let utxo = UtxoEntry{
-        transaction_hash: Some(Hash::from_string_calculate("test")),
-        output_index: 0,
-        address: Some(address.clone()),
+        utxo_id: Some(UtxoId::new(&hash, 0)),
         output: Some(Output::new(&address, 100)),
         time: 0,
     };

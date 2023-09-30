@@ -1,3 +1,4 @@
+use log::info;
 use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
@@ -8,6 +9,7 @@ use redgold_schema::structs::{Address, AddressType, ErrorInfo, UtxoId, TestContr
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
+use redgold_schema::EasyJson;
 
 #[derive(Clone)]
 pub struct SpendableUTXO {

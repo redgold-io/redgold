@@ -267,8 +267,7 @@ impl Node {
             let kp = node_config.words().keypair_at_change(i).expect("works");
             let address = kp.address_typed();
             let o = outputs.iter().find(|o| {
-                let address = o.address().as_ref().expect("a").clone().clone();
-                address == address
+                address == o.address().as_ref().expect("a").clone().clone()
             }).expect("found");
             let s = SpendableUTXO {
                 utxo_entry: o.clone(),
