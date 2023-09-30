@@ -23,7 +23,7 @@ use crypto::sha2::Sha256;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
+use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::seeds::{get_seeds, get_seeds_by_env};
 use redgold_schema::servers::Server;
@@ -64,10 +64,12 @@ impl ArgTranslate {
         // runtime: Arc<Runtime>,
         opts: &RgArgs, node_config: &NodeConfig) -> Self {
         let args = std::env::args().collect_vec();
+        let mut config = node_config.clone();
+        config.opts = opts.clone();
         ArgTranslate {
             // runtime,
             opts: opts.clone(),
-            node_config: node_config.clone(),
+            node_config: config,
             args,
             abort: false
         }
@@ -598,13 +600,14 @@ There's internal libraries for getting the current exe path and calculating chec
 seem to produce a different result than the shell script.
 */
 fn calc_sha_sum(path: String) -> RgResult<String> {
-    util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path]).map(|x| x.0)
-    // util::cmd::run_cmd("shasum", vec!["-a", "256", &*path])
-    //     .0
-    //     .split_whitespace()
-    //     .next()
-    //     .expect("first output")
-    //     .to_string()
+    util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
+        .and_then(|x|
+            x.0
+             .split_whitespace()
+             .next()
+                .ok_or(error_info("No output from shasum"))
+                .map(|x| x.to_string())
+        )
 }
 
 // #[tokio::test]

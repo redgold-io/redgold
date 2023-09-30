@@ -88,6 +88,7 @@ pub struct LocalState {
     pub wallet_state: WalletState,
     pub identity_state: IdentityState,
     pub settings_state: SettingsState,
+    pub address_state: AddressState,
     pub ds_env: DataStore,
     pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
@@ -217,6 +218,7 @@ impl LocalState {
             wallet_state: WalletState::new(hot_mnemonic),
             identity_state: IdentityState::new(),
             settings_state: SettingsState::new(local_stored_state.json_or()),
+            address_state: Default::default(),
             ds_env,
             ds_env_secure,
             local_stored_state,
@@ -319,6 +321,7 @@ use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub};
 use crate::gui::common::{bounded_text_area, bounded_text_area_size_focus, editable_text_input_copy, valid_label};
+use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
@@ -584,6 +587,9 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             }
             Tab::Identity => {
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
+            }
+            Tab::Address => {
+                crate::gui::tabs::address_tab::address_tab(ui, ctx, local_state);
             }
 
             _ => {}

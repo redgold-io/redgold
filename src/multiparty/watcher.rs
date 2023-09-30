@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use log::{error, info};
 
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, ExternalCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -422,7 +422,7 @@ impl Watcher {
                 // and we're generating a bitcoin transaction from that, then its outgoing
                 // To an external network
                 true,
-                ExternalCurrency::Bitcoin,
+                SupportedCurrency::Bitcoin,
                 source_address,
                 &dest,
                 t.time()?.clone(),

@@ -149,7 +149,8 @@
         "structs.HashFormatType",
         "structs.ExecutorBackend",
         "structs.OutputType",
-        "structs.AddressType"
+        "structs.AddressType",
+        "structs.SupportedCurrency"
       ]
     },
     {
