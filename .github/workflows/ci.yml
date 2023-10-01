@@ -55,6 +55,36 @@ jobs:
 #      - run: cargo build --release
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: ./bin/local_test.sh
+  build-vue:
+    runs-on: self-hosted
+    if: contains('
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref)
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build Explorer
+        run: |
+          cd vue-explorer;
+          npm install
+          npm run build;
+
+      - name: Build Docs
+        run: |
+          cd docs;
+          npm install
+          npm run generate
+
+      - name: Upload Explorer Distribution to S3
+        run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
+
+      - name: Upload Docs Distribution to S3
+        run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
+
   build-linux:
 #    needs: [test]
     if:
@@ -253,7 +283,7 @@ jobs:
           path: ./redgold_mac
 
   release:
-    needs: [build-linux, build-mac, build-linux-ubuntu-20, build-windows]
+    needs: [build-linux, build-mac, build-linux-ubuntu-20, build-windows, build-vue]
     if:
         contains('
           refs/heads/predev
@@ -422,26 +452,6 @@ jobs:
           aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac
           aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold.exe
 #      - run: cd .; echo 'Intended upload path: s3://${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}'
-      - run: cd vue-explorer; npm install && npm run build
-      - run: cd docs; npm install && npm run generate
-
-      - name: Upload Explorer Distribution to S3
-        if: contains('
-          refs/heads/dev
-          refs/heads/staging
-          refs/heads/test
-          refs/heads/main
-          ', github.ref)
-        run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
-
-      - name: Upload Docs Distribution to S3
-        if: contains('
-          refs/heads/dev
-          refs/heads/staging
-          refs/heads/test
-          refs/heads/main
-          ', github.ref)
-        run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
 
 
 # TODO: Need tags associated with staging versions for changelog.
