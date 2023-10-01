@@ -79,6 +79,11 @@ jobs:
           npm install
           npm run generate
 
+      - name: Configure AWS Keys
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET }}
+
       - name: Upload Explorer Distribution to S3
         run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
 
