@@ -67,6 +67,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - run: echo "Github branch = ${{ env.BRANCH }}"
+
       - name: Build Explorer
         run: |
           cd vue-explorer;
