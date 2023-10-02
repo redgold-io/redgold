@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use itertools::Itertools;
 use serde::__private::de::Borrowed;
+use uuid::Uuid;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::RequestSupport;
@@ -112,6 +113,9 @@ impl RgHttpClient {
         if let Some(relay) = nc.or(self.relay.as_ref()) {
             r.with_metadata(relay.node_metadata().await?);
             r.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
+        }
+        if r.trace_id.is_none() {
+            r.trace_id = Some(Uuid::new_v4().to_string());
         }
         let result = self.proto_post(r, "request_proto".to_string()).await?;
         result.as_error_info()?;
