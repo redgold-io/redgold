@@ -241,6 +241,10 @@ pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorIn
         Ok::<(), ErrorInfo>(())
     });
 
+    if std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok() {
+        deploy.genesis = true;
+    }
+
     default_deploy(&mut deploy, _config, default_fun).await?;
 
     Ok(())
