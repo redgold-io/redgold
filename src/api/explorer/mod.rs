@@ -430,7 +430,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                     let _ = if let Some((_peer_id, _existing)) = public_to_peer.get_mut(pk) {
                         // existing
                     } else {
-                        let pid = r.ds.peer_store.peer_id_for_node_pk(pk).await.ok().and_then(identity);
+                        let pid = r.peer_id_for_node_pk(pk).await.ok().and_then(identity);
                         let query_result = r.get_trust_of_node_as_query(pk).await?.clone();
                         let q = query_result.or(pid.map(|p| PeerTrustQueryResult{ peer_id: p, trust: 1.0 }));
 
