@@ -61,10 +61,12 @@ pub fn register_metric_names() {
     register_counter!("redgold.e2e.success");
     register_counter!("redgold.peer.message.received");
     increment_counter!("redgold.peer.rest.send.error");
-    increment_counter!("redgold.peer.rest.send");
-    increment_counter!("redgold.peer.send");
-    increment_counter!("redgold.peer.discovery.recv_for_each");
-    increment_counter!("redgold.peer.rest.send.timeout");
+    register_counter!("redgold.peer.rest.send");
+    register_counter!("redgold.peer.send");
+    register_counter!("redgold.peer.discovery.recv_for_each");
+    register_counter!("redgold.peer.rest.send.timeout");
+
+    register_counter!("redgold.recent_download.resolve_input_error");
 
     // register_gauge!("redgold.libp2p.active_connections");
     // register_counter!("redgold.libp2p.total_established_connections");

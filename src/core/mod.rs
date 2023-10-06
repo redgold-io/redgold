@@ -19,3 +19,5 @@ pub mod stream_handlers;
 pub mod mempool;
 pub mod resolve;
 pub mod contract;
+pub mod recent_download;
+pub mod data_discovery;

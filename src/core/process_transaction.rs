@@ -692,7 +692,7 @@ impl TransactionProcessContext {
                 .ds
                 .transaction_store
                 .insert_transaction(
-                    &transaction, util::current_time_millis_i64(), true, None
+                    &transaction, util::current_time_millis_i64(), true, None, true
                 ).await?;
 
         for fixed in transaction.fixed_utxo_ids_of_inputs()? {

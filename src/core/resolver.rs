@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use redgold_schema::structs::{ErrorInfo, Hash, Input, ObservationProof, Output, PublicKey, Request, ResolveHashRequest, Response, Transaction};
+use redgold_schema::structs::{ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, Request, ResolveHashRequest, Response, Transaction};
 use crate::core::relay::Relay;
 
 use async_trait::async_trait;
@@ -11,10 +11,13 @@ use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
-use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, SafeOption, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, RgResult, SafeOption, WithMetadataHashable};
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
 use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::EasyJson;
+use redgold_schema::errors::EnhanceErrorInfo;
+use crate::core::internal_message::SendErrorInfo;
+
 #[async_trait]
 trait SingleResolver {
     async fn resolve(
@@ -29,14 +32,15 @@ trait SingleResolver {
 //
 // }
 
+#[derive(Clone)]
 pub struct ResolvedInput {
-    input: Input,
-    parent_transaction: Transaction,
-    internal_accepted: bool,
-    internal_valid_index: bool,
-    observation_proofs: HashSet<ObservationProof>,
-    peer_valid_index: HashSet<PublicKey>,
-    peer_invalid_index: HashSet<PublicKey>,
+    pub input: Input,
+    pub parent_transaction: Transaction,
+    pub internal_accepted: bool,
+    pub internal_valid_index: bool,
+    pub observation_proofs: HashSet<ObservationProof>,
+    pub peer_valid_index: HashSet<PublicKey>,
+    pub peer_invalid_index: HashSet<PublicKey>,
     pub signable_hash: Hash,
 }
 
@@ -65,7 +69,83 @@ impl ResolvedInput {
     }
 }
 
-pub fn validate_single_result(hash: &Hash, response: Result<Response, ErrorInfo>)
+
+pub struct ResolvedTransactionHash {
+    pub hash: Hash,
+    pub transaction: Transaction,
+    pub observation_proofs: HashSet<ObservationProof>,
+    pub peer_valid_index: HashSet<PublicKey>,
+    pub peer_invalid_index: HashSet<PublicKey>,
+}
+
+impl ResolvedTransactionHash {
+    // TODO: Move validate function here
+    pub fn valid_index(&self, relay: &Relay) {
+        // relay.get_trust_of_node()
+    }
+}
+
+pub async fn resolve_transaction_hash(
+    peers: Option<Vec<PublicKey>>,
+    relay: &Relay,
+    hash: &Hash,
+    output_index: Option<i64>,
+) -> RgResult<Option<ResolvedTransactionHash>> {
+    let all = peers.unwrap_or(relay.ds.peer_store
+        .peers_near(hash, |pi| pi.transaction_hash).await?
+    );
+    let mut request = Request::default();
+    let mut resolve_request = ResolveHashRequest::default();
+    resolve_request.hash = Some(hash.clone());
+    resolve_request.output_index = output_index;
+    request.resolve_hash_request = Some(resolve_request);
+    // TODO: on failure, notify peer manager to remove peer / consider inactive
+    let results = relay.broadcast_async(
+        all,
+        request,
+        Some(Duration::from_secs(10))
+    ).await?;
+    let mut observation_proofs = HashSet::new();
+    let mut peer_valid_index = HashSet::default();
+    let mut peer_invalid_index = HashSet::default();
+    let mut res: Option<Transaction> = None;
+
+    for result in results {
+        if let Some(pk) = result
+            .as_ref()
+            .ok()
+            .and_then(|r| r.proof.as_ref().and_then(|p| p.public_key.clone())) {
+            match validate_single_result(hash, result) {
+                Ok((tx, proofs, valid_idx)) => {
+                    // double check all TX same here.
+                    res = Some(tx);
+                    observation_proofs.extend(proofs);
+                    if valid_idx {
+                        peer_valid_index.insert(pk);
+                    } else {
+                        peer_invalid_index.insert(pk);
+                    }
+                }
+                Err(_) => {
+                    metrics::increment_counter!("redgold.transaction.resolve.input.errors");
+                }
+            }
+        }
+    }
+    Ok(res.map(|r| ResolvedTransactionHash {
+        hash: hash.clone(),
+        transaction: r,
+        observation_proofs,
+        peer_valid_index,
+        peer_invalid_index,
+    }))
+}
+
+
+pub fn validate_single_result(
+    hash: &Hash,
+    response: Result<Response, ErrorInfo>
+)
                               -> Result<(Transaction, Vec<ObservationProof>, bool), ErrorInfo> {
     let response = response?;
     response.as_error_info()?;
@@ -75,14 +155,15 @@ pub fn validate_single_result(hash: &Hash, response: Result<Response, ErrorInfo>
     if !tx.calculate_hash().eq(&hash) {
         return Err(ErrorInfo::error_info("Invalid transaction hash"));
     }
-    let idx = response.queried_output_index_valid
-        .safe_get_msg("Transaction known but queried output index valid missing")?
-        .clone();
+    let idx = response.queried_output_index_valid.unwrap_or(false);
+
     Ok((tx.clone(), response.observation_proofs.clone(), idx))
 }
 
-
-pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, signable_hash: Hash)
+pub async fn resolve_input(
+    input: Input, relay: Relay, peers: Vec<PublicKey>, signable_hash: Hash,
+    check_liveness: bool
+)
                            -> Result<ResolvedInput, ErrorInfo> {
     metrics::increment_counter!("redgold.transaction.resolve.input");
     let u = input.utxo_id.safe_get_msg("Missing utxo id")?;
@@ -111,7 +192,7 @@ pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, si
     // We have the transaction accepted locally
     let internal_accepted = res.is_some();
     // If we are storing this transaction, then we should also know the UTXOs
-    if internal_accepted && !internal_valid_index {
+    if internal_accepted && !internal_valid_index && check_liveness {
         // We have the transaction stored, but we don't consider it's outputs valid anymore
         return Err(ErrorInfo::error_info("Missing valid UTXO index on accepted transaction"));
     }
@@ -133,46 +214,29 @@ pub async fn resolve_input(input: Input, relay: Relay, peers: Vec<PublicKey>, si
     }
 
     if !internal_accepted {
-        // TODO: Order by XOR distance
-        // TODO: Sample a subset to find observation proofs from multiple peers
-        let sorted_peers = peers.clone();
-        let mut request = Request::default();
-        let mut resolve_request = ResolveHashRequest::default();
-        resolve_request.hash = Some(hash.clone());
-        resolve_request.output_index = Some(u.output_index);
-        request.resolve_hash_request = Some(resolve_request);
-        let results = Relay::broadcast(relay,
-            sorted_peers, request,
-                                       // runtime.clone(),
-                                       Some(Duration::from_secs(10))
-        ).await;
-        for (pk, result) in results {
-            match validate_single_result(hash, result) {
-                Ok((tx, proofs, valid_idx)) => {
-                    // double check all TX same here.
-                    res = Some(tx);
-                    observation_proofs.extend(proofs);
-                    if valid_idx {
-                        peer_valid_index.insert(pk);
-                    } else {
-                        peer_invalid_index.insert(pk);
-                    }
-                }
-                Err(_) => {
-                    metrics::increment_counter!("redgold.transaction.resolve.input.errors");
-                }
-            }
+
+        let resolved = resolve_transaction_hash(
+            None, &relay, hash, Some(u.output_index)
+        ).await?;
+        if let Some(r) = resolved {
+            observation_proofs = r.observation_proofs.clone();
+            peer_valid_index = r.peer_valid_index.clone();
+            peer_invalid_index = r.peer_invalid_index.clone();
+            res = Some(r.transaction);
         }
+
         if observation_proofs.len() == 0 {
             return Err(ErrorInfo::error_info("Missing observation proofs"));
         }
         // TODO: Use trust score here
-        if peer_invalid_index.len() > peer_valid_index.len() {
+        let invalid_majority = peer_invalid_index.len() > peer_valid_index.len();
+        if invalid_majority && check_liveness {
             // TODO: Include error information about which peers rejected it, i.e. a distribution
             return Err(ErrorInfo::error_info("UTXO considered invalid by peer selection"));
         }
 
-        if peer_valid_index.is_empty() && !internal_valid_index {
+        let utxo_invalid = peer_valid_index.is_empty() && !internal_valid_index;
+        if utxo_invalid && check_liveness {
             return Err(ErrorInfo::error_info("No peers considered UTXO valid"));
         }
 
@@ -271,11 +335,12 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
         .map(|input|
         async{tokio::spawn(resolve_input(input.clone(), relay.clone(),
                                         // runtime.clone(),
-                                         peers.clone(), tx.signable_hash().clone()))
+                                         peers.clone(), tx.signable_hash().clone(), true))
             .await.map_err(|e| error_info(e.to_string()))}
     ).collect_vec()).await {
         let result = result??;
         if !result.internal_accepted {
+            relay.unknown_resolved_inputs.sender.send_err(result.clone()).mark_abort()?;
             resolved_internally = false;
         }
         vec.push(result)

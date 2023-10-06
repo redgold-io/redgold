@@ -35,4 +35,8 @@ impl structs::PublicKey {
         let key = Self::from_bytes(bytes);
         Ok(key)
     }
+
+    pub fn vec(&self) -> Vec<u8> {
+        self.bytes().expect("")
+    }
 }

@@ -1,5 +1,6 @@
 use crate::{error_info, HashClear, RgResult, SafeOption};
-use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerNodeInfo, PublicKey, TransportInfo};
+use crate::structs::{ErrorInfo, Hash, NetworkEnvironment, NodeMetadata, PartitionInfo, PeerNodeInfo, PublicKey, TransportInfo};
+use crate::util::xor_distance::xorfc_hash;
 
 impl HashClear for NodeMetadata {
     fn hash_clear(&mut self) {}
@@ -29,6 +30,19 @@ impl NodeMetadata {
     pub fn external_address(&self) -> RgResult<String> {
         self.transport_info.safe_get_msg("Missing transport info")
             .and_then(|t| t.external_address())
+    }
+
+    pub fn tx_in_range(&self, h: &Hash) -> bool {
+        self.hash_in_range(h, |i| i.transaction_hash)
+    }
+
+    pub fn hash_in_range(&self, h: &Hash, f: fn(&PartitionInfo) -> Option<i64>) -> bool {
+        if let Some(d) = self.partition_info.as_ref().and_then(f) {
+            let pk = self.public_key.as_ref().expect("pk");
+            xorfc_hash(h, pk) < d
+        } else {
+            true
+        }
     }
 
 }

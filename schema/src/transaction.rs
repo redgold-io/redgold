@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType};
 use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
@@ -41,6 +41,12 @@ impl UtxoId {
         merged.extend(self.transaction_hash.clone().expect("hash").vec());
         merged.extend(self.output_index.to_le_bytes().to_vec());
         merged
+    }
+
+    pub fn as_hash(&self) -> Hash {
+        let mut h = Hash::new(self.utxo_id_vec());
+        h.hash_type = HashType::UtxoId as i32;
+        h
     }
     pub fn utxo_id_hex(&self) -> String {
         hex::encode(self.utxo_id_vec())

@@ -30,7 +30,7 @@ impl IntervalFold for Discovery {
     async fn interval_fold(&mut self) -> RgResult<()> {
 
         // What happens if the peer is non-responsive?
-        let node_tx_all = self.relay.ds.peer_store.active_peer_node_info(None)
+        let node_tx_all = self.relay.ds.peer_store.active_node_info(None)
             .await
             .add("Active nodes query in discovery failure")?;
 
