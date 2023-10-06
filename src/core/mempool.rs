@@ -5,7 +5,7 @@ use flume::{SendError, TrySendError};
 use itertools::Itertools;
 use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
 use redgold_schema::seeds::get_seeds;
-use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse};
+use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse, Transaction};
 use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
@@ -21,6 +21,19 @@ impl Mempool {
             relay: relay.clone(),
             heap: BinaryHeap::new()
         }
+    }
+    pub fn push(&mut self, mempool_entry: MempoolEntry) {
+        let transaction = mempool_entry.transaction.transaction.clone();
+        self.heap.push(mempool_entry);
+        self.relay.mempool_entries.insert(transaction.hash_or(), transaction);
+    }
+
+    pub fn pop(&mut self) -> Option<MempoolEntry> {
+        let o = self.heap.pop();
+        if let Some(me) = &o {
+            self.relay.mempool_entries.remove(&me.transaction.transaction.hash_or());
+        }
+        o
     }
 }
 
@@ -47,9 +60,9 @@ impl Ord for MempoolEntry {
 }
 
 #[derive(Debug, Clone)]
-struct MempoolEntry {
-    transaction: TransactionMessage,
-    fee_acceptable_address: Vec<Address>
+pub struct MempoolEntry {
+    pub transaction: TransactionMessage,
+    pub fee_acceptable_address: Vec<Address>
 }
 
 #[async_trait]
@@ -77,17 +90,17 @@ impl IntervalFold for Mempool {
                 transaction: message,
                 fee_acceptable_address: addrs.clone()
             };
-            self.heap.push(entry);
+            self.push(entry);
         }
         loop {
-            let option = self.heap.pop();
+            let option = self.pop();
             if let Some(entry) = option {
                 match self.relay.transaction_process.sender.try_send(entry.transaction.clone()) {
                     Ok(_) => {}
                     Err(e) => {
                         match e {
                             TrySendError::Full(_) => {
-                                self.heap.push(entry);
+                                self.push(entry);
                                 break;
                             }
                             TrySendError::Disconnected(_) => {

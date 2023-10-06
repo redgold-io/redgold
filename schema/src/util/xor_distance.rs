@@ -11,22 +11,33 @@ pub fn xor_distance(v1: &Vec<u8>, v2: &Vec<u8>) -> i64 {
     distance
 }
 
-// Really need to do this as AsRef<u8;32>
-pub fn xorf_conv_distance(query_hash: &Vec<u8>, peer_id: &Vec<u8>) -> i64 {
+pub fn xorf_conv_distance(query_hash: &Vec<u8>, peer_marker: &Vec<u8>) -> i64 {
 
-    assert!(query_hash.len() >= 32);
+    // Helps prevent pre-generating TX hash to be near specific peer markers
     let mut concat = query_hash.clone();
-    concat.extend(peer_id.clone());
+    concat.extend(peer_marker.clone());
     // 32 bytes
     let merged = Hash::digest(concat).vec();
 
+    // Helps prevent pre-generating peer markers to be near one another.
+    let mut concat2 = peer_marker.clone();
+    concat2.extend(query_hash.clone());
+
+    let merged2 = Hash::digest(concat2).vec();
+
     let xor_value: Vec<u8> = merged
         .iter()
-        .zip(query_hash.iter())
+        .zip(merged2.iter())
         .map(|(&x1, &x2)| x1 ^ x2)
         .collect();
     let distance: i64 = xor_value.iter().map(|&byte| i64::from(byte)).sum();
     distance
+}
+
+pub fn xorfc_hash(query_hash: &Hash, pk: &PublicKey) -> i64 {
+    let query_hash = query_hash.vec();
+    let pk_bytes = pk.bytes().expect("bytes");
+    xorf_conv_distance(&query_hash, &pk_bytes)
 }
 
 pub trait XorfConvDistanceSubset<T> {

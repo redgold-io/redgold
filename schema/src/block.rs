@@ -1,5 +1,5 @@
 use crate::structs::{Block, Error, ErrorInfo, Hash, StructMetadata};
-use crate::{error_message, SafeOption};
+use crate::{error_message, SafeOption, WithMetadataHashable};
 use crate::{HashClear, SafeBytesAccess};
 use crate::{ProtoHashable, WithMetadataHashableFields};
 
@@ -66,12 +66,11 @@ fn verify_hash_equivalent_schema_change() {
         struct_metadata: None,
         previous_block_hash: None,
         metadata: None,
-        hash: None,
         height: 0,
     };
     // before adding 'test_field: Option<String>'
     // 1440a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26
-    println!("Hash hex empty block: {}", block.hash_hex());
+    println!("Hash hex empty block: {}", block.hash_hex().expect(""));
     // same hash after adding test_field: None to schema, verifying we can evolve schema while
     // keeping hashes consistent so long as all fields are None at first.
 }

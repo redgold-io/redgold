@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use itertools::Itertools;
 use metrics::{decrement_gauge, increment_gauge};
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
@@ -116,6 +117,24 @@ impl TransactionStore {
         }
         Ok(res)
     }
+    pub async fn recent_transaction_hashes(
+        &self,
+        limit: Option<i64>,
+        min_time: Option<i64>
+    ) -> Result<Vec<Hash>, ErrorInfo> {
+        let limit = limit.unwrap_or(10);
+        let min_time = min_time.unwrap_or(0);
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT hash FROM transactions
+            WHERE rejection_reason IS NULL AND accepted = 1 AND time > ?1
+            ORDER BY time DESC
+            LIMIT ?2"#,
+            min_time,
+            limit
+        ).fetch_all(&mut *self.ctx.pool().await?).await)?.iter()
+            .map(|t| Hash::new(t.hash.clone()))
+            .collect_vec())
+    }
 
     pub async fn count_total_accepted_transactions(
         &self
@@ -198,6 +217,20 @@ impl TransactionStore {
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
+    }
+
+    pub async fn transaction_known(
+        &self,
+        transaction_hash: &Hash,
+    ) -> RgResult<bool> {
+        let bytes = transaction_hash.safe_bytes()?;
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT count(raw) as count FROM transactions WHERE hash = ?1"#,
+            bytes
+        )
+            .fetch_one(&mut *self.ctx.pool().await?)
+            .await)?
+            .count > 0)
     }
 
 
@@ -374,65 +407,53 @@ impl TransactionStore {
 
 // TODO: Add productId to utxo amount
 
-    //
-    // pub async fn insert_transaction_edge(
-    //     &self,
-    //     utxo_entry: &UtxoEntry,
-    //     child_transaction_hash: &Hash,
-    //     child_input_index: i64
-    // ) -> Result<i64, ErrorInfo> {
-    //     let mut pool = self.ctx.pool().await?;
-    //     let hash = utxo_entry.transaction_hash.clone();
-    //     let child_hash = child_transaction_hash.safe_bytes()?;
-    //     let output_index = utxo_entry.output_index;
-    //     let rows = sqlx::query!(
-    //         r#"
-    //     INSERT OR REPLACE INTO transaction_edge
-    //     (transaction_hash, output_index, address, child_transaction_hash, child_input_index, time)
-    //     VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
-    //         hash,
-    //         output_index,
-    //         utxo_entry.address,
-    //         child_hash,
-    //         child_input_index,
-    //         utxo_entry.time
-    //     )
-    //         .execute(&mut *pool)
-    //         .await;
-    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-    //     Ok(rows_m.last_insert_rowid())
-    // }
-    //
-    // pub async fn query_transaction_edge_get_children_of(
-    //     &self,
-    //     transaction_hash: &Hash,
-    //     output_index: i64,
-    // ) -> Result<Vec<(Hash, i64)>, ErrorInfo> {
-    //
-    //     let mut pool = self.ctx.pool().await?;
-    //     let bytes = transaction_hash.safe_bytes()?;
-    //     let rows = sqlx::query!(
-    //         r#"SELECT child_transaction_hash, child_input_index FROM transaction_edge
-    //         WHERE transaction_hash = ?1 AND output_index = ?2"#,
-    //         bytes,
-    //         output_index
-    //     )
-    //         .fetch_all(&mut *pool)
-    //         .await;
-    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-    //     let mut res = vec![];
-    //     for row in rows_m {
-    //         let option1 = row.child_transaction_hash;
-    //         let option2 = row.child_input_index;
-    //         if let Some(o) = option1 {
-    //             let h = Hash::from_bytes_mh(o);
-    //             if let Some(o2) = option2 {
-    //                 res.push((h, o2 as i64));
-    //             }
-    //         }
-    //     }
-    //     Ok(res)
-    // }
+
+    pub async fn insert_transaction_edge(
+        &self,
+        utxo_id: &UtxoId,
+        address: &Address,
+        child_transaction_hash: &Hash,
+        child_input_index: i64,
+        time: i64
+    ) -> Result<i64, ErrorInfo> {
+
+        let hash = utxo_id.transaction_hash.safe_get_msg("No transaction hash on utxo_id")?.vec();
+        let child_hash = child_transaction_hash.safe_bytes()?;
+        let output_index = utxo_id.output_index;
+        let address = address.address.safe_bytes()?;
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"
+        INSERT OR REPLACE INTO transaction_edge
+        (transaction_hash, output_index, address, child_transaction_hash, child_input_index, time)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+            hash,
+            output_index,
+            address,
+            child_hash,
+            child_input_index,
+            time
+        )
+            .execute(&mut *self.ctx.pool().await?)
+            .await)?;
+        Ok(rows.last_insert_rowid())
+    }
+
+    pub async fn utxo_used(
+        &self,
+        utxo_id: &UtxoId,
+    ) -> Result<Option<(Hash, i64)>, ErrorInfo> {
+        let bytes = utxo_id.transaction_hash.safe_bytes()?;
+        let output_index = utxo_id.output_index;
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT child_transaction_hash, child_input_index FROM transaction_edge
+            WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .fetch_optional(&mut *self.ctx.pool().await?)
+            .await)?
+            .map(|o| (Hash::new(o.child_transaction_hash), o.child_input_index)))
+    }
 
 
     pub async fn insert_transaction_raw(
@@ -589,11 +610,24 @@ impl TransactionStore {
         time: i64,
         accepted: bool,
         rejection_reason: Option<ErrorInfo>,
+        update_utxo: bool
     ) -> Result<i64, ErrorInfo> {
         let i = self.insert_transaction_raw(tx, time.clone(), accepted, rejection_reason).await?;
         let vec = UtxoEntry::from_transaction(tx, time.clone() as i64);
-        for entry in vec {
-            self.insert_utxo(&entry).await?;
+        if update_utxo {
+            for entry in vec {
+                self.insert_utxo(&entry).await?;
+            }
+        }
+        for (i, x)  in tx.inputs.iter().enumerate() {
+            if let Some(utxo) = &x.utxo_id {
+                self.insert_transaction_edge(
+                    utxo,
+                    &x.address()?,
+                    &tx.hash_or(),
+                    i as i64,
+                    time.clone()).await?;
+            }
         }
         self.insert_address_transaction(tx).await?;
         increment_gauge!("redgold.transaction.accepted.total", 1.0);

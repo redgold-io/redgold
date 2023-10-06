@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -18,7 +19,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -28,9 +29,10 @@ use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_keys::request_support::RequestSupport;
+use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionBuilderSupport;
 use redgold_schema::seeds::get_seeds;
+use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
@@ -127,6 +129,43 @@ pub struct Relay {
     pub contract_state_manager_channels: Vec<Channel<ContractStateMessage>>,
     pub contention: Vec<Channel<ContentionMessage>>,
     pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
+    pub unknown_resolved_inputs: Channel<ResolvedInput>,
+    pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
+
+}
+
+impl Relay {
+    pub async fn transaction_known(&self, hash: &Hash) -> RgResult<bool> {
+        if self.mempool_entries.contains_key(hash) {
+            return Ok(true);
+        }
+        if self.transaction_channels.contains_key(hash) {
+            return Ok(true);
+        }
+        if self.ds.transaction_store.query_maybe_transaction(hash).await?.is_some() {
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    pub async fn lookup_transaction(&self, hash: &Hash) -> RgResult<Option<Transaction>> {
+        let res = match self.mempool_entries.get(hash)
+            .map(|t| t.clone())
+            .or_else( ||
+                self.transaction_channels.get(hash).map(|t| t.transaction.clone())
+            )
+        {
+            None => {
+                self.ds.transaction_store.query_maybe_transaction(hash).await?
+                    .map(|t| t.0)
+            }
+            Some(t) => {
+                Some(t)
+            }
+        };
+
+        Ok(res)
+    }
 }
 
 
@@ -143,6 +182,7 @@ are instantiated by the node
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
 use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
 
 pub struct StrictRelay {}
@@ -176,6 +216,18 @@ impl Relay {
         }
         Ok(hm)
         // Err(error_info("test"))
+    }
+
+    pub async fn is_seed(&self, pk: &PublicKey) -> bool {
+        self.node_config.seeds.iter()
+            .filter(|s| s.public_key.as_ref().filter(|&p| p == pk).is_some())
+            .next().is_some()
+    }
+
+    pub async fn seed_trust(&self, pk: &PublicKey) -> Option<Vec<TrustData>> {
+        self.node_config.seeds.iter()
+            .filter(|s| s.public_key.as_ref().filter(|&p| p == pk).is_some())
+            .next().map(|s| s.trust.clone())
     }
 
     // Refactor this and below later to optimize lookup.
@@ -252,6 +304,26 @@ impl Relay {
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)
         }
+    }
+
+    pub async fn partition_info(&self) -> RgResult<Option<PartitionInfo>> {
+        Ok(self.node_metadata().await?.partition_info)
+    }
+
+    pub async fn tx_hash_distance(&self, hash: &Hash) -> RgResult<bool> {
+        let d = xorfc_hash(hash, &self.node_config.public_key());
+        let pi = self.partition_info().await?;
+        Ok(pi.and_then(|pi| pi.transaction_hash)
+            .map(|d_max| d < d_max).unwrap_or(true))
+    }
+
+    pub async fn utxo_hash_distance(&self, utxo_id: &UtxoId) -> RgResult<bool> {
+        let vec = utxo_id.utxo_id_vec();
+        let marker = self.node_config.public_key().vec();
+        let d = xorf_conv_distance(&vec, &marker);
+        let pi = self.partition_info().await?;
+        Ok(pi.and_then(|pi| pi.utxo)
+            .map(|d_max| d < d_max).unwrap_or(true))
     }
 
     pub async fn peer_tx(&self) -> RgResult<Transaction> {
@@ -419,7 +491,8 @@ impl Relay {
         self.peer_message_tx.sender.send_err(pm)?;
         let res = tokio::time::timeout(timeout, r.recv_async_err()).await
             .map_err(|e| error_info(e.to_string()))??;
-        Ok(res)
+        // Is this necessary?? Or have we already handled this elsewhere?
+        res.verify_auth(&node)
     }
 
     // Try to eliminate this function
@@ -463,17 +536,60 @@ impl Relay {
     }
 
     pub async fn gossip_req(&self, req: &Request, hash: &Hash) -> Result<(), ErrorInfo> {
-        let all = self.ds.peer_store.select_gossip_peers_hash(hash).await?;
+        let all = self.ds.peer_store.peers_near(hash, |p| p.transaction_hash).await?;
         for p in all {
             self.send_message(req.clone(), p).await?;
         }
         Ok(())
     }
 
+    pub async fn utxo_id_valid_peers(&self, utxo_id: &UtxoId) -> RgResult<Option<Transaction>> {
+        let peers = self.ds.peer_store
+            .peers_near(&utxo_id.as_hash(), |p| p.utxo).await?;
+        let mut request = Request::empty();
+        request.utxo_valid_request = Some(utxo_id.clone());
+        let res = self.broadcast_async(peers, request, Some(Duration::from_secs(10))).await?;
+        // verify majority here.
+        let mut sum: f64 = 0.;
+        let mut hm: HashMap<Transaction, f64> = HashMap::new();
+        for r in res {
+            if let Ok(r) = &r {
+                if let Some(pk) = r.proof.as_ref().and_then(|p| p.public_key.as_ref()) {
+                    if let Some(utxo_r) = &r.utxo_valid_response {
+                        if let Some(r) = &utxo_r.valid {
+                            if let Some(t) = self.get_trust_of_node(pk).await? {
+                                if r.clone() {
+                                    sum += t;
+                                } else {
+                                    sum -= t;
+                                }
+                                if let (Some(h), Some(i)) = (&utxo_r.child_transaction, &utxo_r.child_transaction_input) {
+                                    if hm.contains_key(h) {
+                                        hm.insert(h.clone(), hm.get(h).unwrap() + t);
+                                    } else {
+                                        hm.insert(h.clone(), t);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let tx = hm.iter()
+            .max_by(|a, b| a.1.partial_cmp(b.1)
+                .unwrap_or(Ordering::Equal)).map(|(h, _)| h.clone());
+        if sum > 0. {
+            Ok(None)
+        } else {
+            Ok(tx)
+        }
+    }
+
     // the new function everything should use
     pub async fn broadcast_async(
         &self,
-        nodes: Vec<structs::PublicKey>,
+        nodes: Vec<PublicKey>,
         request: Request,
         timeout: Option<Duration>
     ) -> RgResult<Vec<RgResult<Response>>> {
@@ -481,18 +597,41 @@ impl Relay {
         for p in nodes {
             let req = request.clone();
             let timeout = Some(timeout.unwrap_or(Duration::from_secs(20)));
-            let res = self.send_message_async(req, p, timeout).await?;
-            results.push(res);
+            let res = self.send_message_async(&req, &p, timeout).await?;
+            results.push((p, res));
         }
         let mut responses = vec![];
-        for r in &results {
-            let x = r.recv_async_err();
-            responses.push(x);
+        for (pk, r) in &results {
+            let fut = async {
+                let result = r.recv_async_err().await;
+                result.and_then(|r| r.verify_auth(pk))
+            };
+            responses.push(fut);
         }
         let res = futures::future::join_all(responses).await;
         Ok(res)
     }
 
+    pub async fn lookup_transaction_serial(&self, h: &Hash) -> RgResult<Option<Transaction>> {
+         let peers = self.ds.peer_store
+                .peers_near(&h, |p| p.transaction_hash).await?;
+        let mut request = Request::empty();
+        request.lookup_transaction_request = Some(h.clone());
+        for p in peers {
+            let res = self.send_message_sync(request.clone(), p, Some(Duration::from_secs(10))).await;
+            if let Ok(r) = res {
+                if let Some(t) = r.lookup_transaction_response {
+                    if &t.hash_or() == h {
+                        return Ok(Some(t))
+                    }
+                }
+            }
+        }
+        return Ok(None)
+            // verify majority here.
+    }
+
+    // old function
     pub async fn broadcast(
         relay: Relay,
         nodes: Vec<structs::PublicKey>,
@@ -534,8 +673,8 @@ impl Relay {
 
     pub async fn send_message_async(
         &self,
-        request: Request,
-        node: structs::PublicKey,
+        request: &Request,
+        node: &PublicKey,
         timeout: Option<Duration>
     ) -> Result<flume::Receiver<Response>, ErrorInfo> {
         let (s, r) = flume::bounded(1);
@@ -667,6 +806,8 @@ impl Relay {
             contract_state_manager_channels,
             contention,
             predicted_trust_overall_rating_score: Arc::new(Mutex::new(Default::default())),
+            unknown_resolved_inputs: internal_message::new_channel(),
+            mempool_entries: Arc::new(Default::default()),
         }
     }
 }

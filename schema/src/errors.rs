@@ -33,10 +33,18 @@ impl HashClear for ErrorInfo {
 
 pub trait EnhanceErrorInfo<T> {
     fn add(self, message: impl Into<String>) -> RgResult<T>;
+    fn mark_abort(self) -> RgResult<T>;
 }
 
 impl<T> EnhanceErrorInfo<T> for RgResult<T> {
     fn add(self, message: impl Into<String>) -> RgResult<T> {
         self.map_err(|e| e.enhance(message))
     }
+    fn mark_abort(mut self) -> RgResult<T> {
+        self.map_err(|mut e| {
+            e.abort = true;
+            e
+        })
+    }
+
 }

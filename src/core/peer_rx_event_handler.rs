@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use futures::channel::mpsc::Receiver;
 use futures::prelude::*;
+use itertools::Itertools;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
 use log::{debug, error, info};
@@ -16,7 +17,7 @@ use tokio::task::JoinHandle;
 use redgold_schema::{error_info, json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, Request, ResolveCodeResponse, SubmitTransactionRequest};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
 
 use crate::api::about;
 use crate::core::discovery::DiscoveryMessage;
@@ -100,6 +101,53 @@ impl PeerRxEventHandler {
 
         // TODO: add a uuid here
         let mut response = Response::empty_success();
+
+        if let Some(r) = &request.lookup_transaction_request {
+            let opt = relay.lookup_transaction(r).await?;
+            response.lookup_transaction_response = opt;
+        }
+
+        if let Some(r) = &request.recent_transactions_request {
+            let from_mempool = relay.mempool_entries.iter().map(|t| t.hash_or()).collect_vec();
+            let in_process = relay.transaction_channels.iter().map(|c| c.transaction_hash.clone()).collect_vec();
+            let accepted = relay.ds.transaction_store
+                .recent_transaction_hashes(r.limit, r.min_time).await?;
+            let mut hashes = vec![];
+            hashes.extend(from_mempool);
+            hashes.extend(in_process);
+            hashes.extend(accepted);
+            let res = RecentDiscoveryTransactionsResponse {
+                transaction_hashes: hashes
+            };
+            response.recent_discovery_transactions_response = Some(res);
+        }
+
+        if let Some(r) = &request.utxo_valid_request {
+            // TODO: Check transaction edge for utxo considered invalid.
+            let rr: &UtxoId = r;
+            let res = relay.ds.transaction_store.query_utxo_id_valid(r.transaction_hash.safe_get()?, r.output_index).await?;
+            let mut u = UtxoValidResponse {
+                valid: None,
+                child_transaction: None,
+                child_transaction_input: None,
+            };
+            if res {
+                u.valid = Some(true);
+            } else {
+                let child = relay.ds.transaction_store.utxo_used(rr).await?;
+                if let Some((child_hash, child_idx)) = child {
+                    if let Some((tx, e)) = relay.ds.transaction_store.query_maybe_transaction(&child_hash).await? {
+                        if e.is_none() {
+                            u.valid = Some(false);
+                            u.child_transaction = Some(tx);
+                            u.child_transaction_input = Some(child_idx);
+                        }
+                    }
+
+                }
+            }
+            response.utxo_valid_response = Some(u);
+        }
 
         if let Some(addr) = &request.resolve_code_request {
             response.resolve_code_response = Some(relay.ds.resolve_code(addr).await?);

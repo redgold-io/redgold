@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS transactions
 (
-    hash    BLOB PRIMARY KEY,
+    hash    BLOB PRIMARY KEY NOT NULL,
     raw       BLOB NOT NULL,
     time       INTEGER NOT NULL,
     rejection_reason       BLOB,

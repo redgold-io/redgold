@@ -51,8 +51,10 @@ use tracing::Span;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::structs::TransactionState::Mempool;
 use crate::core::contract::contract_state_manager::ContractStateManager;
+use crate::core::data_discovery::DataDiscovery;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
+use crate::core::recent_download::RecentDownload;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty::initiate_mp::default_room_id_signing;
@@ -226,6 +228,19 @@ impl Node {
 
         }
 
+        join_handles.push(stream_handlers::run_interval_fold(
+            RecentDownload {
+                relay: relay.clone(),
+            }, Duration::from_secs(60), false
+        ).await);
+
+
+        join_handles.push(stream_handlers::run_interval_fold(
+            DataDiscovery {
+                relay: relay.clone(),
+            }, Duration::from_secs(60), false
+        ).await);
+
 
         join_handles
     }
@@ -313,7 +328,7 @@ impl Node {
                     relay
                         .ds
                         .transaction_store
-                        .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None)
+                        .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None, true)
                         .await.expect("insert failed");
                 // }
                 let genesis_hash = tx.hash_or();
@@ -897,7 +912,7 @@ async fn data_store_test() {
     for i in 0..10 {
         let nci = NodeConfig::from_test_id(&(i + 200 as u16));
         let tx = nci.peer_tx_fixed();
-        relay.ds.transaction_store.insert_transaction(&tx, 0,true, None).await.expect("");
+        relay.ds.transaction_store.insert_transaction(&tx, 0,true, None, true).await.expect("");
         txs.push(tx.clone());
     }
 

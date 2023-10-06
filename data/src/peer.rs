@@ -1,5 +1,5 @@
 use std::time::Duration;
-use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
+use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PartitionInfo, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
 use redgold_schema::{ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -8,6 +8,7 @@ use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::TestConstants;
 use redgold_schema::EasyJson;
 use redgold_schema::structs::PeerIdInfo;
+use redgold_schema::util::xor_distance::xorfc_hash;
 
 #[derive(Clone)]
 pub struct PeerStore {
@@ -64,10 +65,15 @@ impl PeerStore {
     pub async fn select_gossip_peers(&self, tx: &Transaction) -> Result<Vec<PublicKey>, ErrorInfo> {
         self.active_nodes(None).await
     }
-    pub async fn select_gossip_peers_hash(&self, hash: &Hash) -> Result<Vec<PublicKey>, ErrorInfo> {
-        self.active_nodes(None).await
+    pub async fn peers_near(&self, hash: &Hash, partition: fn(&PartitionInfo) -> Option<i64>) -> Result<Vec<PublicKey>, ErrorInfo> {
+        let map = self.active_node_info(None).await?.iter()
+            .filter(|&p|
+                p.node_metadata()
+                    .map(|n| n.hash_in_range(hash, partition)).unwrap_or(false)
+            ).flat_map(|p| p.node_metadata().ok().and_then(|n| n.public_key))
+            .collect_vec();
+        Ok(map)
     }
-
 
     pub async fn query_public_key_metadata(
         &self,
@@ -312,7 +318,7 @@ impl PeerStore {
         &self,
         delay: Option<Duration>
     ) -> Result<Vec<NodeMetadata>, ErrorInfo> {
-        let res = self.active_peer_node_info(delay).await?
+        let res = self.active_node_info(delay).await?
             .iter()
             .filter_map(|pni|
                             pni.node_metadata().ok()
@@ -342,7 +348,7 @@ impl PeerStore {
         Ok(res)
     }
 
-    pub async fn active_peer_node_info(
+    pub async fn active_node_info(
         &self,
         delay: Option<Duration>
     ) -> Result<Vec<Transaction>, ErrorInfo> {

@@ -113,6 +113,14 @@ message Input {
   optional InputType input_type = 7;
 }
 
+enum RatingType {
+  // Conventional rating associated with likelihood to commit double spend or malicious node behavior
+  SecurityRating = 0;
+  // Rating associated with multi-party computation, should always be strictly speaking more
+  // risky than normal security
+  DepositRating = 1;
+}
+
 message TrustData {
   // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
   // Otherwise equivalent to a rounded float
@@ -124,6 +132,7 @@ message TrustData {
   // Additional unstructured or otherwise custom label data
   optional StandardData data = 6;
   bool allow_model_override = 7;
+  optional RatingType rating_type = 8;
 }
 
 message TrustRatingLabel {
@@ -518,6 +527,7 @@ enum HashType {
   TOMBSTONE = 3;
   ADDRESS = 4;
   UNKNOWN = 5;
+  Utxo_Id = 6;
 }
 
 message Tombstone {
@@ -745,6 +755,15 @@ message GetContractStateMarkerRequest {
   StateSelector selector = 2;
 }
 
+message RecentDiscoveryTransactionsResponse {
+  repeated Hash transaction_hashes = 1;
+}
+
+message RecentDiscoveryTransactionsRequest {
+  optional int64 limit = 1;
+  optional int64 min_time = 2;
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -770,6 +789,9 @@ message Request {
   Address resolve_code_request = 22;
   AbridgedNodeMetadata abridged_node_metadata = 23;
   repeated ObservationProof gossip_observation_proof = 24;
+  UtxoId utxo_valid_request = 25;
+  RecentDiscoveryTransactionsRequest recent_transactions_request = 26;
+  Hash lookup_transaction_request = 27;
 }
 
 message HealthResponse {
@@ -781,6 +803,13 @@ message ResolveCodeResponse {
   TransactionInfo transaction = 2;
   ContractStateMarker contract_state_marker = 3;
 }
+
+message UtxoValidResponse {
+  optional bool valid = 1;
+  Transaction child_transaction = 2;
+  optional int64 child_transaction_input = 3;
+}
+
 
 message Response {
   ResponseMetadata response_metadata = 1;
@@ -802,6 +831,9 @@ message Response {
   HealthResponse health_response = 14;
   ContractStateMarker get_contract_state_marker_response = 15;
   ResolveCodeResponse resolve_code_response = 16;
+  UtxoValidResponse utxo_valid_response = 17;
+  RecentDiscoveryTransactionsResponse recent_discovery_transactions_response = 18;
+  Transaction lookup_transaction_response = 19;
 }
 
 message QueryTransactionRequest {

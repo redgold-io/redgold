@@ -10,6 +10,9 @@
       "paths": [
         "structs.TransportInfo",
         "structs.IdentityMetadata",
+        "structs.RecentDiscoveryTransactionsRequest",
+        "structs.RecentDiscoveryTransactionsResponse",
+        "structs.UtxoValidResponse",
         "structs.AncestorMerkleRoot",
         "structs.AbridgedNodeMetadata",
         "structs.ContentionKey",
@@ -132,6 +135,7 @@
       "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString)]",
       "paths": [
         "structs.PowProofType",
+        "structs.RatingType",
         "structs.InputType",
         "structs.ValidationLiveness",
         "structs.TransactionState",
