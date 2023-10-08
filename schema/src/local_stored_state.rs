@@ -1,3 +1,4 @@
+use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use crate::servers::Server;
 use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
@@ -45,6 +46,18 @@ pub struct Contact {
     pub peer_id: Option<PeerId>,
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct StoredMnemonic {
+    pub name: String,
+    pub mnemonic: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct StoredPrivateKey {
+    pub name: String,
+    pub key_hex: String,
+}
+
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalStoredState {
@@ -55,7 +68,39 @@ pub struct LocalStoredState {
     pub contacts: Vec<Contact>,
     pub watched_address: Vec<Address>,
     pub email_alert_config: Option<String>,
-    pub identities: Vec<Identity>
+    pub identities: Vec<Identity>,
+    pub mnemonics: Option<Vec<StoredMnemonic>>,
+    pub private_keys: Option<Vec<StoredPrivateKey>>
+}
+
+impl LocalStoredState {
+    pub fn key_names(&self) -> Vec<String> {
+        let mut k = vec!["default".to_string()];
+        for key in self.mnemonics.as_ref().unwrap_or(&vec![]) {
+            k.push(key.name.clone());
+        }
+        for key in self.private_keys.as_ref().unwrap_or(&vec![]) {
+            k.push(key.name.clone());
+        }
+        k
+    }
+    pub fn by_key(&self, name: &String) -> Option<Either<StoredMnemonic, StoredPrivateKey>> {
+        if let Some(mnemonics) = &self.mnemonics {
+            for mnemonic in mnemonics {
+                if &mnemonic.name == name {
+                    return Some(Either::Left(mnemonic.clone()));
+                }
+            }
+        }
+        if let Some(private_keys) = &self.private_keys {
+            for private_key in private_keys {
+                if &private_key.name == name {
+                    return Some(Either::Right(private_key.clone()));
+                }
+            }
+        }
+        None
+    }
 }
 
 impl Default for LocalStoredState {
@@ -69,6 +114,8 @@ impl Default for LocalStoredState {
             watched_address: vec![],
             email_alert_config: None,
             identities: vec![],
+            mnemonics: None,
+            private_keys: None,
         }
     }
 }

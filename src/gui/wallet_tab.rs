@@ -11,10 +11,12 @@ use strum::IntoEnumIterator;
 // 0.17.1
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
+use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{EasyJsonDeser, ErrorInfoContext, RgResult, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
@@ -64,6 +66,7 @@ enum SendReceiveTabs {
     Send,
     Receive,
     CustomTx,
+    Swap
 }
 
 // #[derive(Clone)]
@@ -80,6 +83,10 @@ pub struct WalletState {
     faucet_success: String,
     balance: String,
     balance_f64: Option<f64>,
+
+    balance_btc: Option<String>,
+    balance_btc_f64: Option<f64>,
+
     address_info: Option<AddressInfo>,
     prepared_transaction: Option<Result<Transaction, ErrorInfo>>,
     unsigned_transaction_hash: Option<String>,
@@ -88,7 +95,11 @@ pub struct WalletState {
     signing_flow_status: Option<String>,
     signing_flow_transaction_box_msg: Option<String>,
     broadcast_transaction_response: Option<Result<SubmitTransactionResponse, ErrorInfo>>,
-    pub hot_mnemonic: String,
+    pub show_btc_info: bool,
+    pub hot_mnemonic_default: String,
+    pub send_currency_type: SupportedCurrency,
+    pub active_hot_mnemonic: Option<String>,
+    pub active_hot_kp: Option<String>,
     pub derivation_path: String,
     pub xpub_derivation_path: String,
     pub derivation_path_valid: bool,
@@ -99,8 +110,15 @@ pub struct WalletState {
     pub active_xpub: String,
     pub active_derivation_path: String,
     pub xpub_save_name: String,
+    pub mnemonic_save_name: String,
+    pub mnemonic_save_data: String,
+    pub is_mnemonic_or_kp: Option<bool>,
+    pub valid_save_mnemonic: String,
     pub show_xpub_loader_window: bool,
     pub selected_xpub_name: String,
+    pub selected_key_name: String,
+    pub last_selected_key_name: String,
+    pub add_new_key_window: bool,
     pub show_save_xpub_window: bool,
     pub purge_existing_xpubs_on_save: bool,
     pub allow_xpub_name_overwrite: bool,
@@ -132,8 +150,10 @@ impl WalletState {
         self.broadcast_transaction_response = None;
         self.signing_flow_transaction_box_msg = None;
         self.faucet_success = "".to_string();
+        self.balance_btc = None;
         self.balance = "".to_string();
         self.balance_f64 = None;
+        self.balance_btc_f64 = None;
         self.destination_address = "".to_string();
         self.address_info = None;
         self.public_key = None;
@@ -166,7 +186,8 @@ impl WalletState {
         } else {
             Some(self.hot_passphrase.clone())
         };
-        let mut w = WordsPass::new(self.hot_mnemonic.clone(), pass.clone());
+        let m = self.active_hot_mnemonic.as_ref().unwrap_or(&self.hot_mnemonic_default);
+        let mut w = WordsPass::new(m, pass.clone());
         if !self.hot_offset.is_empty() {
             w = w.hash_derive_words(self.hot_offset.clone()).expect("err");
             w.passphrase = pass;
@@ -187,6 +208,8 @@ impl WalletState {
             faucet_success: "".to_string(),
             balance: "loading".to_string(),
             balance_f64: None,
+            balance_btc: None,
+            balance_btc_f64: None,
             address_info: None,
             prepared_transaction: None,
             unsigned_transaction_hash: None,
@@ -195,7 +218,11 @@ impl WalletState {
             signing_flow_status: None,
             signing_flow_transaction_box_msg: None,
             broadcast_transaction_response: None,
-            hot_mnemonic,
+            show_btc_info: false,
+            hot_mnemonic_default: hot_mnemonic,
+            send_currency_type: SupportedCurrency::Redgold,
+            active_hot_mnemonic: None,
+            active_hot_kp: None,
             derivation_path: trezor::default_pubkey_path(),
             xpub_derivation_path: "m/44'/0'/0'".to_string(),
             derivation_path_valid: true,
@@ -206,16 +233,23 @@ impl WalletState {
             active_xpub: "".to_string(),
             active_derivation_path: "".to_string(),
             xpub_save_name: "".to_string(),
+            mnemonic_save_name: "".to_string(),
+            mnemonic_save_data: "".to_string(),
+            is_mnemonic_or_kp: None,
             show_save_xpub_window: false,
             purge_existing_xpubs_on_save: false,
             allow_xpub_name_overwrite: true,
             selected_xpub_name: "Select Xpub".to_string(),
+            selected_key_name: "default".to_string(),
+            last_selected_key_name: "default".to_string(),
             show_xpub_loader_window: false,
             xpub_loader_rows: "".to_string(),
             xpub_loader_error_message: "".to_string(),
             hot_passphrase: "".to_string(),
             hot_offset: "".to_string(),
             custom_tx_json: "".to_string(),
+            valid_save_mnemonic: "".to_string(),
+            add_new_key_window: false,
         }
     }
     pub fn update_hardware(&mut self) {
@@ -285,7 +319,7 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
             cold_wallet::cold_header(ui, &mut ls.wallet_state);
         }
         WalletTab::Software => {
-            hot_wallet::hot_header(&mut ls.wallet_state, ui, ctx);
+            hot_wallet::hot_header(ls, ui, ctx);
         }
     }
 
@@ -327,6 +361,18 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     // TODO: Include bitcoin address / ETH address for path 0 here for verification.
     ui.separator();
 
+
+    ui.heading(RichText::new(format!("Balance: RDG: {} {}",
+                                     ls.wallet_state.balance.clone(),
+        ls.wallet_state.balance_btc.clone().map(|b| format!("BTC: {}", b)).unwrap_or("".to_string())
+    ))
+        .color(Color32::LIGHT_GREEN));
+
+    ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
+    if ls.wallet_state.show_btc_info {
+        data_item(ui, "BTC Address", pk.to_bitcoin_address_network(ls.node_config.network.clone()).unwrap_or("".to_string()));
+    }
+
     send_receive_bar(ui, ls, pk);
 
     ui.separator();
@@ -346,6 +392,10 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet_state.custom_tx_json));
 
             }
+            SendReceiveTabs::Swap => {
+                show_prepared = false;
+                swap_view(ui, ls, pk);
+            }
         }
         if show_prepared {
             prepared_view(ui, ls, pk);
@@ -354,6 +404,15 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
 }
 
 fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+
+    ComboBox::from_label("Currency")
+        .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
+        .show_ui(ui, |ui| {
+            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
+            for style in styles {
+                ui.selectable_value(&mut ls.wallet_state.send_currency_type, style.clone(), format!("{:?}", style));
+            }
+        });
     ui.horizontal(|ui| {
         ui.label("Destination Address");
         let string = &mut ls.wallet_state.destination_address;
@@ -374,25 +433,73 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     });
 }
 
+fn swap_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+    //
+    // ComboBox::from_label("Currency")
+    //     .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
+    //     .show_ui(ui, |ui| {
+    //         let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
+    //         for style in styles {
+    //             ui.selectable_value(&mut ls.wallet_state.send_currency_type, style.clone(), format!("{:?}", style));
+    //         }
+    //     });
+    // ui.horizontal(|ui| {
+    //     ui.label("Destination Address");
+    //     let string = &mut ls.wallet_state.destination_address;
+    //     ui.add(egui::TextEdit::singleline(string).desired_width(460.0));
+    //     common::copy_to_clipboard(ui, string.clone());
+    //     let valid_addr = Address::parse(string.clone()).is_ok();
+    //     if valid_addr {
+    //         ui.label(RichText::new("Valid").color(Color32::GREEN));
+    //     } else {
+    //         ui.label(RichText::new("Invalid").color(Color32::RED));
+    //     }
+    // });
+    // // TODO: Amount USD and conversions etc.
+    // ui.horizontal(|ui| {
+    //     ui.label("Amount");
+    //     let string = &mut ls.wallet_state.amount_input;
+    //     ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
+    // });
+}
+
 pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
 
 
     if ui.button("Prepare Transaction").clicked() {
-        match &ls.wallet_state.address_info {
-            None => {}
-            Some(ai) => {
-                let result = prepare_transaction(
-                    ai,
-                    &ls.wallet_state.amount_input,
-                    &ls.wallet_state.destination_address,
+        if ls.wallet_state.send_currency_type == SupportedCurrency::Bitcoin {
+            if let Ok(amount) = ls.wallet_state.amount_input.parse::<f64>() {
+                let mut w = SingleKeyBitcoinWallet::new_wallet(
+                    pk.clone(), ls.node_config.network, true
+                ).expect("w");
+                let result = w.prepare_single(
+                    ls.wallet_state.destination_address.clone(),
+                    amount
                 );
-                ls.wallet_state.update_unsigned_tx(Some(result.clone()));
                 ls.wallet_state.signing_flow_transaction_box_msg = Some(
                     result.clone().json_or_combine()
                 );
                 let status = result.map(|_x| "Transaction Prepared".to_string())
                     .unwrap_or("Preparation Failed".to_string());
                 ls.wallet_state.signing_flow_status = Some(status);
+            }
+        } else {
+            match &ls.wallet_state.address_info {
+                None => {}
+                Some(ai) => {
+                    let result = prepare_transaction(
+                        ai,
+                        &ls.wallet_state.amount_input,
+                        &ls.wallet_state.destination_address,
+                    );
+                    ls.wallet_state.update_unsigned_tx(Some(result.clone()));
+                    ls.wallet_state.signing_flow_transaction_box_msg = Some(
+                        result.clone().json_or_combine()
+                    );
+                    let status = result.map(|_x| "Transaction Prepared".to_string())
+                        .unwrap_or("Preparation Failed".to_string());
+                    ls.wallet_state.signing_flow_status = Some(status);
+                }
             }
         }
         if ls.wallet_state.send_receive == Some(SendReceiveTabs::CustomTx) {
@@ -418,20 +525,41 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 });
             });
             if ui.button("Sign Transaction").clicked() {
-                match ls.wallet_state.tab {
-                    WalletTab::Hardware => {
-                        initiate_hardware_signing(
-                            t.clone(),
-                            ls.wallet_state.updates.sender.clone(),
-                            pk.clone().clone(),
-                        );
-                        ls.wallet_state.signing_flow_status = Some("Awaiting hardware response...".to_string());
+                if ls.wallet_state.send_currency_type == SupportedCurrency::Redgold {
+                    match ls.wallet_state.tab {
+                        WalletTab::Hardware => {
+                            initiate_hardware_signing(
+                                t.clone(),
+                                ls.wallet_state.updates.sender.clone(),
+                                pk.clone().clone(),
+                            );
+                            ls.wallet_state.signing_flow_status = Some("Awaiting hardware response...".to_string());
+                        }
+                        WalletTab::Software => {
+                            let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.wallet_state.derivation_path.clone()).expect("kp");
+                            let mut t2 = t.clone();
+                            let signed = t2.sign(&kp);
+                            ls.wallet_state.update_signed_tx(Some(signed));
+                        }
                     }
-                    WalletTab::Software => {
-                        let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.wallet_state.derivation_path.clone()).expect("kp");
-                        let mut t2 = t.clone();
-                        let signed = t2.sign(&kp);
-                        ls.wallet_state.update_signed_tx(Some(signed));
+                } else if ls.wallet_state.send_currency_type == SupportedCurrency::Bitcoin {
+                    match ls.wallet_state.tab {
+                        WalletTab::Hardware => {
+                            error!("Hardware signing not supported yet for btc");
+                        }
+                        WalletTab::Software => {
+                            error!("Software signing not yet supported for btc");
+                            // let mut w = SingleKeyBitcoinWallet::new_wallet(
+                            //     pk.clone(), ls.node_config.network, true
+                            // ).expect("w");
+                            // let result = w.prepare_single_sign(
+                            //     ls.wallet_state.destination_address.clone(),
+                            //     ls.wallet_state.amount_input.parse::<f64>().expect("f64")
+                            // );
+                            // if let Ok(tx) = result {
+                            //     let signed = w.sign_single(&tx);
+                            //     ls.wallet_state.update_signed_tx(Some(signed));
+                        }
                     }
                 }
             }
@@ -484,9 +612,14 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 ls.wallet_state.send_receive = some;
             }
         }
-
-        ui.heading(RichText::new(format!("Balance: {}", ls.wallet_state.balance.clone()))
-            .color(Color32::LIGHT_GREEN));
+        if ui.button("Swap").clicked() {
+            let some = Some(SendReceiveTabs::Swap);
+            if ls.wallet_state.send_receive == some.clone() {
+                ls.wallet_state.send_receive = None;
+            } else {
+                ls.wallet_state.send_receive = some;
+            }
+        }
 
         let layout = egui::Layout::right_to_left(egui::Align::RIGHT);
         ui.with_layout(layout, |ui| {
@@ -499,9 +632,8 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             };
             ui.label(ls.wallet_state.faucet_success.clone());
             if ui.button("Refresh Balance").clicked() {
-                let address = pk.address().expect("a");
-                get_address_info(ls.node_config.clone(), address,
-                                 NetworkEnvironment::Dev,
+                get_address_info(&ls.node_config, ls.wallet_state.public_key.clone().expect("pk"),
+                                 ls.wallet_state.show_btc_info.clone(),
                                  ls.wallet_state.updates.sender.clone(),
                 );
             };
@@ -530,9 +662,11 @@ pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
                         Ok(pk) => {
                             ls.wallet_state.public_key = Some(pk.clone());
                             ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                            get_address_info(ls.node_config.clone(), pk.address().expect("").clone(),
-                                             NetworkEnvironment::Dev,
-                                             ls.wallet_state.updates.sender.clone(),
+                            get_address_info(
+                                &ls.node_config,
+                                pk.clone(),
+                                ls.wallet_state.show_btc_info,
+                                ls.wallet_state.updates.sender.clone(),
                             );
                         }
                         Err(e) => {
@@ -706,8 +840,10 @@ pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
                             let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
                             ls.wallet_state.public_key = Some(pk.clone());
                             ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                            get_address_info(ls.node_config.clone(), pk.address().expect("").clone(),
-                                             NetworkEnvironment::Dev,
+                            get_address_info(
+                                &ls.node_config,
+                                pk,
+                                             ls.wallet_state.show_btc_info.clone(),
                                              ls.wallet_state.updates.sender.clone(),
                             );
                         }
@@ -804,7 +940,7 @@ fn broadcast_transaction(nc: NodeConfig, tx: Transaction, ne: NetworkEnvironment
     });
 }
 
-fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, public: PublicKey) {
+pub fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, public: PublicKey) {
     tokio::spawn(async move {
         let t = &mut t.clone();
         let res = trezor::sign_transaction(
@@ -845,12 +981,25 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
 
 
 pub fn get_address_info(
-    node_config: NodeConfig, address: Address, network: NetworkEnvironment,
+    node_config: &NodeConfig,
+    public_key: PublicKey,
+    show_btc_info: bool,
     update_channel: flume::Sender<StateUpdate>,
 ) {
-    let mut node_config = node_config;
-    node_config.network = network;
+    let mut node_config = node_config.clone();
+    let address = public_key.address().expect("works");
     let _ = tokio::spawn(async move {
+
+        let btc_bal = if show_btc_info {
+            let w = SingleKeyBitcoinWallet::new_wallet(
+                public_key.clone(), node_config.network.clone(), true)
+                .expect("worx");
+            let fb = w.get_wallet_balance().expect("b").confirmed as f64 / 100_000_000.0;
+            Some(fb)
+        } else {
+            None
+        };
+
         let client = node_config.api_client();
         let response = client
             .address_info(address).await;
@@ -863,6 +1012,8 @@ pub fn get_address_info(
                     ls.wallet_state.balance = o.to_string();
                     ls.wallet_state.balance_f64 = Some(o.clone());
                     ls.wallet_state.address_info = Some(ai.clone());
+                    ls.wallet_state.balance_btc_f64 = btc_bal.clone();
+                    ls.wallet_state.balance_btc = btc_bal.clone().map(|b| b.to_string());
                 })
             }
             Err(e) => {

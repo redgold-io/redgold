@@ -215,6 +215,12 @@ pub struct SingleKeyBitcoinWallet {
     custom_signer: Arc<MultipartySigner>
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct RawTransaction {
+    pub psbt: Option<PartiallySignedTransaction>,
+    pub transaction_details: Option<TransactionDetails>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExternalTimedTransaction {
     pub tx_id: String,
@@ -271,6 +277,59 @@ impl SingleKeyBitcoinWallet {
         }
         Ok(bitcoin_wallet)
     }
+    //
+    // pub fn new_hardware_wallet(
+    //     public_key: structs::PublicKey,
+    //     network: NetworkEnvironment,
+    //     do_sync: bool
+    // ) -> Result<Self, ErrorInfo> {
+    //     let network = if network == NetworkEnvironment::Main {
+    //         Network::Bitcoin
+    //     } else {
+    //         Network::Testnet
+    //     };
+    //     let client = Client::new("ssl://electrum.blockstream.info:60002")
+    //         .error_info("Error building bdk client")?;
+    //     let client = ElectrumBlockchain::from(client);
+    //     let database = MemoryDatabase::default();
+    //     let hex = public_key.hex_or();
+    //     let descr = format!("wpkh({})", hex);
+    //     let wallet = Wallet::new(
+    //         &*descr,
+    //         Some(&*descr),
+    //         network,
+    //         database
+    //     ).error_info("Error creating BDK wallet")?;
+    //     // let custom_signer = Arc::new(MultipartySigner::new(public_key.clone()));
+    //     let mut devices = HWIClient::enumerate()?;
+    //     if devices.is_empty() {
+    //         panic!("No devices found!");
+    //     }
+    //     let first_device = devices.remove(0)?;
+    //     let custom_signer = HWISigner::from_device(&first_device, HWIChain::Test)?;
+    //
+    //
+    //     let mut bitcoin_wallet = Self {
+    //         wallet,
+    //         public_key,
+    //         network,
+    //         psbt: None,
+    //         transaction_details: None,
+    //         client,
+    //         custom_signer: custom_signer.clone(),
+    //     };
+    //     // Adding the multiparty signer to the BDK wallet
+    //     bitcoin_wallet.wallet.add_signer(
+    //         KeychainKind::External,
+    //         SignerOrdering(200),
+    //         custom_signer.clone(),
+    //     );
+    //
+    //     if do_sync {
+    //         bitcoin_wallet.sync()?;
+    //     }
+    //     Ok(bitcoin_wallet)
+    // }
 
     pub fn sync(&self) -> Result<(), ErrorInfo> {
         self.wallet.sync(&self.client, SyncOptions::default()).error_info("Error syncing BDK wallet")?;
@@ -470,6 +529,43 @@ impl SingleKeyBitcoinWallet {
         // psbt.extract_tx()
         // psbt.clone().extract_tx().verify_with_flags()
         Ok(())
+    }
+
+
+    // Same as below
+
+    // Used for rendering json for gui
+    pub fn prepare_single(&mut self, dest: String, amount: f64) -> RgResult<String> {
+        let amount = (amount / (1e8f64)) as u64;
+        self.create_transaction_output_batch(vec![(dest, amount)])?;
+        self.render_json()
+    }
+
+    pub fn render_json(&self) -> RgResult<String> {
+        RawTransaction {
+            psbt: self.psbt.clone(),
+            transaction_details: self.transaction_details.clone(),
+        }.json()
+    }
+
+    pub fn prepare_single_sign(&mut self, dest: String, amount: f64, pkey_hex: String) -> RgResult<String> {
+        self.prepare_single(dest, amount)?;
+        self.local_sign_single(pkey_hex)
+    }
+
+    pub fn local_sign_single(&mut self, pkey_hex: String) -> RgResult<String> {
+        let kp = KeyPair::from_private_hex(pkey_hex)?;
+        let signables = self.signable_hashes()?;
+        for (i, (hash, sighashtype)) in signables.iter().enumerate() {
+            // println!("signable {}: {}", i, hex::encode(hash));
+            let prf = Proof::from_keypair(hash, kp);
+            self.affix_input_signature(i, &prf, sighashtype);
+        }
+        let finalized = self.sign()?;
+        if !finalized {
+            return Err(error_info("Not finalized"));
+        }
+        self.render_json()
     }
 
     pub fn send_local(&mut self, dest: String, amount: u64, pkey_hex: String) -> RgResult<()> {

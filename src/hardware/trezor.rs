@@ -218,6 +218,7 @@ pub fn sign_message(path: String, input_message: String) -> Result<SignMessageRe
 }
 
 
+
 pub const DEFAULT_ACCOUNT_NUM: u32 = 50;
 
 pub fn default_pubkey_path() -> String {
@@ -306,6 +307,11 @@ pub async fn sign_transaction(transaction: &mut Transaction, public: structs::Pu
         }
     }
     Ok(transaction.clone())
+}
+
+// Needs to match trezor expected format
+pub async fn sign_bitcoin_transaction(json_str: String) -> Result<String, ErrorInfo> {
+    trezor_cmd(vec!["btc", "sign-tx", &*json_str])
 }
 
 pub async fn sign_input(i: &mut Input, public: &structs::PublicKey, path: String, hash: &Hash)

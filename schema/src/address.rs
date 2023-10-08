@@ -59,6 +59,10 @@ impl Address {
         }
     }
 
+    pub fn is_bitcoin(&self) -> bool {
+        self.address_type == AddressType::BitcoinExternalString as i32
+    }
+
     pub fn render_string(&self) -> Result<String, ErrorInfo> {
         let result = self.address.safe_bytes()?;
         if self.address_type == AddressType::BitcoinExternalString as i32 {
