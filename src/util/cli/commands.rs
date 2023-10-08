@@ -229,10 +229,10 @@ pub fn add_server_prompt() -> Server {
     }
 }
 
-pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
+pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> Result<(), ErrorInfo> {
     let mut deploy = deploy.clone();
     if deploy.wizard {
-        deploy_wizard(&deploy, _config).await?;
+        deploy_wizard(&deploy, node_config).await?;
         return Ok(());
     }
 
@@ -244,8 +244,25 @@ pub async fn deploy(deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorIn
     if std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok() {
         deploy.genesis = true;
     }
+    let mut net = node_config.network.clone();
 
-    default_deploy(&mut deploy, _config, default_fun).await?;
+    if net == NetworkEnvironment::Local {
+        net = NetworkEnvironment::Dev;
+    } else {
+        if node_config.opts.network.is_none() {
+            if node_config.opts.development_mode {
+                net = NetworkEnvironment::Dev;
+            } else {
+                net = NetworkEnvironment::Main;
+            }
+        }
+        // Get node_config arg translate and set to dev if arg not supplied.
+    }
+
+    let mut nc = node_config.clone();
+    nc.network = net;
+
+    default_deploy(&mut deploy, &nc, default_fun).await?;
 
     Ok(())
 }

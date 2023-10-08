@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.18"
+version = "0.1.19"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -42,11 +42,11 @@ categories = ["cryptography::cryptocurrencies"]
 
 
 [workspace.dependencies]
-redgold-schema = { path = "schema", version = "0.1.18"}
-redgold-data = { path = "data", version = "0.1.18"}
-redgold-keys = { path = "keys", version = "0.1.18"}
-redgold-executor = { path = "executor", version = "0.1.18"}
-redgold-sdk-client = { path = "sdk-client", version = "0.1.18"}
+redgold-schema = { path = "schema", version = "0.1.19"}
+redgold-data = { path = "data", version = "0.1.19"}
+redgold-keys = { path = "keys", version = "0.1.19"}
+redgold-executor = { path = "executor", version = "0.1.19"}
+redgold-sdk-client = { path = "sdk-client", version = "0.1.19"}
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"

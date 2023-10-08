@@ -132,7 +132,7 @@
     {
       "scope": "type",
       "description": "serde support for enum",
-      "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString)]",
+      "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString, strum_macros::EnumIter)]",
       "paths": [
         "structs.PowProofType",
         "structs.RatingType",

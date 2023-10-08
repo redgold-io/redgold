@@ -144,6 +144,26 @@ impl LocalState {
         self.persist_local_state_store();
     }
 
+
+    pub fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> () {
+        let mut updated = self.local_stored_state.mnemonics.as_ref().unwrap_or(&vec![]).iter().filter(|x| {
+            x.name != new_named.name
+        }).map(|x| x.clone()).collect_vec();
+        updated.push(new_named);
+        self.local_stored_state.mnemonics = Some(updated);
+        self.persist_local_state_store();
+    }
+
+    pub fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> () {
+        let mut updated = self.local_stored_state.private_keys.as_ref().unwrap_or(&vec![]).iter().filter(|x| {
+            x.name != new_named.name
+        }).map(|x| x.clone()).collect_vec();
+        updated.push(new_named);
+        self.local_stored_state.private_keys = Some(updated);
+        self.persist_local_state_store();
+    }
+
+
     pub fn process_updates(&mut self) {
         match self.updates.recv_while() {
             Ok(updates) => {
@@ -170,8 +190,7 @@ impl LocalState {
         info!("ds_or connection path {}", string);
         ds_or.run_migrations_fallback_delete(
             true,
-            PathBuf::from(string
-            )
+            PathBuf::from(string)
         ).await.expect("migrations");
         // DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
@@ -319,7 +338,7 @@ use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use crate::gui::keys_tab::KeygenState;
-use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub};
+use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey};
 use crate::gui::common::{bounded_text_area, bounded_text_area_size_focus, editable_text_input_copy, valid_label};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
@@ -449,7 +468,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             let mut inner = arc.lock().expect("lock poisoned");
             *inner = format!("{}\n{}", &*inner, s);
             info!("Deploy result: {}", s);
-            Ok(())
+            Ok::<(), ErrorInfo>(())
         });
         tokio::spawn(async move {
             let mut d2 = d.clone();

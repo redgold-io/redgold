@@ -355,18 +355,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         deploy.skip_ops = true;
     }
     let mut net = node_config.network;
-    if net == NetworkEnvironment::Local {
-        net = NetworkEnvironment::Dev;
-    } else {
-        if node_config.opts.network.is_none() {
-            if node_config.opts.development_mode {
-                net = NetworkEnvironment::Dev;
-            } else {
-                net = NetworkEnvironment::Main;
-            }
-        }
-        // Get node_config arg translate and set to dev if arg not supplied.
-    }
+
     if net == NetworkEnvironment::Main {
         deploy.ask_pass = true;
     } else {
