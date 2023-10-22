@@ -18,7 +18,7 @@ use structs::{
     StructMetadata, Transaction,
 };
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerData, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerMetadata, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -615,13 +615,13 @@ pub fn decode_hex(h: String) -> Result<Vec<u8>, ErrorInfo> {
 }
 
 
-impl PeerData {
+impl PeerMetadata {
     pub fn proto_serialize(&self) -> Vec<u8> {
         return self.encode_to_vec();
     }
 
     pub fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, DecodeError> {
-        return PeerData::decode(&*bytes);
+        return PeerMetadata::decode(&*bytes);
     }
 
 }

@@ -1,4 +1,4 @@
-use crate::{Address, bytes_data, error_info, ErrorInfo, PeerData, RgResult, SafeOption, struct_metadata_new, structs, Transaction, WithMetadataHashable};
+use crate::{Address, bytes_data, error_info, ErrorInfo, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs, Transaction, WithMetadataHashable};
 use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, UtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof, Observation};
 use crate::transaction::amount_data;
 
@@ -204,7 +204,7 @@ impl TransactionBuilder {
         // self.balance
     }
 
-    pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerData, height: i64) -> &mut Self {
+    pub fn with_output_peer_data(&mut self, destination: &Address, pd: PeerMetadata, height: i64) -> &mut Self {
         let mut option = StandardData::peer_data(pd).expect("o");
         option.height = Some(height);
         self.with_options_height(height);

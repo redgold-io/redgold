@@ -89,7 +89,24 @@ pub fn bounded_text_area(ui: &mut Ui, string1: &mut String) {
 
 pub fn bounded_text_area_size(ui: &mut Ui, string1: &mut String, width: f32, height: usize) {
     ui.horizontal(|ui| {
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        let area = egui::ScrollArea::vertical()
+            .max_height(height as f32 * 100.)
+            .show(ui, |ui| {
+            egui::TextEdit::multiline(string1)
+                .desired_width(width)
+                .desired_rows(height)
+                .clip_text(true)
+                .ui(ui);
+        });
+    });
+}
+
+pub fn bounded_text_area_size_id(ui: &mut Ui, string1: &mut String, width: f32, height: usize, id_source: impl Into<String>) {
+    ui.horizontal(|ui| {
+        let area = egui::ScrollArea::vertical()
+            .id_source(id_source.into())
+            .max_height(height as f32 * 100.)
+            .show(ui, |ui| {
             egui::TextEdit::multiline(string1)
                 .desired_width(width)
                 .desired_rows(height)

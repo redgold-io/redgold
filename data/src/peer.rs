@@ -1,5 +1,5 @@
 use std::time::Duration;
-use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PartitionInfo, PeerData, PeerId, PeerNodeInfo, PublicKey, Transaction};
+use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PartitionInfo, PeerMetadata, PeerId, PeerNodeInfo, PublicKey, Transaction};
 use redgold_schema::{ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -258,7 +258,7 @@ impl PeerStore {
 
     pub async fn all_peers(
         &self
-    ) -> Result<Vec<PeerData>, ErrorInfo> {
+    ) -> Result<Vec<PeerMetadata>, ErrorInfo> {
         self.all_peers_tx().await?.iter().map(|tx| tx.peer_data()).collect()
     }
 

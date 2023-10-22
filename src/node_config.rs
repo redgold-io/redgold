@@ -12,7 +12,7 @@ use log::info;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::servers::Server;
 use redgold_schema::{RgResult, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerData, PeerId, Seed, TransportInfo, TrustData, VersionInfo};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerMetadata, PeerId, Seed, TransportInfo, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
@@ -279,6 +279,7 @@ impl NodeConfig {
             partition_info: None,
             peer_id: Some(self.peer_id.clone()),
             node_name: None,
+            deposit_addresses: vec![],
         }
     }
 
@@ -286,7 +287,7 @@ impl NodeConfig {
     pub fn peer_tx_fixed(&self) -> Transaction {
 
         let pair = self.words().default_pid_kp().expect("");
-        let mut pd = PeerData::default();
+        let mut pd = PeerMetadata::default();
         pd.peer_id = Some(self.peer_id());
         pd.node_metadata = vec![self.node_metadata_fixed()];
         pd.version_info = Some(self.version_info());

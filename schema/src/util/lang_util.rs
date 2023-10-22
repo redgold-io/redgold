@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use serde::Serialize;
 use crate::json_or;
 use crate::structs::ErrorInfo;
@@ -31,5 +32,20 @@ where T: Serialize, E: Serialize {
         self.map(|x| json_or(&x))
             .map_err(|x| json_or(&x))
             .combine()
+    }
+}
+
+pub trait VecAddBy<T, K> {
+    fn add_by(&mut self, other: T, func: fn(&T) -> &K) -> Vec<T>;
+}
+
+impl<T, K> VecAddBy<T, K> for Vec<T> where K : PartialEq, T: Clone {
+    fn add_by(&mut self, other: T, func: fn(&T) -> &K) -> Vec<T> {
+        let k = func(&other);
+        let mut res = self.iter().filter(|x| func(x) != k)
+            .map(|x| x.clone()
+            ).collect_vec();
+        res.push(other);
+        res
     }
 }

@@ -111,6 +111,7 @@ pub enum RgTopLevelSubcommand {
     Faucet(FaucetCli),
     Balance(BalanceCli),
     TestTransaction(TestTransactionCli),
+    TestCapture(TestCaptureCli),
 }
 
 
@@ -275,6 +276,10 @@ pub struct BalanceCli {
 /// minimum sizes.
 #[derive(Args, Debug, Clone)]
 pub struct TestTransactionCli {}
+
+/// Debug webcam capture
+#[derive(Args, Debug, Clone)]
+pub struct TestCaptureCli {}
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)
 #[derive(Args, Debug, Clone)]

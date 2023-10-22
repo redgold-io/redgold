@@ -161,7 +161,15 @@ message TransportInfo {
   optional bool nat_restricted = 12;
 }
 
-// This also needs a proof maybe?
+message DepositAddress {
+  // Multi-sig / t-ECDSA address
+  Address address = 1;
+  // If present, the public key associated with the address coordinator, if empty, the address is
+  // coordinated by self.
+  PublicKey owner = 2;
+}
+
+// Per node (machine) metadata, intended to be updated automatically by the hot key on the machine
 message NodeMetadata {
   // Information about how to contact the node
   TransportInfo transport_info = 1;
@@ -180,6 +188,7 @@ message NodeMetadata {
   optional string node_name = 8;
   // Corresponding public key of the overall identity controlling this, and other nodes
   PeerId peer_id = 9;
+  repeated DepositAddress deposit_addresses = 10;
 }
 
 /**
@@ -215,7 +224,21 @@ message IdentityMetadata {
   optional string twitter = 13;
 }
 
-message PeerData {
+message Weighting {
+  int64 value = 1;
+}
+
+message PortfolioWeighting {
+  optional SupportedCurrency currency = 1;
+  ProductId product_id = 2;
+  Weighting weight = 3;
+}
+
+message PortfolioInfo {
+  repeated PortfolioWeighting portfolio_weightings = 1;
+}
+
+message PeerMetadata {
   optional PeerId peer_id = 1;
   repeated NodeMetadata node_metadata = 4;
   repeated TrustRatingLabel labels = 5;
@@ -224,6 +247,7 @@ message PeerData {
   repeated Address sponsored_address = 8;
   IdentityMetadata identity_metadata = 12;
   NetworkEnvironment network_environment = 13;
+  PortfolioInfo portfolio_info = 14;
 }
 
 enum BytesDecoder {
@@ -283,7 +307,7 @@ message StandardData {
   // TODO: ResolvableDataReference fields for larger amounts of data
   // matrix typed value
   // Peer metadata field
-  optional PeerData peer_data = 8;
+  optional PeerMetadata peer_data = 8;
   optional NodeMetadata node_metadata = 9;
   optional DynamicNodeMetadata dynamic_node_metadata = 10;
   // Equivalent to 'block height', linear observation counter
@@ -296,6 +320,23 @@ message StandardData {
   BytesData state = 17;
   BytesData request = 18;
   StandardRequest standard_request = 19;
+  LiquidityRequest liquidity_request = 20;
+}
+
+message LiquidityRange {
+  CurrencyAmount min_inclusive = 1;
+  CurrencyAmount max_exclusive = 2;
+  bool allow_dynamic_fee = 3;
+  Weighting desired_fee_fraction = 4;
+  Weighting allocation_fraction = 5;
+}
+
+message LiquidityDeposit {
+  repeated LiquidityRange liquidity_ranges = 1;
+}
+
+message LiquidityRequest {
+  LiquidityDeposit liquidity_deposit = 1;
 }
 
 message KeyedTypedValue {
@@ -606,7 +647,7 @@ message EagerFullGossipPush {
   repeated Transaction transactions = 1;
   repeated Observation observations = 2;
   repeated ObservationEdge observation_edges = 3;
-  repeated PeerData peer_data = 7;
+  repeated PeerMetadata peer_data = 7;
 }
 
 // These should both be broadcasts at some point
@@ -632,7 +673,7 @@ message ResolveHashResponse {
   TransactionInfo transaction_info = 1;
   AddressInfo address_info = 2;
   Observation observation = 3;
-  PeerData peer_data = 4;
+  PeerMetadata peer_data = 4;
 }
 
 

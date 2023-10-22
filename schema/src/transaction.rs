@@ -4,7 +4,7 @@ use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType};
 use crate::utxo_id::OldUtxoId;
-use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerData, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
+use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use crate::transaction_builder::TransactionBuilder;
 
@@ -422,7 +422,7 @@ impl Transaction {
 
     // This function seems to halt with a bad amoubnt calll
 
-    pub fn peer_data(&self) -> Result<PeerData, ErrorInfo> {
+    pub fn peer_data(&self) -> Result<PeerMetadata, ErrorInfo> {
         let mut res = vec![];
         for o in &self.outputs {
             if let Some(data) = &o.data {
@@ -532,7 +532,7 @@ impl StandardData {
     pub fn empty() -> Self {
         Self::default()
     }
-    pub fn peer_data(pd: PeerData) -> Option<Self> {
+    pub fn peer_data(pd: PeerMetadata) -> Option<Self> {
         let mut mt = Self::empty();
         mt.peer_data = Some(pd);
         Some(mt)
