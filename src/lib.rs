@@ -23,6 +23,7 @@ pub mod observability;
 pub mod integrations;
 pub mod shuffle;
 pub mod test;
+pub mod qr_window;
 
 pub use redgold_schema as schema;
 pub use redgold_data as datas;

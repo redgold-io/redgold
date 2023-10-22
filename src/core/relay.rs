@@ -7,7 +7,7 @@ use std::time::Duration;
 use crate::core::internal_message;
 use crate::core::internal_message::Channel;
 use crate::schema::structs::{
-    Error, ErrorInfo, NodeState, PeerData, SubmitTransactionRequest, SubmitTransactionResponse,
+    Error, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
 use flume::Receiver;
@@ -19,7 +19,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, DepositAddress};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -48,7 +48,7 @@ pub struct TransactionErrorCache {
 
 #[derive(Clone)]
 pub struct TrustUpdate {
-    pub update: PeerData,
+    pub update: PeerMetadata,
     pub remove_peer: Option<Vec<u8>>,
 }
 //
@@ -395,6 +395,17 @@ impl Relay {
         // Really we should just gossip the transaction here.. or rely on discovery
         // let _ = self.submit_transaction_with(&updated, false).await?;
         Ok(())
+    }
+
+    pub async fn add_deposit_address(&self, d: &DepositAddress) -> RgResult<()> {
+        let mut nmd = self.node_metadata().await?;
+        let mut addrs = nmd.deposit_addresses.iter()
+            .filter(|d2| d2.address != d.address)
+            .map(|d| d.clone())
+            .collect_vec();
+        addrs.push(d.clone());
+        nmd.deposit_addresses = addrs;
+        self.update_node_metadata(&nmd).await
     }
 
     pub async fn sign_request(&self, req: &mut Request) -> RgResult<Request> {

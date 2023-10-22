@@ -6,7 +6,7 @@ use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{EasyJson, error_info, RgResult, SafeOption};
 use redgold_schema::local_stored_state::{Identity, NamedXpub};
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{PeerData, PublicKey, Transaction};
+use redgold_schema::structs::{PeerMetadata, PublicKey, Transaction};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::gui::app_loop::{LocalState, PublicKeyStoredState};
 use crate::gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
@@ -151,7 +151,7 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
         .filter(|s| s.peer_id_index == i.peer_id_index)
         .map(|c| c.clone())
         .collect_vec();
-    let mut peer_data = PeerData::default();
+    let mut peer_data = PeerMetadata::default();
     Server::peer_data(
         s,
         &mut peer_data,

@@ -1,5 +1,5 @@
 use std::time::Duration;
-use redgold_schema::structs::{Address, ContractStateMarker, ErrorInfo, UtxoId, Hash, NodeMetadata, PeerData, PeerId, PeerNodeInfo, PublicKey, StateSelector, Transaction};
+use redgold_schema::structs::{Address, ContractStateMarker, ErrorInfo, UtxoId, Hash, NodeMetadata, PeerMetadata, PeerId, PeerNodeInfo, PublicKey, StateSelector, Transaction};
 use redgold_schema::{ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;

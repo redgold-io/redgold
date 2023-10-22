@@ -17,6 +17,9 @@ pub mod keys_tab;
 pub mod common;
 pub mod tabs;
 pub mod top_panel;
+pub mod webcam;
+pub mod image_capture;
+pub mod qr_render;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]

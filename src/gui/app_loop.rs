@@ -86,9 +86,12 @@ pub struct LocalState {
     pub current_time: i64,
     pub keygen_state: KeygenState,
     pub wallet_state: WalletState,
+    pub qr_state: QrState,
+    pub qr_show_state: QrShowState,
     pub identity_state: IdentityState,
     pub settings_state: SettingsState,
     pub address_state: AddressState,
+    pub otp_state: OtpState,
     pub ds_env: DataStore,
     pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
@@ -235,9 +238,12 @@ impl LocalState {
                 node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
             ),
             wallet_state: WalletState::new(hot_mnemonic),
+            qr_state: Default::default(),
+            qr_show_state: Default::default(),
             identity_state: IdentityState::new(),
             settings_state: SettingsState::new(local_stored_state.json_or()),
             address_state: Default::default(),
+            otp_state: Default::default(),
             ds_env,
             ds_env_secure,
             local_stored_state,
@@ -292,14 +298,15 @@ use crate::node_config::NodeConfig; // 0.17.1
 pub enum Tab {
     Home,
     Keys,
-    Wallet,
+    Transact,
     Portfolio,
     Identity,
-    Friends,
+    Contacts,
     Address,
     Servers,
-    Trust,
+    Ratings,
     Settings,
+    OTP,
 }
 
 fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
@@ -342,9 +349,11 @@ use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, 
 use crate::gui::common::{bounded_text_area, bounded_text_area_size_focus, editable_text_input_copy, valid_label};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
+use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
 use crate::infra::deploy::default_deploy;
+use crate::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
 use crate::util::cli::args::Deploy;
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
@@ -600,11 +609,11 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             Tab::Settings => {
                 settings_tab(ui, ctx, local_state);
             }
-            Tab::Trust => {}
+            Tab::Ratings => {}
             Tab::Servers => {
                 servers_tab(ui, ctx, local_state);
             }
-            Tab::Wallet => {
+            Tab::Transact => {
                 wallet_screen(ui, ctx, local_state);
             }
             Tab::Identity => {
@@ -612,8 +621,10 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             }
             Tab::Address => {
                 crate::gui::tabs::address_tab::address_tab(ui, ctx, local_state);
+            },
+            Tab::OTP => {
+                otp_tab(ui, ctx, local_state);
             }
-
             _ => {}
         }
         // ui.hyperlink("https://github.com/emilk/egui_template");
@@ -625,6 +636,9 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             egui::warn_if_debug_build(ui)
         });
     });
+
+    qr_window(ctx, local_state);
+    qr_show_window(ctx, local_state);
 
     // sync local data to RDS -- apart from data associated with phrases
     // discuss extra features around confirmation process. p2p negotation, contacts table.

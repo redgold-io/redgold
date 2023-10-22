@@ -13,7 +13,7 @@ use tracing::debug;
 
 use redgold_schema::{error_info, ErrorInfoContext, json_or, SafeOption};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerData};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata};
 
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
@@ -128,7 +128,7 @@ impl PeerOutgoingEventHandler {
     }
 
     //
-    // async fn send_message_libp2p(&mut self, message: &PeerMessage, pd: &PeerData) -> Result<Response, ErrorInfo> {
+    // async fn send_message_libp2p(&mut self, message: &PeerMessage, pd: &PeerMetadata) -> Result<Response, ErrorInfo> {
     //     let nmd = pd.node_metadata[0].clone();
     //     let pk = nmd.public_key;
     //     let address_str_external = format!("/ip4/{}/tcp/{}", nmd.external_address, nmd.port_offset.safe_get()?.to_string());

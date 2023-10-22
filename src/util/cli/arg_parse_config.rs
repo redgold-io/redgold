@@ -21,6 +21,7 @@ use std::time::Duration;
 use bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
+use openssl_sys::exit;
 use tokio::runtime::Runtime;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
@@ -29,7 +30,7 @@ use redgold_schema::seeds::{get_seeds, get_seeds_by_env};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 use crate::util::cli::{args, commands};
-use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand};
+use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli};
 use crate::util::cli::commands::mnemonic_fingerprint;
 use crate::util::cli::data_folder::DataFolder;
 use crate::util::{init_logger, init_logger_main, ip_lookup, metrics_registry, not_local_debug_mode, sha256_vec};
@@ -47,6 +48,7 @@ pub fn get_default_data_top_folder() -> PathBuf {
 
 use redgold_schema::EasyJson;
 use crate::api::RgHttpClient;
+use crate::gui::image_capture::debug_capture;
 use crate::util::logging::Loggable;
 
 
@@ -137,6 +139,7 @@ impl ArgTranslate {
     }
 
     pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
+        self.immediate_debug();
         self.set_gui_on_empty();
         self.check_load_logger()?;
         self.determine_network()?;
@@ -587,6 +590,20 @@ impl ArgTranslate {
         if let Ok(a) = std::env::var("REDGOLD_ALIAS") {
             if !a.trim().is_empty() {
                 self.node_config.node_info.alias = Some(a.trim().to_string());
+            }
+        }
+    }
+    fn immediate_debug(&self) {
+        if let Some(cmd) = &self.opts.subcmd {
+            match cmd {
+                RgTopLevelSubcommand::TestCapture(t) => {
+                    println!("Attempting test capture");
+                    debug_capture();
+                    unsafe {
+                        exit(0)
+                    }
+                }
+                _ => {}
             }
         }
     }

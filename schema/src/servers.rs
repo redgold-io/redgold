@@ -7,7 +7,7 @@ use serde::Serialize;
 use serde::Deserialize;
 use crate::{error_info, ErrorInfoContext, json_or, json_pretty, RgResult};
 use crate::errors::EnhanceErrorInfo;
-use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerData, PeerId, PublicKey, TransportInfo, VersionInfo};
+use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, PublicKey, TransportInfo, VersionInfo};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
@@ -44,12 +44,12 @@ impl Server {
 
     pub fn peer_data(
         servers: Vec<Server>,
-        peer_data: &mut PeerData,
+        peer_data: &mut PeerMetadata,
         peer_id_index: i64,
         pk: HashMap<i64, PublicKey>,
         checksum: String,
         net: NetworkEnvironment
-    ) -> &mut PeerData {
+    ) -> &mut PeerMetadata {
         let mut nmds = vec![];
         peer_data.network_environment = net.clone() as i32;
         for s in servers {

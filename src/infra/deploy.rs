@@ -10,7 +10,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{EasyJson, RgResult, structs, WithMetadataHashable};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerData, PeerId, TrustRatingLabel, VersionInfo};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, TrustRatingLabel, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 
 use crate::hardware::trezor;
@@ -309,7 +309,7 @@ pub async fn derive_mnemonic_and_peer_id(
     if !peer_id_tx.contains_key(&pid_hex) {
 
         let pkey = pubkey.expect("k");
-        let mut peer_data = PeerData::default();
+        let mut peer_data = PeerMetadata::default();
         peer_data.peer_id = Some(PeerId::from_pk(pkey.clone()));
 
         let mut pkmap = HashMap::default();
