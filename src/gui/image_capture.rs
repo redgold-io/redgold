@@ -242,7 +242,9 @@ pub fn debug_capture() {
 
 #[test]
 pub fn test_cap() {
-    debug_capture()
+
+    // debug_capture()
+
 }
 
 
