@@ -9,7 +9,8 @@ RUN apt install -y automake libtool libssl-dev \
  libxcb-cursor-dev libxcb-xinerama0-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev \
  autoconf libxcb-xrm0 libxcb-xrm-dev automake libxcb-shape0-dev \
  g++ \
- sqlite3 libsqlite3-dev
+ sqlite3 libsqlite3-dev \
+ nasm
 #RUN rustup target add x86_64-unknown-linux-gnu
 #RUN rustup toolchain install stable-x86_64-unknown-linux-gnu
 ADD cargo_config ~/.cargo/config
