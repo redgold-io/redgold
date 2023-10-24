@@ -14,8 +14,8 @@
             <h3 class="detail-group">Address Details</h3>
             <div class="radio-holder" style="display: inline-block; margin-left: 10px;">
               <label class="radio-option"><input type="radio" value="all" v-model="transactionType" /> All</label>
-              <label class="radio-option"><input type="radio" value="incoming" v-model="transactionType" />Incoming</label>
-              <label class="radio-option"><input type="radio" value="outgoing" v-model="transactionType" />Outgoing</label>
+              <label class="radio-option"><input type="radio" value="incoming" v-model="transactionType" />  Incoming</label>
+              <label class="radio-option"><input type="radio" value="outgoing" v-model="transactionType" /> Outgoing</label>
             </div>
           </div>
           <div class="grid-container">
@@ -42,6 +42,71 @@
             <div>{{ hashData.outgoing_count }}</div>
 
           </div>
+
+          <div v-if="hashData.address_pool_info" class="grid-container">
+            <div><strong>BTC Balance</strong></div>
+            <div>{{ (hashData.address_pool_info.btc_balance / 1e8).toFixed(8) }} BTC</div>
+            <div><strong>RDG Address</strong></div>
+            <div><TextCopy :data="hashData.address_pool_info.rdg_address" /></div>
+            <div><strong>Public Key</strong></div>
+            <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
+            <div><strong>Center Price</strong></div>
+            <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /></div>
+            <div><strong>Spread</strong></div>
+            <div>
+              {{ hashData.address_pool_info.bid_ask.asks[0].price -
+            hashData.address_pool_info.bid_ask.bids[0].price }} RDG</div>
+
+          </div>
+
+          <div v-if="hashData.address_pool_info" >
+            <h3 class="detail-group">Bid Ask AMM Curve RDG/BTC</h3>
+            <div class="grid-container">
+              <Bar :data="computedBidData" :options="exampleOptions" class="chart-container" />
+              <Bar :data="computedAskData" :options="exampleOptions" class="chart-container" />
+            </div>
+
+            <h6 class="detail-group">Trade Calculator</h6>
+            <!-- BUY/SELL Radio Buttons -->
+            <label>
+              <input type="radio" v-model="calculatorTransactionType" value="BUY" /> BUY
+            </label>
+            <label>
+              <input type="radio" v-model="calculatorTransactionType" value="SELL" /> SELL
+            </label>
+
+            <!-- Input Boxes -->
+            <div v-if="calculatorTransactionType === 'BUY'">
+              <label>
+                USD:
+                <input type="number" class="search-input" v-model="inputUSD" />
+              </label>
+              <label>
+                BTC:
+                <input type="number" class="search-input" v-model="inputBTC" />
+              </label>
+            </div>
+            <div v-if="calculatorTransactionType === 'SELL'">
+              <label>
+                RDG:
+                <input type="number" v-model="inputRDG" />
+              </label>
+            </div>
+
+            <!-- Results Display -->
+            <div class="horizontal-display">
+              <span v-if="calculatorTransactionType === 'BUY'">You'll receive:</span>
+              <TextCopy v-if="calculatorTransactionType === 'BUY'" :data="rdg_buy_amount.toFixed(8)" />
+              <span v-if="calculatorTransactionType === 'BUY'">RDG</span>
+
+              <span v-if="calculatorTransactionType === 'SELL'">You'll receive:</span>
+              <TextCopy v-if="calculatorTransactionType === 'SELL'" :data="btc_sell_amount.toFixed(8)"/>
+              <span v-if="calculatorTransactionType === 'SELL'">BTC</span>
+            </div>
+
+          </div>
+
+
           <h3 class="detail-group">Transactions</h3>
           <div><BriefTransaction :transactions="filteredTransactions" /></div>
           <nav>
@@ -76,6 +141,7 @@
 </template>
 
 
+
 <script>
 
 // import HashLink from "@/components/HashLink.vue";
@@ -83,26 +149,302 @@ import CopyClipboard from "@/components/util/CopyClipboard.vue";
 // import RenderTime from "@/components/RenderTime.vue";
 import BriefTransaction from "@/components/BriefTransaction.vue";
 import fetchHashInfo from "@/components/mixins/fetchHashInfo";
+// import BidAskCurve from "@/components/BidAskCurve.vue";
+
+// import LineWithLineChart from '@/components/LineWithLineChart.ts'
+// import * as chartConfig from './chartConfig.js'
+import { Chart as ChartJS } from 'chart.js';
+import {   Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale
+} from 'chart.js';
+import { Bar } from 'vue-chartjs';
+import TextCopy from "@/components/util/TextCopy.vue";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+// ChartJS.defaults.global.defaultFontColor = '#FFFFFF';
 
 export default {
   name: 'TransactionDetail',
   props: ['hashDataInitial'],
   components: {
+    TextCopy,
     BriefTransaction,
     // RenderTime,
     // HashLink,
-    CopyClipboard
+    CopyClipboard,
+    Bar
   },
   data: function() {
     return {
+      inputUSD: null,
+      inputBTC: null,
+      inputRDG: null,
+      rdg_buy_amount: 0.0,
+      btc_sell_amount: 0.0,
+      usdBtcRate: 30000.0,
+      updatingValue: false,
+      lastEdited: null,  // Will hold either 'USD' or 'BTC'
+      calculatorTransactionType: 'BUY', // Default value is set to 'BUY'
+      // ... other data properties ...
       transactionType: 'all',
       currentPage: 1,
       perPage: 10,
-      hashData: this.hashDataInitial
+      hashData: this.hashDataInitial,
+      exampleBidAskData: {
+        labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', "", "", "", ""],
+        datasets: [
+          {
+            label: 'Data One',
+            backgroundColor: '#f87979',
+            data: [40, 39, 10, 40, 39, 80, 40, 40, 39, 10, 40, 39, 80, 40]
+          }
+        ]
+      },
+      ask: {
+        labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', "", "", "", ""],
+        datasets: [
+          {
+            label: 'Data One',
+            backgroundColor: '#f87979',
+            data: [40, 39, 10, 40, 39, 80, 40, 40, 39, 10, 40, 39, 80, 40]
+          }
+        ]
+      },
+    }
+  },
+  watch: {
+    inputUSD(newUSDValue) {
+      // If the value is updated by the other watcher, do not recompute
+      if (this.updatingValue || this.lastEdited === "BTC") return;
+
+      this.updatingValue = true;
+      let floatUSDValue = parseFloat(newUSDValue);
+      if (!isNaN(floatUSDValue)) {
+        console.log("New usd value " + floatUSDValue)
+        this.inputBTC = floatUSDValue / this.usdBtcRate;
+        this.lastEdited = "USD";
+        console.log("New BTC value " + this.inputBTC)
+
+      }
+      this.updatingValue = false;
+    },
+    inputRDG(newRDGValue) {
+      let floatRDGValue = parseFloat(newRDGValue);
+      console.log("New RDG value " + newRDGValue)
+      if (this.hashData.address_pool_info != null && !(isNaN(floatRDGValue))) {
+
+        let bids = this.hashData.address_pool_info.bid_ask.bids;
+        let total_rdg = floatRDGValue;
+        let total_fulfilled = 0;
+        console.log("Total RDG: " + total_rdg)
+        for (let i = 0; i < bids.length; i++) {
+          console.log("i: " + i)
+          let bid = bids[i];
+          let p_i = bid.price // RDG / BTC
+          let p = 1 / p_i // BTC / RDG
+          let v = bid.volume / 1e8 // amount BTC available for purchase via RDG
+          let requested_vol = total_rdg * p;
+          console.log("Requested vol: " + requested_vol)
+          console.log("bid: " + bid)
+          console.log("inverse_p: " + p)
+          console.log("v: " + v)
+          if (requested_vol > v) {
+            total_rdg -= v / p;
+            total_fulfilled += v
+          } else {
+            total_rdg = 0;
+            total_fulfilled += requested_vol
+            break
+          }
+        }
+        this.btc_sell_amount = total_fulfilled;
+      }
+    },
+    inputBTC(newBTCValue) {
+      let floatBtcValue = parseFloat(newBTCValue);
+
+      if (this.hashData.address_pool_info != null && !(isNaN(floatBtcValue))) {
+        let asks = this.hashData.address_pool_info.bid_ask.asks;
+        let total_btc = floatBtcValue;
+        let total_fulfilled = 0;
+        for (let i = 0; i < asks.length;  i++) {
+          let ask = asks[i];
+          let p = ask.price // RDG / BTC
+          let v = ask.volume / 1e8 // amount RDG available for sale via ask
+          let requested_vol = total_btc * p;
+          if (requested_vol > v) {
+            total_btc -= v / p;
+            total_fulfilled += v
+          } else {
+            total_btc = 0;
+            total_fulfilled += requested_vol
+            break
+          }
+        }
+        this.rdg_buy_amount = total_fulfilled;
+      }
+
+      // If the value is updated by the other watcher, do not recompute
+      if (this.updatingValue) return;
+
+      this.updatingValue = true;
+      if (!isNaN(floatBtcValue)) {
+        console.log("New usd value " + floatBtcValue)
+        this.inputUSD = floatBtcValue * this.usdBtcRate;
+      }
+      this.updatingValue = false;
     }
   },
   mixins: [fetchHashInfo],
   computed: {
+    exampleOptions(){
+      return {
+      responsive: false,
+      maintainAspectRatio: true,
+      // defaultFontColor: '#FFFFFF',
+      // scales: {
+      //   xAxes: [{
+      //     ticks: {
+      //       fontColor: '#FFFFFF'
+      //     }
+      //   }],
+      //   yAxes: [{
+      //     ticks: {
+      //       fontColor: '#FFFFFF'
+      //     }
+      //   }]
+      // },
+      // legend: {
+      //   labels: {
+      //     fontColor: '#FFFFFF'
+      //   }
+      // },
+      tooltips: {
+        titleFontColor: '#FFFFFF',
+        bodyFontColor: '#FFFFFF',
+        footerFontColor: '#FFFFFF',
+        callbacks: {
+          label: ((tooltipItems, data) => {
+            console.log(this)
+            return tooltipItems.yLabel + '£ yo ' + data;
+          }),
+          title: ((toolTipItems, data) => {
+            return "WTF " + toolTipItems + data;
+          })
+        }
+        // callbacks: {
+        //   title: function(tooltipItems, data) {
+        //     // Return the label for the current item
+        //     return "title: " + data.labels[tooltipItems[0].index];
+        //   },
+        //   label: function(tooltipItem, data) {
+        //     // Return the value for the current item
+        //     return "label: " + data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+        //   }
+        // }
+      },
+    }},
+
+    computedBidData() {
+      let labels = [];
+      let data = [];
+      let api = this.hashData.address_pool_info;
+      if (api != null) {
+        let ba = api.bid_ask;
+        console.log("Bid ask: " + ba);
+        if (ba != null) {
+          let bids = ba.bids;
+          if (bids != null) {
+            for (let i = 0; i < bids.length; i++) {
+              let bid = bids[i];
+              console.log("Bid " + bid);
+              if (bid.price != null) {
+                labels.push(bid.price);
+              }
+              if (bid.volume != null) {
+                data.push(bid.volume / 1e8);
+              }
+            }
+          }
+        }
+      }
+
+      let slice_len = 75;
+      let resultLabels = labels.map(value => {
+        // if ((index % 5) === 0) {
+          return value.toFixed(2);
+        // }
+        // return '';
+      }).reverse().slice(slice_len, labels.length);
+      let resultData = data.map(value => {
+          return value.toFixed(2);
+      }).reverse().slice(slice_len, data.length);
+      console.log("Result labels: " + resultLabels);
+      console.log("Result data: " + resultData);
+      return {
+        labels: resultLabels,
+        datasets: [
+          {
+            label: 'BTC Bid Volume',
+            backgroundColor: '#79f87f',
+            data: resultData
+          }
+        ]
+      }
+    },
+
+    computedAskData() {
+      let labels = [];
+      let data = [];
+      let api = this.hashData.address_pool_info;
+      if (api != null) {
+        let ba = api.bid_ask;
+        console.log("Bid ask: " + ba);
+        if (ba != null) {
+          let asks = ba.asks;
+          if (asks != null) {
+            for (let i = 0; i < asks.length; i++) {
+              let ask = asks[i];
+              console.log("Bid " + ask);
+              if (ask.price != null) {
+                labels.push(ask.price);
+              }
+              if (ask.volume != null) {
+                data.push(ask.volume / 1e8);
+              }
+            }
+          }
+        }
+      }
+
+      let slice_len = 25;
+      let resultLabels = labels.map(value => {
+          return value.toFixed(2);
+      }).slice(0, slice_len);
+      let resultData = data.map(value => {
+          return value.toFixed(2);
+      }).slice(0, slice_len);
+      console.log("Result asks labels: " + resultLabels);
+      console.log("Result asks data: " + resultData);
+      return {
+        labels: resultLabels,
+        datasets: [
+          {
+            label: 'RDG Ask Volume',
+            backgroundColor: '#f87979',
+            data: resultData
+          }
+        ]
+      }
+    },
+
+    // processedData() {
+    //   return this.preprocessData(this.bids, this.asks);
+    // },
     filteredTransactions() {
       if (this.transactionType === 'incoming') {
         return this.hashData.incoming_transactions;
@@ -134,6 +476,35 @@ export default {
     },
   },
   methods: {
+    // preprocessData(bids, asks) {
+    //   // Sort bids and asks
+    //   bids = bids.sort((a, b) => b[0] - a[0]);
+    //   asks = asks.sort((a, b) => a[0] - b[0]);
+    //
+    //   let bidPrices = bids.map(item => item[0]);
+    //   let bidQuantities = bids.map(item => item[1].cumulative || item[1]);
+    //
+    //   let askPrices = asks.map(item => item[0]);
+    //   let askQuantities = asks.map(item => item[1].cumulative || item[1]);
+    //
+    //   return {
+    //     labels: [...bidPrices, ...askPrices],
+    //     datasets: [
+    //       {
+    //         label: 'Bids',
+    //         data: bidQuantities,
+    //         borderColor: 'green',
+    //         fill: false
+    //       },
+    //       {
+    //         label: 'Asks',
+    //         data: askQuantities,
+    //         borderColor: 'red',
+    //         fill: false
+    //       }
+    //     ]
+    //   }
+    // },
     async goToPage(page) {
       if (page !== this.currentPage) {
         this.currentPage = page;
@@ -219,5 +590,49 @@ export default {
   color: #999; /* lighter grey text for disabled buttons */
 }
 
+.chart-container {
+  //position: relative; /* Important for responsive sizing */
+  height: 600px;
+  width: 600px;
+  color: #FFFFFF;
+}
+
+label {
+  margin-right: 20px; /* Adjust the value as per your requirement */
+}
+
+
+.search-bar {
+  background-color: #000;
+}
+
+.search-input,
+.search-input:focus {
+  box-sizing: border-box;
+  min-width: 200px;
+  max-width: 200px;
+  background-color: #191a19;
+  color: #fff;
+}
+.search-input::placeholder {
+  color: #ccc;
+}
+
+/* This will space out each <label> element */
+label {
+  //display: block; /* Makes labels appear on new lines */
+  margin-bottom: 10px; /* Adjust this value as per your preference */
+}
+
+/* This gives space below your headers and results */
+h6, .detail-group, div {
+  margin-bottom: 10px; /* Adjust this value as per your preference */
+}
+
+.horizontal-display {
+  display: flex;
+  align-items: normal; /* Vertically aligns the items in the center */
+  gap: 10px; /* Space between the items, adjust as needed */
+}
 
 </style>

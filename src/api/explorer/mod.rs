@@ -102,6 +102,8 @@ pub struct DetailedTransaction {
 
 #[derive(Serialize, Deserialize)]
 pub struct AddressPoolInfo {
+    public_key: String,
+    // rdg_pk_address: String,
     rdg_address: String,
     rdg_balance: f64,
     btc_address: String,
@@ -236,6 +238,7 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
             let btc_amount = (a.balance_btc as f64) / 1e8;
             let rdg_amount = (a.balance_rdg as f64) / 1e8;
             Some(AddressPoolInfo {
+                public_key: a.key.hex_or(),
                 rdg_address: a.key.address()?.render_string()?,
                 rdg_balance: rdg_amount,
                 btc_address: btc_swap_address,
