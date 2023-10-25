@@ -145,14 +145,14 @@ impl BidAsk {
     ) -> BidAsk {
 
         let bids = PriceVolume::generate(
-            available_balance as u64,
+            pair_balance,
             last_exchange_price,
             divisions,
             -(last_exchange_price*0.9),
             scale
         );
         let asks = PriceVolume::generate(
-            pair_balance,
+            available_balance as u64,
             last_exchange_price,
             divisions,
             last_exchange_price*100.0,
@@ -495,7 +495,10 @@ impl Watcher {
         let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
 
 
-        let bid_ask = BidAsk::generate_default(rdg_starting_balance, btc_starting_balance, bid_ask_original.center_price);
+        let bid_ask = BidAsk::generate_default(
+            rdg_starting_balance,
+            btc_starting_balance,
+            bid_ask_original.center_price);
 
         info!("Starting watcher process request with balances: RDG:{}, BTC:{} bid_ask: {}", rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
 
