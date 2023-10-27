@@ -73,6 +73,9 @@ pub async fn setup_server_redgold(
      } else {
          all_path.clone()
      };
+
+    ssh.exes(format!("mkdir -p {}", path), p).await?;;
+    ssh.exes(format!("mkdir -p {}", all_path), p).await?;;
      // Copy mnemonic / peer_id
      if let Some(words) = words {
          if network != NetworkEnvironment::Main {

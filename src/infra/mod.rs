@@ -13,6 +13,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::path::Path;
+use std::process::id;
+use log::info;
 
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 use ssh2::{Channel, Session};
@@ -70,16 +72,40 @@ impl SSH {
         let mut sess = Session::new().unwrap();
         sess.set_tcp_stream(tcp);
         sess.handshake().unwrap();
-        let home_dir = dirs::home_dir().expect("Cannot find home directory");
-        let buf = home_dir.join(".ssh");
-        let key_path = buf.join("id_rsa");
-        sess.userauth_pubkey_file(
-            &*self.user.clone().unwrap_or("root".to_string()),
-            None,
-            Path::new(&self.private_key_path.as_ref().unwrap_or(&key_path.to_str().expect("Cannot find key path").to_string())),
-            None,
-        )
-        .unwrap();
+
+        let mut agent = sess.agent().unwrap();
+
+        // Connect the agent and request a list of identities
+        agent.connect().unwrap();
+        agent.list_identities().unwrap();
+
+        for identity in agent.identities().unwrap() {
+            println!("{}", identity.comment());
+            let pubkey = identity.blob();
+            println!("public key {}", hex::encode(pubkey));
+        }
+
+        // Try to authenticate with the first identity in the agent.
+        sess.userauth_agent("root").unwrap();
+
+        // Make sure we succeeded
+        assert!(sess.authenticated());
+        // let home_dir = dirs::home_dir().expect("Cannot find home directory");
+        // let buf = home_dir.join(".ssh");
+        // let key_path = buf.join("id_rsa");
+        // let username = self.user.clone().unwrap_or("root".to_string());
+        // let string = key_path.to_str().expect("Cannot find key path").to_string();
+        // let x = self.private_key_path.as_ref().unwrap_or(&string);
+        // let path = Path::new(&x);
+        // println!("SSH with username: {username} and key path: {path:?}");
+        // std::fs::read_to_string(path.clone()).expect("read failure");
+        // sess.userauth_pubkey_file(
+        //     &*username,
+        //     None,
+        //     path,
+        //     None,
+        // )
+        // .unwrap();
         self.session = Some(sess.clone());
         return sess;
     }
@@ -393,17 +419,9 @@ fn debug_ssh() {
     //     return;
     // }
 
-    // let mut ssh = SSH::new_ssh("lb.redgold.io", None);
-    //
-    // ssh.docker_logs();
-    // Connect to the local SSH server
-    // let ssh = SSH {
-    //     addr: "redgold.cash:22".to_string(),
-    //     user: None,
-    //     private_key_path: None,
-    //     session: None
-    // };
-    //
+    let mut ssh = SSH::new_ssh("hostnoc.redgold.io", None);
+    ssh.verify().expect("works");
+
     // ssh.update_redgold()
 
     /*
