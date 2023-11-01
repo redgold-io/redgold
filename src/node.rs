@@ -58,7 +58,7 @@ use crate::core::recent_download::RecentDownload;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty::initiate_mp::default_room_id_signing;
-use crate::multiparty::watcher::Watcher;
+use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use crate::util::logging::Loggable;
@@ -185,7 +185,7 @@ impl Node {
         ).await);
 
         join_handles.push(stream_handlers::run_interval_fold(
-            Watcher::new(relay.clone()), relay.node_config.watcher_interval, false
+            DepositWatcher::new(relay.clone()), relay.node_config.watcher_interval, false
         ).await);
 
 
@@ -235,6 +235,7 @@ impl Node {
         ).await);
 
 
+        // TODO: Change all join handles to a single vec![] instantiation?
         join_handles.push(stream_handlers::run_interval_fold(
             DataDiscovery {
                 relay: relay.clone(),

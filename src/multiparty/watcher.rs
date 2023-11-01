@@ -19,6 +19,7 @@ use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
 use crate::node_config::NodeConfig;
+use crate::scrape::coinbase_btc_spot_latest;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::RgArgs;
 
@@ -54,6 +55,7 @@ impl PriceVolume {
         let first_term = available_volume as f64 * scale / (1.0 - ratio.powf(divisions_f64));
 
         let mut price_volumes = Vec::new();
+
         for i in 0..divisions {
             let price_offset = (i+1) as f64;
             let price = center_price + (price_offset * (price_width/divisions_f64));
@@ -116,8 +118,8 @@ impl BidAsk {
 
     pub fn regenerate(&self, price: f64) -> BidAsk {
         BidAsk::generate_default(
-            self.sum_bid_volume() as i64,
-            self.sum_ask_volume(),
+            self.sum_ask_volume() as i64,
+            self.sum_bid_volume(),
             price
         )
     }
@@ -131,31 +133,41 @@ impl BidAsk {
             available_balance,
             pair_balance,
             last_exchange_price,
-            100,
-            100.
+            50,
+            30.
         )
     }
 
     pub fn generate(
-        available_balance: i64,
-        pair_balance: u64,
+        available_balance_rdg: i64,
+        pair_balance_btc: u64,
         last_exchange_price: f64, // this is for available type / pair type
         divisions: i32,
         scale: f64
     ) -> BidAsk {
 
+        // A bid is an offer to buy RDG with BTC
+        // The volume should be denominated in BTC because this is how much is staked natively
         let bids = PriceVolume::generate(
-            pair_balance,
-            last_exchange_price,
+            pair_balance_btc,
+            last_exchange_price, // Price here is RDG/BTC
             divisions,
             -(last_exchange_price*0.9),
             scale
         );
+
+
+        // An ask price in the inverse of a bid price, since we want to denominate in RDG
+        // since the volume is in RDG.
+        // Here it is now BTC / RDG
+        let ask_price = 1.0 / last_exchange_price;
+        // An ask is how much BTC is being asked for each RDG
+        // Volume is denominated in RDG because this is what the contract is holding for resale
         let asks = PriceVolume::generate(
-            available_balance as u64,
-            last_exchange_price,
+            available_balance_rdg as u64,
+            ask_price,
             divisions,
-            last_exchange_price*100.0,
+            ask_price*3.0,
             scale
         );
         BidAsk {
@@ -239,16 +251,17 @@ pub struct DepositWatcherConfig {
     pub deposit_allocations: Vec<DepositKeyAllocation>,
     // TODO: Make this a map over currency type
     pub bid_ask: BidAsk,
-    pub last_btc_timestamp: u64
+    pub last_btc_timestamp: u64,
+    pub ask_bid_code_reset: Option<bool>
 }
 
 #[derive(Clone)]
-pub struct Watcher {
+pub struct DepositWatcher {
     relay: Relay,
     wallet: Vec<Arc<Mutex<SingleKeyBitcoinWallet>>>
 }
 
-impl Watcher {
+impl DepositWatcher {
     pub async fn genesis_funding(&self, destination: &Address) -> RgResult<()> {
         let (_, utxos) = Node::genesis_from(self.relay.node_config.clone());
         let u = utxos.get(15).safe_get_msg("Missing utxo")?.clone();
@@ -280,7 +293,7 @@ pub struct CurveUpdateResult {
     updated_allocation: DepositKeyAllocation
 }
 
-impl Watcher {
+impl DepositWatcher {
     pub fn new(relay: Relay) -> Self {
         Self {
             relay,
@@ -548,15 +561,17 @@ impl Watcher {
         Ok(update)
     }
 
-    pub async fn get_starting_center_price(&self) -> f64 {
-        // RDG / BTC
-        30_000.0
+    pub async fn get_starting_center_price_rdg_btc(&self) -> f64 {
+        let usd_btc = coinbase_btc_spot_latest().await.expect("works").usd_btc().expect("works");
+        let starting_usd = 100.0;
+        let rdg_btc = usd_btc / starting_usd;
+        rdg_btc
     }
 }
 
 
 #[async_trait]
-impl IntervalFold for Watcher {
+impl IntervalFold for DepositWatcher {
 
     #[tracing::instrument(skip(self))]
     async fn interval_fold(&mut self) -> RgResult<()> {
@@ -566,6 +581,9 @@ impl IntervalFold for Watcher {
         if self.relay.node_config.is_local_debug() {
             return Ok(())
         }
+
+        let usd_btc = coinbase_btc_spot_latest().await.log_error().and_then(|t| t.usd_btc())
+            .unwrap_or(30000.0f64);
 
         let ds = self.relay.ds.clone();
         // TODO: Change to query to include trust information re: deposit score
@@ -583,9 +601,10 @@ impl IntervalFold for Watcher {
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
         //.ok.andthen?
         if let Some(mut cfg) = cfg {
-            if cfg.bid_ask.center_price == 1f64 {
-                info!("Regenerating starting price due to zero stored in config.");
-                cfg.bid_ask = cfg.bid_ask.regenerate(self.get_starting_center_price().await);
+            if cfg.ask_bid_code_reset.is_none() {
+                info!("Regenerating starting price due to code reset");
+                cfg.bid_ask = cfg.bid_ask.regenerate(self.get_starting_center_price_rdg_btc().await);
+                cfg.ask_bid_code_reset = Some(true);
                 ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
             }
 
@@ -652,8 +671,9 @@ impl IntervalFold for Watcher {
                             balance_btc: 0,
                             balance_rdg: 0,
                         }],
-                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price().await },
+                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc().await },
                         last_btc_timestamp: 0,
+                        ask_bid_code_reset: None,
                     };
                     self.genesis_funding(&pk.address()?)
                         .await.add("Genesis watcher funding error").log_error().ok();

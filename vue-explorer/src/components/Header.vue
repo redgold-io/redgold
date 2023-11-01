@@ -86,6 +86,9 @@ export default {
   },
   async created() {
     this.usdBtc = await this.btcUsdPrice();
+    // Commit the value to the store
+    this.$store.commit('setBtcExchangeRate', this.usdBtc);
+
     console.log(this.usdBtc);
     this.usdBtcStr = this.usdBtc.toFixed(2);
     let swapInfo = await this.fetchSwapInfo();
