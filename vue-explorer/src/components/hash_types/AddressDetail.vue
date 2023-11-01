@@ -43,23 +43,28 @@
 
           </div>
 
-          <div v-if="hashData.address_pool_info" class="grid-container">
-            <div><strong>BTC Balance</strong></div>
-            <div>{{ (hashData.address_pool_info.btc_balance / 1e8).toFixed(8) }} BTC</div>
-            <div><strong>RDG Address</strong></div>
-            <div><TextCopy :data="hashData.address_pool_info.rdg_address" /></div>
-            <div><strong>Public Key</strong></div>
-            <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
-            <div><strong>Center Price</strong></div>
-            <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /></div>
-            <div><strong>Spread</strong></div>
-            <div>
-              {{ hashData.address_pool_info.bid_ask.asks[0].price -
-            hashData.address_pool_info.bid_ask.bids[0].price }} RDG</div>
 
-          </div>
 
           <div v-if="hashData.address_pool_info" >
+            <h3 class="detail-group">AMM Swap Info</h3>
+
+            <div class="grid-container">
+              <div><strong>BTC Balance</strong></div>
+              <div>{{ (hashData.address_pool_info.btc_balance / 1e8).toFixed(8) }} BTC</div>
+              <div><strong>RDG Address Balance</strong></div>
+              <div>{{ hashData.address_pool_info.rdg_balance.toFixed(8)}} RDG</div>
+              <div><strong>RDG Address</strong></div>
+              <div><TextCopy :data="hashData.address_pool_info.rdg_address" /></div>
+              <div><strong>Public Key</strong></div>
+              <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
+              <div><strong>Center Price</strong></div>
+              <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /> RDG/BTC </div>
+              <div><strong>Spread</strong></div>
+              <div>
+                {{ hashData.address_pool_info.bid_ask.asks[0].price -
+              hashData.address_pool_info.bid_ask.bids[0].price }} RDG</div>
+            </div>
+
             <h3 class="detail-group">Bid Ask AMM Curve RDG/BTC</h3>
             <div class="grid-container">
               <Bar :data="computedBidData" :options="exampleOptions" class="chart-container" />
@@ -185,7 +190,6 @@ export default {
       inputRDG: null,
       rdg_buy_amount: 0.0,
       btc_sell_amount: 0.0,
-      usdBtcRate: 30000.0,
       updatingValue: false,
       lastEdited: null,  // Will hold either 'USD' or 'BTC'
       calculatorTransactionType: 'BUY', // Default value is set to 'BUY'
@@ -224,34 +228,34 @@ export default {
       this.updatingValue = true;
       let floatUSDValue = parseFloat(newUSDValue);
       if (!isNaN(floatUSDValue)) {
-        console.log("New usd value " + floatUSDValue)
+        // console.log("New usd value " + floatUSDValue)
         this.inputBTC = floatUSDValue / this.usdBtcRate;
         this.lastEdited = "USD";
-        console.log("New BTC value " + this.inputBTC)
+        // console.log("New BTC value " + this.inputBTC)
 
       }
       this.updatingValue = false;
     },
     inputRDG(newRDGValue) {
       let floatRDGValue = parseFloat(newRDGValue);
-      console.log("New RDG value " + newRDGValue)
+      // console.log("New RDG value " + newRDGValue)
       if (this.hashData.address_pool_info != null && !(isNaN(floatRDGValue))) {
 
         let bids = this.hashData.address_pool_info.bid_ask.bids;
         let total_rdg = floatRDGValue;
         let total_fulfilled = 0;
-        console.log("Total RDG: " + total_rdg)
+        // console.log("Total RDG: " + total_rdg)
         for (let i = 0; i < bids.length; i++) {
-          console.log("i: " + i)
+          // console.log("i: " + i)
           let bid = bids[i];
           let p_i = bid.price // RDG / BTC
           let p = 1 / p_i // BTC / RDG
           let v = bid.volume / 1e8 // amount BTC available for purchase via RDG
           let requested_vol = total_rdg * p;
-          console.log("Requested vol: " + requested_vol)
-          console.log("bid: " + bid)
-          console.log("inverse_p: " + p)
-          console.log("v: " + v)
+          // console.log("Requested vol: " + requested_vol)
+          // console.log("bid: " + bid)
+          // console.log("inverse_p: " + p)
+          // console.log("v: " + v)
           if (requested_vol > v) {
             total_rdg -= v / p;
             total_fulfilled += v
@@ -275,9 +279,12 @@ export default {
           let ask = asks[i];
           let p = ask.price // RDG / BTC
           let v = ask.volume / 1e8 // amount RDG available for sale via ask
-          let requested_vol = total_btc * p;
+          let requested_vol = total_btc * p // RDG;
+          let thisBtc = v / p;
+          console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
+          thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
           if (requested_vol > v) {
-            total_btc -= v / p;
+            total_btc -= thisBtc;
             total_fulfilled += v
           } else {
             total_btc = 0;
@@ -293,7 +300,7 @@ export default {
 
       this.updatingValue = true;
       if (!isNaN(floatBtcValue)) {
-        console.log("New usd value " + floatBtcValue)
+        // console.log("New usd value " + floatBtcValue)
         this.inputUSD = floatBtcValue * this.usdBtcRate;
       }
       this.updatingValue = false;
@@ -301,6 +308,9 @@ export default {
   },
   mixins: [fetchHashInfo],
   computed: {
+    usdBtcRate() {
+      return this.$store.state.btcExchangeRate;
+    },
     exampleOptions(){
       return {
       responsive: false,
@@ -355,13 +365,13 @@ export default {
       let api = this.hashData.address_pool_info;
       if (api != null) {
         let ba = api.bid_ask;
-        console.log("Bid ask: " + ba);
+        // console.log("Bid ask: " + ba);
         if (ba != null) {
           let bids = ba.bids;
           if (bids != null) {
             for (let i = 0; i < bids.length; i++) {
               let bid = bids[i];
-              console.log("Bid " + bid);
+              // console.log("Bid " + bid);
               if (bid.price != null) {
                 labels.push(bid.price);
               }
@@ -383,8 +393,8 @@ export default {
       let resultData = data.map(value => {
           return value.toFixed(2);
       }).reverse().slice(slice_len, data.length);
-      console.log("Result labels: " + resultLabels);
-      console.log("Result data: " + resultData);
+      // console.log("Result labels: " + resultLabels);
+      // console.log("Result data: " + resultData);
       return {
         labels: resultLabels,
         datasets: [
@@ -403,13 +413,13 @@ export default {
       let api = this.hashData.address_pool_info;
       if (api != null) {
         let ba = api.bid_ask;
-        console.log("Bid ask: " + ba);
+        // console.log("Bid ask: " + ba);
         if (ba != null) {
           let asks = ba.asks;
           if (asks != null) {
             for (let i = 0; i < asks.length; i++) {
               let ask = asks[i];
-              console.log("Bid " + ask);
+              // console.log("Bid " + ask);
               if (ask.price != null) {
                 labels.push(ask.price);
               }
@@ -428,8 +438,8 @@ export default {
       let resultData = data.map(value => {
           return value.toFixed(2);
       }).slice(0, slice_len);
-      console.log("Result asks labels: " + resultLabels);
-      console.log("Result asks data: " + resultData);
+      // console.log("Result asks labels: " + resultLabels);
+      // console.log("Result asks data: " + resultData);
       return {
         labels: resultLabels,
         datasets: [

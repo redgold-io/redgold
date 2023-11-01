@@ -11,7 +11,7 @@ import CopyClipboard from "@/components/util/CopyClipboard.vue";
 export default {
   components: {CopyClipboard},
   props: {
-    data: String,
+    data: String
   }
 }
 </script>
