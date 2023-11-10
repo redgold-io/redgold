@@ -287,80 +287,131 @@ message StandardRequest {
   StateSelector selector = 1;
 }
 
-// Where to store parquet schema, avro schema, etc. etc.
+message SchemaDef {
+  optional string parquet = 1;
+}
 
-// Generic data structure designed to hold arbitrary data in a common format.
-// This should be considered supplementary to using a regular schema, not a
-// complete substitute.
-message StandardData {
-  // Standard currency style field
-  optional int64 amount = 1;
-
-  // Move to separate class instance still stored here?
-  // Direct data storage for small values
+message GenericTypedValue {
   optional TypedValue typed_value = 2;
   repeated TypedValue typed_value_list = 3;
   optional KeyedTypedValue keyed_typed_value = 4;
   repeated KeyedTypedValue keyed_typed_value_list = 5;
   optional MatrixTypedValue matrix_typed_value = 6;
   repeated MatrixTypedValue matrix_typed_value_list = 7;
-  // TODO: ResolvableDataReference fields for larger amounts of data
-  // matrix typed value
-  // Peer metadata field
+}
+
+message ExternalTransactionId {
+  string identifier = 1;
+}
+
+// Generic data structure designed to hold arbitrary data in a common format.
+// This should be considered supplementary to using a regular schema, not a
+// complete substitute.
+message StandardData {
+  // Standard currency style field
+  CurrencyAmount amount = 1;
+  GenericTypedValue generic_typed_value = 2;
+  // Where a peer (representing a person controlling multiple nodes from a cold wallet,) updates it's metadata
+  // within a transaction
   optional PeerMetadata peer_data = 8;
+  // Where an online or live node programmatically updates it's own metadata using it's live hot keys
   optional NodeMetadata node_metadata = 9;
+  // Latest value associated with the online / hot node -- updated more frequently and not necessarily tracked in
+  // every transaction, but kept here for reference.
   optional DynamicNodeMetadata dynamic_node_metadata = 10;
   // Equivalent to 'block height', linear observation counter
   optional int64 height = 11;
+  // Reference to externally resolved data
   Hash data_hash = 12;
+  // Pure hash reference, without necessarily being backed by any specific data.
   Hash hash = 13;
+  // Used for node transactions related to their internal observation formation, equivalent to a 'local' block
   Observation observation = 14;
-  optional string bitcoin_address = 15;
-  optional string bitcoin_txid = 16;
+  // Used for referencing bitcoin address, kept here at top level for convenience
+  Address address = 15;
+  // Used to store state information directly following eUTXO conventions
   BytesData state = 17;
+  // Contract style request, similar to Ethereum transaction for updating a smart contract, from an external user
   BytesData request = 18;
+  // Contract style response, similar to above, but specifically typed to correspond to a 'default' schema driven
+  // request common to all contracts and available automatically in the SDK.
   StandardRequest standard_request = 19;
+  // Staking request, designed for use with the native AMM/Portfolio functions.
   LiquidityRequest liquidity_request = 20;
+  // Portfolio information, used for updating the current 'target' state of a portfolio
+  PortfolioInfo portfolio_info = 21;
+  // Schema definition for the data, used for parsing and validation
+  SchemaDef schema_def = 22;
+  // Generic bytes data, used for storing arbitrary data
+  BytesData data = 23;
+  // For eUTXO style contracts, the hash of all state information aggregated from initial state origin.
+  // Can be re-calculated.
+  Hash aggregate_state_hash = 24;
+  // A bitcoin txid for example
+  ExternalTransactionId external_transaction_id = 25;
 }
 
+// Native staking range to provide liquidity within. Trades cannot be executed outside of this range
 message LiquidityRange {
+  // No trades can be executed below this amount
   CurrencyAmount min_inclusive = 1;
+  // No trades can be executed above this amount
   CurrencyAmount max_exclusive = 2;
+  // Whether or not to allow dynamic fee calculation
   bool allow_dynamic_fee = 3;
+  // Minimum fees required to be collected for this range
   Weighting desired_fee_fraction = 4;
+  // How much of the total input staking quantity to allocate to this range
   Weighting allocation_fraction = 5;
 }
 
+// Request to withdraw liquidity from a pool
+message LiquidityWithdrawal {
+  Address destination = 1;
+}
+
+// Pre-claim deposit operation designating native multiparty groups to watch address for native deposits
+// Requires that the address on this network match the address of the external network, so that the private
+// key used for both is the same.
 message LiquidityDeposit {
+  // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within
   repeated LiquidityRange liquidity_ranges = 1;
 }
 
+// Request to update external liquidity to a native pool
 message LiquidityRequest {
-  LiquidityDeposit liquidity_deposit = 1;
+  // A marker for a future external (native to the external currency,) deposit to a multiparty AMM-like pool
+  LiquidityDeposit deposit = 1;
+  // A withdrawl request, indicating to the pool to send funds to the specified external chain address
+  LiquidityWithdrawal withdrawal = 2;
 }
 
+// Generically typed value, used for storing arbitrary data in a common format.
 message KeyedTypedValue {
+  // Generically typed key, for lookups
   TypedValue key = 1;
+  // Generically typed value, for storage
   TypedValue value = 2;
 }
 
+// Same as KeyedTypedValue, but specific for matrix data.
 message MatrixTypedValue {
   TypedValue key_i = 1;
   TypedValue key_j = 2;
   TypedValue value = 3;
 }
 
+// Generically typed value class, used for representing arbitrary data
 message TypedValue {
-  // amount
   optional BytesData bytes_value = 2;
   optional string string_value = 3;
   optional uint64 uint64_value = 1;
   optional int64 int64_value = 5;
   // Used to avoid Eq comparison problem in rust for strings encoded from floats.
+  // Can also use bytes_value, but this is easier to read.
   optional string float_value = 7;
   optional string double_value = 4;
   optional bool bool_value = 6;
-  // TODO: consider adding the rest of the proto types?
 }
 
 enum StandardContractType {
@@ -944,6 +995,7 @@ enum AddressType {
 message Address {
   BytesData address = 1;
   AddressType address_type = 2;
+  optional SupportedCurrency currency = 3;
 }
 
 message QueryAddressesRequest {

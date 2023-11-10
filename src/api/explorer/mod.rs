@@ -97,6 +97,7 @@ pub struct DetailedTransaction {
     pub outputs: Vec<DetailedOutput>,
     pub rejection_reason: Option<ErrorInfo>,
     pub signable_hash: String,
+    pub raw_transaction: Transaction
 }
 
 
@@ -548,6 +549,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
             outputs,
             rejection_reason: t.rejection_reason,
             signable_hash: tx.signable_hash().hex(),
+            raw_transaction: tx.clone(),
         };
         h.transaction = Some(detailed)
     }

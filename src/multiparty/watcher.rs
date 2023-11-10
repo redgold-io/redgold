@@ -422,7 +422,9 @@ impl DepositWatcher {
             let source_address = first_input_addr.safe_get_msg("Missing address")?;
             let input_pk_btc_addr = t.first_input_proof_public_key().as_ref()
                 .and_then(|&pk| pk.to_bitcoin_address_network(self.relay.node_config.network.clone()).ok());
-            let opt_btc_addr = t.output_bitcoin_address_of(key_address).cloned()
+            let opt_btc_addr = t.output_bitcoin_address_of(key_address)
+                .cloned()
+                .and_then(|a| a.render_string().ok())
                 .or(input_pk_btc_addr);
             let destination_address_string_btc = opt_btc_addr.safe_get_msg("Missing destination address")?.clone();
             let dest = structs::Address::from_bitcoin(&destination_address_string_btc);
@@ -463,6 +465,7 @@ impl DepositWatcher {
                 let input_pk_btc_addr = t.first_input_proof_public_key().as_ref()
                     .and_then(|&pk| pk.to_bitcoin_address_network(self.relay.node_config.network.clone()).ok());
                 let opt_btc_addr = t.output_bitcoin_address_of(&key_address).cloned()
+                    .and_then(|a| a.render_string().ok())
                     .or(input_pk_btc_addr);
                 let amount_rdg = t.output_swap_amount_of(&key_address);
                 let destination_address_string_btc = opt_btc_addr.safe_get_msg("Missing destination address")?.clone();
@@ -517,6 +520,14 @@ impl DepositWatcher {
 
 
         let mut bid_ask_latest = bid_ask.clone();
+
+        // Grab all recent transactions associated with this key address for on-network
+        // transactions
+        let tx: Vec<structs::Transaction> = self.relay.ds.transaction_store
+            .get_filter_tx_for_address(&key_address, 10000, 0, true).await?;
+
+        // tx.iter().filter(|t| t.pre)
+
 
         // Prepare Fulfill Asks RDG Transaction from BTC deposits to this multiparty address,
         // but don't yet broadcast the transaction.
