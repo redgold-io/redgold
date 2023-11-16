@@ -224,7 +224,7 @@ impl<'r> FromRequest<'r> for LastEventId {
              */
             Some(Err(_parse_err)) => {
                 let tuple = (Status::BadRequest, "last seen msg id is not valid");
-                let o: rocket::outcome::Outcome<LastEventId, (Status, Self::Error), ()> = Outcome::Failure(tuple);
+                let o: rocket::outcome::Outcome<LastEventId, (Status, Self::Error), ()> = rocket::outcome::Outcome::Failure(tuple);
                 o
             }
             None => Outcome::Success(LastEventId(None)),
