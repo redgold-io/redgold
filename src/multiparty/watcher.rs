@@ -448,6 +448,7 @@ impl DepositWatcher {
         Ok(())
     }
 
+
     pub async fn get_rdg_withdrawals_bids(&self, bid_ask: BidAsk, key_address: &structs::Address) -> RgResult<WithdrawalBitcoin> {
         let mut bid_ask_latest = bid_ask.clone();
         // These are all transactions that have been sent as RDG to this deposit address,
