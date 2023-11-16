@@ -10,7 +10,7 @@ use futures::Stream;
 use log::info;
 use rocket::data::ToByteUnit;
 use rocket::http::Status;
-use rocket::request::{FromRequest, Outcome, Request};
+use rocket::request::{FromRequest, Request};
 use rocket::response::stream::{stream, Event, EventStream};
 use rocket::serde::json::Json;
 use rocket::State;
@@ -210,13 +210,13 @@ struct LastEventId(Option<u16>);
 impl<'r> FromRequest<'r> for LastEventId {
     type Error = &'static str;
 
-    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+    async fn from_request(request: &'r Request<'_>) -> rocket::request::Outcome<Self, Self::Error> {
         let header = request
             .headers()
             .get_one("Last-Event-ID")
             .map(|id| id.parse::<u16>());
         match header {
-            Some(Ok(last_seen_msg)) => Outcome::Success(LastEventId(Some(last_seen_msg))),
+            Some(Ok(last_seen_msg)) => rocket::request::Outcome::Success(LastEventId(Some(last_seen_msg))),
             /*
             26
 221 |                 Outcome::Failure((Status::BadRequest, "last seen msg id is not valid"))
@@ -227,7 +227,7 @@ impl<'r> FromRequest<'r> for LastEventId {
                 let o: rocket::outcome::Outcome<LastEventId, (Status, Self::Error), ()> = rocket::outcome::Outcome::Failure(tuple);
                 o
             }
-            None => Outcome::Success(LastEventId(None)),
+            None => rocket::request::Outcome::Success(LastEventId(None)),
         }
     }
 }
