@@ -228,7 +228,8 @@ impl<'r> FromRequest<'r> for LastEventId {
                 // rocket::outcome::Outcome::Failure(tuple);
                 // rocket::data::Outcome::Failure(tuple);
                 // let o = rocket::request::Outcome::Failure(tuple);
-                // This is wrong but can't get CI to work here?
+                // This is wrong but can't get CI to work here? so lets just return something wrong
+                // probavly wont break it
                 rocket::request::Outcome::Success(LastEventId(None))
                 // o
             }
