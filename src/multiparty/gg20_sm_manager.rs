@@ -217,8 +217,15 @@ impl<'r> FromRequest<'r> for LastEventId {
             .map(|id| id.parse::<u16>());
         match header {
             Some(Ok(last_seen_msg)) => Outcome::Success(LastEventId(Some(last_seen_msg))),
+            /*
+            26
+221 |                 Outcome::Failure((Status::BadRequest, "last seen msg id is not valid"))
+    |                          ^^^^^^^ variant or associated item not found in `Outcome<_, (Status, _), Status>`
+             */
             Some(Err(_parse_err)) => {
-                Outcome::Failure((Status::BadRequest, "last seen msg id is not valid"))
+                let tuple = (Status::BadRequest, "last seen msg id is not valid");
+                let o: rocket::outcome::Outcome<LastEventId, (Status, Self::Error), ()> = Outcome::Failure(tuple);
+                o
             }
             None => Outcome::Success(LastEventId(None)),
         }
