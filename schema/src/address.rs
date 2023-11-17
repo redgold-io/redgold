@@ -1,4 +1,4 @@
-use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, UtxoEntry};
+use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
 use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess};
 use crate::{error_message, structs};
 use std::io::Write;
@@ -56,6 +56,7 @@ impl Address {
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::BitcoinExternalString as i32,
+            currency: Some(SupportedCurrency::Bitcoin as i32),
         }
     }
 
@@ -131,6 +132,7 @@ impl Address {
         Address {
             address: bytes_data(address),
             address_type: AddressType::Sha3224ChecksumPublic as i32,
+            currency: None,
         }
     }
 
@@ -149,8 +151,8 @@ impl AddressInfo {
         for r in &entries {
             if let Some(o) = &r.output {
                 if let Some(d) = &o.data {
-                    if let Some(a) = d.amount {
-                        bal += a;
+                    if let Some(a) = &d.amount {
+                        bal += a.amount;
                     }
                 }
             }

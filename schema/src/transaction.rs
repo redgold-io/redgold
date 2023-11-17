@@ -267,18 +267,29 @@ impl Transaction {
             }).sum::<i64>()
     }
 
-    pub fn output_bitcoin_address_of(&self, address: &Address) -> Option<&String> {
-        self.outputs
-            .iter()
-            .filter(|o| {
-                if o.is_swap() {
-                    o.address.as_ref()
-                        .filter(|&a| a == address).is_some()
-                } else {
-                    false
-                }
-            })
-            .filter_map(|o| o.data.as_ref().and_then(|d| d.bitcoin_address.as_ref()))
+    pub fn output_bitcoin_address_of(&self, address: &Address) -> Option<&Address> {
+        address.render_string().ok().and_then(|s| {
+            self.outputs
+                .iter()
+                .filter(|o| {
+                    o.is_swap()
+                        .then(|| o.address.as_ref())
+                        .flatten()
+                        .and_then(|a| a.render_string().ok())
+                        .filter(|a| {
+                            a == &s
+                        })
+                        .is_some()
+                })
+                .filter_map(|o| o.data.as_ref().and_then(|d| d.address.as_ref()))
+                .next()
+        })
+    }
+
+    pub fn liquidity_of(&self, a: &Address) -> Option<&Output> {
+        self.outputs.iter()
+            .filter(|o| o.address.as_ref().filter(|&b| b == a).is_some())
+            .filter(|o| o.is_liquidity())
             .next()
     }
 
@@ -539,19 +550,10 @@ impl StandardData {
     }
     pub fn amount_data(amount: u64) -> Option<Self> {
         let mut mt = Self::empty();
-        mt.amount = Some(amount as i64);
+        mt.amount = Some(CurrencyAmount::from(amount as i64));
         Some(mt)
     }
 
-    pub fn bytes_data(bytes: &Vec<u8>) -> Self {
-        let mut mt = Self::empty();
-        mt.typed_value = Some(TypedValue::bytes(bytes));
-        mt
-    }
-
-    pub fn bytes(&self) -> Option<&BytesData> {
-        self.typed_value.as_ref().and_then(|t| t.bytes_value.as_ref())
-    }
 
 }
 

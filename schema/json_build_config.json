@@ -9,6 +9,10 @@
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
         "structs.TransportInfo",
+        "structs.GenericTypedValue",
+        "structs.SchemaDef",
+        "structs.LiquidityWithdrawal",
+        "structs.ExternalTransactionId",
         "structs.LiquidityRequest",
         "structs.LiquidityRange",
         "structs.LiquidityDeposit",

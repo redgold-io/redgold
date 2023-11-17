@@ -262,3 +262,8 @@ pub(crate) async fn run_server(port: u16, relay: Relay) -> Result<(), Box<dyn st
         .await?;
     Ok(())
 }
+
+#[test]
+fn debug() {
+
+}
