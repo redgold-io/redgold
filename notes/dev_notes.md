@@ -15,7 +15,7 @@ curl -X POST http://localhost:16181/request \
 
 
 
-curl -X POST http://hostnoc.redgold.io:16181/request \
+curl -X POST http://lb.redgold.io:16181/request \
 -H 'Content-Type: application/json' \
 -d '{"about_node_request": {"verbose": true}}'
 

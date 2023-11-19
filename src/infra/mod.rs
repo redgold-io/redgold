@@ -411,7 +411,7 @@ impl SSH {
 // }
 
 // https://grafana.com/docs/grafana/latest/installation/docker/
-// #[ignore]
+#[ignore]
 #[test]
 fn debug_ssh() {
     // let do_run = std::env::var("REDGOLD_LOCAL_DEBUG");
@@ -419,8 +419,8 @@ fn debug_ssh() {
     //     return;
     // }
 
-    let mut ssh = SSH::new_ssh("hostnoc.redgold.io", None);
-    ssh.verify().expect("works");
+    // let mut ssh = SSH::new_ssh("lb.redgold.io", None);
+    // ssh.verify().expect("works");
 
     // ssh.update_redgold()
 
