@@ -10,6 +10,7 @@
 
 <script>
 import HeaderBox from './components/Header.vue';
+// import store from './store'; // Import the store
 
 export default {
   name: 'App',

@@ -175,6 +175,7 @@ impl PublicClient {
                     .map(|a| Address {
                         address: bytes_data(a.clone()),
                         address_type: AddressType::Sha3224ChecksumPublic as i32,
+                        currency: None,
                     })
                     .collect_vec(),
             });

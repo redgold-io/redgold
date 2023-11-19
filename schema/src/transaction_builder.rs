@@ -155,7 +155,7 @@ impl TransactionBuilder {
     pub fn with_last_output_deposit_swap(&mut self, btc_txid: String) -> &mut Self {
         if let Some(o) = self.transaction.outputs.last_mut() {
             if let Some(d) = o.data.as_mut() {
-                d.bitcoin_txid = Some(btc_txid)
+                d.external_transaction_id = Some(crate::structs::ExternalTransactionId{identifier: btc_txid.clone()});
             }
         }
         self

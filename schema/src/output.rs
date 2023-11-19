@@ -101,6 +101,10 @@ impl Output {
         self.data.as_ref().and_then(|c| c.peer_data.as_ref()).is_some()
     }
 
+    pub fn is_liquidity(&self) -> bool {
+        self.data.as_ref().and_then(|c| c.liquidity_request.as_ref()).is_some()
+    }
+
     pub fn utxo_entry(
         &self,
         transaction_hash: &Hash,
@@ -114,12 +118,16 @@ impl Output {
     }
 
     pub fn amount(&self) -> u64 {
-        self.data.as_ref().unwrap().amount.unwrap() as u64
+        self.amount_i64() as u64
+    }
+
+    pub fn amount_i64(&self) -> i64 {
+        self.data.as_ref().unwrap().amount.clone().unwrap().amount
     }
 
     pub fn safe_ensure_amount(&self) -> Result<&i64, ErrorInfo> {
-        self.data.safe_get_msg("Missing data field on output")?
-            .amount.safe_get_msg("Missing amount field on output")
+        Ok(&self.data.safe_get_msg("Missing data field on output")?
+            .amount.safe_get_msg("Missing amount field on output")?.amount)
     }
 
     pub fn observation(&self) -> RgResult<&Observation> {
@@ -128,12 +136,13 @@ impl Output {
     }
 
     pub fn opt_amount(&self) -> Option<i64> {
-        self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
+        self.data.safe_get_msg("Missing data field on output").ok()
+            .and_then(|data| data.amount.as_ref())
+            .map(|data| data.amount)
     }
 
     pub fn opt_amount_typed(&self) -> Option<CurrencyAmount> {
-        self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount)
-            .map(|a| CurrencyAmount::from(a))
+        self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount.clone())
     }
 
     pub fn rounded_amount(&self) -> f64 {
