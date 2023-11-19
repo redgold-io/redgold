@@ -215,6 +215,8 @@ pub struct Deploy {
     pub debug_skip_start: bool,
     #[clap(long)]
     pub passphrase: bool,
+    #[clap(long)]
+    pub hard_coord_reset: bool,
 
 
 }

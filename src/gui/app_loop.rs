@@ -39,6 +39,7 @@ pub struct ServersState {
     genesis: bool,
     ops: bool,
     purge_ops: bool,
+    hard_coord_reset: bool,
     deployment_result: Option<String>
 }
 
@@ -231,6 +232,7 @@ impl LocalState {
                 genesis: node_config.opts.development_mode,
                 ops: false,
                 purge_ops: false,
+                hard_coord_reset: false,
                 deployment_result: None,
             },
             current_time: util::current_time_millis_i64(),
@@ -452,6 +454,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
         if local_state.node_config.opts.development_mode {
             ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
+            ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
         }
         ui.label("Single Server Index:");
         TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
@@ -470,6 +473,13 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         d.purge = local_state.server_state.purge;
         d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
         d.genesis = local_state.server_state.genesis;
+
+        let hard = local_state.server_state.hard_coord_reset.clone();
+        if hard {
+            d.hard_coord_reset = true;
+            d.purge = true;
+            d.debug_skip_start = true;
+        }
         let config = local_state.node_config.clone();
         let mut arc = local_state.server_state.deployment_result_info_box.clone();
         let fun = Box::new(move |s: String| {
@@ -480,9 +490,17 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             Ok::<(), ErrorInfo>(())
         });
         tokio::spawn(async move {
+            let f = fun.clone();
+            let f2 = fun.clone();
+
             let mut d2 = d.clone();
+            let mut d3 = d2.clone();
             let nc = config.clone();
-            let res = default_deploy(&mut d2, &nc, fun).await;
+            let res = default_deploy(&mut d2, &nc, f).await;
+            if hard {
+                d3.debug_skip_start = false;
+                let res = default_deploy(&mut d3, &nc, f2).await;
+            }
             // Update final deploy result here.
         });
     };

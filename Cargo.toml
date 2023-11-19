@@ -113,7 +113,7 @@ base64 = "0.21.2"
 serde_with = { version = "3.2.0", features = ["hex"] }
 log4rs = "1.0.0"
 metrics = "0.18.1"
-ssh2 = "0.9.1"
+ssh2 = "0.9.2"
 # Move to trust module
 ndarray = "0.15.3"
 chrono = "0.4.19"
