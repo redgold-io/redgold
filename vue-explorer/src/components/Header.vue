@@ -16,6 +16,21 @@
           Docs
         </a>
 
+        <div class="navbar-right-links">
+          <a class="navbar-brand brand" href="https://dev.explorer.redgold.io">
+            Dev
+          </a>
+          <a class="navbar-brand brand" href="https://staging.explorer.redgold.io">
+            Staging
+          </a>
+          <a class="navbar-brand brand" href="https://test.explorer.redgold.io">
+            Test
+          </a>
+          <a class="navbar-brand brand" href="https://main.explorer.redgold.io">
+            Main
+          </a>
+        </div>
+
       </div>
 
       <!-- Navbar items -->
@@ -147,6 +162,23 @@ export default {
   display: flex;
   align-items: center;
   gap: 10px; /* Set the gap you want */
+}
+
+/* Ensure the navbar container is using flexbox */
+.navbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%; /* Make sure the container spans the full width */
+  padding: 0; /* Remove padding to ensure alignment to the edges */
+}
+
+/* Align the right links to the far right */
+.navbar-right-links {
+  margin-left: auto; /* This will push the .navbar-right-links to the right */
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 </style>
