@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJson, RgResult, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, ErrorInfoContext, RgResult, structs, WithMetadataHashable};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, TrustRatingLabel, VersionInfo};
@@ -455,7 +455,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         println!("Setting up server: {}", ss.host.clone());
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         if !deploy.ops {
-            setup_server_redgold(
+            let t = tokio::time::timeout(Duration::from_secs(120), setup_server_redgold(
                 ssh, net, gen, Some(hm), purge,
                 words_opt,
                 peer_id_hex_opt,
@@ -463,7 +463,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
                 ss.node_name.clone(),
                 peer_tx_opt.map(|p| p.json_or()),
                 &fun
-            ).await.expect("worx");
+            )).await.error_info("Timeout")??;
         }
         gen = false;
         if !deploy.skip_ops || deploy.ops {
