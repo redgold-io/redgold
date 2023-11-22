@@ -370,7 +370,8 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
     let df = DataFolder::from_path(sd);
     let buf = df.all().servers_path();
     let m = df.all().mnemonic().await.expect("");
-    let passphrase = if deploy.ask_pass {
+    let passphrase = deploy.mixing_password.clone().or_else(|| {
+        if deploy.ask_pass {
         let passphrase = rpassword::prompt_password("Enter passphrase for mnemonic: ").unwrap();
         let passphrase2 = rpassword::prompt_password("Re-enter passphrase for mnemonic: ").unwrap();
         if passphrase != passphrase2 {
@@ -383,7 +384,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         }
     } else {
         None
-    };
+    }});
     // Ok heres what to do, in here we need to potentially invoke the HW signer for peer id
     // if we don't have one generated FOR THE ENVIRONMENT of interest.
     // So check to see if the peer id exists, if not, generate it according to hardware signer

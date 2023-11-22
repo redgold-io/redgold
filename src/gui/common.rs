@@ -129,3 +129,24 @@ pub fn bounded_text_area_size_focus(ui: &mut Ui, string1: &mut String, width: f3
         res.state
     });
 }
+
+
+
+pub fn password_single(
+    text: &mut String,
+    label: impl Into<String>,
+    ui: &mut Ui,
+    show: &mut bool
+) {
+    ui.horizontal(|ui| {
+        ui.label(label.into());
+        TextEdit::singleline(text)
+            .password(show.clone())
+            .desired_width(250f32)
+            .desired_rows(1)
+            .show(ui);
+        if ui.button("Show").clicked() {
+            *show = !*show;
+        }
+    });
+}
