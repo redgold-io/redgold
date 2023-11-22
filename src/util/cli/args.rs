@@ -217,6 +217,9 @@ pub struct Deploy {
     pub passphrase: bool,
     #[clap(long)]
     pub hard_coord_reset: bool,
+    #[clap(long)]
+    pub mixing_password: Option<String>,
+
 
 
 }

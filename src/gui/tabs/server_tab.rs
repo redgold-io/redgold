@@ -4,10 +4,10 @@ use eframe::egui::{TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
 use log::info;
-use redgold_schema::structs::ErrorInfo;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, valid_label};
+use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use crate::gui::tables;
 use crate::infra::deploy::default_deploy;
 use crate::infra::SSH;
@@ -27,7 +27,6 @@ pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<Se
 }
 
 pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
-
 
     let servers = local_state.node_config.servers.clone();
 
@@ -115,6 +114,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
     });
 
+    password_single(&mut local_state.server_state.mixing_password,"Mixing Password", ui,
+                    &mut local_state.server_state.show_mixing_password);
+
     if ui.button("Deploy").clicked() {
         local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
         info!("Deploying");
@@ -128,6 +130,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         d.purge = local_state.server_state.purge;
         d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
         d.genesis = local_state.server_state.genesis;
+        d.mixing_password = Some(local_state.server_state.mixing_password.clone());
 
         let hard = local_state.server_state.hard_coord_reset.clone();
         if hard {
@@ -172,6 +175,13 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
     bounded_text_area_size_focus(ui, &mut arc1, 600., 15);
 
+    let last_env = local_state.node_config.network.clone();
+
+    if last_env != local_state.server_state.last_env {
+        local_state.server_state.mixing_password = "".to_string();
+        local_state.server_state.last_env = last_env;
+    }
+
 }
 
 #[derive(Clone)]
@@ -194,7 +204,10 @@ pub struct ServersState {
     purge_ops: bool,
     hard_coord_reset: bool,
     deployment_result: Option<String>,
-    deploy_process: Option<Arc<JoinHandle<()>>>
+    deploy_process: Option<Arc<JoinHandle<()>>>,
+    mixing_password: String,
+    show_mixing_password: bool,
+    last_env: NetworkEnvironment
 }
 
 impl Default for ServersState {
@@ -214,6 +227,9 @@ impl Default for ServersState {
             hard_coord_reset: false,
             deployment_result: None,
             deploy_process: None,
+            mixing_password: "".to_string(),
+            show_mixing_password: true,
+            last_env: NetworkEnvironment::Dev,
         }
     }
 }
