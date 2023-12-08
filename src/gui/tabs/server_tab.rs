@@ -10,7 +10,7 @@ use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use crate::gui::tables;
 use crate::infra::deploy::default_deploy;
-use crate::infra::SSH;
+use crate::infra::{deploy, SSH};
 use crate::util::cli::args::Deploy;
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
@@ -102,8 +102,10 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     ui.label("Deploy Options");
 
     ui.horizontal(|ui| {
+        ui.checkbox(&mut local_state.server_state.words_and_id, "Words/Id");
+        ui.checkbox(&mut local_state.server_state.cold, "Cold");
         ui.checkbox(&mut local_state.server_state.purge, "Purge");
-        ui.checkbox(&mut local_state.server_state.ops, "ops");
+        ui.checkbox(&mut local_state.server_state.ops, "Ops");
         ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
         ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
         if local_state.node_config.opts.development_mode {
@@ -117,10 +119,20 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     password_single(&mut local_state.server_state.mixing_password,"Mixing Password", ui,
                     &mut local_state.server_state.show_mixing_password);
 
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut local_state.server_state.load_offline_deploy, "Load Offline Deploy");
+        if local_state.server_state.load_offline_deploy {
+            editable_text_input_copy(ui, "Load Offline Path", &mut local_state.server_state.load_offline_path, 250.0);
+        }
+    });
+
     if ui.button("Deploy").clicked() {
         local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
         info!("Deploying");
         let mut d = Deploy::default();
+        if local_state.server_state.load_offline_deploy {
+            d.server_offline_info = Some(local_state.server_state.load_offline_path.clone());
+        }
         d.ops = local_state.server_state.ops;
         if d.ops == false {
             d.skip_ops = true;
@@ -130,7 +142,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         d.purge = local_state.server_state.purge;
         d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
         d.genesis = local_state.server_state.genesis;
-        d.mixing_password = Some(local_state.server_state.mixing_password.clone());
+        d.mixing_password = Some(local_state.server_state.mixing_password.clone()).filter(|s| !s.is_empty());
+        d.words_and_id = local_state.server_state.words_and_id;
+        d.cold = local_state.server_state.cold;
 
         let hard = local_state.server_state.hard_coord_reset.clone();
         if hard {
@@ -182,6 +196,20 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         local_state.server_state.last_env = last_env;
     }
 
+    ui.horizontal(|ui| {
+       editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
+        if ui.button("Generate Peer TXs / Words").clicked() {
+            let config1 = local_state.node_config.clone();
+            tokio::spawn(deploy::offline_generate_keys_servers(
+                config1,
+                local_state.local_stored_state.servers.clone(),
+                PathBuf::from(local_state.server_state.generate_offline_path.clone()),
+                local_state.wallet_state.hot_mnemonic().words.clone(),
+                local_state.wallet_state.hot_mnemonic().passphrase.clone(),
+            ));
+        }
+    });
+
 }
 
 #[derive(Clone)]
@@ -203,9 +231,14 @@ pub struct ServersState {
     ops: bool,
     purge_ops: bool,
     hard_coord_reset: bool,
+    words_and_id: bool,
+    cold: bool,
     deployment_result: Option<String>,
     deploy_process: Option<Arc<JoinHandle<()>>>,
     mixing_password: String,
+    generate_offline_path: String,
+    load_offline_path: String,
+    load_offline_deploy: bool,
     show_mixing_password: bool,
     last_env: NetworkEnvironment
 }
@@ -225,10 +258,15 @@ impl Default for ServersState {
             ops: false,
             purge_ops: false,
             hard_coord_reset: false,
+            words_and_id: false,
+            cold: false,
             deployment_result: None,
             deploy_process: None,
             mixing_password: "".to_string(),
-            show_mixing_password: true,
+            generate_offline_path: "./servers".to_string(),
+            load_offline_path: "./servers".to_string(),
+            load_offline_deploy: false,
+            show_mixing_password: false,
             last_env: NetworkEnvironment::Dev,
         }
     }

@@ -219,8 +219,8 @@ pub struct Deploy {
     pub hard_coord_reset: bool,
     #[clap(long)]
     pub mixing_password: Option<String>,
-
-
+    #[clap(long)]
+    pub server_offline_info: Option<String>,
 
 }
 

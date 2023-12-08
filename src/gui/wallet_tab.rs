@@ -126,7 +126,8 @@ pub struct WalletState {
     pub xpub_loader_error_message: String,
     pub hot_passphrase: String,
     pub hot_offset: String,
-    pub custom_tx_json: String
+    pub custom_tx_json: String,
+    pub mnemonic_save_persist: bool
 }
 
 impl WalletState {
@@ -250,6 +251,7 @@ impl WalletState {
             custom_tx_json: "".to_string(),
             valid_save_mnemonic: "".to_string(),
             add_new_key_window: false,
+            mnemonic_save_persist: true
         }
     }
     pub fn update_hardware(&mut self) {
