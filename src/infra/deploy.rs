@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -7,10 +8,10 @@ use itertools::Itertools;
 
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJson, ErrorInfoContext, RgResult, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, structs, WithMetadataHashable};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, TrustRatingLabel, VersionInfo};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, TrustRatingLabel, VersionInfo, Transaction};
 use redgold_schema::transaction_builder::TransactionBuilder;
 
 use crate::hardware::trezor;
@@ -348,6 +349,42 @@ pub async fn derive_mnemonic_and_peer_id(
 }
 
 
+/// Allow offline (airgapped) generation of peer TX / node TX from servers manifest
+pub async fn offline_generate_keys_servers(
+    node_config: NodeConfig,
+    servers: Vec<Server>,
+    save_path: PathBuf,
+    salt_mnemonic: String,
+    passphrase: Option<String>
+) -> RgResult<()> {
+    let mut pid_tx: HashMap<String, structs::Transaction> = HashMap::default();
+    for ss in &servers {
+        let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
+            &node_config,
+            salt_mnemonic.clone(),
+            ss.peer_id_index as usize,
+            false,
+            passphrase.clone(),
+            None,
+            ss.index,
+            servers.clone(),
+            vec![],
+            &mut pid_tx,
+            &node_config.network
+        ).await?;
+        let peer_tx = pid_tx.get(&peer_id_hex).expect("").clone();
+        let peer_tx_ser = peer_tx.json_or();
+        let mut save = save_path.clone();
+        let server_index_path = save.join(format!("{}", ss.index));
+        std::fs::create_dir_all(server_index_path.clone()).expect("");
+        let peer_tx_path = server_index_path.join("peer_tx");
+        let words_path = server_index_path.join("mnemonic");
+        std::fs::write(peer_tx_path, peer_tx_ser).expect("");
+        std::fs::write(words_path, words).expect("");
+    }
+    Ok(())
+}
+
 
 pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
     deploy: &mut Deploy, node_config: &NodeConfig, fun: Box<F>) -> RgResult<()> {
@@ -360,7 +397,8 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
     let mut net = node_config.network;
 
     if net == NetworkEnvironment::Main {
-        deploy.ask_pass = true;
+        // TODO: Does this matter?
+        // deploy.ask_pass = true;
     } else {
         deploy.words_and_id = true;
     }
@@ -435,12 +473,12 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         ).await?;
 
         let mut peer_tx_opt: Option<structs::Transaction> = None;
-        let words_opt = if deploy.words || deploy.words_and_id {
+        let mut words_opt = if deploy.words || deploy.words_and_id {
             Some(words.clone())
         } else {
             None
         };
-        let peer_id_hex_opt = if deploy.peer_id  || deploy.words_and_id {
+        let mut peer_id_hex_opt = if deploy.peer_id  || deploy.words_and_id {
             peer_tx_opt = pid_tx.get(&peer_id_hex).clone().cloned();
             Some(peer_id_hex.clone())
         } else {
@@ -454,6 +492,20 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         peer_id_index.insert(ss.peer_id_index, peer_id_hex.clone());
         let hm = hm.clone();
         println!("Setting up server: {}", ss.host.clone());
+
+        if let Some(o) = &deploy.server_offline_info {
+            let p = PathBuf::from(o);
+            let pi = p.join(format!("{}", ss.index));
+            let o = pi.join("peer_tx");
+            let peer_ser = std::fs::read_to_string(o).expect("offline info");
+            let peer_tx =  peer_ser.json_from::<Transaction>().expect("peer tx");
+            peer_tx_opt = Some(peer_tx.clone());
+            peer_id_hex_opt = Some(peer_tx.peer_data().expect("").peer_id.expect("").hex_or());
+            let words_path = pi.join("mnemonic");
+            let words_read = std::fs::read_to_string(words_path).expect("offline info");
+            words_opt = Some(words_read);
+        }
+
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         if !deploy.ops {
             let t = tokio::time::timeout(Duration::from_secs(120), setup_server_redgold(

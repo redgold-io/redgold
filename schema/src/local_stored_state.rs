@@ -50,6 +50,7 @@ pub struct Contact {
 pub struct StoredMnemonic {
     pub name: String,
     pub mnemonic: String,
+    pub persist_disk: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -71,6 +72,16 @@ pub struct LocalStoredState {
     pub identities: Vec<Identity>,
     pub mnemonics: Option<Vec<StoredMnemonic>>,
     pub private_keys: Option<Vec<StoredPrivateKey>>
+}
+
+impl LocalStoredState {
+    pub fn clear_sensitive(&mut self) {
+        self.mnemonics = self.mnemonics.clone().map(|mnemonics| {
+            mnemonics.iter().filter(|mnemonic| {
+                mnemonic.persist_disk.unwrap_or(true)
+            }).map(|d| d.clone()).collect_vec()
+        });
+    }
 }
 
 impl LocalStoredState {

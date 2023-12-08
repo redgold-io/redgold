@@ -26,6 +26,7 @@ fn save_key_window(
             ui.vertical(|ui| {
                 editable_text_input_copy(ui, "Name", &mut ls.wallet_state.mnemonic_save_name, 150.0);
                 editable_text_input_copy(ui, "Mnemonic / Key", &mut ls.wallet_state.mnemonic_save_data, 150.0);
+                ui.checkbox(&mut ls.wallet_state.mnemonic_save_persist, "Persist to Disk");
                 valid_label(ui, ls.wallet_state.is_mnemonic_or_kp.is_some());
 
                 if ui.button("Save Internal").clicked() {
@@ -47,6 +48,7 @@ fn save_key_window(
                                         lss.upsert_mnemonic(StoredMnemonic {
                                             name: name.clone(),
                                             mnemonic: data.clone(),
+                                            persist_disk: None,
                                         });
                                     } else {
                                         lss.upsert_private_key(StoredPrivateKey {
@@ -92,7 +94,7 @@ pub fn hot_header(ls: &mut LocalState, ui: &mut Ui, _ctx: &egui::Context) {
             let opt = ls.local_stored_state.by_key(&string).map(|key| {
                 match key {
                     Either::Left(mnemonic) => {
-                        ls.wallet_state.active_hot_mnemonic = Some(mnemonic.name);
+                        ls.wallet_state.active_hot_mnemonic = Some(mnemonic.mnemonic.clone());
                     }
                     Either::Right(private_key) => {
                         ls.wallet_state.active_hot_kp = Some(private_key.key_hex);

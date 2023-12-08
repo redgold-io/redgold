@@ -13,7 +13,6 @@ pub mod initialize;
 pub mod tables;
 pub mod home;
 pub mod wallet_tab;
-pub mod keys_tab;
 pub mod common;
 pub mod tabs;
 pub mod top_panel;

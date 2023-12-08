@@ -12,7 +12,7 @@ use redgold_schema::{EasyJson, error_info, RgResult};
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::{ClientApp, home, keys_tab, top_panel};
+use crate::gui::{ClientApp, home, top_panel};
 use crate::util;
 use rand::Rng;
 // impl NetworkStatusInfo {
@@ -79,6 +79,19 @@ pub struct LocalState {
 
 impl LocalState {
 
+    pub fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool) {
+        self.updates.sender.send(StateUpdate {
+            update: Box::new(
+                move |lss: &mut LocalState| {
+                    lss.upsert_mnemonic(StoredMnemonic {
+                        name: name.clone(),
+                        mnemonic: mnemonic.clone(),
+                        persist_disk: Some(persist_disk),
+                    });
+                })
+        }).unwrap();
+    }
+
     pub fn secure_or(&self) -> DataStore {
         self.ds_env_secure.clone().unwrap_or(self.ds_env.clone())
     }
@@ -88,7 +101,8 @@ impl LocalState {
 
     pub fn persist_local_state_store(&self) {
         let store = self.secure_or();
-        let state = self.local_stored_state.clone();
+        let mut state = self.local_stored_state.clone();
+        state.clear_sensitive();
         tokio::spawn(async move {
             store.config_store.update_stored_state(state).await
         });
@@ -212,7 +226,11 @@ impl LocalState {
             qr_state: Default::default(),
             qr_show_state: Default::default(),
             identity_state: IdentityState::new(),
-            settings_state: SettingsState::new(local_stored_state.json_or()),
+            settings_state: SettingsState::new(local_stored_state.json_or(),
+                                               node_config.data_folder.clone().path.parent().unwrap().to_str().unwrap().to_string(),
+                                               node_config.secure_data_folder.unwrap_or(node_config.data_folder.clone())
+                                                   .path.parent().unwrap().to_str().unwrap().to_string()
+            ),
             address_state: Default::default(),
             otp_state: Default::default(),
             ds_env,
@@ -313,12 +331,12 @@ use redgold_keys::util::dhash_vec;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
-use crate::gui::keys_tab::KeygenState;
+use crate::gui::tabs::keys_tab::KeygenState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
-use crate::gui::tabs::server_tab;
+use crate::gui::tabs::{keys_tab, server_tab};
 use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};

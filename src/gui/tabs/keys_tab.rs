@@ -8,7 +8,7 @@ use redgold_keys::util::mnemonic_words::MnemonicWords;
 use redgold_schema::EasyJson;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
-use crate::gui::common::{copy_to_clipboard, medium_data_item, valid_label};
+use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
 use crate::util;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::argon_kdf::argon2d_hash;
@@ -56,7 +56,10 @@ pub struct MnemonicWindowState {
     private_key_hex: String,
     calc_private_key_hex: bool,
     generation_time_seconds: String,
-    exe_checksum: String
+    exe_checksum: String,
+    save_name: String,
+    persist_disk: bool,
+    set_hot_mnemonic: bool
 }
 
 impl MnemonicWindowState {
@@ -166,6 +169,9 @@ impl KeygenState {
                 calc_private_key_hex: false,
                 generation_time_seconds: "".to_string(),
                 exe_checksum: exe_checksum,
+                save_name: "keygen".to_string(),
+                persist_disk: false,
+                set_hot_mnemonic: false
             },
             generate_mnemonic_state: GenerateMnemonicState {
                 random_input_mnemonic: "".to_string(),
@@ -228,7 +234,7 @@ pub fn keys_screen_scroll(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Lo
 
     // let mnem = key.mnemonic_window_state.words.clone();
     mnemonic_window(
-        ctx, &mut key.mnemonic_window_state
+        ctx, local_state
     );
 
 }
@@ -487,8 +493,18 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
 }
 
 fn mnemonic_window(
-    ctx: &Context, state: &mut MnemonicWindowState
+    ctx: &Context, ls: &mut LocalState
 ) {
+
+    if ls.keygen_state.mnemonic_window_state.set_hot_mnemonic {
+        ls.add_mnemonic(ls.keygen_state.mnemonic_window_state.save_name.clone(),
+                        ls.keygen_state.mnemonic_window_state.words.clone(),
+                        ls.keygen_state.mnemonic_window_state.persist_disk);
+        ls.keygen_state.mnemonic_window_state.set_hot_mnemonic = false;
+    }
+
+    let state = &mut ls.keygen_state.mnemonic_window_state;
+
 
     if state.requires_reset {
         state.set_words_from_passphrase();
@@ -563,8 +579,8 @@ fn mnemonic_window(
                             .desired_width(400f32).show(ui);
                         copy_to_clipboard(ui, string.clone());
                     });
-                    ui.label("Get Private Key Hex");
                     ui.horizontal(|ui| {
+                        ui.label("Get Private Key Hex");
                         ui.label("Path");
                         TextEdit::singleline(&mut state.hd_path)
                             .desired_width(130f32)
@@ -575,18 +591,26 @@ fn mnemonic_window(
                         if ui.button("Clear").clicked() {
                             state.private_key_hex = "".to_string();
                         }
+                        medium_data_item(ui, "Private Key Hex", state.private_key_hex.clone());
                     });
-                    medium_data_item(ui, "Private Key Hex", state.private_key_hex.clone());
-                    if ui.button("Save metadata to local ./metadata.json file").clicked() {
-                        let words = state.words.clone();
-                        let pass = state.passphrase.clone();
-                        let wp = WordsPass::new(words, pass);
-                        let metadata_json = wp.metadata().expect("metadata error")
-                            .with_exe_checksum(state.exe_checksum.clone())
-                            .json_pretty_or();
-                        std::fs::write("metadata.json", metadata_json)
-                            .expect("Unable to write file");
-                    }
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Save ./metadata.json").clicked() {
+                            let words = state.words.clone();
+                            let pass = state.passphrase.clone();
+                            let wp = WordsPass::new(words, pass);
+                            let metadata_json = wp.metadata().expect("metadata error")
+                                .with_exe_checksum(state.exe_checksum.clone())
+                                .json_pretty_or();
+                            std::fs::write("metadata.json", metadata_json)
+                                .expect("Unable to write file");
+                        }
+                        editable_text_input_copy(ui, "Mnemonic Name", &mut state.save_name, 100.0);
+                        ui.checkbox(&mut state.persist_disk, "Persist Disk");
+                        if ui.button("Set As Hot Mnemonic").clicked() {
+                            state.set_hot_mnemonic = true;
+                        }
+                    });
             });
         });
 }
