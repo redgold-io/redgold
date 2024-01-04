@@ -46,17 +46,34 @@ pub async fn default_identifier(relay: Relay) -> RgResult<MultipartyIdentifier> 
     Ok(ident)
 }
 
+pub async fn default_half_identifier(kp: Vec<PublicKey>) -> RgResult<MultipartyIdentifier> {
+    let ident = MultipartyIdentifier {
+        uuid: default_room_id(),
+        threshold: (kp.len()/2) as i64,
+        party_keys: kp,
+    };
+    Ok(ident)
+}
+
 
 pub async fn initiate_mp_keygen(
     relay: Relay,
     ident: Option<MultipartyIdentifier>,
-    store_local_share: bool
+    store_local_share: bool,
+    node_ids: Option<Vec<PublicKey>>
 ) -> Result<SelfInitiateKeygenResult, ErrorInfo> {
 
     // Better pattern for unwrap or else async error?
     let ident = match ident {
         None => {
-            default_identifier(relay.clone()).await?
+            match node_ids {
+                None => {
+                    default_identifier(relay.clone()).await?
+                }
+                Some(pks) => {
+                    default_half_identifier(pks).await?
+                }
+            }
         }
         Some(x) => {x}
     };

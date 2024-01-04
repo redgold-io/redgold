@@ -715,7 +715,7 @@ impl NetworkEnvironment {
     }
 
     pub fn is_main(&self) -> bool {
-        self == &NetworkEnvironment::All
+        self == &NetworkEnvironment::Main
     }
 
     pub fn default_port_offset(&self) -> u16 {

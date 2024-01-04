@@ -357,11 +357,11 @@ message LiquidityRange {
   CurrencyAmount min_inclusive = 1;
   // No trades can be executed above this amount
   CurrencyAmount max_exclusive = 2;
-  // Whether or not to allow dynamic fee calculation
-  bool allow_dynamic_fee = 3;
-  // Minimum fees required to be collected for this range
+  // Whether or not to disable dynamic fee calculation, default false
+  bool disable_dynamic_fee = 3;
+  // Minimum fees required to be collected for this range, optional for defaults
   Weighting desired_fee_fraction = 4;
-  // How much of the total input staking quantity to allocate to this range
+  // How much of the total input staking quantity to allocate to this range, defaults to equal division among fractions
   Weighting allocation_fraction = 5;
 }
 

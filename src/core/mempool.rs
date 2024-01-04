@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use flume::{SendError, TrySendError};
 use itertools::Itertools;
 use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
-use redgold_schema::seeds::get_seeds;
 use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse, Transaction};
 use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -69,7 +68,7 @@ pub struct MempoolEntry {
 impl IntervalFold for Mempool {
     async fn interval_fold(&mut self) -> RgResult<()> {
         let messages = self.relay.mempool.recv_while()?;
-        let addrs = get_seeds().iter()
+        let addrs = self.relay.node_config.seeds.iter()
             .filter_map(|s| s.public_key.as_ref())
             .filter_map(|s| s.address().ok())
             .collect_vec();

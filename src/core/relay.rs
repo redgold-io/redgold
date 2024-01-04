@@ -31,7 +31,6 @@ use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionBuilderSupport;
-use redgold_schema::seeds::get_seeds;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
@@ -191,7 +190,7 @@ pub struct StrictRelay {}
 impl Relay {
 
     pub async fn get_trust(&self) -> RgResult<HashMap<PeerId, f64>> {
-        let seeds = get_seeds().iter().filter_map(|s|
+        let seeds = self.node_config.seeds.iter().filter_map(|s|
             s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
         ).collect::<HashMap<PeerId, f64>>();
         let peer_tx = self.peer_tx().await?;

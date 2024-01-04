@@ -1,9 +1,11 @@
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use futures::TryFutureExt;
+use itertools::{Itertools, max, min};
 use log::{error, info};
 
 use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -18,6 +20,7 @@ use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::seeds::get_seeds_by_env;
 use crate::node_config::NodeConfig;
 use crate::scrape::coinbase_btc_spot_latest;
 use crate::util::cli::arg_parse_config::ArgTranslate;
@@ -116,25 +119,28 @@ impl BidAsk {
         self.asks.iter().find(|v| v.volume == 0).is_some()
     }
 
-    pub fn regenerate(&self, price: f64) -> BidAsk {
+    pub fn regenerate(&self, price: f64, min_ask: f64) -> BidAsk {
         BidAsk::generate_default(
             self.sum_ask_volume() as i64,
             self.sum_bid_volume(),
-            price
+            price,
+            min_ask
         )
     }
 
     pub fn generate_default(
         available_balance: i64,
         pair_balance: u64,
-        last_exchange_price: f64, // this is for available type / pair type
+        last_exchange_price: f64,
+        min_ask: f64,
     ) -> BidAsk {
         BidAsk::generate(
             available_balance,
             pair_balance,
             last_exchange_price,
             50,
-            30.
+            30.,
+            min_ask
         )
     }
 
@@ -143,7 +149,9 @@ impl BidAsk {
         pair_balance_btc: u64,
         last_exchange_price: f64, // this is for available type / pair type
         divisions: i32,
-        scale: f64
+        scale: f64,
+        // BTC / RDG
+        min_ask: f64
     ) -> BidAsk {
 
         // A bid is an offer to buy RDG with BTC
@@ -160,7 +168,11 @@ impl BidAsk {
         // An ask price in the inverse of a bid price, since we want to denominate in RDG
         // since the volume is in RDG.
         // Here it is now BTC / RDG
-        let ask_price = 1.0 / last_exchange_price;
+        let ask_price_expected = 1.0 / last_exchange_price;
+
+        // Apply a max to ask price.
+        let ask_price = f64::max(ask_price_expected, min_ask);
+
         // An ask is how much BTC is being asked for each RDG
         // Volume is denominated in RDG because this is what the contract is holding for resale
         let asks = PriceVolume::generate(
@@ -262,20 +274,24 @@ pub struct DepositWatcher {
 }
 
 impl DepositWatcher {
+
+    // Need to update this to the current test address?
     pub async fn genesis_funding(&self, destination: &Address) -> RgResult<()> {
         let (_, utxos) = Node::genesis_from(self.relay.node_config.clone());
-        let u = utxos.get(15).safe_get_msg("Missing utxo")?.clone();
-        let a = u.key_pair.address_typed().render_string().expect("a");
+        let u = utxos.get(14).safe_get_msg("Missing utxo")?.clone();
+        let a = u.key_pair.address_typed();
+        let a_str = a.render_string()?;
         let res = self.relay.ds.transaction_store.query_utxo_id_valid(
             &u.utxo_entry.utxo_id()?.transaction_hash.clone().expect("hash"),
             u.utxo_entry.utxo_id()?.output_index.clone()
         ).await?;
         let uu = u.utxo_entry.clone().json_or();
         if res {
-            info!("Sending genesis funding to multiparty address from origin {a} using utxo {uu}");
+            info!("Sending genesis funding to multiparty address from origin {a_str} using utxo {uu}");
             let mut tb = TransactionBuilder::new();
             tb.with_utxo(&u.utxo_entry)?;
             tb.with_output(&destination, &CurrencyAmount::from(u.utxo_entry.amount() as i64));
+            tb.with_stake(100f64, 1000f64, &a);
             let mut tx = tb.build()?;
             tx.sign(&u.key_pair)?;
             self.relay.submit_transaction_sync(&tx).await?;
@@ -291,6 +307,12 @@ pub struct CurveUpdateResult {
     updated_bid_ask: BidAsk,
     updated_btc_timestamp: u64,
     updated_allocation: DepositKeyAllocation
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct StakeDepositInfo {
+    amount: CurrencyAmount,
+    deposit: LiquidityDeposit,
+    tx_hash: Hash
 }
 
 impl DepositWatcher {
@@ -339,7 +361,12 @@ impl DepositWatcher {
         Ok((max_ts, res.clone()))
     }
 
-    pub async fn build_rdg_ask_swap_tx(&self, btc_deposits: Vec<ExternalTimedTransaction>, bid_ask: BidAsk, key_address: &structs::Address)
+    pub async fn build_rdg_ask_swap_tx(&self,
+                                       btc_deposits: Vec<ExternalTimedTransaction>,
+                                       bid_ask: BidAsk,
+                                       key_address: &structs::Address,
+        min_ask: f64
+    )
         -> RgResult<(Option<Transaction>, BidAsk)> {
 
         let mut bid_ask_latest = bid_ask.clone();
@@ -371,7 +398,7 @@ impl DepositWatcher {
             tb.with_last_output_deposit_swap(tx.tx_id.clone());
 
             let price = ask_fulfillment.fulfillment_price() * 1.05;
-            bid_ask_latest = bid_ask_latest.regenerate(price)
+            bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
 
         }
         let mut tx_ret = None;
@@ -449,7 +476,7 @@ impl DepositWatcher {
     }
 
 
-    pub async fn get_rdg_withdrawals_bids(&self, bid_ask: BidAsk, key_address: &structs::Address) -> RgResult<WithdrawalBitcoin> {
+    pub async fn get_rdg_withdrawals_bids(&self, bid_ask: BidAsk, key_address: &structs::Address, min_ask: f64) -> RgResult<WithdrawalBitcoin> {
         let mut bid_ask_latest = bid_ask.clone();
         // These are all transactions that have been sent as RDG to this deposit address,
         // We need to filter out the ones that have already been paid.
@@ -478,8 +505,10 @@ impl DepositWatcher {
                     tx_res.push(t.clone());
                     // In case of failure or error, we need to keep track of the last price that was used so
                     // we can recover the partial state that was updated instead of the full.
-                    let price = fulfillment.fulfillment_price() * 0.95;
-                    bid_ask_latest = bid_ask_latest.regenerate(price);
+                    if bid_ask_latest.volume_empty() {
+                        let price = fulfillment.fulfillment_price() * 0.98;
+                        bid_ask_latest = bid_ask_latest.regenerate(price, min_ask);
+                    }
 
                 }
 
@@ -511,24 +540,48 @@ impl DepositWatcher {
         let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
         let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
 
-
-        let bid_ask = BidAsk::generate_default(
-            rdg_starting_balance,
-            btc_starting_balance,
-            bid_ask_original.center_price);
-
-        info!("Starting watcher process request with balances: RDG:{}, BTC:{} bid_ask: {}", rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
-
-
-        let mut bid_ask_latest = bid_ask.clone();
+        // BTC / RDG
+        let min_ask = 1f64 / self.get_starting_center_price_rdg_btc().await?;
 
         // Grab all recent transactions associated with this key address for on-network
         // transactions
         let tx: Vec<structs::Transaction> = self.relay.ds.transaction_store
             .get_filter_tx_for_address(&key_address, 10000, 0, true).await?;
 
-        // tx.iter().filter(|t| t.pre)
+        let mut staking_deposits = vec![];
+        // TODO: Add withdrawal support
+        // let mut staking_withdrawals = vec![];
 
+        for t in &tx {
+            if let Some((amount, liquidity_request)) = t.liquidity_of(&key_address) {
+                if let Some(d) = &liquidity_request.deposit {
+                    let d = StakeDepositInfo {
+                        amount: amount.clone(),
+                        deposit: d.clone(),
+                        tx_hash: t.hash_or(),
+                    };
+                    staking_deposits.push(d);
+                }
+            }
+        }
+
+        let bid_ask = if bid_ask_original.asks.is_empty() && bid_ask_original.bids.is_empty() {
+            BidAsk::generate_default(
+                rdg_starting_balance,
+                btc_starting_balance,
+                bid_ask_original.center_price,
+                min_ask
+            )
+        } else {
+            bid_ask_original
+        };
+
+
+
+        info!("Starting watcher process request with balances: RDG:{}, BTC:{} bid_ask: {}", rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
+
+
+        let mut bid_ask_latest = bid_ask.clone();
 
         // Prepare Fulfill Asks RDG Transaction from BTC deposits to this multiparty address,
         // but don't yet broadcast the transaction.
@@ -537,7 +590,9 @@ impl DepositWatcher {
         info!("Found {} new deposits last_updated {} updated_last_ts {} deposit_txs {}",
             deposit_txs.len(), last_timestamp, updated_last_ts, deposit_txs.json_or());
 
-        let (tx, bid_ask_updated_ask_side) = self.build_rdg_ask_swap_tx(deposit_txs, bid_ask_latest, &key_address.clone()).await?;
+        let (tx, bid_ask_updated_ask_side) = self.build_rdg_ask_swap_tx(
+            deposit_txs,
+            bid_ask_latest, &key_address.clone(), min_ask).await?;
         // info!("Built RDG ask swap tx: {} bid_ask_updated {}", tx.json_or(), bid_ask_updated_ask_side.json_or());
         if let Some(tx) = tx {
             info!("Sending RDG ask swap tx: {}", tx.json_or());
@@ -546,7 +601,7 @@ impl DepositWatcher {
 
         bid_ask_latest = bid_ask_updated_ask_side;
 
-        let withdrawals = self.get_rdg_withdrawals_bids(bid_ask_latest, &key_address).await?;
+        let withdrawals = self.get_rdg_withdrawals_bids(bid_ask_latest, &key_address, min_ask).await?;
         bid_ask_latest = withdrawals.updated_bidask.clone();
 
         info!("Found {} new withdrawals {}",
@@ -573,11 +628,12 @@ impl DepositWatcher {
         Ok(update)
     }
 
-    pub async fn get_starting_center_price_rdg_btc(&self) -> f64 {
-        let usd_btc = coinbase_btc_spot_latest().await.expect("works").usd_btc().expect("works");
+    // Returns price in RDG/BTC, i.e. ~300 for USD/RDG 100 and BTC 30k
+    pub async fn get_starting_center_price_rdg_btc(&self) -> RgResult<f64> {
+        let usd_btc = coinbase_btc_spot_latest().await?.usd_btc()?;
         let starting_usd = 100.0;
         let rdg_btc = usd_btc / starting_usd;
-        rdg_btc
+        Ok(rdg_btc)
     }
 }
 
@@ -613,12 +669,12 @@ impl IntervalFold for DepositWatcher {
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
         //.ok.andthen?
         if let Some(mut cfg) = cfg {
-            if cfg.ask_bid_code_reset.is_none() {
-                info!("Regenerating starting price due to code reset");
-                cfg.bid_ask = cfg.bid_ask.regenerate(self.get_starting_center_price_rdg_btc().await);
-                cfg.ask_bid_code_reset = Some(true);
-                ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
-            }
+            // if cfg.ask_bid_code_reset.is_none() {
+            //     info!("Regenerating starting price due to code reset");
+            //     cfg.bid_ask = cfg.bid_ask.regenerate(self.get_starting_center_price_rdg_btc().await);
+            //     cfg.ask_bid_code_reset = Some(true);
+            //     ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
+            // }
 
             // Check to see if other nodes are dead / not responding, if so, move the thing.
             // Also check bitcoin transaction balances? Find the address they came from.
@@ -658,7 +714,20 @@ impl IntervalFold for DepositWatcher {
         } else {
             info!("Attempting to start MP watcher keygen round");
             // Initiate MP keysign etc. gather public key and original proof and params
-            let res = initiate_mp::initiate_mp_keygen(self.relay.clone(), None, true).await.log_error();
+            let seeds = self.relay.node_config.seeds.clone();
+            if seeds.len() < 3 {
+                error!("Not enough seeds to initiate MP keygen");
+                return Ok(())
+            }
+
+            let pks = seeds.iter().flat_map(|s| s.public_key.clone()).collect_vec();
+
+            let res = initiate_mp::initiate_mp_keygen(
+                self.relay.clone(),
+                None,
+                true,
+                Some(pks)
+            ).await.log_error();
             // TODO: Get this from local share instead of from a second keysign round.
             if let Ok(r) = res {
                 let test_sign = r.identifier.uuid.clone();
@@ -683,7 +752,7 @@ impl IntervalFold for DepositWatcher {
                             balance_btc: 0,
                             balance_rdg: 0,
                         }],
-                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc().await },
+                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc().await? },
                         last_btc_timestamp: 0,
                         ask_bid_code_reset: None,
                     };

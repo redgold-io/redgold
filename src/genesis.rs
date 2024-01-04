@@ -29,7 +29,7 @@ fn main_entry(address: impl Into<String>, fraction_pct: impl Into<f64>) -> Genes
 }
 fn main_distribution(test_address: &Address) -> Vec<GenesisDistribution> {
     let mut zero_distribution = main_entry("3a299a25abcc604983dcabbf8a20dfb1440d6c36766762c936030ee8de6a7465", 1);
-    zero_distribution.amount.amount -= (1000 * DECIMAL_MULTIPLIER);
+    zero_distribution.amount.amount -= (10 * DECIMAL_MULTIPLIER);
     let mut entries = vec![
         // 0 - Active dev fund
         zero_distribution,
@@ -52,7 +52,7 @@ fn main_distribution(test_address: &Address) -> Vec<GenesisDistribution> {
         // 9 - Origin DAO
         main_entry("8965cf0387275d2ac5100b9a3d0e46d9d5cf6e6066db9d5779b1f1649f159068", 65),
         // Node testing address
-        GenesisDistribution { address: test_address.clone(), amount: CurrencyAmount::from_fractional(1000.0).expect("a") }
+        GenesisDistribution { address: test_address.clone(), amount: CurrencyAmount::from_fractional(10.0).expect("a") }
     ];
 
     let total = entries.iter().map(|e| e.amount.to_rounded_int()).sum::<i64>();
