@@ -25,7 +25,7 @@ use tokio::runtime::Runtime;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
-use redgold_schema::seeds::{get_seeds, get_seeds_by_env};
+use redgold_schema::seeds::{get_seeds_by_env};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 use crate::util::cli::{args, commands};
@@ -217,7 +217,9 @@ impl ArgTranslate {
         // TODO: We can use the lb or another node to check if port is reciprocal open
         // TODO: Check ports open in separate thing
         // TODO: Also set from HOSTNAME maybe? With nslookup for confirmation of IP?
-        if !self.node_config.is_local_debug() && self.node_config.external_ip == "127.0.0.1".to_string() {
+        if !self.node_config.is_local_debug() &&
+            self.node_config.external_ip == "127.0.0.1".to_string() &&
+            !self.is_gui() {
             let ip =
                 // runtime.block_on(
                 ip_lookup::get_self_ip()
@@ -263,11 +265,7 @@ impl ArgTranslate {
         // Remove any defaults; we want to be explicit
         self.node_config.mnemonic_words = "".to_string();
 
-        // First load from environment
-        if let Some(words) = std::env::var("REDGOLD_WORDS").ok() {
-            self.node_config.mnemonic_words = words;
-        };
-
+        // First try to load from the all environment data folder for re-use across environments
         if let Ok(words) = self.node_config.data_folder.all().mnemonic().await {
             self.node_config.mnemonic_words = words;
         };
@@ -276,6 +274,13 @@ impl ArgTranslate {
         if let Ok(words) = self.node_config.env_data_folder().mnemonic().await {
             self.node_config.mnemonic_words = words;
         };
+
+        // TODO: Merge this with CLI
+        // Then override with environment variable
+        if let Some(words) = std::env::var("REDGOLD_WORDS").ok() {
+            self.node_config.mnemonic_words = words;
+        };
+
 
         // Then override with command line
         if let Some(words) = &self.opts.words {
@@ -482,9 +487,11 @@ impl ArgTranslate {
                 if seed.public_key.is_none() {
                     info!("Querying seed: {}", seed.external_address.clone());
 
-                    let response = RgHttpClient::new(seed.external_address.clone(),
-                                                     seed.port_offset.map(|p| (p + 1) as u16)
-                                                         .unwrap_or(port),
+                    let response = RgHttpClient::new(
+                        seed.external_address.clone(),
+                                                     port, // TODO: Account for seed listed offset instead of direct.
+                                                     // seed.port_offset.map(|p| (p + 1) as u16)
+                                                     //     .unwrap_or(port),
                                                      None
                     ).about().await;
                     if let Ok(response) = response {

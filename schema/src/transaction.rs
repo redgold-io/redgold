@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest};
 use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
@@ -286,11 +286,17 @@ impl Transaction {
         })
     }
 
-    pub fn liquidity_of(&self, a: &Address) -> Option<&Output> {
-        self.outputs.iter()
-            .filter(|o| o.address.as_ref().filter(|&b| b == a).is_some())
-            .filter(|o| o.is_liquidity())
-            .next()
+    pub fn liquidity_of(&self, a: &Address) -> Option<(CurrencyAmount, &LiquidityRequest)> {
+        let output_contract = self.output_of(a).iter().next().cloned();
+        let amount = output_contract
+            .and_then(|o| o.data.as_ref().and_then(|d| d.amount.clone()));
+        self.outputs.iter().filter(|o| o.is_liquidity()).next()
+            .and_then(|o| o.data.as_ref().and_then(|d| d.liquidity_request.as_ref()))
+            .and_then(|o| {
+            amount.map(|a| {
+                (a, o)
+            })
+        })
     }
 
     pub fn total_output_amount(&self) -> i64 {
@@ -492,6 +498,9 @@ impl Transaction {
     }
 
 }
+
+// #[derive(Clone)]
+// pub struct LiquidityInfo
 
 impl CurrencyAmount {
     pub fn from_fractional(a: impl Into<f64>) -> Result<Self, ErrorInfo> {

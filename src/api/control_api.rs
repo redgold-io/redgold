@@ -94,35 +94,38 @@ impl ControlServer {
 
         let mut response = ControlResponse::empty();
 
-        // TODO: Shouldn't both of these really be in the initiate function?
-        if let Some(mps) = request.control_multiparty_keygen_request {
-
-            info!("Initiate multiparty request: {}", json_or(&mps));
-            let result = initiate_mp_keygen(
-                relay.clone(),
-                mps.multiparty_identifier.clone(),
-                true
-            ).await?;
-            let mut resp = ControlMultipartyKeygenResponse::default();
-            if mps.return_local_share {
-                resp.local_share = Some(result.local_share);
+        if relay.node_config.network.local_debug() {
+            // TODO: Shouldn't both of these really be in the initiate function?
+            if let Some(mps) = request.control_multiparty_keygen_request {
+                info!("Initiate multiparty request: {}", json_or(&mps));
+                let result = initiate_mp_keygen(
+                    relay.clone(),
+                    mps.multiparty_identifier.clone(),
+                    true,
+                    None
+                ).await?;
+                let mut resp = ControlMultipartyKeygenResponse::default();
+                if mps.return_local_share {
+                    resp.local_share = Some(result.local_share);
+                }
+                resp.multiparty_identifier = Some(result.identifier);
+                response.control_multiparty_keygen_response = Some(resp);
             }
-            resp.multiparty_identifier = Some(result.identifier);
-            response.control_multiparty_keygen_response = Some(resp);
-        } else if let Some(req) = request.control_multiparty_signing_request {
 
-            let req = req.signing_request.safe_get_msg("Missing signing request")?;
-            let result = initiate_mp_keysign(
-                relay.clone(),
-                req.identifier.safe_get_msg("Missing identifier")?.clone(),
-                req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
-                req.signing_party_keys.clone(),
-                Some(req.signing_room_id.clone())
-            ).await?;
-            let mut res = ControlMultipartySigningResponse::default();
-            res.identifier = req.identifier.clone();
-            res.proof = Some(result.proof.clone());
-            response.control_multiparty_signing_response = Some(res);
+            if let Some(req) = request.control_multiparty_signing_request {
+                let req = req.signing_request.safe_get_msg("Missing signing request")?;
+                let result = initiate_mp_keysign(
+                    relay.clone(),
+                    req.identifier.safe_get_msg("Missing identifier")?.clone(),
+                    req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
+                    req.signing_party_keys.clone(),
+                    Some(req.signing_room_id.clone())
+                ).await?;
+                let mut res = ControlMultipartySigningResponse::default();
+                res.identifier = req.identifier.clone();
+                res.proof = Some(result.proof.clone());
+                response.control_multiparty_signing_response = Some(res);
+            }
         }
         // if add_peer_full_request.is_some() {
         //     let add: AddPeerFullRequest = add_peer_full_request.unwrap();

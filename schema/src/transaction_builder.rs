@@ -1,5 +1,5 @@
 use crate::{Address, bytes_data, error_info, ErrorInfo, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs, Transaction, WithMetadataHashable};
-use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, UtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof, Observation};
+use crate::structs::{AddressInfo, CodeExecutionContract, ExecutorBackend, UtxoId, Input, NodeMetadata, Output, OutputContract, OutputType, StandardData, CurrencyAmount, TransactionData, TransactionOptions, UtxoEntry, Proof, Observation, LiquidityRange, LiquidityRequest, LiquidityDeposit};
 use crate::transaction::amount_data;
 
 pub struct TransactionBuilder {
@@ -158,6 +158,22 @@ impl TransactionBuilder {
                 d.external_transaction_id = Some(crate::structs::ExternalTransactionId{identifier: btc_txid.clone()});
             }
         }
+        self
+    }
+    pub fn with_stake(&mut self, lower: f64, upper: f64, address: &Address) -> &mut Self {
+        let mut o = Output::default();
+        o.address = Some(address.clone());
+        let mut d = StandardData::default();
+        let mut lq = LiquidityRequest::default();
+        let mut deposit = LiquidityDeposit::default();
+        let mut lr = LiquidityRange::default();
+        lr.min_inclusive = Some(CurrencyAmount::from_fractional(lower).expect("works"));
+        lr.max_exclusive = Some(CurrencyAmount::from_fractional(upper).expect("works"));
+        deposit.liquidity_ranges = vec![lr];
+        lq.deposit = Some(deposit);
+        d.liquidity_request = Some(lq);
+        o.data = Some(d);
+        self.transaction.outputs.push(o);
         self
     }
 
