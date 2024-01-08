@@ -277,10 +277,10 @@ export default {
         let total_fulfilled = 0;
         for (let i = 0; i < asks.length;  i++) {
           let ask = asks[i];
-          let p = ask.price // RDG / BTC
+          let p = ask.price // BTC / RDG now
           let v = ask.volume / 1e8 // amount RDG available for sale via ask
-          let requested_vol = total_btc * p // RDG;
-          let thisBtc = v / p;
+          let requested_vol = total_btc / p // BTC / (BTC/RDG) = vol RDG unit;
+          let thisBtc = v * p; // RDG * BTC / RDG = BTC
           console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
           thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
           if (requested_vol > v) {
@@ -358,7 +358,6 @@ export default {
         // }
       },
     }},
-
     computedBidData() {
       let labels = [];
       let data = [];
@@ -421,7 +420,9 @@ export default {
               let ask = asks[i];
               // console.log("Bid " + ask);
               if (ask.price != null) {
-                labels.push(ask.price);
+                let price = ask.price; // BTC / RDG
+                let usdPrice = price * this.usdBtcRate; // USD / RDG
+                labels.push(usdPrice);
               }
               if (ask.volume != null) {
                 data.push(ask.volume / 1e8);
