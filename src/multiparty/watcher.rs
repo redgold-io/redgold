@@ -537,6 +537,12 @@ impl DepositWatcher {
         let btc_starting_balance = w.lock()
             .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
             .get_wallet_balance()?.confirmed;
+
+        let environment = self.relay.node_config.network.clone();
+        let btc_address = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+            .public_key.to_bitcoin_address_network(environment.clone())?;
+
         let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
         let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
 
@@ -578,7 +584,9 @@ impl DepositWatcher {
 
 
 
-        info!("Starting watcher process request with balances: RDG:{}, BTC:{} bid_ask: {}", rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
+        info!("Starting watcher process request with balances: RDG:{}, BTC:{} \
+         BTC_address: {} environment: {} \
+         bid_ask: {}", btc_address, environment.to_std_string(), rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
 
 
         let mut bid_ask_latest = bid_ask.clone();
