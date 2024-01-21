@@ -568,7 +568,7 @@ impl SingleKeyBitcoinWallet {
         self.render_json()
     }
 
-    pub fn send_local(&mut self, dest: String, amount: u64, pkey_hex: String) -> RgResult<()> {
+    pub fn send_local(&mut self, dest: String, amount: u64, pkey_hex: String) -> RgResult<String> {
         self.create_transaction_output_batch(vec![(dest, amount)])?;
         let kp = KeyPair::from_private_hex(pkey_hex)?;
         // let d = w.transaction_details.clone().expect("d");
@@ -587,9 +587,11 @@ impl SingleKeyBitcoinWallet {
         // println!("finalized: {:?}", finalized);
 
         self.broadcast_tx()?;
+
+        let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid.to_string();
         // let txid = w.broadcast_tx().expect("txid");
         // println!("txid: {:?}", txid);
-        Ok(())
+        Ok(txid)
     }
 
 }
