@@ -727,7 +727,8 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                     commands::deploy(d, &config).await
                 }
                 RgTopLevelSubcommand::TestBitcoinBalance(b) => {
-                    commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await
+                    commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
+                    Ok(())
                 }
                 _ => {
                     abort = false;

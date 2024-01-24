@@ -733,43 +733,47 @@ impl IntervalFold for DepositWatcher {
         //     Err(_) => {}
         // }
 
-        let broken_cfg = ds.config_store.get_json::<DepositWatcherConfigBroken>("deposit_watcher_config").await;
-        if let Ok(Some(bcfg)) = broken_cfg {
-            let ba = bcfg.bid_ask;
-            let new_bid_ask = BidAsk{
-                bids: ba.bids.iter().filter_map(|v| {
-                    if let Some(p) = v.price {
-                        if let Some(v) = v.volume {
-                            Some(PriceVolume { price: p, volume: v })
+        let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
+
+        if test_load.is_err() {
+            let broken_cfg = ds.config_store.get_json::<DepositWatcherConfigBroken>("deposit_watcher_config").await;
+            if let Ok(Some(bcfg)) = broken_cfg {
+                let ba = bcfg.bid_ask;
+                let new_bid_ask = BidAsk {
+                    bids: ba.bids.iter().filter_map(|v| {
+                        if let Some(p) = v.price {
+                            if let Some(v) = v.volume {
+                                Some(PriceVolume { price: p, volume: v })
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
-                    }
-                }).collect::<Vec<PriceVolume>>(),
-                asks: ba.asks.iter().filter_map(|v| {
-                    if let Some(p) = v.price {
-                        if let Some(v) = v.volume {
-                            Some(PriceVolume { price: p, volume: v })
+                    }).collect::<Vec<PriceVolume>>(),
+                    asks: ba.asks.iter().filter_map(|v| {
+                        if let Some(p) = v.price {
+                            if let Some(v) = v.volume {
+                                Some(PriceVolume { price: p, volume: v })
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
-                    }
-                }).collect::<Vec<PriceVolume>>(),
-                center_price: self.get_starting_center_price_rdg_btc_fallback(),
+                    }).collect::<Vec<PriceVolume>>(),
+                    center_price: self.get_starting_center_price_rdg_btc_fallback().await,
+                };
+                let mut new_cfg = DepositWatcherConfig {
+                    deposit_allocations: bcfg.deposit_allocations,
+                    bid_ask: new_bid_ask,
+                    last_btc_timestamp: 0,
+                    ask_bid_code_reset: None,
+                };
+                ds.config_store.insert_update_json("deposit_watcher_config", new_cfg).await?;
+                info!("Updated broken deposit watcher config");
             };
-            let mut new_cfg = DepositWatcherConfig {
-                deposit_allocations: bcfg.deposit_allocations,
-                bid_ask: new_bid_ask,
-                last_btc_timestamp: 0,
-                ask_bid_code_reset: None,
-            };
-            ds.config_store.insert_update_json("deposit_watcher_config", new_cfg).await?;
-            info!("Updated broken deposit watcher config");
-        };
+        }
 
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
 
@@ -858,7 +862,7 @@ impl IntervalFold for DepositWatcher {
                             balance_btc: 0,
                             balance_rdg: 0,
                         }],
-                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc_fallback().await? },
+                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc_fallback().await },
                         last_btc_timestamp: 0,
                         ask_bid_code_reset: None,
                     };
