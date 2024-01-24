@@ -61,9 +61,19 @@ impl PriceVolume {
 
         for i in 0..divisions {
             let price_offset = (i+1) as f64;
-            let price = center_price + (price_offset * (price_width/divisions_f64));
-            let volume = (first_term * ratio.powi(divisions-i)) as u64;
-            price_volumes.push(PriceVolume { price, volume });
+            let mut price = center_price + (price_offset * (price_width/divisions_f64));
+            if price.is_nan() || price.is_infinite()  || price.is_sign_negative() {
+                error!("Price is invalid: {} center_price: {} price_offset: {} price_width: {} divisions_f64: {}",
+                       price, center_price, price_offset, price_width, divisions_f64);
+            } else {
+                let volume = (first_term * ratio.powi(divisions - i)) as u64;
+                if volume <= 0 || volume > available_volume {
+                    error!("Volume is invalid: {} first_term: {} ratio: {} divisions: {} i: {}",
+                           volume, first_term, ratio, divisions, i);
+                } else {
+                    price_volumes.push(PriceVolume { price, volume });
+                }
+            }
         }
         let total_volume = price_volumes.iter().map(|v| v.volume).sum::<u64>();
 
@@ -74,11 +84,12 @@ impl PriceVolume {
 
         if total_volume != available_volume {
             let delta = total_volume as i64 - available_volume as i64;
-            let last = price_volumes.last_mut().unwrap();
-            if delta > 0 && (last.volume as u64) > delta as u64 {
-                last.volume = ((last.volume as i64) - delta) as u64;
-            } else if delta < 0 {
-                last.volume = ((last.volume as i64) - delta) as u64;
+            if let Some(last) = price_volumes.last_mut() {
+                if delta > 0 && (last.volume as u64) > delta as u64 {
+                    last.volume = ((last.volume as i64) - delta) as u64;
+                } else if delta < 0 {
+                    last.volume = ((last.volume as i64) - delta) as u64;
+                }
             }
         }
         price_volumes
@@ -101,6 +112,11 @@ pub struct BidAsk{
 }
 
 impl BidAsk {
+
+    pub fn validate(&self) -> RgResult<()> {
+
+        Ok(())
+    }
 
     pub fn asking_price(&self) -> f64 {
         self.asks.get(0).map(|v| v.price).unwrap_or(0.)
@@ -156,13 +172,17 @@ impl BidAsk {
 
         // A bid is an offer to buy RDG with BTC
         // The volume should be denominated in BTC because this is how much is staked natively
-        let bids = PriceVolume::generate(
-            pair_balance_btc,
-            last_exchange_price, // Price here is RDG/BTC
-            divisions,
-            -(last_exchange_price*0.9),
-            scale
-        );
+        let bids = if pair_balance_btc > 0 {
+            PriceVolume::generate(
+                pair_balance_btc,
+                last_exchange_price, // Price here is RDG/BTC
+                divisions,
+                -(last_exchange_price*0.9),
+                scale
+            )
+        } else {
+            vec![]
+        };
 
 
         // An ask price in the inverse of a bid price, since we want to denominate in RDG
@@ -175,13 +195,17 @@ impl BidAsk {
 
         // An ask is how much BTC is being asked for each RDG
         // Volume is denominated in RDG because this is what the contract is holding for resale
-        let asks = PriceVolume::generate(
-            available_balance_rdg as u64,
-            ask_price,
-            divisions,
-            ask_price*3.0,
-            scale
-        );
+        let asks = if available_balance_rdg > 0 {
+            PriceVolume::generate(
+                available_balance_rdg as u64,
+                ask_price,
+                divisions,
+                ask_price*3.0,
+                scale
+            )
+        } else {
+            vec![]
+        };
         BidAsk {
             bids,
             asks,
@@ -263,6 +287,32 @@ pub struct DepositWatcherConfig {
     pub deposit_allocations: Vec<DepositKeyAllocation>,
     // TODO: Make this a map over currency type
     pub bid_ask: BidAsk,
+    pub last_btc_timestamp: u64,
+    pub ask_bid_code_reset: Option<bool>
+}
+
+
+
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PriceVolumeBroken {
+    pub price: Option<f64>, // RDG/BTC (in satoshis for both) for now
+    pub volume: Option<u64>, // Volume of RDG available
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct BidAskBroken{
+    pub bids: Vec<PriceVolumeBroken>,
+    pub asks: Vec<PriceVolumeBroken>,
+    pub center_price: f64
+}
+
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DepositWatcherConfigBroken {
+    pub deposit_allocations: Vec<DepositKeyAllocation>,
+    // TODO: Make this a map over currency type
+    pub bid_ask: BidAskBroken,
     pub last_btc_timestamp: u64,
     pub ask_bid_code_reset: Option<bool>
 }
@@ -547,7 +597,7 @@ impl DepositWatcher {
         let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
 
         // BTC / RDG
-        let min_ask = 1f64 / self.get_starting_center_price_rdg_btc().await?;
+        let min_ask = 1f64 / self.get_starting_center_price_rdg_btc_fallback().await;
 
         // Grab all recent transactions associated with this key address for on-network
         // transactions
@@ -643,6 +693,14 @@ impl DepositWatcher {
         let rdg_btc = usd_btc / starting_usd;
         Ok(rdg_btc)
     }
+
+    pub async fn get_starting_center_price_rdg_btc_fallback(&self) -> f64 {
+        self.get_starting_center_price_rdg_btc().await
+            .add("Failed getting BTC/USD spot").log_error()
+            .unwrap_or(0.00256410256f64) // 100 / 39000
+
+    }
+
 }
 
 
@@ -659,7 +717,7 @@ impl IntervalFold for DepositWatcher {
         }
 
         let usd_btc = coinbase_btc_spot_latest().await.log_error().and_then(|t| t.usd_btc())
-            .unwrap_or(30000.0f64);
+            .unwrap_or(39000.0f64);
 
         let ds = self.relay.ds.clone();
         // TODO: Change to query to include trust information re: deposit score
@@ -674,7 +732,47 @@ impl IntervalFold for DepositWatcher {
         //     Ok(_) => {}
         //     Err(_) => {}
         // }
+
+        let broken_cfg = ds.config_store.get_json::<DepositWatcherConfigBroken>("deposit_watcher_config").await;
+        if let Ok(Some(bcfg)) = broken_cfg {
+            let ba = bcfg.bid_ask;
+            let new_bid_ask = BidAsk{
+                bids: ba.bids.iter().filter_map(|v| {
+                    if let Some(p) = v.price {
+                        if let Some(v) = v.volume {
+                            Some(PriceVolume { price: p, volume: v })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }).collect::<Vec<PriceVolume>>(),
+                asks: ba.asks.iter().filter_map(|v| {
+                    if let Some(p) = v.price {
+                        if let Some(v) = v.volume {
+                            Some(PriceVolume { price: p, volume: v })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }).collect::<Vec<PriceVolume>>(),
+                center_price: self.get_starting_center_price_rdg_btc_fallback(),
+            };
+            let mut new_cfg = DepositWatcherConfig {
+                deposit_allocations: bcfg.deposit_allocations,
+                bid_ask: new_bid_ask,
+                last_btc_timestamp: 0,
+                ask_bid_code_reset: None,
+            };
+            ds.config_store.insert_update_json("deposit_watcher_config", new_cfg).await?;
+            info!("Updated broken deposit watcher config");
+        };
+
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
+
         //.ok.andthen?
         if let Some(mut cfg) = cfg {
             // if cfg.ask_bid_code_reset.is_none() {
@@ -760,7 +858,7 @@ impl IntervalFold for DepositWatcher {
                             balance_btc: 0,
                             balance_rdg: 0,
                         }],
-                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc().await? },
+                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc_fallback().await? },
                         last_btc_timestamp: 0,
                         ask_bid_code_reset: None,
                     };

@@ -112,6 +112,7 @@ pub enum RgTopLevelSubcommand {
     Balance(BalanceCli),
     TestTransaction(TestTransactionCli),
     TestCapture(TestCaptureCli),
+    TestBitcoinBalance(TestBitcoinBalanceCli),
 }
 
 
@@ -285,6 +286,12 @@ pub struct TestTransactionCli {}
 /// Debug webcam capture
 #[derive(Args, Debug, Clone)]
 pub struct TestCaptureCli {}
+
+/// Debug btc sync functionality
+#[derive(Args, Debug, Clone)]
+pub struct TestBitcoinBalanceCli {
+
+}
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)
 #[derive(Args, Debug, Clone)]
