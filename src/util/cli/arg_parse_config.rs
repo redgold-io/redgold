@@ -160,7 +160,7 @@ impl ArgTranslate {
         self.genesis();
         self.alias();
 
-        self.abort = immediate_commands(&self.opts, &self.node_config).await;
+        self.abort = immediate_commands(&self.opts, &self.node_config, self.args()).await;
         if self.abort {
             return Ok(());
         }
@@ -688,8 +688,9 @@ fn load_ds_path() {
         .unwrap();
 */
 // Pre logger commands
-pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
-                          // , simple_runtime: Arc<Runtime>
+pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
+                                // , simple_runtime: Arc<Runtime>
+                                args: Vec<&String>
 ) -> bool {
     let mut abort = false;
     let res: Result<(), ErrorInfo> = match &opts.subcmd {
@@ -724,6 +725,10 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig
                 }
                 RgTopLevelSubcommand::Deploy(d) => {
                     commands::deploy(d, &config).await
+                }
+                RgTopLevelSubcommand::TestBitcoinBalance(b) => {
+                    commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
+                    Ok(())
                 }
                 _ => {
                     abort = false;

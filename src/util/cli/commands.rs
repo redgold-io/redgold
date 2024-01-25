@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
+use log::info;
 use rocket::form::FromForm;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, CurrencyAmount};
 use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
@@ -12,6 +13,7 @@ use crate::e2e::tx_submit::TransactionSubmitter;
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
@@ -452,4 +454,17 @@ async fn test_transaction_dev() {
     let _ = test_transaction(&&t, &nc
                                // , arc
     ).await.expect("");
+}
+
+pub(crate) async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) {
+    let hex = p0.clone().clone();
+    let pk = PublicKey::from_hex(&hex).expect("hex");
+    let w = SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("works");
+    let b = w.get_wallet_balance().expect("balance");
+    println!("Balance: {:?}", b);
+    info!("Balance: {:?}", b);
+    let txs = w.get_sourced_tx().expect("tx");
+    for t in txs {
+        println!("Tx: {:?}", t);
+    }
 }
