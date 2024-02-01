@@ -23,6 +23,7 @@ use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::JsonCombineResult;
+use crate::util::cli::arg_parse_config::ArgTranslate;
 
 pub struct CanaryConfig {}
 
@@ -402,6 +403,16 @@ impl NodeConfig {
 
     pub fn default_debug() -> Self {
         NodeConfig::from_test_id(&(0 as u16))
+    }
+
+    pub async fn dev_default() -> Self {
+        let mut opts = RgArgs::default();
+        opts.network = Some("dev".to_string());
+        let node_config = NodeConfig::default();
+        let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
+        arg_translate.translate_args().await.unwrap();
+        let nc = arg_translate.node_config;
+        nc
     }
 
     pub fn default() -> Self {
