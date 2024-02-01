@@ -26,13 +26,18 @@ pub fn load_ci_kp() {
     }
 }
 
-#[ignore]
+// #[ignore]
+#[test]
 pub fn dev_balance_check() {
 
     let dev_amm_address = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
 
     let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
     let pk = PublicKey::from_hex(pk_hex).expect("pk");
+
+    let addr = pk.address().expect("address").render_string().expect("");
+
+    println!("address: {addr}");
 
     let mut w =
         SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true).expect("w");
