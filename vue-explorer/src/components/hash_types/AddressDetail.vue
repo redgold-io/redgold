@@ -223,16 +223,60 @@ export default {
   watch: {
     inputUSD(newUSDValue) {
       // If the value is updated by the other watcher, do not recompute
-      if (this.updatingValue || this.lastEdited === "BTC") return;
+      if (this.updatingValue
+          // || this.lastEdited === "BTC"
+      ) return;
 
       this.updatingValue = true;
+      this.lastEdited = "USD";
+
       let floatUSDValue = parseFloat(newUSDValue);
       if (!isNaN(floatUSDValue)) {
         // console.log("New usd value " + floatUSDValue)
         this.inputBTC = floatUSDValue / this.usdBtcRate;
-        this.lastEdited = "USD";
         // console.log("New BTC value " + this.inputBTC)
+      }
+      this.updatingValue = false;
+    },
 
+    inputBTC(newBTCValue) {
+
+      if (this.updatingValue
+          // || this.lastEdited === "USD"
+      ) return;
+
+      this.updatingValue = true;
+      this.lastEdited = "BTC";
+
+      let floatBtcValue = parseFloat(newBTCValue);
+
+      if (this.hashData.address_pool_info != null && !(isNaN(floatBtcValue))) {
+        let asks = this.hashData.address_pool_info.bid_ask.asks;
+        let total_btc = floatBtcValue;
+        let total_fulfilled = 0;
+        for (let i = 0; i < asks.length;  i++) {
+          let ask = asks[i];
+          let p = ask.price // BTC / RDG
+          let v = ask.volume / 1e8 // amount RDG available for sale via ask
+          let requested_vol = total_btc / p // RDG;
+          let thisBtc = v * p;
+          console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
+          thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
+          if (requested_vol > v) {
+            total_btc -= thisBtc;
+            total_fulfilled += v
+          } else {
+            total_btc = 0;
+            total_fulfilled += requested_vol
+            break
+          }
+        }
+        this.rdg_buy_amount = total_fulfilled;
+      }
+
+      if (!isNaN(floatBtcValue)) {
+        // console.log("New usd value " + floatBtcValue)
+        this.inputUSD = floatBtcValue * this.usdBtcRate;
       }
       this.updatingValue = false;
     },
@@ -267,43 +311,6 @@ export default {
         }
         this.btc_sell_amount = total_fulfilled;
       }
-    },
-    inputBTC(newBTCValue) {
-      let floatBtcValue = parseFloat(newBTCValue);
-
-      if (this.hashData.address_pool_info != null && !(isNaN(floatBtcValue))) {
-        let asks = this.hashData.address_pool_info.bid_ask.asks;
-        let total_btc = floatBtcValue;
-        let total_fulfilled = 0;
-        for (let i = 0; i < asks.length;  i++) {
-          let ask = asks[i];
-          let p = ask.price // RDG / BTC
-          let v = ask.volume / 1e8 // amount RDG available for sale via ask
-          let requested_vol = total_btc * p // RDG;
-          let thisBtc = v / p;
-          console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
-          thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
-          if (requested_vol > v) {
-            total_btc -= thisBtc;
-            total_fulfilled += v
-          } else {
-            total_btc = 0;
-            total_fulfilled += requested_vol
-            break
-          }
-        }
-        this.rdg_buy_amount = total_fulfilled;
-      }
-
-      // If the value is updated by the other watcher, do not recompute
-      if (this.updatingValue) return;
-
-      this.updatingValue = true;
-      if (!isNaN(floatBtcValue)) {
-        // console.log("New usd value " + floatBtcValue)
-        this.inputUSD = floatBtcValue * this.usdBtcRate;
-      }
-      this.updatingValue = false;
     }
   },
   mixins: [fetchHashInfo],
@@ -417,36 +424,35 @@ export default {
         if (ba != null) {
           let asks = ba.asks;
           if (asks != null) {
-            for (let i = 0; i < asks.length; i++) {
+            for (let i = 0; i < 25; i++) {
               let ask = asks[i];
               // console.log("Bid " + ask);
+              let ask_usd = ask.price * this.usdBtcRate;
               if (ask.price != null) {
-                labels.push(ask.price);
+                // price in BTC * USD/BTC = usd
+                let label = ask_usd.toFixed(2) + " USD";
+                labels.push(label);
               }
               if (ask.volume != null) {
-                data.push(ask.volume / 1e8);
+                let norm_vol = ask.volume / 1e8;
+                // let total_val_k = (ask_usd * norm_vol) / 1e3;
+                let fixed_vol = norm_vol.toFixed(2);
+                // let fixed_val = total_val_k.toFixed(2);
+                // let data_str = fixed_vol + " RDG ($" + fixed_val + "k)";
+                data.push(fixed_vol);
               }
             }
           }
         }
       }
 
-      let slice_len = 25;
-      let resultLabels = labels.map(value => {
-          return value.toFixed(2);
-      }).slice(0, slice_len);
-      let resultData = data.map(value => {
-          return value.toFixed(2);
-      }).slice(0, slice_len);
-      // console.log("Result asks labels: " + resultLabels);
-      // console.log("Result asks data: " + resultData);
       return {
-        labels: resultLabels,
+        labels: labels,
         datasets: [
           {
             label: 'RDG Ask Volume',
             backgroundColor: '#f87979',
-            data: resultData
+            data: data
           }
         ]
       }
