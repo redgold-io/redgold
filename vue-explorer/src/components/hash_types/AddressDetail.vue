@@ -50,7 +50,7 @@
 
             <div class="grid-container">
               <div><strong>BTC Balance</strong></div>
-              <div>{{ (hashData.address_pool_info.btc_balance / 1e8).toFixed(8) }} BTC</div>
+              <div>{{ (hashData.address_pool_info.btc_balance).toFixed(8) }} BTC</div>
               <div><strong>RDG Address Balance</strong></div>
               <div>{{ hashData.address_pool_info.rdg_balance.toFixed(8)}} RDG</div>
               <div><strong>RDG Address</strong></div>
