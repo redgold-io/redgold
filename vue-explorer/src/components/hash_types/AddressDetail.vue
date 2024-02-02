@@ -61,7 +61,7 @@
               <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /> RDG/BTC </div>
               <div><strong>Spread</strong></div>
               <div>
-                {{ hashData.address_pool_info.bid_ask.asks[0].price -
+                {{ (1 / hashData.address_pool_info.bid_ask.asks[0].price) -
               hashData.address_pool_info.bid_ask.bids[0].price }} RDG</div>
             </div>
 
@@ -372,33 +372,36 @@ export default {
               let bid = bids[i];
               // console.log("Bid " + bid);
               if (bid.price != null) {
-                labels.push(bid.price);
+                // Price is originally in RDG / BTC -- i.e. 400 RDG / 1 BTC
+                // We want to convert it to USD / RDG
+                let rdg_btc = bid.price; // RDG / BTC
+                let btc_rdg = (1 / rdg_btc); // BTC / RDG
+                let usd_btc = this.usdBtcRate; // USD / BTC
+                let price = btc_rdg * usd_btc; // USD / RDG
+                labels.push(price);
               }
               if (bid.volume != null) {
-                data.push(bid.volume / 1e8);
+                data.push(bid.volume);
               }
             }
           }
         }
       }
 
-      let slice_len = 75;
+      let slice_len = 25;
       let resultLabels = labels.map(value => {
-        // if ((index % 5) === 0) {
-          return value.toFixed(2);
-        // }
-        // return '';
-      }).reverse().slice(slice_len, labels.length);
+        return value.toFixed(2);
+      }).slice(0, slice_len);
       let resultData = data.map(value => {
-          return value.toFixed(2);
-      }).reverse().slice(slice_len, data.length);
+        return value.toFixed(2);
+      }).slice(0, slice_len);
       // console.log("Result labels: " + resultLabels);
       // console.log("Result data: " + resultData);
       return {
         labels: resultLabels,
         datasets: [
           {
-            label: 'BTC Bid Volume',
+            label: 'BTC Bid Volume Sats',
             backgroundColor: '#79f87f',
             data: resultData
           }
