@@ -4,7 +4,7 @@ use futures::TryFutureExt;
 use itertools::{Itertools, max, min};
 use log::{error, info};
 
-use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
@@ -218,7 +218,7 @@ impl BidAsk {
                 pair_balance_btc,
                 last_exchange_price, // Price here is RDG/BTC
                 divisions,
-                -(last_exchange_price*0.9),
+                last_exchange_price*0.9,
                 scale
             )
         } else {
@@ -878,6 +878,14 @@ impl IntervalFold for DepositWatcher {
 
                     let balance = self.relay.ds.transaction_store.get_balance(&d.key.address()?).await?;
                     if balance.map(|x| x > 0).unwrap_or(false) { // && btc_starting_balance > 3500 {
+                        if cfg.ask_bid_code_reset.is_none() {
+                            info!("Regenerating starting price due to code reset");
+                            let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
+                            let min_ask = 1f64 / center_price;
+                            cfg.bid_ask = cfg.bid_ask.regenerate(center_price, min_ask);
+                            cfg.ask_bid_code_reset = Some(true);
+                            ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
+                        }
                         let update_result = self.process_requests(
                             d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
                         ).await;
@@ -983,8 +991,29 @@ async fn debug_local_ds_utxo_balance() {
 }
 
 
+#[derive(Serialize, Deserialize)]
+struct TestJson {
+    some: String
+}
 
-#[ignore]
+#[derive(Serialize, Deserialize)]
+struct TestJson2 {
+    some: String,
+    other: Option<String>
+}
+
+#[test]
+fn test_json() {
+    let t = TestJson{
+        some: "yo".to_string(),
+    };
+    let ser = t.json().expect("works");
+    let t2 = ser.json_from::<TestJson2>().expect("works");
+    assert_eq!(t2.some, "yo".to_string());
+    assert_eq!(t2.other, None);
+}
+
+// #[ignore]
 #[tokio::test]
 async fn debug_local() {
     let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
@@ -1023,8 +1052,8 @@ async fn debug_local() {
     let p = ba.json_pretty_or();
 
 
-    let ba2 = ba.regenerate(center_price*1.1f64, min_ask).json_pretty_or();
+    // let ba2 = ba.regenerate(center_price*1.1f64, min_ask).json_pretty_or();
 
-    println!("bid ask: {ba2}");
+    println!("bid ask: {p}");
 
 }
