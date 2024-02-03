@@ -11,7 +11,7 @@ use itertools::Itertools;
 use log::info;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::servers::Server;
-use redgold_schema::{RgResult, ShortString, structs};
+use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerMetadata, PeerId, Seed, TransportInfo, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::merkle;
@@ -24,6 +24,7 @@ use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::util::cli::arg_parse_config::ArgTranslate;
+use crate::util::logging::Loggable;
 
 pub struct CanaryConfig {}
 
@@ -266,7 +267,10 @@ impl NodeConfig {
     }
 
     pub fn build_number() -> i64 {
-        include_str!("resources/build_number").to_string().parse::<i64>().expect("build number parse error")
+        let build_num_str = include_str!("resources/build_number").to_string();
+        build_num_str.parse::<i64>()
+            .error_info(format!("Build number {build_num_str}")).log_error()
+            .unwrap_or(0)
     }
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
