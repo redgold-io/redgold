@@ -289,6 +289,8 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
+        relay.update_nmd_auto().await?;
+
         if node_config.genesis {
             info!("Starting from genesis");
             // relay.node_state.store(NodeState::Ready);
@@ -354,6 +356,8 @@ impl Node {
                 relay.node_config.seeds.get(0).unwrap().clone()
 
             };
+
+            // Change to immediate discovery message
             let port = seed.port_offset.unwrap() + 1;
             let client = PublicClient::from(seed.external_address.clone(), port as u16, Some(relay.clone()));
             info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
@@ -392,6 +396,8 @@ impl Node {
             //     DiscoveryMessage::new(metadata.clone(), result.dynamic_node_metadata.clone())
             // )?;
 
+
+
             tokio::time::sleep(Duration::from_secs(3)).await;
             info!("Now starting download after discovery has ran.");
 
@@ -400,6 +406,8 @@ impl Node {
                 relay.clone(),
                 pk1.clone()
             ).await;
+
+
         }
 
         info!("Node ready");

@@ -42,7 +42,10 @@ pub struct PriceVolume {
     pub volume: u64, // Volume of RDG available
 }
 
+pub const DUST_LIMIT: u64 = 2500;
+
 impl PriceVolume {
+
     pub fn generate(
         available_volume: u64,
         center_price: f64,
@@ -50,6 +53,11 @@ impl PriceVolume {
         price_width: f64,
         scale: f64
     ) -> Vec<PriceVolume> {
+
+        if available_volume < DUST_LIMIT {
+            return vec![];
+        }
+
         let divisions_f64 = divisions as f64;
 
         // Calculate the common ratio
@@ -73,10 +81,8 @@ impl PriceVolume {
         }
 
         // Normalize the volumes so their sum equals available_volume
-        let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
-        for pv in &mut price_volumes {
-            pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
-        }
+        Self::normalize_volumes(available_volume, &mut price_volumes);
+
 
 // Re-calculate the total after normalization
         let mut adjusted_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
@@ -99,7 +105,7 @@ impl PriceVolume {
 
         // Final assert
         let final_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
-        assert_eq!(final_total_volume, available_volume, "Total volume should equal available volume");
+        assert!(final_total_volume <= available_volume, "Total volume should equal available volume or be less than");
 
 
         //
@@ -135,6 +141,46 @@ impl PriceVolume {
         }
         fpv
     }
+    // 
+    // fn normalize_volumes(available_volume: u64, price_volumes: &mut Vec<PriceVolume>) {
+    //     let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+    //     for pv in price_volumes.iter_mut() {
+    //         pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
+    //     }
+    // }
+
+    fn normalize_volumes(available_volume: u64, price_volumes: &mut Vec<PriceVolume>) {
+        let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+
+        // Initially normalize volumes
+        for pv in price_volumes.iter_mut() {
+            pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
+        }
+
+        let mut dust_trigger = false;
+
+        for pv in price_volumes.iter_mut() {
+            if pv.volume < DUST_LIMIT {
+                dust_trigger = true;
+            }
+        }
+
+        if dust_trigger {
+            let mut new_price_volumes = vec![];
+            let divs = (available_volume / DUST_LIMIT) as usize;
+            for (i,pv) in price_volumes.iter_mut().enumerate() {
+                if i < divs {
+                    new_price_volumes.push(PriceVolume {
+                        price: pv.price,
+                        volume: DUST_LIMIT
+                    });
+                }
+            }
+            price_volumes.clear();
+            price_volumes.extend(new_price_volumes);
+        }
+    }
+
 }
 
 #[test]
@@ -195,8 +241,8 @@ impl BidAsk {
             available_balance,
             pair_balance,
             last_exchange_price,
-            50,
-            30.,
+            40,
+            20.0f64,
             min_ask
         )
     }
@@ -219,7 +265,7 @@ impl BidAsk {
                 last_exchange_price, // Price here is RDG/BTC
                 divisions,
                 last_exchange_price*0.9,
-                scale
+                scale / 2.0
             )
         } else {
             vec![]
@@ -878,12 +924,13 @@ impl IntervalFold for DepositWatcher {
 
                     let balance = self.relay.ds.transaction_store.get_balance(&d.key.address()?).await?;
                     if balance.map(|x| x > 0).unwrap_or(false) { // && btc_starting_balance > 3500 {
-                        if cfg.ask_bid_code_reset.is_none() {
+                        let reset_condition = true;
+                        if cfg.ask_bid_code_reset == Some(reset_condition) {
                             info!("Regenerating starting price due to code reset");
                             let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
                             let min_ask = 1f64 / center_price;
                             cfg.bid_ask = cfg.bid_ask.regenerate(center_price, min_ask);
-                            cfg.ask_bid_code_reset = Some(true);
+                            cfg.ask_bid_code_reset = Some(!reset_condition);
                             ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
                         }
                         let update_result = self.process_requests(
@@ -1013,7 +1060,7 @@ fn test_json() {
     assert_eq!(t2.other, None);
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_local() {
     let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
@@ -1023,12 +1070,12 @@ async fn debug_local() {
     let dev_amm_address = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
     let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
     let pk = PublicKey::from_hex(pk_hex).expect("pk");
-    let pk_rdg_address = pk.address().expect("address");
+    let pk_rdg_address = pk.clone().address().expect("address");
     let addr = pk_rdg_address.render_string().expect("");
     println!("address: {addr}");
 
     let mut w =
-        SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true).expect("w");
+        SingleKeyBitcoinWallet::new_wallet(pk.clone(), NetworkEnvironment::Dev, true).expect("w");
     let a = w.address().expect("a");
     println!("wallet address: {a}");
     assert_eq!(dev_amm_address, a);
@@ -1044,13 +1091,14 @@ async fn debug_local() {
 
     let ba = BidAsk::generate_default(
         rdg_b,
-        confirmed,
+        confirmed * 300,
         center_price,
         min_ask
     );
 
-    let p = ba.json_pretty_or();
+    let p = ba.bids.json_pretty_or();
 
+    // w.create_transaction(Some(pk), None, 2000).expect("tx");
 
     // let ba2 = ba.regenerate(center_price*1.1f64, min_ask).json_pretty_or();
 

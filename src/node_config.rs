@@ -258,9 +258,15 @@ impl NodeConfig {
         VersionInfo{
             executable_checksum: self.executable_checksum.clone().unwrap_or("".to_string()),
             commit_hash: None,
+            // TODO: Move these fields into a different struct so they can be updated
             next_upgrade_time: None,
             next_executable_checksum: None,
+            build_number: Some(Self::build_number())
         }
+    }
+
+    pub fn build_number() -> i64 {
+        include_str!("resources/build_number").to_string().parse::<i64>().expect("build number parse error")
     }
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
