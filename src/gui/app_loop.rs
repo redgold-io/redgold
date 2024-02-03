@@ -410,7 +410,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                         egui::Vec2::new((img.size()[0] as f32 / scale) as f32, (img.size()[1] as f32 / scale) as f32);
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);
-                    ui.image(texture_id, size);
+                    // ui.image(texture_id); //, size);
                     ui.style_mut().override_text_style = Some(TextStyle::Heading);
 
                     ui.style_mut().spacing.item_spacing.y = 5f32;
