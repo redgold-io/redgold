@@ -13,7 +13,7 @@ pub async fn debug_endpoints() {
     let ds = DataStore::from_config_path(&ds).await;
     let mut relay = Relay::default().await;
     relay.ds = ds;
-    let res = handle_explorer_recent(relay.clone()).await.expect("");
+    let res = handle_explorer_recent(relay.clone(), None).await.expect("");
 
     for x in res.recent_observations {
         let res = hash_query(relay.clone(), x.hash, None, None).await.expect("");

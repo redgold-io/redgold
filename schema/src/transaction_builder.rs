@@ -20,6 +20,12 @@ impl TransactionBuilder {
         self.transaction.options = Some(options);
         self
     }
+    pub fn with_is_test(&mut self) -> &mut Self{
+        let mut options = self.transaction.options.clone().unwrap_or(TransactionOptions::default());
+        options.is_test = Some(true);
+        self.transaction.options = Some(options);
+        self
+    }
     // pub fn with_input_utxo_id(&mut self, input_utxo_id: &UtxoId) -> &mut Self {
     //     let mut input = Input::default();
     //     input.utxo_id = Some(input_utxo_id.clone());

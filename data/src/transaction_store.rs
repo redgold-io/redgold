@@ -97,25 +97,32 @@ impl TransactionStore {
     }
 
     pub async fn query_recent_transactions(
-        &self, limit: Option<i64>
+        &self, limit: Option<i64>,
+        is_test: Option<bool>
     ) -> Result<Vec<Transaction>, ErrorInfo> {
         let limit = limit.unwrap_or(10);
         let mut pool = self.ctx.pool().await?;
 
         // : Map<Sqlite, fn(SqliteRow) -> Result<Record, Error>, SqliteArguments>
-        let map = sqlx::query!(
+        let map = match is_test {
+            None => {
+                DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT raw FROM transactions WHERE rejection_reason IS NULL AND accepted = 1
             ORDER BY time DESC LIMIT ?1"#,
             limit
-        );
-        let rows = map.fetch_all(&mut *pool).await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            let deser = Transaction::proto_deserialize(row.raw)?;
-            res.push(deser);
-        }
-        Ok(res)
+            ).fetch_all(&mut *pool).await)?.iter().map(|row| Transaction::proto_deserialize(row.raw.clone()))
+                    .collect::<RgResult<Vec<Transaction>>>()
+            }
+            Some(b) => {
+                DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM transactions WHERE rejection_reason IS NULL
+            AND accepted = 1 AND is_test=?2
+            ORDER BY time DESC LIMIT ?1"#,
+            limit, b).fetch_all(&mut *pool).await)?.iter().map(|row| Transaction::proto_deserialize(row.raw.clone()))
+                    .collect::<RgResult<Vec<Transaction>>>()
+            }
+        };
+        map
     }
     pub async fn recent_transaction_hashes(
         &self,
@@ -465,13 +472,15 @@ impl TransactionStore {
     ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
         let rejection_ser = rejection_reason.map(|x| json_or(&x));
+        let is_test = tx.is_test();
         let hash_vec = tx.hash_bytes()?;
         let ser = tx.proto_serialize();
+
         let rows = sqlx::query!(
             r#"
         INSERT OR REPLACE INTO transactions
-        (hash, raw, time, rejection_reason, accepted) VALUES (?1, ?2, ?3, ?4, ?5)"#,
-           hash_vec, ser, time, rejection_ser, accepted
+        (hash, raw, time, rejection_reason, accepted, is_test) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+           hash_vec, ser, time, rejection_ser, accepted, is_test
         )
             .execute(&mut *pool)
             .await;

@@ -55,7 +55,7 @@ async fn init_db() {
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await
-        .expect("Wtf");
+        .expect("Migrations execution failed");
     println!("SQL migrations Build script ran");
 }
 
