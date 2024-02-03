@@ -396,6 +396,18 @@ impl Relay {
         Ok(())
     }
 
+    pub async fn update_nmd_auto(&self) -> RgResult<()> {
+        let mut nmd = self.node_metadata().await?;
+        let vii = self.node_config.version_info();
+        if let Some(vi) = nmd.version_info.as_mut() {
+            vi.commit_hash = vii.commit_hash;
+            vi.executable_checksum = vii.executable_checksum;
+            vi.build_number = vii.build_number;
+        };
+        self.update_node_metadata(&nmd).await?;
+        Ok(())
+    }
+
     pub async fn add_deposit_address(&self, d: &DepositAddress) -> RgResult<()> {
         let mut nmd = self.node_metadata().await?;
         let mut addrs = nmd.deposit_addresses.iter()

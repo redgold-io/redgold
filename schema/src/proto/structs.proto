@@ -206,6 +206,9 @@ message VersionInfo {
   optional string next_executable_checksum = 3;
   // Intended time for performing a software update, for coordination of upgrades (not yet used.)
   optional int64 next_upgrade_time = 4;
+  // Build number associated with GitHub actions release action counter
+  // Should correspond directly to the executable hash, check the releases page for the correspondence
+  optional int64 build_number = 5;
 }
 
 message PeerId {

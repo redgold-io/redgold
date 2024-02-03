@@ -129,6 +129,7 @@ jobs:
       - run: rustup -V
       - run: cargo clean
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
+      - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: cargo build --release
         # try CWD?
 #      - run: ./bin/local_test.sh "./target/release/redgold"
@@ -163,6 +164,7 @@ jobs:
         with:
           cache-on-failure: true
       - run: ./bin/install_build_deps.sh
+      - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
       - uses: actions/upload-artifact@v3
@@ -269,7 +271,7 @@ jobs:
         run: ./bin/release_branches.sh
       - run: echo "release branch match output ${{ steps.check-branch.outputs.match }}"
       - run: echo steps.check-branch.outputs.match
-
+      - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
       - if:
           contains('
