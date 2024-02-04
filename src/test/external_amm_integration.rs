@@ -1,8 +1,10 @@
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::EasyJson;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 
 #[ignore]
+#[test]
 pub fn load_ci_kp() {
 
     let dev_amm_address = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
@@ -21,7 +23,7 @@ pub fn load_ci_kp() {
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
 
-        let res = w.send_local(dev_amm_address, 3500, privk).expect("send");
+        let res = w.send_local(dev_amm_address, 1900, privk).expect("send");
         println!("txid: {res}");
     }
 }
@@ -45,8 +47,12 @@ pub fn dev_balance_check() {
     println!("wallet address: {a}");
     let b = w.get_wallet_balance().expect("balance");
     println!("wallet balance: {b}");
-    let c = b.confirmed;
-    let t = b.get_total();
-    let sp = b.get_spendable();
-    println!("wallet confirmed: {c} total {t} spendable {sp}");
+
+    let mut tx = w.get_sourced_tx().expect("sourced tx");
+    tx.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    for t in tx {
+        let tj = t.json_or();
+        println!("tx: {tj}");
+    }
+
 }

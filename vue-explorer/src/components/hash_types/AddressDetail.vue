@@ -50,12 +50,17 @@
 
 
             <div class="grid-container">
+
+              <div><strong>BTC Explorer Link</strong></div>
+              <a :href="btcExplorerLink">{{btcExplorerLink}}</a>
+              <div><strong>BTC Address</strong></div>
+              <div><HashLink :shorten="false" :data="hashData.address_pool_info.btc_address" /></div>
               <div><strong>BTC Balance</strong></div>
               <div>{{ (hashData.address_pool_info.btc_balance).toFixed(8) }} BTC</div>
               <div><strong>RDG Address Balance</strong></div>
               <div>{{ hashData.address_pool_info.rdg_balance.toFixed(8)}} RDG</div>
               <div><strong>RDG Address</strong></div>
-              <div><TextCopy :data="hashData.address_pool_info.rdg_address" /></div>
+              <div><HashLink :shorten="false" :data="hashData.address_pool_info.rdg_address" /></div>
               <div><strong>Public Key</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
               <div><strong>Price USD/RDG</strong></div>
@@ -170,6 +175,7 @@ import {   Title,
 } from 'chart.js';
 import { Bar } from 'vue-chartjs';
 import TextCopy from "@/components/util/TextCopy.vue";
+import HashLink from "@/components/util/HashLink.vue";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 // ChartJS.defaults.global.defaultFontColor = '#FFFFFF';
@@ -178,6 +184,7 @@ export default {
   name: 'TransactionDetail',
   props: ['hashDataInitial'],
   components: {
+    HashLink,
     TextCopy,
     BriefTransaction,
     // RenderTime,
@@ -310,6 +317,17 @@ export default {
   },
   mixins: [fetchHashInfo],
   computed: {
+    btcExplorerLink() {
+
+      var net = "testnet/";
+      let btcAddress = this.hashData.address_pool_info.btc_address;
+
+      if (!btcAddress.startsWith("tb")) {
+        net = "";
+      }
+
+      return "https://blockstream.info/" + net + "address/" + btcAddress;
+    },
     centerPriceUsdRdg() {
       if (this.hashData.address_pool_info != null) {
         let centerPrice = this.hashData.address_pool_info.bid_ask.center_price;

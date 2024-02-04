@@ -193,6 +193,10 @@
       "description": "skip option default values",
       "attr": "#[serde(skip_serializing_if = \"Option::is_none\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
       "paths": [
+        "structs.Input.product_id",
+        "structs.Input.floating_utxo_id",
+        "structs.Input.input_type",
+        "structs.Address.currency",
         "structs.ResolveCodeResponse",
         "structs.ExecutionResult.result_metadata",
         "structs.TypedValue.string_value",
@@ -207,6 +211,17 @@
         "structs.StandardData.bitcoin_txid",
         "structs.StandardData.typed_value",
         "structs.StandardData.matrix_typed_value",
+        "structs.StandardData.generic_typed_value",
+        "structs.StandardData.address",
+        "structs.StandardData.state",
+        "structs.StandardData.request",
+        "structs.StandardData.standard_request",
+        "structs.StandardData.liquidity_request",
+        "structs.StandardData.portfolio_info",
+        "structs.StandardData.schema_def",
+        "structs.StandardData.data",
+        "structs.StandardData.aggregate_state_hash",
+        "structs.StandardData.external_transaction_id",
         "structs.StandardData.peer_data",
         "structs.StandardData.node_metadata",
         "structs.StandardData.dynamic_node_metadata",
@@ -215,6 +230,8 @@
         "structs.StandardData.hash",
         "structs.Output.contract",
         "structs.Output.product_id",
+        "structs.Output.output_type",
+        "structs.Output.utxo_id",
         "structs.Transaction.options",
         "structs.StructMetadata.signable_hash",
         "structs.StructMetadata.signed_hash",
@@ -294,7 +311,9 @@
         "structs.BytesData.version",
         "structs.StructMetadata.version",
         "structs.Hash.hash_format_type",
-        "structs.Address.address_type"
+        "structs.Address.address_type",
+        "structs.Signature.signature_type",
+        "structs.PublicKey.key_type"
       ]
     },
     {

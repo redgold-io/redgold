@@ -773,8 +773,10 @@ impl DepositWatcher {
         }
 
         let mut updated_allocation = alloc.clone();
-        updated_allocation.balance_btc = bid_ask_latest.sum_bid_volume();
-        updated_allocation.balance_rdg = bid_ask_latest.sum_ask_volume();
+
+        // This is okay to use as a delayed balance because we'll recalculate on the next step, only used by UI really
+        updated_allocation.balance_btc = btc_starting_balance;
+        updated_allocation.balance_rdg = rdg_starting_balance as u64;
         let update = CurveUpdateResult{
             updated_bid_ask: bid_ask_latest,
             updated_btc_timestamp: updated_last_ts,

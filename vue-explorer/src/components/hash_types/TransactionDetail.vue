@@ -134,8 +134,17 @@
             </div>
           </div>
 
+          <h3 class="detail-group">Transaction Data</h3>
+          <div class="grid-container">
+            <div><strong>Compact JSON</strong></div>
+            <div class="json-container">{{ hashData.raw_transaction }}</div>
+            <div><strong>Pretty JSON</strong></div>
+            <div><pre class="json-container">{{ prettyTransactionData }}</pre></div>
 
-<!--            <div><strong>Signers</strong></div>-->
+          </div>
+
+
+          <!--            <div><strong>Signers</strong></div>-->
 <!--            <div>-->
 <!--              <ul>-->
 <!--                <li v-for="(signer, index) in hashData.signers" :key="index">-->
@@ -185,6 +194,17 @@ export default {
       hashData: this.hashDataInitial
     }
   },
+  computed: {
+    prettyTransactionData() {
+        // Assuming hashData.raw_transaction is a JSON string
+        try {
+          const obj = this.hashData.raw_transaction;
+          return JSON.stringify(obj, null, 2); // Convert it back to a string with indentation
+        } catch (e) {
+          return "Invalid JSON data"; // Error handling for invalid JSON
+        }
+      }
+  }
 }
 </script>
 
@@ -195,6 +215,7 @@ export default {
   gap: 10px; /* Adjust as needed */
   padding-top: 5px;
   padding-bottom: 5px;
+  word-wrap: break-word; /* allows long words to be able to be broken and wrap onto the next line */
 }
 
 .hash-container {
@@ -210,6 +231,13 @@ export default {
 .signature {
   word-break: break-word;
   overflow-wrap: break-word;
+}
+
+.json-container {
+  width: 80%; /* or any other appropriate width */
+  word-break: break-word;
+  overflow-wrap: break-word;
+  font-size: smaller;
 }
 
 </style>
