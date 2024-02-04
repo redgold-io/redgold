@@ -187,6 +187,9 @@ opt-level = 3
 version = "0.9.88"
 features = ["vendored"]
 
+[dependencies.nix]
+version = "0.24.3"
+features = ["user"]
 
 [profile.release]
 codegen-units=1
