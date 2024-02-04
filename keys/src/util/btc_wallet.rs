@@ -408,6 +408,7 @@ impl SingleKeyBitcoinWallet {
 
     pub fn get_wallet_balance(&self
     ) -> Result<Balance, ErrorInfo> {
+        self.sync()?;
         let balance = self.wallet.get_balance().error_info("Error getting BDK wallet balance")?;
         Ok(balance)
     }
