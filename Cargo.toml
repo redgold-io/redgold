@@ -150,7 +150,7 @@ tokio-stream = "0.1.14"
 csv = "1.1"
 rpassword = "7.2.0"
 
-nix = { version = "0.24.3", features = ["user"] }
+nix = { version = "0.26.4", features = ["user"] }
 #[dependencies.nix]
 #version = "0.24.3"
 #features = ["user"]
