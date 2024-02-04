@@ -89,8 +89,8 @@ dashmap = "5.5.0"
 crossbeam = "0.8.1"
 uuid = { version = "1.3.3", features = ["serde", "v4", "v1"] }
 # GUI Alone
-eframe = "0.21.0" # Gives us egui, epi and web+native backends
-egui_extras = {version = "0.21.0", features = ["default", "image"]}
+eframe = "0.25.0" # Gives us egui, epi and web+native backends
+egui_extras = {version = "0.25.0", features = ["default", "image"]}
 strum = "0.25"
 strum_macros = "0.25"
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
@@ -150,6 +150,12 @@ tokio-stream = "0.1.14"
 csv = "1.1"
 rpassword = "7.2.0"
 
+nix = { version = "0.26.4", features = ["user"] }
+#[dependencies.nix]
+#version = "0.24.3"
+#features = ["user"]
+
+
 # Webcam QR decoding
 # https://github.com/sayanarijit/qrscan/blob/main/Cargo.toml
 #opencv = "0.84.5"
@@ -186,7 +192,6 @@ opt-level = 3
 [dependencies.openssl-sys]
 version = "0.9.88"
 features = ["vendored"]
-
 
 [profile.release]
 codegen-units=1

@@ -4,7 +4,7 @@ use futures::TryFutureExt;
 use itertools::{Itertools, max, min};
 use log::{error, info};
 
-use redgold_schema::{bytes_data, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
@@ -25,6 +25,7 @@ use crate::node_config::NodeConfig;
 use crate::scrape::coinbase_btc_spot_latest;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::RgArgs;
+use crate::util::{current_time_millis, current_time_millis_i64};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {
@@ -41,7 +42,10 @@ pub struct PriceVolume {
     pub volume: u64, // Volume of RDG available
 }
 
+pub const DUST_LIMIT: u64 = 2500;
+
 impl PriceVolume {
+
     pub fn generate(
         available_volume: u64,
         center_price: f64,
@@ -49,6 +53,11 @@ impl PriceVolume {
         price_width: f64,
         scale: f64
     ) -> Vec<PriceVolume> {
+
+        if available_volume < DUST_LIMIT {
+            return vec![];
+        }
+
         let divisions_f64 = divisions as f64;
 
         // Calculate the common ratio
@@ -67,33 +76,111 @@ impl PriceVolume {
                        price, center_price, price_offset, price_width, divisions_f64);
             } else {
                 let volume = (first_term * ratio.powi(divisions - i)) as u64;
-                if volume <= 0 || volume > available_volume {
-                    error!("Volume is invalid: {} first_term: {} ratio: {} divisions: {} i: {}",
-                           volume, first_term, ratio, divisions, i);
-                } else {
-                    price_volumes.push(PriceVolume { price, volume });
-                }
+                price_volumes.push(PriceVolume { price, volume });
             }
         }
-        let total_volume = price_volumes.iter().map(|v| v.volume).sum::<u64>();
 
         // Normalize the volumes so their sum equals available_volume
-        for pv in &mut price_volumes {
-            pv.volume = ((pv.volume as f64 / total_volume as f64) * available_volume as f64) as u64;
-        }
+        Self::normalize_volumes(available_volume, &mut price_volumes);
 
-        if total_volume != available_volume {
-            let delta = total_volume as i64 - available_volume as i64;
-            if let Some(last) = price_volumes.last_mut() {
-                if delta > 0 && (last.volume as u64) > delta as u64 {
-                    last.volume = ((last.volume as i64) - delta) as u64;
-                } else if delta < 0 {
-                    last.volume = ((last.volume as i64) - delta) as u64;
-                }
+
+// Re-calculate the total after normalization
+        let mut adjusted_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+
+        // Adjust volumes to ensure total equals available_volume
+        let mut adjustment = available_volume as i64 - adjusted_total_volume as i64;
+        for pv in &mut price_volumes {
+            if adjustment == 0 {
+                break;
+            }
+
+            if adjustment > 0 && pv.volume > 0 {
+                pv.volume += 1;
+                adjustment -= 1;
+            } else if adjustment < 0 && pv.volume > 1 {
+                pv.volume -= 1;
+                adjustment += 1;
             }
         }
-        price_volumes
+
+        // Final assert
+        let final_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+        assert!(final_total_volume <= available_volume, "Total volume should equal available volume or be less than");
+
+
+        //
+        // let total_volume = price_volumes.iter().map(|v| v.volume).sum::<u64>();
+        //
+        // // Normalize the volumes so their sum equals available_volume
+        // for pv in &mut price_volumes {
+        //     pv.volume = ((pv.volume as f64 / total_volume as f64) * available_volume as f64) as u64;
+        // }
+        //
+        // if total_volume != available_volume {
+        //     let delta = total_volume as i64 - available_volume as i64;
+        //     if let Some(last) = price_volumes.last_mut() {
+        //         if delta > 0 && (last.volume as u64) > delta as u64 {
+        //             last.volume = ((last.volume as i64) - delta) as u64;
+        //         } else if delta < 0 {
+        //             last.volume = ((last.volume as i64) - delta) as u64;
+        //         }
+        //     }
+        // }
+        //
+        // let total_volume = price_volumes.iter().map(|v| v.volume).sum::<u64>();
+        // assert_eq!(total_volume, available_volume, "Total volume should equal available volume");
+
+        let mut fpv = vec![];
+
+        for pv in price_volumes {
+            if pv.volume <= 0 || pv.volume > available_volume {
+                error!("Volume is invalid: {:?}", pv);
+            } else {
+                fpv.push(pv);
+            }
+        }
+        fpv
     }
+    // 
+    // fn normalize_volumes(available_volume: u64, price_volumes: &mut Vec<PriceVolume>) {
+    //     let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+    //     for pv in price_volumes.iter_mut() {
+    //         pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
+    //     }
+    // }
+
+    fn normalize_volumes(available_volume: u64, price_volumes: &mut Vec<PriceVolume>) {
+        let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+
+        // Initially normalize volumes
+        for pv in price_volumes.iter_mut() {
+            pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
+        }
+
+        let mut dust_trigger = false;
+
+        for pv in price_volumes.iter_mut() {
+            if pv.volume < DUST_LIMIT {
+                dust_trigger = true;
+            }
+        }
+
+        if dust_trigger {
+            let mut new_price_volumes = vec![];
+            let divs = (available_volume / DUST_LIMIT) as usize;
+            for (i,pv) in price_volumes.iter_mut().enumerate() {
+                if i < divs {
+                    new_price_volumes.push(PriceVolume {
+                        price: pv.price,
+                        volume: DUST_LIMIT
+                    });
+                }
+            }
+            price_volumes.clear();
+            price_volumes.extend(new_price_volumes);
+        }
+    }
+
 }
 
 #[test]
@@ -154,8 +241,8 @@ impl BidAsk {
             available_balance,
             pair_balance,
             last_exchange_price,
-            50,
-            30.,
+            40,
+            20.0f64,
             min_ask
         )
     }
@@ -177,8 +264,8 @@ impl BidAsk {
                 pair_balance_btc,
                 last_exchange_price, // Price here is RDG/BTC
                 divisions,
-                -(last_exchange_price*0.9),
-                scale
+                last_exchange_price*0.9,
+                scale / 2.0
             )
         } else {
             vec![]
@@ -580,6 +667,7 @@ impl DepositWatcher {
         last_timestamp: u64,
         w: &Arc<Mutex<SingleKeyBitcoinWallet>>,
     ) -> Result<CurveUpdateResult, ErrorInfo> {
+
         let key = &alloc.key;
         let key_address = key.address()?;
         let identifier = alloc.initiate.identifier.safe_get().cloned()?;
@@ -597,12 +685,14 @@ impl DepositWatcher {
         let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
 
         // BTC / RDG
-        let min_ask = 1f64 / self.get_starting_center_price_rdg_btc_fallback().await;
+        let min_ask = 1f64 / Self::get_starting_center_price_rdg_btc_fallback().await;
 
+        let cutoff_time = current_time_millis_i64() - 30_000; //
         // Grab all recent transactions associated with this key address for on-network
         // transactions
-        let tx: Vec<structs::Transaction> = self.relay.ds.transaction_store
-            .get_filter_tx_for_address(&key_address, 10000, 0, true).await?;
+        let tx = self.relay.ds.transaction_store
+            .get_filter_tx_for_address(&key_address, 10000, 0, true).await?
+            .iter().filter(|t| t.time().unwrap_or(&0i64) < &cutoff_time).cloned().collect_vec();
 
         let mut staking_deposits = vec![];
         // TODO: Add withdrawal support
@@ -621,11 +711,19 @@ impl DepositWatcher {
             }
         }
 
-        let bid_ask = if bid_ask_original.asks.is_empty() && bid_ask_original.bids.is_empty() {
+        // Zero or empty check
+        let check_zero = bid_ask_original.center_price == 0.0f64;
+        let bid_ask = if bid_ask_original.asks.is_empty() && bid_ask_original.bids.is_empty() || check_zero {
+            let price = if check_zero {
+                info!("BidAsk center price is zero, generating default bid_ask");
+                Self::get_starting_center_price_rdg_btc_fallback().await
+            } else {
+                bid_ask_original.center_price
+            };
             BidAsk::generate_default(
                 rdg_starting_balance,
                 btc_starting_balance,
-                bid_ask_original.center_price,
+                price,
                 min_ask
             )
         } else {
@@ -636,7 +734,9 @@ impl DepositWatcher {
 
         info!("Starting watcher process request with balances: RDG:{}, BTC:{} \
          BTC_address: {} environment: {} \
-         bid_ask: {}", btc_address, environment.to_std_string(), rdg_starting_balance, btc_starting_balance, bid_ask.json_or());
+         bid_ask: {}",
+            rdg_starting_balance, btc_starting_balance, btc_address, environment.to_std_string(), bid_ask.json_or()
+        );
 
 
         let mut bid_ask_latest = bid_ask.clone();
@@ -687,54 +787,26 @@ impl DepositWatcher {
     }
 
     // Returns price in RDG/BTC, i.e. ~300 for USD/RDG 100 and BTC 30k
-    pub async fn get_starting_center_price_rdg_btc(&self) -> RgResult<f64> {
+    pub async fn get_starting_center_price_rdg_btc() -> RgResult<f64> {
         let usd_btc = coinbase_btc_spot_latest().await?.usd_btc()?;
         let starting_usd = 100.0;
         let rdg_btc = usd_btc / starting_usd;
         Ok(rdg_btc)
     }
 
-    pub async fn get_starting_center_price_rdg_btc_fallback(&self) -> f64 {
-        self.get_starting_center_price_rdg_btc().await
+    pub async fn get_starting_center_price_rdg_btc_fallback() -> f64 {
+        Self::get_starting_center_price_rdg_btc().await
             .add("Failed getting BTC/USD spot").log_error()
             .unwrap_or(0.00256410256f64) // 100 / 39000
 
     }
 
-}
-
-
-#[async_trait]
-impl IntervalFold for DepositWatcher {
-
-    #[tracing::instrument(skip(self))]
-    async fn interval_fold(&mut self) -> RgResult<()> {
-
-        info!("Deposit watcher interval fold complete");
-
-        if self.relay.node_config.is_local_debug() {
-            return Ok(())
-        }
-
-        let usd_btc = coinbase_btc_spot_latest().await.log_error().and_then(|t| t.usd_btc())
-            .unwrap_or(39000.0f64);
-
+    pub async fn fix_historical_errors(&self) -> RgResult<()> {
         let ds = self.relay.ds.clone();
-        // TODO: Change to query to include trust information re: deposit score
-        // How best to represent this to user? As trustData?
-        let _nodes = ds.peer_store.active_nodes(None).await?;
-
-        // Fund from genesis for test purposes
-        // self.genesis_funding().await?;
-
-        // let kp = initiate_mp::find_multiparty_key_pairs(self.relay.clone()).await;
-        // match kp {
-        //     Ok(_) => {}
-        //     Err(_) => {}
-        // }
 
         let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
 
+        // First broken json error
         if test_load.is_err() {
             let broken_cfg = ds.config_store.get_json::<DepositWatcherConfigBroken>("deposit_watcher_config").await;
             if let Ok(Some(bcfg)) = broken_cfg {
@@ -762,7 +834,7 @@ impl IntervalFold for DepositWatcher {
                             None
                         }
                     }).collect::<Vec<PriceVolume>>(),
-                    center_price: self.get_starting_center_price_rdg_btc_fallback().await,
+                    center_price: Self::get_starting_center_price_rdg_btc_fallback().await,
                 };
                 let mut new_cfg = DepositWatcherConfig {
                     deposit_allocations: bcfg.deposit_allocations,
@@ -774,6 +846,54 @@ impl IntervalFold for DepositWatcher {
                 info!("Updated broken deposit watcher config");
             };
         }
+        //
+        // if let Ok(Some(l)) = test_load {
+        //     let jsl = l.json_or();
+        //
+        //     if l.bid_ask.asks.is_empty() || l.bid_ask.center_price == 0.0f64 {
+        //         // BidAsk::generate_default()
+        //         // let mut new_cfg = l.clone();
+        //         // new_cfg.bid_ask = new_bid_ask;
+        //         // ds.config_store.insert_update_json("deposit_watcher_config", new_cfg).await?;
+        //         // info!("Error found in historical deposit watcher config, updating old config of {jsl} to new");
+        //     }
+        // }
+        Ok(())
+    }
+
+}
+
+
+#[async_trait]
+impl IntervalFold for DepositWatcher {
+
+    #[tracing::instrument(skip(self))]
+    async fn interval_fold(&mut self) -> RgResult<()> {
+
+        info!("Deposit watcher interval fold complete");
+
+        if self.relay.node_config.is_local_debug() {
+            return Ok(())
+        }
+
+        let usd_btc = coinbase_btc_spot_latest().await.log_error().and_then(|t| t.usd_btc())
+            .unwrap_or(39000.0f64);
+
+        let ds = self.relay.ds.clone();
+        // TODO: Change to query to include trust information re: deposit score
+        // How best to represent this to user? As trustData?
+        let _nodes = ds.peer_store.active_nodes(None).await?;
+        self.fix_historical_errors().await.log_error().ok();
+
+        // Fund from genesis for test purposes
+        // self.genesis_funding().await?;
+
+        // let kp = initiate_mp::find_multiparty_key_pairs(self.relay.clone()).await;
+        // match kp {
+        //     Ok(_) => {}
+        //     Err(_) => {}
+        // }
+
 
         let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
 
@@ -804,6 +924,15 @@ impl IntervalFold for DepositWatcher {
 
                     let balance = self.relay.ds.transaction_store.get_balance(&d.key.address()?).await?;
                     if balance.map(|x| x > 0).unwrap_or(false) { // && btc_starting_balance > 3500 {
+                        let reset_condition = true;
+                        if cfg.ask_bid_code_reset == Some(reset_condition) {
+                            info!("Regenerating starting price due to code reset");
+                            let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
+                            let min_ask = 1f64 / center_price;
+                            cfg.bid_ask = cfg.bid_ask.regenerate(center_price, min_ask);
+                            cfg.ask_bid_code_reset = Some(!reset_condition);
+                            ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
+                        }
                         let update_result = self.process_requests(
                             d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
                         ).await;
@@ -862,7 +991,7 @@ impl IntervalFold for DepositWatcher {
                             balance_btc: 0,
                             balance_rdg: 0,
                         }],
-                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: self.get_starting_center_price_rdg_btc_fallback().await },
+                        bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: Self::get_starting_center_price_rdg_btc_fallback().await },
                         last_btc_timestamp: 0,
                         ask_bid_code_reset: None,
                     };
@@ -896,6 +1025,8 @@ async fn debug_local_ds_utxo_balance() {
     // let res = r.ds.transaction_store.query_utxo_output_index(&tx.hash_or()).await.unwrap();
     // println!("UTXO: {}", res.json_or());
     println!("Genesis hash {}", tx.hash_or().hex());
+
+
     //
     // // Node::prelim_setup(r);
     // for (i,utxo) in gutxos.iter().enumerate() {
@@ -904,4 +1035,73 @@ async fn debug_local_ds_utxo_balance() {
     //         println!("UTXO {i}: {}", utxo.utxo_entry.json_or());
     //     }
     // }
+}
+
+
+#[derive(Serialize, Deserialize)]
+struct TestJson {
+    some: String
+}
+
+#[derive(Serialize, Deserialize)]
+struct TestJson2 {
+    some: String,
+    other: Option<String>
+}
+
+#[test]
+fn test_json() {
+    let t = TestJson{
+        some: "yo".to_string(),
+    };
+    let ser = t.json().expect("works");
+    let t2 = ser.json_from::<TestJson2>().expect("works");
+    assert_eq!(t2.some, "yo".to_string());
+    assert_eq!(t2.other, None);
+}
+
+#[ignore]
+#[tokio::test]
+async fn debug_local() {
+    let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
+    let min_ask = 1f64 / center_price;
+    let nc = NodeConfig::dev_default().await;
+    let c = nc.api_client();
+    let dev_amm_address = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
+    let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
+    let pk = PublicKey::from_hex(pk_hex).expect("pk");
+    let pk_rdg_address = pk.clone().address().expect("address");
+    let addr = pk_rdg_address.render_string().expect("");
+    println!("address: {addr}");
+
+    let mut w =
+        SingleKeyBitcoinWallet::new_wallet(pk.clone(), NetworkEnvironment::Dev, true).expect("w");
+    let a = w.address().expect("a");
+    println!("wallet address: {a}");
+    assert_eq!(dev_amm_address, a);
+    let b = w.get_wallet_balance().expect("balance");
+    println!("wallet balance: {b}");
+    let confirmed = b.confirmed;
+
+    let rdg_b = (c.balance(pk_rdg_address.clone()).await.expect("balance") * 1e8) as i64;
+
+    println!("rdg balance: {rdg_b}");
+    println!("confirmed: {confirmed}");
+    println!("center price: {center_price}");
+
+    let ba = BidAsk::generate_default(
+        rdg_b,
+        confirmed * 300,
+        center_price,
+        min_ask
+    );
+
+    let p = ba.bids.json_pretty_or();
+
+    // w.create_transaction(Some(pk), None, 2000).expect("tx");
+
+    // let ba2 = ba.regenerate(center_price*1.1f64, min_ask).json_pretty_or();
+
+    println!("bid ask: {p}");
+
 }

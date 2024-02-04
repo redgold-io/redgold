@@ -11,7 +11,7 @@ use itertools::Itertools;
 use log::info;
 use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
 use redgold_schema::servers::Server;
-use redgold_schema::{RgResult, ShortString, structs};
+use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
 use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerMetadata, PeerId, Seed, TransportInfo, TrustData, VersionInfo};
 use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::merkle;
@@ -23,6 +23,8 @@ use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::JsonCombineResult;
+use crate::util::cli::arg_parse_config::ArgTranslate;
+use crate::util::logging::Loggable;
 
 pub struct CanaryConfig {}
 
@@ -257,9 +259,18 @@ impl NodeConfig {
         VersionInfo{
             executable_checksum: self.executable_checksum.clone().unwrap_or("".to_string()),
             commit_hash: None,
+            // TODO: Move these fields into a different struct so they can be updated
             next_upgrade_time: None,
             next_executable_checksum: None,
+            build_number: Some(Self::build_number())
         }
+    }
+
+    pub fn build_number() -> i64 {
+        let build_num_str = include_str!("resources/build_number").to_string();
+        build_num_str.parse::<i64>()
+            .error_info(format!("Build number {build_num_str}")).log_error()
+            .unwrap_or(0)
     }
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
@@ -402,6 +413,16 @@ impl NodeConfig {
 
     pub fn default_debug() -> Self {
         NodeConfig::from_test_id(&(0 as u16))
+    }
+
+    pub async fn dev_default() -> Self {
+        let mut opts = RgArgs::default();
+        opts.network = Some("dev".to_string());
+        let node_config = NodeConfig::default();
+        let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
+        arg_translate.translate_args().await.unwrap();
+        let nc = arg_translate.node_config;
+        nc
     }
 
     pub fn default() -> Self {

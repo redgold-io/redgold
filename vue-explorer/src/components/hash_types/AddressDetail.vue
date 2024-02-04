@@ -48,21 +48,23 @@
           <div v-if="hashData.address_pool_info" >
             <h3 class="detail-group">AMM Swap Info</h3>
 
+
             <div class="grid-container">
               <div><strong>BTC Balance</strong></div>
-              <div>{{ (hashData.address_pool_info.btc_balance / 1e8).toFixed(8) }} BTC</div>
+              <div>{{ (hashData.address_pool_info.btc_balance).toFixed(8) }} BTC</div>
               <div><strong>RDG Address Balance</strong></div>
               <div>{{ hashData.address_pool_info.rdg_balance.toFixed(8)}} RDG</div>
               <div><strong>RDG Address</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.rdg_address" /></div>
               <div><strong>Public Key</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
-              <div><strong>Center Price</strong></div>
-              <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /> RDG/BTC </div>
-              <div><strong>Spread</strong></div>
+              <div><strong>Price USD/RDG</strong></div>
+              <div><TextCopy :data="centerPriceUsdRdg" /></div>
+              <div><strong>Price RDG/BTC</strong></div>
+              <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /></div>
+              <div><strong>Spread USD</strong></div>
               <div>
-                {{ hashData.address_pool_info.bid_ask.asks[0].price -
-              hashData.address_pool_info.bid_ask.bids[0].price }} RDG</div>
+                ${{ spreadUsd }} USD</div>
             </div>
 
             <h3 class="detail-group">Bid Ask AMM Curve RDG/BTC</h3>
@@ -308,6 +310,28 @@ export default {
   },
   mixins: [fetchHashInfo],
   computed: {
+    centerPriceUsdRdg() {
+      if (this.hashData.address_pool_info != null) {
+        let centerPrice = this.hashData.address_pool_info.bid_ask.center_price;
+        let usdPrice = (1/centerPrice) * this.usdBtcRate;
+        return usdPrice.toFixed(2);
+      }
+      return 0;
+    },
+    spreadUsd() {
+      if (this.hashData.address_pool_info != null) {
+        let ba = this.hashData.address_pool_info.bid_ask;
+        if (ba.asks.length > 0 && ba.bids.length > 0) {
+          let ask_first = ba.asks[0].price; // BTC / RDG
+          let bid_first = ba.bids[0].price; // RDG / BTC
+          let adjusted_bid = 1/bid_first; // BTC / RDG
+          let usd_ask = ask_first * this.usdBtcRate
+          let usd_bid = adjusted_bid * this.usdBtcRate
+          return (usd_ask - usd_bid).toFixed(2);
+        }
+      }
+      return "na";
+    },
     usdBtcRate() {
       return this.$store.state.btcExchangeRate;
     },
@@ -372,33 +396,42 @@ export default {
               let bid = bids[i];
               // console.log("Bid " + bid);
               if (bid.price != null) {
-                labels.push(bid.price);
+                // Price is originally in RDG / BTC -- i.e. 400 RDG / 1 BTC
+                // We want to convert it to USD / RDG
+                let rdg_btc = bid.price; // RDG / BTC
+                let btc_rdg = (1 / rdg_btc); // BTC / RDG
+                let usd_btc = this.usdBtcRate; // USD / BTC
+                let price = btc_rdg * usd_btc; // USD / RDG
+                labels.push(price);
               }
               if (bid.volume != null) {
-                data.push(bid.volume / 1e8);
+                data.push(bid.volume);
               }
             }
           }
         }
       }
+      while (labels.length < 25) {
+        labels.push(0);
+      }
+      while (data.length < 25) {
+        data.push(0);
+      }
 
-      let slice_len = 75;
+      let slice_len = 25;
       let resultLabels = labels.map(value => {
-        // if ((index % 5) === 0) {
-          return value.toFixed(2);
-        // }
-        // return '';
-      }).reverse().slice(slice_len, labels.length);
+        return value.toFixed(2);
+      }).slice(0, slice_len).reverse();
       let resultData = data.map(value => {
-          return value.toFixed(2);
-      }).reverse().slice(slice_len, data.length);
+        return value.toFixed(2);
+      }).slice(0, slice_len).reverse();
       // console.log("Result labels: " + resultLabels);
       // console.log("Result data: " + resultData);
       return {
         labels: resultLabels,
         datasets: [
           {
-            label: 'BTC Bid Volume',
+            label: 'BTC Bid USD/Volume(Sats)',
             backgroundColor: '#79f87f',
             data: resultData
           }
@@ -445,7 +478,7 @@ export default {
         labels: resultLabels,
         datasets: [
           {
-            label: 'RDG Ask Volume',
+            label: 'RDG Ask USD/Volume(RDG)',
             backgroundColor: '#f87979',
             data: resultData
           }
