@@ -48,6 +48,7 @@
           <div v-if="hashData.address_pool_info" >
             <h3 class="detail-group">AMM Swap Info</h3>
 
+
             <div class="grid-container">
 
               <div><strong>BTC Explorer Link</strong></div>
