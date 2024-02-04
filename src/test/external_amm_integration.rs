@@ -7,6 +7,7 @@ use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 #[test]
 pub fn load_ci_kp() {
 
+
     let dev_amm_address = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
 
     if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
