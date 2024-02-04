@@ -48,6 +48,7 @@
           <div v-if="hashData.address_pool_info" >
             <h3 class="detail-group">AMM Swap Info</h3>
 
+
             <div class="grid-container">
               <div><strong>BTC Balance</strong></div>
               <div>{{ (hashData.address_pool_info.btc_balance).toFixed(8) }} BTC</div>

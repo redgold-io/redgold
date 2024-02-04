@@ -304,6 +304,7 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
             ui.add_space(ctx.available_rect().max.y / 3f32);
             ui.heading("Enter session password");
             ui.add_space(20f32);
+
             let edit = TextEdit::singleline(&mut local_state.password_entry)
                 .password(true)
                 .lock_focus(true);
