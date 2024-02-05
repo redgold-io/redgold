@@ -41,6 +41,7 @@ pub struct BriefTransaction {
     pub bytes: i64,
     pub timestamp: i64,
     pub first_amount: f64,
+    pub is_test: bool
 }
 
 
@@ -557,6 +558,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
 }
 
 
+// TODO Make trait implicit
 fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
     Ok(BriefTransaction {
         hash: tx.hash_or().hex(),
@@ -569,12 +571,13 @@ fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
         bytes: tx.proto_serialize().len() as i64,
         timestamp: tx.struct_metadata.clone().and_then(|s| s.time).safe_get_msg("Missing tx timestamp")?.clone(),
         first_amount: tx.first_output_amount().safe_get_msg("Missing first output amount")?.clone(),
+        is_test: tx.is_test(),
     })
 }
 
 
-pub async fn handle_explorer_recent(r: Relay) -> RgResult<RecentDashboardResponse>{
-    let recent = r.ds.transaction_store.query_recent_transactions(Some(10)).await?;
+pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult<RecentDashboardResponse>{
+    let recent = r.ds.transaction_store.query_recent_transactions(Some(10), is_test).await?;
     let mut recent_transactions = Vec::new();
     for tx in recent {
         let brief_tx = brief_transaction(&tx)?;

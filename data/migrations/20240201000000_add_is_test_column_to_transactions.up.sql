@@ -1,0 +1,1 @@
+ALTER TABLE transactions ADD COLUMN is_test INTEGER DEFAULT 0;

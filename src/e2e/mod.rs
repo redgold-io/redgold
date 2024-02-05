@@ -173,6 +173,7 @@ impl LiveE2E {
         let tx = tx_b
             .with_output(&destination, &amount)
             .with_unsigned_input(u.utxo_entry.clone())?
+            .with_is_test()
             .build()?
             .sign(&u.key_pair)?;
         return Ok(tx);

@@ -4,7 +4,7 @@ use crate::core::relay::Relay;
 pub async fn handle_about_node(_p0: AboutNodeRequest, relay: Relay) -> Result<AboutNodeResponse, ErrorInfo> {
     let num_active_peers = relay.ds.peer_store.active_nodes(None).await?.len();
     let num_total_peers = relay.ds.peer_store.all_peers().await?.len();
-    let recent_transactions = relay.ds.transaction_store.query_recent_transactions(None).await?;
+    let recent_transactions = relay.ds.transaction_store.query_recent_transactions(None, None).await?;
     let total_accepted_transactions =
         relay.ds.transaction_store.count_total_accepted_transactions().await?;
     let pending_transactions = relay.transaction_channels.len() as i64;
