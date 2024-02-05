@@ -5,7 +5,7 @@ use itertools::{Itertools, max, min};
 use log::{error, info};
 
 use redgold_schema::{bytes_data, EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit, UtxoEntry};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -183,13 +183,13 @@ impl PriceVolume {
 
 }
 
-#[test]
-fn inspect_price_volume() {
-    let pv = PriceVolume::generate(1_000_000, 1., 25, -0.5, 10.0);
-    for p in pv.iter() {
-        println!("{}, {}", p.price, p.volume);
-    }
-}
+// #[test]
+// fn inspect_price_volume() {
+//     let pv = PriceVolume::generate(1_000_000, 1., 25, -0.5, 10.0);
+//     for p in pv.iter() {
+//         println!("{}, {}", p.price, p.volume);
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct BidAsk{
@@ -324,43 +324,52 @@ pub struct WithdrawalBitcoin {
 
 
 impl BidAsk {
+
+    pub fn remove_empty(&mut self) {
+        self.bids.retain(|v| v.volume > 0);
+        self.asks.retain(|v| v.volume > 0);
+    }
     pub fn fulfill_taker_order(&self, order_amount: u64, is_ask: bool) -> OrderFulfillment {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
         let mut updated_curve = if is_ask {
+            // Asks are ordered in increasing amount(USD), denominated in BTC/RDG
             self.asks.clone()
         } else {
-            // Reverse the bids and invert the price so we can pop them off in order
-            let mut b = self.bids.clone();
-            b.reverse();
-            for b in b.iter_mut() {
-                b.price = 1.0 / b.price;
-            }
-            b
+            // Bids are ordered in decreasing amount(USD), denominated in RDG/BTC
+            self.bids.clone()
         };
-        for b in updated_curve.iter_mut() {
-            // Price is in RDG / BTC (satoshi)
-            // Amount is in BTC satoshis, this gives RDG
-            let rdg_amount = (b.price * (remaining_order_amount as f64)) as u64;
-            if rdg_amount > b.volume {
-                // We have more RDG than this ask can fulfill, so we take it all and move on.
-                fulfilled_amount += b.volume;
-                remaining_order_amount -= (b.volume as f64 / b.price) as u64;
-                b.volume = 0;
+
+
+        for pv in updated_curve.iter_mut() {
+
+            let other_amount_requested = if is_ask {
+                // Comments left here for clarity even if code is the same
+                let price = pv.price; // BTC / RDG
+                // BTC / (BTC / RDG) = RDG
+                remaining_order_amount as f64 / price
             } else {
-                // We have less RDG than this ask can fulfill, so we take it and stop
-                b.volume -= rdg_amount;
+                // RDG / RDG/BTC = BTC
+                remaining_order_amount as f64 / pv.price
+            } as u64;
+
+            let this_vol = pv.volume;
+            if other_amount_requested >= this_vol {
+                // We have more Other than this ask can fulfill, so we take it all and move on.
+                fulfilled_amount += this_vol;
+                remaining_order_amount -= (this_vol as f64 * pv.price) as u64;
+                pv.volume = 0;
+            } else {
+                // We have less Other than this ask can fulfill, so we take it and stop
+                pv.volume -= other_amount_requested;
                 remaining_order_amount = 0;
+                fulfilled_amount += other_amount_requested;
                 break
             }
         };
-        // Return bids to the original order
-        if !is_ask {
-            updated_curve.reverse();
-            for b in updated_curve.iter_mut() {
-                b.price = 1.0 / b.price;
-            }
-        }
+
+        updated_curve.retain(|v| v.volume > 0);
+
         OrderFulfillment {
             order_amount,
             fulfilled_amount,
@@ -498,7 +507,7 @@ impl DepositWatcher {
         Ok((max_ts, res.clone()))
     }
 
-    pub async fn build_rdg_ask_swap_tx(&self,
+    pub async fn build_rdg_ask_swap_tx(utxos: Vec<UtxoEntry>,
                                        btc_deposits: Vec<ExternalTimedTransaction>,
                                        bid_ask: BidAsk,
                                        key_address: &structs::Address,
@@ -508,9 +517,6 @@ impl DepositWatcher {
 
         let mut bid_ask_latest = bid_ask.clone();
 
-        let utxos =
-            self.relay.ds.transaction_store.query_utxo_address(&key_address)
-                .await?;
         // We're building a transaction FROM some stored input balance we have
         // for our pubkey multisig address
         let mut tb = TransactionBuilder::new();
@@ -534,7 +540,7 @@ impl DepositWatcher {
             );
             tb.with_last_output_deposit_swap(tx.tx_id.clone());
 
-            let price = ask_fulfillment.fulfillment_price() * 1.05;
+            let price = ask_fulfillment.fulfillment_price() * 1.01;
             bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
 
         }
@@ -748,7 +754,10 @@ impl DepositWatcher {
         info!("Found {} new deposits last_updated {} updated_last_ts {} deposit_txs {}",
             deposit_txs.len(), last_timestamp, updated_last_ts, deposit_txs.json_or());
 
-        let (tx, bid_ask_updated_ask_side) = self.build_rdg_ask_swap_tx(
+        let utxos = self.relay.ds.transaction_store.query_utxo_address(&key_address)
+            .await?;
+
+        let (tx, bid_ask_updated_ask_side) = Self::build_rdg_ask_swap_tx(utxos,
             deposit_txs,
             bid_ask_latest, &key_address.clone(), min_ask).await?;
         // info!("Built RDG ask swap tx: {} bid_ask_updated {}", tx.json_or(), bid_ask_updated_ask_side.json_or());
@@ -1010,7 +1019,7 @@ impl IntervalFold for DepositWatcher {
 }
 
 #[ignore]
-#[tokio::test]
+// #[tokio::test]
 async fn debug_local_ds_utxo_balance() {
     let mut opts = RgArgs::default();
     opts.network = Some("dev".to_string());
@@ -1062,10 +1071,11 @@ fn test_json() {
     assert_eq!(t2.other, None);
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn debug_local() {
     let center_price = DepositWatcher::get_starting_center_price_rdg_btc_fallback().await;
+    println!("center price: {center_price}");
     let min_ask = 1f64 / center_price;
     let nc = NodeConfig::dev_default().await;
     let c = nc.api_client();
@@ -1075,6 +1085,9 @@ async fn debug_local() {
     let pk_rdg_address = pk.clone().address().expect("address");
     let addr = pk_rdg_address.render_string().expect("");
     println!("address: {addr}");
+
+
+    let utxos = c.address_info(pk_rdg_address.clone()).await.expect("info").utxo_entries;
 
     let mut w =
         SingleKeyBitcoinWallet::new_wallet(pk.clone(), NetworkEnvironment::Dev, true).expect("w");
@@ -1091,19 +1104,61 @@ async fn debug_local() {
     println!("confirmed: {confirmed}");
     println!("center price: {center_price}");
 
+
+    let mut deposit_txs = w.get_sourced_tx().expect("works");
+    deposit_txs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    let example_deposit_tx = deposit_txs.last().expect("works");
+
     let ba = BidAsk::generate_default(
         rdg_b,
-        confirmed * 300,
+        confirmed,
         center_price,
         min_ask
     );
 
     let p = ba.bids.json_pretty_or();
 
-    // w.create_transaction(Some(pk), None, 2000).expect("tx");
+    let first_ask = ba.asks.first().expect("works");
+    let first_ask_price = 1f64/first_ask.price;
+    println!("first_ask_price: {first_ask_price}");
 
-    // let ba2 = ba.regenerate(center_price*1.1f64, min_ask).json_pretty_or();
 
-    println!("bid ask: {p}");
+    let first_bid = ba.bids.first().expect("works");
+    let first_bid_price = first_bid.price;
+    println!(  "first_bid_price: {first_bid_price}");
+
+
+    // println!("bids: {p}");
+    let ask_fulfillment = ba.fulfill_taker_order(3500, true);
+    let afj = ask_fulfillment.fulfilled_amount.json_pretty_or();
+
+
+    println!("fullfilled: {afj}");
+    println!("fulfilled price: {}", ask_fulfillment.fulfillment_price());
+
+    let bid_fulfillment = ba.fulfill_taker_order((2000f64*center_price) as u64, false);
+
+    let bfj = bid_fulfillment.fulfilled_amount.json_pretty_or();
+    println!("fullfilled: {bfj}");
+    println!("fulfilled price: {}", 1f64/bid_fulfillment.fulfillment_price());
+
+    //
+    // let (tx, bid_ask_updated_ask_side) = DepositWatcher::build_rdg_ask_swap_tx(
+    //     utxos,
+    //     deposit_txs,
+    //     ba, &pk_rdg_address.clone(), min_ask).await.expect("Workx");
+    //
+    // // w.create_transaction(Some(pk), None, 2000).expect("tx");
+    //
+    // // let ba2 = ba.regenerate(center_price*1.1f64, min_ask).json_pretty_or();
+    //
+    // let txs = tx.json_pretty_or();
+    // println!("tx: {txs}");
+
+}
+
+#[test]
+fn empty() {
 
 }
