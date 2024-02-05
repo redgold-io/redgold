@@ -42,6 +42,6 @@ sha3 = {workspace = true}
 
 
 [dependencies.bitcoin]
-version = "0.21"
+version = "0.31"
 features = ["serde", "bitcoinconsensus"]
 
