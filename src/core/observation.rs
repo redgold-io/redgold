@@ -6,7 +6,7 @@ use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
 use log::info;
-use metrics::{gauge, increment_counter};
+use metrics::{counter, gauge};
 use tokio::task::JoinHandle;
 // use futures::stream::StreamExt;
 use tokio::time::Interval;
@@ -167,7 +167,7 @@ impl ObservationBuffer {
 
     pub async fn process_incoming(&mut self, o: ObservationMetadataInternalSigning) -> Result<(), ErrorInfo> {
         if let Some(h) = o.observation_metadata.observed_hash.clone() {
-            increment_counter!("redgold.observation.buffer.added");
+            counter!("redgold.observation.buffer.added").increment(1);
             // log::info!("Pushing observation metadata to buffer {}", json_or(&o.observation_metadata.clone()));
             self.subscribers.insert(h.clone(), o.sender.clone());
             self.data.push(o.observation_metadata);
@@ -180,7 +180,7 @@ impl ObservationBuffer {
             return Ok(vec![]);
         }
         // info!("Forming observation");
-        increment_counter!("redgold.observation.attempt");
+        counter!("redgold.observation.attempt").increment(1);
 
         let observations = self.data.clone();
         let num_observations = observations.len();
@@ -242,11 +242,11 @@ impl ObservationBuffer {
                 observation: Some(signed_tx.clone()),
         });
         self.relay.gossip_req(&request, &signed_tx.hash_or()).await?;
-        increment_counter!("redgold.observation.created");
-        gauge!("redgold.observation.height", height as f64);
-        gauge!("redgold.observation.last.size", num_observations as f64);
+        counter!("redgold.observation.created").increment(1);
+        gauge!("redgold.observation.height").set(height as f64);
+        gauge!("redgold.observation.last.size").set(num_observations as f64);
         for _ in 0..num_observations {
-            increment_counter!("redgold.observation.metadata.total");
+            counter!("redgold.observation.metadata.total").increment(1);
         }
         let node_id = self.relay.node_config.short_id()?;
         info!("node_id={} Formed observation {}", node_id, json(&o.clone())?);

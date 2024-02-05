@@ -1,7 +1,7 @@
 use std::env;
 use clap::Parser;
 use log::{error, info};
-use metrics::increment_counter;
+use metrics::counter;
 use crate::node_config::NodeConfig;
 use crate::util::cli::arg_parse_config;
 use crate::util::cli::args::RgArgs;
@@ -21,7 +21,7 @@ use crate::util::cli::arg_parse_config::ArgTranslate;
 pub async fn main_from_args(opts: RgArgs) {
 
     info!("Starting node main method");
-    increment_counter!("redgold.node.main_started");
+    counter!("redgold.node.main_started").increment(1);
 
     let mut node_config = NodeConfig::default();
 

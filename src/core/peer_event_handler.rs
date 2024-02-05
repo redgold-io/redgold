@@ -5,7 +5,7 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use futures::FutureExt;
 // use libp2p::Multiaddr;
 use log::{error, info};
-use metrics::increment_counter;
+use metrics::counter;
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
@@ -39,7 +39,7 @@ pub struct PeerOutgoingEventHandler {
 impl PeerOutgoingEventHandler {
 
     async fn send_peer_message(relay: Relay, message: PeerMessage) -> Result<(), ErrorInfo> {
-        increment_counter!("redgold.peer.send");
+        counter!("redgold.peer.send").increment(1);
         let ser_msgp = json_or(&message.request.clone());
         // tracing::info!("PeerOutgoingEventHandler send message {}", ser_msgp);
         if let Some(pk) = &message.public_key {
@@ -84,7 +84,7 @@ impl PeerOutgoingEventHandler {
     }
 
     pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<(), ErrorInfo> {
-        increment_counter!("redgold.peer.rest.send");
+        counter!("redgold.peer.rest.send").increment(1);
         let result = match tokio::time::timeout(
             message.send_timeout.clone(), Self::send_message_rest_ret_err(&mut message, nmd, relay)
         ).await
@@ -94,12 +94,12 @@ impl PeerOutgoingEventHandler {
             ) {
             Ok(r) => {r}
             Err(e) => {
-                increment_counter!("redgold.peer.rest.send.timeout");
+                counter!("redgold.peer.rest.send.timeout").increment(1);
                 Err(e)
             }
         };
         let r = result.map_err(|e| {
-            increment_counter!("redgold.peer.rest.send.error");
+            counter!("redgold.peer.rest.send.error").increment(1);
             log::error!("Error sending message to peer: {}", json_or(&e));
             Response::from_error_info(e)
         }).combine();

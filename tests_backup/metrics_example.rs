@@ -74,10 +74,10 @@
 //     register_histogram!("unused_histogram", Unit::Seconds, "unused histo", "service" => "middleware");
 
 //     // All the supported permutations of `increment!`:
-//     increment_counter!("requests_processed");
-//     increment_counter!("requests_processed", "request_type" => "admin");
-//     increment_counter!("requests_processed", "request_type" => "admin", "server" => server_name.clone());
-//     increment_counter!("requests_processed", common_labels);
+//     counter!("requests_processed").increment(1);
+//     counter!("requests_processed", "request_type" => "admin").increment(1);
+//     counter!("requests_processed", "request_type" => "admin", "server" => server_name.clone()).increment(1);
+//     counter!("requests_processed", common_labels).increment(1);
 
 //     // All the supported permutations of `counter!`:
 //     counter!("bytes_sent", 64);

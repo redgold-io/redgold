@@ -120,11 +120,11 @@ impl DataStore {
 
     pub async fn count_gauges(&self) -> RgResult<()> {
         let tx_count = self.transaction_store.count_total_accepted_transactions().await?;
-        gauge!("redgold.transaction.accepted.total", tx_count as f64);
+        gauge!("redgold.transaction.accepted.total").set(tx_count as f64);
         let obs_count = self.observation.count_total_observations().await?;
-        gauge!("redgold.observation.total", obs_count as f64);
+        gauge!("redgold.observation.total").set(obs_count as f64);
         let utxo_total = self.transaction_store.count_total_utxos().await?;
-        gauge!("redgold.utxo.total", utxo_total as f64);
+        gauge!("redgold.utxo.total").set(utxo_total as f64);
         Ok(())
     }
 
