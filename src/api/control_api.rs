@@ -89,7 +89,7 @@ impl ControlServer {
     async fn request_response(request: ControlRequest, relay: Relay
                               // , rt: Arc<Runtime>
     )-> Result<ControlResponse, ErrorInfo> {
-        metrics::increment_counter!("redgold.api.control.num_requests");
+        metrics::counter!("redgold.api.control.num_requests").increment(1);
         info!("Control request received");
 
         let mut response = ControlResponse::empty();

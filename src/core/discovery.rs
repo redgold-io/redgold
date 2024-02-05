@@ -5,7 +5,7 @@ use futures::TryFutureExt;
 use itertools::Itertools;
 // use libp2p::request_response::RequestResponseMessage::Request;
 use log::info;
-use metrics::increment_counter;
+use metrics::counter;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error};
@@ -126,7 +126,7 @@ impl DiscoveryMessage {
 impl RecvForEachConcurrent<DiscoveryMessage> for Discovery {
     // TODO: Ensure discovery message is not for self
     async fn recv_for_each(&mut self, message: DiscoveryMessage) -> RgResult<()> {
-        increment_counter!("redgold.peer.discovery.recv_for_each");
+        counter!("redgold.peer.discovery.recv_for_each").increment(1);
         let mut request = structs::Request::default();
         request.about_node_request = Some(structs::AboutNodeRequest::default());
         // message.dynamic_node_metadata

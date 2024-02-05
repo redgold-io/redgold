@@ -7,70 +7,70 @@
 //! which are documented in detail for the respective macro.
 
 use log::info;
-use metrics::{describe_counter, describe_gauge, register_counter, register_gauge, KeyName, increment_counter, SharedString, register_histogram};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::Arc;
 
 pub fn register_metric_names() {
-    register_counter!("redgold.p2p.request_peer_info");
+    describe_counter!("redgold.p2p.request_peer_info", "");
 
-    register_counter!("redgold.node.main_started");
-    register_counter!("redgold.node.node_started");
-    register_counter!("redgold.node.async_started");
+    describe_counter!("redgold.node.main_started", "");
+    describe_counter!("redgold.node.node_started", "");
+    describe_counter!("redgold.node.async_started", "");
 
-    register_counter!("redgold.observation.created");
-    register_counter!("redgold.observation.received");
-    register_counter!("redgold.observation.insert");
-    register_counter!("redgold.observation.metadata.added");
-    register_counter!("redgold.observation.attempt");
-    register_counter!("redgold.observation.metadata.total");
-    register_counter!("redgold.observation.buffer.added");
-    register_counter!("redgold.observation.failed_to_send_to_transaction_processor");
-    register_gauge!("redgold.observation.height");
-    register_gauge!("redgold.observation.total");
-    register_gauge!("redgold.observation.last.size");
-    register_gauge!("redgold.utxo.total");
+    describe_counter!("redgold.observation.created", "");
+    describe_counter!("redgold.observation.received", "");
+    describe_counter!("redgold.observation.insert", "");
+    describe_counter!("redgold.observation.metadata.added", "");
+    describe_counter!("redgold.observation.attempt", "");
+    describe_counter!("redgold.observation.metadata.total", "");
+    describe_counter!("redgold.observation.buffer.added", "");
+    describe_counter!("redgold.observation.failed_to_send_to_transaction_processor", "");
+    describe_gauge!("redgold.observation.height", "");
+    describe_gauge!("redgold.observation.total", "");
+    describe_gauge!("redgold.observation.last.size", "");
+    describe_gauge!("redgold.utxo.total", "");
 
-    register_counter!("redgold.transaction.accepted");
-    register_gauge!("redgold.transaction.accepted.total");
-    register_counter!("redgold.transaction.received");
-    register_counter!("redgold.transaction.missing_response_channel");
-    register_counter!("redgold.transaction.resolve.input");
-    register_counter!("redgold.transaction.resolve.output");
-    register_counter!("redgold.transaction.resolve.input.errors");
-    register_counter!("redgold.transaction.resolve.output.errors");
-    register_gauge!("redgold.transaction.total");
-    register_histogram!("redgold.transaction.size_bytes");
-    register_histogram!("redgold.transaction.floating_inputs");
-    register_histogram!("redgold.transaction.total_output_amount");
-    register_histogram!("redgold.transaction.num_inputs");
-    register_histogram!("redgold.transaction.num_outputs");
+    describe_counter!("redgold.transaction.accepted", "");
+    describe_gauge!("redgold.transaction.accepted.total", "");
+    describe_counter!("redgold.transaction.received", "");
+    describe_counter!("redgold.transaction.missing_response_channel", "");
+    describe_counter!("redgold.transaction.resolve.input", "");
+    describe_counter!("redgold.transaction.resolve.output", "");
+    describe_counter!("redgold.transaction.resolve.input.errors", "");
+    describe_counter!("redgold.transaction.resolve.output.errors", "");
+    describe_gauge!("redgold.transaction.total", "");
+    describe_histogram!("redgold.transaction.size_bytes", "");
+    describe_histogram!("redgold.transaction.floating_inputs", "");
+    describe_histogram!("redgold.transaction.total_output_amount", "");
+    describe_histogram!("redgold.transaction.num_inputs", "");
+    describe_histogram!("redgold.transaction.num_outputs", "");
 
-    register_counter!("redgold.multiparty.received");
+    describe_counter!("redgold.multiparty.received", "");
 
-    register_counter!("redgold.datastore.utxo.insert");
+    describe_counter!("redgold.datastore.utxo.insert", "");
 
-    register_counter!("redgold.api.control.num_requests");
-    register_counter!("redgold.blocks.created");
-    register_counter!("redgold.api.rosetta.account_balance");
-    register_counter!("redgold.api.rosetta.account_coins");
+    describe_counter!("redgold.api.control.num_requests", "");
+    describe_counter!("redgold.blocks.created", "");
+    describe_counter!("redgold.api.rosetta.account_balance", "");
+    describe_counter!("redgold.api.rosetta.account_coins", "");
 
-    register_gauge!("redgold.e2e.num_peers");
-    register_counter!("redgold.e2e.failure");
-    register_counter!("redgold.e2e.success");
-    register_counter!("redgold.peer.message.received");
-    increment_counter!("redgold.peer.rest.send.error");
-    register_counter!("redgold.peer.rest.send");
-    register_counter!("redgold.peer.send");
-    register_counter!("redgold.peer.discovery.recv_for_each");
-    register_counter!("redgold.peer.rest.send.timeout");
+    describe_gauge!("redgold.e2e.num_peers", "");
+    describe_counter!("redgold.e2e.failure", "");
+    describe_counter!("redgold.e2e.success", "");
+    describe_counter!("redgold.peer.message.received", "");
+    describe_counter!("redgold.peer.rest.send.error", "");
+    describe_counter!("redgold.peer.rest.send", "");
+    describe_counter!("redgold.peer.send", "");
+    describe_counter!("redgold.peer.discovery.recv_for_each", "");
+    describe_counter!("redgold.peer.rest.send.timeout", "");
 
-    register_counter!("redgold.recent_download.resolve_input_error");
+    describe_counter!("redgold.recent_download.resolve_input_error", "");
 
-    // register_gauge!("redgold.libp2p.active_connections");
-    // register_counter!("redgold.libp2p.total_established_connections");
-    // register_counter!("redgold.libp2p.inbound_request");
+    // describe_gauge!("redgold.libp2p.active_connections", "");
+    // describe_counter!("redgold.libp2p.total_established_connections", "");
+    // describe_counter!("redgold.libp2p.inbound_request", "");
 
 
 }
@@ -106,55 +106,55 @@ impl HistogramFn for PrintHandle {
         println!("histogram record for '{}': {}", self.0, value);
     }
 }
-
-#[derive(Default)]
-struct PrintRecorder;
-
-impl Recorder for PrintRecorder {
-    fn describe_counter(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
-        println!(
-            "(counter) registered key {} with unit {:?} and description {:?}",
-            key_name.as_str(),
-            unit,
-            description
-        );
-    }
-
-    fn describe_gauge(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
-        println!(
-            "(gauge) registered key {} with unit {:?} and description {:?}",
-            key_name.as_str(),
-            unit,
-            description
-        );
-    }
-
-    fn describe_histogram(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
-        println!(
-            "(histogram) registered key {} with unit {:?} and description {:?}",
-            key_name.as_str(),
-            unit,
-            description
-        );
-    }
-
-    fn register_counter(&self, key: &Key) -> Counter {
-        Counter::from_arc(Arc::new(PrintHandle(key.clone())))
-    }
-
-    fn register_gauge(&self, key: &Key) -> Gauge {
-        Gauge::from_arc(Arc::new(PrintHandle(key.clone())))
-    }
-
-    fn register_histogram(&self, key: &Key) -> Histogram {
-        Histogram::from_arc(Arc::new(PrintHandle(key.clone())))
-    }
-}
-
-pub fn init_print_logger() {
-    let recorder = PrintRecorder::default();
-    metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
-}
+//
+// #[derive(Default)]
+// struct PrintRecorder;
+//
+// impl Recorder for PrintRecorder {
+//     fn describe_counter(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
+//         println!(
+//             "(counter) registered key {} with unit {:?} and description {:?}",
+//             key_name.as_str(),
+//             unit,
+//             description
+//         );
+//     }
+//
+//     fn describe_gauge(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
+//         println!(
+//             "(gauge) registered key {} with unit {:?} and description {:?}",
+//             key_name.as_str(),
+//             unit,
+//             description
+//         );
+//     }
+//
+//     fn describe_histogram(&self, key_name: KeyName, unit: Option<Unit>, description: &'static str) {
+//         println!(
+//             "(histogram) registered key {} with unit {:?} and description {:?}",
+//             key_name.as_str(),
+//             unit,
+//             description
+//         );
+//     }
+//
+//     fn register_counter(&self) -> Counter {
+//         Counter::from_arc(Arc::new(PrintHandle(key.clone())))
+//     }
+//
+//     fn register_gauge(&self, key: &Key) -> Gauge {
+//         Gauge::from_arc(Arc::new(PrintHandle(key.clone())))
+//     }
+//
+//     fn register_histogram(&self, key: &Key) -> Histogram {
+//         Histogram::from_arc(Arc::new(PrintHandle(key.clone())))
+//     }
+// }
+//
+// pub fn init_print_logger() {
+//     let recorder = PrintRecorder::default();
+//     metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
+// }
 pub fn init_prometheus(port_offset: u16) {
     let builder = PrometheusBuilder::new();
     use std::net::{Ipv4Addr, SocketAddrV4};
@@ -192,7 +192,7 @@ enum MetricType {
 
 pub fn register_metrics(port_offset: u16) {
     if std::env::var("REDGOLD_LOCAL_DEBUG").is_ok() {
-        init_print_logger();
+        // init_print_logger();
     } else {
         init_prometheus(port_offset);
     }
@@ -218,19 +218,19 @@ pub fn register_metrics(port_offset: u16) {
 // );
 //
 // // And registering them:
-// let counter1 = register_counter!("test_counter");
+// let counter1 = describe_counter!("test_counter", "");
 // counter1.increment(1);
-// let counter2 = register_counter!("test_counter", "type" => "absolute");
+// let counter2 = describe_counter!("test_counter", "type" => "absolute", "");
 // counter2.absolute(42);
 //
-// let gauge1 = register_gauge!("test_gauge");
+// let gauge1 = describe_gauge!("test_gauge", "");
 // gauge1.increment(1.0);
-// let gauge2 = register_gauge!("test_gauge", "type" => "decrement");
+// let gauge2 = describe_gauge!("test_gauge", "type" => "decrement", "");
 // gauge2.decrement(1.0);
-// let gauge3 = register_gauge!("test_gauge", "type" => "set");
+// let gauge3 = describe_gauge!("test_gauge", "type" => "set", "");
 // gauge3.set(3.1459);
 //
-// let histogram1 = register_histogram!("test_histogram");
+// let histogram1 = describe_histogram!("test_histogram", "");
 // histogram1.record(0.57721);
 //
 // // All the supported permutations of `counter!` and its increment/absolute versions:
@@ -239,10 +239,10 @@ pub fn register_metrics(port_offset: u16) {
 // counter!("bytes_sent", 64, "listener" => "frontend", "server" => server_name.clone());
 // counter!("bytes_sent", 64, common_labels);
 //
-// increment_counter!("requests_processed");
-// increment_counter!("requests_processed", "request_type" => "admin");
-// increment_counter!("requests_processed", "request_type" => "admin", "server" => server_name.clone());
-// increment_counter!("requests_processed", common_labels);
+// counter!("requests_processed").increment(1);
+// counter!("requests_processed", "request_type" => "admin").increment(1);
+// counter!("requests_processed", "request_type" => "admin", "server" => server_name.clone()).increment(1);
+// counter!("requests_processed", common_labels).increment(1);
 //
 // absolute_counter!("bytes_sent", 64);
 // absolute_counter!("bytes_sent", 64, "listener" => "frontend");
@@ -268,21 +268,21 @@ pub fn register_metrics(port_offset: u16) {
 // histogram!("svc.execution_time", 70.0, "type" => "users");
 // histogram!("svc.execution_time", 70.0, "type" => "users", "server" => server_name.clone());
 // histogram!("svc.execution_time", 70.0, common_labels);
-// register_counter!("bytes_sent", Unit::Bytes);
-// register_gauge!("connection_count", common_labels);
+// describe_counter!("bytes_sent", Unit::Bytes, "");
+// describe_gauge!("connection_count", common_labels, "");
 // register_histogram!(
 //     "svc.execution_time",
 //     Unit::Milliseconds,
 //     "execution time of request handler"
 // );
-// register_gauge!("unused_gauge", "service" => "backend");
-// register_histogram!("unused_histogram", Unit::Seconds, "unused histo", "service" => "middleware");
+// describe_gauge!("unused_gauge", "service" => "backend", "");
+// describe_histogram!("unused_histogram", Unit::Seconds, "unused histo", "service" => "middleware", "");
 //
 // // All the supported permutations of `increment!`:
-// increment_counter!("requests_processed");
-// increment_counter!("requests_processed", "request_type" => "admin");
-// increment_counter!("requests_processed", "request_type" => "admin", "server" => server_name.clone());
-// increment_counter!("requests_processed", common_labels);
+// counter!("requests_processed").increment(1);
+// counter!("requests_processed", "request_type" => "admin").increment(1);
+// counter!("requests_processed", "request_type" => "admin", "server" => server_name.clone()).increment(1);
+// counter!("requests_processed", common_labels).increment(1);
 //
 // // All the supported permutations of `counter!`:
 // counter!("bytes_sent", 64);

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use itertools::Itertools;
-use metrics::increment_counter;
+use metrics::counter;
 use redgold_schema::{RgResult, WithMetadataHashable};
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::internal_message::SendErrorInfo;
@@ -40,7 +40,7 @@ impl RecentDownload {
                 }
             }
             if store {
-                increment_counter!("redgold.recent_download.accepted_transactions");
+                counter!("redgold.recent_download.accepted_transactions").increment(1);
                 // TODO: Determine time from seed or peers view.
                 self.relay.ds.transaction_store.insert_transaction(
                     &update.parent_transaction,
@@ -82,7 +82,7 @@ impl RecentDownload {
                             if let Ok(resolved_input) = resolved_input {
                                 self.relay.unknown_resolved_inputs.sender.send_err(resolved_input)?;
                             } else {
-                                increment_counter!("redgold.recent_download.resolve_input_error");
+                                counter!("redgold.recent_download.resolve_input_error").increment(1);
                             }
                         }
                     }

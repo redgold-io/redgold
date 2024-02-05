@@ -1,7 +1,7 @@
 use dashmap::mapref::one::Ref;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, info};
-use metrics::increment_counter;
+use metrics::counter;
 use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
 use redgold_schema::{util, WithMetadataHashable};
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -29,7 +29,7 @@ impl ObservationHandler {
                                 r.internal_channel.sender.try_send(message)
                                     .unwrap_or_else(|e| {
                                         tracing::error!("Failed to send proof received message to transaction processor: {}", e);
-                                        increment_counter!("redgold.observation.failed_to_send_to_transaction_processor");
+                                        counter!("redgold.observation.failed_to_send_to_transaction_processor").increment(1);
                                     });
                             }
                         }
@@ -40,7 +40,7 @@ impl ObservationHandler {
     }
 
     async fn process_message(&self, o: Transaction) -> Result<(), ErrorInfo> {
-        increment_counter!("redgold.observation.received");
+        counter!("redgold.observation.received").increment(1);
         debug!("Received peer observation {}", o.json_or());
         // TODO: Verify merkle root
         // TODO: Verify time and/or avoid updating time if row already present.
