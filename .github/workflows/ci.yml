@@ -16,7 +16,7 @@ on:
 jobs:
   test:
     if:
-      ${{ !contains('
+      ${{ github.event_name == 'pull_request_target' || !contains('
       refs/heads/predev
       refs/heads/dev
       refs/heads/staging
@@ -56,12 +56,12 @@ jobs:
       - run: ./bin/local_test.sh
   build-vue:
     runs-on: self-hosted
-    if: contains('
+    if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/dev
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref)
+      ', github.ref) }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v2
@@ -94,14 +94,13 @@ jobs:
 
   build-linux:
 #    needs: [test]
-    if:
-      contains('
+    if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
       refs/heads/dev
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref)
+      ', github.ref) }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 100
     permissions:
@@ -147,14 +146,13 @@ jobs:
           path: ./redgold_linux
 #    needs: [test]
   build-linux-ubuntu-20:
-    if:
-      contains('
+    if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
       refs/heads/dev
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref)
+      ', github.ref) }}
     runs-on: ubuntu-20.04
     timeout-minutes: 100
     permissions:
@@ -178,14 +176,13 @@ jobs:
           path: ./redgold_linux_ubuntu20
   build-windows:
     #    needs: [test]
-    if:
-      contains('
+    if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
       refs/heads/dev
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref)
+      ', github.ref) }}
     runs-on: windows-latest
     timeout-minutes: 100
     permissions:
@@ -238,14 +235,13 @@ jobs:
           path: ./redgold.exe
   build-mac:
 #    needs: [test]
-    if:
-      contains('
+    if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
       refs/heads/dev
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref)
+      ', github.ref) }}
     runs-on: macos-latest
     timeout-minutes: 100
     permissions:
@@ -293,14 +289,13 @@ jobs:
 
   release:
     needs: [build-linux, build-mac, build-linux-ubuntu-20, build-windows, build-vue]
-    if:
-        contains('
+    if: ${{ github.event_name != 'pull_request_target' && contains('
           refs/heads/predev
           refs/heads/dev
           refs/heads/staging
           refs/heads/test
           refs/heads/main
-          ', github.ref)
+          ', github.ref) }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 100
     permissions:
@@ -321,7 +316,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
-
+#
       #      - uses: actions/download-artifact@v3
 #        with:
 #          name: redgold_mac
