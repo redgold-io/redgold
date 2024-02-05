@@ -550,6 +550,9 @@ message TransactionOptions {
   TransactionData data = 4;
   TransactionContract contract = 5;
   OfflineTimeSponsor offline_time_sponsor = 6;
+  // Used for marking a test transaction for filtering from indexes
+  // Primarily used by the live E2E but also appropriate for small, user initiated tests
+  optional bool is_test = 7;
 }
 
 message Transaction {

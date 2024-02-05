@@ -107,6 +107,10 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn is_test(&self) -> bool {
+        self.options.as_ref().and_then(|o| o.is_test).unwrap_or(false)
+    }
+
     // TODO: Validator should ensure UtxoId only used once
     // Lets rename all UtxoId just utxoid
     pub fn input_of(&self, f: &UtxoId) -> Option<&Input> {

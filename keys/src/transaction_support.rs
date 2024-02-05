@@ -230,6 +230,7 @@ impl TransactionBuilderSupport for TransactionBuilder {
                     data: None,
                     contract: None,
                     offline_time_sponsor: None,
+                    is_test: None
                 }),
             },
             utxos: vec![],

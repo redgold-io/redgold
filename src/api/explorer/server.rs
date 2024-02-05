@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use log::info;
 use tokio::task::JoinHandle;
@@ -38,17 +39,32 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             }
         }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
-
     let explorer_relay2 = relay.clone();
     let explorer_recent = warp::get()
         .and(warp::path("explorer"))
-        .and_then(move || {
+        // Add optional query parameter `is_test`
+        .and(warp::query::<HashMap<String, String>>())
+        .and_then(move |query_params: HashMap<String, String>| {
             let relay3 = explorer_relay2.clone();
             async move {
-                as_warp_json_response( explorer::handle_explorer_recent(relay3.clone()).await)
+                // Extract `is_test` parameter and convert to boolean, defaulting to false if not provided
+                let is_test = query_params.get("is_test").map(|value| value == "true");
+                as_warp_json_response(explorer::handle_explorer_recent(relay3.clone(), is_test).await)
             }
         })
-        .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+        .with(warp::cors().allow_any_origin());
+    //
+    //
+    // let explorer_relay2 = relay.clone();
+    // let explorer_recent = warp::get()
+    //     .and(warp::path("explorer"))
+    //     .and_then(move || {
+    //         let relay3 = explorer_relay2.clone();
+    //         async move {
+    //             as_warp_json_response( explorer::handle_explorer_recent(relay3.clone()).await)
+    //         }
+    //     })
+    //     .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
     let explorer_relay3 = relay.clone();
     let explorer_swap = warp::get()
