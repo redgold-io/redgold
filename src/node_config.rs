@@ -503,6 +503,7 @@ impl NodeConfig {
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
         node_config.e2e_enabled = false;
+        node_config.watcher_interval = Duration::from_secs(5);
         node_config
     }
     pub fn internal_mnemonic(&self) -> MnemonicWords {

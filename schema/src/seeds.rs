@@ -91,7 +91,7 @@ pub fn get_seeds_by_env(env: &NetworkEnvironment) -> Vec<Seed> {
                         .unwrap_or(false
                         )
                 ).is_some();
-            let allow_all = all_env && !env.local_debug();
+            let allow_all = all_env && !env.is_local_debug();
             env_match || allow_all
         })
         .collect_vec()

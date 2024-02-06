@@ -583,8 +583,9 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
         let brief_tx = brief_transaction(&tx)?;
         recent_transactions.push(brief_tx);
     }
+    // TODO: Rename this
     let total_accepted_transactions =
-        r.ds.transaction_store.count_total_accepted_transactions().await?;
+        r.ds.transaction_store.count_total_transactions().await?;
     let peers = r.ds.peer_store.active_nodes(None).await?;
     let num_active_peers = (peers.len() as i64) + 1;
 

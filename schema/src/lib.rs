@@ -704,7 +704,7 @@ impl NetworkEnvironment {
         ]
     }
 
-    pub fn local_debug(&self) -> bool {
+    pub fn is_local_debug(&self) -> bool {
         vec![
             NetworkEnvironment::Debug, NetworkEnvironment::Local
         ].contains(self)

@@ -162,6 +162,16 @@ impl TransactionStore {
         Ok(option)
     }
 
+    pub async fn count_total_transactions(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM transactions"#
+        )
+            .fetch_one(&mut *self.ctx.pool().await?)
+            .await)?.count as i64)
+    }
+
     pub async fn count_total_utxos(
         &self
     ) -> Result<i64, ErrorInfo> {

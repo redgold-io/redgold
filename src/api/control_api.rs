@@ -94,7 +94,7 @@ impl ControlServer {
 
         let mut response = ControlResponse::empty();
 
-        if relay.node_config.network.local_debug() {
+        if relay.node_config.network.is_local_debug() {
             // TODO: Shouldn't both of these really be in the initiate function?
             if let Some(mps) = request.control_multiparty_keygen_request {
                 info!("Initiate multiparty request: {}", json_or(&mps));

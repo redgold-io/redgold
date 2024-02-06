@@ -965,7 +965,13 @@ impl IntervalFold for DepositWatcher {
             info!("Attempting to start MP watcher keygen round");
             // Initiate MP keysign etc. gather public key and original proof and params
             let seeds = self.relay.node_config.seeds.clone();
-            if seeds.len() < 3 {
+            let min_seeds = if self.relay.node_config.network.is_local_debug() {
+                3
+            } else {
+                4
+            };
+
+            if seeds.len() <= min_seeds {
                 error!("Not enough seeds to initiate MP keygen");
                 return Ok(())
             }
