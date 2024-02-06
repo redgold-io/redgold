@@ -18,7 +18,7 @@ pub struct ResolvedOutputChild {
 pub async fn resolve_output(
     output: Output, relay: Relay, peers: Vec<NodeMetadata>
 )  -> RgResult<ResolvedOutputChild> {
-    metrics::increment_counter!("redgold.transaction.resolve.output");
+    metrics::counter!("redgold.transaction.resolve.output").increment(1);
 
     let pay_desc = output.pay_update_descendents();
     if !pay_desc {
@@ -66,7 +66,7 @@ pub async fn resolve_output(
                     // observation_proofs.extend(proofs);
                 }
                 Err(_) => {
-                    metrics::increment_counter!("redgold.transaction.resolve.output.errors");
+                    metrics::counter!("redgold.transaction.resolve.output.errors").increment(1);
                 }
             }
         }

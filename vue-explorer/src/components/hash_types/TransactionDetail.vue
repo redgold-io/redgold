@@ -54,11 +54,11 @@
             <div><strong>Acceptance Score</strong></div>
             <div>{{ hashData.acceptance_score }}</div>
 
-            <div><strong>Message</strong></div>
-            <div>{{ hashData.message }}</div>
+            <div v-if="hashData.message"><strong>Message</strong></div>
+            <div v-if="hashData.message">{{ hashData.message }}</div>
 
-            <div><strong>Rejection Reason</strong></div>
-            <div>{{ hashData.rejection_reason }}</div>
+            <div v-if="hashData.rejection_reason"><strong>Rejection Reason</strong></div>
+            <div v-if="hashData.rejection_reason">{{ hashData.rejection_reason }}</div>
 
             <div><strong>Signable Hash</strong></div>
             <div>{{ hashData.signable_hash }}</div>

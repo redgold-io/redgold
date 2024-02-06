@@ -5,7 +5,7 @@ use log::{error, info};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use metrics::{gauge, increment_counter};
+use metrics::{counter, gauge};
 use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::{RgResult, SafeOption};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo};
@@ -78,7 +78,7 @@ use crate::util::logging::Loggable;
 //             sleep(Duration::from_secs(20));
 //             let response = submit.submit().await;
 //             if !response.is_ok() {
-//                 increment_counter!("redgold.e2e.failure");
+//                 counter!("redgold.e2e.failure").increment(1);
 //                 let failure_msg = serde_json::to_string(&response).unwrap_or("ser failure".to_string());
 //                 error!("Canary failure: {}", failure_msg.clone());
 //                 let recovered = (num_success > 10 && util::current_time_millis() - last_failure > 1000 * 60 * 30);
@@ -92,7 +92,7 @@ use crate::util::logging::Loggable;
 //             } else {
 //                 num_success += 1;
 //                 info!("Canary success");
-//                 increment_counter!("redgold.e2e.success");
+//                 counter!("redgold.e2e.success").increment(1);
 //                 if let Some(s) = response.ok() {
 //                     if let Some(q) = s.query_transaction_response {
 //                         increment_gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
@@ -222,13 +222,13 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                 Ok(response) => {
                     c.num_success += 1;
                     info!("Live E2E request success");
-                    increment_counter!("redgold.e2e.success");
+                    counter!("redgold.e2e.success").increment(1);
                     if let Some(q) = response.query_transaction_response {
-                        gauge!("redgold.e2e.num_peers", q.observation_proofs.len() as f64);
+                        gauge!("redgold.e2e.num_peers").set(q.observation_proofs.len() as f64);
                     }
                 }
                 Err(e) => {
-                    increment_counter!("redgold.e2e.failure");
+                    counter!("redgold.e2e.failure").increment(1);
                     let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
                     error!("Canary failure: {}", failure_msg.clone());
                     let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;

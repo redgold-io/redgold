@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use metrics::{decrement_gauge, increment_gauge};
+use metrics::gauge;
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
@@ -406,7 +406,7 @@ impl TransactionStore {
             .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        decrement_gauge!("redgold.utxo.total", 1.0);
+        gauge!("redgold.utxo.total").increment(1.0);
         Ok(rows_m.rows_affected())
     }
 
@@ -639,7 +639,7 @@ impl TransactionStore {
             }
         }
         self.insert_address_transaction(tx).await?;
-        increment_gauge!("redgold.transaction.accepted.total", 1.0);
+        gauge!("redgold.transaction.accepted.total").increment(1.0);
         return Ok(i);
     }
     //
@@ -700,7 +700,7 @@ impl TransactionStore {
             .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        increment_gauge!("redgold.utxo.total", 1.0);
+        gauge!("redgold.utxo.total").increment(1.0);
         Ok(rows_m.last_insert_rowid())
     }
 

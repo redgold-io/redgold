@@ -8,7 +8,7 @@ use flume::TryRecvError;
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
-use metrics::{histogram, increment_counter};
+use metrics::{histogram, counter};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
@@ -169,7 +169,7 @@ impl TransactionProcessContext {
     /// Loop to check messages and process them
     // TODO: Abstract this out
     async fn run(&self) -> Result<(), ErrorInfo> {
-        increment_counter!("redgold.node.async_started");
+        counter!("redgold.node.async_started").increment(1);
         // let mut fut = FutLoopPoll::new();
         // TODO: Change to queue
         let receiver = self.relay.transaction_process.receiver.clone();
@@ -277,7 +277,7 @@ impl TransactionProcessContext {
 
         match transaction_message.response_channel {
             None => {
-                // increment_counter!("redgold.transaction.missing_response_channel");
+                // counter!("redgold.transaction.missing_response_channel").increment(1);
                 // let details = ErrorInfo::error_info("Missing response channel for transaction");
                 // error!("Missing response channel for transaction {:?}", json_or(&details));
             }
@@ -325,15 +325,15 @@ impl TransactionProcessContext {
 
     // TODO: Add a debug info thing here? to include data about debug calls? Thread local info? something ?
     async fn process(&mut self, transaction: &Transaction, processing_time_start: i64, request_uuid: String) -> Result<SubmitTransactionResponse, ErrorInfo> {
-        increment_counter!("redgold.transaction.received");
+        counter!("redgold.transaction.received").increment(1);
         let hash = transaction.hash_or();
         self.transaction_hash = Some(hash.clone());
 
-        histogram!("redgold.transaction.size_bytes", transaction.proto_serialize().len() as f64);
-        histogram!("redgold.transaction.total_output_amount", transaction.total_output_amount_float());
-        histogram!("redgold.transaction.floating_inputs", transaction.floating_inputs().count() as f64);
-        histogram!("redgold.transaction.num_inputs", transaction.inputs.len() as f64);
-        histogram!("redgold.transaction.num_outputs", transaction.outputs.len() as f64);
+        histogram!("redgold.transaction.size_bytes").record(transaction.proto_serialize().len() as f64);
+        histogram!("redgold.transaction.total_output_amount").record(transaction.total_output_amount_float());
+        histogram!("redgold.transaction.floating_inputs").record(transaction.floating_inputs().count() as f64);
+        histogram!("redgold.transaction.num_inputs").record(transaction.inputs.len() as f64);
+        histogram!("redgold.transaction.num_outputs").record(transaction.outputs.len() as f64);
 
         // Establish channels for other transaction threads to communicate conflicts with this one.
         let request_processor = self.create_receiver_or_err(&hash, request_uuid, &transaction)?;
@@ -538,7 +538,7 @@ impl TransactionProcessContext {
         let prf = self.observe(validation_type, State::Accepted).await?;
         observation_proofs.insert(prf);
         self.insert_transaction(&transaction).await?;
-        increment_counter!("redgold.transaction.accepted");
+        counter!("redgold.transaction.accepted").increment(1);
         tracing::info!("Accepted transaction");
 
         // tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());

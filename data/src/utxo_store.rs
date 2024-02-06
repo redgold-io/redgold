@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use metrics::{decrement_gauge, increment_gauge};
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};

@@ -7,7 +7,7 @@ use futures::stream::FuturesUnordered;
 use itertools::Itertools;
 
 use log::info;
-use metrics::increment_counter;
+use metrics::counter;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -411,7 +411,7 @@ impl Node {
         }
 
         info!("Node ready");
-        increment_counter!("redgold.node.node_started");
+        counter!("redgold.node.node_started").increment(1);
 
         return Ok(node);
     }

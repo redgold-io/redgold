@@ -127,7 +127,7 @@ pub async fn resolve_transaction_hash(
                     }
                 }
                 Err(_) => {
-                    metrics::increment_counter!("redgold.transaction.resolve.input.errors");
+                    metrics::counter!("redgold.transaction.resolve.input.errors").increment(1);
                 }
             }
         }
@@ -165,7 +165,7 @@ pub async fn resolve_input(
     check_liveness: bool
 )
                            -> Result<ResolvedInput, ErrorInfo> {
-    metrics::increment_counter!("redgold.transaction.resolve.input");
+    metrics::counter!("redgold.transaction.resolve.input").increment(1);
     let u = input.utxo_id.safe_get_msg("Missing utxo id")?;
     let hash = u.transaction_hash.safe_get_msg("Missing transaction hash on input")?;
 

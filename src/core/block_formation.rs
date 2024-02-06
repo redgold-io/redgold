@@ -69,7 +69,7 @@ impl BlockFormationProcess {
                 // TODO: Re-enable
                 // self.relay.ds.insert_block_update_historicals(&block).await?;
                 self.last_block = block.clone();
-                metrics::increment_counter!("redgold.blocks.created");
+                metrics::counter!("redgold.blocks.created").increment(1);
                 debug!("Formed block with hash {}", block.hash_hex_or_missing())
             }
         }

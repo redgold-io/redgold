@@ -13,7 +13,7 @@
 // use futures::prelude::*;
 // use libp2p::core::{Multiaddr, PeerId};
 // use log::{error, info};
-// use metrics::increment_counter;
+// use metrics::counter;
 // use tokio::runtime::Runtime;
 // use tokio::task::JoinHandle;
 //
@@ -51,7 +51,7 @@
 //         loop {
 //             match network_events.next().await {
 //                 Some(e) => {
-//                     increment_counter!("redgold.libp2p.inbound_request");
+//                     counter!("redgold.libp2p.inbound_request").increment(1);
 //                     // Move all this to inbound handler
 //                     // start an async thread here which sends to another channel
 //                     // then responds on the interior here with a response if required?
@@ -791,7 +791,7 @@
 //
 //                     self.active_connections.insert(peer_id);
 //                     self.address_lookup.insert(peer_id, endpoint.get_remote_address().clone());
-//                     metrics::increment_counter!("redgold.libp2p.total_established_connections");
+//                     metrics::counter!("redgold.libp2p.total_established_connections").increment(1);
 //                     metrics::increment_gauge!("redgold.libp2p.active_connections", 1.0);
 //                     info!(
 //                         "ConnectionEstablished IS_DIALER={} PEER_ID={} LOCAL_ID={} NUM_ESTABLISHED={} ACTIVE_CONNECTIONS={}",

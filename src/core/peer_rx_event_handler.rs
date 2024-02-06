@@ -9,7 +9,7 @@ use itertools::Itertools;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
 use log::{debug, error, info};
-use metrics::increment_counter;
+use metrics::counter;
 // use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
@@ -52,7 +52,7 @@ impl PeerRxEventHandler {
         relay: Relay, pm: PeerMessage
         // , rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
-        increment_counter!("redgold.peer.message.received");
+        counter!("redgold.peer.message.received").increment(1);
 
         // This is important for some requests but not others, use in case by case basis
         let verified = pm.request.verify_auth();
@@ -270,7 +270,7 @@ impl PeerRxEventHandler {
     //
     //     let receiver = self.relay.peer_message_rx.receiver.clone();
     //     fut.run(receiver, |pm| {
-    //         increment_counter!("redgold.peer.message.received");
+    //         counter!("redgold.peer.message.received").increment(1);
     //         // info!("Peer rx event handler received message");
     //         tokio::spawn({
     //             Self::request_response_rest(self.relay.clone(), pm.clone(),
@@ -354,7 +354,7 @@ impl PeerRxEventHandler {
 // }
 //
 // async fn libp2p_request_peer_info(mut p2p_client: Client, peer_id: PeerId, addr: Multiaddr, relay: Relay) {
-//     increment_counter!("redgold.p2p.request_peer_info");
+//     counter!("redgold.p2p.request_peer_info").increment(1);
 //     info!("Requesting peer info for {:?} on addr {:?}", peer_id, addr.clone());
 //     let mut r = Request::default();
 //     r.about_node_request = Some(AboutNodeRequest{
