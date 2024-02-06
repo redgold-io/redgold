@@ -29,15 +29,14 @@ pub struct LocalTestNodeContext {
 }
 
 impl LocalTestNodeContext {
-    async fn new(id: u16, random_port_offset: u16, seed: Option<Seed>) -> Self {
+    async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;
         }
-        for x in seed {
-            node_config.seeds = vec![x];
-        }
+
+        node_config.seeds = seed.clone();
         // let runtimes = NodeRuntimes::default();
         let relay = Relay::new(node_config.clone()).await;
         Node::prelim_setup(relay.clone()
@@ -82,6 +81,7 @@ async fn throw_panic() {
 struct LocalNodes {
     nodes: Vec<LocalTestNodeContext>,
     current_seed: Seed,
+    seeds: Vec<Seed>,
 }
 
 impl LocalNodes {
@@ -101,10 +101,19 @@ impl LocalNodes {
     fn current_seed_id(&self) -> u16 {
         self.nodes.len() as u16
     }
+    fn seeds() -> Vec<Seed> {
+        let mut seeds = vec![];
+        for i in 0..3 {
+            let mut seed = NodeConfig::from_test_id(&0).self_seed();
+            seed.port_offset = Some(util::random_port() as u32);
+            seeds.push(seed);
+        }
+        seeds
+    }
+
     async fn new(
-        // runtime: Arc<Runtime>,
-        offset: Option<u16>) -> LocalNodes {
-        let port_offset = offset.unwrap_or(util::random_port());
+        offset: Option<u16>
+    ) -> LocalNodes {
         // TODO: Lets avoid this and write them out to disk, or is that done already and this can be removed?
         // let path = NodeConfig::memdb_path(&(0 as u16));
         // let store =
@@ -115,10 +124,13 @@ impl LocalNodes {
         //         store.create_all_err_info()
         //     // )
         //     .expect("test failure create tables");
-        let start = LocalTestNodeContext::new(0, port_offset, None).await;
+        let seeds = Self::seeds();
+        let s = seeds.get(0).expect("").port_offset.expect("") as u16;
+        let start = LocalTestNodeContext::new(0, s, Self::seeds()).await;
         LocalNodes {
             current_seed: start.node.relay.node_config.self_seed(),
             nodes: vec![start],
+            seeds,
         }
     }
 
@@ -250,7 +262,7 @@ impl LocalNodes {
         let start = LocalTestNodeContext::new(
             self.current_seed_id(),
             port_offset,
-            Some(self.current_seed.clone()),
+            self.seeds.clone(),
         ).await;
 
         info!(
@@ -483,6 +495,8 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
     do_signing(keygen2).await;
+
+    // TODO: AMM tests
 
 
     std::mem::forget(local_nodes);
