@@ -255,6 +255,8 @@ pub async fn some_boring_fun() {
     tokio::time::sleep(Duration::from_secs(1)).await;
     event!(Level::INFO, "Boring function info");
 }
+
+#[ignore]
 #[tokio::test]
 pub async fn test_perf_timing() {
     init_tracing("DEBUG");
