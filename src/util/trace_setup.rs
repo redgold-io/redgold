@@ -2,9 +2,10 @@ use crate::util;
 
 use std::{error::Error, io};
 use std::collections::HashMap;
+use std::time::Duration;
 use tokio::task_local;
-use tracing::{debug, error, info, span, warn, Level, Span};
-use tracing_subscriber::fmt::format::Format;
+use tracing::{debug, error, info, span, warn, Level, Span, event};
+use tracing_subscriber::fmt::format::{FmtSpan, Format};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use redgold_schema::{EasyJson, error_info, error_message, task_local, task_local_map};
@@ -194,7 +195,11 @@ pub fn init_tracing(log_level: &str) {
 
     let fmt_layer = tracing_subscriber::fmt::Layer::default()
         .compact()
-        .with_ansi(false);
+        .with_ansi(false)
+        .with_span_events(FmtSpan::CLOSE);
+        // .with_target(false)
+        // .with_level(false);
+
     let filter_layer = EnvFilter::new(format!(
         "sqlx=ERROR,warp=WARN,rocket=WARN,redgold={}", log_level));
 
@@ -242,5 +247,17 @@ pub async fn debug_span_inject() {
     let mut hm: HashMap<String, String> = HashMap::default();
     hm.insert("error_key".to_string(), "error_value_initial".to_string());
     task_local_map(hm, some_trace_func("param1")).await;
+
+}
+
+#[tracing::instrument(fields(outer_empty))]
+pub async fn some_boring_fun() {
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    event!(Level::INFO, "Boring function info");
+}
+#[tokio::test]
+pub async fn test_perf_timing() {
+    init_tracing("DEBUG");
+    some_boring_fun().await;
 
 }
