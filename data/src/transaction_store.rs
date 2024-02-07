@@ -96,6 +96,7 @@ impl TransactionStore {
         Ok(option)
     }
 
+    // #[tracing::instrument()]
     pub async fn query_recent_transactions(
         &self, limit: Option<i64>,
         is_test: Option<bool>
@@ -162,6 +163,7 @@ impl TransactionStore {
         Ok(option)
     }
 
+    // #[tracing::instrument()]
     pub async fn count_total_transactions(
         &self
     ) -> Result<i64, ErrorInfo> {
