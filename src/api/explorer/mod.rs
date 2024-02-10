@@ -340,12 +340,12 @@ pub fn convert_trust(trust: &TrustRatingLabel) -> RgResult<DetailedTrust> {
     })
 }
 
-pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
+pub async fn handle_peer(p: &PeerIdInfo, r: &Relay, skip_recent_observations: bool) -> RgResult<DetailedPeer> {
     let pd = p.latest_peer_transaction.safe_get_msg("Missing latest peer transaction in handle peer")?
         .peer_data()?;
     let mut nodes = vec![];
     for pni in &p.peer_node_info {
-        let node = handle_peer_node(pni, &r).await.log_error();
+        let node = handle_peer_node(pni, &r, skip_recent_observations).await.log_error();
         if let Ok(node) = node {
             nodes.push(node);
         }
@@ -359,15 +359,17 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay) -> RgResult<DetailedPeer> {
     })
 }
 
-pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay) -> RgResult<DetailedPeerNode> {
+pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay, skip_recent_observations: bool) -> RgResult<DetailedPeerNode> {
     let nmd = p.latest_node_transaction.safe_get_msg("Missing latest node transaction")?.node_metadata()?;
     let vi = nmd.version_info.clone().safe_get_msg("Missing version info")?.clone();
     let pk = nmd.public_key.safe_get_msg("Missing public key")?;
     let mut obs = vec![];
 
-    for o in _r.ds.observation.get_pk_observations(pk, 10).await? {
-        let oo = handle_observation(&o, _r).await?;
-        obs.push(oo);
+    if !skip_recent_observations {
+        for o in _r.ds.observation.get_pk_observations(pk, 10).await? {
+            let oo = handle_observation(&o, _r).await?;
+            obs.push(oo);
+        }
     }
 
     Ok(DetailedPeerNode{
@@ -412,10 +414,10 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
         h.observation = Some(handle_observation(o, &r).await?);
     }
     if let Some(p) = &hq.peer_id_info {
-        h.peer = Some(handle_peer(p, &r).await?);
+        h.peer = Some(handle_peer(p, &r, false).await?);
     }
     if let Some(p) = &hq.peer_node_info {
-        h.peer_node = Some(handle_peer_node(p, &r).await?);
+        h.peer_node = Some(handle_peer_node(p, &r, false).await?);
     }
 
     if let Some(t) = hq.transaction_info {
@@ -603,18 +605,20 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     let pks = peers[0..9.min(peers.len())].to_vec();
     let mut active_peers_abridged = vec![];
     active_peers_abridged.push(
-        handle_peer(&r.peer_id_info().await?, &r).await?
+        handle_peer(&r.peer_id_info().await?, &r, true).await?
     );
+
+    info!("active nodes first handle peer elapsed: {:?}", current_time_millis_i64() - start);
+
     for pk in &pks {
         if let Some(pid) = r.ds.peer_store.peer_id_for_node_pk(pk).await? {
             if let Some(pid_info) = r.ds.peer_store.query_peer_id_info(&pid).await? {
-                if let Some(p) = handle_peer(&pid_info, &r).await.ok() {
+                if let Some(p) = handle_peer(&pid_info, &r, true).await.ok() {
                     active_peers_abridged.push(p);
                 }
             }
         }
     }
-
 
     active_peers_abridged = active_peers_abridged.iter().filter(|p| !p.nodes.is_empty()).cloned().collect_vec();
     info!("active nodes and peers done time elapsed: {:?}", current_time_millis_i64() - start);
