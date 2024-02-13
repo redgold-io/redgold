@@ -25,7 +25,7 @@ itertools = { workspace = true }
 metrics = { workspace = true }
 hex = { workspace = true }
 log = { workspace = true }
-
+tracing = { workspace = true }
 
 polars = "0.32.1"
 
