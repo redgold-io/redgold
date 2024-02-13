@@ -538,7 +538,7 @@ message Salt {
 }
 
 // For use in providing a secondary, recent, submission time for offline signing process with delayed broadcast.
-message OfflineTimeSponsor {
+message TimeSponsor {
   int64 time = 1;
   Proof proof = 2;
 }
@@ -549,7 +549,7 @@ message TransactionOptions {
   repeated KeyValueOption key_value_options = 3;
   TransactionData data = 4;
   TransactionContract contract = 5;
-  OfflineTimeSponsor offline_time_sponsor = 6;
+  TimeSponsor time_sponsor = 6;
   // Used for marking a test transaction for filtering from indexes
   // Primarily used by the live E2E but also appropriate for small, user initiated tests
   optional bool is_test = 7;
@@ -631,11 +631,6 @@ enum HashType {
 message Tombstone {
   Hash hash = 1;
   // TODO: Other fields for the reason 'why'
-}
-
-message ObservationData {
-  Transaction transaction = 1;
-  Observation observation = 2;
 }
 
 enum ValidationType {
@@ -956,7 +951,6 @@ message ObservationProof {
 
 message QueryTransactionResponse {
   repeated ObservationProof observation_proofs = 1;
-  Hash block_hash = 2;
 }
 
 message SubmitTransactionRequest {
@@ -1339,6 +1333,15 @@ message TestContractInternalState {
 message TestContractRequest {
   TestContractUpdate test_contract_update = 1;
   TestContractUpdate2 test_contract_update2 = 2;
+}
+
+message DebugSerChange {
+  string field1 = 1;
+  optional string field2 = 2;
+}
+
+message DebugSerChange2 {
+  string field1 = 1;
 }
 
 

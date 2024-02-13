@@ -530,17 +530,17 @@ impl TransactionStore {
         offset: i64
     ) -> Result<Vec<Transaction>, ErrorInfo> {
 
-        let mut pool = self.ctx.pool().await?;
         let bytes = address.address.safe_bytes()?;
-        let rows = sqlx::query!(
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT tx_hash FROM address_transaction WHERE address = ?1 ORDER BY time DESC LIMIT ?2 OFFSET ?3"#,
             bytes, limit, offset
         )
-            .fetch_all(&mut *pool)
-            .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?;
+
+        // TODO: Convert to map
         let mut res = vec![];
-        for row in rows_m {
+        for row in rows {
             let tx_hash: Vec<u8> = row.tx_hash.clone();
             let tx_hash = Hash::new(tx_hash);
             // Suppress failed transactions from listing, maybe add a flag to show them

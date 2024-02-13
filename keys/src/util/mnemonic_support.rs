@@ -77,8 +77,8 @@ impl WordsPass {
                 derivation_path: path.clone(),
                 account: account.clone(),
                 rdg_address: pk.address()?.render_string()?,
-                rdg_btc_main_address: pk.to_bitcoin_address_network(NetworkEnvironment::Main)?,
-                rdg_btc_test_address: pk.to_bitcoin_address_network(NetworkEnvironment::Test)?,
+                rdg_btc_main_address: pk.to_bitcoin_address(&NetworkEnvironment::Main)?,
+                rdg_btc_test_address: pk.to_bitcoin_address(&NetworkEnvironment::Test)?,
                 xpub: self.xpub(xpub_path)?.to_string(),
                 public_hex: pk.hex_or(),
             });
@@ -86,7 +86,7 @@ impl WordsPass {
         Ok(WordsPassMetadata {
             checksum: self.checksum()?,
             checksum_words: self.checksum_words()?,
-            btc_84h_0h_0h_0_0_address: self.public_at("m/84'/0'/0'/0/0")?.to_bitcoin_address()?,
+            btc_84h_0h_0h_0_0_address: self.public_at("m/84'/0'/0'/0/0")?.to_bitcoin_address(&NetworkEnvironment::Main)?,
             btc_84h_0h_0h_0_0_xpub: self.xpub("m/84'/0'/0'")?.to_string(),
             eth_44h_60h_0h_0_0_address: self.public_at("m/44'/60'/0'/0/0")?.to_ethereum_address()?,
             eth_44h_60h_0h_0_0_xpub: self.xpub("m/44'/60'/0'")?.to_string(),

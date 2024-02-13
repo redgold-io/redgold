@@ -58,8 +58,7 @@ dirs = "5.0.1"
 sha3 = "0.10.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-
+rand = '0.8.4'
 
 [dependencies]
 redgold-schema = {workspace = true}
@@ -98,7 +97,7 @@ strum = "0.25"
 strum_macros = "0.25"
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
 #zxcvbn = '2.1.1'
-rand = '0.8.4'
+rand = { workspace = true}
 clap = { version = "4.3.21", features = ["derive", "env"] }
 log = "0.4.14"
 hex = "0.4.3"

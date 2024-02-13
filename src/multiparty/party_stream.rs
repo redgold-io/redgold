@@ -1,0 +1,308 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use itertools::Itertools;
+use log::error;
+use rocket::serde::{Deserialize, Serialize};
+use redgold_keys::address_external::ToBitcoinAddress;
+use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
+use redgold_schema::{EasyJson, error_info, RgResult, structs, WithMetadataHashable};
+use redgold_schema::structs::{Address, CurrencyAmount, ObservationProof, PublicKey, SupportedCurrency, Transaction, ValidationLiveness};
+use crate::core::relay::Relay;
+use crate::multiparty::watcher::{BidAsk, DepositWatcher, get_rdg_btc_starting, OrderFulfillment};
+
+#[derive(Clone, Debug)]
+struct TransactionWithObservations {
+    tx: Transaction,
+    observations: Vec<ObservationProof>
+}
+
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Balance {
+    value: i64,
+    currency: SupportedCurrency
+}
+
+impl Balance {
+    pub fn new(value: i64, currency: SupportedCurrency) -> Self {
+        Self {
+            value,
+            currency
+        }
+    }
+    pub fn btc(value: u64) -> Self {
+        Self::new(value as i64, SupportedCurrency::Bitcoin)
+    }
+    pub fn rdg(value: i64) -> Self {
+        Self::new(value, SupportedCurrency::Redgold)
+    }
+    pub fn rdga(value: CurrencyAmount) -> Self {
+        Self::new(value.amount, SupportedCurrency::Redgold)
+    }
+
+    pub fn add(&mut self, amount: i64) {
+        self.value += amount;
+    }
+
+    pub fn subtract(&mut self, amount: i64) {
+        self.value -= amount;
+    }
+
+
+}
+
+
+struct PartyEvents {
+    key_address: Address,
+    party_public_key: structs::PublicKey,
+    relay: Relay,
+    events: Vec<AddressEvent>,
+    balance_map: HashMap<SupportedCurrency, i64>,
+    unfulfilled_deposits: Vec<(OrderFulfillment, AddressEvent)>,
+    unfulfilled_withdrawals: Vec<(OrderFulfillment, AddressEvent)>,
+    price: f64,
+    bid_ask: BidAsk,
+}
+
+impl PartyEvents {
+    pub fn new(party_public_key: &PublicKey, relay: &Relay, price: f64) -> Self {
+        Self {
+            key_address: party_public_key.address().expect("works").clone(),
+            party_public_key: party_public_key.clone(),
+            relay: relay.clone(),
+            events: vec![],
+            balance_map: Default::default(),
+            unfulfilled_deposits: vec![],
+            unfulfilled_withdrawals: vec![],
+            price,
+            bid_ask: BidAsk::generate_default(
+                0, 0, price, get_rdg_btc_starting(0)
+            )
+        }
+    }
+
+    pub async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()> {
+        let ec = e.clone().clone();
+        let mut event_fulfillment: Option<OrderFulfillment> = None;
+        match e {
+            // External Bitcoin Transaction event
+            AddressEvent::External(t) => {
+                let balance = self.balance_map.get(&t.currency).unwrap_or(&(0i64));
+                let mut balance_sign = 1;
+
+                if t.incoming {
+                    // Represents a deposit / swap external event.
+                    // This should be a fulfillment of an ASK, corresponding to a TAKER BUY
+                    // Corresponding to a price increase
+                    // Event initiator, has no pairing event yet (short of staking requests)
+                    // Balance / price adjustment event
+                    let fulfillment = self.bid_ask.fulfill_taker_order(t.amount, true);
+
+                    if let Some(fulfillment) = fulfillment {
+                        event_fulfillment = Some(fulfillment.clone());
+                        let pair = (fulfillment, ec.clone());
+                        self.unfulfilled_deposits.push(pair);
+
+
+                    }
+                } else {
+                    balance_sign = -1;
+                    // Represents a receipt transaction for outgoing withdrawal.
+                    // Should have a paired internal deposit event
+                    self.unfulfilled_withdrawals.retain(|(of, d)| {
+                        match d {
+                            AddressEvent::Internal(t2) => {
+                                let is_swap = t2.tx.has_swap_to_multi(&self.party_public_key,&self.relay.node_config.network);
+                                // RDG transaction previously sent to AMM address with some input address
+                                // We need to check if the input address is the same as the output address of the current transaction
+                                // To see if this constitutes a reception outgoing transaction or receipt
+                                let address_match = t2.tx.input_bitcoin_address(&self.relay.node_config.network, &t.other_address);
+                                let matching_receipt = is_swap && address_match;
+                                !matching_receipt
+                            }
+                            _ => true
+                        }
+                    });
+                }
+                let delta = balance + (t.amount as i64);
+                let new_balance = delta * balance_sign;
+                self.balance_map.insert(t.currency.clone(), new_balance);
+            }
+            // Internal Redgold transaction event
+            AddressEvent::Internal(t) => {
+                let balance = self.balance_map.get(&SupportedCurrency::Redgold).unwrap_or(&(0i64));
+                let mut balance_sign = -1;
+                let amount = t.tx.output_swap_amount_of_multi(&self.party_public_key, &self.relay.node_config.network).unwrap_or(0);
+                let incoming = !t.tx.input_addresses().contains(&self.key_address);
+                if incoming {
+                    balance_sign = 1;
+                    let is_swap = t.tx.has_swap_to_multi(&self.party_public_key, &self.relay.node_config.network);
+                    if is_swap {
+                        // Represents a withdrawal initiation event
+                        let fulfillment = self.bid_ask.fulfill_taker_order(amount as u64, false);
+                        if let Some(fulfillment) = fulfillment {
+                            event_fulfillment = Some(fulfillment.clone());
+                            let pair = (fulfillment, ec.clone());
+                            self.unfulfilled_withdrawals.push(pair);
+                        }
+
+                    } else {
+                        // Represents a stake deposit initiation event
+                    }
+                } else {
+                    // This is an outgoing transaction representing a deposit fulfillment receipt
+                    let btc_tx_id = t.tx.first_output_external_txid();
+                    if let Some(tx_id) = btc_tx_id {
+                        self.unfulfilled_withdrawals.retain(|(of,d)| {
+                            match d {
+                                AddressEvent::External(t2) => {
+                                    let receipt_match = t2.tx_id == tx_id.identifier;
+                                    !receipt_match
+                                }
+                                _ => true
+                            }
+                        });
+                    } else {
+                        error!("No external txid found for internal outgoing transaction")
+                    }
+                }
+                let delta = amount * balance_sign;
+                let new_balance = balance + delta;
+                self.balance_map.insert(SupportedCurrency::Redgold, new_balance);
+            }
+        }
+
+        if let Some(f) = event_fulfillment {
+            let p_delta = f.fulfillment_fraction() * 0.01;
+            let new_price = self.price * (1.0 + p_delta);
+            let time = ec.time(&self.relay.node_config.seeds_pk());
+            let min_ask = get_rdg_btc_starting(time);
+            let balance = self.balance_map.get(&SupportedCurrency::Redgold).unwrap_or(&(0i64)).clone() as i64;
+            let pair_balance = self.balance_map.get(&SupportedCurrency::Bitcoin).unwrap_or(&(0i64)).clone() as u64;
+            self.bid_ask = BidAsk::generate_default(
+                balance, pair_balance, new_price, min_ask
+            );
+            self.price = new_price;
+        }
+
+        Ok(())
+    }
+    pub async fn default(
+        pk_address: &PublicKey,
+        relay: &Relay,
+        btc_wallet: &Arc<Mutex<SingleKeyBitcoinWallet>>,
+        price: f64
+    ) -> RgResult<Self> {
+        let mut n = Self::new(pk_address, relay, price);
+        // transactions
+
+        let seeds = relay.node_config.seeds.iter().flat_map(|s| s.public_key.clone()).collect_vec();
+
+        // First get all transactions associated with the address, both incoming or outgoing.
+
+        let tx = relay.ds.transaction_store
+            .get_all_tx_for_address(&n.key_address, 100000, 0).await?;
+
+        let mut res = vec![];
+        for t in tx {
+            let h = t.hash_or();
+            let obs = relay.ds.observation.select_observation_edge(&h).await?;
+            let txo = TransactionWithObservations {
+                tx: t,
+                observations: obs,
+            };
+            let ae = AddressEvent::Internal(txo);
+            res.push(ae);
+        }
+
+        btc_wallet.lock().map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+            .get_all_tx()?.iter().for_each(|t| {
+            let ae = AddressEvent::External(t.clone());
+            res.push(ae);
+        });
+
+        res.sort_by(|a, b| a.time(&seeds).cmp(&b.time(&seeds)));
+
+        n.events = res.clone();
+
+        for e in &res {
+            n.process_event(e).await?;
+        }
+
+        Ok(n)
+
+        // let mut staking_deposits = vec![];
+        // // TODO: Add withdrawal support
+        // // let mut staking_withdrawals = vec![];
+        //
+        // for t in &tx {
+        //     if let Some((amount, liquidity_request)) = t.liquidity_of(&key_address) {
+        //         if let Some(d) = &liquidity_request.deposit {
+        //             let d = StakeDepositInfo {
+        //                 amount: amount.clone(),
+        //                 deposit: d.clone(),
+        //                 tx_hash: t.hash_or(),
+        //             };
+        //             staking_deposits.push(d);
+        //         }
+        //     }
+        // }
+        //
+
+
+
+    }
+
+}
+
+
+#[derive(Clone)]
+enum AddressEvent {
+    External(ExternalTimedTransaction),
+    Internal(TransactionWithObservations)
+}
+
+
+
+impl AddressEvent {
+    pub fn time(&self, seeds: &Vec<PublicKey>) -> i64 {
+        match self {
+            AddressEvent::External(e) => e.timestamp as i64,
+            AddressEvent::Internal(t) => {
+                let seed_obs = t.observations.iter().filter_map(|o|
+                    {
+                        let metadata = o.proof.as_ref()
+                            .and_then(|p| p.public_key.as_ref())
+                            .filter(|pk| seeds.contains(pk))
+                            .and_then(|pk| o.metadata.as_ref());
+                        metadata
+                            .and_then(|m| m.time().ok())
+                            .filter(|_| metadata.filter(|m| m.validation_liveness == ValidationLiveness::Live as i32).is_some())
+                    }
+                ).map(|t| t.clone()).collect_vec();
+                let times = seed_obs.iter().sum::<i64>();
+                let avg = times / seed_obs.len() as i64;
+                avg
+            }
+        }
+    }
+}
+
+
+// #[ignore]
+#[tokio::test]
+async fn debug_event_stream() {
+
+    let ba = BidAsk::generate_default(
+        0, 0, 5.0, 1.0
+    );
+
+    let j = ba.json_pretty_or();
+
+    println!("ba: {j}");
+
+
+    // DepositWatcher::get_starting_center_price_rdg_btc_fallback()
+
+}

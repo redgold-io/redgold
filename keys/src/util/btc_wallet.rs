@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use bdk::{Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
-use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash};
+use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash, TxIn, TxOut};
 use bdk::bitcoin::blockdata::opcodes;
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::bitcoin::hashes::Hash;
@@ -17,7 +17,7 @@ use bdk::electrum_client::Client;
 use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
 // use crate::util::cli::commands::send;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
 use crate::{KeyPair, TestConstants};
 use crate::proof_support::ProofSupport;
@@ -227,7 +227,8 @@ pub struct ExternalTimedTransaction {
     pub timestamp: u64,
     pub other_address: String,
     pub amount: u64,
-    pub incoming: bool
+    pub incoming: bool,
+    pub currency: SupportedCurrency,
 }
 
 
@@ -399,6 +400,80 @@ impl SingleKeyBitcoinWallet {
                     other_address: a,
                     amount: value,
                     incoming: true,
+                    currency: SupportedCurrency::Bitcoin,
+                };
+                res.push(ett)
+            }
+        }
+        Ok(res)
+    }
+
+    pub fn outputs_convert(&self, outs: &Vec<TxOut>) -> Vec<(String, u64)> {
+        let mut res = vec![];
+        for o in outs {
+            let a = Address::from_script(&o.script_pubkey, self.network).ok();
+            if let Some(a) = a {
+                res.push((a.to_string(), o.value))
+            }
+        }
+        res
+    }
+
+    pub fn convert_tx_inputs_address(&self, tx_ins: &Vec<TxIn>) -> RgResult<Vec<(String, u64)>> {
+        let mut res = vec![];
+        for i in tx_ins {
+            let txid = i.previous_output.txid;
+            let vout = i.previous_output.vout;
+            let prev_tx = self.client.get_tx(&txid).error_info("Error getting tx")?;
+            let prev_tx = prev_tx.safe_get_msg("No tx found")?;
+            let prev_output = prev_tx.output.get(vout as usize);
+            let prev_output = prev_output.safe_get_msg("Error getting output")?;
+            let amount = prev_output.value;
+            let a = Address::from_script(&prev_output.script_pubkey, self.network).ok();
+            // println!("{}", format!("TxIn address: {:?}", a));
+            if let Some(a) = a {
+                let a = a.to_string();
+                res.push((a, amount));
+            }
+        }
+        Ok(res)
+    }
+    pub fn get_all_tx(&self) -> Result<Vec<ExternalTimedTransaction>, ErrorInfo> {
+        let self_addr = self.address()?;
+        let mut res = vec![];
+        let result = self.wallet.list_transactions(true)
+            .error_info("Error listing transactions")?;
+        for x in result.iter() {
+            let tx = x.transaction.safe_get_msg("Error getting transaction")?;
+            let output_amounts = self.outputs_convert(&tx.output);
+            let input_addrs = self.convert_tx_inputs_address(&tx.input)?;
+
+            // Not needed?
+            // let has_self_output = output_amounts.iter().filter(|(x,y)| x != &self_addr).next().is_some();
+            let has_self_input = input_addrs.iter().filter(|(x,y)| x == &self_addr).next().is_some();
+            let incoming = !has_self_input;
+
+            let other_address = if incoming {
+                input_addrs.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| x.clone())
+            } else {
+                output_amounts.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| x.clone())
+            };
+
+            let amount = if incoming {
+                output_amounts.iter().filter(|(x,y)| x == &self_addr).next().map(|(x,y)| y.clone())
+            } else {
+                output_amounts.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| y.clone())
+            };
+
+            if let (Some(c), Some(a), Some(value)) = (x.confirmation_time.clone(), other_address, amount) {
+
+                let ett = ExternalTimedTransaction {
+                    tx_id: x.txid.to_string(),
+                    timestamp: c.timestamp,
+                    other_address: a,
+                    amount: value,
+                    incoming,
+                    currency: SupportedCurrency::Bitcoin,
                 };
                 res.push(ett)
             }

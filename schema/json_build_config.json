@@ -109,7 +109,7 @@
         "structs.FloatingUtxoId",
         "structs.UtxoId",
         "structs.UsedOutputs",
-        "structs.OfflineTimeSponsor",
+        "structs.TimeSponsor",
         "structs.UtxoConflictResolveRequest",
         "structs.UtxoConflictResolveResponse",
         "structs.PeerNodeInfo",
@@ -271,7 +271,19 @@
         "structs.VersionInfo.commit_hash",
         "structs.VersionInfo.next_executable_checksum",
         "structs.VersionInfo.next_upgrade_time",
-        "structs.StandardData.keyed_typed_value"
+        "structs.StandardData.keyed_typed_value",
+        "structs.TransactionData.time",
+        "structs.TransactionData.standard_data",
+        "structs.TransactionOptions.contract",
+        "structs.TransactionOptions.time_sponsor",
+        "structs.TransactionOptions.network_type",
+        "structs.TransactionOptions.is_test",
+        "structs.Response.response_metadata",
+        "structs.Response.submit_transaction_response",
+        "structs.Response.query_transaction_response",
+        "structs.Response.about_node_response",
+        "structs.Response.query_addresses_response",
+        "structs.ObservationMetadata.liveness_confidence"
       ]
     },
     {
@@ -284,7 +296,8 @@
         "structs.Output.counter_party_proofs",
         "structs.StandardData.keyed_typed_value_list",
         "structs.StandardData.matrix_typed_value_list",
-        "structs.ResponseMetadata.task_local_details"
+        "structs.ResponseMetadata.task_local_details",
+        "structs.TransactionOptions.key_value_options"
       ]
     },
     {
@@ -313,7 +326,10 @@
         "structs.Hash.hash_format_type",
         "structs.Address.address_type",
         "structs.Signature.signature_type",
-        "structs.PublicKey.key_type"
+        "structs.PublicKey.key_type",
+        "structs.ObservationMetadata.observation_type",
+        "structs.ObservationMetadata.state",
+        "structs.ObservationMetadata.validation_liveness"
       ]
     },
     {

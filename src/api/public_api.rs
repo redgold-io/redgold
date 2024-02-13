@@ -712,8 +712,7 @@ async fn mock_relay(relay: Relay) {
         response.submit_transaction_response = Some(SubmitTransactionResponse {
                 transaction_hash: create_test_genesis_transaction().hash_or().into(),
                 query_transaction_response: Some(QueryTransactionResponse {
-                    observation_proofs: vec![],
-                    block_hash: None,
+                    observation_proofs: vec![]
                 }),
             transaction: None,
         });
