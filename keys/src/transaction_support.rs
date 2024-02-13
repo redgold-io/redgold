@@ -4,13 +4,20 @@ use bdk::bitcoin::secp256k1::rand::Rng;
 use bitcoin::secp256k1::{PublicKey, SecretKey};
 use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, struct_metadata_new, structs, WithMetadataHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, CurrencyAmount, TransactionOptions, UtxoEntry, UtxoId};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, CurrencyAmount, TransactionOptions, UtxoEntry, UtxoId, TimeSponsor, NetworkEnvironment};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::KeyPair;
 use crate::proof_support::ProofSupport;
 
+use crate::structs::DebugSerChange;
+use crate::structs::DebugSerChange2;
+use redgold_schema::ProtoSerde;
+use redgold_schema::util::current_time_millis;
+use crate::address_external::ToBitcoinAddress;
+
 pub trait TransactionSupport {
+    fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
     fn new(
@@ -23,9 +30,40 @@ pub trait TransactionSupport {
     fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo>;
     fn validate(&self) -> RgResult<()>;
     fn prevalidate(&self) -> Result<(), ErrorInfo>;
+
+    fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool;
+    fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
+    fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool;
+}
+
+#[test]
+fn proto_ser_remove_opt_change() {
+    let ser = DebugSerChange{
+        field1: "asdf".to_string(),
+        field2: None
+    }.proto_serialize();
+    let sec = DebugSerChange2::proto_deserialize(ser).expect("deser");
+    assert_eq!(sec.field1, "asdf".to_string());
 }
 
 impl TransactionSupport for Transaction {
+    fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction> {
+        let mut x = self.with_hash();
+        let hash = x.hash_or();
+        let mut options = TransactionOptions::default();
+        let mut opts = x.options.as_mut().unwrap_or(&mut options);
+        if opts.time_sponsor.is_none() {
+            let time = current_time_millis();
+            let proof = Proof::from_keypair_hash(&hash, &key_pair);
+            let mut ot = TimeSponsor::default();
+            ot.proof = Some(proof);
+            ot.time = time;
+            opts.time_sponsor = Some(ot);
+            x.with_hash();
+        }
+        Ok(x.clone())
+    }
+
     fn sign(&mut self, key_pair: &KeyPair) -> RgResult<Transaction> {
         let hash = self.signable_hash();
         let addr = key_pair.address_typed();
@@ -47,7 +85,6 @@ impl TransactionSupport for Transaction {
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())
     }
-
     // TODO: Move all of this to TransactionBuilder
     fn new(
         source: &UtxoEntry,
@@ -73,7 +110,6 @@ impl TransactionSupport for Transaction {
         txb
     }
 
-
     fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
         let id = utxo_entry.utxo_id.safe_get_msg("Missing utxo id during verify_utxo_entry_proof")?;
         let input = self
@@ -90,6 +126,7 @@ impl TransactionSupport for Transaction {
             address,
         )?)
     }
+
 
     fn validate(&self) -> RgResult<()> {
         self.prevalidate()?;
@@ -176,6 +213,36 @@ impl TransactionSupport for Transaction {
         return Ok(());
     }
 
+    fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool {
+        self.inputs.iter()
+            .flat_map(|i| -> &Vec<Proof> { i.proof.as_ref()})
+            .filter_map(|p: &structs::Proof| p.public_key.as_ref())
+            .filter_map(|pk| pk.to_bitcoin_address(network).ok())
+            .filter(|a| a == other_address)
+            .count() > 0
+    }
+
+    fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64> {
+        let btc_address = pk_address.to_bitcoin_address(network_environment)?;
+        let address = pk_address.address()?;
+        let amt = self.outputs
+            .iter()
+            .filter_map(|o| {
+                if o.is_swap() {
+                    o.address.as_ref()
+                        .filter(|&a| a == &address || a.render_string().ok().as_ref() == Some(&btc_address))
+                        .and_then(|_| o.opt_amount())
+                } else {
+                    None
+                }
+            }).sum::<i64>();
+        Ok(amt)
+    }
+
+    fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool {
+        self.output_swap_amount_of_multi(pk_address, network_environment).map(|b| b > 0).unwrap_or(false)
+    }
+
 
 
 }
@@ -216,23 +283,9 @@ pub trait TransactionBuilderSupport {
 
 impl TransactionBuilderSupport for TransactionBuilder {
     fn new() -> Self {
-        let mut rng = rand::thread_rng();
+        let tx = Transaction::new_blank();
         Self {
-            transaction: Transaction{
-                inputs: vec![],
-                outputs: vec![],
-                struct_metadata: struct_metadata_new(),
-                options: Some(TransactionOptions{
-                    salt: Some(rng.gen::<i64>()),
-                    // TODO: None here or with setter?
-                    network_type: None,
-                    key_value_options: vec![],
-                    data: None,
-                    contract: None,
-                    offline_time_sponsor: None,
-                    is_test: None
-                }),
-            },
+            transaction: tx,
             utxos: vec![],
             used_utxos: vec![],
         }

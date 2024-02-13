@@ -202,6 +202,10 @@ pub struct NodeConfig {
 impl NodeConfig {
 
 
+    pub fn seeds_pk(&self) -> Vec<structs::PublicKey> {
+        self.seeds.iter().flat_map(|s| s.public_key.clone()).collect()
+    }
+
     pub fn secure_or(&self) -> &DataFolder {
         match &self.secure_data_folder {
             Some(folder) => folder,

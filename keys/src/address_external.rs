@@ -1,16 +1,15 @@
 use std::str::FromStr;
 use bitcoin::{Address, Network};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey};
+use redgold_schema::structs::{AddressType, ErrorInfo, NetworkEnvironment, PublicKey};
 use bitcoin::util::key;
 use hex::ToHex;
 // use web3::types::H160;
-use redgold_schema::ErrorInfoContext;
+use redgold_schema::{ErrorInfoContext, SafeBytesAccess, structs};
 use sha3::{Digest, Keccak256};
 use crate::util::ToPublicKey;
 
 pub trait ToBitcoinAddress {
-    fn to_bitcoin_address(&self) -> Result<String, ErrorInfo>;
-    fn to_bitcoin_address_network(&self, network: NetworkEnvironment) -> Result<String, ErrorInfo>;
+    fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo>;
 }
 
 pub trait ToEthereumAddress {
@@ -19,20 +18,27 @@ pub trait ToEthereumAddress {
 
 
 impl ToBitcoinAddress for PublicKey {
-    fn to_bitcoin_address(&self) -> Result<String, ErrorInfo> {
+    fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo> {
+
         let pk = &key::PublicKey::from_slice(&self.bytes()?).error_info("public key conversion")?;
-        let address = Address::p2wpkh(pk, Network::Bitcoin);
-        Ok(address.to_string())
-    }
-    fn to_bitcoin_address_network(&self, network: NetworkEnvironment) -> Result<String, ErrorInfo> {
-        let pk = &key::PublicKey::from_slice(&self.bytes()?).error_info("public key conversion")?;
-        let network1 = if network == NetworkEnvironment::Main {
+        let network1 = if network == &NetworkEnvironment::Main {
             Network::Bitcoin
         } else {
             Network::Testnet
         };
         let address = Address::p2wpkh(pk, network1);
         Ok(address.to_string())
+    }
+
+}
+
+impl ToBitcoinAddress for structs::Address {
+    fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo> {
+        if self.is_bitcoin() {
+            self.render_string()
+        } else {
+            Err(ErrorInfo::new("Address is not a bitcoin address"))
+        }
     }
 
 }

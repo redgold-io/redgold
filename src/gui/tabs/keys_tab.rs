@@ -11,6 +11,7 @@ use crate::gui::tables::text_table;
 use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
 use crate::util;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_schema::structs::NetworkEnvironment;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
@@ -89,8 +90,8 @@ impl MnemonicWindowState {
         let w = MnemonicWords::from_mnemonic_words(
             &*self.words.clone(), passphrase.clone()
         );
-        self.bitcoin_p2wpkh_44 = w.btc_key_44_0().public_key.to_struct_public_key().to_bitcoin_address().unwrap();
-        self.bitcoin_p2wpkh_84 = w.btc_key_84_0().public_key.to_struct_public_key().to_bitcoin_address().unwrap();
+        self.bitcoin_p2wpkh_44 = w.btc_key_44_0().public_key.to_struct_public_key().to_bitcoin_address(&NetworkEnvironment::Main).unwrap();
+        self.bitcoin_p2wpkh_84 = w.btc_key_84_0().public_key.to_struct_public_key().to_bitcoin_address(&NetworkEnvironment::Main).unwrap();
         self.ethereum_address_44 = w.eth_key_44_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
         self.ethereum_address_84 = w.eth_key_84_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
         self.words_checksum = w.words_checksum().unwrap();

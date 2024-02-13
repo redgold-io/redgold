@@ -372,7 +372,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
 
     ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
     if ls.wallet_state.show_btc_info {
-        data_item(ui, "BTC Address", pk.to_bitcoin_address_network(ls.node_config.network.clone()).unwrap_or("".to_string()));
+        data_item(ui, "BTC Address", pk.to_bitcoin_address(&ls.node_config.network).unwrap_or("".to_string()));
     }
 
     send_receive_bar(ui, ls, pk);

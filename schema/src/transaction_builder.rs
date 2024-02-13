@@ -77,6 +77,12 @@ impl TransactionBuilder {
         self.utxos.push(entry);
         Ok(self)
     }
+    pub fn with_utxos(&mut self, utxo_entry: &Vec<UtxoEntry>) -> Result<&mut Self, ErrorInfo> {
+        for x in utxo_entry {
+            self.with_utxo(x)?;
+        }
+        Ok(self)
+    }
 
     pub fn with_maybe_currency_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let o = utxo_entry.output.safe_get_msg("Missing output")?;
@@ -166,6 +172,17 @@ impl TransactionBuilder {
         }
         self
     }
+    pub fn with_last_output_withdrawal_swap(&mut self) -> &mut Self {
+        if let Some(o) = self.transaction.outputs.last_mut() {
+            let mut oc = OutputContract::default();
+            oc.standard_contract_type = Some(crate::structs::StandardContractType::Swap as i32);
+            o.contract = Some(oc);
+            assert!(o.is_swap())
+        }
+        self
+    }
+
+
     pub fn with_stake(&mut self, lower: f64, upper: f64, address: &Address) -> &mut Self {
         let mut o = Output::default();
         o.address = Some(address.clone());

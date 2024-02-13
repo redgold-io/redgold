@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest, NetworkEnvironment, ExternalTransactionId};
 use crate::utxo_id::OldUtxoId;
-use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable, WithMetadataHashableFields};
+use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, struct_metadata_new, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
+use rand::Rng;
 use crate::transaction_builder::TransactionBuilder;
 
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
@@ -107,6 +108,16 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn new_blank() -> Self {
+        let mut rng = rand::thread_rng();
+        let mut tx = Self::default();
+        tx.struct_metadata = struct_metadata_new();
+
+        let mut opts = TransactionOptions::default();
+        opts.salt = Some(rng.gen::<i64>());
+        tx.options = Some(opts);
+        tx
+    }
     pub fn is_test(&self) -> bool {
         self.options.as_ref().and_then(|o| o.is_test).unwrap_or(false)
     }
@@ -233,6 +244,13 @@ impl Transaction {
             })
             .collect()
     }
+    pub fn first_output_external_txid(&self) -> Option<&ExternalTransactionId> {
+        self.outputs
+            .iter()
+            .filter_map(|o| o.data.as_ref())
+            .filter_map(|d| d.external_transaction_id.as_ref())
+            .next()
+    }
 
     pub fn output_amount_of(&self, address: &Address) -> i64 {
         self.outputs
@@ -269,6 +287,10 @@ impl Transaction {
                     None
                 }
             }).sum::<i64>()
+    }
+
+    pub fn has_swap_to(&self, address: &Address) -> bool {
+        self.output_swap_amount_of(address) > 0
     }
 
     pub fn output_bitcoin_address_of(&self, address: &Address) -> Option<&Address> {
