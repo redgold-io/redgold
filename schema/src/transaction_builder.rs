@@ -79,7 +79,7 @@ impl TransactionBuilder {
     }
     pub fn with_utxos(&mut self, utxo_entry: &Vec<UtxoEntry>) -> Result<&mut Self, ErrorInfo> {
         for x in utxo_entry {
-            self.with_utxo(x)?;
+            self.with_maybe_currency_utxo(x)?;
         }
         Ok(self)
     }

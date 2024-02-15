@@ -12,6 +12,7 @@ use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::multiparty::initiate_mp::default_room_id_signing;
+use crate::multiparty::watcher::DepositWatcherConfig;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
@@ -340,7 +341,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let start_node = local_nodes.start();
     // info!("Started initial node");
     let client1 = start_node.control_client.clone();
-    // let ds = start_node.node.relay.ds.clone();
+    let ds = start_node.node.relay.ds.clone();
     // let show_balances = || {
     //     let res = &ds.query_all_balance();
     //     let res2 = res.as_ref().unwrap();
@@ -497,6 +498,23 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     do_signing(keygen2).await;
 
     // TODO: AMM tests
+
+    // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
+    // ETH support.
+    // let ds = start_node.node.relay.ds.clone();
+    //
+    // let mut loaded = false;
+    // for _ in 0..10 {
+    //     let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
+    //     if let Ok(Some(t)) = test_load {
+    //         info!("Deposit watcher config: {}", t.json_or());
+    //         loaded = true;
+    //         break;
+    //     }
+    //     tokio::time::sleep(Duration::from_secs(2)).await;
+    // }
+    // assert!(loaded);
+
 
 
     std::mem::forget(local_nodes);
