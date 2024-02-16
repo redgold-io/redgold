@@ -17,6 +17,7 @@ use redgold_schema::transaction_builder::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::seeds::get_seeds_by_env;
 use crate::api::public_api::PublicClient;
 use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
@@ -201,6 +202,9 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
+    pub fn seeds_at(&self, time: i64) -> Vec<Seed> {
+        get_seeds_by_env(&self.network, time)
+    }
 
     pub fn seeds_pk(&self) -> Vec<structs::PublicKey> {
         self.seeds.iter().flat_map(|s| s.public_key.clone()).collect()
