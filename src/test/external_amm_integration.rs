@@ -8,7 +8,7 @@ use crate::node_config::NodeConfig;
 
 
 // Use this for testing AMM transactions.
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn load_ci_kp() {
 
@@ -31,43 +31,43 @@ pub async fn load_ci_kp() {
 
         let rdg_address = pk.address().expect("");
         println!("pk: {}", rdg_address.render_string().expect(""));
-
-        let client = NodeConfig::dev_default().await.api_client();
-        // client.faucet(&rdg_address).await.expect("faucet");
-        let result = client.query_address(vec![rdg_address]).await.expect("").as_error().expect("");
-        let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
-            .utxo_entries.clone();
-
-        let amount = CurrencyAmount::from_fractional(0.01).expect("");
-        let tb = TransactionBuilder::new()
-            .with_utxos(&utxos).expect("utxos")
-            .with_output(&dev_amm_rdg_address, &amount)
-            .with_last_output_withdrawal_swap()
-            .build().expect("build")
-            .sign(&keypair).expect("sign");
-
-        let res = client.send_transaction(&tb, true).await.expect("send").json_or();
-
-        println!("send: {}", res);
+        //
+        // let client = NodeConfig::dev_default().await.api_client();
+        // // client.faucet(&rdg_address).await.expect("faucet");
+        // let result = client.query_address(vec![rdg_address]).await.expect("").as_error().expect("");
+        // let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
+        //     .utxo_entries.clone();
+        //
+        // let amount = CurrencyAmount::from_fractional(0.01).expect("");
+        // let tb = TransactionBuilder::new()
+        //     .with_utxos(&utxos).expect("utxos")
+        //     .with_output(&dev_amm_rdg_address, &amount)
+        //     .with_last_output_withdrawal_swap()
+        //     .build().expect("build")
+        //     .sign(&keypair).expect("sign");
+        //
+        // let res = client.send_transaction(&tb, true).await.expect("send").json_or();
+        //
+        // println!("send: {}", res);
 
         // let res = NodeConfig::dev_default().await.api_client().faucet(&rdg_address).await.expect("faucet");
 
         // println!("faucet: {}", res.json_or());
-        // let mut w =
-        //     SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true)
-        //         .expect("w");
-        // let a = w.address().expect("a");
-        // // tb1qrxdzt6v9yuu567j52cmla4v9kler3wzj9swxy9
-        // println!("wallet address: {a}");
-        // let b = w.get_wallet_balance().expect("balance");
-        // println!("wallet balance: {b}");
-        //
-        // let res = w.send_local(dev_amm_address, 2222, privk).expect("send");
-        // println!("txid: {res}");
+        let mut w =
+            SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true)
+                .expect("w");
+        let a = w.address().expect("a");
+        // tb1qrxdzt6v9yuu567j52cmla4v9kler3wzj9swxy9
+        println!("wallet address: {a}");
+        let b = w.get_wallet_balance().expect("balance");
+        println!("wallet balance: {b}");
+
+        let res = w.send_local(dev_amm_address, 2345, privk).expect("send");
+        println!("txid: {res}");
     }
 }
 
-#[ignore]
+// #[ignore]
 #[test]
 pub fn dev_balance_check() {
 

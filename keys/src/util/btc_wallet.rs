@@ -224,11 +224,28 @@ pub struct RawTransaction {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExternalTimedTransaction {
     pub tx_id: String,
-    pub timestamp: u64,
+    pub timestamp: Option<u64>,
     pub other_address: String,
     pub amount: u64,
     pub incoming: bool,
     pub currency: SupportedCurrency,
+}
+
+impl ExternalTimedTransaction {
+    pub fn confirmed(&self) -> bool {
+        self.timestamp.is_some()
+    }
+
+    pub fn other_address_typed(&self) -> RgResult<structs::Address> {
+        // TODO: Move to keys util to validate the address
+        if self.currency == SupportedCurrency::Bitcoin {
+            let destination_address = structs::Address::from_bitcoin(&self.other_address);
+            Ok(destination_address)
+        } else {
+            Err(error_info("Unsupported currency".to_string()))
+        }
+    }
+
 }
 
 
@@ -396,7 +413,7 @@ impl SingleKeyBitcoinWallet {
 
                 let ett = ExternalTimedTransaction {
                     tx_id: x.txid.to_string(),
-                    timestamp: c.timestamp,
+                    timestamp: Some(c.timestamp),
                     other_address: a,
                     amount: value,
                     incoming: true,
@@ -465,11 +482,13 @@ impl SingleKeyBitcoinWallet {
                 output_amounts.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| y.clone())
             };
 
-            if let (Some(c), Some(a), Some(value)) = (x.confirmation_time.clone(), other_address, amount) {
+            let block_timestamp = x.confirmation_time.clone().map(|x| x.timestamp);
+
+            if let (Some(a), Some(value)) = (other_address, amount) {
 
                 let ett = ExternalTimedTransaction {
                     tx_id: x.txid.to_string(),
-                    timestamp: c.timestamp,
+                    timestamp: block_timestamp,
                     other_address: a,
                     amount: value,
                     incoming,

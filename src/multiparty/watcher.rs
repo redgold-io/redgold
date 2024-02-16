@@ -6,7 +6,7 @@ use itertools::{Itertools, max, min};
 use log::{error, info};
 
 use redgold_schema::{bytes_data, EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit, UtxoEntry, Observation, ObservationMetadata, ObservationProof, ValidationLiveness};
+use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit, UtxoEntry, Observation, ObservationMetadata, ObservationProof, ValidationLiveness, ExternalTransactionId};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
@@ -22,8 +22,10 @@ use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::seeds::get_seeds_by_env;
+use crate::multiparty::party_stream::PartyEvents;
 use crate::node_config::NodeConfig;
 use crate::scrape::coinbase_btc_spot_latest;
+use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::RgArgs;
 use crate::util::{current_time_millis, current_time_millis_i64};
@@ -307,7 +309,10 @@ pub struct OrderFulfillment {
     pub order_amount: u64,
     pub fulfilled_amount: u64,
     pub updated_curve: Vec<PriceVolume>,
-    pub is_ask: bool
+    pub is_ask: bool,
+    pub event_time: i64,
+    pub tx_id_ref: Option<ExternalTransactionId>,
+    pub destination: Address
 }
 
 impl OrderFulfillment {
@@ -320,6 +325,26 @@ impl OrderFulfillment {
         let fraction = self.fulfilled_amount as f64 / total as f64;
         fraction
     }
+
+    pub fn fulfilled_currency_amount(&self) -> CurrencyAmount {
+        CurrencyAmount::from(self.fulfilled_amount as i64)
+    }
+
+
+    pub async fn build_rdg_ask_swap_tx(
+        &self,
+        utxos: Vec<UtxoEntry>
+    )
+        -> RgResult<Transaction> {
+        let mut tb = TransactionBuilder::new();
+        tb.with_utxos(&utxos)?;
+        let destination_amount = self.fulfilled_currency_amount();
+        tb.with_output(&self.destination, &destination_amount);
+        let option = self.tx_id_ref.safe_get_msg("Missing tx_id")?.clone();
+        tb.with_last_output_deposit_swap(option.identifier);
+        tb.build()
+    }
+
 }
 
 
@@ -337,7 +362,7 @@ impl BidAsk {
         self.bids.retain(|v| v.volume > 0);
         self.asks.retain(|v| v.volume > 0);
     }
-    pub fn fulfill_taker_order(&self, order_amount: u64, is_ask: bool) -> Option<OrderFulfillment> {
+    pub fn fulfill_taker_order(&self, order_amount: u64, is_ask: bool, event_time: i64, tx_id: Option<String>) -> Option<OrderFulfillment> {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
         let mut updated_curve = if is_ask {
@@ -386,6 +411,9 @@ impl BidAsk {
                 fulfilled_amount,
                 updated_curve,
                 is_ask,
+                event_time,
+                tx_id_ref: tx_id.map(|id| ExternalTransactionId{ identifier: id }),
+                destination: Default::default(),
             })
         }
     }
@@ -398,7 +426,6 @@ pub struct DepositWatcherConfig {
     pub bid_ask: BidAsk,
     pub last_btc_timestamp: u64,
     pub ask_bid_code_reset: Option<bool>,
-    pub min_ask: Option<f64>
 }
 
 
@@ -519,11 +546,16 @@ impl DepositWatcher {
         sourced_tx.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
         let mut res = vec![];
         for tx in sourced_tx.iter() {
-            if tx.timestamp <= last_timestamp {
-                continue;
-            }
-            if tx.timestamp > max_ts {
-                max_ts = tx.timestamp;
+            if let Some(ts) = tx.timestamp {
+                if ts <= last_timestamp {
+                    continue;
+                }
+                if ts > max_ts {
+                    max_ts = ts;
+                }
+                res.push(tx.clone());
+            } else {
+                continue
             }
             let used = self.relay.ds.multiparty_store.check_bridge_txid_used(&from_hex(tx.tx_id.clone())?).await?;
             if used {
@@ -559,16 +591,20 @@ impl DepositWatcher {
         for tx in btc_deposits.iter() {
             let destination = tx.other_address.clone();
             let destination_address = structs::Address::from_bitcoin(&destination);
-            if let Some(ask_fulfillment) = bid_ask_latest.fulfill_taker_order(tx.amount, true) {
-                let destination_amount = ask_fulfillment.fulfilled_amount;
+            if let Some(timestamp) = tx.timestamp {
+                if let Some(ask_fulfillment) = bid_ask_latest.fulfill_taker_order(
+                    tx.amount, true, timestamp as i64, Some(tx.tx_id.clone())
+                ) {
+                    let destination_amount = ask_fulfillment.fulfilled_amount;
 
-                tb.with_output(&destination_address,
-                               &CurrencyAmount::from(destination_amount as i64)
-                );
-                tb.with_last_output_deposit_swap(tx.tx_id.clone());
+                    tb.with_output(&destination_address,
+                                   &CurrencyAmount::from(destination_amount as i64)
+                    );
+                    tb.with_last_output_deposit_swap(tx.tx_id.clone());
 
-                let price = ask_fulfillment.fulfillment_price() * 1.01;
-                bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
+                    let price = ask_fulfillment.fulfillment_price() * 1.01;
+                    bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
+                }
             }
 
         }
@@ -674,7 +710,7 @@ impl DepositWatcher {
 
                 if amount_rdg > 0 && opt_btc_addr.is_some() {
 
-                    if let Some(fulfillment) = bid_ask_latest.fulfill_taker_order(amount_rdg as u64, false) {
+                    if let Some(fulfillment) = bid_ask_latest.fulfill_taker_order(amount_rdg as u64, false, t.time()?.clone(), None) {
                         btc_outputs.push((destination_address_string_btc.clone(), fulfillment.fulfilled_amount));
                         tx_res.push(t.clone());
                         // In case of failure or error, we need to keep track of the last price that was used so
@@ -695,6 +731,101 @@ impl DepositWatcher {
             updated_bidask: bid_ask_latest,
             used_tx: tx_res,
         })
+    }
+
+
+    pub async fn process_requests_new(
+        &mut self,
+        alloc: &DepositKeyAllocation,
+        bid_ask_original: BidAsk,
+        last_timestamp: u64,
+        w: &Arc<Mutex<SingleKeyBitcoinWallet>>,
+    ) -> Result<CurveUpdateResult, ErrorInfo> {
+
+        let key = &alloc.key;
+        let key_address = key.address()?;
+        let ps = PartyEvents::historical_initialize(&key, &self.relay, w).await?;
+        let orders = ps.orders();
+        let cutoff_time = current_time_millis_i64() - 30_000; //
+        let identifier = alloc.initiate.identifier.safe_get().cloned()?;
+
+
+        let btc_starting_balance = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+            .get_wallet_balance()?.confirmed;
+
+        let environment = self.relay.node_config.network.clone();
+        let btc_address = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+            .public_key.to_bitcoin_address(&environment)?;
+
+        let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
+        let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
+
+
+        let num_events = ps.events.len();
+        let num_unconfirmed = ps.unconfirmed_events.len();
+        let num_unfulfilled_deposits = ps.unfulfilled_deposits.len();
+        let num_unfulfilled_withdrawals = ps.unfulfilled_withdrawals.len();
+        let utxos = self.relay.ds.transaction_store.query_utxo_address(&key_address).await?;
+
+        info!("Starting watcher process request with balances: RDG:{}, BTC:{} \
+         BTC_address: {} environment: {} orders {} num_events: {} num_unconfirmed {} num_un_deposit {} \
+         num_un_withdrawls {} num_utxos: {} \
+         bid_ask: {}",
+            rdg_starting_balance, btc_starting_balance, btc_address, environment.to_std_string(),
+            orders.len(),
+            num_events, num_unconfirmed, num_unfulfilled_deposits, num_unfulfilled_withdrawals,
+            utxos.len(),
+            ps.bid_ask.json_or()
+        );
+
+
+        // let (asks, bids) = orders.iter()
+        //     .filter(|e| e.event_time < cutoff_time)
+        //     .partition(|o| o.is_ask).collect::<(Vec<OrderFulfillment>, Vec<OrderFulfillment>)>();
+        // TODO: Change this to support batches -- might need some consideration around ids and utxos later
+        // when calculating the receipts?
+
+
+        for o in orders.iter() {
+            if o.event_time < cutoff_time {
+                if o.is_ask {
+                    let tx = o.build_rdg_ask_swap_tx(utxos.clone()).await?;
+                    self.send_ask_fulfillment_transaction(&mut tx.clone(), identifier.clone()).await?;
+                } else {
+                    let btc = o.destination.to_bitcoin_address(&self.relay.node_config.network)?;
+                    let amount = o.fulfilled_amount;
+                    let outputs = vec![(btc, amount)];
+                    self.fulfill_btc_bids(w, identifier.clone(), outputs).await?;
+                }
+            }
+        }
+        let mut alloc2 = alloc.clone();
+        alloc2.balance_btc = btc_starting_balance;
+        alloc2.balance_rdg = rdg_starting_balance as u64;
+
+        let cur = CurveUpdateResult {
+            updated_bid_ask: ps.bid_ask.clone(),
+            updated_btc_timestamp: last_timestamp,
+            updated_allocation: alloc2.clone()
+        };
+
+        // asks.iter().chunks(10).for_each(|chunk| {
+        //     let mut txs = vec![];
+        //     let mut bid_ask_latest = bid_ask_original.clone();
+        //     for ask in chunk {
+        //         let mut tx = ask.build_rdg_ask_swap_tx(ps.utxos.clone());
+        //         if let Some(tx) = tx {
+        //             self.send_ask_fulfillment_transaction(&mut tx.clone(), alloc.initiate.identifier.clone()).await?;
+        //         }
+        //         let updated_bid_ask = bid_ask_latest.clone();
+        //         bid_ask_latest = ask.updated_curve.clone();
+        //         txs.push(tx);
+        //     }
+        // });
+
+        Ok(cur)
     }
 
 
@@ -768,13 +899,6 @@ impl DepositWatcher {
             bid_ask_original
         };
 
-
-
-        info!("Starting watcher process request with balances: RDG:{}, BTC:{} \
-         BTC_address: {} environment: {} \
-         bid_ask: {}",
-            rdg_starting_balance, btc_starting_balance, btc_address, environment.to_std_string(), bid_ask.json_or()
-        );
 
 
         let mut bid_ask_latest = bid_ask.clone();
@@ -885,24 +1009,11 @@ impl DepositWatcher {
                     bid_ask: new_bid_ask,
                     last_btc_timestamp: 0,
                     ask_bid_code_reset: None,
-                    min_ask: None,
                 };
                 ds.config_store.insert_update_json("deposit_watcher_config", new_cfg).await?;
                 info!("Updated broken deposit watcher config");
             };
         }
-        //
-        // if let Ok(Some(l)) = test_load {
-        //     let jsl = l.json_or();
-        //
-        //     if l.bid_ask.asks.is_empty() || l.bid_ask.center_price == 0.0f64 {
-        //         // BidAsk::generate_default()
-        //         // let mut new_cfg = l.clone();
-        //         // new_cfg.bid_ask = new_bid_ask;
-        //         // ds.config_store.insert_update_json("deposit_watcher_config", new_cfg).await?;
-        //         // info!("Error found in historical deposit watcher config, updating old config of {jsl} to new");
-        //     }
-        // }
         Ok(())
     }
 
@@ -920,9 +1031,6 @@ impl IntervalFold for DepositWatcher {
         if self.relay.node_config.is_local_debug() {
             return Ok(())
         }
-
-        let usd_btc = coinbase_btc_spot_latest().await.log_error().and_then(|t| t.usd_btc())
-            .unwrap_or(39000.0f64);
 
         let ds = self.relay.ds.clone();
         // TODO: Change to query to include trust information re: deposit score
@@ -978,7 +1086,7 @@ impl IntervalFold for DepositWatcher {
                             cfg.ask_bid_code_reset = Some(!reset_condition);
                             ds.config_store.insert_update_json("deposit_watcher_config", cfg.clone()).await?;
                         }
-                        let update_result = self.process_requests(
+                        let update_result = self.process_requests_new(
                             d, cfg.bid_ask.clone(), cfg.last_btc_timestamp, &w
                         ).await;
                         if let Ok(update_result) = &update_result {
@@ -1045,7 +1153,6 @@ impl IntervalFold for DepositWatcher {
                         bid_ask: BidAsk { bids: vec![], asks: vec![], center_price: Self::get_starting_center_price_rdg_btc_fallback().await },
                         last_btc_timestamp: 0,
                         ask_bid_code_reset: None,
-                        min_ask: None,
                     };
                     self.genesis_funding(&pk.address()?)
                         .await.add("Genesis watcher funding error").log_error().ok();
@@ -1171,14 +1278,14 @@ async fn debug_local() {
 
 
     // println!("bids: {p}");
-    let ask_fulfillment = ba.fulfill_taker_order(3500, true).expect("works");
+    let ask_fulfillment = ba.fulfill_taker_order(3500, true, util::current_time_millis_i64(), None).expect("works");
     let afj = ask_fulfillment.fulfilled_amount.json_pretty_or();
 
 
     println!("fullfilled: {afj}");
     println!("fulfilled price: {}", ask_fulfillment.fulfillment_price());
 
-    let bid_fulfillment = ba.fulfill_taker_order((2000f64*center_price) as u64, false).expect("works");
+    let bid_fulfillment = ba.fulfill_taker_order((2000f64*center_price) as u64, false, util::current_time_millis_i64(), None).expect("works");
 
     let bfj = bid_fulfillment.fulfilled_amount.json_pretty_or();
     println!("fullfilled: {bfj}");
