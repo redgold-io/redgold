@@ -4,20 +4,21 @@ use bitcoin_wallet::account::MasterKeyEntropy;
 use bitcoin_wallet::mnemonic::Mnemonic;
 use log::info;
 use rocket::form::FromForm;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey, CurrencyAmount};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
 use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
 use redgold_schema::servers::Server;
 use redgold_schema::transaction::rounded_balance_i64;
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use redgold_schema::EasyJson;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::infra::deploy::default_deploy;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {

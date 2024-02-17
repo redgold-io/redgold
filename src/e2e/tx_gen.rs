@@ -1,15 +1,14 @@
-use log::info;
 use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, ErrorInfo, UtxoId, TestContractRequest, CurrencyAmount};
+use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, TestContractRequest};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::mnemonic_words::MnemonicWords;
-use redgold_schema::EasyJson;
+use crate::core::transact::tx_builder_supports::{TransactionBuilderSupport, TransactionHelpBuildSupport};
 
 #[derive(Clone)]
 pub struct SpendableUTXO {

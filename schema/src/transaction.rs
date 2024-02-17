@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
@@ -7,7 +7,6 @@ use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, struct_metadata_new, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use rand::Rng;
-use crate::transaction_builder::TransactionBuilder;
 
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
 
@@ -244,6 +243,31 @@ impl Transaction {
             })
             .collect()
     }
+
+    pub fn output_amount_map<'a>(&'a self) -> HashMap<&'a Address, i64> {
+        self.outputs
+            .iter()
+            .filter_map(|o| {
+                // Now working entirely with references, avoiding cloning.
+                // This assumes `o.address` is an Option<&Address> and `o.opt_amount()`
+                // returns an Option<i64>.
+                o.address.as_ref().and_then(|ad| o.opt_amount().map(|a| (ad, a)))
+            })
+            .fold(HashMap::new(), |mut acc: HashMap<&'a Address, i64>, (ad, a)| {
+                *acc.entry(&ad).or_insert(0) += a;
+                acc
+            })
+    }
+
+    pub fn non_remainder_amount(&self) -> i64 {
+        let inputs = self.input_address_set();
+        self.outputs.iter().filter_map(|o| {
+            o.address.as_ref()
+                .filter(|&a| !inputs.contains(a))
+                .and_then(|_| o.opt_amount())}
+        ).sum::<i64>()
+    }
+
     pub fn first_output_external_txid(&self) -> Option<&ExternalTransactionId> {
         self.outputs
             .iter()
@@ -503,6 +527,10 @@ impl Transaction {
 
     pub fn input_addresses(&self) -> Vec<Address> {
         self.inputs.iter().filter_map(|o| o.address().ok()).collect_vec()
+    }
+
+    pub fn input_address_set(&self) -> HashSet<Address> {
+        self.inputs.iter().filter_map(|o| o.address().ok()).collect()
     }
 
     pub fn first_input_address(&self) -> Option<Address> {

@@ -15,7 +15,7 @@ use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -163,6 +163,19 @@ impl RgHttpClient {
         req.resolve_code_request = Some(address.clone());
         let response = self.proto_post_request(&mut req, None).await?;
         Ok(response.resolve_code_response.ok_or(error_info("Missing resolve code response"))?)
+    }
+
+
+    #[allow(dead_code)]
+    pub async fn query_hash(
+        &self,
+        input: String,
+    ) -> Result<HashSearchResponse, ErrorInfo> {
+        let mut request = Request::default();
+        request.hash_search_request = Some(HashSearchRequest {
+            search_string: input
+        });
+        Ok(self.proto_post_request(&mut request, None).await?.hash_search_response.safe_get()?.clone())
     }
 
 }

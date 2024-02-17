@@ -16,21 +16,21 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
 
 use redgold_keys::proof_support::ProofSupport;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
-use redgold_schema::{SafeBytesAccess, SafeOption, struct_metadata_new, WithMetadataHashable};
+use redgold_keys::transaction_support::TransactionSupport;
+use redgold_schema::{SafeBytesAccess, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::structs::{Hash, ObservationProof, Transaction};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::schema::json;
-use crate::schema::structs::{Observation, ObservationMetadata, Proof};
+use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;
 use crate::schema::structs::Request;
-use crate::util::random_salt;
 
 const ANCESTOR_MERKLE_ROOT_LENGTH: usize = 1000;
 

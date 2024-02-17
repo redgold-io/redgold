@@ -16,6 +16,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
 
     let mut addr = None;
 
+    // TODO: Move to unified parser function.
     if let Ok(_a) = SingleKeyBitcoinWallet::parse_address(&hash_input) {
         addr = Some(Address::from_bitcoin(&hash_input));
     } else if let Ok(a) = Address::parse(hash_input.clone()) {

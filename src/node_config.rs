@@ -3,27 +3,27 @@ use std::hash::Hash;
 use redgold_data::data_store::DataStore;
 use crate::genesis;
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
-use redgold_schema::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, default_node_internal_derivation_path, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
+use redgold_schema::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 use std::path::PathBuf;
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::servers::Server;
 use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerMetadata, PeerId, Seed, TransportInfo, TrustData, VersionInfo};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerId, PeerMetadata, Seed, TransportInfo, TrustData, VersionInfo};
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::seeds::get_seeds_by_env;
+use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
 use crate::api::public_api::PublicClient;
 use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
-use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::JsonCombineResult;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::logging::Loggable;
 
@@ -203,7 +203,7 @@ pub struct NodeConfig {
 impl NodeConfig {
 
     pub fn seeds_at(&self, time: i64) -> Vec<Seed> {
-        get_seeds_by_env(&self.network, time)
+        get_seeds_by_env_time(&self.network, time)
     }
 
     pub fn seeds_pk(&self) -> Vec<structs::PublicKey> {

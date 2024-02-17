@@ -5,14 +5,14 @@ use crate::schema::output::output_data;
 use crate::schema::structs::{Block, Output, Transaction, UtxoEntry};
 use crate::schema::transaction::amount_data;
 use redgold_keys::TestConstants;
-use redgold_keys::transaction_support::TransactionBuilderSupport;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::schema::{struct_metadata, WithMetadataHashable};
 use redgold_schema::{constants, ProtoHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY, REDGOLD_PURPOSE, REWARD_AMOUNT};
 use redgold_schema::output::tx_output_data;
 use redgold_schema::structs::{Address, BlockMetadata, CurrencyAmount, NetworkEnvironment, PublicKey, Seed};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::node_config::NodeConfig;
 
 pub struct GenesisDistribution{

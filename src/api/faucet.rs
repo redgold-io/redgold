@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use log::info;
 use redgold_keys::KeyPair;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
-use redgold_schema::{error_info, SafeOption, WithMetadataHashable};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, CurrencyAmount};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use redgold_keys::transaction_support::TransactionSupport;
+use redgold_schema::{error_info, SafeOption};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetResponse};
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::relay::Relay;
 use redgold_schema::EasyJson;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 //
 // async fn faucet_request_old(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {

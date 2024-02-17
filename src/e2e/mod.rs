@@ -9,18 +9,19 @@ use metrics::{counter, gauge};
 use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::{RgResult, SafeOption};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo};
-use redgold_schema::structs::{Address, ErrorInfo, SubmitTransactionRequest, Transaction, CurrencyAmount};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, SubmitTransactionRequest, Transaction};
 use crate::core::relay::Relay;
 use tokio_stream::StreamExt;
 use redgold_keys::KeyPair;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
 use redgold_schema::EasyJson;
 use redgold_schema::transaction::amount_to_raw_amount;
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::logging::Loggable;
 // i think this is the one currently in use?
 

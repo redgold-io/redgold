@@ -6,13 +6,14 @@ use std::time::Duration;
 // use filepath::FilePath;
 use itertools::Itertools;
 
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, structs, WithMetadataHashable};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, TrustRatingLabel, VersionInfo, Transaction};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;

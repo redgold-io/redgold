@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use eframe::egui::{ComboBox, Context, Ui};
 use itertools::Itertools;
-use redgold_keys::transaction_support::TransactionBuilderSupport;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{EasyJson, error_info, RgResult, SafeOption};
 use redgold_schema::local_stored_state::{Identity, NamedXpub};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{PeerMetadata, PublicKey, Transaction};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::gui::app_loop::{LocalState, PublicKeyStoredState};
 use crate::gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
 use crate::gui::wallet_tab::StateUpdate;
