@@ -743,15 +743,16 @@ impl DepositWatcher {
 
         let key = &alloc.key;
         let key_address = key.address()?;
+
+        let btc_starting_balance = w.lock()
+            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+            .get_wallet_balance()?.confirmed;
+
         let ps = PartyEvents::historical_initialize(&key, &self.relay, w).await?;
         let orders = ps.orders();
         let cutoff_time = current_time_millis_i64() - 30_000; //
         let identifier = alloc.initiate.identifier.safe_get().cloned()?;
 
-
-        let btc_starting_balance = w.lock()
-            .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
-            .get_wallet_balance()?.confirmed;
 
         let environment = self.relay.node_config.network.clone();
         let btc_address = w.lock()
@@ -1025,7 +1026,7 @@ impl IntervalFold for DepositWatcher {
     #[tracing::instrument(skip(self))]
     async fn interval_fold(&mut self) -> RgResult<()> {
 
-        info!("Deposit watcher interval fold complete");
+        // info!("Deposit watcher interval fold complete");
 
         if self.relay.node_config.is_local_debug() {
             return Ok(())
@@ -1062,7 +1063,7 @@ impl IntervalFold for DepositWatcher {
             // Also check bitcoin transaction balances? Find the address they came from.
             // we'll need a guide saying to send from a single account
             if let Some(d) = cfg.deposit_allocations.get(0) {
-                info!("Watcher checking deposit allocation pubkey hex: {}", d.key.hex()?);
+                // info!("Watcher checking deposit allocation pubkey hex: {}", d.key.hex()?);
                 if self.wallet.get(0).is_none() {
                     let key = &d.key;
                     let w = SingleKeyBitcoinWallet::new_wallet(key.clone(), self.relay.node_config.network, true)?;

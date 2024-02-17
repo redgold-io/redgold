@@ -3,7 +3,7 @@ use std::ops::Add;
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use itertools::Itertools;
-use log::error;
+use log::{error, info};
 use rocket::serde::{Deserialize, Serialize};
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::transaction_support::TransactionSupport;
@@ -16,7 +16,7 @@ use crate::core::relay::Relay;
 use crate::multiparty::watcher::{BidAsk, DepositWatcher, get_btc_per_rdg_starting_min_ask, OrderFulfillment};
 use crate::node_config::NodeConfig;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransactionWithObservations {
     tx: Transaction,
     observations: Vec<ObservationProof>
@@ -133,6 +133,7 @@ impl PartyEvents {
                     // Balance / price adjustment event
 
                     let fulfillment = self.bid_ask.fulfill_taker_order(t.amount, true, time, Some(t.tx_id.clone()));
+                    info!("Incoming BTC tx {} Fulfillment: {}", t.json_or(), fulfillment.json_or());
                     if let Some(fulfillment) = fulfillment {
                         event_fulfillment = Some(fulfillment.clone());
                         let pair = (fulfillment, ec.clone());
@@ -146,6 +147,8 @@ impl PartyEvents {
                         Self::retain_unfulfilled_withdrawals(&t, d, &self.party_public_key, &self.relay.node_config.network)
                     });
                     self.remove_unconfirmed_event(&e);
+                    info!("Outgoing BTC tx {}", t.json_or());
+
                 }
                 let delta = (t.amount as i64) * balance_sign;
                 let new_balance = balance + delta;
@@ -204,6 +207,9 @@ impl PartyEvents {
         self.bid_ask = BidAsk::generate_default(
             balance, pair_balance, new_price, min_ask
         );
+
+        info!("New bid ask: {}", self.bid_ask.json_or());
+        info!("New balances: {}", self.balance_map.json_or());
         self.price = new_price;
         Ok(())
     }
@@ -271,6 +277,9 @@ impl PartyEvents {
 
         n.events = res.clone();
 
+        info!("Watcher Processing {} events", res.len());
+        info!("Watcher Processing events {}", res.json_or());
+
         for e in &res {
             n.process_event(e).await?;
         }
@@ -315,7 +324,7 @@ impl PartyEvents {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum AddressEvent {
     External(ExternalTimedTransaction),
     Internal(TransactionWithObservations)
@@ -387,7 +396,7 @@ impl AllTxObsForAddress for RgHttpClient {
     }
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn debug_event_stream() {
     debug_events().await.unwrap();
@@ -400,50 +409,52 @@ async fn debug_events() -> RgResult<()> {
 
     let relay = Relay::dev_default().await;
 
-    let historical_start_price = get_btc_per_rdg_starting_min_ask(0);
-
-    let mut n = PartyEvents::new(&pk_address, &relay);
-    // transactions
-
-    let seeds = relay.node_config.seeds.iter().flat_map(|s| s.public_key.clone()).collect_vec();
-
-    // First get all transactions associated with the address, both incoming or outgoing.
-
-    let txf = relay.ds.transaction_store
-        .get_filter_tx_for_address(&n.key_address, 10000, 0, true).await?;
-
-    let tx = relay.ds.transaction_store
-        .get_all_tx_for_address(&n.key_address, 100000, 0).await?;
-
-    let mut res = vec![];
-    for t in tx {
-        let h = t.hash_or();
-        let obs = relay.ds.observation.select_observation_edge(&h).await?;
-        let txo = TransactionWithObservations {
-            tx: t,
-            observations: obs,
-        };
-        let ae = AddressEvent::Internal(txo);
-        res.push(ae);
-    }
-    let mut btc_wallet =
+let mut btc_wallet =
     Arc::new(Mutex::new(
-        SingleKeyBitcoinWallet::new_wallet(pk_address, NetworkEnvironment::Dev, true)
+        SingleKeyBitcoinWallet::new_wallet(pk_address.clone(), NetworkEnvironment::Dev, true)
             .expect("w")));
 
-    btc_wallet.lock().map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
-        .get_all_tx()?.iter().for_each(|t| {
-        let ae = AddressEvent::External(t.clone());
-        res.push(ae);
-    });
+    let mut n = PartyEvents::historical_initialize(&pk_address, &relay, &btc_wallet).await?;
 
-    res.sort_by(|a, b| a.time(&seeds).cmp(&b.time(&seeds)));
 
-    n.events = res.clone();
 
-    for e in &res {
-        n.process_event(e).await?;
-    }
+    // transactions
+    //
+    // let seeds = relay.node_config.seeds.iter().flat_map(|s| s.public_key.clone()).collect_vec();
+    //
+    // // First get all transactions associated with the address, both incoming or outgoing.
+    //
+    // let txf = relay.ds.transaction_store
+    //     .get_filter_tx_for_address(&n.key_address, 10000, 0, true).await?;
+    //
+    // let tx = relay.ds.transaction_store
+    //     .get_all_tx_for_address(&n.key_address, 100000, 0).await?;
+    //
+    // let mut res = vec![];
+    // for t in tx {
+    //     let h = t.hash_or();
+    //     let obs = relay.ds.observation.select_observation_edge(&h).await?;
+    //     let txo = TransactionWithObservations {
+    //         tx: t,
+    //         observations: obs,
+    //     };
+    //     let ae = AddressEvent::Internal(txo);
+    //     res.push(ae);
+    // }
+
+    // btc_wallet.lock().map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
+    //     .get_all_tx()?.iter().for_each(|t| {
+    //     let ae = AddressEvent::External(t.clone());
+    //     res.push(ae);
+    // });
+    //
+    // res.sort_by(|a, b| a.time(&seeds).cmp(&b.time(&seeds)));
+    //
+    // n.events = res.clone();
+    //
+    // for e in &res {
+    //     n.process_event(e).await?;
+    // }
 
 
 
