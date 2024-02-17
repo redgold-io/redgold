@@ -1,12 +1,9 @@
 use std::collections::HashSet;
-use bdk::bitcoin::secp256k1::rand;
-use bdk::bitcoin::secp256k1::rand::Rng;
 use bitcoin::secp256k1::{PublicKey, SecretKey};
-use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, struct_metadata_new, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, Proof, Transaction, CurrencyAmount, TransactionOptions, UtxoEntry, UtxoId, TimeSponsor, NetworkEnvironment};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
-use redgold_schema::transaction_builder::TransactionBuilder;
 use crate::KeyPair;
 use crate::proof_support::ProofSupport;
 
@@ -20,19 +17,13 @@ pub trait TransactionSupport {
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
-    fn new(
-        source: &UtxoEntry,
-        destination: &Vec<u8>,
-        amount: u64,
-        secret: &SecretKey,
-        public: &PublicKey,
-    ) -> Self;
     fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo>;
     fn validate(&self) -> RgResult<()>;
     fn prevalidate(&self) -> Result<(), ErrorInfo>;
 
     fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool;
     fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
+    fn output_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
     fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool;
 }
 
@@ -84,30 +75,6 @@ impl TransactionSupport for Transaction {
         let x = self.with_hash();
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())
-    }
-    // TODO: Move all of this to TransactionBuilder
-    fn new(
-        source: &UtxoEntry,
-        destination: &Vec<u8>,
-        amount: u64,
-        secret: &SecretKey,
-        public: &PublicKey,
-    ) -> Self {
-
-        let mut amount_actual = amount;
-        if amount < (MAX_COIN_SUPPLY as u64) {
-            amount_actual = amount * (DECIMAL_MULTIPLIER as u64);
-        }
-        let amount = CurrencyAmount::from(amount as i64);
-        // let fee = 0 as u64; //MIN_FEE_RAW;
-        // amount_actual -= fee;
-        let destination = Address::from_bytes(destination.clone()).unwrap();
-        let txb = TransactionBuilder::new()
-            .with_utxo(&source).expect("")
-            .with_output(&destination, &amount)
-            .build().expect("")
-            .sign(&KeyPair::new(&secret.clone(), &public.clone())).expect("");
-        txb
     }
 
     fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
@@ -238,6 +205,18 @@ impl TransactionSupport for Transaction {
             }).sum::<i64>();
         Ok(amt)
     }
+    fn output_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64> {
+        let btc_address = pk_address.to_bitcoin_address(network_environment)?;
+        let address = pk_address.address()?;
+        let amt = self.outputs
+            .iter()
+            .filter_map(|o| {
+                    o.address.as_ref()
+                        .filter(|&a| a == &address || a.render_string().ok().as_ref() == Some(&btc_address))
+                        .and_then(|_| o.opt_amount())
+            }).sum::<i64>();
+        Ok(amt)
+    }
 
     fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool {
         self.output_swap_amount_of_multi(pk_address, network_environment).map(|b| b > 0).unwrap_or(false)
@@ -273,21 +252,5 @@ impl InputSupport for Input {
         let address = o.address.safe_get_msg("Missing address on enriched output for transaction verification")?;
         self.verify_proof(&address, hash)?;
         return Ok(());
-    }
-}
-
-
-pub trait TransactionBuilderSupport {
-    fn new() -> Self;
-}
-
-impl TransactionBuilderSupport for TransactionBuilder {
-    fn new() -> Self {
-        let tx = Transaction::new_blank();
-        Self {
-            transaction: tx,
-            utxos: vec![],
-            used_utxos: vec![],
-        }
     }
 }

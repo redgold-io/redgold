@@ -13,7 +13,7 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::TestConstants;
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{EasyJsonDeser, ErrorInfoContext, RgResult, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
@@ -21,16 +21,17 @@ use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
-use crate::gui::{common};
+use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::util::logging::Loggable;
 use redgold_schema::local_stored_state::NamedXpub;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::gui::tabs::{cold_wallet, hot_wallet};
 
 

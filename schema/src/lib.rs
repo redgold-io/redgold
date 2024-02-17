@@ -36,7 +36,6 @@ pub mod utxo_entry;
 pub mod utxo_id;
 pub mod merkle_proof;
 pub mod errors;
-pub mod transaction_builder;
 pub mod response;
 pub mod servers;
 pub mod peers;

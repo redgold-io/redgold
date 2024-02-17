@@ -1,34 +1,33 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures::TryFutureExt;
-use itertools::{Itertools, max, min};
+use itertools::Itertools;
 use log::{error, info};
 
-use redgold_schema::{bytes_data, EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, ErrorInfo, SupportedCurrency, Hash, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, StandardContractType, SubmitTransactionResponse, Transaction, CurrencyAmount, LiquidityDeposit, UtxoEntry, Observation, ObservationMetadata, ObservationProof, ValidationLiveness, ExternalTransactionId};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, LiquidityDeposit, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
 
-use serde::{Serialize, Deserialize};
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use serde::{Deserialize, Serialize};
+use redgold_keys::transaction_support::TransactionSupport;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
-use crate::multiparty::initiate_mp::{default_room_id, initiate_mp_keysign};
+use crate::multiparty::initiate_mp::initiate_mp_keysign;
 use crate::node::Node;
-use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::address_external::ToBitcoinAddress;
 use crate::util::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::seeds::get_seeds_by_env;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::multiparty::party_stream::PartyEvents;
 use crate::node_config::NodeConfig;
 use crate::scrape::coinbase_btc_spot_latest;
 use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::RgArgs;
-use crate::util::{current_time_millis, current_time_millis_i64};
+use crate::util::current_time_millis_i64;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {
@@ -503,15 +502,15 @@ pub struct StakeDepositInfo {
 }
 
 // 100 / 45000
-const RDG_BTC_STARTING: f64 = 0.00222222222f64;
+const BTC_RDG_STARTING: f64 = 0.00222222222f64;
 
 
 // Needs to be hard-coded to deal with event stream changes.
-pub fn get_rdg_btc_starting(time: i64) -> f64 {
+pub fn get_btc_per_rdg_starting_min_ask(time: i64) -> f64 {
     return if time > 1707715165171i64 {
-        RDG_BTC_STARTING
+        BTC_RDG_STARTING
     } else {
-        RDG_BTC_STARTING
+        BTC_RDG_STARTING
     }
 }
 
@@ -965,7 +964,7 @@ impl DepositWatcher {
 
         Self::get_starting_center_price_rdg_btc().await
             .add("Failed getting BTC/USD spot").log_error()
-            .unwrap_or(RDG_BTC_STARTING) // 100 / 39000
+            .unwrap_or(BTC_RDG_STARTING) // 100 / 39000
 
     }
 

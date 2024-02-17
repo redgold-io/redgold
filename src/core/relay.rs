@@ -20,7 +20,7 @@ use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, DepositAddress};
-use redgold_schema::transaction_builder::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
@@ -30,7 +30,7 @@ use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use redgold_keys::transaction_support::TransactionBuilderSupport;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
@@ -131,6 +131,12 @@ pub struct Relay {
     pub unknown_resolved_inputs: Channel<ResolvedInput>,
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
 
+}
+
+impl Relay {
+    pub(crate) async fn dev_default() -> Self {
+        Self::new(NodeConfig::dev_default().await).await
+    }
 }
 
 impl Relay {

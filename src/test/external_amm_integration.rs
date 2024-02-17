@@ -1,11 +1,9 @@
-use redgold_keys::transaction_support::{TransactionBuilderSupport, TransactionSupport};
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJson, SafeOption};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey};
-use redgold_schema::transaction_builder::TransactionBuilder;
-use crate::node_config::NodeConfig;
-
+use redgold_schema::EasyJson;
+use redgold_schema::structs::{NetworkEnvironment, PublicKey};
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 // Use this for testing AMM transactions.
 // #[ignore]

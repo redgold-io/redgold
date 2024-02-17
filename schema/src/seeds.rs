@@ -97,6 +97,11 @@ pub fn get_seeds_by_env(env: &NetworkEnvironment) -> Vec<Seed> {
         .collect_vec()
 }
 
+pub fn get_seeds_by_env_time(env: &NetworkEnvironment, time: i64) -> Vec<Seed> {
+    // Use this for a time match statement
+    get_seeds_by_env(env)
+}
+
 // Not used, future example if necessary
 fn get_seeds_csv() -> Vec<Seed> {
 // Use this for triggering upgrades to the seed list
