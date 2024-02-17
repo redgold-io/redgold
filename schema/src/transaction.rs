@@ -275,6 +275,12 @@ impl Transaction {
             .filter_map(|d| d.external_transaction_id.as_ref())
             .next()
     }
+    pub fn output_external_txids(&self) -> impl Iterator<Item = &ExternalTransactionId> {
+        self.outputs
+            .iter()
+            .filter_map(|o| o.data.as_ref())
+            .filter_map(|d| d.external_transaction_id.as_ref())
+    }
 
     pub fn output_amount_of(&self, address: &Address) -> i64 {
         self.outputs

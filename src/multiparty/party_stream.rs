@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Add;
+use std::ops::{Add, Sub};
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use itertools::Itertools;
@@ -179,14 +179,11 @@ impl PartyEvents {
                     let outgoing_amount = t.tx.non_remainder_amount();
                     amount = outgoing_amount;
                     // This is an outgoing transaction representing a deposit fulfillment receipt
-                    let btc_tx_id = t.tx.first_output_external_txid();
-                    if let Some(tx_id) = btc_tx_id {
+                    for tx_id in t.tx.output_external_txids() {
                         self.remove_unconfirmed_event(e);
                         self.unfulfilled_deposits.retain(|(of, d)| {
                             Self::retain_unfulfilled_deposits(tx_id, d)
                         });
-                    } else {
-                        error!("No external txid found for internal outgoing transaction")
                     }
                 }
                 let delta = amount as i64 * balance_sign;
@@ -396,7 +393,7 @@ impl AllTxObsForAddress for RgHttpClient {
     }
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn debug_event_stream() {
     debug_events().await.unwrap();
@@ -417,6 +414,25 @@ let mut btc_wallet =
     let mut n = PartyEvents::historical_initialize(&pk_address, &relay, &btc_wallet).await?;
 
 
+    let mut txids = HashSet::new();
+    let mut txidsbtc = HashSet::new();
+
+    for e in n.events {
+        match e {
+            AddressEvent::External(t) => {
+                if t.incoming {
+                    txidsbtc.insert(t.tx_id.clone());
+                }
+            }
+            AddressEvent::Internal(int) => {
+                if let Some(txid) = int.tx.first_output_external_txid() {
+                    txids.insert(txid.identifier.clone());
+                }
+            }
+        }
+    };
+
+    let mut missing = txidsbtc.sub(&txids);
 
     // transactions
     //
