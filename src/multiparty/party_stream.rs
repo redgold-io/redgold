@@ -393,7 +393,7 @@ impl AllTxObsForAddress for RgHttpClient {
     }
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_event_stream() {
     debug_events().await.unwrap();
