@@ -308,7 +308,7 @@ pub struct OrderFulfillment {
     pub order_amount: u64,
     pub fulfilled_amount: u64,
     pub updated_curve: Vec<PriceVolume>,
-    pub is_ask: bool,
+    pub is_ask_fulfillment_from_external_deposit: bool,
     pub event_time: i64,
     pub tx_id_ref: Option<ExternalTransactionId>,
     pub destination: Address
@@ -340,7 +340,7 @@ impl OrderFulfillment {
         let destination_amount = self.fulfilled_currency_amount();
         tb.with_output(&self.destination, &destination_amount);
         let option = self.tx_id_ref.safe_get_msg("Missing tx_id")?.clone();
-        tb.with_last_output_deposit_swap(option.identifier);
+        tb.with_last_output_deposit_swap_fulfillment(option.identifier);
         tb.build()
     }
 
@@ -409,7 +409,7 @@ impl BidAsk {
                 order_amount,
                 fulfilled_amount,
                 updated_curve,
-                is_ask,
+                is_ask_fulfillment_from_external_deposit: is_ask,
                 event_time,
                 tx_id_ref: tx_id.map(|id| ExternalTransactionId{ identifier: id }),
                 destination: Default::default(),
@@ -599,7 +599,7 @@ impl DepositWatcher {
                     tb.with_output(&destination_address,
                                    &CurrencyAmount::from(destination_amount as i64)
                     );
-                    tb.with_last_output_deposit_swap(tx.tx_id.clone());
+                    tb.with_last_output_deposit_swap_fulfillment(tx.tx_id.clone());
 
                     let price = ask_fulfillment.fulfillment_price() * 1.01;
                     bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
@@ -787,19 +787,52 @@ impl DepositWatcher {
         // TODO: Change this to support batches -- might need some consideration around ids and utxos later
         // when calculating the receipts?
 
+        let with_cutoff = orders.iter()
+            .filter(|o| o.event_time < cutoff_time)
+            .collect_vec();
 
-        for o in orders.iter() {
-            if o.event_time < cutoff_time {
-                if o.is_ask {
-                    let tx = o.build_rdg_ask_swap_tx(utxos.clone()).await?;
-                    self.send_ask_fulfillment_transaction(&mut tx.clone(), identifier.clone()).await?;
-                } else {
-                    let btc = o.destination.to_bitcoin_address(&self.relay.node_config.network)?;
-                    let amount = o.fulfilled_amount;
-                    let outputs = vec![(btc, amount)];
-                    self.fulfill_btc_bids(w, identifier.clone(), outputs).await?;
-                }
-            }
+        info!("Found {} orders to process", with_cutoff.len());
+
+        /*
+
+        tb.with_utxos(&utxos)?;
+        let destination_amount = self.fulfilled_currency_amount();
+        tb.with_output(&self.destination, &destination_amount);
+        let option = self.tx_id_ref.safe_get_msg("Missing tx_id")?.clone();
+        tb.with_last_output_deposit_swap(option.identifier);
+        tb.build()
+         */
+        let mut tb = TransactionBuilder::new();
+        tb.with_utxos(&utxos)?;
+
+        let rdg_fulfillment_txb = with_cutoff.iter()
+            .filter(|e| e.is_ask_fulfillment_from_external_deposit && e.tx_id_ref.is_some())
+            .fold(&mut tb, |mut tb, o| {
+            tb.with_output(&o.destination, &o.fulfilled_currency_amount())
+            .with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id").identifier)
+        });
+
+        if rdg_fulfillment_txb.transaction.outputs.len() > 0 {
+            let tx = rdg_fulfillment_txb.build()?;
+            info!("Sending RDG fulfillment transaction: {}", tx.json_or());
+            self.send_ask_fulfillment_transaction(&mut tx.clone(), identifier.clone()).await.log_error().ok();
+        }
+
+        let mut outputs = vec![];
+        let btc_outputs = with_cutoff.iter()
+            .filter(|e| !e.is_ask_fulfillment_from_external_deposit &&
+            e.destination.to_bitcoin_address(&self.relay.node_config.network).is_ok())
+            .fold(&mut outputs, |mut vec, o| {
+                let btc = o.destination.to_bitcoin_address(&self.relay.node_config.network).expect("works");
+                let amount = o.fulfilled_amount;
+                let outputs = (btc, amount);
+                vec.push(outputs);
+                vec
+            });
+
+        if btc_outputs.len() > 0 {
+            info!("Sending BTC fulfillment transaction: {:?}", btc_outputs);
+            self.fulfill_btc_bids(w, identifier.clone(), btc_outputs.clone()).await.log_error().ok();
         }
         let mut alloc2 = alloc.clone();
         alloc2.balance_btc = btc_starting_balance;

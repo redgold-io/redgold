@@ -259,10 +259,10 @@ impl TransactionBuilder {
     }
 
     // Should this be hex or bytes data?
-    pub fn with_last_output_deposit_swap(&mut self, btc_txid: String) -> &mut Self {
+    pub fn with_last_output_deposit_swap_fulfillment(&mut self, btc_txid: String) -> &mut Self {
         if let Some(o) = self.transaction.outputs.last_mut() {
             if let Some(d) = o.data.as_mut() {
-                d.external_transaction_id = Some(redgold_schema::structs::ExternalTransactionId {identifier: btc_txid.clone()});
+                d.external_transaction_id = Some(structs::ExternalTransactionId {identifier: btc_txid.clone()});
             }
         }
         self
