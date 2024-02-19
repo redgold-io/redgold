@@ -7,7 +7,7 @@ use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use redgold_schema::{empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, UtxoId, SubmitTransactionResponse};
 use redgold_keys::util::mnemonic_words::MnemonicWords;
 
@@ -22,6 +22,19 @@ pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
     // runtime: Arc<Runtime>,
     client: PublicClient,
+}
+
+impl TransactionSubmitter {
+    pub(crate) async fn submit_invalid_signature(&self) {
+        let transaction = self.generator.lock().unwrap().generate_simple_tx().clone().expect("tx");
+        let mut tx = transaction.transaction.clone();
+        let mut sig = tx.inputs.get_mut(0).expect("sig").proof.get_mut(0).expect("sig").signature.as_mut().expect("sign");
+        sig.bytes = bytes_data(vec!(0; 32));
+        let res = self.client.clone().send_transaction(&tx, true).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.code, Error::IncorrectSignature as i32);
+    }
 }
 
 
