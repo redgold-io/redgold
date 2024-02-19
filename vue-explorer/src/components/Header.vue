@@ -9,11 +9,11 @@
         <a class="navbar-brand brand" href="https://redgold.io">
           Website
         </a>
-        <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
-          Discord
-        </a>
         <a class="navbar-brand brand" href="https://dev.docs.redgold.io">
           Docs
+        </a>
+        <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
+          Discord
         </a>
 
         <div class="navbar-right-links">
@@ -26,7 +26,7 @@
           <a class="navbar-brand brand" href="https://test.explorer.redgold.io">
             Test
           </a>
-          <a class="navbar-brand brand" href="https://main.explorer.redgold.io">
+          <a class="navbar-brand brand" href="https://explorer.redgold.io">
             Main
           </a>
         </div>

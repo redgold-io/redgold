@@ -21,7 +21,7 @@ export default {
 </script>
 
 <style lang="scss">
-$body-bg: #000;
+$body-bg: #1c1b1b;
 $body-color: #fff;
 $medium-grey: #191a19;
 

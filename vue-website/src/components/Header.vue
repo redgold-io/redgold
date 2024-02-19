@@ -1,33 +1,29 @@
 <template>
   <div class="container-fluid">
     <nav class="navbar custom-navbar">
-      <div class="navbar-container">
-        <a class="navbar-brand brand" href="/">
+      <div class="navbar-container top-left-logo">
+        <a class="navbar-brand brand  d-flex align-items-center" href="/">
           <img :src="require('@/assets/logo.png')" alt="Logo" class="logo">
-          Redgold Explorer
+          <div class="redgold-title">
+            Red
+          </div>
+          <div class="redgold-title2">
+            gold
+          </div>
         </a>
-        <a class="navbar-brand brand" href="https://redgold.io">
-          Website
-        </a>
-        <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
-          Discord
+        <a class="navbar-brand brand" href="https://dev.explorer.redgold.io">
+          Explorer
         </a>
         <a class="navbar-brand brand" href="https://dev.docs.redgold.io">
           Docs
         </a>
+        <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
+          Discord
+        </a>
 
         <div class="navbar-right-links">
-          <a class="navbar-brand brand" href="https://dev.explorer.redgold.io">
-            Dev
-          </a>
-          <a class="navbar-brand brand" href="https://staging.explorer.redgold.io">
-            Staging
-          </a>
-          <a class="navbar-brand brand" href="https://test.explorer.redgold.io">
-            Test
-          </a>
-          <a class="navbar-brand brand" href="https://main.explorer.redgold.io">
-            Main
+          <a class="navbar-brand brand" href="https://github.com/redgold-io/redgold">
+            GitHub
           </a>
         </div>
 
@@ -46,26 +42,6 @@
 
       <!-- Main content div -->
       <div class="col-10">
-
-        <div class="hash-container">
-          <div>Swap Deposit Address: {{ btcSwapAddress ? '' : 'loading...' }} </div>
-          <HashLink v-if="btcSwapAddress !== ''" :data="btcSwapAddress" :shorten=false />
-          <div>{{ rgdBtcStr }} RDG/BTC</div>
-          <div>${{ usdRdgStr }} USD/RDG</div>
-          <div>${{ usdBtcStr }} USD/BTC</div>
-        </div>
-
-
-
-        <!-- Search bar -->
-        <div class="jumbotron search-bar py-4">
-          <h5 class="text-light">Enter hash search query:</h5>
-          <form class="d-flex align-items-center" :action="'/hash/' + searchValue" method="get">
-<!--            <label for="inline-form-input-name" class="sr-only">Search</label>-->
-            <input v-model="searchValue" id="inline-form-input-name" class="form-control mr-2 search-input" type="text" placeholder="Query hash...">
-            <button type="submit" class="btn btn-primary">Submit</button>
-          </form>
-        </div>
       </div>
     </div>
 
@@ -73,60 +49,51 @@
 </template>
 
 <script>
-import fetchHashInfo from "@/components/mixins/fetchHashInfo";
-import HashLink from "@/components/util/HashLink.vue";
 
 export default {
   name: 'HeaderBox',
   components: {
-    HashLink,
   },
-  data() {
-    return {
-      searchValue: '',
-      btcSwapAddress: '',
-      rgdBtc: 100.012312,
-      rgdBtcStr: '100.012312',
-      usdRdg: 1.012312,
-      usdRdgStr: '1.012',
-      usdBtc: 30000.3210,
-      usdBtcStr: '30000.32'
-    };
-  },
-  mixins: [fetchHashInfo],
-  methods: {
-    handleSubmit() {
-      this.$router.push(`/hash/${this.searchValue}`);
-    }
-  },
-  async created() {
-    this.usdBtc = await this.btcUsdPrice();
-    // Commit the value to the store
-    this.$store.commit('setBtcExchangeRate', this.usdBtc);
 
-    console.log(this.usdBtc);
-    this.usdBtcStr = this.usdBtc.toFixed(2);
-    let swapInfo = await this.fetchSwapInfo();
-    if (swapInfo != null) {
-      this.btcSwapAddress = swapInfo.btc_address;
-      this.rgdBtc = swapInfo.bid_ask.center_price;
-      this.rgdBtcStr = this.rgdBtc.toFixed(2);
-      this.usdRdg = (1 / this.rgdBtc) * this.usdBtc;
-      this.usdRdgStr = this.usdRdg.toFixed(2);
-    }
-
-  }
 }
 </script>
 
 <style scoped>
-.custom-navbar {
-  background-color: #000;
+
+.top-left-logo {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  //display: grid;
+  //grid-template-columns: 2fr 1fr; /* Adjust as needed */
+  //gap: 10px; /* Adjust as needed */
+}
+
+.redgold-title2 {
+  font-size: 1.0em;
+  font-weight: bold;
+  //color: #ffcc00;
+  //margin-top: 10px;
+}
+
+.redgold-title {
+  font-size: 1.0em;
+  font-weight: bold;
+  //color: #bf3737;
+  //margin-top: 10px;
+}
+
+.container-fluid {
+  //background-color: #ededf0;
+  //background-color: #2e2405;
+  //background-color: #f1fa8c ;
+  background-color: #29220c;
+  //background-color: #44475a;
 }
 
 .logo {
-  height: 50px;
-  width: 50px;
+  height: 55px;
+  width: 55px;
   margin-right: 10px;
 }
 
@@ -134,35 +101,15 @@ export default {
   color: #fff;
   user-select: none;
   text-decoration: none;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .custom-navbar .brand:hover {
-  background-color: #000;
+  //background-color: #000;
   color: #fff;
 }
 
-.search-bar {
-  background-color: #000;
-}
-
-.search-input,
-.search-input:focus {
-  box-sizing: border-box;
-  min-width: 600px;
-  max-width: 600px;
-  background-color: #191a19;
-  color: #fff;
-}
-.search-input::placeholder {
-  color: #ccc;
-}
-
-
-.hash-container {
-  display: flex;
-  align-items: center;
-  gap: 10px; /* Set the gap you want */
-}
 
 /* Ensure the navbar container is using flexbox */
 .navbar-container {
@@ -179,6 +126,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 20px;
+  padding-right: 160px;
 }
 
 </style>
