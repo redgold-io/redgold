@@ -97,7 +97,7 @@ jobs:
         run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
 
       - name: Upload Website Distribution to S3
-        run: aws s3 rm --recursive ${{env.S3_WEBSITE_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-website/dist/ ${{env.S3_WEBSITE_PREFIX}}-${{env.BRANCH}}/
+        run: aws s3 rm --recursive ${{env.S3_WEBSITE_PREFIX}} && aws s3 cp --recursive ./vue-website/dist/ ${{env.S3_WEBSITE_PREFIX}}/
 
       - name: Upload Docs Distribution to S3
         run: aws s3 rm --recursive ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./docs/dist/ ${{env.S3_DOCS_PREFIX}}-${{env.BRANCH}}/
