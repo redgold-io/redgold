@@ -412,7 +412,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         submit.submit_double_spend(None).await;
     }
 
-    // submit.submit_invalid_signature().await;
+    submit.submit_invalid_signature().await;
 
     // info!("Num utxos after double spend submit {:?}", utxos.len());
 

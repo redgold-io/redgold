@@ -240,6 +240,7 @@ impl TransactionProcessContext {
         node_id: String
     ) -> Result<(), ErrorInfo> {
 
+        self.transaction_hash = Some(transaction_message.transaction.hash_or());
 
         if self.check_peer_message(&transaction_message.transaction).await? {
             return self.process_peer_transaction(&transaction_message.transaction).await;
