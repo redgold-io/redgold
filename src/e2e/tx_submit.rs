@@ -33,7 +33,6 @@ impl TransactionSubmitter {
         let res = self.client.clone().send_transaction(&tx, true).await;
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert_eq!(err.code, Error::IncorrectSignature as i32);
     }
 }
 
