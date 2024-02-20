@@ -9,7 +9,9 @@ use crate::node_config::NodeConfig;
 
 // Use this for testing AMM transactions.
 
-const DEV_AMM_BTC_ADDRESS: String = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
+pub fn dev_amm_btc_addres() -> String {
+    return "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
+}
 
 pub fn dev_amm_public_key() -> PublicKey {
     let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
@@ -42,7 +44,7 @@ pub async fn send_dev_test_btc_transaction() {
         println!("wallet address: {a}");
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
-        let res = w.send_local(DEV_AMM_BTC_ADDRESS, 3141, privk).expect("send");
+        let res = w.send_local(dev_amm_btc_addres(), 3141, privk).expect("send");
         println!("txid: {res}");
     }
 }
@@ -69,8 +71,8 @@ pub async fn send_dev_test_rdg_btc_transaction() {
         println!("pk: {}", rdg_address.render_string().expect(""));
 
         let client = NodeConfig::dev_default().await.api_client();
-        // client.faucet(&rdg_address).await.expect("faucet");
-        let result = client.query_address(vec![rdg_address]).await.expect("").as_error().expect("");
+        client.faucet(&rdg_address).await.expect("faucet");
+        let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
 
@@ -96,8 +98,7 @@ pub async fn send_dev_test_rdg_btc_transaction() {
 #[test]
 pub fn dev_balance_check() {
 
-    let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
-    let pk = PublicKey::from_hex(pk_hex).expect("pk");
+    let pk = dev_amm_public_key();
 
     let addr = pk.address().expect("address").render_string().expect("");
 

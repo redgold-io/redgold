@@ -132,7 +132,11 @@ impl PartyEvents {
                     // Event initiator, has no pairing event yet (short of staking requests)
                     // Balance / price adjustment event
 
-                    let fulfillment = self.bid_ask.fulfill_taker_order(t.amount, true, time, Some(t.tx_id.clone()));
+                    // Expect BTC here
+                    let other_addr = t.other_address_typed().expect("addr");
+                    let fulfillment = self.bid_ask.fulfill_taker_order(
+                        t.amount, true, time, Some(t.tx_id.clone()), &other_addr
+                    );
                     info!("Incoming BTC tx {} Fulfillment: {}", t.json_or(), fulfillment.json_or());
                     if let Some(fulfillment) = fulfillment {
                         event_fulfillment = Some(fulfillment.clone());
@@ -161,17 +165,26 @@ impl PartyEvents {
                 let mut amount = 0;
                 let incoming = !t.tx.input_addresses().contains(&self.key_address);
                 if incoming {
+
                     balance_sign = 1;
                     amount = t.tx.output_amount_of_multi(&self.party_public_key, &self.relay.node_config.network).unwrap_or(0);
                     let is_swap = t.tx.has_swap_to_multi(&self.party_public_key, &self.relay.node_config.network);
                     if is_swap {
                         // Represents a withdrawal initiation event
-                        let fulfillment = self.bid_ask.fulfill_taker_order(amount as u64, false, time, None);
-                        if let Some(fulfillment) = fulfillment {
-                            event_fulfillment = Some(fulfillment.clone());
-                            let pair = (fulfillment, ec.clone());
-                            self.unfulfilled_withdrawals.push(pair);
-                        }
+                        let mut other_address =
+                        if let Some(public_other) = t.tx.inputs.iter()
+                            .flat_map(|i| i.proof.iter().flat_map(|p| p.public_key.as_ref())).next() {
+                            let addr_str = public_other.to_bitcoin_address(&self.relay.node_config.network).expect("addr");
+                            let addr = Address::from_bitcoin(&addr_str);
+                            let fulfillment = self.bid_ask.fulfill_taker_order(
+                                amount as u64, false, time, None, &addr
+                            );
+                            if let Some(fulfillment) = fulfillment {
+                                event_fulfillment = Some(fulfillment.clone());
+                                let pair = (fulfillment, ec.clone());
+                                self.unfulfilled_withdrawals.push(pair);
+                            }
+                        };
                     } else {
                         // Represents a stake deposit initiation event
                     }
@@ -417,7 +430,7 @@ let mut btc_wallet =
     let mut txids = HashSet::new();
     let mut txidsbtc = HashSet::new();
 
-    for e in n.events {
+    for e in &n.events {
         match e {
             AddressEvent::External(t) => {
                 if t.incoming {
@@ -473,7 +486,7 @@ let mut btc_wallet =
     // }
 
 
-
+    let orders = n.orders();
 
     Ok(())
 

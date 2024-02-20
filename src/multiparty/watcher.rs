@@ -361,7 +361,14 @@ impl BidAsk {
         self.bids.retain(|v| v.volume > 0);
         self.asks.retain(|v| v.volume > 0);
     }
-    pub fn fulfill_taker_order(&self, order_amount: u64, is_ask: bool, event_time: i64, tx_id: Option<String>) -> Option<OrderFulfillment> {
+    pub fn fulfill_taker_order(
+        &self,
+        order_amount: u64,
+        is_ask: bool,
+        event_time: i64,
+        tx_id: Option<String>,
+        destination: &Address
+    ) -> Option<OrderFulfillment> {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
         let mut updated_curve = if is_ask {
@@ -412,7 +419,7 @@ impl BidAsk {
                 is_ask_fulfillment_from_external_deposit: is_ask,
                 event_time,
                 tx_id_ref: tx_id.map(|id| ExternalTransactionId{ identifier: id }),
-                destination: Default::default(),
+                destination: destination.clone(),
             })
         }
     }
@@ -592,7 +599,7 @@ impl DepositWatcher {
             let destination_address = structs::Address::from_bitcoin(&destination);
             if let Some(timestamp) = tx.timestamp {
                 if let Some(ask_fulfillment) = bid_ask_latest.fulfill_taker_order(
-                    tx.amount, true, timestamp as i64, Some(tx.tx_id.clone())
+                    tx.amount, true, timestamp as i64, Some(tx.tx_id.clone()), &destination_address
                 ) {
                     let destination_amount = ask_fulfillment.fulfilled_amount;
 
@@ -708,8 +715,11 @@ impl DepositWatcher {
                 let destination_address_string_btc = opt_btc_addr.safe_get_msg("Missing destination address")?.clone();
 
                 if amount_rdg > 0 && opt_btc_addr.is_some() {
-
-                    if let Some(fulfillment) = bid_ask_latest.fulfill_taker_order(amount_rdg as u64, false, t.time()?.clone(), None) {
+                    let address = Address::from_bitcoin(&destination_address_string_btc);
+                    if let Some(fulfillment) = bid_ask_latest.fulfill_taker_order(
+                        amount_rdg as u64, false, t.time()?.clone(), None,
+                        &address
+                    ) {
                         btc_outputs.push((destination_address_string_btc.clone(), fulfillment.fulfilled_amount));
                         tx_res.push(t.clone());
                         // In case of failure or error, we need to keep track of the last price that was used so
@@ -1308,21 +1318,21 @@ async fn debug_local() {
     let first_bid = ba.bids.first().expect("works");
     let first_bid_price = first_bid.price;
     println!(  "first_bid_price: {first_bid_price}");
-
-
-    // println!("bids: {p}");
-    let ask_fulfillment = ba.fulfill_taker_order(3500, true, util::current_time_millis_i64(), None).expect("works");
-    let afj = ask_fulfillment.fulfilled_amount.json_pretty_or();
-
-
-    println!("fullfilled: {afj}");
-    println!("fulfilled price: {}", ask_fulfillment.fulfillment_price());
-
-    let bid_fulfillment = ba.fulfill_taker_order((2000f64*center_price) as u64, false, util::current_time_millis_i64(), None).expect("works");
-
-    let bfj = bid_fulfillment.fulfilled_amount.json_pretty_or();
-    println!("fullfilled: {bfj}");
-    println!("fulfilled price: {}", 1f64/bid_fulfillment.fulfillment_price());
+    //
+    //
+    // // println!("bids: {p}");
+    // let ask_fulfillment = ba.fulfill_taker_order(3500, true, util::current_time_millis_i64(), None).expect("works");
+    // let afj = ask_fulfillment.fulfilled_amount.json_pretty_or();
+    //
+    //
+    // println!("fullfilled: {afj}");
+    // println!("fulfilled price: {}", ask_fulfillment.fulfillment_price());
+    //
+    // let bid_fulfillment = ba.fulfill_taker_order((2000f64*center_price) as u64, false, util::current_time_millis_i64(), None).expect("works");
+    //
+    // let bfj = bid_fulfillment.fulfilled_amount.json_pretty_or();
+    // println!("fullfilled: {bfj}");
+    // println!("fulfilled price: {}", 1f64/bid_fulfillment.fulfillment_price());
 
     //
     // let (tx, bid_ask_updated_ask_side) = DepositWatcher::build_rdg_ask_swap_tx(
