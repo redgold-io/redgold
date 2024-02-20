@@ -129,4 +129,51 @@ export default {
   padding-right: 160px;
 }
 
+/* Existing styles */
+.navbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+}
+/* Responsive styles */
+@media (max-width: 768px) {
+  /* Adjust the breakpoint if needed */
+  .navbar-container {
+    flex-direction: row; /* Keep the row direction */
+    flex-wrap: wrap; /* Allow the items to wrap to the next line */
+    justify-content: center; /* Center items horizontally */
+    align-items: center; /* Center items vertically */
+  }
+
+  .top-left-logo, .navbar-right-links {
+    width: 100%; /* Make these elements take the full width */
+    justify-content: center; /* Center the content */
+    flex-wrap: wrap; /* Allow these items to wrap as well */
+    margin-bottom: 10px; /* Add some space between the rows */
+  }
+
+  .custom-navbar .brand {
+    flex: 1 1 auto; /* Allow the item to grow and shrink */
+    max-width: 50%; /* Maximum width for each item */
+    padding: 5px 10px; /* Adjust padding to reduce space */
+    text-align: center; /* Center the text inside the buttons */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  }
+
+  .logo {
+    height: 40px; /* Smaller logo for mobile */
+    width: 40px;
+    margin: 0 auto 10px; /* Center the logo and add margin at the bottom */
+    display: block; /* Change display to block for the image */
+  }
+
+  .navbar-right-links {
+    padding-right: 0; /* Remove padding */
+  }
+}
+
+
+
 </style>

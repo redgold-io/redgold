@@ -2,9 +2,9 @@
   <div class="container-fluid">
     <div class="row no-gutters align-items-center desktop-buffer">
       <!-- Intro text container -->
-      <div class="col-12 col-md-6 order-2 order-md-1 px-md-3">
+      <div class="col-12 col-md-6 order-1 order-md-1 px-md-3">
         <div class="intro-text">
-          <h2>Peer-to-Peer Data Lake & Compute Engine</h2>
+          <h2 style="margin-top: 10px">Peer-to-Peer Data Lake & Compute Engine</h2>
           <p class="sub-intro-text">
             Redgold is a decentralized platform for building data-oriented crypto applications and smart contracts, with
             a focus on ETFs & portfolio models.
@@ -20,7 +20,7 @@
         </div>
       </div>
       <!-- Image container -->
-      <div class="col-12 col-md-6 order-1 order-md-2 px-md-3">
+      <div class="col-12 col-md-6 order-2 order-md-2 px-md-3">
         <img class="splash-image" :src="require('@/assets/dalle-home-splash.webp')" alt="Splash Image">
       </div>
     </div>
@@ -155,11 +155,11 @@
     <div class="row no-gutters align-items-center desktop-buffer second-element">
 
 
-      <div class="col-12 col-md-6 order-1 order-md-2 px-md-3">
+      <div class="col-12 col-md-6 order-2 order-md-2 px-md-3">
       <!-- Image container -->
         <img class="splash-image-smaller" :src="require('@/assets/main-splash-images/portfolio-target-models.webp')" alt="Splash Image">
       </div>
-     <div class="col-12 col-md-6 order-2 order-md-1 px-md-3">
+     <div class="col-12 col-md-6 order-1 order-md-1 px-md-3">
 
         <div class="intro-text">
           <h2>PORTFOLIO TARGET MODELS</h2>
@@ -239,11 +239,11 @@
     <div class="row no-gutters align-items-center desktop-buffer second-element">
 
 
-      <div class="col-12 col-md-6 order-1 order-md-2 px-md-3">
+      <div class="col-12 col-md-6 order-2 order-md-2 px-md-3">
         <!-- Image container -->
         <img class="splash-image-smaller" :src="require('@/assets/main-splash-images/secure-scaling.webp')" alt="Splash Image">
       </div>
-      <div class="col-12 col-md-6 order-2 order-md-1 px-md-3">
+      <div class="col-12 col-md-6 order-1 order-md-1 px-md-3">
 
         <div class="intro-text">
           <h2>SECURE SCALING</h2>
@@ -344,7 +344,7 @@
 @media (min-width: 768px) { /* Adjusts to Bootstrap's MD breakpoint */
   .desktop-buffer {
     padding-left: 100px; /* Adjust as needed */
-    padding-right: 120px; /* Adjust as needed */
+    padding-right: 100px; /* Adjust as needed */
   }
 }
 
