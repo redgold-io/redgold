@@ -96,8 +96,6 @@ pub async fn send_dev_test_rdg_btc_transaction() {
 #[test]
 pub fn dev_balance_check() {
 
-    let DEV_AMM_BTC_ADDRESS = "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
-
     let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
     let pk = PublicKey::from_hex(pk_hex).expect("pk");
 
