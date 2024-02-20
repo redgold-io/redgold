@@ -473,7 +473,7 @@ impl NodeConfig {
             discovery_interval: Duration::from_secs(5),
             watcher_interval: Duration::from_secs(200),
             shuffle_interval: Duration::from_secs(600),
-            live_e2e_interval: Duration::from_secs(60),
+            live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
             opts: RgArgs::default(),
             mempool: Default::default(),
