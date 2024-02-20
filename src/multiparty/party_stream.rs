@@ -171,7 +171,6 @@ impl PartyEvents {
                     let is_swap = t.tx.has_swap_to_multi(&self.party_public_key, &self.relay.node_config.network);
                     if is_swap {
                         // Represents a withdrawal initiation event
-                        let mut other_address =
                         if let Some(public_other) = t.tx.inputs.iter()
                             .flat_map(|i| i.proof.iter().flat_map(|p| p.public_key.as_ref())).next() {
                             let addr_str = public_other.to_bitcoin_address(&self.relay.node_config.network).expect("addr");
@@ -183,6 +182,7 @@ impl PartyEvents {
                                 event_fulfillment = Some(fulfillment.clone());
                                 let pair = (fulfillment, ec.clone());
                                 self.unfulfilled_withdrawals.push(pair);
+                                // info!("Withdrawal fulfillment request for incoming RDG tx: {} for tx {}", fulfillment.json_or(), t.tx.json_or());
                             }
                         };
                     } else {
@@ -197,7 +197,9 @@ impl PartyEvents {
                         self.unfulfilled_deposits.retain(|(of, d)| {
                             Self::retain_unfulfilled_deposits(tx_id, d)
                         });
+                        // info!("Outgoing RDG tx fulfillment for BTC tx_id: {} {}", tx_id.identifier.clone(), t.tx.json_or());
                     }
+
                 }
                 let delta = amount as i64 * balance_sign;
                 let new_balance = balance + delta;
@@ -218,8 +220,8 @@ impl PartyEvents {
             balance, pair_balance, new_price, min_ask
         );
 
-        info!("New bid ask: {}", self.bid_ask.json_or());
-        info!("New balances: {}", self.balance_map.json_or());
+        // info!("New bid ask: {}", self.bid_ask.json_or());
+        // info!("New balances: {}", self.balance_map.json_or());
         self.price = new_price;
         Ok(())
     }

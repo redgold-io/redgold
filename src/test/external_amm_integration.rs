@@ -44,14 +44,14 @@ pub async fn send_dev_test_btc_transaction() {
         println!("wallet address: {a}");
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
-        let res = w.send_local(dev_amm_btc_addres(), 3141, privk).expect("send");
+        let res = w.send_local(dev_amm_btc_addres(), 1911, privk).expect("send");
         println!("txid: {res}");
     }
 }
 
 
 // Use this for testing AMM transactions.
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn send_dev_test_rdg_btc_transaction() {
 
@@ -60,18 +60,13 @@ pub async fn send_dev_test_rdg_btc_transaction() {
 
     println!("dev amm address: {addr}");
 
-    if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
-        let w = WordsPass::new(w, None);
-        let path = "m/84'/0'/0'/0/0";
-        let pk = w.public_at(path.to_string()).expect("private key");
-        let privk = w.private_at(path.to_string()).expect("private key");
-        let keypair = w.keypair_at(path.to_string()).expect("private key");
-
+    if let Some((privk, keypair)) = dev_ci_kp() {
+        let pk = keypair.public_key();
         let rdg_address = pk.address().expect("");
         println!("pk: {}", rdg_address.render_string().expect(""));
 
         let client = NodeConfig::dev_default().await.api_client();
-        client.faucet(&rdg_address).await.expect("faucet");
+        // client.faucet(&rdg_address).await.expect("faucet");
         let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
@@ -88,9 +83,6 @@ pub async fn send_dev_test_rdg_btc_transaction() {
 
         println!("send: {}", res);
 
-        let res = NodeConfig::dev_default().await.api_client().faucet(&rdg_address).await.expect("faucet");
-
-        println!("faucet: {}", res.json_or());
     }
 }
 

@@ -270,7 +270,7 @@ impl TransactionBuilder {
     pub fn with_last_output_withdrawal_swap(&mut self) -> &mut Self {
         if let Some(o) = self.transaction.outputs.last_mut() {
             let mut oc = OutputContract::default();
-            oc.standard_contract_type = Some(redgold_schema::structs::StandardContractType::Swap as i32);
+            oc.standard_contract_type = Some(structs::StandardContractType::Swap as i32);
             o.contract = Some(oc);
             assert!(o.is_swap())
         }

@@ -779,14 +779,15 @@ impl DepositWatcher {
         let num_unfulfilled_withdrawals = ps.unfulfilled_withdrawals.len();
         let utxos = self.relay.ds.transaction_store.query_utxo_address(&key_address).await?;
 
-        info!("Starting watcher process request with balances: RDG:{}, BTC:{} \
+        info!("watcher balances: RDG:{}, BTC:{} \
          BTC_address: {} environment: {} orders {} num_events: {} num_unconfirmed {} num_un_deposit {} \
-         num_un_withdrawls {} num_utxos: {} \
+         num_un_withdrawls {} num_utxos: {} orders_json {} \
          bid_ask: {}",
             rdg_starting_balance, btc_starting_balance, btc_address, environment.to_std_string(),
             orders.len(),
             num_events, num_unconfirmed, num_unfulfilled_deposits, num_unfulfilled_withdrawals,
             utxos.len(),
+            orders.json_or(),
             ps.bid_ask.json_or()
         );
 
@@ -800,8 +801,6 @@ impl DepositWatcher {
         let with_cutoff = orders.iter()
             .filter(|o| o.event_time < cutoff_time)
             .collect_vec();
-
-        info!("Found {} orders to process", with_cutoff.len());
 
         /*
 
