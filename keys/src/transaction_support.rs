@@ -25,6 +25,7 @@ pub trait TransactionSupport {
     fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
     fn output_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
     fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool;
+    fn first_input_address_to_btc_address(&self, network: &NetworkEnvironment) -> Option<String>;
 }
 
 #[test]
@@ -220,6 +221,13 @@ impl TransactionSupport for Transaction {
 
     fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool {
         self.output_swap_amount_of_multi(pk_address, network_environment).map(|b| b > 0).unwrap_or(false)
+    }
+
+    fn first_input_address_to_btc_address(&self, network: &NetworkEnvironment) -> Option<String> {
+        self.inputs.iter()
+            .flat_map(|i| i.proof.iter().flat_map(|p| p.public_key.as_ref()))
+            .next()
+            .and_then(|public_other| { public_other.to_bitcoin_address(&network).ok() })
     }
 
 

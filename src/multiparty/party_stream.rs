@@ -74,18 +74,83 @@ pub struct PartyEvents {
 }
 
 impl PartyEvents {
+    //
+    pub fn unconfirmed_rdg_output_btc_txid_refs(&self) -> HashSet<String> {
+        self.unconfirmed_events.iter().filter_map(|e| {
+            match e {
+                AddressEvent::Internal(t) => {
+                    Some(t.tx.output_external_txids().map(|t| t.identifier.clone()))
+                }
+                _ => {
+                    None
+                }
+            }
+        }).flatten().collect()
+    }
+
+    pub fn unconfirmed_btc_output_other_addresses(&self) -> HashSet<String> {
+        let mut hs = HashSet::new();
+
+        for e in self.unconfirmed_events.iter() {
+            match e {
+                AddressEvent::External(t) => {
+                    if !t.incoming {
+                        // This is a transaction we sent (the party) to some output address not ourself
+                        // which has yet to be confirmed, but we don't want to duplicate it.
+                        t.other_output_addresses.iter().for_each(|a| {
+                            hs.insert(a.clone());
+                        });
+                    }
+                }
+                _ => {
+                }
+            }
+        }
+        hs
+    }
 
     pub fn orders(&self) -> Vec<OrderFulfillment> {
         let mut orders = vec![];
-        let ids = self.unconfirmed_events.iter().map(|d| d.identifier())
-            .collect::<HashSet<String>>();
-        for (order, ae) in self.unfulfilled_deposits.iter().chain(self.unfulfilled_withdrawals.iter()) {
-            if !ids.contains(&ae.identifier()) {
-                orders.push(order.clone());
+
+        let rdg_extern_txids = self.unconfirmed_rdg_output_btc_txid_refs();
+
+        for (of, ae) in self.unfulfilled_deposits.iter() {
+            match ae {
+                AddressEvent::External(t) => {
+                    // Since this is a BTC incoming transaction,
+                    // we need to check for unconfirmed events that have the txid in one of the output refs
+                    if !rdg_extern_txids.contains(&t.tx_id) {
+                        orders.push(of.clone());
+                    }
+                }
+                AddressEvent::Internal(_) => {}
             }
         }
+
+        for (of, ae) in &self.unfulfilled_withdrawals {
+            match ae {
+                AddressEvent::Internal(t) => {
+                    // Since this is a RDG incoming transaction, which we'll fulfill with BTC,
+                    // We need to know it's corresponding BTC address to see if an unconfirmed output matches it
+                    // (i.e. it's already been unconfirmed fulfilled.)
+                    t.tx.first_input_address_to_btc_address(&self.relay.node_config.network).map(|addr| {
+                        if !self.unconfirmed_btc_output_other_addresses().contains(&addr) {
+                            orders.push(of.clone());
+                        }
+                    });
+                }
+                AddressEvent::External(_) => {}
+            }
+        }
+
         orders.sort_by(|a, b| a.event_time.cmp(&b.event_time));
         orders
+    }
+
+    pub fn unconfirmed_identifiers(&self) -> HashSet<String> {
+        let ids = self.unconfirmed_events.iter().map(|d| d.identifier())
+            .collect::<HashSet<String>>();
+        ids
     }
     pub fn new(party_public_key: &PublicKey, relay: &Relay) -> Self {
         let btc_rdg = get_btc_per_rdg_starting_min_ask(0);
@@ -156,7 +221,7 @@ impl PartyEvents {
                             // This represents and outgoing BTC fulfillment of an incoming RDG tx
                             let fulfillment = (of.clone(), d.clone(), ec.clone());
                             self.fulfillment_history.push(fulfillment);
-                            info!("Outgoing BTC tx fulfillment with hash: {} to {} fulfillment {}", t.tx_id.clone(), t.other_address, of.json_or());
+                            // info!("Outgoing BTC tx fulfillment with hash: {} to {} fulfillment {}", t.tx_id.clone(), t.other_address, of.json_or());
                         };
                         res
                     });
@@ -181,10 +246,8 @@ impl PartyEvents {
                     let is_swap = t.tx.has_swap_to_multi(&self.party_public_key, &self.relay.node_config.network);
                     if is_swap {
                         // Represents a withdrawal initiation event
-                        if let Some(public_other) = t.tx.inputs.iter()
-                            .flat_map(|i| i.proof.iter().flat_map(|p| p.public_key.as_ref())).next() {
-                            let addr_str = public_other.to_bitcoin_address(&self.relay.node_config.network).expect("addr");
-                            let addr = Address::from_bitcoin(&addr_str);
+                        if let Some(addr) = t.tx.first_input_address_to_btc_address(&self.relay.node_config.network) {
+                            let addr = Address::from_bitcoin(&addr);
                             let fulfillment = self.bid_ask.fulfill_taker_order(
                                 amount as u64, false, time, None, &addr
                             );
@@ -192,7 +255,7 @@ impl PartyEvents {
                                 event_fulfillment = Some(fulfillment.clone());
                                 let pair = (fulfillment.clone(), ec.clone());
                                 self.unfulfilled_withdrawals.push(pair);
-                                info!("Withdrawal fulfillment request for incoming RDG tx_hash: {} fulfillment {}", t.tx.hash_or(), fulfillment.json_or());
+                                // info!("Withdrawal fulfillment request for incoming RDG tx_hash: {} fulfillment {}", t.tx.hash_or(), fulfillment.json_or());
                             }
                         };
                     } else {
@@ -367,6 +430,13 @@ impl AddressEvent {
             AddressEvent::Internal(t) => t.tx.hash_or().hex()
         }
     }
+    // pub fn other_addresses(&self) -> HashSet<Address> {
+    //     match self {
+    //         AddressEvent::External(e) => e.tx_id.clone(),
+    //         AddressEvent::Internal(t) => t.tx.hash_or().hex()
+    //     }
+    // }
+
     pub fn time(&self, seeds: &Vec<PublicKey>) -> Option<i64> {
         match self {
             // Convert from unix time to time ms

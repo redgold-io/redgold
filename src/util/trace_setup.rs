@@ -201,7 +201,7 @@ pub fn init_tracing(log_level: &str) {
         // .with_level(false);
 
     let filter_layer = EnvFilter::new(format!(
-        "sqlx=ERROR,warp=WARN,rocket=WARN,redgold={}", log_level));
+        "sqlx=ERROR,warp=WARN,rocket=ERROR,redgold={}", log_level));
 
     tracing_subscriber::registry()
         .with(filter_layer)

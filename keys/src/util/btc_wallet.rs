@@ -226,6 +226,7 @@ pub struct ExternalTimedTransaction {
     pub tx_id: String,
     pub timestamp: Option<u64>,
     pub other_address: String,
+    pub other_output_addresses: Vec<String>,
     pub amount: u64,
     pub incoming: bool,
     pub currency: SupportedCurrency,
@@ -374,11 +375,14 @@ impl SingleKeyBitcoinWallet {
         for x in result.iter() {
             let tx = x.transaction.safe_get_msg("Error getting transaction")?;
             let mut to_self_output_amount: Option<u64> = None;
+            let mut non_self_addrs_output = vec![];
             for o in &tx.output {
                 if let Some(a) = Address::from_script(&o.script_pubkey, self.network).ok() {
                     if a.to_string() == self_addr {
                         // sum value here instead?
                         to_self_output_amount = Some(o.value)
+                    } else {
+                        non_self_addrs_output.push(a.to_string())
                     }
                 }
             }
@@ -415,6 +419,7 @@ impl SingleKeyBitcoinWallet {
                     tx_id: x.txid.to_string(),
                     timestamp: Some(c.timestamp),
                     other_address: a,
+                    other_output_addresses: non_self_addrs_output,
                     amount: value,
                     incoming: true,
                     currency: SupportedCurrency::Bitcoin,
@@ -463,6 +468,13 @@ impl SingleKeyBitcoinWallet {
         for x in result.iter() {
             let tx = x.transaction.safe_get_msg("Error getting transaction")?;
             let output_amounts = self.outputs_convert(&tx.output);
+            let other_output_addresses = output_amounts.iter().filter_map(|(x,y)| {
+                if x != &self_addr {
+                    Some(x.clone())
+                } else {
+                    None
+                }
+            }).collect();
             let input_addrs = self.convert_tx_inputs_address(&tx.input)?;
 
             // Not needed?
@@ -490,6 +502,7 @@ impl SingleKeyBitcoinWallet {
                     tx_id: x.txid.to_string(),
                     timestamp: block_timestamp,
                     other_address: a,
+                    other_output_addresses,
                     amount: value,
                     incoming,
                     currency: SupportedCurrency::Bitcoin,
