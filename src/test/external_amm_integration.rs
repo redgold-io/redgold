@@ -71,7 +71,7 @@ pub async fn send_dev_test_rdg_btc_transaction() {
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
 
-        let amount = CurrencyAmount::from_fractional(0.01).expect("");
+        let amount = CurrencyAmount::from_fractional(0.013).expect("");
         let tb = TransactionBuilder::new()
             .with_utxos(&utxos).expect("utxos")
             .with_output(&dev_amm_rdg_address, &amount)

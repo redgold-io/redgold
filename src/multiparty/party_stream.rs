@@ -68,7 +68,9 @@ pub struct PartyEvents {
     pub unfulfilled_withdrawals: Vec<(OrderFulfillment, AddressEvent)>,
     pub price: f64,
     pub(crate) bid_ask: BidAsk,
-    pub unconfirmed_events: Vec<AddressEvent>
+    pub unconfirmed_events: Vec<AddressEvent>,
+    // TODO: populate
+    pub fulfillment_history: Vec<(OrderFulfillment, AddressEvent, AddressEvent)>
 }
 
 impl PartyEvents {
@@ -102,6 +104,7 @@ impl PartyEvents {
                 0, 0, price, min_ask
             ),
             unconfirmed_events: vec![],
+            fulfillment_history: vec![],
         }
     }
 
@@ -148,7 +151,14 @@ impl PartyEvents {
                     // Represents a receipt transaction for outgoing withdrawal.
                     // Should have a paired internal deposit event
                     self.unfulfilled_withdrawals.retain(|(of, d)| {
-                        Self::retain_unfulfilled_withdrawals(&t, d, &self.party_public_key, &self.relay.node_config.network)
+                        let res = Self::retain_unfulfilled_withdrawals(&t, d, &self.party_public_key, &self.relay.node_config.network);
+                        if !res {
+                            // This represents and outgoing BTC fulfillment of an incoming RDG tx
+                            let fulfillment = (of.clone(), d.clone(), ec.clone());
+                            self.fulfillment_history.push(fulfillment);
+                            info!("Outgoing BTC tx fulfillment with hash: {} to {} fulfillment {}", t.tx_id.clone(), t.other_address, of.json_or());
+                        };
+                        res
                     });
                     self.remove_unconfirmed_event(&e);
                     // info!("Outgoing BTC tx {}", t.json_or());
@@ -180,9 +190,9 @@ impl PartyEvents {
                             );
                             if let Some(fulfillment) = fulfillment {
                                 event_fulfillment = Some(fulfillment.clone());
-                                let pair = (fulfillment, ec.clone());
+                                let pair = (fulfillment.clone(), ec.clone());
                                 self.unfulfilled_withdrawals.push(pair);
-                                // info!("Withdrawal fulfillment request for incoming RDG tx: {} for tx {}", fulfillment.json_or(), t.tx.json_or());
+                                info!("Withdrawal fulfillment request for incoming RDG tx_hash: {} fulfillment {}", t.tx.hash_or(), fulfillment.json_or());
                             }
                         };
                     } else {
@@ -195,7 +205,12 @@ impl PartyEvents {
                     for tx_id in t.tx.output_external_txids() {
                         self.remove_unconfirmed_event(e);
                         self.unfulfilled_deposits.retain(|(of, d)| {
-                            Self::retain_unfulfilled_deposits(tx_id, d)
+                            let res = Self::retain_unfulfilled_deposits(tx_id, d);
+                            if !res {
+                                let fulfillment = (of.clone(), d.clone(), ec.clone());
+                                self.fulfillment_history.push(fulfillment);
+                            }
+                            res
                         });
                         // info!("Outgoing RDG tx fulfillment for BTC tx_id: {} {}", tx_id.identifier.clone(), t.tx.json_or());
                     }
@@ -289,8 +304,8 @@ impl PartyEvents {
 
         n.events = res.clone();
 
-        info!("Watcher Processing {} events", res.len());
-        info!("Watcher Processing events {}", res.json_or());
+        // info!("Watcher Processing {} events", res.len());
+        // info!("Watcher Processing events {}", res.json_or());
 
         for e in &res {
             n.process_event(e).await?;
@@ -421,7 +436,7 @@ async fn debug_events() -> RgResult<()> {
 
     let relay = Relay::dev_default().await;
 
-let mut btc_wallet =
+    let mut btc_wallet =
     Arc::new(Mutex::new(
         SingleKeyBitcoinWallet::new_wallet(pk_address.clone(), NetworkEnvironment::Dev, true)
             .expect("w")));
