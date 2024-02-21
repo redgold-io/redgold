@@ -44,14 +44,14 @@ pub async fn send_dev_test_btc_transaction() {
         println!("wallet address: {a}");
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
-        let res = w.send_local(dev_amm_btc_addres(), 1911, privk).expect("send");
+        let res = w.send_local(dev_amm_btc_addres(), 2024, privk).expect("send");
         println!("txid: {res}");
     }
 }
 
 
 // Use this for testing AMM transactions.
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn send_dev_test_rdg_btc_transaction() {
 

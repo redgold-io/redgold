@@ -137,7 +137,7 @@ impl PartyEvents {
                     let fulfillment = self.bid_ask.fulfill_taker_order(
                         t.amount, true, time, Some(t.tx_id.clone()), &other_addr
                     );
-                    info!("Incoming BTC tx {} Fulfillment: {}", t.json_or(), fulfillment.json_or());
+                    // info!("Incoming BTC tx {} Fulfillment: {}", t.json_or(), fulfillment.json_or());
                     if let Some(fulfillment) = fulfillment {
                         event_fulfillment = Some(fulfillment.clone());
                         let pair = (fulfillment, ec.clone());
@@ -151,7 +151,7 @@ impl PartyEvents {
                         Self::retain_unfulfilled_withdrawals(&t, d, &self.party_public_key, &self.relay.node_config.network)
                     });
                     self.remove_unconfirmed_event(&e);
-                    info!("Outgoing BTC tx {}", t.json_or());
+                    // info!("Outgoing BTC tx {}", t.json_or());
 
                 }
                 let delta = (t.amount as i64) * balance_sign;
