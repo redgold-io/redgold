@@ -29,7 +29,7 @@ async fn subscribe(
     room_id: &str,
     // request: &rocket::Request<'r>,
 ) -> Result<EventStream<impl Stream<Item = Event>>, rocket::http::Status> {
-    println!("Subscribe message");
+    // println!("Subscribe message");
     // TODO: https://stackoverflow.com/questions/64829301/how-to-retrieve-http-headers-from-a-request-in-rocket
     // let headers = request.headers();
     // You can now access individual headers. For example, to access a header named "X-Custom-Header":
@@ -82,7 +82,7 @@ fn verify_message(room_id: &str, message: String, db: &State<Db>) -> Option<(usi
 
 #[rocket::post("/rooms/<room_id>/issue_unique_idx", data = "<message>")]
 async fn issue_idx(db: &State<Db>, room_id: &str, message: String) -> Json<IssuedUniqueIdx> {
-    println!("room issue message");
+    // println!("room issue message");
     let mut idx = 5000;
     if let Some((i, _)) = verify_message(room_id, message, db) {
         idx = i;
@@ -92,7 +92,7 @@ async fn issue_idx(db: &State<Db>, room_id: &str, message: String) -> Json<Issue
 
 #[rocket::post("/rooms/<room_id>/broadcast", data = "<message>")]
 async fn broadcast(db: &State<Db>, room_id: &str, message: String) -> Status {
-    println!("room broadcast");
+    // println!("room broadcast");
     if let Some((_i, Some(msg))) = verify_message(room_id, message, db) {
         let room = db.get_room_or_create_empty(room_id).await;
         room.publish(msg).await;
