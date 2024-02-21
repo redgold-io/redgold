@@ -841,7 +841,7 @@ impl DepositWatcher {
 
         if btc_outputs.len() > 0 {
             let txid = self.fulfill_btc_bids(w, identifier.clone(), btc_outputs.clone()).await.log_error().ok();
-            info!("Sending BTC fulfillment transaction id {}: {:?}", tx_id.json_or(), btc_outputs);
+            info!("Sending BTC fulfillment transaction id {}: {:?}", txid.json_or(), btc_outputs);
         }
         let mut alloc2 = alloc.clone();
         alloc2.balance_btc = btc_starting_balance;
