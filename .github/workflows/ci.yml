@@ -293,7 +293,7 @@ jobs:
 #          refs/heads/test
 #          refs/heads/main
 #          ', github.ref)
-      - run: export RUST_BACKTRACE=1; export MAKEFLAGS="-j1"; cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+      - run: export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
