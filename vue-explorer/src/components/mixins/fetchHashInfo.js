@@ -53,12 +53,14 @@ export default {
 
             // Add offset and limit as query parameters if they are present
             let params = new URLSearchParams();
-            if (offset !== null) {
-                params.append('offset', offset);
+            if (offset == null) {
+                offset = 0;
             }
-            if (limit !== null) {
-                params.append('limit', limit);
+            params.append('offset', offset);
+            if (limit == null) {
+                limit = 25;
             }
+            params.append('limit', limit);
             if (params.toString()) {
                 input += `?${params.toString()}`;
             }

@@ -44,7 +44,7 @@ pub async fn send_dev_test_btc_transaction() {
         println!("wallet address: {a}");
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
-        let res = w.send_local(dev_amm_btc_addres(), 2024, privk).expect("send");
+        let res = w.send_local(dev_amm_btc_addres(), 52024, privk).expect("send");
         println!("txid: {res}");
     }
 }
@@ -71,7 +71,7 @@ pub async fn send_dev_test_rdg_btc_transaction() {
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
 
-        let amount = CurrencyAmount::from_fractional(0.013).expect("");
+        let amount = CurrencyAmount::from_fractional(0.02).expect("");
         let tb = TransactionBuilder::new()
             .with_utxos(&utxos).expect("utxos")
             .with_output(&dev_amm_rdg_address, &amount)
