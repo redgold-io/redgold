@@ -196,7 +196,7 @@ features = ["serde", "bitcoinconsensus"]
 opt-level = 3
 
 [dependencies.openssl-sys]
-version = "0.9.88"
+version = "0.9.101"
 features = ["vendored"]
 
 [profile.release]
