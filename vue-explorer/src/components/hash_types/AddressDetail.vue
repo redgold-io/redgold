@@ -12,11 +12,6 @@
         <div>
           <div class="hash-container">
             <h3 class="detail-group">Address Details</h3>
-            <div class="radio-holder" style="display: inline-block; margin-left: 10px;">
-              <label class="radio-option"><input type="radio" value="all" v-model="transactionType" /> All</label>
-              <label class="radio-option"><input type="radio" value="incoming" v-model="transactionType" />  Incoming</label>
-              <label class="radio-option"><input type="radio" value="outgoing" v-model="transactionType" /> Outgoing</label>
-            </div>
           </div>
           <div class="grid-container">
 
@@ -63,9 +58,11 @@
               <div><HashLink :shorten="false" :data="hashData.address_pool_info.rdg_address" /></div>
               <div><strong>Public Key</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
-              <div><strong>Price USD/RDG</strong></div>
+              <div><strong>Price Ask USD/RDG</strong></div>
+              <div><TextCopy :data="askPriceUsdRdg" /></div>
+              <div><strong>Price Center USD/RDG</strong></div>
               <div><TextCopy :data="centerPriceUsdRdg" /></div>
-              <div><strong>Price RDG/BTC</strong></div>
+              <div><strong>Price Center RDG/BTC</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /></div>
               <div><strong>Spread USD</strong></div>
               <div>
@@ -119,7 +116,14 @@
           </div>
 
 
-          <h3 class="detail-group">Transactions</h3>
+          <div class="flex-center">
+            <h3 class="detail-group">Transactions</h3>
+            <div class="radio-holder" style="display: inline-block; margin-left: 10px;">
+              <label class="radio-option"><input type="radio" value="all" v-model="transactionType" /> All</label>
+              <label class="radio-option"><input type="radio" value="incoming" v-model="transactionType" />  Incoming</label>
+              <label class="radio-option"><input type="radio" value="outgoing" v-model="transactionType" /> Outgoing</label>
+            </div>
+          </div>
           <div><BriefTransaction :transactions="filteredTransactions" /></div>
           <nav>
             <ul class="pagination">
@@ -205,7 +209,7 @@ export default {
       // ... other data properties ...
       transactionType: 'all',
       currentPage: 1,
-      perPage: 10,
+      perPage: 25,
       hashData: this.hashDataInitial,
       exampleBidAskData: {
         labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', "", "", "", ""],
@@ -333,6 +337,19 @@ export default {
         let centerPrice = this.hashData.address_pool_info.bid_ask.center_price;
         let usdPrice = (1/centerPrice) * this.usdBtcRate;
         return usdPrice.toFixed(2);
+      }
+      return 0;
+    },
+    askPriceUsdRdg() {
+      if (this.hashData.address_pool_info != null) {
+        let asks = this.hashData.address_pool_info.bid_ask.asks;
+        if (asks.length > 0) {
+          let centerPrice = asks[0].price; // Now in RDG / BTC
+          let usdPrice =  centerPrice * this.usdBtcRate ;
+          return usdPrice.toFixed(2);
+        } else {
+          return 0
+        }
       }
       return 0;
     },
@@ -576,7 +593,7 @@ export default {
         let limit = this.perPage;
 
         // Fetch data and update hashData
-        await this.fetchData(null, null,  offset, limit)
+        await this.fetchData(offset, limit)
       }
     }
   }
@@ -597,6 +614,13 @@ export default {
   display: flex;
   align-items: center;
 }
+
+.flex-center {
+  display: flex;
+  align-items: center;
+}
+
+
 .detail-group {
   padding-top: 15px;
   padding-bottom: 15px;
