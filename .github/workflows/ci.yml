@@ -285,6 +285,7 @@ jobs:
       - run: echo steps.check-branch.outputs.match
       - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
+      - run: ./bin/install_mac_build_deps.sh
 #      - if:
 #          contains('
 #          refs/heads/staging
