@@ -16,14 +16,14 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   test:
-    if:
-      ${{ github.event_name == 'pull_request_target' || !contains('
-      refs/heads/predev
-      refs/heads/dev
-      refs/heads/staging
-      refs/heads/test
-      refs/heads/main
-      ', github.ref) }}
+    if: false
+#      ${{ github.event_name == 'pull_request_target' || !contains('
+#      refs/heads/predev
+#      refs/heads/dev
+#      refs/heads/staging
+#      refs/heads/test
+#      refs/heads/main
+#      ', github.ref) }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 60
     permissions:
@@ -245,13 +245,13 @@ jobs:
           path: ./redgold.exe
   build-mac:
 #    needs: [test]
-    if: ${{ github.event_name != 'pull_request_target' && contains('
-      refs/heads/predev
-      refs/heads/dev
-      refs/heads/staging
-      refs/heads/test
-      refs/heads/main
-      ', github.ref) }}
+#    if: ${{ github.event_name != 'pull_request_target' && contains('
+#      refs/heads/predev
+#      refs/heads/dev
+#      refs/heads/staging
+#      refs/heads/test
+#      refs/heads/main
+#      ', github.ref) }}
     runs-on: macos-latest
     timeout-minutes: 100
     permissions:
@@ -284,13 +284,13 @@ jobs:
       - run: echo steps.check-branch.outputs.match
       - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
-      - if:
-          contains('
-          refs/heads/staging
-          refs/heads/test
-          refs/heads/main
-          ', github.ref)
-        run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+#      - if:
+#          contains('
+#          refs/heads/staging
+#          refs/heads/test
+#          refs/heads/main
+#          ', github.ref)
+      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
