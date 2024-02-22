@@ -47,7 +47,7 @@ pub fn get_default_data_top_folder() -> PathBuf {
 
 use redgold_schema::EasyJson;
 use crate::api::RgHttpClient;
-use crate::gui::image_capture::debug_capture;
+// use crate::gui::image_capture::debug_capture;
 use crate::util::logging::Loggable;
 
 
@@ -604,7 +604,7 @@ impl ArgTranslate {
             match cmd {
                 RgTopLevelSubcommand::TestCapture(t) => {
                     println!("Attempting test capture");
-                    debug_capture();
+                    // debug_capture();
                     unsafe {
                         exit(0)
                     }

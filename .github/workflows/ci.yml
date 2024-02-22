@@ -258,8 +258,8 @@ jobs:
       contents: write
     env:
       DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-      CARGO_BUILD_JOBS: 1 # Adjust based on your CI environment's capability
-      MAKEFLAGS: "-j1"
+#      CARGO_BUILD_JOBS: 1 # Adjust based on your CI environment's capability
+#      MAKEFLAGS: "-j1"
     outputs:
       release_match: ${{ steps.check-branch.outputs.match }}
     steps:
@@ -293,7 +293,8 @@ jobs:
 #          refs/heads/test
 #          refs/heads/main
 #          ', github.ref)
-      - run: export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+      # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1";
+      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
