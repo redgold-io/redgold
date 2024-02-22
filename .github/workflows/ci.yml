@@ -252,7 +252,7 @@ jobs:
 #      refs/heads/test
 #      refs/heads/main
 #      ', github.ref) }}
-    runs-on: macos-12-xl
+    runs-on: macos-latest
     timeout-minutes: 100
     permissions:
       contents: write
