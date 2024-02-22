@@ -3,9 +3,9 @@ use std::thread::sleep;
 use std::time::Duration;
 use image::DynamicImage::ImageRgb8;
 use image::{DynamicImage, ImageBuffer};
-use nokhwa::Camera;
-use nokhwa::pixel_format::RgbFormat;
-use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
+// use nokhwa::Camera;
+// use nokhwa::pixel_format::RgbFormat;
+// use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
 
 use openpnp_capture::{Device, Format, Stream};
 use rqrr::MetaData;

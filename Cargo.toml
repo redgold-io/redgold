@@ -174,7 +174,7 @@ qrencode = "0.14.0"
 rqrr = "0.6.0"
 csscolorparser = "0.6.2"
 #viuer = "0.6.2"
-nokhwa = { version = "0.10.4", features = ["input-native"] }
+#nokhwa = { version = "0.10.4", features = ["input-native"] }
 #uvc = "0.2.0"
 #eye-hal = "0.1.0"
 openpnp_capture = "0.2.4"
