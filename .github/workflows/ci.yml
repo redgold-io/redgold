@@ -252,14 +252,14 @@ jobs:
 #      refs/heads/test
 #      refs/heads/main
 #      ', github.ref) }}
-    runs-on: macos-latest-xl
+    runs-on: macos-12-xl
     timeout-minutes: 100
     permissions:
       contents: write
     env:
       DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-      CARGO_BUILD_JOBS: 2 # Adjust based on your CI environment's capability
-      MAKEFLAGS: "-j2"
+      CARGO_BUILD_JOBS: 1 # Adjust based on your CI environment's capability
+      MAKEFLAGS: "-j1"
     outputs:
       release_match: ${{ steps.check-branch.outputs.match }}
     steps:
@@ -293,7 +293,7 @@ jobs:
 #          refs/heads/test
 #          refs/heads/main
 #          ', github.ref)
-      - run: cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+      - run: export MAKEFLAGS="-j1"; cargo clean; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
 
       - uses: actions/upload-artifact@v3
         with:
