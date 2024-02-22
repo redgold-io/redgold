@@ -195,9 +195,12 @@ features = ["serde", "bitcoinconsensus"]
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
-[dependencies.openssl-sys]
-version = "0.9.101"
-features = ["vendored"]
+openssl = { version = "0.10", features = ["vendored"] }
+
+
+#[dependencies.openssl-sys]
+#version = "0.9.101"
+#features = ["vendored"]
 
 [profile.release]
 codegen-units=1
