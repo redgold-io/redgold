@@ -16,14 +16,14 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   test:
-    if: false
-#      ${{ github.event_name == 'pull_request_target' || !contains('
-#      refs/heads/predev
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref) }}
+    if:
+      ${{ github.event_name == 'pull_request_target' || !contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref) }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 60
     permissions:
@@ -244,14 +244,14 @@ jobs:
           name: redgold.exe
           path: ./redgold.exe
   build-mac:
-#    needs: [test]
-#    if: ${{ github.event_name != 'pull_request_target' && contains('
-#      refs/heads/predev
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref) }}
+    needs: [test]
+    if: ${{ github.event_name != 'pull_request_target' && contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref) }}
     runs-on: macos-latest
     timeout-minutes: 100
     permissions:

@@ -1,6 +1,6 @@
 [package]
 name = "redgold-sdk"
-version = "0.1.21"
+version = "0.1.22"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -17,7 +17,7 @@ categories = ["cryptography::cryptocurrencies"]
 [dependencies]
 extism-pdk = "0.3.3"
 serde = "1.0.163"
-redgold-schema = { path = "../schema", version = "0.1.21" }
+redgold-schema = { path = "../schema", version = "0.1.22" }
 #redgold-schema = {workspace = true, features = []}
 
 [lib]
