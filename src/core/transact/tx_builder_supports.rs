@@ -100,8 +100,11 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn with_network(&mut self, network: NetworkEnvironment) -> &mut Self {
-        self.network = Some(network);
+    pub fn with_network(&mut self, network: &NetworkEnvironment) -> &mut Self {
+        self.network = Some(network.clone());
+        let mut options = self.transaction.options.clone().unwrap_or(TransactionOptions::default());
+        options.network_type = Some(network.clone() as i32);
+        self.transaction.options = Some(options);
         self
     }
 
