@@ -433,6 +433,16 @@ impl NodeConfig {
         nc
     }
 
+    pub async fn default_env(network_environment: NetworkEnvironment) -> Self {
+        let mut opts = RgArgs::default();
+        opts.network = Some(network_environment.to_std_string());
+        let node_config = NodeConfig::default();
+        let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
+        arg_translate.translate_args().await.unwrap();
+        let nc = arg_translate.node_config;
+        nc
+    }
+
     pub fn default() -> Self {
         Self {
             peer_id: Default::default(),

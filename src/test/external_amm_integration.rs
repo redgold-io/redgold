@@ -9,14 +9,22 @@ use crate::node_config::NodeConfig;
 
 // Use this for testing AMM transactions.
 
-pub fn dev_amm_btc_addres() -> String {
-    return "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2".to_string();
+pub fn amm_btc_address(network_environment: NetworkEnvironment) -> String {
+    match network_environment {
+        NetworkEnvironment::Dev => { "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2" }
+        NetworkEnvironment::Staging => { "tb1qftm7w70xmr7xplzp6w6ntxs4dygxtd2evc7x2e" }
+        _ => { panic!("not implemented"); }
+    }.to_string()
 }
-
-pub fn dev_amm_public_key() -> PublicKey {
-    let pk_hex = "03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37";
-    let dev_amm_pk = PublicKey::from_hex(pk_hex).expect("pk");
-    return dev_amm_pk
+pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
+    let pk_hex = match network_environment {
+        // NetworkEnvironment::Main => {}
+        // NetworkEnvironment::Test => {}
+        NetworkEnvironment::Dev => {"03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37"}
+        NetworkEnvironment::Staging => {"02efbe0b97d823da74ef2d88b2321d4e52ce2f62b137b0b5c5b415be9e40a9ca15"}
+        _ => { panic!("not implemented"); }
+    };
+    PublicKey::from_hex(pk_hex.to_string()).expect("pk")
 }
 
 // Has faucet bitcoin test funds
@@ -34,7 +42,9 @@ pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
 
 #[ignore]
 #[tokio::test]
-pub async fn send_dev_test_btc_transaction() {
+pub async fn send_test_btc_transaction_deposit() {
+    let network = NetworkEnvironment::Staging;
+    let amount_sats = 40000;
 
     if let Some((privk, kp)) = dev_ci_kp() {
         let pk = kp.public_key();
@@ -45,7 +55,7 @@ pub async fn send_dev_test_btc_transaction() {
         println!("wallet address: {a}");
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
-        let res = w.send_local(dev_amm_btc_addres(), 52024, privk).expect("send");
+        let res = w.send_local(amm_btc_address(network), amount_sats, privk).expect("send");
         println!("txid: {res}");
     }
 }
@@ -54,28 +64,32 @@ pub async fn send_dev_test_btc_transaction() {
 // Use this for testing AMM transactions.
 #[ignore]
 #[tokio::test]
-pub async fn send_dev_test_rdg_btc_transaction() {
+pub async fn send_test_rdg_btc_tx_withdrawal() {
 
-    let dev_amm_rdg_address = dev_amm_public_key().address().expect("address");
-    let addr = dev_amm_rdg_address.render_string().expect("");
+    let network = NetworkEnvironment::Staging;
+    let amm_addr = amm_public_key(&network).address().expect("address");
+    let amount = 1.0;
 
-    println!("dev amm address: {addr}");
+    let addr = amm_addr.render_string().expect("");
+
+    println!("sending to rdg amm address: {addr}");
 
     if let Some((privk, keypair)) = dev_ci_kp() {
         let pk = keypair.public_key();
         let rdg_address = pk.address().expect("");
         println!("pk: {}", rdg_address.render_string().expect(""));
 
-        let client = NodeConfig::dev_default().await.api_client();
-        // client.faucet(&rdg_address).await.expect("faucet");
+        let client = NodeConfig::default_env(network).await.api_client();
+        client.faucet(&rdg_address).await.expect("faucet");
         let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
 
-        let amount = CurrencyAmount::from_fractional(0.02).expect("");
+        let amount = CurrencyAmount::from_fractional(amount).expect("");
         let tb = TransactionBuilder::new()
+            .with_network(&network)
             .with_utxos(&utxos).expect("utxos")
-            .with_output(&dev_amm_rdg_address, &amount)
+            .with_output(&amm_addr, &amount)
             .with_last_output_withdrawal_swap()
             .build().expect("build")
             .sign(&keypair).expect("sign");
@@ -91,14 +105,15 @@ pub async fn send_dev_test_rdg_btc_transaction() {
 #[test]
 pub fn dev_balance_check() {
 
-    let pk = dev_amm_public_key();
+    let network = NetworkEnvironment::Dev;
+    let pk = amm_public_key(&network);
 
     let addr = pk.address().expect("address").render_string().expect("");
 
     println!("address: {addr}");
 
     let mut w =
-        SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true).expect("w");
+        SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("w");
 
     //
     // let a = w.address().expect("a");
