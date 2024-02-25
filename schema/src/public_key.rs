@@ -1,5 +1,14 @@
+use std::fmt::{Display, Formatter};
 use crate::{bytes_data, from_hex, SafeBytesAccess, ShortString, structs};
-use crate::structs::{Address, ErrorInfo, PublicKeyType};
+use crate::structs::{Address, ErrorInfo, PublicKey, PublicKeyType};
+
+
+
+impl Display for PublicKey {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.hex_or())
+    }
+}
 
 impl structs::PublicKey {
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
