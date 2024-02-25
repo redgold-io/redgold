@@ -14,6 +14,14 @@ enum SignatureType {
   // hardware cold wallets, can be deprecated once hardware wallet support is added for native signatures matching
   // Redgold schema.
   EcdsaBitcoinSignMessageHardware = 1;
+  // The raw RSV signature outputs, used for ETH compatibility.
+  ECDSARecoverable = 2;
+}
+
+message RsvSignature {
+  BytesData r = 1;
+  BytesData s = 2;
+  optional int64 v = 3;
 }
 
 // The raw data associated with a signature, along with type information for how to verify it. Does not include
@@ -22,6 +30,7 @@ enum SignatureType {
 message Signature {
   BytesData bytes = 1;
   SignatureType signature_type = 2;
+  RsvSignature rsv = 3;
 }
 
 // Future placeholder in the event of use of different public key types, will eventually cover ed25519 etc.

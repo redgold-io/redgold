@@ -195,8 +195,9 @@ pub fn init_tracing(log_level: &str) {
 
     let fmt_layer = tracing_subscriber::fmt::Layer::default()
         .compact()
-        .with_ansi(false)
-        .with_span_events(FmtSpan::CLOSE);
+        .with_ansi(false);
+    // This does instrument timing, which doesn't seem to be that useful or well formatted.
+        // .with_span_events(FmtSpan::CLOSE);
         // .with_target(false)
         // .with_level(false);
 

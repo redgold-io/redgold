@@ -49,3 +49,13 @@ impl<T, K> VecAddBy<T, K> for Vec<T> where K : PartialEq, T: Clone {
         res
     }
 }
+
+pub trait AnyPrinter{
+    fn print(&self);
+}
+
+impl<T> AnyPrinter for T where T: std::fmt::Display {
+    fn print(&self) {
+        println!("{}", self);
+    }
+}

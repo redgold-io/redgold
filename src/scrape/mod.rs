@@ -79,7 +79,7 @@ pub struct BinanceAggTradesResponse {
     q: String,
     f: u64,
     l: u64,
-    T: u64,
+    t: u64,
     m: bool,
     M: bool,
 }

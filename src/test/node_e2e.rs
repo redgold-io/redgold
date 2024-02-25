@@ -2,10 +2,12 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
+use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::eth::example::{dev_ci_kp, EthHistoricalClient, EthWalletWrapper};
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_schema::{bytes_data, EasyJson, ProtoHashable, ProtoSerde, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, Seed, TestContractInternalState};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, TestContractInternalState};
 use crate::api::control_api::ControlClient;
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
@@ -341,6 +343,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let start_node = local_nodes.start();
     // info!("Started initial node");
     let client1 = start_node.control_client.clone();
+    let client2 = start_node.control_client.clone();
     let ds = start_node.node.relay.ds.clone();
     // let show_balances = || {
     //     let res = &ds.query_all_balance();
@@ -459,26 +462,9 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     // tokio::time::sleep(Duration::from_secs(10)).await;
 
-    let do_signing = |party: ControlMultipartyKeygenResponse| async {
 
-        let signing_data = Hash::from_string_calculate("hey");
-        let vec1 = signing_data.vec();
-        let vec = bytes_data(vec1.clone()).expect("");
-        let mut signing_request = ControlMultipartySigningRequest::default();
-        let mut init_signing = InitiateMultipartySigningRequest::default();
-        let identifier = party.multiparty_identifier.expect("");
-        init_signing.signing_room_id = default_room_id_signing(identifier.uuid.clone());
-        init_signing.data_to_sign = Some(vec);
-        init_signing.identifier = Some(identifier.clone());
-        signing_request.signing_request = Some(init_signing);
-        let res =
-            client1.multiparty_signing(signing_request).await;
-        // println!("{:?}", res);
-        assert!(res.is_ok());
-        res.expect("ok").proof.expect("prof").verify(&signing_data).expect("verified");
-    };
-
-    do_signing(keygen1).await;
+    let signing_data = Hash::from_string_calculate("hey");
+    let result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
 
     tracing::info!("After MP test");
 
@@ -497,8 +483,43 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // submit.submit().await?.at_least_n(3).unwrap();
 
     let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
-    do_signing(keygen2).await;
+    let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
+    let public = res.public_key.expect("public key");
+    let mp_eth_addr = public.to_ethereum_address().expect("eth address");
 
+    let environment = NetworkEnvironment::Dev;
+
+
+    let do_mp_eth_test = false;
+
+    if do_mp_eth_test {
+        // Ignore this part for now
+        let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
+        let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
+        let txs = h.get_all_tx(&string_addr).await.expect("works");
+        println!("txs: {}", txs.json_or());
+        let tx_head = txs.get(0).expect("tx");
+        let other_address = tx_head.other_address.clone();
+
+        // Load using the faucet KP, but send to the multiparty address
+        let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
+        let eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
+        let dev_faucet_rx_addr = dev_kp.public_key().to_ethereum_address().expect("works");
+        let fee = "0.000108594791676".to_string();
+        let fee_value = EthHistoricalClient::translate_float_value(&fee.to_string()).expect("works") as u64;
+        let amount = fee_value * 6;
+        let tx = eth.send_tx(&mp_eth_addr, amount).await.expect("works");
+
+        tokio::time::sleep(Duration::from_secs(20)).await;
+
+        let mut tx = eth.create_transaction(&mp_eth_addr, &dev_faucet_rx_addr, fee_value * 3).await.expect("works");
+        let data = EthWalletWrapper::signing_data(&tx).expect("works");
+        let h = Hash::new(data);
+        let res = do_signing(keygen2.clone(), h.clone(), client1.clone()).await;
+        let sig = res.signature.expect("sig");
+        let raw = EthWalletWrapper::process_signature(sig, &mut tx).expect("works");
+        eth.broadcast_tx(raw).await.expect("works");
+    }
     // TODO: AMM tests
 
     // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
@@ -567,6 +588,27 @@ async fn data_store_test() {
     // for (tx, xor_value) in ds_ret {
     //     println!("xor_value: {} tx_hash: {}", hex::encode(xor_value), hex::encode(tx));
     // }
+
+}
+
+async fn do_signing(party: ControlMultipartyKeygenResponse, signing_data: Hash, client: ControlClient) -> Proof {
+
+        let vec1 = signing_data.vec();
+        let vec = bytes_data(vec1.clone()).expect("");
+        let mut signing_request = ControlMultipartySigningRequest::default();
+        let mut init_signing = InitiateMultipartySigningRequest::default();
+        let identifier = party.multiparty_identifier.expect("");
+        init_signing.signing_room_id = default_room_id_signing(identifier.uuid.clone());
+        init_signing.data_to_sign = Some(vec);
+        init_signing.identifier = Some(identifier.clone());
+        signing_request.signing_request = Some(init_signing);
+        let res =
+            client.multiparty_signing(signing_request).await;
+        // println!("{:?}", res);
+        assert!(res.is_ok());
+        let proof = res.expect("ok").proof.expect("prof");
+        proof.verify(&signing_data).expect("verified");
+        proof
 
 }
 

@@ -606,6 +606,7 @@ pub fn signature_data(data: Vec<u8>) -> Option<crate::structs::Signature> {
     Some(structs::Signature {
         bytes: bytes_data(data),
         signature_type: SignatureType::Ecdsa as i32,
+        rsv: None
     })
 }
 
