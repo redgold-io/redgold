@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use redgold_schema::{ProtoSerde, structs};
 use redgold_schema::structs::InitiateMultipartyKeygenRequest;
 
+#[ignore]
 #[test]
 fn debug_load_offline_shares() {
     for line in std::fs::read_to_string(PathBuf::from("exportedData.csv")).unwrap().split("\n") {
