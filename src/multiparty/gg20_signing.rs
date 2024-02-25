@@ -17,7 +17,7 @@ use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::sig
 };
 use round_based::async_runtime::AsyncProtocol;
 use round_based::Msg;
-use redgold_schema::{error_info, json, json_from, structs};
+use redgold_schema::{bytes_data, error_info, json, json_from, structs};
 use redgold_schema::structs::{ErrorInfo, Proof};
 use redgold_keys::util::verify;
 use crate::multiparty::gg20_keygen::external_address_to_surf_url;
@@ -116,6 +116,7 @@ use curv::elliptic::curves::ECScalar;
 use log::info;
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
+use crate::schema::structs::RsvSignature;
 
 pub async fn signing(
     external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, relay: Relay
@@ -133,8 +134,20 @@ pub async fn signing(
     let sig_secp = Signature::from_compact(&*vec).map_err(|e| error_info(e.to_string()))?;
     // TODO: verify() -- where is the public key?
     let comp = sig_secp.serialize_compact().to_vec();
-    let sig_struct = structs::Signature::ecdsa(comp.clone());
+    let mut sig_struct = structs::Signature::ecdsa(comp.clone());
     let recovery_id = sig.recid;
+    // recovery_id.to_be_bytes()
+
+    let rsv_sig = RsvSignature {
+        r: bytes_data(r),
+        s: bytes_data(s),
+        v: Some(recovery_id as i64)
+    };
+
+    // TODO: Technically, we can drop the other signature here for simplicity when an appropriate verify is in place
+    // For now this is fine.
+    sig_struct.rsv = Some(rsv_sig);
+
     let rec_id = RecoveryId::from_i32(recovery_id as i32).map_err(|e| error_info(e.to_string()))?;
     let rec_sig = RecoverableSignature::from_compact(&*comp, rec_id).map_err(|e| error_info(e.to_string()))?;
 

@@ -12,6 +12,7 @@ pub mod util;
 pub mod debug;
 pub mod xpub_wrapper;
 pub mod address_external;
+pub mod eth;
 
 use crate::util::mnemonic_words::generate_key_i;
 

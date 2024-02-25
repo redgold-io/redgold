@@ -278,6 +278,7 @@ impl Rosetta {
         Ok(structs::Signature {
             bytes: bytes_data(sig_bytes.clone()),
             signature_type: structs::SignatureType::Ecdsa as i32,
+            rsv: None,
         })
     }
 
