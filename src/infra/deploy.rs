@@ -20,6 +20,7 @@ use crate::hardware::trezor::trezor_bitcoin_standard_path;
 use crate::infra::SSH;
 use crate::node_config::NodeConfig;
 use crate::resources::Resources;
+use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::Deploy;
 use crate::util::cli::data_folder::DataFolder;
@@ -533,4 +534,42 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
 #[tokio::test]
 async fn test_setup_server() {
     // default_deploy().await;
+}
+
+pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Server>) {
+
+    let net_str = p0.network.to_std_string();
+    let time = util::current_time_unix();
+    let secure_or = p0.secure_or().by_env(p0.network);
+    let bk = secure_or.backups();
+    let time_back = bk.join(time.to_string());
+
+
+    for s in p1 {
+        let server_dir = time_back.join(s.index.to_string());
+        std::fs::create_dir_all(server_dir.clone()).expect("");
+        let mut ssh = SSH::new_ssh(s.host.clone(), None);
+        let fnm_export = "multiparty.csv";
+        std::fs::remove_file(fnm_export).ok();
+        let cmd = format!(
+            "sqlite3 ~/.rg/{}/data_store.sqlite \"SELECT \
+            room_id, keygen_time, hex(keygen_public_key), hex(host_public_key), self_initiated, \
+            hex(local_share), hex(initiate_keygen) FROM multiparty;\" > ~/.rg/{}/{}",
+            net_str,
+            net_str,
+            fnm_export
+        );
+        ssh.exec("sudo apt install -y sqlite3", true);
+        ssh.exec(cmd, true);
+        let user = s.username.unwrap_or("root".to_string());
+        let res = util::cmd::run_bash(
+            format!(
+                "scp {}@{}:~/.rg/{}/{} {}",
+                user, s.host.clone(), net_str, fnm_export, fnm_export)
+        ).expect("");
+        println!("Backup result: {:?}", res);
+        let contents = std::fs::read_to_string(fnm_export).expect("");
+        std::fs::remove_file(fnm_export).ok();
+        std::fs::write(server_dir.join(fnm_export), contents).expect("");
+    }
 }

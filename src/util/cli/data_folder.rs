@@ -13,6 +13,10 @@ pub struct EnvDataFolder {
 
 impl EnvDataFolder {
 
+    pub fn backups(&self) -> PathBuf {
+        self.path.join("backups")
+    }
+
     pub fn data_store_path(&self) -> PathBuf {
         self.path.join("data_store.sqlite")
     }
