@@ -16,14 +16,21 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   test:
-    if:
-      ${{ github.event_name == 'pull_request_target' || !contains('
-      refs/heads/predev
-      refs/heads/dev
-      refs/heads/staging
-      refs/heads/test
-      refs/heads/main
-      ', github.ref) }}
+    if: >
+      (
+        github.event_name == 'push' && 
+        !contains('
+          refs/heads/predev
+          refs/heads/dev
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+        ', github.ref)
+      ) || 
+      (
+        github.event_name == 'pull_request_target' && 
+        github.event.pull_request.head.repo.full_name != github.repository
+      )
     runs-on: ubuntu-latest-m
     timeout-minutes: 60
     permissions:
