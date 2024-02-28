@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use bitcoin::secp256k1::{PublicKey, SecretKey};
+use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};

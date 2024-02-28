@@ -142,7 +142,7 @@ impl LiveE2E {
             let min_offset = 20;
             let max_offset = 30;
             for i in min_offset..max_offset {
-                let key = self.relay.node_config.internal_mnemonic().key_at(i);
+                let key = self.relay.node_config.words().keypair_at_change(i).expect("");
                 let address = key.address_typed();
                 map.insert(address, key);
             }

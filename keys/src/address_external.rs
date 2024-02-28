@@ -1,7 +1,7 @@
 use std::str::FromStr;
-use bitcoin::{Address, Network};
+use bdk::bitcoin::{Address, Network};
 use redgold_schema::structs::{AddressType, ErrorInfo, NetworkEnvironment, PublicKey};
-use bitcoin::util::key;
+use bdk::bitcoin::util::key;
 use hex::ToHex;
 // use web3::types::H160;
 use redgold_schema::{ErrorInfoContext, SafeBytesAccess, structs};
@@ -26,7 +26,7 @@ impl ToBitcoinAddress for PublicKey {
         } else {
             Network::Testnet
         };
-        let address = Address::p2wpkh(pk, network1);
+        let address = Address::p2wpkh(pk, network1).error_info("bitcoin address conversion")?;
         Ok(address.to_string())
     }
 

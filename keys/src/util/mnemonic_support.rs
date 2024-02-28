@@ -1,23 +1,23 @@
 use std::str::FromStr;
-use bdk::bitcoin::{Network, PrivateKey, XpubIdentifier};
+
+use bdk::bitcoin::Network;
 use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::secp256k1::rand::RngCore;
 use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey, ExtendedPubKey};
-use bdk::keys::bip39::{Mnemonic, Language};
 use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
+use bdk::keys::bip39::{Language, Mnemonic};
 use bdk::keys::bip39::WordCount::Words24;
 use bdk::miniscript::miniscript;
-use bitcoin::hashes::hex::ToHex;
-use bitcoin_wallet::account::MasterKeyEntropy;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH, redgold_keypair_change_path};
+use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
+
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
-use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
-use crate::util::mnemonic_words::MnemonicWords;
+use crate::util::btc_wallet::SingleKeyBitcoinWallet;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct WordsPass {
@@ -42,16 +42,16 @@ pub struct WordsPassBtcMessageAccountMetadata {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct WordsPassMetadata {
-    checksum: String,
-    checksum_words: String,
-    btc_84h_0h_0h_0_0_address: String,
-    btc_84h_0h_0h_0_0_xpub: String,
-    eth_44h_60h_0h_0_0_address: String,
-    eth_44h_60h_0h_0_0_xpub: String,
-    rdg_44h_16180h_0h_0_0_address: String,
-    rdg_44h_16180h_0h_0_0_xpub: String,
-    rdg_btc_message_account_metadata: Vec<WordsPassBtcMessageAccountMetadata>,
-    executable_checksum: String
+    pub checksum: String,
+    pub checksum_words: String,
+    pub btc_84h_0h_0h_0_0_address: String,
+    pub btc_84h_0h_0h_0_0_xpub: String,
+    pub eth_44h_60h_0h_0_0_address: String,
+    pub eth_44h_60h_0h_0_0_xpub: String,
+    pub rdg_44h_16180h_0h_0_0_address: String,
+    pub rdg_44h_16180h_0h_0_0_xpub: String,
+    pub rdg_btc_message_account_metadata: Vec<WordsPassBtcMessageAccountMetadata>,
+    pub executable_checksum: String
 }
 
 impl WordsPassMetadata {
@@ -168,12 +168,30 @@ impl WordsPass {
         })
     }
 
+    pub fn from_bytes(bytes: &[u8]) -> RgResult<Self> {
+        let m = Mnemonic::from_entropy(bytes).error_info("Failed to derive mnemonic from entropy")?;
+        Ok(Self {
+            words: m.to_string(),
+            passphrase: None
+        })
+    }
+
+    pub fn from_str_hashed(str: impl Into<String>) -> Self {
+        let b: Vec<u8> = structs::Hash::from_string_calculate(&str.into()).vec();
+        Self::from_bytes(&b).unwrap()
+    }
+
     pub fn mnemonic(&self) -> RgResult<Mnemonic> {
         Mnemonic::parse_in(
             Language::English,
             self.words.clone(),
         ).map_err(|e| error_info(format!("Failed to parse mnemonic: {}",
         e.to_string())))
+    }
+
+    pub fn validate(&self) -> RgResult<&Self> {
+        self.mnemonic()?;
+        Ok(self)
     }
 
     pub fn pair(&self) -> RgResult<(Mnemonic, Option<String>)> {
@@ -196,20 +214,20 @@ impl WordsPass {
         Ok(xpub)
     }
 
-    pub fn key_from_path_str(&self, path: String) -> RgResult<ExtendedPrivKey> {
-        let dp = DerivationPath::from_str(path.as_str())
+    pub fn key_from_path_str(&self, path: impl Into<String>) -> RgResult<ExtendedPrivKey> {
+        let dp = DerivationPath::from_str(path.into().as_str())
             .error_info("Failed to parse derivation path")?;
         Ok(self.xprv()?.derive_priv(&Secp256k1::new(), &dp)
             .error_info("Failed to derive private key")?)
     }
 
-    pub fn private_at(&self, path: String) -> RgResult<String> {
+    pub fn private_at(&self, path: impl Into<String>) -> RgResult<String> {
         let key = self.key_from_path_str(path)?;
         let pkhex = hex::encode(key.private_key.secret_bytes().to_vec());
         Ok(pkhex)
     }
 
-    pub fn keypair_at(&self, path: String) -> RgResult<KeyPair> {
+    pub fn keypair_at(&self, path: impl Into<String>) -> RgResult<KeyPair> {
         KeyPair::from_private_hex(self.private_at(path)?)
     }
 
@@ -297,38 +315,38 @@ pub fn load_ci_kp() {
     }
 }
 
-
-#[test]
-pub fn test() {
-
-    let words = bitcoin_wallet::mnemonic::Mnemonic::new_random(MasterKeyEntropy::Double)
-        .unwrap().to_string();
-    println!("{}", words.clone());
-
-    let mnemonic1 = MnemonicWords::from_mnemonic_words(words.clone().as_str(), Some("test".to_string()));
-    let seed1 = mnemonic1.seed.0.clone();
-
-    let mnemonic = Mnemonic::parse_in(
-        Language::English,
-        words.clone(),
-    ).unwrap();
-    let seed = mnemonic.to_seed("test");
-    // let test_seed_no_p = mnemonic.to_seed(None);
-    assert_eq!(seed1.clone(), seed.clone().to_vec());
-    let xkey: ExtendedKey =
-        (mnemonic, Some("test".to_string()))
-            .into_extended_key().unwrap();
-    let xprv = xkey.into_xprv(Network::Bitcoin).unwrap();
-    let k1 = Secp256k1::new();
-    let path = "m/84'/0'/0'/0/0";
-    let dp = DerivationPath::from_str(path).unwrap();
-    let key1 = xprv.derive_priv(&k1, &dp).unwrap();
-    let pkhex = hex::encode(key1.private_key.secret_bytes().to_vec());
-    println!("Pkhex {}", pkhex.clone());
-
-    let pkhex2 = mnemonic1.key_from_path_str(path.to_string()).0.to_hex();
-    println!("Pkhex2 {}", pkhex2.clone());
-    assert_eq!(pkhex, pkhex2);
-    ()
-
-}
+//
+// #[test]
+// pub fn test() {
+//
+//     let words = bitcoin_wallet::mnemonic::Mnemonic::new_random(MasterKeyEntropy::Double)
+//         .unwrap().to_string();
+//     println!("{}", words.clone());
+//
+//     let mnemonic1 = MnemonicWords::from_mnemonic_words(words.clone().as_str(), Some("test".to_string()));
+//     let seed1 = mnemonic1.seed.0.clone();
+//
+//     let mnemonic = Mnemonic::parse_in(
+//         Language::English,
+//         words.clone(),
+//     ).unwrap();
+//     let seed = mnemonic.to_seed("test");
+//     // let test_seed_no_p = mnemonic.to_seed(None);
+//     assert_eq!(seed1.clone(), seed.clone().to_vec());
+//     let xkey: ExtendedKey =
+//         (mnemonic, Some("test".to_string()))
+//             .into_extended_key().unwrap();
+//     let xprv = xkey.into_xprv(Network::Bitcoin).unwrap();
+//     let k1 = Secp256k1::new();
+//     let path = "m/84'/0'/0'/0/0";
+//     let dp = DerivationPath::from_str(path).unwrap();
+//     let key1 = xprv.derive_priv(&k1, &dp).unwrap();
+//     let pkhex = hex::encode(key1.private_key.secret_bytes().to_vec());
+//     println!("Pkhex {}", pkhex.clone());
+//
+//     let pkhex2 = mnemonic1.key_from_path_str(path.to_string()).0.to_hex();
+//     println!("Pkhex2 {}", pkhex2.clone());
+//     assert_eq!(pkhex, pkhex2);
+//     ()
+//
+// }

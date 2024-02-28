@@ -7,16 +7,15 @@ use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
+use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, UtxoId, SubmitTransactionResponse};
-use redgold_keys::util::mnemonic_words::MnemonicWords;
+use redgold_schema::EasyJson;
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse, UtxoId};
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
 use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transaction};
 use crate::schema::WithMetadataHashable;
-use redgold_schema::EasyJson;
-
 
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
@@ -44,23 +43,6 @@ impl TransactionSubmitter {
         utxos: Vec<SpendableUTXO>,
     ) -> Self {
         let generator = TransactionGenerator::default(utxos.clone());
-        // if utxos.is_empty() {
-        //     generator = generator.with_genesis().clone();
-        // }
-        Self {
-            generator: Arc::new(Mutex::new(generator)),
-            // runtime,
-            client,
-        }
-    }
-    pub fn default_adv(
-        client: PublicClient,
-        utxos: Vec<SpendableUTXO>,
-        min_offset: usize,
-        max_offset: usize,
-        wallet: MnemonicWords
-    ) -> Self {
-        let generator = TransactionGenerator::default_adv(utxos.clone(), min_offset, max_offset, wallet);
         // if utxos.is_empty() {
         //     generator = generator.with_genesis().clone();
         // }
@@ -158,7 +140,7 @@ impl TransactionSubmitter {
 
     pub async fn with_faucet(&self) -> Result<FaucetResponse, ErrorInfo> {
         let pc = &self.client;
-        let w = MnemonicWords::from_iterated_phrase("random").key_at(0);
+        let w = WordsPass::from_str_hashed("random").keypair_at_change(0).expect("kp");
         let a = w.address_typed();
         let _vec_a = a.address.safe_bytes()?;
         let res = //self.runtime.block_on(

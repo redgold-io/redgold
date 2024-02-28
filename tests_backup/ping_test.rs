@@ -43,7 +43,7 @@
 // use async_std::task::spawn;
 // use async_std::task::JoinHandle;
 // use async_std::{io, task};
-// use bitcoin::hashes::core::task::Context;
+// use bdk::bitcoin::hashes::core::task::Context;
 // use crossbeam_channel::Sender;
 // use future::IntoFuture;
 // use futures;

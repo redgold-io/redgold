@@ -6,8 +6,8 @@ pub mod matrix;
 pub mod netmaker;
 pub mod deploy;
 
-use bitcoin::util::bip32::ExtendedPrivKey;
-use bitcoin::Network;
+use bdk::bitcoin::util::bip32::ExtendedPrivKey;
+use bdk::bitcoin::Network;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
@@ -16,7 +16,6 @@ use std::path::Path;
 use std::process::id;
 use log::info;
 
-use redgold_keys::util::mnemonic_words::MnemonicWords;
 use ssh2::{Channel, Session};
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::servers::Server;

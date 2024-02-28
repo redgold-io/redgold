@@ -1,10 +1,10 @@
-use redgold_keys::util::mnemonic_words::MnemonicWords;
 use crate::api::RgHttpClient;
 use redgold_data::data_store::DataStore;
+use redgold_keys::util::mnemonic_support::WordsPass;
 
 #[derive(Clone)]
 struct Wallet {
-    mnemonic_words: MnemonicWords,
+    mnemonic_words: WordsPass,
     client: Option<RgHttpClient>,
     data_store: DataStore
 }
@@ -12,7 +12,6 @@ struct Wallet {
 impl Wallet {
 
     pub fn scan_initial(&self) {
-        let words = self.mnemonic_words.clone();
-        words.address();
+
     }
 }

@@ -9,7 +9,7 @@ pub fn prepare_message(msg: String) -> String {
 
 pub fn prepare_message_sign(msg: String) -> Vec<u8> {
     let message = prepare_message(msg);
-    bitcoin::util::misc::signed_msg_hash(&*message).to_vec()
+    bdk::bitcoin::util::misc::signed_msg_hash(&*message).to_vec()
 }
 
 pub fn message_from_hash(hash: &Hash) -> String {

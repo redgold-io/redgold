@@ -59,28 +59,22 @@ sha3 = "0.10.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = '0.8.4'
+tokio = { version = "1.36.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread"] }
+
 
 [dependencies]
 redgold-schema = {workspace = true}
-[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
-redgold-data = {workspace = true}
-redgold-keys = {workspace = true}
-redgold-executor = {workspace = true}
+
+sha3 = {workspace = true}
 #redgold-sdk-client = {workspace = true}
 tempfile = "3.3.0"
-sha3 = {workspace = true}
 argon2 = "0.5.0"
-
 dirs = "5.0.1"
-#sqlx = { version = "0.5", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
-# Is this only used in schema now?
 #backtrace = "0.3.65"
 
 flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
 dotenv = "0.15.0"
 futures = "0.3.1"
-# TODO: This needs to be replaced
-bitcoin-wallet = "1.1.0"
 # Used for Sha256 but can be deprecated
 rust-crypto = "0.2.36"
 # only used in schema?
@@ -133,10 +127,6 @@ config = "0.13.3"
 
 itertools = "0.10.1"
 bytes = "1.1.0"
-#Dependencies for email sending
-aws-config = "0.55.1"
-aws-sdk-sesv2 = "0.28.0"
-dns-lookup = "2.0.2"
 
 #Dependencies for multiparty threshold ecdsa
 multi-party-ecdsa = "0.8.1"
@@ -149,7 +139,7 @@ surf = "2"
 curv-kzen = { version = "0.9", default-features = false }
 
 # conflict with multi-party-ecdsa
-tokio = { version = "1.0.0", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "full"] }
+tokio = { workspace = true }
 tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
 tokio-stream = "0.1.14"
 
@@ -183,6 +173,13 @@ csscolorparser = "0.6.2"
 #openpnp_capture = "0.2.4"
 #openpnp_capture_sys = "0.4.0"
 
+bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
+
+
+[dependencies.getrandom]
+version = "0.2.12"
+features = ["js"]
+
 [build-dependencies]
 pkg-config = "0.3.27"
 
@@ -191,9 +188,9 @@ assert_cmd = "2.0.11"
 cargo-audit = "0.17.6"
 
 
-[dependencies.bitcoin]
-version = "0.21"
-features = ["serde", "bitcoinconsensus"]
+#[dependencies.bitcoin]
+#version = "0.21"
+#features = ["serde", "bitcoinconsensus"]
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
@@ -235,7 +232,14 @@ opt-level = 1
 #noise = "0.7.0"
 #bs58 = "0.4.0"
 #error-chain = "0.12.4"
-#btc-transaction-utils = "0.9.0" # build conflict, out of date anyways
-# todo: add rust-bitcoin here. https://github.com/rust-bitcoin/rust-bitcoin not necessary til after cli
 #swagger = "2.2" # breaks openssl?
-#hdpath = { version = "0.5.0", features = ["with-bitcoin"] }
+
+
+
+[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies]
+redgold-data = {workspace = true}
+redgold-keys = {workspace = true}
+redgold-executor = {workspace = true}
+aws-config = "0.55.1" #Dependencies for email sending
+aws-sdk-sesv2 = "0.28.0" #Dependencies for email sending
+dns-lookup = "2.0.2" #Dependencies for email sending

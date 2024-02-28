@@ -1,25 +1,27 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use bitcoin_wallet::account::MasterKeyEntropy;
-use bitcoin_wallet::mnemonic::Mnemonic;
+
 use log::info;
 use rocket::form::FromForm;
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
-use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
-use redgold_schema::servers::Server;
-use redgold_schema::transaction::rounded_balance_i64;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::e2e::tx_submit::TransactionSubmitter;
+
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use redgold_schema::EasyJson;
+use redgold_schema::servers::Server;
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
+use redgold_schema::transaction::rounded_balance_i64;
+
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use crate::e2e::tx_submit::TransactionSubmitter;
+use crate::infra::deploy::default_deploy;
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
-use redgold_schema::EasyJson;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::infra::deploy::default_deploy;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
     let ds = config.data_store().await;
@@ -78,18 +80,18 @@ pub async fn list_servers(config: &NodeConfig) -> Result<Vec<Server>, ErrorInfo>
 }
 
 pub fn generate_mnemonic(_generate_mnemonic: &GenerateMnemonic) {
-    let m = generate_random_mnemonic();
-    println!("{}", m.to_string());
+    let wp = WordsPass::generate().expect("works");
+    println!("{}", wp.words);
 }
 
 pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfig) -> Result<String, ErrorInfo> {
-    let wallet = node_config.internal_mnemonic();
+    let wallet = node_config.words();
     let address = if let Some(path) = generate_address.path {
-        wallet.keypair_from_path_str(path).address_typed()
+        wallet.keypair_at(path).expect("works").address_typed()
     } else if let Some(index) = generate_address.index {
-        wallet.key_at(index as usize).address_typed()
+        wallet.keypair_at_change(index as i64).expect("works").address_typed()
     } else {
-        node_config.internal_mnemonic().active_keypair().address_typed()
+        node_config.keypair().address_typed()
     };
     let string = address.render_string().expect("address render failure");
     println!("{}", string.clone());
@@ -110,7 +112,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     use redgold_schema::SafeBytesAccess;
 
     for i in 0..10 {
-        let kp = p1.internal_mnemonic().key_at(i as usize);
+        let kp = p1.words().keypair_at_change(i as i64).expect("works");
         let x1 = kp.address_typed();
         let x: Vec<u8> = x1.address.safe_bytes()?;
         query_addresses.push(x1);
@@ -167,36 +169,15 @@ pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     Ok(())
 }
 
-pub fn mnemonic_fingerprint(m: Mnemonic) -> String {
-    let vec = m.to_seed(None).0;
-    let res = Hash::digest(vec);
-    let vec2 = res.vec();
-    let vec1 = vec2[0..4].to_vec();
-    let hx = hex::encode(vec1);
-    hx
+
+pub fn generate_random_mnemonic() -> WordsPass {
+    WordsPass::generate().expect("works")
 }
 
-pub fn generate_random_mnemonic() -> Mnemonic {
-    Mnemonic::new_random(MasterKeyEntropy::Double)
-        .expect("New mnemonic generation failure")
-}
-
-pub fn generate_random_mnemonic_words(num_words: usize) -> Result<Mnemonic, ErrorInfo> {
-    let entropy = match num_words {
-        48 => {MasterKeyEntropy::Paranoid}
-        24 => MasterKeyEntropy::Double,
-        12 => MasterKeyEntropy::Sufficient,
-        _ => {
-            return Err(error_info("Unsupported num words for mnemonic generation"))
-        }
-    };
-    Mnemonic::new_random(entropy)
-        .error_info("New mnemonic generation failure")
-}
 
 #[test]
 pub fn mnemonic_generate_test() {
-    assert_eq!(generate_random_mnemonic().to_string().split(" ").count(), 24);
+    assert_eq!(generate_random_mnemonic().words.split(" ").count(), 24);
 }
 
 pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_DATA_PATH";
@@ -325,7 +306,7 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
 
         // Check to see if we have a mnemonic stored in backup for generating a random seed
 
-        let mnemonics: Vec<Mnemonic> = vec![]; // TODO: Replace from config; DataStoreContext::map_err_sqlx(ds.query_all_mnemonic().await)?;
+        let mnemonics: Vec<WordsPass> = vec![]; // TODO: Replace from config; DataStoreContext::map_err_sqlx(ds.query_all_mnemonic().await)?;
         let mnemonic = if mnemonics.is_empty() {
             println!("Unable to find random mnemonic from backup, generating a new one and saving");
             let m = generate_random_mnemonic();
@@ -339,10 +320,10 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
         } else {
             println!("Found stored random mnemonic");
             let x = mnemonics.get(0).expect("").clone();
-            let string = x.to_string().clone();
-            Mnemonic::from_str(&string).expect("words")
+            let string = x.words.clone();
+            WordsPass::new(&string, None)
         };
-        println!("Random mnemonic fingerprint: {}", mnemonic_fingerprint(mnemonic.clone()));
+        println!("Random mnemonic fingerprint: {}", mnemonic.checksum().expect("checksum"));
 
         let mut servers: Vec<Server> = vec![]; // ds.server_store.servers().await?;
 
@@ -381,7 +362,7 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
         } else {
             Some(&*passphrase_input)
         };
-        let _seed_bytes = mnemonic.to_seed(passphrase).0;
+        // let _seed_bytes = mnemonic.to_seed(passphrase).0;
         //
         // for server in servers {
         //

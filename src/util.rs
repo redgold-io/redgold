@@ -22,8 +22,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::node_config::NodeConfig;
 use crate::schema::SafeBytesAccess;
-use bitcoin::hashes::hex::ToHex;
-use bitcoin::hashes::Hash;
+use bdk::bitcoin::hashes::hex::ToHex;
+use bdk::bitcoin::hashes::Hash;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 use rand::rngs::OsRng;
