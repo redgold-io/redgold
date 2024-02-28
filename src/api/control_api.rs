@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use bitcoin::secp256k1::PublicKey;
+use bdk::bitcoin::secp256k1::PublicKey;
 use std::sync::Arc;
 use std::time::Duration;
 // use futures::channel::mpsc;

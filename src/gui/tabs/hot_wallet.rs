@@ -1,10 +1,9 @@
 use std::str::FromStr;
-use bitcoin::PrivateKey;
+use bdk::bitcoin::PrivateKey;
 use eframe::egui;
 use eframe::egui::{ComboBox, Ui};
 use itertools::{Either, Itertools};
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_keys::util::mnemonic_words::MnemonicWords;
 use redgold_schema::local_stored_state::{StoredMnemonic, StoredPrivateKey};
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{data_item, editable_text_input_copy, valid_label};

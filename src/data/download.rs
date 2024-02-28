@@ -7,7 +7,7 @@ use crate::schema::structs::{
     DownloadDataType, DownloadRequest, DownloadResponse, NodeState, Request, Response,
 };
 use crate::util;
-use bitcoin::secp256k1::PublicKey;
+use bdk::bitcoin::secp256k1::PublicKey;
 use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;

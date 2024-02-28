@@ -1,6 +1,6 @@
 // // extern crate redgold;
 // //
-// // use bitcoin_wallet::mnemonic::Mnemonic;
+// // use bdk::bitcoin_wallet::mnemonic::Mnemonic;
 // // use hex;
 // // use crate::mnemonic_builder;
 // // use crate::util;
@@ -13,14 +13,14 @@
 // // use std::fs::File;
 // // use std::io::Write;
 // //
-// // use bitcoin::hashes::hex::ToHex;
-// // use bitcoin::{
+// // use bdk::bitcoin::hashes::hex::ToHex;
+// // use bdk::bitcoin::{
 // //     network::constants::Network,
 // //     secp256k1::Secp256k1,
 // //     util::bip32::{DerivationPath, ExtendedPrivKey},
 // //     Address,
 // // };
-// // use bitcoin_wallet::account::MasterAccount;
+// // use bdk::bitcoin_wallet::account::MasterAccount;
 // // use hdpath::StandardHDPath;
 // // use std::str::FromStr;
 // //
@@ -220,7 +220,7 @@
 // //     let w = Wallet::from_mnemonic(m, None);
 // //     let public_key = w.key_from_path_str("m/84'/0'/0'/0/0".to_string()).1;
 // //     // println!("{}", public_key.to_hex());
-// //     use bitcoin::util::key;
+// //     use bdk::bitcoin::util::key;
 // //     let address = Address::p2wpkh(
 // //         &key::PublicKey::from_str(&*public_key.to_string()).unwrap(),
 // //         Network::Bitcoin,
@@ -267,7 +267,7 @@
 // //         SubCommand::BitcoinAddress(d) => {
 // //             let w = Wallet::from_mnemonic(&*d.mnemonic, d.passphrase);
 // //             let public_key = w.key_from_path_str(d.key_path).1;
-// //             use bitcoin::util::key;
+// //             use bdk::bitcoin::util::key;
 // //             let address = Address::p2wpkh(
 // //                 &key::PublicKey::from_str(&*public_key.to_string()).unwrap(),
 // //                 Network::Bitcoin,

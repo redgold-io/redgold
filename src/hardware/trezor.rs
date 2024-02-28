@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::string::ToString;
-use bitcoin::util::bip32::ExtendedPubKey;
-use bitcoin::util::psbt::serialize::Serialize;
+use bdk::bitcoin::util::bip32::ExtendedPubKey;
+use bdk::bitcoin::util::psbt::serialize::Serialize;
 use itertools::Itertools;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
@@ -10,7 +10,6 @@ use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use redgold_keys::util::mnemonic_words::HDPathCursor;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cmd::run_cmd;
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
@@ -152,10 +151,6 @@ pub fn get_public_node(path: String) -> Result<PublicNodeResponse, ErrorInfo> {
     })
 }
 
-pub fn get_public_key(cursor: HDPathCursor) -> Result<structs::PublicKey, ErrorInfo> {
-    let res = get_public_node(cursor.to_string())?;
-    res.public_key()
-}
 
 
 /// Message signing
@@ -361,17 +356,17 @@ async fn debug_sign_tx () {
 #[ignore]
 #[test]
 pub fn trezor_test() {
-
-    let cursor = HDPathCursor::from( 0, 0, 0, 0);
-    let node = get_public_node(cursor.to_string()).unwrap();
-    // let res = node.public_key();
-    // let xpub = node.xpub().unwrap();
-    let res = node.public_key().unwrap();
-
-    println!("Got public key {}", res.hex().expect(""));
-    let msg = "ahoy";
-    let signature = sign_message(cursor.to_string(), msg.to_string()).unwrap();
-    let _sig = Signature::ecdsa(signature.signature_vec());
+    //
+    // let cursor = HDPathCursor::from( 0, 0, 0, 0);
+    // let node = get_public_node(cursor.to_string()).unwrap();
+    // // let res = node.public_key();
+    // // let xpub = node.xpub().unwrap();
+    // let res = node.public_key().unwrap();
+    //
+    // println!("Got public key {}", res.hex().expect(""));
+    // let msg = "ahoy";
+    // let signature = sign_message(cursor.to_string(), msg.to_string()).unwrap();
+    // let _sig = Signature::ecdsa(signature.signature_vec());
     // let proof = Proof::from(res, sig);
     // proof.verify(&vec).unwrap();
     // println!("Verified proof");

@@ -415,7 +415,7 @@ async fn servers_multiple() -> std::io::Result<()> {
     let socket_addr2 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port2);
 
     let mut pm = PeerMessage::empty();
-    let pair = relay1.node_config.internal_mnemonic().active_keypair().clone();
+    let pair = relay1.node_config.words().default_kp().expect("").clone();
     let mut request = Request::empty().about();
     let msg = request.with_auth(&pair);
     msg.verify_auth().expect("");

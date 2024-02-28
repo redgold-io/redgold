@@ -2,8 +2,6 @@ use redgold_data::data_store::{DataStore};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::NetworkEnvironment;
 use crate::{e2e, gui, util};
-use bitcoin_wallet::account::MasterKeyEntropy;
-use bitcoin_wallet::mnemonic::Mnemonic;
 use clap::{Args, Parser, Subcommand};
 use crypto::digest::Digest;
 #[allow(unused_imports)]
@@ -18,7 +16,7 @@ use std::slice::Iter;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use bitcoin::bech32::ToBase32;
+use bdk::bitcoin::bech32::ToBase32;
 use crypto::sha2::Sha256;
 use itertools::Itertools;
 use tokio::runtime::Runtime;
@@ -30,7 +28,7 @@ use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli};
-use crate::util::cli::commands::mnemonic_fingerprint;
+
 use crate::util::cli::data_folder::DataFolder;
 use crate::util::{init_logger, init_logger_main, ip_lookup, metrics_registry, not_local_debug_mode, sha256_vec};
 use crate::util::trace_setup::init_tracing;

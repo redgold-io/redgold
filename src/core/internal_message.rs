@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 use crate::schema::structs::{Error, ErrorInfo, PublicResponse, Request, Response, Transaction};
 use crate::schema::error_message;
-use bitcoin::secp256k1::PublicKey;
+use bdk::bitcoin::secp256k1::PublicKey;
 use tokio::task::JoinError;
 // #[derive(Clone)]
 // pub struct InternalChannel<T> {

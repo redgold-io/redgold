@@ -2,7 +2,6 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use bitcoin::util::misc::hex_bytes;
 use bytes::Bytes;
 use futures::TryFutureExt;
 

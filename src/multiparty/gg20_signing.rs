@@ -2,8 +2,8 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
-use bitcoin::secp256k1::recovery::{RecoverableSignature, RecoveryId};
-use bitcoin::secp256k1::{Message, Secp256k1, Signature};
+use bdk::bitcoin::secp256k1::{Message, Secp256k1, Signature};
+use bdk::bitcoin::secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::party_i::SignatureRecid;
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::keygen::LocalKey;

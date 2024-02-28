@@ -4,11 +4,11 @@ use redgold_data::data_store::DataStore;
 use crate::genesis;
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
 use redgold_schema::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
-use redgold_keys::util::mnemonic_words::MnemonicWords;
 use std::path::PathBuf;
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
+use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::servers::Server;
 use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
@@ -225,6 +225,10 @@ impl NodeConfig {
 
     pub fn words(&self) -> WordsPass {
         WordsPass::new(self.mnemonic_words.clone(), None)
+    }
+
+    pub fn keypair(&self) -> KeyPair {
+        self.words().default_kp().expect("")
     }
 
     // This should ONLY be used by the genesis node when starting for the very first time
@@ -500,11 +504,7 @@ impl NodeConfig {
     }
 
     pub fn from_test_id(seed_id: &u16) -> Self {
-        let words = redgold_keys::util::mnemonic_builder::from_str_rounds(
-            &*seed_id.clone().to_string(),
-            0,
-        )
-        .to_string();
+        let words = WordsPass::from_str_hashed(seed_id.to_string()).words;
         // let path: String = ""
         let folder = DataFolder::target(seed_id.clone() as u32);
         folder.delete().ensure_exists();
@@ -524,10 +524,6 @@ impl NodeConfig {
         node_config.watcher_interval = Duration::from_secs(5);
         node_config
     }
-    pub fn internal_mnemonic(&self) -> MnemonicWords {
-        MnemonicWords::from_mnemonic_words(&*self.mnemonic_words, None)
-    }
-
     pub async fn data_store(&self) -> DataStore {
         DataStore::from_config_path(&self.env_data_folder().data_store_path()).await
     }
@@ -572,13 +568,6 @@ impl NodeConfig {
 
 }
 
-// TODO: Update function!
-pub fn peer_id_from_single_mnemonic(mnemonic_words: String) -> Result<MerkleTree, ErrorInfo> {
-    let wallet = MnemonicWords::from_mnemonic_words(&*mnemonic_words, None);
-    let (_, pk) = wallet.active_key();
-    let h = structs::Hash::digest(pk.serialize().to_vec());
-    merkle::build_root(vec![h])
-}
 
 #[test]
 fn debug(){

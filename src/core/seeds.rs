@@ -1,4 +1,4 @@
-use bitcoin::secp256k1::PublicKey;
+use bdk::bitcoin::secp256k1::PublicKey;
 use redgold_schema::seeds::get_seeds;
 use redgold_schema::structs::{NetworkEnvironment, TrustData};
 use crate::api::public_api::PublicClient;

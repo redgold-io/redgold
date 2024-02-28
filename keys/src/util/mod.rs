@@ -1,8 +1,8 @@
 use std::io::Cursor;
 
 use bdk::miniscript::serde::Serialize;
-use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
-use bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
+use bdk::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
+use bdk::bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 
@@ -13,7 +13,6 @@ use redgold_schema::structs::ErrorInfo;
 use crate::{TestConstants, util};
 
 pub mod mnemonic_builder;
-pub mod mnemonic_words;
 pub mod mnemonic_support;
 pub mod bitcoin_message_signer;
 pub mod btc_wallet;

@@ -1,5 +1,5 @@
-use bitcoin::secp256k1::{Error, PublicKey};
-use bitcoin::hashes::hex::ToHex;
+use bdk::bitcoin::secp256k1::{Error, PublicKey};
+use bdk::bitcoin::hashes::hex::ToHex;
 use redgold_keys::TestConstants;
 use redgold_schema::{error_info, SafeBytesAccess, structs};
 use redgold_schema::structs::ErrorInfo;
