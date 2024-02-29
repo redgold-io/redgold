@@ -74,7 +74,7 @@ pub fn available_bytes(path: impl Into<String>, is_windows: bool) -> RgResult<i6
     // let re = Regex::new(r"\s+").expect("Failed to compile regex");
 
     let blocks = head.split_whitespace().dropping(1).next().ok_msg("Missing second column from df disk space command")?
-        .split("-").next().ok_msg("Missing first part of second column from df disk space command")?.lowercase();
+        .split("-").next().ok_msg("Missing first part of second column from df disk space command")?.to_lowercase();
 
     let multiplier: i64 = match blocks {
         "1k" => {1024}
