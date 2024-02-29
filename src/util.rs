@@ -4,8 +4,8 @@ use std::io::Write;
 use std::sync::Once;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bitcoin::hashes::Hash;
-use bitcoin::hashes::hex::ToHex;
+use bdk::bitcoin::hashes::Hash;
+use bdk::bitcoin::hashes::hex::ToHex;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 use rand::{Rng, RngCore};
@@ -29,20 +29,6 @@ pub mod hashviz;
 pub mod keys;
 pub mod test_util;
 pub mod argon_kdf;
-
-use std::io::Write;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::node_config::NodeConfig;
-use crate::schema::SafeBytesAccess;
-use bdk::bitcoin::hashes::hex::ToHex;
-use bdk::bitcoin::hashes::Hash;
-use crypto::digest::Digest;
-use crypto::sha2::{Sha256, Sha512};
-use rand::rngs::OsRng;
-use rand::{Rng, RngCore};
-use redgold_keys::util::dhash_str;
-use crate::util::trace_setup::init_tracing;
 
 pub fn random_salt() -> i64 {
     let mut rng = rand::thread_rng();

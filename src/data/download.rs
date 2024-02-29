@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use crate::core::internal_message::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
@@ -10,10 +11,12 @@ use crate::util;
 use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
+use futures::StreamExt;
+use itertools::Itertools;
 use metrics::{counter, gauge};
 use tokio_stream::Elapsed;
 use redgold_schema::{ProtoHashable, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{ErrorInfo, UtxoId};
+use redgold_schema::structs::{ErrorInfo, Hash, PublicKey, Transaction, UtxoId};
 use redgold_schema::EasyJson;
 use crate::observability::logging::Loggable;
 use crate::observability::metrics_help::WithMetrics;
@@ -189,6 +192,11 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
     // TODO: Not this, also a maximum earliest lookback period.
     let bootstrap = bootstrap_pks.get(0).expect("bootstrap").clone();
 
+    if let Some(g_time) = download_genesis(&relay, bootstrap_pks).await? {
+        // Workaround to get genesis currently valid UTXOs
+        download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
+    }
+
     let mut cur_end = start_time;
 
     let mut perf_timer = PerfTimer::new();
@@ -211,6 +219,39 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
     info!("Download time seconds {}", secs);
 
     Ok(())
+}
+
+async fn download_genesis(relay: &Relay, bootstrap_pks: Vec<PublicKey>) -> Result<Option<i64>, ErrorInfo> {
+    if relay.ds.config_store.get_genesis().await?.is_none() {
+        let mut r = Request::default();
+        r.genesis_request = Some(structs::GenesisRequest::default());
+        let genesis = relay.broadcast_async(bootstrap_pks.clone(), r, None).await?;
+        let mut hm: HashMap<Hash, (Transaction, i64)> = HashMap::new();
+        let filtered = genesis.iter().filter_map(|g| {
+            if let Ok(r) = g {
+                if let Some(genesis) = &r.genesis_response {
+                    return Some(genesis)
+                }
+            }
+            None
+        });
+        let accum = filtered.fold(hm, |mut acc, g| {
+            let h = g.calculate_hash();
+            let count = acc.get(&h).map(|(_, c)| c.clone()).unwrap_or(1i64);
+            acc.insert(h, (g.clone(), count));
+            acc
+        });
+        let gens = accum.iter().max_by(|(_, (_, c1)), (_, (_, c2))| {
+            c1.cmp(&c2)
+        });
+        let gen_actual = gens.ok_msg("No genesis response")?.1.0.clone();
+        relay.ds.config_store.store_genesis(&gen_actual).await?;
+        let result = gen_actual.time();
+        let g_time = result?.clone();
+        relay.ds.transaction_store.insert_transaction(&gen_actual, g_time, true, None, false).await?;
+        return Ok(Some(g_time))
+    }
+    Ok(None)
 }
 
 

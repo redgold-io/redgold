@@ -107,6 +107,10 @@ impl PeerRxEventHandler {
             response.lookup_transaction_response = opt;
         }
 
+        if let Some(_) = &request.genesis_request {
+            response.genesis_response = relay.ds.config_store.get_genesis().await?.clone();
+        }
+
         if let Some(r) = &request.recent_transactions_request {
             let from_mempool = relay.mempool_entries.iter().map(|t| t.hash_or()).collect_vec();
             let in_process = relay.transaction_channels.iter().map(|c| c.transaction_hash.clone()).collect_vec();
