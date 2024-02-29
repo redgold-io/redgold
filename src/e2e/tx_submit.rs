@@ -27,11 +27,11 @@ impl TransactionSubmitter {
     pub(crate) async fn submit_invalid_signature(&self) {
         let transaction = self.generator.lock().unwrap().generate_simple_tx().clone().expect("tx");
         let mut tx = transaction.transaction.clone();
-        let mut sig = tx.inputs.get_mut(0).expect("sig").proof.get_mut(0).expect("sig").signature.as_mut().expect("sign");
+        let sig = tx.inputs.get_mut(0).expect("sig").proof.get_mut(0).expect("sig").signature.as_mut().expect("sign");
         sig.bytes = bytes_data(vec!(0; 32));
         let res = self.client.clone().send_transaction(&tx, true).await;
         assert!(res.is_err());
-        let err = res.unwrap_err();
+        let _err = res.unwrap_err();
     }
 }
 

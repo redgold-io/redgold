@@ -179,7 +179,7 @@ impl ContractStateManager {
 
     // TODO: Introduce time ordering strategy selector, additional proofs, etc.
     pub async fn interval(&mut self) -> RgResult<()> {
-        let ct = util::current_time_millis_i64();
+        let _ct = util::current_time_millis_i64();
         let mut finished_contention_keys = vec![];
         for (k, v) in self.unordered.iter_mut() {
             // TODO: Earlier validation should find something in the recent state -- at least
@@ -203,7 +203,7 @@ impl ContractStateManager {
             // TODO: This is only one strategy, and missing proof steps etc.
             let mut v2 = v.clone();
             v2.sort_by(|a, b| a.0.time().expect("t").cmp(&b.0.time().expect("t")));
-            for (idx, (tx, t)) in v2.iter().enumerate() {
+            for (idx, (tx, _t)) in v2.iter().enumerate() {
                 // TODO: Send to executor channel rather than processing here locally.
                 let output_col = tx.output_of(&address);
                 let output_of = output_col.get(0);

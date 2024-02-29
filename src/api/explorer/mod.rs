@@ -23,8 +23,8 @@ use crate::api::public_api::Pagination;
 use crate::multiparty::watcher::{BidAsk, DepositWatcherConfig};
 use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
+use crate::observability::logging::Loggable;
 use crate::util::current_time_millis_i64;
-use crate::util::logging::Loggable;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {

@@ -34,7 +34,7 @@ use crate::schema::response_metadata;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::SameResult;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: &mut Request) -> Result<Response, ErrorInfo> {
     let client = crate::api::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
@@ -105,6 +105,10 @@ impl PeerRxEventHandler {
         if let Some(r) = &request.lookup_transaction_request {
             let opt = relay.lookup_transaction(r).await?;
             response.lookup_transaction_response = opt;
+        }
+
+        if let Some(_) = &request.genesis_request {
+            response.genesis_response = relay.ds.config_store.get_genesis().await?.clone();
         }
 
         if let Some(r) = &request.recent_transactions_request {

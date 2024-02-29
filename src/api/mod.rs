@@ -15,7 +15,7 @@ use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -163,6 +163,13 @@ impl RgHttpClient {
         req.resolve_code_request = Some(address.clone());
         let response = self.proto_post_request(&mut req, None).await?;
         Ok(response.resolve_code_response.ok_or(error_info("Missing resolve code response"))?)
+    }
+
+    pub async fn genesis(&self) -> RgResult<Transaction> {
+        let mut req = Request::default();
+        req.genesis_request = Some(structs::GenesisRequest::default());
+        let response = self.proto_post_request(&mut req, None).await?;
+        response.genesis_response.ok_msg("Missing genesis response")
     }
 
 

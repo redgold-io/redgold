@@ -12,7 +12,7 @@ use tokio_stream::StreamExt;
 use redgold_schema::structs::{ErrorInfo, GetPeersInfoRequest};
 use tracing::error;
 use redgold_schema::errors::EnhanceErrorInfo;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 #[async_trait]
 pub trait IntervalFold  {

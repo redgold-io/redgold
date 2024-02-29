@@ -15,7 +15,7 @@ use crate::node_config::NodeConfig;
 use crate::util;
 
 pub fn gui_status_networks() -> Vec<NetworkEnvironment> {
-    let mut vec = NetworkEnvironment::status_networks();
+    let _vec = NetworkEnvironment::status_networks();
     vec![NetworkEnvironment::Dev, NetworkEnvironment::Staging]
     // vec
 }

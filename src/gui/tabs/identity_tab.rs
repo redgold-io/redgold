@@ -44,7 +44,7 @@ impl IdentityState {
     }
 }
 
-pub fn identity_tab(ui: &mut Ui, ctx: &Context, ls: &mut LocalState) {
+pub fn identity_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     ui.heading("Identity");
     // ui.label("WIP TAB -- not yet implemented, for now update json config manually in config tab");
 

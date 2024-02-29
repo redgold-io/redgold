@@ -113,7 +113,7 @@ impl TransactionGenerator {
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
         let a = x.opt_amount().expect("a");
-        let c_amount = CurrencyAmount::from(a.amount / 2);
+        let _c_amount = CurrencyAmount::from(a.amount / 2);
         // TODO: Add fees / fee address, use genesis utxos or something?
         // let fee_amount = CurrencyAmount::from(a.amount / 10);
 

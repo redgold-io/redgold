@@ -48,7 +48,7 @@ pub async fn setup_server_redgold(
     ssh.verify()?;
 
 
-     let host = ssh.host.clone();
+     let _host = ssh.host.clone();
     //
     // let p= &Box::new(move |s: String| {
     //     proc_func(format!("{}", host.clone())).expect("");
@@ -149,6 +149,19 @@ pub async fn setup_server_redgold(
     ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
     if start_node {
         ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+        if is_genesis {
+            // After starting node for the first time, mark the environment file as not genesis
+            // for the next time.
+            env.remove("REDGOLD_GENESIS");
+            // TODO: Move this to an Deploy class with an SSHLike trait as an inner.
+            // so it's a repeated function.
+            let env_contents = env.iter().map(|(k, v)| {
+                format!("{}={}", k, format!("{}", v))
+            }).join("\n");
+            ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
+            ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
+
+        }
     }
 
     Ok(())
@@ -376,7 +389,7 @@ pub async fn offline_generate_keys_servers(
         ).await?;
         let peer_tx = pid_tx.get(&peer_id_hex).expect("").clone();
         let peer_tx_ser = peer_tx.json_or();
-        let mut save = save_path.clone();
+        let save = save_path.clone();
         let server_index_path = save.join(format!("{}", ss.index));
         std::fs::create_dir_all(server_index_path.clone()).expect("");
         let peer_tx_path = server_index_path.join("peer_tx");
@@ -396,7 +409,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         // Also set environment here to dev if not main
         deploy.skip_ops = true;
     }
-    let mut net = node_config.network;
+    let net = node_config.network;
 
     if net == NetworkEnvironment::Main {
         // TODO: Does this matter?
@@ -486,7 +499,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
         } else {
             None
         };
-        let pid_tx_ser = if deploy.peer_id  || deploy.words_and_id {
+        let _pid_tx_ser = if deploy.peer_id  || deploy.words_and_id {
             Some(pid_tx.clone())
         } else {
             None
@@ -510,7 +523,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
 
         let ssh = SSH::new_ssh(ss.host.clone(), None);
         if !deploy.ops {
-            let t = tokio::time::timeout(Duration::from_secs(120), setup_server_redgold(
+            let _t = tokio::time::timeout(Duration::from_secs(120), setup_server_redgold(
                 ssh, net, gen, Some(hm), purge,
                 words_opt,
                 peer_id_hex_opt,

@@ -1,10 +1,8 @@
-use std::str::FromStr;
+
 use bdk::bitcoin::{Address, Network};
-use redgold_schema::structs::{AddressType, ErrorInfo, NetworkEnvironment, PublicKey};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey};
 use bdk::bitcoin::util::key;
-use hex::ToHex;
-// use web3::types::H160;
-use redgold_schema::{ErrorInfoContext, SafeBytesAccess, structs};
+use redgold_schema::{ErrorInfoContext, structs};
 use sha3::{Digest, Keccak256};
 use crate::util::ToPublicKey;
 
@@ -33,7 +31,7 @@ impl ToBitcoinAddress for PublicKey {
 }
 
 impl ToBitcoinAddress for structs::Address {
-    fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo> {
+    fn to_bitcoin_address(&self, _network: &NetworkEnvironment) -> Result<String, ErrorInfo> {
         if self.is_bitcoin() {
             self.render_string()
         } else {

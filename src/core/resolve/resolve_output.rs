@@ -30,7 +30,7 @@ pub async fn resolve_output(
     // TODO this check can be skipped if we check our XOR distance first.
     // Check if we have the parent transaction stored locally
     // relay.ds.transaction_store.
-    let mut internal_resolve = relay.ds.resolve_code(addr).await?;
+    let internal_resolve = relay.ds.resolve_code(addr).await?;
 
     // Add xor distance here
 
@@ -53,12 +53,12 @@ pub async fn resolve_output(
         let peer_keys = peer_subset.iter().filter_map(|n| n.public_key.clone()).collect_vec();
 
         let mut request = Request::default();
-        let mut resolve_request = addr.clone();
+        let resolve_request = addr.clone();
         request.resolve_code_request = Some(resolve_request);
 
         let results = relay.broadcast_async(peer_keys.clone(), request, Some(Duration::from_secs(10))).await?;
 
-        for (result, pk) in results.iter().zip(peer_keys.iter()) {
+        for (result, _pk) in results.iter().zip(peer_keys.iter()) {
             match validate_resolve_output_response(addr, result) {
                 Ok(r) => {
                     // double check all TX same here.

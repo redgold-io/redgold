@@ -1,22 +1,23 @@
 use std::env;
-use clap::Parser;
-use log::{error, info};
-use metrics::counter;
-use crate::node_config::NodeConfig;
-use crate::util::cli::arg_parse_config;
-use crate::util::cli::args::RgArgs;
-use crate::util::metrics_registry;
-use crate::util::runtimes::build_runtime;
 use std::thread::sleep;
 use std::time::Duration;
+
+use clap::Parser;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, info};
+use metrics::counter;
+
 use redgold_schema::structs::ErrorInfo;
+
 use crate::core::internal_message;
 use crate::core::relay::Relay;
-use crate::node::{Node};
+use crate::node::Node;
+use crate::node_config::NodeConfig;
+use crate::util::cli::arg_parse_config;
 use crate::util::cli::arg_parse_config::ArgTranslate;
-
+use crate::util::cli::args::RgArgs;
+use crate::util::runtimes::build_runtime;
 
 pub async fn main_from_args(opts: RgArgs) {
 

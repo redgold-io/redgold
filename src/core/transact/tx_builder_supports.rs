@@ -161,7 +161,7 @@ impl TransactionBuilder {
     pub fn with_fee(&mut self, destination: &Address, amount: &CurrencyAmount) -> RgResult<&mut Self> {
         self.with_output(destination, amount);
         let option = self.transaction.outputs.last_mut();
-        let mut o = option.ok_or(error_info("Missing output"))?;
+        let o = option.ok_or(error_info("Missing output"))?;
         o.output_type = Some(OutputType::Fee as i32);
         Ok(self)
     }
@@ -184,14 +184,14 @@ impl TransactionBuilder {
 
     pub fn with_maybe_currency_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let o = utxo_entry.output.safe_get_msg("Missing output")?;
-        if let Ok(a) = o.safe_ensure_amount() {
+        if let Ok(_a) = o.safe_ensure_amount() {
             self.with_utxo(utxo_entry)?;
         }
         Ok(self)
     }
 
     pub fn with_message(&mut self, msg: impl Into<String>) -> Result<&mut Self, ErrorInfo> {
-        let mut x = self.transaction.options.as_mut().expect("");
+        let x = self.transaction.options.as_mut().expect("");
         match x.data.as_mut() {
             None => {
                 let mut data = TransactionData::default();
@@ -301,9 +301,9 @@ impl TransactionBuilder {
         // Aha heres the issue, we're expecting output to be populated here
     // Remove this assumption elsewhere
     pub fn with_unsigned_input(&mut self, utxo: UtxoEntry) -> Result<&mut Self, ErrorInfo> {
-        let mut input = utxo.to_input();
+        let input = utxo.to_input();
         let output = utxo.output.safe_get()?;
-        let data = output.data.safe_get()?;
+        let _data = output.data.safe_get()?;
         // if let Some(a) = data.amount {
         //     self.balance += a;
         // }

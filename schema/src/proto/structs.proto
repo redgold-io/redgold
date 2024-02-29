@@ -876,6 +876,10 @@ message RecentTransactionAndObservationRequest {
   optional int64 offset = 3;
 }
 
+message GenesisRequest {
+
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -905,6 +909,7 @@ message Request {
   RecentDiscoveryTransactionsRequest recent_transactions_request = 26;
   Hash lookup_transaction_request = 27;
   RecentTransactionAndObservationRequest recent_transaction_and_observation_request = 28;
+  GenesisRequest genesis_request = 29;
 }
 
 message HealthResponse {
@@ -948,6 +953,7 @@ message Response {
   RecentDiscoveryTransactionsResponse recent_discovery_transactions_response = 18;
   Transaction lookup_transaction_response = 19;
   repeated TransactionAndObservations recent_transaction_and_observation_response = 20;
+  Transaction genesis_response = 21;
 }
 
 message QueryTransactionRequest {

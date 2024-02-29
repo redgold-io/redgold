@@ -29,7 +29,7 @@ use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 use redgold_schema::local_stored_state::NamedXpub;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::gui::tabs::{cold_wallet, hot_wallet};
@@ -406,7 +406,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     }
 }
 
-fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
 
     ComboBox::from_label("Currency")
         .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
@@ -436,7 +436,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     });
 }
 
-fn swap_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {
     //
     // ComboBox::from_label("Currency")
     //     .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
@@ -686,7 +686,7 @@ pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
 
 
 fn window_xpub(
-    ui: &mut Ui,
+    _ui: &mut Ui,
     ls: &mut LocalState,
     ctx: &egui::Context,
 ) {
@@ -758,7 +758,7 @@ fn parse_xpub_rows(str: &str) -> RgResult<Vec<NamedXpub>> {
 
 // TODO: This window exceeds the max size bound for some crazy reason??
 fn window_xpub_loader(
-    ui: &mut Ui,
+    _ui: &mut Ui,
     ls: &mut LocalState,
     ctx: &egui::Context,
 ) {
@@ -989,7 +989,7 @@ pub fn get_address_info(
     show_btc_info: bool,
     update_channel: flume::Sender<StateUpdate>,
 ) {
-    let mut node_config = node_config.clone();
+    let node_config = node_config.clone();
     let address = public_key.address().expect("works");
     let _ = tokio::spawn(async move {
 

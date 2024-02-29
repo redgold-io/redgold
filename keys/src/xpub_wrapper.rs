@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use bdk::bitcoin::util::bip32::{ChildNumber, ExtendedPubKey};
-use bdk::miniscript::ToPublicKey;
+
 use serde::{Deserialize, Serialize};
 use redgold_schema::{ErrorInfoContext, RgResult, structs};
 

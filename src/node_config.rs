@@ -25,7 +25,7 @@ use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 pub struct CanaryConfig {}
 

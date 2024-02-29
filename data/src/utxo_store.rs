@@ -16,7 +16,7 @@ impl UtxoStore {
 
     // Good template example to copy elsewhere.
     pub async fn code_utxo(
-        &self, address: &Address, has_code: bool
+        &self, _address: &Address, has_code: bool
     ) -> RgResult<Option<UtxoEntry>> {
         DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT raw FROM utxo WHERE has_code = ?1"#,

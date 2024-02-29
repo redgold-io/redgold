@@ -17,7 +17,7 @@ use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinW
 use crate::multiparty::initiate_mp::initiate_mp_keysign;
 use crate::node::Node;
 use redgold_keys::address_external::ToBitcoinAddress;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -72,7 +72,7 @@ impl PriceVolume {
 
         for i in 0..divisions {
             let price_offset = (i+1) as f64;
-            let mut price = center_price + (price_offset * (price_width/divisions_f64));
+            let price = center_price + (price_offset * (price_width/divisions_f64));
             if price.is_nan() || price.is_infinite()  || price.is_sign_negative() {
                 error!("Price is invalid: {} center_price: {} price_offset: {} price_width: {} divisions_f64: {}",
                        price, center_price, price_offset, price_width, divisions_f64);
@@ -87,7 +87,7 @@ impl PriceVolume {
 
 
 // Re-calculate the total after normalization
-        let mut adjusted_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
+        let adjusted_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
 
         // Adjust volumes to ensure total equals available_volume
         let mut adjustment = available_volume as i64 - adjusted_total_volume as i64;
@@ -575,7 +575,7 @@ impl DepositWatcher {
     pub async fn build_rdg_ask_swap_tx(utxos: Vec<UtxoEntry>,
                                        btc_deposits: Vec<ExternalTimedTransaction>,
                                        bid_ask: BidAsk,
-                                       key_address: &structs::Address,
+                                       _key_address: &structs::Address,
         min_ask: f64
     )
         -> RgResult<(Option<Transaction>, BidAsk)> {
@@ -746,7 +746,7 @@ impl DepositWatcher {
     pub async fn process_requests_new(
         &mut self,
         alloc: &DepositKeyAllocation,
-        bid_ask_original: BidAsk,
+        _bid_ask_original: BidAsk,
         last_timestamp: u64,
         w: &Arc<Mutex<SingleKeyBitcoinWallet>>,
     ) -> Result<CurveUpdateResult, ErrorInfo> {
@@ -816,7 +816,7 @@ impl DepositWatcher {
 
         let rdg_fulfillment_txb = with_cutoff.iter()
             .filter(|e| e.is_ask_fulfillment_from_external_deposit && e.tx_id_ref.is_some())
-            .fold(&mut tb, |mut tb, o| {
+            .fold(&mut tb, |tb, o| {
             tb.with_output(&o.destination, &o.fulfilled_currency_amount())
             .with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id").identifier)
         });
@@ -831,7 +831,7 @@ impl DepositWatcher {
         let btc_outputs = with_cutoff.iter()
             .filter(|e| !e.is_ask_fulfillment_from_external_deposit &&
             e.destination.to_bitcoin_address(&self.relay.node_config.network).is_ok())
-            .fold(&mut outputs, |mut vec, o| {
+            .fold(&mut outputs, |vec, o| {
                 let btc = o.destination.to_bitcoin_address(&self.relay.node_config.network).expect("works");
                 let amount = o.fulfilled_amount;
                 let outputs = (btc, amount);
@@ -1046,7 +1046,7 @@ impl DepositWatcher {
                     }).collect::<Vec<PriceVolume>>(),
                     center_price: Self::get_starting_center_price_rdg_btc_fallback().await,
                 };
-                let mut new_cfg = DepositWatcherConfig {
+                let new_cfg = DepositWatcherConfig {
                     deposit_allocations: bcfg.deposit_allocations,
                     bid_ask: new_bid_ask,
                     last_btc_timestamp: 0,

@@ -176,5 +176,13 @@ impl ConfigStore {
         self.insert_update_json("local_stored_state", local_stored_state).await.map(|_| ())
     }
 
+    pub async fn store_genesis(&self, gen: &Transaction) -> RgResult<i64> {
+        self.store_proto("genesis", gen.clone()).await
+    }
+
+    pub async fn get_genesis(&self) -> RgResult<Option<Transaction>> {
+        self.get_maybe_proto("genesis").await
+    }
+
 
 }

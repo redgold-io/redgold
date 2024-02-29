@@ -15,7 +15,7 @@ use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoReques
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::{IntervalFold, RecvForEachConcurrent};
 use crate::e2e::run;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 use redgold_schema::EasyJson;
 use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo};
 

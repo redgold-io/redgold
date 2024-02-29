@@ -640,7 +640,13 @@ impl TransactionStore {
                 self.insert_utxo(&entry).await?;
             }
         }
-        for (i, x)  in tx.inputs.iter().enumerate() {
+        self.insert_transaction_indexes(&tx, time).await?;
+        gauge!("redgold.transaction.accepted.total").increment(1.0);
+        return Ok(i);
+    }
+
+    async fn insert_transaction_indexes(&self, tx: &&Transaction, time: i64) -> Result<(), ErrorInfo> {
+        for (i, x) in tx.inputs.iter().enumerate() {
             if let Some(utxo) = &x.utxo_id {
                 self.insert_transaction_edge(
                     utxo,
@@ -651,8 +657,7 @@ impl TransactionStore {
             }
         }
         self.insert_address_transaction(tx).await?;
-        gauge!("redgold.transaction.accepted.total").increment(1.0);
-        return Ok(i);
+        Ok(())
     }
     //
     // // This doesn't seem to work correctly, not returning proper xor

@@ -56,13 +56,13 @@ impl PeerStore {
         let rows = sqlx::query!("DELETE FROM peers WHERE id = ?1", vec)
             .execute(&mut *pool)
             .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let _rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
     }
 
 
     // TODO: Implement XOR distance + fee distance metrics + trust distance metrics
-    pub async fn select_gossip_peers(&self, tx: &Transaction) -> Result<Vec<PublicKey>, ErrorInfo> {
+    pub async fn select_gossip_peers(&self, _tx: &Transaction) -> Result<Vec<PublicKey>, ErrorInfo> {
         self.active_nodes(None).await
     }
     pub async fn peers_near(&self, hash: &Hash, partition: fn(&PartitionInfo) -> Option<i64>) -> Result<Vec<PublicKey>, ErrorInfo> {
@@ -205,8 +205,8 @@ impl PeerStore {
     pub async fn insert_peer(&self, tx: &Transaction) -> Result<i64, ErrorInfo> {
         let pd = tx.peer_data()?;
         let tx_blob = tx.proto_serialize();
-        let pd_blob = pd.proto_serialize();
-        let tx_hash = tx.hash_or().vec();
+        let _pd_blob = pd.proto_serialize();
+        let _tx_hash = tx.hash_or().vec();
         let mut pool = self.ctx.pool().await?;
         let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().bytes()?;
 
@@ -411,7 +411,7 @@ impl PeerStore {
             let rows = sqlx::query!("DELETE FROM nodes WHERE public_key = ?1", vec)
                 .execute(&mut *pool)
                 .await;
-            let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+            let _rows_m = DataStoreContext::map_err_sqlx(rows)?;
             let c = self.peer_id_count_node_pk(p0).await?;
             if c > 0 {
                 self.remove_peer_id(&p).await?;
@@ -468,7 +468,7 @@ impl PeerStore {
         public_key.validate()?;
         let pk_bytes = public_key.bytes()?;
         let pid = nmd.peer_id.safe_get()?.peer_id.safe_get()?.bytes.safe_bytes()?;
-        let ser_nmd = nmd.proto_serialize();
+        let _ser_nmd = nmd.proto_serialize();
         let tx_ser = tx.proto_serialize();
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO nodes (public_key, peer_id, status, last_seen, tx) VALUES (?1, ?2, ?3, ?4, ?5)"#,
@@ -494,7 +494,7 @@ fn distance_check(){
     let a = tc.rhash_1.safe_bytes().unwrap();
     let b = tc.rhash_2.safe_bytes().unwrap();
 
-    let c: Vec<u8> = a.iter().zip(b).map(|(x, y)| x ^ y).collect();
+    let _c: Vec<u8> = a.iter().zip(b).map(|(x, y)| x ^ y).collect();
 
 
 }

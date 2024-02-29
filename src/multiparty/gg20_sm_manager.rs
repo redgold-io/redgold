@@ -19,7 +19,7 @@ use tokio::sync::{Notify, RwLock};
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{EasyJsonDeser, structs};
 use crate::core::relay::Relay;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 #[rocket::get("/rooms/<room_id>/subscribe")]
 async fn subscribe(
@@ -223,7 +223,7 @@ impl<'r> FromRequest<'r> for LastEventId {
     |                          ^^^^^^^ variant or associated item not found in `Outcome<_, (Status, _), Status>`
              */
             Some(Err(_parse_err)) => {
-                let tuple = (Status::BadRequest, "last seen msg id is not valid");
+                let _tuple = (Status::BadRequest, "last seen msg id is not valid");
                 // Outcome::Failure(tuple);
                 // rocket::outcome::Outcome::Failure(tuple);
                 // rocket::data::Outcome::Failure(tuple);

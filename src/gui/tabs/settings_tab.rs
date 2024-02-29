@@ -34,7 +34,7 @@ impl SettingsState {
 }
 
 
-pub fn settings_tab(ui: &mut Ui, ctx: &Context, ls: &mut LocalState) {
+pub fn settings_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     ui.heading("Settings");
 
     ui.label("Local stored state json");

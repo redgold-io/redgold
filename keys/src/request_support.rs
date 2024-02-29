@@ -1,6 +1,6 @@
 use redgold_schema::{error_info, ProtoHashable, RgResult, SafeOption};
 use redgold_schema::structs::{Proof, PublicKey, Request, Response};
-use crate::{KeyPair, TestConstants};
+use crate::{KeyPair};
 use crate::proof_support::ProofSupport;
 
 pub trait RequestSupport {

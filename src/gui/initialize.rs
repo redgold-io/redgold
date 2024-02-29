@@ -35,7 +35,7 @@ pub async fn attempt_start(nc: NodeConfig
     let bytes = resources.logo_bytes;
     let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
     let app = gui::ClientApp::from(ri, nc).await?;
-    let mut native_options = eframe::NativeOptions::default();
+    let native_options = eframe::NativeOptions::default();
     // native_options. = Some(egui::Vec2::new(1024., 632.));
     // native_options.
     

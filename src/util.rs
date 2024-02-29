@@ -1,10 +1,25 @@
 #![allow(dead_code)]
 
+use std::io::Write;
+use std::sync::Once;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use bdk::bitcoin::hashes::Hash;
+use bdk::bitcoin::hashes::hex::ToHex;
+use crypto::digest::Digest;
+use crypto::sha2::{Sha256, Sha512};
+use rand::{Rng, RngCore};
+use rand::rngs::OsRng;
+
+use redgold_keys::util::dhash_str;
+
+use crate::node_config::NodeConfig;
+use crate::observability::trace_setup::init_tracing;
+use crate::schema::SafeBytesAccess;
+
 pub mod auto_update;
 pub mod base26;
 pub mod cmd;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod metrics_registry;
 pub mod rg_merkle;
 pub mod runtimes;
 pub mod sym_crypt;
@@ -12,24 +27,8 @@ pub mod ip_lookup;
 pub mod cli;
 pub mod hashviz;
 pub mod keys;
-pub mod logging;
-pub mod trace_setup;
 pub mod test_util;
 pub mod argon_kdf;
-
-use std::io::Write;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::node_config::NodeConfig;
-use crate::schema::SafeBytesAccess;
-use bdk::bitcoin::hashes::hex::ToHex;
-use bdk::bitcoin::hashes::Hash;
-use crypto::digest::Digest;
-use crypto::sha2::{Sha256, Sha512};
-use rand::rngs::OsRng;
-use rand::{Rng, RngCore};
-use redgold_keys::util::dhash_str;
-use crate::util::trace_setup::init_tracing;
 
 pub fn random_salt() -> i64 {
     let mut rng = rand::thread_rng();
@@ -140,8 +139,6 @@ pub fn init_logger_with_config(node_config: &NodeConfig) {
     // TODO: Log level from config
     init_tracing(&node_config.log_level);
 }
-
-use std::sync::Once;
 
 static INIT: Once = Once::new();
 

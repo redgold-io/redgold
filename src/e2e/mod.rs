@@ -22,7 +22,7 @@ use redgold_schema::EasyJson;
 use redgold_schema::transaction::amount_to_raw_amount;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 // i think this is the one currently in use?
 
 // This one is NOT being used due to malfunctioning, thats why metrics weren't being picked up
