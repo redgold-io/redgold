@@ -4,6 +4,12 @@ use crate::structs::{NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, Tru
 use crate::util::current_time_millis;
 
 
+impl Seed {
+    pub fn port_or(&self, default: u16) -> u16 {
+        self.port_offset.map(|p| p as u16).unwrap_or(default)
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct SeedCsvRecord {
     external_address: String,

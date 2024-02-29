@@ -7,13 +7,16 @@ use crate::schema::structs::{
     DownloadDataType, DownloadRequest, DownloadResponse, NodeState, Request, Response,
 };
 use crate::util;
-use bitcoin::secp256k1::PublicKey;
 use log::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
-use redgold_schema::{RgResult, SafeOption, structs};
+use metrics::{counter, gauge};
+use tokio_stream::Elapsed;
+use redgold_schema::{ProtoHashable, RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{ErrorInfo, UtxoId};
 use redgold_schema::EasyJson;
+use crate::observability::logging::Loggable;
+use crate::observability::metrics_help::WithMetrics;
 
 #[derive(Clone, Debug)]
 pub struct DownloadMaxTimes {
@@ -29,12 +32,8 @@ pub async fn download_msg(
     end_time: i64,
     data_type: DownloadDataType,
     key: structs::PublicKey,
-) -> Result<Response, ErrorInfo> {
+) -> RgResult<DownloadResponse> {
 
-    // let key_hex = hex::encode(key.serialize().to_vec());
-    // info!("Sending download message: start {:?} end: {:?}  type {:?} key_hex: {}", start_time, end_time, data_type, key_hex);
-    let c = new_channel::<Response>();
-    let r = c.sender.clone();
     let mut request = Request::empty();
     request.download_request = Some(DownloadRequest {
             start_time: start_time as u64,
@@ -42,194 +41,184 @@ pub async fn download_msg(
             data_type: data_type as i32,
             offset: None,
     });
-    let mut message = PeerMessage::empty();
-    message.response = Some(r);
-    message.public_key = Some(key);
-    message.request = request;
-    let _err = relay
-        .peer_message_tx
-        .sender
-        .send_err(message)?;
-    // info!("Sent peer message for download, awaiting response with timeout 120");
-    let response = c.receiver
-        .recv_async_err_timeout(Duration::from_secs(120))
-        .await?;
+    // TODO: Handle retries to other peers
+    let response = relay.send_message_sync(request, key, None).await?;
     response.as_error_info()?;
-    use redgold_schema::json_or;
-    // info!("Download response: {}", json_or(&response.clone()));
-    Ok(response)
+    response.download_response.ok_msg("Missing download response")
 }
 
 pub async fn download_all(
     relay: &Relay,
     start_time: i64,
     end_time: i64,
-    key: structs::PublicKey,
-    clean_up_utxo: bool,
-) -> Result<(), ErrorInfo> {
-    let rr = download_msg(
+    key: &structs::PublicKey,
+) -> Result<bool, ErrorInfo> {
+
+    let mut got_data = false;
+
+    if let Ok(dr) = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::UtxoEntry,
         key.clone(),
-    ).await;
-
-    let vec = rr.unwrap().download_response.unwrap().utxo_entries;
-    info!("Downloaded: {} utxo entries", vec.len());
-    for x in vec.clone() {
-        relay.ds.transaction_store.insert_utxo(&x).await?;
+    ).await.log_error().with_err_count("redgold.download.utxo_error") {
+        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+        let utxo_entries = dr.utxo_entries;
+        counter!("redgold.download.utxo").increment(utxo_entries.len() as u64);
+        for utxo in utxo_entries {
+            if let Some(utxo_id) = utxo.utxo_id.as_ref() {
+                got_data = true;
+                if !relay.utxo_channels.contains_key(utxo_id) {
+                    relay.ds.transaction_store.insert_utxo(&utxo).await?;
+                }
+            }
+        }
     }
 
-    let r = download_msg(
+    if let Ok(dr) = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::TransactionEntry,
         key.clone(),
-    ).await?;
-
-    let dr = r.download_response.safe_get()?;
-
-    for x in &dr.transactions {
-        let x1 = x.transaction.safe_get()?;
-        relay
-            .ds
-            .transaction_store
-            .insert_transaction_raw(x1, x.time as i64, true, None)
-            .await?;
-        // TODO return this error
-        // .expect("fix");
-        for f in x.transaction.as_ref().unwrap().fixed_utxo_ids_of_inputs().expect("") {
-            // todo probably distinguish between empty or not ?
-            if clean_up_utxo {
-                relay.ds.transaction_store.delete_utxo(&f).await.expect("fix");
+    ).await.log_error().with_err_count("redgold.download.transaction_error") {
+        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+        let txs = dr.transactions;
+        counter!("redgold.download.transaction").increment(txs.len() as u64);
+        for txe in txs {
+            if let Some(tx) = txe.transaction.as_ref() {
+                got_data = true;
+                if !relay.transaction_known(&tx.calculate_hash()).await? {
+                    relay
+                        .ds
+                        .transaction_store
+                        .insert_transaction(&tx, txe.time as i64, true, None, false)
+                        .await?;
+                }
             }
         }
     }
 
-    let r = download_msg(
+    if let Ok(dr) = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::ObservationEntry,
         key.clone(),
-    ).await?;
-    let dr = r.download_response.safe_get()?;
-    info!("Downloaded: {} observation entries", dr.observations.len());
-    for x in &dr.observations {
-        let x2 = x.observation.safe_get()?;
-        relay.ds.observation.insert_observation_and_edges(x2).await?;
+    ).await.log_error().with_err_count("redgold.download.observation_error") {
+        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+        let obes = dr.observations;
+        counter!("redgold.download.observation").increment(obes.len() as u64);
+        for obe in obes {
+            got_data = true;
+            if let Some(tx) = obe.observation.as_ref() {
+                relay.ds.observation.insert_observation_and_edges(tx).await?;
+            }
+        }
     }
 
-    let _ = download_msg(
+    if let Ok(dr) = download_msg(
         &relay,
         start_time,
         end_time,
         DownloadDataType::ObservationEdgeEntry,
         key.clone(),
-    ).await?;
-    let dr = r.download_response.safe_get()?;
-    for x in &dr.observation_edges {
-        relay.ds.observation.insert_observation_edge(&x).await?;
+    ).await.log_error().with_err_count("redgold.download.observation_edge_error") {
+        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+        let obes = dr.observation_edges;
+        counter!("redgold.download.observation").increment(obes.len() as u64);
+        for obe in obes {
+            got_data = true;
+            relay.ds.observation.insert_observation_edge(&obe).await?;
+        }
     }
-    Ok(())
+    Ok(got_data)
+}
+
+struct PerfTimer {
+    start: std::time::Instant,
+    latest: std::time::Instant,
+    map: std::collections::HashMap<String, i64>,
+}
+
+impl PerfTimer {
+    pub fn new() -> Self {
+        let start = std::time::Instant::now();
+        Self {
+            start,
+            latest: start,
+            map: Default::default(),
+        }
+    }
+    pub fn mark(&mut self) {
+        self.latest = std::time::Instant::now();
+    }
+
+    pub fn record(&mut self, name: impl Into<String>) {
+        let millis = self.millis();
+        self.map.insert(name.into(), millis);
+    }
+
+    pub fn millis(&mut self) -> i64 {
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(self.latest);
+        self.latest = now;
+        let millis = elapsed.as_millis() as i64;
+        millis
+    }
 }
 
 /**
-Actual download process should start with getting the current parquet part file
+Current 'direct trusted' download process to bootstrap historical data.
+Should not interfere with other live synchronization processes. Requests backwards in time
+
+Actual future download process should start with getting the current parquet part file
 snapshot through IPFS for all the different data types. The compacted format.
 */
-pub async fn download(relay: Relay, key: structs::PublicKey) {
-    // remove genesis entry if it exists.
-    // for (x, y) in create_genesis_transaction().iter_utxo_outputs() {
-    //     // let err = DataStore::map_err(relay.ds.clone().delete_utxo(&x, y as u32));
-    //     // if err.is_err() {
-    //     //     error!("{:?}", err);
-    //     // }
-    // }
+pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> RgResult<()> {
 
-    // Query last time for each database, use that on the download functionality as offset
-    //let last_time = relay.ds.query_download_times();
 
-    // relay.node_state.store(NodeState::Downloading);
+    let recent = relay.ds.transaction_store.query_recent_transactions(Some(1), None).await?;
+    let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
+    let start_time = util::current_time_millis_i64();
 
-    let start_dl_time = util::current_time_millis();
+    // Time slice by days backwards.
+    let mut no_data_count = 0;
 
-    let dl_result = download_all(&relay, EARLIEST_TIME, start_dl_time as i64, key, false).await;
-    if let Some(e) = dl_result.err() {
-        error!("Download result: {}", e.json_or());
+    // TODO: Not this, also a maximum earliest lookback period.
+    let bootstrap = bootstrap_pks.get(0).expect("bootstrap").clone();
+
+    let mut cur_end = start_time;
+
+    let mut perf_timer = PerfTimer::new();
+
+    while no_data_count < 3 && cur_end > min_time{
+        let prev_day = cur_end - 1000 * 60 * 60 * 24;
+
+        let got_data = download_all(&relay, prev_day, cur_end, &bootstrap).await?;
+
+        if got_data {
+            no_data_count = 0;
+        } else {
+            no_data_count += 1;
+        }
+        cur_end = prev_day;
     }
 
+    let secs = perf_timer.millis() / 1000;
+    gauge!("redgold.download.time_seconds").set(secs as f64);
+    info!("Download time seconds {}", secs);
 
-    // relay.node_state.store(NodeState::Synchronizing);
-    //
-    // download_all(
-    //     &relay,
-    //     start_dl_time,
-    //     util::current_time_millis(),
-    //     key,
-    //     true,
-    // );
-
-    // Verify that we've cleaned up an old output.
-
-    // relay.node_state.store(NodeState::Ready);
-
-    info!(
-        "Number of transactions after download {}",
-        relay
-            .ds
-            .transaction_store
-            .query_time_transaction(0, util::current_time_millis_i64()).await
-            .unwrap()
-            .len()
-    );
+    Ok(())
 }
 
-//
-// pub struct DownloadHandler {
-//     relay: Relay
-// }
-//
-// impl DownloadHandler {
-//     async fn run(&mut self) {
-//         // let mut interval = tokio::time::interval(self.node_config.observation_formation_millis);
-//         // TODO use a select! between these two.
-//         loop {
-//             match self.relay.observation_metadata.receiver.try_recv() {
-//                 Ok(o) => {
-//                     info!(
-//                         "Pushing observation metadata to buffer {}",
-//                         serde_json::to_string(&o.clone()).unwrap()
-//                     );
-//                     self.data.push(o);
-//                 }
-//                 Err(_) => {}
-//             }
-//             if SystemTime::now().duration_since(self.last_flush).unwrap()
-//                 > Duration::from_millis(self.relay.node_config.observation_formation_millis)
-//             {
-//                 self.form_observation();
-//             }
-//         }
-//     }
-//
-//     // https://stackoverflow.com/questions/63347498/tokiospawn-borrowed-value-does-not-live-long-enough-argument-requires-tha
-//     pub fn new(relay: Relay, arc: Arc<Runtime>) {
-//         let mut o = Self {
-//             data: vec![],
-//             relay,
-//             last_flush: SystemTime::now(),
-//         };
-//         arc.spawn(async move { o.run().await });
-//     }
-//
 
 pub async fn process_download_request(
     relay: &Relay,
     download_request: DownloadRequest,
 ) -> RgResult<DownloadResponse> {
+    counter!("redgold.download.request").increment(1);
     Ok(DownloadResponse {
         utxo_entries: {
             if download_request.data_type != DownloadDataType::UtxoEntry as i32 {

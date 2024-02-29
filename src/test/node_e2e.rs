@@ -18,8 +18,8 @@ use crate::multiparty::watcher::DepositWatcherConfig;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
-use crate::util::logging::Loggable;
-use crate::util::metrics_registry;
+use crate::observability::logging::Loggable;
+use crate::observability::metrics_registry;
 
 #[allow(dead_code)]
 pub struct LocalTestNodeContext {

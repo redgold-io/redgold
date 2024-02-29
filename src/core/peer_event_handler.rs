@@ -27,7 +27,7 @@ use crate::util;
 
 use redgold_schema::EasyJson;
 use redgold_schema::util::lang_util::SameResult;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {

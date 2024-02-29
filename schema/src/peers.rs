@@ -49,6 +49,17 @@ impl NodeMetadata {
 
 
 impl PeerNodeInfo {
+
+    pub fn nmd_pk(&self) -> Option<PublicKey> {
+        if let Some(t) = &self.latest_node_transaction {
+            if let Ok(n) = t.node_metadata() {
+                if let Some(p) = n.public_key {
+                    return Some(p);
+                }
+            }
+        }
+        None
+    }
     pub fn public_keys(&self) -> Vec<PublicKey> {
         let mut res = vec![];
         if let Some(t) = &self.latest_node_transaction {
@@ -61,12 +72,8 @@ impl PeerNodeInfo {
             }
         }
 
-        if let Some(t) = &self.latest_node_transaction {
-            if let Ok(n) = &t.node_metadata() {
-                if let Some(p) = &n.public_key {
-                    res.push(p.clone());
-                }
-            }
+        if let Some(pk) = self.nmd_pk() {
+            res.push(pk.clone());
         }
 
         res

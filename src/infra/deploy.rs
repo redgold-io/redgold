@@ -148,6 +148,19 @@ pub async fn setup_server_redgold(
     ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
     if start_node {
         ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+        if is_genesis {
+            // After starting node for the first time, mark the environment file as not genesis
+            // for the next time.
+            env.remove("REDGOLD_GENESIS");
+            // TODO: Move this to an Deploy class with an SSHLike trait as an inner.
+            // so it's a repeated function.
+            let env_contents = env.iter().map(|(k, v)| {
+                format!("{}={}", k, format!("{}", v))
+            }).join("\n");
+            ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
+            ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
+
+        }
     }
 
     Ok(())

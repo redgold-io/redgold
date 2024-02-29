@@ -39,7 +39,7 @@ use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
 use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 #[derive(Clone)]
 pub struct Conflict {

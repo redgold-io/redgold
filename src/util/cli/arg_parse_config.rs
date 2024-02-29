@@ -1,14 +1,3 @@
-use redgold_data::data_store::{DataStore};
-use crate::node_config::NodeConfig;
-use crate::schema::structs::NetworkEnvironment;
-use crate::{e2e, gui, util};
-use bitcoin_wallet::account::MasterKeyEntropy;
-use bitcoin_wallet::mnemonic::Mnemonic;
-use clap::{Args, Parser, Subcommand};
-use crypto::digest::Digest;
-#[allow(unused_imports)]
-use futures::StreamExt;
-use log::{error, info};
 use std::fs;
 use std::io::Read;
 use std::net::{AddrParseError, IpAddr, SocketAddr};
@@ -18,22 +7,40 @@ use std::slice::Iter;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+
 use bitcoin::bech32::ToBase32;
+use bitcoin_wallet::account::MasterKeyEntropy;
+use bitcoin_wallet::mnemonic::Mnemonic;
+use clap::{Args, Parser, Subcommand};
+use crypto::digest::Digest;
 use crypto::sha2::Sha256;
+#[allow(unused_imports)]
+use futures::StreamExt;
 use itertools::Itertools;
+use log::{error, info};
 use tokio::runtime::Runtime;
+
+use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
-use redgold_schema::seeds::{get_seeds_by_env};
+use redgold_schema::EasyJson;
+use redgold_schema::seeds::get_seeds_by_env;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
+
+use crate::{e2e, gui, util};
+use crate::api::RgHttpClient;
+use crate::node_config::NodeConfig;
+// use crate::gui::image_capture::debug_capture;
+use crate::observability::logging::Loggable;
+use crate::observability::metrics_registry;
+use crate::schema::structs::NetworkEnvironment;
+use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
 use crate::util::cli::{args, commands};
 use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli};
 use crate::util::cli::commands::mnemonic_fingerprint;
 use crate::util::cli::data_folder::DataFolder;
-use crate::util::{init_logger, init_logger_main, ip_lookup, metrics_registry, not_local_debug_mode, sha256_vec};
-use crate::util::trace_setup::init_tracing;
 
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
 
@@ -44,12 +51,6 @@ pub fn get_default_data_top_folder() -> PathBuf {
     let redgold_dir = home_or_current.join(".rg");
     redgold_dir
 }
-
-use redgold_schema::EasyJson;
-use crate::api::RgHttpClient;
-// use crate::gui::image_capture::debug_capture;
-use crate::util::logging::Loggable;
-
 
 pub struct ArgTranslate {
     // runtime: Arc<Runtime>,

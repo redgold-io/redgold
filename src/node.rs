@@ -3,17 +3,18 @@ use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
+use futures::{stream, StreamExt};
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
 
 use log::info;
-use metrics::counter;
+use metrics::{counter, gauge};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
+use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
@@ -42,14 +43,14 @@ use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
 use crate::multiparty::gg20_sm_manager;
 use crate::util::runtimes::build_runtime;
-use crate::util::{auto_update, keys, metrics_registry};
+use crate::util::{auto_update, keys};
 use crate::schema::constants::EARLIEST_TIME;
 use redgold_keys::TestConstants;
-use crate::util::trace_setup::init_tracing;
 use tokio::task::spawn_blocking;
 use tracing::Span;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::structs::TransactionState::Mempool;
+use crate::api::rosetta::models::Peer;
 use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::data_discovery::DataDiscovery;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
@@ -61,7 +62,7 @@ use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
-use crate::util::logging::Loggable;
+use crate::observability::logging::Loggable;
 
 /**
 * Node is the main entry point for the application /
@@ -292,120 +293,59 @@ impl Node {
         relay.update_nmd_auto().await?;
 
         if node_config.genesis {
-            info!("Starting from genesis");
-            // relay.node_state.store(NodeState::Ready);
-            // TODO: Replace with genesis per network type.
-            // if node_config.is_debug() {
-            //     info!("Genesis code kp");
-            //     let _res_err = DataStore::map_err(
-            //         relay
-            //             .ds
-            //             .insert_transaction(&create_genesis_transaction(), EARLIEST_TIME),
-            //     );
-            // } else {
-            //     info!("Genesis local test multiple kp");
-
-            let existing = relay.ds.config_store.get_maybe_proto::<Transaction>("genesis").await?;
-
-            if existing.is_none() {
-                info!("No genesis transaction found, generating new one");
-                let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
-                // let tx = Node::genesis_from(node_config.clone()).0;
-                // runtimes.auxiliary.block_on(
-                relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
-                let _res_err =
-                    // runtimes.auxiliary.block_on(
-                    relay
-                        .ds
-                        .transaction_store
-                        .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None, true)
-                        .await.expect("insert failed");
-                // }
-                let genesis_hash = tx.hash_or();
-                info!("Genesis hash {}", genesis_hash.json_or());
-                let obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
-                let obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
-                assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);
-                // .expect("Genesis inserted or already exists");
-            }
-
+            Self::genesis_start(&relay, &node_config).await?;
         } else {
 
             info!("Starting from seed nodes");
-            let seed = if node_config.main_stage_network() {
-                info!("Querying LB for node info");
-                let a =
-                    // runtimes.auxiliary.block_on(
-                    node_config.api_client().about().await?;
-                    // )?;
-                let tx = a.latest_metadata.safe_get_msg("Missing latest metadata from seed node")?;
-                let pd = tx.outputs.get(0).expect("a").data.as_ref().expect("d").peer_data.as_ref().expect("pd");
-                let nmd = pd.node_metadata.get(0).expect("nmd");
-                let _vec = nmd.public_key_bytes().expect("ok");
-                let vec1 = pd.peer_id.safe_get()?.clone().peer_id.safe_bytes()?.clone();
-                // TODO: Derive from NodeMetadata?
-                Seed{
-                    peer_id: Some(PeerId::from_bytes(vec1)),
-                    trust: vec![TrustData::from_label(1.0)],
-                    public_key: Some(nmd.public_key.safe_get_msg("Missing pk on about").cloned()?),
-                    external_address: nmd.external_address()?.clone(),
-                    port_offset: Some(nmd.port_or(node_config.network) as u32),
-                    environments: vec![node_config.network as i32],
-                }
-            } else {
-                relay.node_config.seeds.get(0).unwrap().clone()
 
+            let all_seeds = if node_config.main_stage_network() {
+                relay.node_config.seeds.clone()
+            } else {
+                vec![relay.node_config.seeds.get(0).unwrap().clone()]
             };
 
-            // Change to immediate discovery message
-            let port = seed.port_offset.unwrap() + 1;
-            let client = PublicClient::from(seed.external_address.clone(), port as u16, Some(relay.clone()));
-            info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, port);
-            let response = client.about().await?;
-            let result = response.peer_node_info.safe_get()?;
 
-            info!("Got LB node info {}, adding peer", result.json_or());
+            let seeds = all_seeds.iter().filter(|s| s.public_key != Some(node_config.public_key())).collect_vec();
 
-            // TODO: How do we handle situation where we get self peer id here other than an error?
-            relay.ds.peer_store.add_peer_new(result, &relay.node_config.public_key()).await?;
+            let seed_results = stream::iter(seeds)
+                .then(|seed| Self::query_seed(&relay, &node_config, seed))
+                .filter_map(|x| async {
+                    let res = x.ok();
+                    if res.is_none() {
+                        counter!("redgold.node.seed_startup_query_failure").increment(1);
+                    }
+                    res
+                })
+                .collect::<Vec<PeerNodeInfo>>()
+                .await;
 
-            info!("Added peer, attempting download");
+            let bootstrap_pks = seed_results.iter().filter_map(|x| {
+                x.nmd_pk()
+            }).collect_vec();
 
-            let x = result.latest_node_transaction.safe_get()?;
-            let metadata = x.node_metadata()?;
-            let pk1 = metadata.public_key.safe_get()?;
+            gauge!("redgold.node.seed_startup_query_count").set(seed_results.len() as f64);
 
-            // ensure peer added successfully
-            let key = pk1.clone();
-            let qry_result = relay.ds.peer_store.query_public_key_node(&key).await;
-            qry_result.log_error().ok();
-            let opt_info = qry_result.expect("query public key node");
-            let pk_store = opt_info
-                .expect("query public key node")
-                .node_metadata().expect("node metadata")
-                .public_key.expect("pk");
-            assert_eq!(&pk_store, pk1);
+            // TODO: Allow bypassing this check for testing purposes
+            if seed_results.is_empty() {
+                return Err(error_info("No seed nodes found, exiting"));
+            }
 
-            // This triggers peer exploration.
+            for result in &seed_results {
+                relay.ds.peer_store.add_peer_new(result, &relay.node_config.public_key()).await?;
+            }
+            info!("Added seed peers, attempting download");
+
+            // This triggers peer exploration immediately
             tracing::info!("Attempting discovery process of peers on startup for node");
             let mut discovery = Discovery::new(relay.clone()).await;
             discovery.interval_fold().await?;
-            // This was only immediate discovery of that node and is already covered
-            // // TODO: Remove this in favor of discovery
-            // relay.discovery.sender.send_err(
-            //     DiscoveryMessage::new(metadata.clone(), result.dynamic_node_metadata.clone())
-            // )?;
-
-
 
             tokio::time::sleep(Duration::from_secs(3)).await;
-            info!("Now starting download after discovery has ran.");
-
+            info!("Now starting download after discovery has run.");
             // TODO Change this invocation to an .into() in a non-schema key module
             download::download(
-                relay.clone(),
-                pk1.clone()
-            ).await;
+                relay.clone(), bootstrap_pks
+            ).await?;
 
 
         }
@@ -414,5 +354,42 @@ impl Node {
         counter!("redgold.node.node_started").increment(1);
 
         return Ok(node);
+    }
+
+    async fn query_seed(relay: &Relay, node_config: &NodeConfig, seed: &Seed) -> Result<PeerNodeInfo, ErrorInfo> {
+        let api_port = seed.port_or(node_config.port_offset) + 1;
+        let client = PublicClient::from(seed.external_address.clone(), api_port, Some(relay.clone()));
+        info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, api_port);
+        let response = client.about().await?;
+        let result = response.peer_node_info.safe_get()?;
+        Ok(result.clone())
+    }
+
+    async fn genesis_start(relay: &Relay, node_config: &NodeConfig) -> Result<(), ErrorInfo> {
+        info!("Starting from genesis");
+        let existing = relay.ds.config_store.get_maybe_proto::<Transaction>("genesis").await?;
+
+        if existing.is_none() {
+            counter!("redgold.node.genesis_created").increment(1);
+            info!("No genesis transaction found, generating new one");
+            let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
+            // let tx = Node::genesis_from(node_config.clone()).0;
+            // runtimes.auxiliary.block_on(
+            relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
+            let _res_err =
+                // runtimes.auxiliary.block_on(
+                relay
+                    .ds
+                    .transaction_store
+                    .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None, true)
+                    .await.expect("insert failed");
+            // }
+            let genesis_hash = tx.hash_or();
+            info!("Genesis hash {}", genesis_hash.json_or());
+            let obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+            let obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+            assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);
+        }
+        Ok(())
     }
 }
