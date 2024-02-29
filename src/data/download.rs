@@ -73,7 +73,7 @@ pub async fn download_all(
             if let Some(utxo_id) = utxo.utxo_id.as_ref() {
                 got_data = true;
                 if !relay.utxo_channels.contains_key(utxo_id) {
-                    relay.ds.transaction_store.insert_utxo(&utxo).await?;
+                    relay.ds.transaction_store.insert_utxo(&utxo).await.log_error().with_err_count("redgold.download.utxo_insert_error").ok();
                 }
             }
         }
@@ -116,7 +116,8 @@ pub async fn download_all(
         for obe in obes {
             got_data = true;
             if let Some(tx) = obe.observation.as_ref() {
-                relay.ds.observation.insert_observation_and_edges(tx).await?;
+                relay.ds.observation.insert_observation_and_edges(tx).await
+                    .log_error().with_err_count("redgold.download.observation_insert_error").ok();;
             }
         }
     }
@@ -133,7 +134,8 @@ pub async fn download_all(
         counter!("redgold.download.observation").increment(obes.len() as u64);
         for obe in obes {
             got_data = true;
-            relay.ds.observation.insert_observation_edge(&obe).await?;
+            relay.ds.observation.insert_observation_edge(&obe).await
+                .log_error().with_err_count("redgold.download.oe_insert_error").ok();;
         }
     }
     Ok(got_data)
@@ -248,7 +250,9 @@ async fn download_genesis(relay: &Relay, bootstrap_pks: Vec<PublicKey>) -> Resul
         relay.ds.config_store.store_genesis(&gen_actual).await?;
         let result = gen_actual.time();
         let g_time = result?.clone();
-        relay.ds.transaction_store.insert_transaction(&gen_actual, g_time, true, None, false).await?;
+        if relay.ds.transaction_store.query_maybe_transaction(&gen_actual.calculate_hash()).await?.is_none() {
+            relay.ds.transaction_store.insert_transaction(&gen_actual, g_time, true, None, false).await?;
+        }
         return Ok(Some(g_time))
     }
     Ok(None)
