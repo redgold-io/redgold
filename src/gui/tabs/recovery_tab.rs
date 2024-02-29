@@ -29,7 +29,7 @@ enum RecoverySubtab {
     KeyLoad
 }
 
-pub(crate) fn recovery_tab(ui: &mut Ui, ctx: &Context, ls: &mut LocalState) {
+pub(crate) fn recovery_tab(ui: &mut Ui, _ctx: &Context, _ls: &mut LocalState) {
     ui.heading("Recovery");
     // ui.horizontal(|ui| {
     //    for t in RecoverySubtab::iter() {

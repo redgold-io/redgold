@@ -18,7 +18,7 @@ impl ObservationHandler {
     async fn notify_subscribers(&self, o: &Transaction) {
         // Notify subscribers
         // TODO: FP
-        let h = o.hash_or();
+        let _h = o.hash_or();
         if let Ok(proofs) = o.build_observation_proofs() {
             for proof in proofs {
                 if let Some(m) = &proof.metadata {

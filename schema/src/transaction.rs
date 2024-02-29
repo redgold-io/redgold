@@ -90,7 +90,7 @@ impl WithMetadataHashableFields for Transaction {
 impl HashClear for Transaction {
     fn hash_clear(&mut self) {
         // TODO: Implement hashclear for inputs
-        for mut x in self.inputs.iter_mut() {
+        for x in self.inputs.iter_mut() {
             x.output = None;
         }
         if let Some(s) = self.struct_metadata_opt() {
@@ -128,7 +128,7 @@ impl Transaction {
     }
 
     pub fn observation_output_index(&self) -> RgResult<i64> {
-        self.outputs.iter().enumerate().find(|(i, o)| o.observation().is_ok()
+        self.outputs.iter().enumerate().find(|(_i, o)| o.observation().is_ok()
         ).map(|o| o.0 as i64).ok_or(error_info("Missing observation output"))
     }
 

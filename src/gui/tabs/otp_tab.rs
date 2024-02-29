@@ -112,7 +112,7 @@ fn otp_xor(msg: &Vec<u8>, pad: &Vec<u8>) -> RgResult<Vec<u8>> {
     Ok(msg.iter().zip(pad.iter()).map(|(a, b)| a ^ b).collect_vec())
 }
 
-pub(crate) fn otp_tab(ui: &mut Ui, ctx: &Context, ls: &mut LocalState) {
+pub(crate) fn otp_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     ui.heading("One Time Pad Tab");
     ui.horizontal(|ui| {
        for t in OtpSubTab::iter() {

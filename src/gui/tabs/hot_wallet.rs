@@ -12,7 +12,7 @@ use crate::gui::wallet_tab::{StateUpdate, WalletState};
 
 
 fn save_key_window(
-    ui: &mut Ui,
+    _ui: &mut Ui,
     ls: &mut LocalState,
     ctx: &egui::Context,
 ) {

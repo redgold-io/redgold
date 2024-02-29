@@ -386,8 +386,8 @@ impl Node {
             // }
             let genesis_hash = tx.hash_or();
             info!("Genesis hash {}", genesis_hash.json_or());
-            let obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
-            let obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+            let _obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
+            let _obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
             assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);
         }
         Ok(())

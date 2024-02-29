@@ -80,7 +80,7 @@ pub struct ResolvedTransactionHash {
 
 impl ResolvedTransactionHash {
     // TODO: Move validate function here
-    pub fn valid_index(&self, relay: &Relay) {
+    pub fn valid_index(&self, _relay: &Relay) {
         // relay.get_trust_of_node()
     }
 }
@@ -161,7 +161,7 @@ pub fn validate_single_result(
 }
 
 pub async fn resolve_input(
-    input: Input, relay: Relay, peers: Vec<PublicKey>, signable_hash: Hash,
+    input: Input, relay: Relay, _peers: Vec<PublicKey>, signable_hash: Hash,
     check_liveness: bool
 )
                            -> Result<ResolvedInput, ErrorInfo> {

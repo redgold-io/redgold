@@ -74,7 +74,7 @@ impl ContentionConflictManager {
     pub async fn process_message(&mut self,
                                  key: &ContentionKey,
                                  msg: &ContentionMessageInner,
-                                 response: &Sender<RgResult<ContentionResult>>
+                                 _response: &Sender<RgResult<ContentionResult>>
     ) -> RgResult<ContentionResult> {
         let time = util::current_time_millis_i64();
         match msg {
@@ -102,7 +102,7 @@ impl ContentionConflictManager {
             ContentionMessageInner::ObservationInfo { .. } => {
 
             }
-            ContentionMessageInner::CheckContentionAccepted { transaction_hash } => {}
+            ContentionMessageInner::CheckContentionAccepted { transaction_hash: _ } => {}
         }
         //
         // if output.is_deploy() {

@@ -153,7 +153,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             d.debug_skip_start = true;
         }
         let config = local_state.node_config.clone();
-        let mut arc = local_state.server_state.deployment_result_info_box.clone();
+        let arc = local_state.server_state.deployment_result_info_box.clone();
         let fun = Box::new(move |s: String| {
             // Lock the Mutex and get mutable access to the inner String.
             let mut inner = arc.lock().expect("lock poisoned");
@@ -168,10 +168,10 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             let mut d2 = d.clone();
             let mut d3 = d2.clone();
             let nc = config.clone();
-            let res = default_deploy(&mut d2, &nc, f).await;
+            let _res = default_deploy(&mut d2, &nc, f).await;
             if hard {
                 d3.debug_skip_start = false;
-                let res = default_deploy(&mut d3, &nc, f2).await;
+                let _res = default_deploy(&mut d3, &nc, f2).await;
             }
             // Update final deploy result here.
         });

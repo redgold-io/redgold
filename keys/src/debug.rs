@@ -1,6 +1,6 @@
-use redgold_schema::structs::Hash;
-use crate::TestConstants;
-use crate::util::mnemonic_support::WordsPass;
+
+
+
 
 #[test]
 fn xor_test() {

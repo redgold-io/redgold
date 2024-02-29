@@ -52,14 +52,14 @@ impl XorfConvDistanceSubset<NodeMetadata> for Vec<NodeMetadata> {
         &self, other: &Vec<u8>, partition_func: F
     ) -> Vec<&NodeMetadata>
     where F: FnOnce(&PartitionInfo) -> Option<i64> + Copy {
-        let mut res = self.iter()
+        let res = self.iter()
             .filter_map(|n| n.public_key.as_ref().map(|p| (p, n)))
             .filter_map(|(p, n)| p.bytes.as_ref().map(|b| (b.value.clone(), n)))
             .map(|(p, n)| (xorf_conv_distance(other, &p), n))
             .filter(|(p, n)|
                 n.partition_info.as_ref().and_then(|i| partition_func(i)).map(|d| d < *p).unwrap_or(true))
             .sorted_by(|(p1, _), (p2, _)| p1.cmp(p2))
-            .map(|(p, n)| n)
+            .map(|(_p, n)| n)
             .collect_vec();
         res
     }

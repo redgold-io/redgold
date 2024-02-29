@@ -1,15 +1,14 @@
-use std::process::Child;
+
 use std::str::FromStr as frmstr;
 
 use bitcoin::{
     network::constants::Network,
-    secp256k1,
     secp256k1::Secp256k1,
     util::bip32::{DerivationPath, ExtendedPrivKey, ExtendedPubKey},
 };
 // #[cfg(test)]
 // use bitcoin::hashes::core::str::FromStr;
-use bitcoin::hashes::hex::ToHex;
+
 use bitcoin::secp256k1::{PublicKey, SecretKey};
 use bitcoin::util::bip32::ChildNumber;
 use bitcoin_wallet::account::Seed;
@@ -17,7 +16,7 @@ use bitcoin_wallet::mnemonic::Mnemonic;
 use hdpath::{Purpose, StandardHDPath};
 
 use redgold_schema::constants::REDGOLD_KEY_DERIVATION_PATH;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult};
+use redgold_schema::{error_info, RgResult};
 use redgold_schema::structs::{Address, ErrorInfo, Hash};
 use crate::KeyPair;
 use crate::util::mnemonic_builder;
@@ -318,7 +317,7 @@ impl MnemonicWords {
 
     pub fn keypair_from_path_str_checked(&self, hd_path: String) -> RgResult<KeyPair> {
         let hd_path = StandardHDPath::from_str(&*hd_path)
-            .map_err(|e| error_info("invalid hd path"))?;
+            .map_err(|_e| error_info("invalid hd path"))?;
         let key = get_pk(&self.seed.0, &hd_path);
         let pk = key.private_key.key;
         let pub_key = MnemonicWords::get_public_key(&key);

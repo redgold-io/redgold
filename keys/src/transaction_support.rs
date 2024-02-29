@@ -1,15 +1,15 @@
 use std::collections::HashSet;
-use bitcoin::secp256k1::{PublicKey, SecretKey};
+
 use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
+use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use crate::KeyPair;
 use crate::proof_support::ProofSupport;
 
-use crate::structs::DebugSerChange;
-use crate::structs::DebugSerChange2;
-use redgold_schema::ProtoSerde;
+
+
+
 use redgold_schema::util::current_time_millis;
 use crate::address_external::ToBitcoinAddress;
 
@@ -40,10 +40,10 @@ fn proto_ser_remove_opt_change() {
 
 impl TransactionSupport for Transaction {
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction> {
-        let mut x = self.with_hash();
+        let x = self.with_hash();
         let hash = x.hash_or();
         let mut options = TransactionOptions::default();
-        let mut opts = x.options.as_mut().unwrap_or(&mut options);
+        let opts = x.options.as_mut().unwrap_or(&mut options);
         if opts.time_sponsor.is_none() {
             let time = current_time_millis();
             let proof = Proof::from_keypair_hash(&hash, &key_pair);

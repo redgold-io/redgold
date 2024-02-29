@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use bdk::bitcoin::{Network, PrivateKey, XpubIdentifier};
+use bdk::bitcoin::{Network};
 use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::secp256k1::rand::RngCore;
 use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey, ExtendedPubKey};
@@ -7,17 +7,17 @@ use bdk::keys::bip39::{Mnemonic, Language};
 use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
 use bdk::keys::bip39::WordCount::Words24;
 use bdk::miniscript::miniscript;
-use bitcoin::hashes::hex::ToHex;
-use bitcoin_wallet::account::MasterKeyEntropy;
+
+
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::constants::{default_node_internal_derivation_path, REDGOLD_KEY_DERIVATION_PATH, redgold_keypair_change_path};
+use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
-use crate::util::btc_wallet::{SingleKeyBitcoinWallet, struct_public_to_address};
-use crate::util::mnemonic_words::MnemonicWords;
+
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct WordsPass {

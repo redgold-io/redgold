@@ -9,7 +9,7 @@ async fn init_db() {
 
     let home_fallback = dirs::home_dir()
         .map(|d| d.join(".rg/sqlx/data_store.sqlite"))
-        .and_then(|d| d.to_str().map(|s| s.clone().to_string()))
+        .and_then(|d| d.to_str().map(|s| s.to_string()))
         .map(|d| format!("sqlite://{}", d));
 
     let path = std::env::var("DATABASE_URL")
@@ -19,9 +19,9 @@ async fn init_db() {
 
     let raw_path = path.clone().replace("file://", "");
 
-    let path1 = Path::new(&raw_path).clone();
-    let path_parent = path1.parent().expect("data store folder no parent").clone();
-    println!("path parent url = {:?}", path_parent.clone().to_str());
+    let path1 = Path::new(&raw_path);
+    let path_parent = path1.parent().expect("data store folder no parent");
+    println!("path parent url = {:?}", path_parent.to_str());
     fs::create_dir_all(path_parent).expect("Directory unable to be created.");
     let remove = fs::remove_file(raw_path);
     println!("file remove result {:?}", remove);

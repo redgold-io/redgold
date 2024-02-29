@@ -304,7 +304,7 @@ impl TransactionProcessContext {
     }
 
     async fn observe(&self, validation_type: ValidationType, state: State) -> Result<ObservationProof, ErrorInfo> {
-        let mut hash: Hash = self.transaction_hash.safe_get()?.clone();
+        let hash: Hash = self.transaction_hash.safe_get()?.clone();
         // TODO: It might be nice to grab the proof of a signature here?
         self.relay.observe_tx(&hash, state, validation_type, structs::ValidationLiveness::Live).await
     }

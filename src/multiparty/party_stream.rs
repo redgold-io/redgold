@@ -190,7 +190,7 @@ impl PartyEvents {
         match e {
             // External Bitcoin Transaction event
             AddressEvent::External(t) => {
-                let balance = self.balance_map.get(&t.currency).map(|b| b.clone()).unwrap_or((0i64));
+                let balance = self.balance_map.get(&t.currency).map(|b| b.clone()).unwrap_or(0i64);
                 let mut balance_sign = 1;
 
                 if t.incoming {
@@ -235,7 +235,7 @@ impl PartyEvents {
             }
             // Internal Redgold transaction event
             AddressEvent::Internal(t) => {
-                let balance = self.balance_map.get(&SupportedCurrency::Redgold).cloned().unwrap_or((0i64));
+                let balance = self.balance_map.get(&SupportedCurrency::Redgold).cloned().unwrap_or(0i64);
                 let mut balance_sign = -1;
                 let mut amount = 0;
                 let incoming = !t.tx.input_addresses().contains(&self.key_address);
@@ -447,7 +447,7 @@ impl AddressEvent {
                         let metadata = o.proof.as_ref()
                             .and_then(|p| p.public_key.as_ref())
                             .filter(|pk| seeds.contains(pk))
-                            .and_then(|pk| o.metadata.as_ref());
+                            .and_then(|_pk| o.metadata.as_ref());
                         metadata
                             .and_then(|m| m.time().ok())
                             .filter(|_| metadata.filter(|m| m.validation_liveness == ValidationLiveness::Live as i32).is_some())
@@ -474,7 +474,7 @@ pub trait AllTxObsForAddress {
 
 #[async_trait]
 impl AllTxObsForAddress for RgHttpClient {
-    async fn get_all_tx_obs_for_address(&self, address: &Address, limit: i64, offset: i64) -> RgResult<Vec<TransactionWithObservations>> {
+    async fn get_all_tx_obs_for_address(&self, _address: &Address, _limit: i64, _offset: i64) -> RgResult<Vec<TransactionWithObservations>> {
 
         // self.query_hash(address.render_string())
         // let tx = self.get_all_tx_for_address(address, limit, offset).await?;
@@ -506,12 +506,12 @@ async fn debug_events() -> RgResult<()> {
 
     let relay = Relay::dev_default().await;
 
-    let mut btc_wallet =
+    let btc_wallet =
     Arc::new(Mutex::new(
         SingleKeyBitcoinWallet::new_wallet(pk_address.clone(), NetworkEnvironment::Dev, true)
             .expect("w")));
 
-    let mut n = PartyEvents::historical_initialize(&pk_address, &relay, &btc_wallet).await?;
+    let n = PartyEvents::historical_initialize(&pk_address, &relay, &btc_wallet).await?;
 
 
     let mut txids = HashSet::new();
@@ -532,7 +532,7 @@ async fn debug_events() -> RgResult<()> {
         }
     };
 
-    let mut missing = txidsbtc.sub(&txids);
+    let _missing = txidsbtc.sub(&txids);
 
     // transactions
     //
@@ -573,7 +573,7 @@ async fn debug_events() -> RgResult<()> {
     // }
 
 
-    let orders = n.orders();
+    let _orders = n.orders();
 
     Ok(())
 

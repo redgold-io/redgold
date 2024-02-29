@@ -10,7 +10,7 @@ use redgold_schema::{bytes_data, error_info, error_message,
                      ErrorInfoContext, SafeBytesAccess, structs};
 use redgold_schema::structs::ErrorInfo;
 
-use crate::{TestConstants, util};
+use crate::{util};
 
 pub mod mnemonic_builder;
 pub mod mnemonic_words;

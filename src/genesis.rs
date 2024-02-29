@@ -29,8 +29,8 @@ fn main_entry(address: impl Into<String>, fraction_pct: impl Into<f64>) -> Genes
 }
 fn main_distribution(test_address: &Address) -> Vec<GenesisDistribution> {
     let mut zero_distribution = main_entry("3a299a25abcc604983dcabbf8a20dfb1440d6c36766762c936030ee8de6a7465", 1);
-    zero_distribution.amount.amount -= (10 * DECIMAL_MULTIPLIER);
-    let mut entries = vec![
+    zero_distribution.amount.amount -= 10 * DECIMAL_MULTIPLIER;
+    let entries = vec![
         // 0 - Active dev fund
         zero_distribution,
         // 1 - Original dev fund
@@ -66,7 +66,7 @@ pub fn verify_genesis_distribution_main() {
     main_distribution(&tc.address_1);
 }
 
-fn lower_distribution(network: &NetworkEnvironment, words_pass: &WordsPass, seeds: &Vec<Seed>) -> Vec<GenesisDistribution> {
+fn lower_distribution(_network: &NetworkEnvironment, words_pass: &WordsPass, seeds: &Vec<Seed>) -> Vec<GenesisDistribution> {
     let mut pks = vec![];
 
     for i in 0..50 {

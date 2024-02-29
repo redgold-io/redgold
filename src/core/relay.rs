@@ -196,7 +196,7 @@ pub struct StrictRelay {}
 impl Relay {
 
     pub async fn get_trust(&self) -> RgResult<HashMap<PeerId, f64>> {
-        let seeds = self.node_config.seeds.iter().filter_map(|s|
+        let _seeds = self.node_config.seeds.iter().filter_map(|s|
             s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
         ).collect::<HashMap<PeerId, f64>>();
         let peer_tx = self.peer_tx().await?;
@@ -591,7 +591,7 @@ impl Relay {
                                 } else {
                                     sum -= t;
                                 }
-                                if let (Some(h), Some(i)) = (&utxo_r.child_transaction, &utxo_r.child_transaction_input) {
+                                if let (Some(h), Some(_i)) = (&utxo_r.child_transaction, &utxo_r.child_transaction_input) {
                                     if hm.contains_key(h) {
                                         hm.insert(h.clone(), hm.get(h).unwrap() + t);
                                     } else {

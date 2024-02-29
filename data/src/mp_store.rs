@@ -70,7 +70,7 @@ impl MultipartyStore {
     ) -> Result<(), ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
-        let time = util::current_time_millis();
+        let _time = util::current_time_millis();
         let pkb = key.bytes.safe_bytes()?;
         let rows = sqlx::query!(
             r#"UPDATE multiparty SET keygen_public_key = ?1 WHERE room_id = ?2"#,
@@ -79,7 +79,7 @@ impl MultipartyStore {
         )
             .execute(&mut *pool)
             .await;
-        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let _rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
     }
 

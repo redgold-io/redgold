@@ -603,7 +603,7 @@ impl ArgTranslate {
     fn immediate_debug(&self) {
         if let Some(cmd) = &self.opts.subcmd {
             match cmd {
-                RgTopLevelSubcommand::TestCapture(t) => {
+                RgTopLevelSubcommand::TestCapture(_t) => {
                     println!("Attempting test capture");
                     // debug_capture();
                     unsafe {
@@ -727,7 +727,7 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                 RgTopLevelSubcommand::Deploy(d) => {
                     commands::deploy(d, &config).await
                 }
-                RgTopLevelSubcommand::TestBitcoinBalance(b) => {
+                RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
                     commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
                     Ok(())
                 }

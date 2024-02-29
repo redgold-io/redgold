@@ -106,7 +106,7 @@ impl LocalNodes {
     }
     fn seeds() -> Vec<Seed> {
         let mut seeds = vec![];
-        for i in 0..3 {
+        for _i in 0..3 {
             let mut seed = NodeConfig::from_test_id(&0).self_seed();
             seed.port_offset = Some(util::random_port() as u32);
             seeds.push(seed);
@@ -115,7 +115,7 @@ impl LocalNodes {
     }
 
     async fn new(
-        offset: Option<u16>
+        _offset: Option<u16>
     ) -> LocalNodes {
         // TODO: Lets avoid this and write them out to disk, or is that done already and this can be removed?
         // let path = NodeConfig::memdb_path(&(0 as u16));
@@ -343,8 +343,8 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let start_node = local_nodes.start();
     // info!("Started initial node");
     let client1 = start_node.control_client.clone();
-    let client2 = start_node.control_client.clone();
-    let ds = start_node.node.relay.ds.clone();
+    let _client2 = start_node.control_client.clone();
+    let _ds = start_node.node.relay.ds.clone();
     // let show_balances = || {
     //     let res = &ds.query_all_balance();
     //     let res2 = res.as_ref().unwrap();
@@ -377,7 +377,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let res = submit.submit_test_contract().await.expect("submit test contract");
         let ct = res.transaction.expect("tx");
         let contract_address = ct.first_output_address().expect("cont");
-        let o = ct.outputs.get(0).expect("O");
+        let _o = ct.outputs.get(0).expect("O");
         let state = client.client_wrapper().contract_state(&contract_address).await.expect("res");
         let state_json = TestContractInternalState::proto_deserialize(state.state.clone().expect("").value).expect("").json_or();
         info!("First contract state marker: {} {}", state.json_or(), state_json);
@@ -464,7 +464,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
 
     let signing_data = Hash::from_string_calculate("hey");
-    let result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
+    let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
 
     tracing::info!("After MP test");
 
@@ -499,7 +499,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let txs = h.get_all_tx(&string_addr).await.expect("works");
         println!("txs: {}", txs.json_or());
         let tx_head = txs.get(0).expect("tx");
-        let other_address = tx_head.other_address.clone();
+        let _other_address = tx_head.other_address.clone();
 
         // Load using the faucet KP, but send to the multiparty address
         let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
@@ -508,7 +508,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let fee = "0.000108594791676".to_string();
         let fee_value = EthHistoricalClient::translate_float_value(&fee.to_string()).expect("works") as u64;
         let amount = fee_value * 6;
-        let tx = eth.send_tx(&mp_eth_addr, amount).await.expect("works");
+        let _tx = eth.send_tx(&mp_eth_addr, amount).await.expect("works");
 
         tokio::time::sleep(Duration::from_secs(20)).await;
 

@@ -72,7 +72,7 @@ impl Default for AddressState {
     }
 }
 
-pub(crate) fn address_tab(ui: &mut Ui, ctx: &Context, ls: &mut LocalState) {
+pub(crate) fn address_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     ui.heading("Address Tab");
 
     let ast = &mut ls.address_state;

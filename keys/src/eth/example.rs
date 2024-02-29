@@ -1,17 +1,17 @@
 use std::str::FromStr;
-use bitcoin::hashes::hex::ToHex;
-use ethers::{core::{types::TransactionRequest, utils::Anvil},
+
+use ethers::{core::{types::TransactionRequest},
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, providers, signers::{LocalWallet, Signer}};
-use ethers::abi::AbiEncode;
-use redgold_schema::util::lang_util::AnyPrinter;
-use crate::{KeyPair, TestConstants};
-use crate::address_external::ToEthereumAddress;
+
+
+use crate::{KeyPair};
+
 use crate::util::mnemonic_support::WordsPass;
 
 use alloy_chains::Chain;
-use ethers::core::k256::FieldBytes;
-use ethers::middleware::signer::SignerMiddlewareError;
-use ethers::prelude::{maybe, PendingTransaction, to_eip155_v, U256, Wallet};
+
+
+use ethers::prelude::{maybe, to_eip155_v, U256};
 use ethers::types::{Address, Bytes, Signature};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use foundry_block_explorers::account::GenesisOption;
@@ -175,7 +175,7 @@ async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     // assert_eq!(metadata.items[0].contract_name, "DAO");
     println!("balance: {}", metadata.balance);
 
-    let txs = client.get_transactions(&address, None).await.expect("works");
+    let _txs = client.get_transactions(&address, None).await.expect("works");
 
     let environment = NetworkEnvironment::Dev;
     let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
@@ -186,15 +186,15 @@ async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     println!("txs: {}", txs.json_or());
 
     let tx_head = txs.get(0).expect("tx");
-    let from = tx_head.other_address.clone();
+    let _from = tx_head.other_address.clone();
 
-    let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
+    let (dev_secret, _dev_kp) = dev_ci_kp().expect("works");
 
-    let eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
+    let _eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
 
     let fee = "0.000108594791676".to_string();
     let fee_value = EthHistoricalClient::translate_value(&fee.to_string()).expect("works") as u64;
-    let amount = fee_value * 2;
+    let _amount = fee_value * 2;
     // eth.create_transaction(&from, amount).await.expect("works");
 
     Ok(())
@@ -311,7 +311,7 @@ impl EthWalletWrapper {
 
         // since we initialize with None we need to re-set the chain_id for the sighash to be
         // correct
-        let mut tx = tx;
+        let tx = tx;
         tx.set_chain_id(chain_id);
         let sighash = tx.sighash();
 
@@ -325,10 +325,10 @@ impl EthWalletWrapper {
     pub async fn broadcast_tx(&self, tx: Bytes) -> RgResult<()> {
         let result = self.client.send_raw_transaction(tx).await;
         match result {
-            Ok(o) => {
+            Ok(_o) => {
                 Ok(())
             }
-            Err(e) => {
+            Err(_e) => {
                 Err(error_info(format!("tx send failure {}", "error")))
             }
         }
@@ -367,16 +367,16 @@ impl EthWalletWrapper {
 async fn main() {
     foo().await.expect("works");
 
-    let api_key = std::env::var("ETHERSCAN_API_KEY").expect("");
+    let _api_key = std::env::var("ETHERSCAN_API_KEY").expect("");
 
     let testc = TestConstants::new();
-    let test_skhex = testc.key_pair().secret_key.to_hex();
+    let _test_skhex = testc.key_pair().secret_key.to_hex();
 
     let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
 
     let bytes = hex::decode(dev_secret).expect("wtf");
 
-    let eth = dev_kp.public_key().to_ethereum_address().expect("works").print();
+    let _eth = dev_kp.public_key().to_ethereum_address().expect("works").print();
 
     let w = LocalWallet::from_bytes(&bytes).expect("works");
     println!("Wallet btc: {}", w.address().to_string());

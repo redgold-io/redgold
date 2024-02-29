@@ -115,7 +115,7 @@ impl LocalState {
             new_xpubs.push(new_named);
             new_xpubs
         } else {
-            let mut has_existing = self.local_stored_state.xpubs.iter().find(|x| {
+            let has_existing = self.local_stored_state.xpubs.iter().find(|x| {
                 x.name == new_named.name
             }).is_some();
             if has_existing {
@@ -387,7 +387,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     top_panel::render_top(ctx, local_state);
 
     let img = logo;
-    let texture_id = img.texture_id(ctx);
+    let _texture_id = img.texture_id(ctx);
 
     egui::SidePanel::left("side_panel")
         .resizable(false)
@@ -407,7 +407,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 egui::Layout::top_down_justified(egui::Align::default()),
                 |ui| {
                     let scale = 2.0;
-                    let size =
+                    let _size =
                         egui::Vec2::new((img.size()[0] as f32 / scale) as f32, (img.size()[1] as f32 / scale) as f32);
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);

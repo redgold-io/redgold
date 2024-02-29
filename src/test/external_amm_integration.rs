@@ -74,7 +74,7 @@ pub async fn send_test_rdg_btc_tx_withdrawal() {
 
     println!("sending to rdg amm address: {addr}");
 
-    if let Some((privk, keypair)) = dev_ci_kp() {
+    if let Some((_privk, keypair)) = dev_ci_kp() {
         let pk = keypair.public_key();
         let rdg_address = pk.address().expect("");
         println!("pk: {}", rdg_address.render_string().expect(""));
@@ -112,7 +112,7 @@ pub fn dev_balance_check() {
 
     println!("address: {addr}");
 
-    let mut w =
+    let w =
         SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("w");
 
     //

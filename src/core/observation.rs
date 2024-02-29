@@ -190,8 +190,8 @@ impl ObservationBuffer {
             .map(|r| r.hash_or())
             .collect_vec();
         let root = redgold_schema::util::merkle::build_root(hashes)?.root;
-        let vec = root.safe_bytes()?;
-        let parent_hash = self.latest.hash_or();
+        let _vec = root.safe_bytes()?;
+        let _parent_hash = self.latest.hash_or();
         let height = self.latest.height().expect("Missing height on internal observation") + 1;
         let utxo_id = self.latest.observation_as_utxo_id()?;
 
@@ -205,7 +205,7 @@ impl ObservationBuffer {
 
         let ancestor_roots = vec![ancestor_root].into_iter().flatten().collect_vec();
 
-        let mut o = Observation {
+        let o = Observation {
             merkle_root: Some(root),
             observations,
             parent_id: Some(utxo_id.clone()),

@@ -17,18 +17,18 @@ use bdk::electrum_client::Client;
 use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
 // use crate::util::cli::commands::send;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, SupportedCurrency};
 use serde::{Deserialize, Serialize};
-use crate::{KeyPair, TestConstants};
+use crate::{KeyPair};
 use crate::proof_support::ProofSupport;
 
-use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
+
+
 
 #[test]
 fn schnorr_test() {
     let tc = TestConstants::new();
-    let kp = tc.key_pair();
+    let _kp = tc.key_pair();
 
 }
 
@@ -468,7 +468,7 @@ impl SingleKeyBitcoinWallet {
         for x in result.iter() {
             let tx = x.transaction.safe_get_msg("Error getting transaction")?;
             let output_amounts = self.outputs_convert(&tx.output);
-            let other_output_addresses = output_amounts.iter().filter_map(|(x,y)| {
+            let other_output_addresses = output_amounts.iter().filter_map(|(x,_y)| {
                 if x != &self_addr {
                     Some(x.clone())
                 } else {
@@ -479,19 +479,19 @@ impl SingleKeyBitcoinWallet {
 
             // Not needed?
             // let has_self_output = output_amounts.iter().filter(|(x,y)| x != &self_addr).next().is_some();
-            let has_self_input = input_addrs.iter().filter(|(x,y)| x == &self_addr).next().is_some();
+            let has_self_input = input_addrs.iter().filter(|(x,_y)| x == &self_addr).next().is_some();
             let incoming = !has_self_input;
 
             let other_address = if incoming {
-                input_addrs.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| x.clone())
+                input_addrs.iter().filter(|(x,_y)| x != &self_addr).next().map(|(x,_y)| x.clone())
             } else {
-                output_amounts.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| x.clone())
+                output_amounts.iter().filter(|(x,_y)| x != &self_addr).next().map(|(x,_y)| x.clone())
             };
 
             let amount = if incoming {
-                output_amounts.iter().filter(|(x,y)| x == &self_addr).next().map(|(x,y)| y.clone())
+                output_amounts.iter().filter(|(x,_y)| x == &self_addr).next().map(|(_x,y)| y.clone())
             } else {
-                output_amounts.iter().filter(|(x,y)| x != &self_addr).next().map(|(x,y)| y.clone())
+                output_amounts.iter().filter(|(x,_y)| x != &self_addr).next().map(|(_x,y)| y.clone())
             };
 
             let block_timestamp = x.confirmation_time.clone().map(|x| x.timestamp);
@@ -544,7 +544,7 @@ impl SingleKeyBitcoinWallet {
             .enable_rbf()
             .fee_rate(FeeRate::from_sat_per_vb(1.0));
 
-        let (mut psbt, details) = builder
+        let (psbt, details) = builder
             .finish()
             .error_info("Builder TX issue")?;
 
@@ -586,7 +586,7 @@ impl SingleKeyBitcoinWallet {
     pub fn signable_hashes(&mut self) -> Result<Vec<(Vec<u8>, EcdsaSighashType)>, ErrorInfo> {
         let psbt = self.psbt.safe_get_msg("No psbt found")?.clone();
         let mut res = vec![];
-        for (input_index, input) in psbt.inputs.iter().enumerate() {
+        for (input_index, _input) in psbt.inputs.iter().enumerate() {
             // TODO: Port SignerContext if necessary
             // let (hash, sighash) = match input.witness_utxo {
             //     Some(_) => segwitv0_sighash(&psbt, input_index).error_info("segwitv0_sighash extraction failure")?,
@@ -612,7 +612,7 @@ impl SingleKeyBitcoinWallet {
         -> Result<bool, ErrorInfo> {
         let res = if let Some(psbt) = self.psbt.as_mut() {
             self.wallet.sign(psbt, SignOptions::default())
-                .map_err(|e| self.custom_signer.err.read().unwrap().clone().unwrap().clone())
+                .map_err(|_e| self.custom_signer.err.read().unwrap().clone().unwrap().clone())
         } else {
             return Err(error_info("No psbt found"))
         };
@@ -632,8 +632,8 @@ impl SingleKeyBitcoinWallet {
     // TODO: How to implement this check native to BDK?
     pub fn verify(&mut self) -> Result<(), ErrorInfo> {
         let psbt = self.psbt.safe_get()?;
-        let transaction = psbt.clone().extract_tx();
-        let transaction_details = self.transaction_details.safe_get()?;
+        let _transaction = psbt.clone().extract_tx();
+        let _transaction_details = self.transaction_details.safe_get()?;
         // psbt.extract_tx()
         // psbt.clone().extract_tx().verify_with_flags()
         Ok(())
@@ -720,10 +720,10 @@ test integrations::bitcoin::bdk_example::balance_test ... ok
 #[tokio::test]
 async fn tx_debug() {
     // MnemonicWords::from_mnemonic_words()
-    let pkey = test_pkey_hex().expect("");
+    let _pkey = test_pkey_hex().expect("");
     let public = test_pubk().expect("");
     println!("Public key rg address {}", public.address().expect("").render_string().expect(""));
-    let mut w = SingleKeyBitcoinWallet
+    let w = SingleKeyBitcoinWallet
     ::new_wallet(public, NetworkEnvironment::Test, true).expect("worx");
     let balance = w.get_wallet_balance().expect("");
     println!("balance: {:?}", balance);
@@ -739,7 +739,7 @@ async fn tx_debug() {
 #[ignore]
 #[tokio::test]
 async fn balance_test2() {
-    let mut w = SingleKeyBitcoinWallet
+    let w = SingleKeyBitcoinWallet
     ::new_wallet(PublicKey::from_hex("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
     let balance = w.get_wallet_balance().expect("");
 
@@ -756,18 +756,18 @@ async fn balance_test2() {
 #[tokio::test]
 async fn balance_test() {
     let tc = TestConstants::new();
-    let kp = tc.key_pair();
+    let _kp = tc.key_pair();
     // let pk = kp.public_key.to_struct_public_key();
     // let balance = get_balance(pk).expect("");
     // Source address: tb1q0287j37tntffkndch8fj38s2f994xk06rlr4w4
     // Send to address: tb1q68rhft47r5jwq5832k9urtypggpvzyh5z9c9gn
-    let mut w = SingleKeyBitcoinWallet
+    let w = SingleKeyBitcoinWallet
     ::new_wallet(tc.public.to_struct_public_key(), NetworkEnvironment::Test, true).expect("worx");
     let balance = w.get_wallet_balance().expect("");
     println!("balance: {:?}", balance);
     println!("address: {:?}", w.address().expect(""));
     // w.get_source_addresses();
-    let mut w2 = SingleKeyBitcoinWallet
+    let w2 = SingleKeyBitcoinWallet
     ::new_wallet(tc.public2.to_struct_public_key(), NetworkEnvironment::Test, true).expect("worx");
     let balance = w2.get_wallet_balance().expect("");
     println!("balance2: {:?}", balance);

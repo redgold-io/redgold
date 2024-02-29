@@ -103,7 +103,7 @@ pub fn get_seeds_by_env(env: &NetworkEnvironment) -> Vec<Seed> {
         .collect_vec()
 }
 
-pub fn get_seeds_by_env_time(env: &NetworkEnvironment, time: i64) -> Vec<Seed> {
+pub fn get_seeds_by_env_time(env: &NetworkEnvironment, _time: i64) -> Vec<Seed> {
     // Use this for a time match statement
     get_seeds_by_env(env)
 }
