@@ -1,21 +1,20 @@
-use bitcoin_wallet::mnemonic::Mnemonic;
 use eframe::egui;
 use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
+
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_builder;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_keys::util::mnemonic_words::MnemonicWords;
 use redgold_schema::EasyJson;
-use crate::gui::app_loop::LocalState;
-use crate::gui::tables::text_table;
-use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
-use crate::util;
-use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_schema::structs::NetworkEnvironment;
+
+use crate::gui::app_loop::LocalState;
+use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
+use crate::gui::tables::text_table;
+use crate::util;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
-
 
 #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
 // #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -41,10 +40,8 @@ pub struct MnemonicWindowState {
     open: bool,
     words: String,
     label: String,
-    bitcoin_p2wpkh_44: String,
     bitcoin_p2wpkh_84: String,
     ethereum_address_44: String,
-    ethereum_address_84: String,
     words_checksum: String,
     seed_checksum: Option<String>,
     passphrase: Option<String>,
@@ -65,18 +62,13 @@ pub struct MnemonicWindowState {
 
 impl MnemonicWindowState {
     pub fn get_private_key_hex(&self) -> String {
-        self.mnemonic_words().private_hex(self.hd_path.clone()).unwrap_or("err".to_string())
+        // self.mnemonic_words().private_hex(self.hd_path.clone()).unwrap_or("err".to_string())
+        self.words_pass().private_at(self.hd_path.clone()).unwrap()
     }
 }
 
 impl MnemonicWindowState {
 
-    pub fn mnemonic_words(&self) -> MnemonicWords {
-        let w = MnemonicWords::from_mnemonic_words(
-            &*self.words.clone(), self.passphrase.clone()
-        );
-        w
-    }
 
     pub fn words_pass(&self) -> WordsPass {
         let w = WordsPass::new(
@@ -87,17 +79,18 @@ impl MnemonicWindowState {
 
     pub fn set_words_from_passphrase(&mut self) {
         let passphrase = self.passphrase.clone();
-        let w = MnemonicWords::from_mnemonic_words(
-            &*self.words.clone(), passphrase.clone()
+        let wp = WordsPass::new(
+            self.words.clone(), passphrase.clone()
         );
-        self.bitcoin_p2wpkh_44 = w.btc_key_44_0().public_key.to_struct_public_key().to_bitcoin_address(&NetworkEnvironment::Main).unwrap();
-        self.bitcoin_p2wpkh_84 = w.btc_key_84_0().public_key.to_struct_public_key().to_bitcoin_address(&NetworkEnvironment::Main).unwrap();
-        self.ethereum_address_44 = w.eth_key_44_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
-        self.ethereum_address_84 = w.eth_key_84_0().public_key.to_struct_public_key().to_ethereum_address().unwrap();
-        self.words_checksum = w.words_checksum().unwrap();
-        self.seed_checksum = passphrase.and(w.seed_checksum().ok());
-        self.redgold_node_address = w.address().render_string().unwrap();
-        self.redgold_hardware_default_address = w.hardware_default_address().render_string().unwrap();
+        let md = wp.metadata().expect("metadata error");
+
+        self.bitcoin_p2wpkh_84 = md.btc_84h_0h_0h_0_0_address;
+        self.ethereum_address_44 = md.eth_44h_60h_0h_0_0_address;
+        self.words_checksum = wp.checksum_words().unwrap();
+        self.seed_checksum = passphrase.and(wp.checksum().ok());
+        self.redgold_node_address = wp.default_public_key().expect("").address().expect("works").render_string().unwrap();
+        let hw_addr = wp.keypair_at("m/44/0/50/0/0").expect("keypair error").address_typed().render_string().unwrap();
+        self.redgold_hardware_default_address = hw_addr;
     }
 
     pub fn set_words(&mut self, words: impl Into<String>, label: impl Into<String>) {
@@ -153,10 +146,10 @@ impl KeygenState {
                 open: false,
                 words: "".to_string(),
                 label: "".to_string(),
-                bitcoin_p2wpkh_44: "".to_string(),
+
                 bitcoin_p2wpkh_84: "".to_string(),
                 ethereum_address_44: "".to_string(),
-                ethereum_address_84: "".to_string(),
+
                 words_checksum: "".to_string(),
                 seed_checksum: None,
                 passphrase: None,
@@ -169,7 +162,7 @@ impl KeygenState {
                 private_key_hex: "".to_string(),
                 calc_private_key_hex: false,
                 generation_time_seconds: "".to_string(),
-                exe_checksum: exe_checksum,
+                exe_checksum,
                 save_name: "keygen".to_string(),
                 persist_disk: false,
                 set_hot_mnemonic: false
@@ -206,7 +199,7 @@ pub fn keys_screen_scroll(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Lo
     ui.horizontal(|ui| {
         if ui.button("Generate Random Entropy Mnemonic Words").clicked() {
             key.mnemonic_window_state.set_words(
-                generate_random_mnemonic().to_string(),
+                generate_random_mnemonic().words,
                 "Generated with internal random entropy"
             );
         }
@@ -289,7 +282,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.label("Salt Words");
-            valid_label(ui, Mnemonic::from_str(&key.generate_mnemonic_state.salt_words).is_ok());
+            valid_label(ui, WordsPass::new(&key.generate_mnemonic_state.salt_words, None).mnemonic().is_ok());
         });
         TextEdit::multiline(&mut key.generate_mnemonic_state.salt_words)
             .desired_width(500f32)
@@ -457,8 +450,8 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                         let mnemonic = mnemonic_builder::from_str_rounds(
                             &*string.clone(),
                             rounds as usize
-                        ).to_string();
-                        key.mnemonic_window_state.set_words(mnemonic.to_string(), "Generated from password");
+                        );
+                        key.mnemonic_window_state.set_words(mnemonic, "Generated from password");
                     }
                 }
                 KeyDerivation::Argon2d => {
@@ -466,9 +459,10 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                         key.generate_mnemonic_state.m_cost,
                         key.generate_mnemonic_state.p_cost,
                         key.generate_mnemonic_state.t_cost,
-                        Mnemonic::from_str(&*key.generate_mnemonic_state.salt_words).ok()
+                        WordsPass::new(&*key.generate_mnemonic_state.salt_words, None).validate().ok()
                     ) {
-                        let salt = m.to_seed(None).0;
+                        let salt = m.seed().expect("works").to_vec();
+                        // let salt = m.to_seed(None).0;
                         tracing::info!("Attempting to run Argon2d with params: {} {} {}", m_cost, p_cost, t_cost);
                         let start = util::current_time_millis_i64();
                         let result = argon2d_hash(salt, string.as_bytes().to_vec(), m_cost, t_cost, p_cost);
@@ -477,8 +471,8 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                         tracing::info!("Argon2d took {} seconds", delta_seconds.clone());
 
                         if let Some(r) = result.ok() {
-                            if let Some(w) = Mnemonic::new(&*r).ok() {
-                                key.mnemonic_window_state.set_words(w.to_string(),
+                            if let Some(w) = WordsPass::from_bytes(&*r).ok() {
+                                key.mnemonic_window_state.set_words(w.words,
                                                                     format!("Generated from password Argon2d in {} seconds", delta_seconds));
                                 key.mnemonic_window_state.generation_time_seconds = delta_seconds.to_string();
                             }
@@ -512,8 +506,7 @@ fn mnemonic_window(
         state.requires_reset = false;
     }
     if state.calc_private_key_hex {
-        state.private_key_hex = state.clone().mnemonic_words()
-            .private_hex(state.hd_path.clone()).unwrap_or("err".to_string());
+        state.private_key_hex = state.get_private_key_hex();
         state.calc_private_key_hex = false;
     }
 
@@ -543,10 +536,8 @@ fn mnemonic_window(
                     ui.vertical(|ui| {
                         medium_data_item(ui, "Redgold m/44'/0'/50'/0/0' Address", state.redgold_hardware_default_address.clone());
                         medium_data_item(ui, "Redgold m/84'/16180'/0'/0/0 Address", state.redgold_node_address.clone());
-                        medium_data_item(ui, "Bitcoin m/44'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_44.clone());
                         medium_data_item(ui, "Bitcoin m/84'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_84.clone());
                         medium_data_item(ui, "Ethereum m/44'/60'/0'/0/0 Address", state.ethereum_address_44.clone());
-                        medium_data_item(ui, "Ethereum m/84'/60'/0'/0/0 Address", state.ethereum_address_84.clone());
                         ui.horizontal(|ui| {
                             medium_data_item(ui, "Words Checksum", state.words_checksum.clone());
                             if let Some(c) = &state.seed_checksum {

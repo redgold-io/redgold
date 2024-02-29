@@ -6,7 +6,7 @@
 // use std::time::Duration;
 //
 // use async_std::io;
-// use bitcoin::secp256k1::SecretKey;
+// use bdk::bitcoin::secp256k1::SecretKey;
 // use futures::channel::mpsc;
 // use futures::channel::mpsc::{Receiver, Sender};
 //

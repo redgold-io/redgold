@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bitcoin::secp256k1::PublicKey;
+use bdk::bitcoin::secp256k1::PublicKey;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use futures::FutureExt;
 // use libp2p::Multiaddr;

@@ -78,7 +78,7 @@ impl PeerRxEventHandler {
         let mut response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine();
         response.with_metadata(relay.node_metadata().await?);
-        response.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
+        response.with_auth(&relay.node_config.keypair());
         if let Some(c) = pm.response {
             let _ser = response.clone().json_or();
             let _peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());

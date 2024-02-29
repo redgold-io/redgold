@@ -1,9 +1,7 @@
 
-use bitcoin::{Address, Network};
+use bdk::bitcoin::{Address, Network};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey};
-use bitcoin::util::key;
-
-// use web3::types::H160;
+use bdk::bitcoin::util::key;
 use redgold_schema::{ErrorInfoContext, structs};
 use sha3::{Digest, Keccak256};
 use crate::util::ToPublicKey;
@@ -26,7 +24,7 @@ impl ToBitcoinAddress for PublicKey {
         } else {
             Network::Testnet
         };
-        let address = Address::p2wpkh(pk, network1);
+        let address = Address::p2wpkh(pk, network1).error_info("bitcoin address conversion")?;
         Ok(address.to_string())
     }
 

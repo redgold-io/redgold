@@ -1,10 +1,10 @@
-// use bitcoin::{
+// use bdk::bitcoin::{
 //     network::constants::Network,
 //     secp256k1::Secp256k1,
 //     util::bip32::{DerivationPath, ExtendedPrivKey},
 // };
-// use bitcoin_wallet::account::MasterAccount;
-// use bitcoin_wallet::mnemonic::Mnemonic;
+// use bdk::bitcoin_wallet::account::MasterAccount;
+// use bdk::bitcoin_wallet::mnemonic::Mnemonic;
 // use hdpath::StandardHDPath;
 // use std::str::FromStr;
 //

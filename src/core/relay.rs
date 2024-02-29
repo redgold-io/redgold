@@ -428,7 +428,7 @@ impl Relay {
     pub async fn sign_request(&self, req: &mut Request) -> RgResult<Request> {
         Ok(req
             .with_metadata(self.node_metadata().await?)
-            .with_auth(&self.node_config.internal_mnemonic().active_keypair()).clone())
+            .with_auth(&self.node_config.words().default_kp().expect("works")).clone())
     }
 
 

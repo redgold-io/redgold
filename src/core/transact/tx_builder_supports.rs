@@ -1,4 +1,4 @@
-use bitcoin::secp256k1::{PublicKey, SecretKey};
+use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;

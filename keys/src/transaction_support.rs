@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-
 use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};

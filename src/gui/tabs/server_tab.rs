@@ -210,6 +210,13 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         }
     });
 
+    if ui.button("Backup Multiparty Local Shares").clicked() {
+        tokio::spawn(deploy::backup_multiparty_local_shares(
+            local_state.node_config.clone(),
+            local_state.local_stored_state.servers.clone(),
+        ));
+    }
+
 }
 
 #[derive(Clone)]

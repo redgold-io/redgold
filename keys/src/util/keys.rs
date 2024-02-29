@@ -1,4 +1,4 @@
-use bitcoin::secp256k1::PublicKey;
+use bdk::bitcoin::secp256k1::PublicKey;
 use redgold_schema::structs;
 
 pub trait ToPublicKeyFromLib {

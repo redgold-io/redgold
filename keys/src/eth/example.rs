@@ -1,5 +1,5 @@
 use std::str::FromStr;
-
+use bdk::bitcoin::hashes::hex::ToHex;
 use ethers::{core::{types::TransactionRequest},
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, providers, signers::{LocalWallet, Signer}};
 

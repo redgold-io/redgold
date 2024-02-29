@@ -112,7 +112,7 @@ impl RgHttpClient {
     pub async fn proto_post_request(&self, r: &mut Request, nc: Option<&Relay>) -> Result<Response, ErrorInfo> {
         if let Some(relay) = nc.or(self.relay.as_ref()) {
             r.with_metadata(relay.node_metadata().await?);
-            r.with_auth(&relay.node_config.internal_mnemonic().active_keypair());
+            r.with_auth(&relay.node_config.keypair());
         }
         if r.trace_id.is_none() {
             r.trace_id = Some(Uuid::new_v4().to_string());

@@ -3,11 +3,11 @@ use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::constants::MIN_FEE_RAW;
 use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, TestContractRequest};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use redgold_keys::util::mnemonic_words::MnemonicWords;
 use crate::core::transact::tx_builder_supports::{TransactionBuilderSupport, TransactionHelpBuildSupport};
 
 #[derive(Clone)]
@@ -31,7 +31,7 @@ pub struct TransactionGenerator {
     offset: usize,
     min_offset: usize,
     max_offset: usize,
-    pub wallet: MnemonicWords, // default_client: Option<PublicClient>
+    pub wallet: WordsPass, // default_client: Option<PublicClient>
 }
 
 impl TransactionGenerator {
@@ -49,16 +49,6 @@ impl TransactionGenerator {
         }
         self.clone()
     }
-    pub fn default_adv(utxos: Vec<SpendableUTXO>, min_offset: usize, max_offset: usize, wallet: MnemonicWords) -> Self {
-        Self {
-            finished_pool: utxos,
-            pending_pool: vec![],
-            offset: min_offset,
-            min_offset,
-            max_offset,
-            wallet
-        }
-    }
     pub fn default(utxos: Vec<SpendableUTXO>) -> Self {
         Self {
             finished_pool: utxos,
@@ -66,16 +56,12 @@ impl TransactionGenerator {
             offset: 1,
             min_offset: 1,
             max_offset: 49,
-            wallet: MnemonicWords::test_default()
+            wallet: TestConstants::new().words_pass
         }
     }
 
-    pub fn set_wallet(&mut self, wallet: MnemonicWords) {
-        self.wallet = wallet;
-    }
-
     pub fn next_kp(&mut self) -> KeyPair {
-        let kp = self.wallet.key_at(self.offset);
+        let kp = self.wallet.keypair_at_change(self.offset as i64).expect("keypair");
         self.offset += 1;
         if self.offset >= self.max_offset {
             self.offset = self.min_offset;

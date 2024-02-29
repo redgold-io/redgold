@@ -15,8 +15,8 @@
 //
 // //! Example: Signing a 2-of-3 multisignature
 //
-// use bitcoin;
-// use bitcoin::secp256k1; // secp256k1 re-exported from rust-bitcoin
+// use bdk::bitcoin;
+// use bdk::bitcoin::secp256k1; // secp256k1 re-exported from rust-bitcoin
 // use miniscript;
 // use miniscript::DescriptorTrait;
 // use std::collections::HashMap;
