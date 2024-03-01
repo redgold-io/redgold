@@ -85,7 +85,7 @@ impl PeerOutgoingEventHandler {
     pub async fn send_message_rest(mut message: PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<(), ErrorInfo> {
         counter!("redgold.peer.rest.send").increment(1);
         let result = match tokio::time::timeout(
-            message.send_timeout.clone(), Self::send_message_rest_ret_err(&mut message, nmd, relay)
+            message.send_timeout.clone(), Self::send_message_rest_ret_err(&mut message, nmd.clone(), relay)
         ).await
             .error_info(
                 format!("Timeout sending message to peer with duration {} secs",
@@ -99,8 +99,10 @@ impl PeerOutgoingEventHandler {
         };
         let r = result.map_err(|e| {
             counter!("redgold.peer.rest.send.error").increment(1);
-            log::error!("Error sending message to peer: {}", json_or(&e));
-            Response::from_error_info(e)
+            let mut e2 = e.clone();
+            e2.with_detail("node_metadata", nmd.json_or());
+            log::error!("Error sending message to peer: {}", e2.json_or());
+            Response::from_error_info(e2)
         }).combine();
         if let Some(response_channel) = &message.response {
             response_channel.send_err(r).add("Error sending message back on response channel").log_error().ok();

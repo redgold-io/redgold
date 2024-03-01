@@ -1,5 +1,5 @@
 use crate::{ErrorInfo, HashClear, RgResult};
-use crate::structs::ResponseMetadata;
+use crate::structs::{ErrorDetails, ResponseMetadata};
 
 impl ErrorInfo {
     pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
@@ -22,6 +22,12 @@ impl ErrorInfo {
         let mut e = self;
         e.message = format!("{} {} ", e.message, message.into());
         e
+    }
+    pub fn with_detail(&mut self, k: impl Into<String>, v: impl Into<String>) {
+        let mut ed = ErrorDetails::default();
+        ed.detail = v.into();
+        ed.detail_name = k.into();
+        self.details.push(ed);
     }
 }
 

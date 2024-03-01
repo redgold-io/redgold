@@ -531,7 +531,6 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
             outputs.push(output);
         }
 
-
         // TODO: Make this over Vec<ObservationProof> Instead
         let mut submit_response = SubmitTransactionResponse::default();
         let mut query_transaction_response = QueryTransactionResponse::default();
