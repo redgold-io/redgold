@@ -484,7 +484,7 @@ impl DepositWatcher {
             let mut tb = TransactionBuilder::new();
             tb.with_utxo(&u.utxo_entry)?;
             tb.with_output(&destination, &CurrencyAmount::from(u.utxo_entry.amount() as i64));
-            tb.with_stake(100f64, 1000f64, &a);
+            tb.with_stake_usd_bounds(Some(100f64), Some(1000f64), &a);
             let mut tx = tb.build()?;
             tx.sign(&u.key_pair)?;
             self.relay.submit_transaction_sync(&tx).await?;
