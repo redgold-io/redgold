@@ -7,7 +7,7 @@ use itertools::Itertools;
 use log::info;
 use metrics::gauge;
 use sqlx::SqlitePool;
-use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
 use crate::address_block::AddressBlockStore;
 use crate::config::ConfigStore;
@@ -153,7 +153,12 @@ WHERE
 
         let options = SqliteConnectOptions::new()
             .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal) // Set journal mode to WAL
+            .busy_timeout(std::time::Duration::from_secs(60)) // Set busy timeout to 10 seconds
             .filename(Path::new(&path.clone()));
+        /*
+
+         */
         let pool = SqlitePool::connect_with(options)
             .await
             .expect("Connection failure");

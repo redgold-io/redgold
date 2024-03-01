@@ -135,7 +135,7 @@ struct LiveE2E {
 
 
 impl LiveE2E {
-    pub async fn build_tx(&self) -> RgResult<Transaction> {
+    pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
 
         let mut map: HashMap<Address, KeyPair> = HashMap::new();
         if !self.relay.node_config.network.is_main() {
@@ -165,6 +165,9 @@ impl LiveE2E {
                 break;
             }
         }
+        if utxo.is_none() {
+            return Ok(None);
+        }
         let u = utxo.safe_get_msg("No utxo in e2e")?;
         let mut tx_b = TransactionBuilder::new();
         let destination = addresses.iter()
@@ -177,7 +180,7 @@ impl LiveE2E {
             .with_is_test()
             .build()?
             .sign(&u.key_pair)?;
-        return Ok(tx);
+        return Ok(Some(tx));
     }
 }
 
@@ -196,7 +199,7 @@ pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
 
     tokio::time::sleep(Duration::from_secs(100)).await;
     // See if we should start at all, but with a retry for genesis stuff
-    c.build_tx().await?;
+    // c.build_tx().await?;
 
     let interval1 = tokio::time::interval(relay.node_config.clone().live_e2e_interval.clone());
     use futures::TryStreamExt;
@@ -211,8 +214,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
     let result1 = c.build_tx().await;
     let result = result1.log_error().clone();
     match result {
-        Err(_e) => {}
-        Ok(transaction) => {
+        Ok(Some(transaction)) => {
             let transaction = transaction.clone();
             let res = c.relay.submit_transaction(SubmitTransactionRequest {
                 transaction: Some(transaction.clone()),
@@ -243,6 +245,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                 }
             }
         }
+        _ => {}
     }
     Ok(())
 }
