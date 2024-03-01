@@ -73,7 +73,7 @@ pub async fn download_all(
             if let Some(utxo_id) = utxo.utxo_id.as_ref() {
                 got_data = true;
                 if !relay.utxo_channels.contains_key(utxo_id) {
-                    relay.ds.transaction_store.insert_utxo(&utxo).await.log_error().with_err_count("redgold.download.utxo_insert_error").ok();
+                    relay.ds.transaction_store.insert_utxo(&utxo).await.with_err_count("redgold.download.utxo_insert_error").ok();
                 }
             }
         }
@@ -117,7 +117,7 @@ pub async fn download_all(
             got_data = true;
             if let Some(tx) = obe.observation.as_ref() {
                 relay.ds.observation.insert_observation_and_edges(tx).await
-                    .log_error().with_err_count("redgold.download.observation_insert_error").ok();;
+                    .with_err_count("redgold.download.observation_insert_error").ok();;
             }
         }
     }
@@ -135,7 +135,7 @@ pub async fn download_all(
         for obe in obes {
             got_data = true;
             relay.ds.observation.insert_observation_edge(&obe).await
-                .log_error().with_err_count("redgold.download.oe_insert_error").ok();;
+                .with_err_count("redgold.download.oe_insert_error").ok();;
         }
     }
     Ok(got_data)

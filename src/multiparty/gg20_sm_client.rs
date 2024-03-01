@@ -84,10 +84,10 @@ impl SmClient {
         mpa.message = message;
         mpa.room_id = self.room_id.clone();
         req.multiparty_authentication_request = Some(mpa);
-        req = self.relay.sign_request(&mut req).await.expect("Bad signing request in SM client");
+        req = self.relay.sign_request(req).await.expect("Bad signing request in SM client");
         let result = req.verify_auth();
         if result.is_err() {
-            panic!("Wtf")
+            panic!("Self signing panic in sm_client multiparty")
         }
         result.expect("Immediate verification failure");
         req

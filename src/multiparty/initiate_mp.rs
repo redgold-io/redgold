@@ -18,6 +18,7 @@ fn debug() {
 
 }
 use redgold_schema::EasyJson;
+use redgold_schema::errors::EnhanceErrorInfo;
 use crate::node_config::NodeConfig;
 
 #[derive(Clone, Debug)]
@@ -184,8 +185,12 @@ pub async fn initiate_mp_keygen_authed(
 
 
 
-pub async fn initiate_mp_keygen_follower(relay: Relay, mp_req: InitiateMultipartyKeygenRequest)
+pub async fn initiate_mp_keygen_follower(
+    relay: Relay, mp_req: InitiateMultipartyKeygenRequest, initiating_pk: &PublicKey
+)
                                 -> Result<InitiateMultipartyKeygenResponse, ErrorInfo> {
+
+    // TODO: Verify score of initiating pk
 
     let ident = mp_req.identifier.safe_get()?;
     let index = ident.party_keys.iter().enumerate().find(|(_idx, x)| x == &&relay.node_config.public_key())
@@ -341,12 +346,13 @@ pub async fn initiate_mp_keysign(
 
 pub async fn initiate_mp_keysign_authed(
     relay: Relay,
-    mp_req: InitiateMultipartySigningRequest,
+    mp_req: InitiateMultipartySigningRequest
 ) -> RgResult<SelfInitiateKeysignResult> {
 
     let ident = mp_req.identifier.safe_get_msg("Missing identifier")?.clone();
     let _data_to_sign = mp_req.data_to_sign.safe_get_msg("Missing data")?.clone();
     let parties = mp_req.signing_party_keys.clone();
+
     let signing_room_id = mp_req.signing_room_id.clone();
 
     let address = "127.0.0.1".to_string();
@@ -362,10 +368,11 @@ pub async fn initiate_mp_keysign_authed(
         }
     }).collect_vec();
 
-    let (local_share, _init_) = relay.ds.multiparty_store
+    let (local_share, init) = relay.ds.multiparty_store
         .local_share_and_initiate(init_keygen_req_room_id.clone()).await?
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
+
 
 
     let option = mp_req.data_to_sign.clone().safe_bytes()?;
@@ -430,7 +437,10 @@ pub async fn initiate_mp_keysign_authed(
     Ok(response1)
 }
 
-pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipartySigningRequest)
+pub async fn initiate_mp_keysign_follower(
+    relay: Relay, mp_req: InitiateMultipartySigningRequest,
+    initiating_pk: &PublicKey
+)
     -> Result<InitiateMultipartySigningResponse, ErrorInfo> {
 
     let ident = mp_req.identifier.safe_get_msg("Missing room id for keygen on signing follower")?;
@@ -460,10 +470,15 @@ pub async fn initiate_mp_keysign_follower(relay: Relay, mp_req: InitiateMultipar
 
     //TODO: This should be returned as immediate failure on the response level instead of going
     // thru process, maybe done as part of health check?
-    let (local_share, _) = relay.ds.multiparty_store
+    let (local_share, init) = relay.ds.multiparty_store
         .local_share_and_initiate(keygen_room_id.clone()).await?
         .ok_or(error_info("Local share not found"))?;
     // TODO: Check initiate keygen matches
+
+    let ser = init.json_or();
+    if !init.identifier.ok_msg("No identifier on stored initiate keygen").add(ser.clone())?.party_keys.contains(&initiating_pk) {
+        Err(error_info("Initiating public key not found in stored initiate keygen")).add(ser).add(initiating_pk.json_or())?
+    }
 
     info!("Initiating follower keysign for \
     room {} with parties {} address: {} port: {} host_key: {}",

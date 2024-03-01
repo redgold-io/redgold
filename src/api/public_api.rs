@@ -141,7 +141,7 @@ impl PublicClient {
                 sync_query_response: sync,
         });
         // debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
-        let response = c.proto_post_request(&mut request, None).await?;
+        let response = c.proto_post_request(request, None, None).await?;
         response.as_error_info()?;
         Ok(response.submit_transaction_response.safe_get()?.clone())
     }
@@ -202,7 +202,7 @@ impl PublicClient {
         request.hash_search_request = Some(HashSearchRequest {
             search_string: input
         });
-        Ok(self.client_wrapper().proto_post_request(&mut request, None).await?.hash_search_response.safe_get()?.clone())
+        Ok(self.client_wrapper().proto_post_request(request, None, None).await?.hash_search_response.safe_get()?.clone())
     }
     pub async fn balance(
         &self,

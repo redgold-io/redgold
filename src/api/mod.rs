@@ -10,12 +10,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use itertools::Itertools;
 use serde::__private::de::Borrowed;
+use tracing::info;
 use uuid::Uuid;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
-use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction};
+use redgold_keys::request_support::{RequestSupport, ResponseSupport};
+use redgold_schema::{EasyJson, error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -109,17 +111,25 @@ impl RgHttpClient {
         Ok(deser)
     }
 
-    pub async fn proto_post_request(&self, r: &mut Request, nc: Option<&Relay>) -> Result<Response, ErrorInfo> {
-        if let Some(relay) = nc.or(self.relay.as_ref()) {
-            r.with_metadata(relay.node_metadata().await?);
-            r.with_auth(&relay.node_config.keypair());
-        }
+    pub async fn proto_post_request(&self, mut r: Request, nc: Option<&Relay>, intended_pk: Option<&PublicKey>) -> Result<Response, ErrorInfo> {
         if r.trace_id.is_none() {
             r.trace_id = Some(Uuid::new_v4().to_string());
         }
-        let result = self.proto_post(r, "request_proto".to_string()).await?;
-        result.as_error_info()?;
-        Ok(result)
+
+        let mut r = if let Some(relay) = nc.or(self.relay.as_ref()) {
+            let rrr = r.with_metadata(relay.node_metadata().await?)
+                .with_auth(&relay.node_config.keypair());
+            rrr.verify_auth().add("Self request signing immediate auth failure")?;
+            // let h = rrr.calculate_hash();
+            // info!("proto_post_request calculate_hash={} after verify auth: {}", h.hex(), rrr.json_or());
+            rrr
+        } else {
+            r
+        };
+        let result = self.proto_post(&r, "request_proto".to_string()).await?;
+        result.as_error_info().add("Response metadata found as errorInfo")?;
+        let string = result.json_or();
+        result.verify_auth(intended_pk).add("Response authentication verification failure").add(string)
     }
 
     pub async fn test_request<Req, Resp>(port: u16, req: &Req, endpoint: String) -> Result<Resp, ErrorInfo>
@@ -135,7 +145,7 @@ impl RgHttpClient {
     pub async fn get_peers(&self) -> Result<Response, ErrorInfo> {
         let mut req = Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
-        let response = self.proto_post_request(&mut req, None).await?;
+        let response = self.proto_post_request(req, None, None).await?;
         Ok(response)
     }
 
@@ -147,28 +157,28 @@ impl RgHttpClient {
         // cmr.utxo_id = Some(utxo_id.clone());
         cmr.address = Some(address.clone());
         req.get_contract_state_marker_request = Some(cmr);
-        let response = self.proto_post_request(&mut req, None).await?;
+        let response = self.proto_post_request(req, None, None).await?;
         Ok(response.get_contract_state_marker_response.ok_or(error_info("Missing get_contract_state_marker_response"))?)
     }
 
     pub async fn about(&self) -> RgResult<AboutNodeResponse> {
         let mut req = Request::default();
         req.about_node_request = Some(AboutNodeRequest::default());
-        let response = self.proto_post_request(&mut req, None).await?;
+        let response = self.proto_post_request(req, None, None).await?;
         Ok(response.about_node_response.ok_or(error_info("Missing about node response"))?)
     }
 
     pub async fn resolve_code(&self, address: &Address) -> RgResult<structs::ResolveCodeResponse> {
         let mut req = Request::default();
         req.resolve_code_request = Some(address.clone());
-        let response = self.proto_post_request(&mut req, None).await?;
+        let response = self.proto_post_request(req, None, None).await?;
         Ok(response.resolve_code_response.ok_or(error_info("Missing resolve code response"))?)
     }
 
     pub async fn genesis(&self) -> RgResult<Transaction> {
         let mut req = Request::default();
         req.genesis_request = Some(structs::GenesisRequest::default());
-        let response = self.proto_post_request(&mut req, None).await?;
+        let response = self.proto_post_request(req, None, None).await?;
         response.genesis_response.ok_msg("Missing genesis response")
     }
 
@@ -182,7 +192,7 @@ impl RgHttpClient {
         request.hash_search_request = Some(HashSearchRequest {
             search_string: input
         });
-        Ok(self.proto_post_request(&mut request, None).await?.hash_search_response.safe_get()?.clone())
+        Ok(self.proto_post_request(request, None, None).await?.hash_search_response.safe_get()?.clone())
     }
 
 }

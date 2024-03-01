@@ -260,7 +260,7 @@ impl NodeConfig {
 
     // TODO: this can be fixed at arg parse time
     pub fn public_key(&self) -> structs::PublicKey {
-        self.words().default_kp().expect("").public_key()
+        self.keypair().public_key()
     }
 
     pub fn short_id(&self) -> Result<String, ErrorInfo> {

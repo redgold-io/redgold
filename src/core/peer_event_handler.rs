@@ -11,13 +11,12 @@ use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
-use redgold_schema::{error_info, ErrorInfoContext, json_or, SafeOption};
+use redgold_schema::{error_info, ErrorInfoContext, json_or, SafeOption, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request};
 
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
-use crate::core::peer_rx_event_handler::rest_peer;
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use crate::schema::json;
@@ -110,8 +109,10 @@ impl PeerOutgoingEventHandler {
     }
     pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<Response, ErrorInfo> {
         let port = nmd.port_or(relay.node_config.network) + 1;
+        let request = message.request.clone();
+        let pk = nmd.public_key.safe_get_msg("Missing public key on node metadata in outgoing request")?;
         let res = rest_peer(
-            relay, nmd.external_address()?.clone(), port as i64, &mut message.request
+            relay, nmd.external_address()?.clone(), port as i64, request, pk
         ).await;
         res
     }
@@ -154,4 +155,9 @@ impl PeerOutgoingEventHandler {
     //     Ok(res)
     // }
 
+}
+
+pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: Request, intended_pk: &structs::PublicKey) -> Result<Response, ErrorInfo> {
+    let client = crate::api::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
+    client.proto_post_request(request, Some(relay), Some(intended_pk)).await
 }

@@ -4,7 +4,7 @@ use ethers::{core::{types::TransactionRequest},
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, providers, signers::{LocalWallet, Signer}};
 
 
-use crate::{KeyPair};
+use crate::{KeyPair, TestConstants};
 
 use crate::util::mnemonic_support::WordsPass;
 
@@ -14,12 +14,15 @@ use alloy_chains::Chain;
 use ethers::prelude::{maybe, to_eip155_v, U256};
 use ethers::types::{Address, Bytes, Signature};
 use ethers::types::transaction::eip2718::TypedTransaction;
+use ethers::utils::Anvil;
 use foundry_block_explorers::account::GenesisOption;
 use foundry_block_explorers::Client;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
+use redgold_schema::util::lang_util::AnyPrinter;
+use crate::address_external::ToEthereumAddress;
 use crate::util::btc_wallet::ExternalTimedTransaction;
 
 
@@ -370,7 +373,7 @@ async fn main() {
     let _api_key = std::env::var("ETHERSCAN_API_KEY").expect("");
 
     let testc = TestConstants::new();
-    let _test_skhex = testc.key_pair().secret_key.to_hex();
+    // let _test_skhex = testc.key_pair().secret_key.to_hex();
 
     let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
 

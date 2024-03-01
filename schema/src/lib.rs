@@ -650,9 +650,13 @@ impl Request {
         self.clone()
     }
 
-    pub fn with_metadata(&mut self, node_metadata: NodeMetadata) -> &mut Request {
+    pub fn with_metadata(mut self, node_metadata: NodeMetadata) -> Request {
         self.node_metadata = Some(node_metadata);
         self
+    }
+
+    pub fn auth_required(&self) -> bool {
+        self.initiate_keygen.is_some() || self.initiate_signing.is_some()
     }
 
 }

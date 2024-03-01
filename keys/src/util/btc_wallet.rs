@@ -17,12 +17,12 @@ use bdk::electrum_client::Client;
 use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
 // use crate::util::cli::commands::send;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, SupportedCurrency};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
-use crate::{KeyPair};
+use crate::{KeyPair, TestConstants};
 use crate::proof_support::ProofSupport;
-
-
+use crate::util::keys::ToPublicKeyFromLib;
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
 
 
 #[test]
