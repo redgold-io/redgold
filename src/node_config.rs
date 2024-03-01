@@ -283,7 +283,7 @@ impl NodeConfig {
             .split("\n")
             .next()
             .map(|s| s.trim())
-            .and_then(|s| s.parse::<i64>().error_info(format!("Build number {build_num_str}")).log_error().ok())
+            .and_then(|s| s.parse::<i64>().error_info(format!("Build number {s}")).log_error().ok())
             .unwrap_or(0)
     }
 
