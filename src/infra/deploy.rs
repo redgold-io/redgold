@@ -114,6 +114,7 @@ pub async fn setup_server_redgold(
     env.insert("REDGOLD_P2P_PORT".to_string(), format!("{}", port));
     env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
     env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
+    env.insert("RUST_BACKTRACE".to_string(), "full".to_string());
      if let Some(a) = alias {
          env.insert("REDGOLD_ALIAS".to_string(), a);
      }
