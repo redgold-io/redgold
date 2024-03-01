@@ -526,7 +526,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                 output_index: i.clone() as i32,
                 address: o.address.safe_get()?.render_string()?,
                 available: t.valid_utxo_index.contains(&(i as i32)),
-                amount: o.rounded_amount(),
+                amount: o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0)
             };
             outputs.push(output);
         }
