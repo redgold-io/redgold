@@ -259,7 +259,8 @@ impl PartyEvents {
                             }
                         };
                     } else {
-                        // Represents a stake deposit initiation event
+                        // Represents a stake deposit initiation event OR just a regular transaction sending here
+                        // TODO: Don't match this an else, but rather allow both swaps and stakes as part of the same TX.
                     }
                 } else {
                     let outgoing_amount = t.tx.non_remainder_amount();

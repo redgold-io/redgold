@@ -430,6 +430,7 @@ enum StandardContractType {
   CURRENCY = 0;
   DEPOSIT = 1;
   SWAP = 2;
+  STAKE = 3;
 }
 
 message KeyValueOption {

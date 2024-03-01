@@ -4,7 +4,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
 use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, StandardData, Transaction, TransactionData, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, StandardContractType, StandardData, Transaction, TransactionData, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 
@@ -280,16 +280,28 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn with_last_output_stake(&mut self) -> &mut Self {
+        self.with_last_output_contract_type(StandardContractType::Stake)
+    }
+    pub fn with_last_output_contract_type(&mut self, contract_type: StandardContractType) -> &mut Self {
+        if let Some(o) = self.transaction.outputs.last_mut() {
+            let mut oc = OutputContract::default();
+            oc.standard_contract_type = Some(contract_type as i32);
+            o.contract = Some(oc);
+        }
+        self
+    }
 
-    pub fn with_stake(&mut self, lower: f64, upper: f64, address: &Address) -> &mut Self {
+
+    pub fn with_stake_usd_bounds(&mut self, lower: Option<f64>, upper: Option<f64>, address: &Address) -> &mut Self {
         let mut o = Output::default();
         o.address = Some(address.clone());
         let mut d = StandardData::default();
         let mut lq = LiquidityRequest::default();
         let mut deposit = LiquidityDeposit::default();
         let mut lr = LiquidityRange::default();
-        lr.min_inclusive = Some(CurrencyAmount::from_fractional(lower).expect("works"));
-        lr.max_exclusive = Some(CurrencyAmount::from_fractional(upper).expect("works"));
+        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_fractional(lower).expect("works"));
+        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_fractional(upper).expect("works"));
         deposit.liquidity_ranges = vec![lr];
         lq.deposit = Some(deposit);
         d.liquidity_request = Some(lq);

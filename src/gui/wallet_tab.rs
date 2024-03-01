@@ -15,7 +15,7 @@ use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{EasyJsonDeser, ErrorInfoContext, RgResult, WithMetadataHashable};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, RgResult, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
@@ -67,7 +67,7 @@ enum SendReceiveTabs {
     Send,
     Receive,
     CustomTx,
-    Swap
+    // Swap
 }
 
 // #[derive(Clone)]
@@ -128,7 +128,9 @@ pub struct WalletState {
     pub hot_passphrase: String,
     pub hot_offset: String,
     pub custom_tx_json: String,
-    pub mnemonic_save_persist: bool
+    pub mnemonic_save_persist: bool,
+    pub mark_output_as_stake: bool,
+    pub mark_output_as_swap: bool
 }
 
 impl WalletState {
@@ -252,7 +254,9 @@ impl WalletState {
             custom_tx_json: "".to_string(),
             valid_save_mnemonic: "".to_string(),
             add_new_key_window: false,
-            mnemonic_save_persist: true
+            mnemonic_save_persist: true,
+            mark_output_as_stake: false,
+            mark_output_as_swap: false,
         }
     }
     pub fn update_hardware(&mut self) {
@@ -393,12 +397,11 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             SendReceiveTabs::CustomTx => {
                 ui.label("Enter custom transaction JSON:");
                 ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet_state.custom_tx_json));
-
             }
-            SendReceiveTabs::Swap => {
-                show_prepared = false;
-                swap_view(ui, ls, pk);
-            }
+            // SendReceiveTabs::Swap => {
+            //     // show_prepared = false;
+            //     // swap_view(ui, ls, pk);
+            // }
         }
         if show_prepared {
             prepared_view(ui, ls, pk);
@@ -433,7 +436,11 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
         ui.label("Amount");
         let string = &mut ls.wallet_state.amount_input;
         ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
+        ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
+        ui.checkbox(&mut ls.wallet_state.mark_output_as_swap, "Mark as Swap");
+
     });
+
 }
 
 fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {
@@ -494,6 +501,7 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                         ai,
                         &ls.wallet_state.amount_input,
                         &ls.wallet_state.destination_address,
+                        &ls.wallet_state,
                     );
                     ls.wallet_state.update_unsigned_tx(Some(result.clone()));
                     ls.wallet_state.signing_flow_transaction_box_msg = Some(
@@ -615,14 +623,14 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 ls.wallet_state.send_receive = some;
             }
         }
-        if ui.button("Swap").clicked() {
-            let some = Some(SendReceiveTabs::Swap);
-            if ls.wallet_state.send_receive == some.clone() {
-                ls.wallet_state.send_receive = None;
-            } else {
-                ls.wallet_state.send_receive = some;
-            }
-        }
+        // if ui.button("Swap").clicked() {
+        //     let some = Some(SendReceiveTabs::Swap);
+        //     if ls.wallet_state.send_receive == some.clone() {
+        //         ls.wallet_state.send_receive = None;
+        //     } else {
+        //         ls.wallet_state.send_receive = some;
+        //     }
+        // }
 
         let layout = egui::Layout::right_to_left(egui::Align::RIGHT);
         ui.with_layout(layout, |ui| {
@@ -971,13 +979,24 @@ pub fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, publ
     });
 }
 
-pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String)
+pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String, x: &WalletState)
                            -> Result<Transaction, ErrorInfo> {
     let destination = Address::parse(destination.clone())?;
     let amount = CurrencyAmount::from_float_string(amount)?;
     let mut tb = TransactionBuilder::new();
+    let a = ai.address.as_ref().expect("a");
     tb.with_address_info(ai.clone());
     tb.with_output(&destination, &amount);
+    if x.mark_output_as_swap {
+        tb.with_last_output_withdrawal_swap();
+    }
+    if x.mark_output_as_stake {
+        tb.with_last_output_stake();
+        tb.with_stake_usd_bounds(None, None, a);
+    }
+    if x.mark_output_as_swap && x.mark_output_as_stake {
+        return Err(error_info("Cannot mark as both swap and stake"));
+    }
     let res = tb.build();
     res
 }
