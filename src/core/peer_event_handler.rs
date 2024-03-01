@@ -101,6 +101,7 @@ impl PeerOutgoingEventHandler {
             counter!("redgold.peer.rest.send.error").increment(1);
             let mut e2 = e.clone();
             e2.with_detail("node_metadata", nmd.json_or());
+            e2.with_detail("message", message.request.json_or());
             log::error!("Error sending message to peer: {}", e2.json_or());
             Response::from_error_info(e2)
         }).combine();
