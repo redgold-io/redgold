@@ -1,7 +1,7 @@
 use std::collections::HashSet;
-use redgold_schema::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
+use redgold_schema::structs::{Address, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use crate::KeyPair;
 use crate::proof_support::ProofSupport;

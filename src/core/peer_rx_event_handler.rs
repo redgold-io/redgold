@@ -23,7 +23,7 @@ use crate::api::about;
 use crate::core::discovery::DiscoveryMessage;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
-use crate::core::relay::{ Relay};
+use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use crate::data::download::process_download_request;
@@ -35,11 +35,6 @@ use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::SameResult;
 use crate::observability::logging::Loggable;
-
-pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: &mut Request) -> Result<Response, ErrorInfo> {
-    let client = crate::api::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
-    client.proto_post_request(request, Some(relay)).await
-}
 
 pub struct PeerRxEventHandler {
     relay: Relay,
@@ -55,7 +50,7 @@ impl PeerRxEventHandler {
         counter!("redgold.peer.message.received").increment(1);
 
         // This is important for some requests but not others, use in case by case basis
-        let verified = pm.request.verify_auth();
+        let verified = pm.request.verify_auth().add("Incoming request authorization failure in peer rx event handler");
 
         // Check if we know the peer, if not, attempt discovery
         if let Some(pk) = pm.request.clone().proof.clone().and_then(|r| r.public_key) {
@@ -75,13 +70,14 @@ impl PeerRxEventHandler {
         // Handle the request
 
         // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let mut response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
-            .map_err(|e| Response::from_error_info(e)).combine();
-        response.with_metadata(relay.node_metadata().await?);
-        response.with_auth(&relay.node_config.keypair());
+        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
+            .map_err(|e| Response::from_error_info(e)).combine()
+            .with_metadata(relay.node_metadata().await?)
+            .with_auth(&relay.node_config.keypair())
+            .verify_auth(Some(&relay.node_config.public_key())).expect("immediate verify");
         if let Some(c) = pm.response {
-            let _ser = response.clone().json_or();
-            let _peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
+            // let _ser = response.clone().json_or();
+            // let _peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
             // debug!("Sending response to peer {} contents {}", peer, ser);
             c.send_err(response).add("Send message to response channel failed in handle incoming message")
                 .log_error().ok();
@@ -101,6 +97,8 @@ impl PeerRxEventHandler {
 
         // TODO: add a uuid here
         let mut response = Response::empty_success();
+
+        let auth_required = request.auth_required();
 
         if let Some(r) = &request.lookup_transaction_request {
             let opt = relay.lookup_transaction(r).await?;
@@ -229,61 +227,45 @@ impl PeerRxEventHandler {
         }
 
         // Verified requests only below here
-        // if let Ok(pk) = verified {
-        if let Some(r) = request.initiate_keygen {
-            // TODO Track future with loop poll pattern
-            // oh wait can we remove this spawn entirely?
-            info!("Received MP request on peer rx: {}", json_or(&r));
-            let rel2 = relay.clone();
-            // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-            // tokio::spawn(async move {
-                let result1 = initiate_mp_keygen_follower(
-                    rel2.clone(), r).await;
-                let mp_response: String = result1.clone()
-                    .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-            info!("Multiparty response from follower: {}", mp_response);
+        if auth_required {
+            match _verified {
+                Ok(pk) => {
+                    if let Some(r) = &request.initiate_keygen {
+                        // TODO Track future with loop poll pattern
+                        // oh wait can we remove this spawn entirely?
+                        info!("Received MP request on peer rx: {}", json_or(&r));
+                        let rel2 = relay.clone();
+                        // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
+                        // tokio::spawn(async move {
+                        let result1 = initiate_mp_keygen_follower(
+                            rel2.clone(), r.clone(), &pk).await;
+                        let mp_response: String = result1.clone()
+                            .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+                        info!("Multiparty response from follower: {}", mp_response);
 
-            response.initiate_keygen_response = Some(result1?);
+                        response.initiate_keygen_response = Some(result1?);
 
-            // });
+                        // });
+                    }
+                    if let Some(k) = &request.initiate_signing {
+                        let rel2 = relay.clone();
+                        info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
+                        // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
+                        // tokio::spawn(async move {
+                        let result1 = initiate_mp_keysign_follower(rel2.clone(), k.clone(), &pk).await;
+                        let mp_response: String = result1.clone()
+                            .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
+                        info!("Multiparty signing response from follower: {}", mp_response);
+                        response.initiate_signing_response = Some(result1?);
+                        // });
+                    }
+                }
+                Err(e) => { return Err(e).add("Unable to process request, authorization required and failed").log_error(); }
+            }
         }
-        if let Some(k) = request.initiate_signing {
-            let rel2 = relay.clone();
-            info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
-            // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-            // tokio::spawn(async move {
-                let result1 = initiate_mp_keysign_follower(rel2.clone(), k).await;
-                let mp_response: String = result1.clone()
-                    .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                info!("Multiparty signing response from follower: {}", mp_response);
-                response.initiate_signing_response = Some(result1?);
-            // });
-        }
-        // }
-        // info!(
-        //                 "Preparing response to peer RX event handler: {}",
-        //                 serde_json::to_string(&response.clone()).unwrap_or("json fail".into())
-        //             );
+
         Ok(response)
     }
-    //
-    // async fn run(&mut self) -> Result<(), ErrorInfo> {
-    //
-    //     // Wait a minute if we're polling these futures do we even need a spawn here?
-    //     let mut fut = FutLoopPoll::new();
-    //
-    //     let receiver = self.relay.peer_message_rx.receiver.clone();
-    //     fut.run(receiver, |pm| {
-    //         counter!("redgold.peer.message.received").increment(1);
-    //         // info!("Peer rx event handler received message");
-    //         tokio::spawn({
-    //             Self::request_response_rest(self.relay.clone(), pm.clone(),
-    //                                         // self.rt.clone()
-    //             )
-    //         })
-    //     }).await
-    // }
-    //
 
     async fn run(&mut self) -> Result<(), ErrorInfo> {
         let receiver = self.relay.peer_message_rx.receiver.clone();

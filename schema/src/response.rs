@@ -40,7 +40,7 @@ impl Response {
         return r.clone();
     }
 
-    pub fn with_metadata(&mut self, node_metadata: NodeMetadata) -> &mut Response {
+    pub fn with_metadata(mut self, node_metadata: NodeMetadata) -> Response {
         self.node_metadata = Some(node_metadata);
         self
     }

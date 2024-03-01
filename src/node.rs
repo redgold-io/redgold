@@ -27,7 +27,7 @@ use crate::core::{block_formation, stream_handlers};
 use crate::core::block_formation::BlockFormationProcess;
 use crate::core::observation::ObservationBuffer;
 use crate::core::peer_event_handler::PeerOutgoingEventHandler;
-use crate::core::peer_rx_event_handler::{PeerRxEventHandler, rest_peer};
+use crate::core::peer_rx_event_handler::{PeerRxEventHandler};
 use crate::core::process_transaction::TransactionProcessContext;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;

@@ -248,7 +248,7 @@ impl Relay {
     }
 
     pub async fn peer_id_for_node_pk(&self, public_key: &PublicKey) -> RgResult<Option<PeerId>> {
-        if &self.node_config.public_key == public_key {
+        if &self.node_config.public_key() == public_key {
             return Ok(Some(self.peer_id().await?))
         }
         self.ds.peer_store.peer_id_for_node_pk(public_key).await
@@ -425,10 +425,10 @@ impl Relay {
         self.update_node_metadata(&nmd).await
     }
 
-    pub async fn sign_request(&self, req: &mut Request) -> RgResult<Request> {
+    pub async fn sign_request(&self, req: Request) -> RgResult<Request> {
         Ok(req
             .with_metadata(self.node_metadata().await?)
-            .with_auth(&self.node_config.words().default_kp().expect("works")).clone())
+            .with_auth(&self.node_config.keypair()).clone())
     }
 
 
@@ -520,7 +520,8 @@ impl Relay {
         let res = tokio::time::timeout(timeout, r.recv_async_err()).await
             .map_err(|e| error_info(e.to_string()))??;
         // Is this necessary?? Or have we already handled this elsewhere?
-        res.verify_auth(&node)
+        // res.verify_auth(&node)
+        Ok(res)
     }
 
     // Try to eliminate this function
@@ -632,7 +633,7 @@ impl Relay {
         for (pk, r) in &results {
             let fut = async {
                 let result = r.recv_async_err().await;
-                result.and_then(|r| r.verify_auth(pk))
+                result
             };
             responses.push(fut);
         }

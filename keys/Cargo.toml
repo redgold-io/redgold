@@ -43,6 +43,7 @@ foundry-block-explorers = "0.2.3"
 alloy-chains = "0.1.12"
 num-bigint = "0.4"
 num-traits = "0.2"
+log = "0.4.20"
 #elliptic-curve = "0.13.5"
 
 #[dependencies.bitcoin]

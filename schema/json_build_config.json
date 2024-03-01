@@ -190,7 +190,9 @@
       "scope": "field",
       "description": "skip string default values",
       "attr": "#[serde(skip_serializing_if = \"String::is_empty\", default)]",
-      "paths": []
+      "paths": [
+        "structs.VersionInfo.executable_checksum"
+      ]
     },
     {
       "scope": "field",
@@ -199,6 +201,7 @@
       "paths": [
         "structs.Input.product_id",
         "structs.Input.floating_utxo_id",
+        "structs.TransportInfo.external_ipv6",
         "structs.Input.input_type",
         "structs.Address.currency",
         "structs.ResolveCodeResponse",
@@ -258,6 +261,19 @@
         "structs.Request.query_observation_proof_request",
         "structs.Request.about_node_request",
         "structs.Request.get_peers_info_request",
+        "structs.Request.initiate_keygen",
+        "structs.Request.initiate_signing",
+        "structs.Request.multiparty_authentication_request",
+        "structs.Request.health_request",
+        "structs.Request.get_node_transaction_request",
+        "structs.Request.get_contract_state_marker_request",
+        "structs.Request.resolve_code_request",
+        "structs.Request.abridged_node_metadata",
+        "structs.Request.utxo_valid_request",
+        "structs.Request.recent_transactions_request",
+        "structs.Request.lookup_transaction_request",
+        "structs.Request.recent_transaction_and_observation_request",
+        "structs.Request.genesis_request",
         "structs.Response.utxo_conflict_resolve_response",
         "structs.Response.multiparty_threshold_response",
         "structs.Response.query_observation_proof_response",
@@ -287,6 +303,7 @@
         "structs.Response.query_transaction_response",
         "structs.Response.about_node_response",
         "structs.Response.query_addresses_response",
+        "structs.NodeMetadata.node_name",
         "structs.ObservationMetadata.liveness_confidence"
       ]
     },
@@ -298,6 +315,9 @@
         "structs.StandardData.typed_value_list",
         "structs.Transaction.inputs",
         "structs.Output.counter_party_proofs",
+        "structs.Request.gossip_observation_proof",
+        "structs.NodeMetadata.deposit_addresses",
+        "structs.PeerId.known_proof",
         "structs.StandardData.keyed_typed_value_list",
         "structs.StandardData.matrix_typed_value_list",
         "structs.ResponseMetadata.task_local_details",
