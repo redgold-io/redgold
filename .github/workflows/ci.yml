@@ -162,7 +162,49 @@ jobs:
         with:
           name: redgold_linux
           path: ./redgold_linux
-#    needs: [test]
+  build-linux-windows:
+#    if: ${{ github.event_name != 'pull_request_target' && contains('
+#      refs/heads/predev
+#      refs/heads/dev
+#      refs/heads/staging
+#      refs/heads/test
+#      refs/heads/main
+#      ', github.ref) }}
+    runs-on: ubuntu-latest-m
+    timeout-minutes: 100
+    permissions:
+      contents: write
+#    env:
+#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+        # TODO: Update to use release plugin
+        #      - run: cargo install cargo-release
+        #      - run: cargo release # --execute --no-confirm --token ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - run: echo "Github branch = ${{ env.BRANCH }}"
+      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - run: echo "Testing version = ${{ env.VERSION }}"
+      - run: ./bin/install_build_deps.sh
+      - run: sudo apt update; sudo apt install -y mingw-w64
+      - run: rustup target add x86_64-pc-windows-gnu
+      - run: cargo build --target x86_64-pc-windows-gnu --release
+      - run: ls ./target/release -lA
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: redgold_win_cross
+          path: ./target/release/redgold.exe
   build-linux-ubuntu-20:
     if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
