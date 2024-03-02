@@ -224,12 +224,12 @@ jobs:
          Currently broken due to external change.
       - shell: msys2 {0}
         name: "Msys2 cargo build with dependencies"
-        if:
-          contains('
-          refs/heads/staging
-          refs/heads/test
-          refs/heads/main
-          ', github.ref)
+#        if:
+#          contains('
+#          refs/heads/staging
+#          refs/heads/test
+#          refs/heads/main
+#          ', github.ref)
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
