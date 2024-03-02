@@ -320,6 +320,9 @@ impl TransactionProcessContext {
 
         // Validate obvious schema related errors / local errors requiring no other context information
         transaction.prevalidate()?;
+
+        transaction.validate_network(&self.relay.node_config.network)?;
+
         Ok(())
 
     }
