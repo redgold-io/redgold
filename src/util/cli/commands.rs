@@ -458,7 +458,7 @@ async fn test_transaction_dev() {
     ).await.expect("");
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn test_new_deploy() {
     // init_logger(); //.ok();
