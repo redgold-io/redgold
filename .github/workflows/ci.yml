@@ -246,6 +246,8 @@ jobs:
           echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
           echo "CC=gcc" >> $GITHUB_ENV      CC: gcc
           echo "CFLAGS=-std=cli" >> $GITHUB_ENV
+          export CC=gcc
+          export CFLAGS="-std=c11"
           cargo build --release --target x86_64-pc-windows-gnu
           ls
           ls target/
