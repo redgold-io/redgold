@@ -267,19 +267,13 @@ jobs:
       - run: echo "asdf" > ./redgold.exe
          Currently broken due to external change.
       - shell: msys2 {0}
-        name: "Msys2 cargo build with dependencies"
-#        if:
-#          contains('
-#          refs/heads/staging
-#          refs/heads/test
-#          refs/heads/main
-#          ', github.ref)
+        name: "Msys2 cargo build with upgrade"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
           ls -lA
           pwd
-          pacman -Syu --noconfirm
+          pacman -Sy --noconfirm mingw-w64-x86_64-toolchain || true
       - shell: msys2 {0}
         name: "Msys2 cargo build with dependencies"
         #        if:
