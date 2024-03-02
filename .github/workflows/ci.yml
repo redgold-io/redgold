@@ -276,12 +276,6 @@ jobs:
           pacman -Sy --noconfirm mingw-w64-x86_64-toolchain || true
       - shell: msys2 {0}
         name: "Msys2 cargo build with dependencies"
-        #        if:
-        #          contains('
-        #          refs/heads/staging
-        #          refs/heads/test
-        #          refs/heads/main
-        #          ', github.ref)
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
@@ -290,12 +284,6 @@ jobs:
           pacman -S --noconfirm mingw-w64-x86_64-rust
           pacman -S --noconfirm mingw-w64-x86_64-openssl
           pacman -S --noconfirm make
-#          echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
-#          echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
-#          echo "CC=gcc" >> $GITHUB_ENV      CC: gcc
-#          echo "CFLAGS=-std=cli" >> $GITHUB_ENV
-#          export CC=gcc
-#          export CFLAGS="-std=c11"
           cargo build --release --target x86_64-pc-windows-gnu
           ls
           ls target/
