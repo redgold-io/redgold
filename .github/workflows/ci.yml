@@ -207,6 +207,8 @@ jobs:
       contents: write
     env:
       DATABASE_URL: "sqlite:///Users/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+      CC: gcc
+      CFLAGS: "-std=c11"
     outputs:
       release_match: ${{ steps.check-branch.outputs.match }}
     steps:
@@ -241,6 +243,8 @@ jobs:
           pacman -S --noconfirm make
           echo "OPENSSL_DIR=/mingw64" >> $GITHUB_ENV
           echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
+          echo "CC=gcc" >> $GITHUB_ENV      CC: gcc
+          echo "CFLAGS=-std=cli" >> $GITHUB_ENV
           cargo build --release --target x86_64-pc-windows-gnu
           ls
           ls target/
