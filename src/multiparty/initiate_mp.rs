@@ -8,7 +8,7 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ Relay};
 use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
-use ssh2::init;
+// use ssh2::init;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 use crate::multiparty::{gg20_keygen, gg20_signing};

@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use log::info;
+use log::{error, info};
 use rocket::form::FromForm;
+use tokio::task::JoinHandle;
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
@@ -14,6 +15,7 @@ use redgold_schema::EasyJson;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
 use redgold_schema::transaction::rounded_balance_i64;
+use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -213,17 +215,12 @@ pub fn add_server_prompt() -> Server {
     }
 }
 
-pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> Result<(), ErrorInfo> {
+pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinHandle<()>> {
     let mut deploy = deploy.clone();
     if deploy.wizard {
         deploy_wizard(&deploy, node_config).await?;
-        return Ok(());
+        return Ok(tokio::spawn(async move {()}));
     }
-
-    let default_fun = Box::new(move |s: String| {
-        println!("output: {}", s);
-        Ok::<(), ErrorInfo>(())
-    });
 
     if std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok() {
         deploy.genesis = true;
@@ -246,9 +243,32 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> Result<(), Err
     let mut nc = node_config.clone();
     nc.network = net;
 
-    default_deploy(&mut deploy, &nc, default_fun).await?;
 
-    Ok(())
+    let c: Channel::<String> = Channel::new();
+    let r = c.receiver.clone();
+    let default_fun = tokio::spawn(async move {
+        loop {
+            let s = match r.recv_async_err().await {
+                Ok(x) => {
+                    x
+                }
+                Err(e) => {
+                    error!("Error in deploy: {}", e.json_or());
+                    break;
+                }
+            };
+            if !s.trim().is_empty() {
+                info!("{}", s);
+            }
+        }
+        ()
+    });
+
+    let output_handler = Some(c.sender.clone());
+
+    default_deploy(&mut deploy, &nc, output_handler).await?;
+
+    Ok(default_fun)
 }
 
 pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {
@@ -436,6 +456,18 @@ async fn test_transaction_dev() {
     let _ = test_transaction(&&t, &nc
                                // , arc
     ).await.expect("");
+}
+
+// #[ignore]
+#[tokio::test]
+async fn test_new_deploy() {
+    // init_logger(); //.ok();
+    let mut nc = NodeConfig::dev_default().await;
+    let mut dep = Deploy::default();
+    dep.ops = false;
+    info!("Deploying with {:?}", dep.clone());
+    dep.server_index = Some(4);
+    deploy(&dep, &nc).await.expect("works").abort();
 }
 
 pub(crate) async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) {

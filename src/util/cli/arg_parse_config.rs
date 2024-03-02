@@ -722,7 +722,8 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                     commands::test_transaction(&test_transaction_cli, &config).await
                 }
                 RgTopLevelSubcommand::Deploy(d) => {
-                    commands::deploy(d, &config).await
+                    commands::deploy(d, &config).await.unwrap().abort();
+                    Ok(())
                 }
                 RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
                     commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
