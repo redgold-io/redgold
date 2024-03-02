@@ -1,9 +1,13 @@
 use std::collections::HashMap;
+use std::{env, fs};
+use std::fs::File;
 use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
+use flume::Sender;
 
-// use filepath::FilePath;
+use std::io::prelude::*;
+use async_trait::async_trait;
 use itertools::Itertools;
 
 use redgold_keys::transaction_support::TransactionSupport;
@@ -17,13 +21,186 @@ use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
-use crate::infra::SSH;
 use crate::node_config::NodeConfig;
 use crate::resources::Resources;
 use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::Deploy;
 use crate::util::cli::data_folder::DataFolder;
+use crate::util::cmd::{run_bash, run_bash_async, run_powershell, run_powershell_async};
+
+
+#[async_trait]
+pub trait SSHLike {
+    async fn execute(&self, command: impl Into<String> + Send, output_handler: Option<Sender<String>>) -> RgResult<String>;
+    async fn scp(&self, from: impl Into<String> + Send, to: impl Into<String> + Send, to_dest: bool, output_handler: Option<Sender<String>>) -> RgResult<String>;
+
+}
+
+pub struct SSHProcessInvoke {
+    user: Option<String>,
+    identity_path: Option<String>,
+    host: String
+}
+
+#[async_trait]
+impl SSHLike for SSHProcessInvoke {
+
+    async fn execute(&self, command: impl Into<String> + Send, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        let identity_opt = self.identity_opt();
+        let user = self.user_opt();
+        let cmd = format!(
+            "ssh {} {}@{} \"bash -c '{}'\"",
+            identity_opt, user, self.host, command.into()
+        );
+        output_handler.clone().map(|s|
+            s.send(format!("{}: {}", self.host, cmd.clone())).expect("send"));
+        self.run_cmd(output_handler, cmd).await
+    }
+
+    async fn scp(&self, local_file: impl Into<String> + Send, remote_file: impl Into<String> + Send, to_dest: bool, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        let identity_opt = self.identity_opt();
+        let user = self.user_opt();
+        let lf = local_file.into();
+        let first_arg = if to_dest { lf.clone() } else { "".to_string() };
+        let last_arg = if to_dest { "".to_string() } else { lf };
+        let cmd = format!(
+            "scp {} {} {}@{}:{} {}",
+            identity_opt, first_arg, user, self.host, remote_file.into(), last_arg
+        );
+        self.run_cmd(output_handler, cmd).await
+    }
+
+}
+
+pub fn is_windows() -> bool {
+    env::consts::OS == "windows"
+}
+
+impl SSHProcessInvoke {
+    fn identity_opt(&self) -> String {
+        let identity_opt = self.identity_path.clone()
+            .map(|i| format!("-i {}", i)).unwrap_or("".to_string());
+        identity_opt
+    }
+
+    fn user_opt(&self) -> String {
+        let user = self.user.clone().unwrap_or("root".to_string());
+        user
+    }
+
+    async fn run_cmd(&self,
+               output_handler: Option<Sender<String>>,
+               cmd: String
+    ) -> RgResult<String> {
+        let (stdout, stderr) = if !is_windows() {
+            run_bash_async(cmd).await?
+        } else {
+            run_powershell_async(cmd).await?
+        };
+        if let Some(s) = output_handler {
+            s.send(stdout.clone()).expect("send");
+            s.send(stderr.clone()).expect("send");
+        }
+        Ok(format!("{}\n{}", stdout, stderr).to_string())
+    }
+}
+
+#[ignore]
+#[tokio::test]
+async fn debug_ssh_invoke() {
+    let host = "hostnoc".to_string();
+    let ssh = SSHProcessInvoke {
+        user: None,
+        identity_path: None,
+        host: host.clone(),
+    };
+    let result = ssh.execute("ls", None).await.expect("ssh");
+    println!("Result: {}", result);
+
+    let mut s = Server{
+        name: "".to_string(),
+        host,
+        index: 0,
+        peer_id_index: 0,
+        network_environment: "".to_string(),
+        username: None,
+        ipv4: None,
+        node_name: None,
+        external_host: None,
+    };
+
+    let mut dm = DeployMachine::new(&s, None);
+    // dm.verify().expect("verify");
+    let res = dm.exes("ls ~/.rg", &None).await.expect("ls");
+    println!("Result2: {}", res);
+}
+
+pub struct DeployMachine<S: SSHLike> {
+    pub server: Server,
+    pub ssh: S,
+}
+
+impl DeployMachine<SSHProcessInvoke> {
+
+    pub fn new(s: &Server, identity_path: Option<String>) -> Self {
+        let ssh = SSHProcessInvoke {
+            user: s.username.clone(),
+            // TODO: Home dir .join(".ssh").join("id_rsa")
+            // Or override with a different path
+            identity_path,
+            host: s.host.clone()
+        };
+        Self {
+            server: s.clone(),
+            ssh
+        }
+    }
+}
+
+impl<S: SSHLike> DeployMachine<S> {
+
+    pub async fn verify(&mut self) -> Result<(), ErrorInfo> {
+        let mut info = ErrorInfo::error_info("Cannot verify ssh connection");
+        info.with_detail("server", self.server.json_or());
+        self.ssh.execute("df", None)
+            .await?
+            .contains("Filesystem")
+            .then(|| Ok(()))
+            .unwrap_or(Err(info))
+    }
+
+    pub async fn exes(&mut self, command: impl Into<String> + Send, output_handler: &Option<Sender<String>>) -> RgResult<String> {
+        self.ssh.execute(command, output_handler.clone()).await
+    }
+
+    pub async fn copy_p(
+        &mut self, contents: impl Into<String> + Send, remote_path: impl Into<String> + Send,
+        output_handler: &Option<Sender<String>>
+    ) -> RgResult<()> {
+        let contents = contents.into();
+        let remote_path = remote_path.into();
+        if let Some(s) = output_handler.clone() {
+            s.send(format!("Copying to: {}", remote_path.clone())).expect("send");
+        }
+        self.exes(format!("rm -f {}", remote_path.clone()), &output_handler.clone()).await?;
+        self.copy(contents, remote_path).await?;
+        Ok(())
+    }
+    pub async fn copy(&mut self, contents: impl Into<String> + Send, remote_path: String) -> RgResult<()> {
+        // println!("Copying to: {}", remote_path);
+        let contents = contents.into();
+        let path = "tmpfile";
+        fs::remove_file("tmpfile").ok();
+        let mut file = File::create(path).expect("create failed");
+        file.write_all(contents.as_bytes()).expect("write temp file");
+        self.ssh.scp("./tmpfile", &*remote_path, true, None).await?;
+        fs::remove_file("tmpfile").unwrap();
+        Ok(())
+    }
+
+
+}
 
 /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
@@ -32,7 +209,7 @@ They must be manually deployed.
  This whole thing should really have a streaming output for the lines and stuff.
  */
 pub async fn setup_server_redgold(
-     mut ssh: SSH,
+     mut ssh: DeployMachine<SSHProcessInvoke>,
      network: NetworkEnvironment,
      is_genesis: bool,
      additional_env: Option<HashMap<String, String>>,
@@ -42,19 +219,12 @@ pub async fn setup_server_redgold(
      start_node: bool,
      alias: Option<String>,
      ser_pid_tx: Option<String>,
-     p: &Box<impl Fn(String) -> RgResult<()> + 'static>
+     p: &Option<Sender<String>>
  ) -> Result<(), ErrorInfo> {
 
-    ssh.verify()?;
+    ssh.verify().await?;
 
-
-     let _host = ssh.host.clone();
-    //
-    // let p= &Box::new(move |s: String| {
-    //     proc_func(format!("{}", host.clone())).expect("");
-    //     proc_func(s).expect("");
-    //     Ok::<(), ErrorInfo>(())
-    // });
+    let _host = ssh.server.host.clone();
 
     ssh.exes("docker system prune -a -f", p).await?;
     ssh.exes("apt install -y ufw", p).await?;
@@ -62,8 +232,8 @@ pub async fn setup_server_redgold(
     ssh.exes("sudo ufw allow in on tailscale0", p).await?;
     ssh.exes("echo 'y' | sudo ufw enable", p).await?;
 
-    let compose = ssh.exec("docker-compose", true);
-    if !(compose.stderr.contains("applications")) {
+    let compose = ssh.exes("docker-compose", p).await?;
+    if !(compose.contains("applications")) {
         ssh.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
         ssh.exes("sudo apt install -y docker-compose", p).await?;
     }
@@ -169,21 +339,22 @@ pub async fn setup_server_redgold(
 }
 
 pub async fn deploy_ops_services(
-    mut ssh: SSH,
+    mut ssh: DeployMachine<SSHProcessInvoke>,
     _additional_env: Option<HashMap<String, String>>,
     remote_path_prefix: Option<String>,
     grafana_pass: Option<String>,
     purge_data: bool,
+    p: &Option<Sender<String>>
 ) -> Result<(), ErrorInfo> {
     let remote_path = remote_path_prefix.unwrap_or("/root/.rg/all".to_string());
-    ssh.verify()?;
+    ssh.verify().await?;
+    //
+    // let p = &Box::new(|s: String| {
+    //     println!("Partial output: {}", s);
+    //     Ok(())
+    // });
 
-    let p = &Box::new(|s: String| {
-        println!("Partial output: {}", s);
-        Ok(())
-    });
-
-    ssh.execs("docker ps", false, p).await?;
+    ssh.exes("docker ps", p).await?;
     ssh.copy(
         include_str!("../resources/infra/ops_services/services-all.yml"),
         format!("{}/services-all.yml", remote_path)
@@ -222,8 +393,8 @@ pub async fn deploy_ops_services(
         format!("{}/grafana_password", remote_path)
     );
 
-    ssh.execs(format!("rm -r {}/dashboards", remote_path), false, p).await?;
-    ssh.execs(format!("mkdir {}/dashboards", remote_path), false, p).await?;
+    ssh.exes(format!("rm -r {}/dashboards", remote_path), p).await?;
+    ssh.exes(format!("mkdir {}/dashboards", remote_path), p).await?;
 
     let x = include_str!("../resources/infra/ops_services/dashboards/node-exporter-full_rev31.json");
     ssh.copy(
@@ -263,18 +434,18 @@ pub async fn deploy_ops_services(
     }).join("\n");
     ssh.copy(env_contents.clone(), format!("{}/ops_var.env", remote_path));
 
-    ssh.execs(format!("cd {}; docker-compose -f services-all.yml down", remote_path), false, p).await?;
+    ssh.exes(format!("cd {}; docker-compose -f services-all.yml down", remote_path), p).await?;
 
     for s in vec!["grafana", "prometheus", "esdata"] {
         if purge_data {
-            ssh.execs(format!("rm -r {}/data/{}", remote_path, s), false, p).await?;
+            ssh.exes(format!("rm -r {}/data/{}", remote_path, s), p).await?;
         }
-        ssh.execs(format!("mkdir -p {}/data/{}", remote_path, s), false, p).await?;
+        ssh.exes(format!("mkdir -p {}/data/{}", remote_path, s), p).await?;
     };
 
     ssh.exes(format!("chmod -R 777 {}/data/esdata", remote_path), p).await?;
 
-    ssh.execs(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), false, p).await?;
+    ssh.exes(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), p).await?;
 
     tokio::time::sleep(Duration::from_secs(15)).await;
 
@@ -402,8 +573,9 @@ pub async fn offline_generate_keys_servers(
 }
 
 
-pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
-    deploy: &mut Deploy, node_config: &NodeConfig, fun: Box<F>) -> RgResult<()> {
+pub async fn default_deploy(
+    deploy: &mut Deploy, node_config: &NodeConfig, output_handler: Option<Sender<String>>
+) -> RgResult<()> {
 
     // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
     if node_config.opts.development_mode {
@@ -458,7 +630,7 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
 
     let mut servers = s.to_vec();
     if let Some(i) = deploy.server_index {
-        let x = servers.get(i as usize).expect("").clone();
+        let x = servers.iter().filter(|s| s.index == (i as i64)).next().expect("").clone();
         servers = vec![x]
     }
 
@@ -522,7 +694,8 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
             words_opt = Some(words_read);
         }
 
-        let ssh = SSH::new_ssh(ss.host.clone(), None);
+        // let ssh = SSH::new_ssh(ss.host.clone(), None);
+        let ssh = DeployMachine::new(ss, None);
         if !deploy.ops {
             let _t = tokio::time::timeout(Duration::from_secs(120), setup_server_redgold(
                 ssh, net, gen, Some(hm), purge,
@@ -531,24 +704,24 @@ pub async fn default_deploy<F: Fn(String) -> RgResult<()> + 'static>(
                 !deploy.debug_skip_start,
                 ss.node_name.clone(),
                 peer_tx_opt.map(|p| p.json_or()),
-                &fun
+                &output_handler
             )).await.error_info("Timeout")??;
         }
         gen = false;
         if !deploy.skip_ops || deploy.ops {
-            let ssh = SSH::new_ssh(ss.host.clone(), None);
-            deploy_ops_services(ssh, None, None, None, deploy.purge_ops).await.expect("")
+            let ssh = DeployMachine::new(ss, None);
+            deploy_ops_services(ssh, None, None, None, deploy.purge_ops, &output_handler).await.expect("")
         }
     }
     Ok(())
 }
 
-
-#[ignore]
-#[tokio::test]
-async fn test_setup_server() {
-    // default_deploy().await;
-}
+//
+// #[ignore]
+// #[tokio::test]
+// async fn test_setup_server() {
+//     default_deploy().await;
+// }
 
 pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Server>) {
 
@@ -562,7 +735,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
     for s in p1 {
         let server_dir = time_back.join(s.index.to_string());
         std::fs::create_dir_all(server_dir.clone()).expect("");
-        let mut ssh = SSH::new_ssh(s.host.clone(), None);
+        let mut ssh = DeployMachine::new(&s, None);
         let fnm_export = "multiparty.csv";
         std::fs::remove_file(fnm_export).ok();
         let cmd = format!(
@@ -573,14 +746,14 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
             net_str,
             fnm_export
         );
-        ssh.exec("sudo apt install -y sqlite3", true);
-        ssh.exec(cmd, true);
+        ssh.exes("sudo apt install -y sqlite3", &None).await.expect("");
+        ssh.exes(cmd, &None).await.expect("");
         let user = s.username.unwrap_or("root".to_string());
-        let res = util::cmd::run_bash(
+        let res = util::cmd::run_bash_async(
             format!(
                 "scp {}@{}:~/.rg/{}/{} {}",
                 user, s.host.clone(), net_str, fnm_export, fnm_export)
-        ).expect("");
+        ).await.expect("");
         println!("Backup result: {:?}", res);
         let contents = std::fs::read_to_string(fnm_export).expect("");
         std::fs::remove_file(fnm_export).ok();

@@ -1,24 +1,26 @@
 use redgold_schema::servers::Server;
 use std::sync::{Arc, Mutex};
-use eframe::egui::{TextEdit, Ui};
+use eframe::egui::{Color32, RichText, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
-use log::info;
+use log::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
+use redgold_schema::{EasyJson, RgResult};
+use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use crate::gui::tables;
-use crate::infra::deploy::default_deploy;
-use crate::infra::{deploy, SSH};
+use crate::infra::deploy::{default_deploy, DeployMachine};
+use crate::infra::{deploy};
 use crate::util::cli::args::Deploy;
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
     let mut results = vec![];
 
     for server in servers {
-        let mut ssh = SSH::from_server(&server);
-        let reachable = ssh.verify().is_ok();
+        let mut ssh = DeployMachine::new(&server, None);
+        let reachable = ssh.verify().await.is_ok();
         results.push(ServerStatus{ ssh_reachable: reachable});
     };
     let mut guard = status.lock().expect("lock");
@@ -128,6 +130,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
 
     if ui.button("Deploy").clicked() {
         local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
+        local_state.server_state.deployment_result = Arc::new(Mutex::new(None));
         info!("Deploying");
         let mut d = Deploy::default();
         if local_state.server_state.load_offline_deploy {
@@ -154,30 +157,66 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         }
         let config = local_state.node_config.clone();
         let arc = local_state.server_state.deployment_result_info_box.clone();
-        let fun = Box::new(move |s: String| {
-            // Lock the Mutex and get mutable access to the inner String.
-            let mut inner = arc.lock().expect("lock poisoned");
-            *inner = format!("{}\n{}", &*inner, s);
-            info!("Deploy result: {}", s);
-            Ok::<(), ErrorInfo>(())
+
+        let c: Channel::<String> = Channel::new();
+        let r = c.receiver.clone();
+        let default_fun = tokio::spawn(async move {
+            loop {
+                let s = match r.recv_async_err().await {
+                    Ok(x) => {
+                        x
+                    }
+                    Err(e) => {
+                        error!("Channel receive error: {}", e.json_or());
+                        break;
+                    }
+                };
+                let mut inner = arc.lock().expect("lock poisoned");
+                let s = s.trim();
+                if s.is_empty() {
+                    continue;
+                }
+                *inner = format!("{}\n{}", &*inner, s);
+                info!("Deploy result: {}", s);
+            }
+            ()
         });
+
+        let output_handler = Some(c.sender.clone());
+        let arc = local_state.server_state.deployment_result.clone();
         let deploy_join = tokio::spawn(async move {
-            let f = fun.clone();
-            let f2 = fun.clone();
+            let f = output_handler.clone();
+            let f2 = output_handler.clone();
 
             let mut d2 = d.clone();
             let mut d3 = d2.clone();
             let nc = config.clone();
             let _res = default_deploy(&mut d2, &nc, f).await;
+            info!("Deploy complete {}", _res.json_or());
+            arc.lock().expect("").replace(_res);
             if hard {
                 d3.debug_skip_start = false;
                 let _res = default_deploy(&mut d3, &nc, f2).await;
             }
+            default_fun.abort();
             // Update final deploy result here.
         });
 
         local_state.server_state.deploy_process = Some(Arc::new(deploy_join));
     };
+
+    match local_state.server_state.deployment_result.lock().expect("").as_ref() {
+        None => {
+            ui.label(RichText::new("Running").color(Color32::WHITE));
+        }
+        Some(Ok(_)) => {
+            ui.label(RichText::new("Success").color(Color32::GREEN));
+        }
+        Some(Err(e)) => {
+            ui.label(RichText::new("Deployment Error").color(Color32::RED));
+        }
+    }
+
 
     if ui.button("Abort Deploy").clicked() {
         if let Some(join) = local_state.server_state.deploy_process.clone() {
@@ -240,7 +279,7 @@ pub struct ServersState {
     hard_coord_reset: bool,
     words_and_id: bool,
     cold: bool,
-    deployment_result: Option<String>,
+    deployment_result: Arc<Mutex<Option<RgResult<()>>>>,
     deploy_process: Option<Arc<JoinHandle<()>>>,
     mixing_password: String,
     generate_offline_path: String,
@@ -267,7 +306,7 @@ impl Default for ServersState {
             hard_coord_reset: false,
             words_and_id: false,
             cold: false,
-            deployment_result: None,
+            deployment_result: Arc::new(Mutex::new(None)),
             deploy_process: None,
             mixing_password: "".to_string(),
             generate_offline_path: "./servers".to_string(),

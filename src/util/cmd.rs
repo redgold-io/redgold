@@ -48,8 +48,35 @@ pub fn run_cmd_safe(cmd: impl Into<String>, args: Vec<impl Into<String>>) -> RgR
     Ok((stdout, stderr))
 }
 
+pub async fn run_cmd_safe_async(cmd: impl Into<String>, args: Vec<impl Into<String>>) -> RgResult<(String, String)> {
+    let program = cmd.into();
+    let mut command = tokio::process::Command::new(program.clone());
+    for arg in args {
+        command.arg(arg.into());
+    }
+    let cmd_output = command.output().await.error_info("Ouput from command failure ")
+        .add(program.clone())?;
+    let stdout = String::from_utf8(cmd_output.stdout).error_info("stdout String decode failure ")
+        .add(program.clone())?;
+    let stderr = String::from_utf8(cmd_output.stderr).error_info("stderr String decode failure ")
+        .add(program.clone())?;
+    Ok((stdout, stderr))
+}
+
 pub fn run_bash(cmd: impl Into<String>) -> RgResult<(String, String)> {
     run_cmd_safe("bash", vec!["-c", &cmd.into()])
+}
+
+pub fn run_powershell(cmd: impl Into<String>) -> RgResult<(String, String)> {
+    run_cmd_safe("powershell", vec!["-Command", &cmd.into()])
+}
+
+pub async fn run_bash_async(cmd: impl Into<String>) -> RgResult<(String, String)> {
+    run_cmd_safe_async("bash", vec!["-c", &cmd.into()]).await
+}
+
+pub async fn run_powershell_async(cmd: impl Into<String>) -> RgResult<(String, String)> {
+    run_cmd_safe_async("powershell", vec!["-Command", &cmd.into()]).await
 }
 
 pub fn available_bytes(path: impl Into<String>, is_windows: bool) -> RgResult<i64> {
