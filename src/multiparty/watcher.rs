@@ -332,10 +332,11 @@ impl OrderFulfillment {
 
     pub async fn build_rdg_ask_swap_tx(
         &self,
-        utxos: Vec<UtxoEntry>
+        utxos: Vec<UtxoEntry>,
+        network: &NetworkEnvironment
     )
         -> RgResult<Transaction> {
-        let mut tb = TransactionBuilder::new();
+        let mut tb = TransactionBuilder::new(network);
         tb.with_utxos(&utxos)?;
         let destination_amount = self.fulfilled_currency_amount();
         tb.with_output(&self.destination, &destination_amount);
@@ -481,7 +482,7 @@ impl DepositWatcher {
         let uu = u.utxo_entry.clone().json_or();
         if res {
             info!("Sending genesis funding to multiparty address from origin {a_str} using utxo {uu}");
-            let mut tb = TransactionBuilder::new();
+            let mut tb = TransactionBuilder::new(&self.relay.node_config.network);
             tb.with_utxo(&u.utxo_entry)?;
             tb.with_output(&destination, &CurrencyAmount::from(u.utxo_entry.amount() as i64));
             tb.with_stake_usd_bounds(Some(100f64), Some(1000f64), &a);
@@ -571,55 +572,55 @@ impl DepositWatcher {
     //     }
     //     Ok((max_ts, res.clone()))
     // }
-
-    pub async fn build_rdg_ask_swap_tx(utxos: Vec<UtxoEntry>,
-                                       btc_deposits: Vec<ExternalTimedTransaction>,
-                                       bid_ask: BidAsk,
-                                       _key_address: &structs::Address,
-        min_ask: f64
-    )
-        -> RgResult<(Option<Transaction>, BidAsk)> {
-
-        let mut bid_ask_latest = bid_ask.clone();
-
-        // We're building a transaction FROM some stored input balance we have
-        // for our pubkey multisig address
-        let mut tb = TransactionBuilder::new();
-        for u in &utxos {
-            // Check contract type here
-            // let o = u.output.safe_get_msg("Missing output on UTXO")?;
-            // if let Some(o) = &o.contract.as_ref().and_then(|c| c.standard_contract_type) {
-            //     if o == StandardContractType::Swap as i32
-            // }
-            tb.with_maybe_currency_utxo(u)?;
-        }
-
-        for tx in btc_deposits.iter() {
-            let destination = tx.other_address.clone();
-            let destination_address = structs::Address::from_bitcoin(&destination);
-            if let Some(timestamp) = tx.timestamp {
-                if let Some(ask_fulfillment) = bid_ask_latest.fulfill_taker_order(
-                    tx.amount, true, timestamp as i64, Some(tx.tx_id.clone()), &destination_address
-                ) {
-                    let destination_amount = ask_fulfillment.fulfilled_amount;
-
-                    tb.with_output(&destination_address,
-                                   &CurrencyAmount::from(destination_amount as i64)
-                    );
-                    tb.with_last_output_deposit_swap_fulfillment(tx.tx_id.clone());
-
-                    let price = ask_fulfillment.fulfillment_price() * 1.01;
-                    bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
-                }
-            }
-
-        }
-        let mut tx_ret = None;
-        if !btc_deposits.is_empty() {
-            tx_ret = Some(tb.build()?);
-        }
-        Ok((tx_ret, bid_ask_latest))
-    }
+    //
+    // pub async fn build_rdg_ask_swap_tx(utxos: Vec<UtxoEntry>,
+    //                                    btc_deposits: Vec<ExternalTimedTransaction>,
+    //                                    bid_ask: BidAsk,
+    //                                    _key_address: &structs::Address,
+    //     min_ask: f64
+    // )
+    //     -> RgResult<(Option<Transaction>, BidAsk)> {
+    //
+    //     let mut bid_ask_latest = bid_ask.clone();
+    //
+    //     // We're building a transaction FROM some stored input balance we have
+    //     // for our pubkey multisig address
+    //     let mut tb = TransactionBuilder::new();
+    //     for u in &utxos {
+    //         // Check contract type here
+    //         // let o = u.output.safe_get_msg("Missing output on UTXO")?;
+    //         // if let Some(o) = &o.contract.as_ref().and_then(|c| c.standard_contract_type) {
+    //         //     if o == StandardContractType::Swap as i32
+    //         // }
+    //         tb.with_maybe_currency_utxo(u)?;
+    //     }
+    //
+    //     for tx in btc_deposits.iter() {
+    //         let destination = tx.other_address.clone();
+    //         let destination_address = structs::Address::from_bitcoin(&destination);
+    //         if let Some(timestamp) = tx.timestamp {
+    //             if let Some(ask_fulfillment) = bid_ask_latest.fulfill_taker_order(
+    //                 tx.amount, true, timestamp as i64, Some(tx.tx_id.clone()), &destination_address
+    //             ) {
+    //                 let destination_amount = ask_fulfillment.fulfilled_amount;
+    //
+    //                 tb.with_output(&destination_address,
+    //                                &CurrencyAmount::from(destination_amount as i64)
+    //                 );
+    //                 tb.with_last_output_deposit_swap_fulfillment(tx.tx_id.clone());
+    //
+    //                 let price = ask_fulfillment.fulfillment_price() * 1.01;
+    //                 bid_ask_latest = bid_ask_latest.regenerate(price, min_ask)
+    //             }
+    //         }
+    //
+    //     }
+    //     let mut tx_ret = None;
+    //     if !btc_deposits.is_empty() {
+    //         tx_ret = Some(tb.build()?);
+    //     }
+    //     Ok((tx_ret, bid_ask_latest))
+    // }
 
     pub async fn send_ask_fulfillment_transaction(&self, tx: &mut Transaction, identifier: MultipartyIdentifier) -> RgResult<SubmitTransactionResponse> {
 
@@ -811,7 +812,7 @@ impl DepositWatcher {
         tb.with_last_output_deposit_swap(option.identifier);
         tb.build()
          */
-        let mut tb = TransactionBuilder::new();
+        let mut tb = TransactionBuilder::new(&self.relay.node_config.network);
         tb.with_utxos(&utxos)?;
 
         let rdg_fulfillment_txb = with_cutoff.iter()

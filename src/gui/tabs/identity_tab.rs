@@ -144,7 +144,7 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
     let p = ls.local_stored_state.public_key(i.xpub_name.clone())
         .ok_or(error_info("No public key for xpub"))?;
 
-    let mut tb = TransactionBuilder::new();
+    let mut tb = TransactionBuilder::new(&ls.node_config.network);
     let mut pkmap = HashMap::default();
     pkmap.insert(i.peer_id_index, p);
     let s = ls.local_stored_state.servers.iter()

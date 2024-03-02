@@ -502,6 +502,7 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                         &ls.wallet_state.amount_input,
                         &ls.wallet_state.destination_address,
                         &ls.wallet_state,
+                        &ls.node_config
                     );
                     ls.wallet_state.update_unsigned_tx(Some(result.clone()));
                     ls.wallet_state.signing_flow_transaction_box_msg = Some(
@@ -979,11 +980,11 @@ pub fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, publ
     });
 }
 
-pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String, x: &WalletState)
+pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String, x: &WalletState, nc: &NodeConfig)
                            -> Result<Transaction, ErrorInfo> {
     let destination = Address::parse(destination.clone())?;
     let amount = CurrencyAmount::from_float_string(amount)?;
-    let mut tb = TransactionBuilder::new();
+    let mut tb = TransactionBuilder::new(&nc.network);
     let a = ai.address.as_ref().expect("a");
     tb.with_address_info(ai.clone());
     tb.with_output(&destination, &amount);

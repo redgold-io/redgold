@@ -387,7 +387,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     top_panel::render_top(ctx, local_state);
 
     let img = logo;
-    let _texture_id = img.texture_id(ctx);
+    // let texture_id = img.texture_id(ctx);
 
     egui::SidePanel::left("side_panel")
         .resizable(false)
@@ -400,6 +400,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
 
             //https://github.com/emilk/egui/blob/master/egui_demo_lib/src/apps/http_app.rs
             // ui.image(TextureId::default())
+
             ui.set_max_width(54f32);
             // ui.set_max_width(104f32);
 
@@ -407,11 +408,18 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 egui::Layout::top_down_justified(egui::Align::default()),
                 |ui| {
                     let scale = 2.0;
-                    let _size =
+                    let size =
                         egui::Vec2::new((img.size()[0] as f32 / scale) as f32, (img.size()[1] as f32 / scale) as f32);
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);
                     // ui.image(texture_id); //, size);
+                    let image = egui::Image::new(egui::include_image!("../resources/svg_rg_2_crop.png"));
+                    // image.load_for_size(ctx, size).expect("works");
+                    ui.add(
+                        image
+                        // egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
+                    );
+
                     ui.style_mut().override_text_style = Some(TextStyle::Heading);
 
                     ui.style_mut().spacing.item_spacing.y = 5f32;

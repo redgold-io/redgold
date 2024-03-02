@@ -101,12 +101,12 @@ pub fn genesis_transaction(
     } else {
         lower_distribution(network, words, seeds)
     };
-    genesis_tx_from(distribution)
+    genesis_tx_from(distribution, network)
 }
 
 
-pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>) -> Transaction {
-    let mut txb = TransactionBuilder::new();
+pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>, network: &NetworkEnvironment) -> Transaction {
+    let mut txb = TransactionBuilder::new(network);
     for d in distribution {
         txb.with_output(&d.address, &d.amount);
     }
