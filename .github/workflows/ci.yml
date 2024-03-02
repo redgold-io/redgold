@@ -237,6 +237,7 @@ jobs:
           uname -a
           ls -lA
           pwd
+          pacman -Syu --noconfirm
           pacman -S --noconfirm mingw-w64-x86_64-gmp
           pacman -S --noconfirm mingw-w64-x86_64-rust
           pacman -S --noconfirm mingw-w64-x86_64-openssl
