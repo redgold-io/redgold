@@ -16,22 +16,21 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   test:
-    if: false
-#      >
-#      (
-#        github.event_name == 'push' &&
-#        !contains('
-#          refs/heads/predev
-#          refs/heads/dev
-#          refs/heads/staging
-#          refs/heads/test
-#          refs/heads/main
-#        ', github.ref)
-#      ) ||
-#      (
-#        github.event_name == 'pull_request_target' &&
-#        github.event.pull_request.head.repo.full_name != github.repository
-#      )
+    if: >
+      (
+        github.event_name == 'push' && 
+        !contains('
+          refs/heads/predev
+          refs/heads/dev
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+        ', github.ref)
+      ) || 
+      (
+        github.event_name == 'pull_request_target' && 
+        github.event.pull_request.head.repo.full_name != github.repository
+      )
     runs-on: ubuntu-latest-m
     timeout-minutes: 60
     permissions:
@@ -162,49 +161,50 @@ jobs:
         with:
           name: redgold_linux
           path: ./redgold_linux
-  build-linux-windows:
-#    if: ${{ github.event_name != 'pull_request_target' && contains('
-#      refs/heads/predev
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref) }}
-    runs-on: ubuntu-latest-m
-    timeout-minutes: 100
-    permissions:
-      contents: write
-#    env:
-#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '14'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.TOOLCHAIN }}
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
-        # TODO: Update to use release plugin
-        #      - run: cargo install cargo-release
-        #      - run: cargo release # --execute --no-confirm --token ${{ secrets.GITHUB_TOKEN }}
-      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
-      - run: echo "Github branch = ${{ env.BRANCH }}"
-      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - run: echo "Testing version = ${{ env.VERSION }}"
-      - run: ./bin/install_build_deps.sh
-      - run: sudo apt update; sudo apt install -y mingw-w64 mingw-w64-tools
-      - run: rustup target add x86_64-pc-windows-gnu
-      - run: cargo build --target x86_64-pc-windows-gnu --release
-      - run: ls ./target/release -lA
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: redgold_win_cross
-          path: ./target/release/redgold.exe
+# Potential Alternative if the other build starts failing again, requires compiling lgmp from source for mingw64
+#  build-linux-windows:
+##    if: ${{ github.event_name != 'pull_request_target' && contains('
+##      refs/heads/predev
+##      refs/heads/dev
+##      refs/heads/staging
+##      refs/heads/test
+##      refs/heads/main
+##      ', github.ref) }}
+#    runs-on: ubuntu-latest-m
+#    timeout-minutes: 100
+#    permissions:
+#      contents: write
+##    env:
+##      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions/setup-node@v2
+#        with:
+#          node-version: '14'
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: ${{ env.TOOLCHAIN }}
+#      - uses: Swatinem/rust-cache@v1
+#        with:
+#          cache-on-failure: true
+#        # TODO: Update to use release plugin
+#        #      - run: cargo install cargo-release
+#        #      - run: cargo release # --execute --no-confirm --token ${{ secrets.GITHUB_TOKEN }}
+#      - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+#      - run: echo "Github branch = ${{ env.BRANCH }}"
+#      - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
+#      - run: echo "Testing version = ${{ env.VERSION }}"
+#      - run: ./bin/install_build_deps.sh
+#      - run: sudo apt update; sudo apt install -y mingw-w64 mingw-w64-tools
+#      - run: rustup target add x86_64-pc-windows-gnu
+#      - run: cargo build --target x86_64-pc-windows-gnu --release
+#      - run: ls ./target/release -lA
+#
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: redgold_win_cross
+#          path: ./target/release/redgold.exe
   build-linux-ubuntu-20:
     if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
@@ -235,14 +235,13 @@ jobs:
           name: redgold_linux_ubuntu20
           path: ./redgold_linux_ubuntu20
   build-windows:
-    #    needs: [test]
-#    if: ${{ github.event_name != 'pull_request_target' && contains('
-#      refs/heads/predev
-#      refs/heads/dev
-#      refs/heads/staging
-#      refs/heads/test
-#      refs/heads/main
-#      ', github.ref) }}
+    if: ${{ github.event_name != 'pull_request_target' && contains('
+      refs/heads/predev
+      refs/heads/dev
+      refs/heads/staging
+      refs/heads/test
+      refs/heads/main
+      ', github.ref) }}
     runs-on: windows-latest
     timeout-minutes: 100
     permissions:
@@ -268,6 +267,12 @@ jobs:
          Currently broken due to external change.
       - shell: msys2 {0}
         name: "Msys2 cargo build with upgrade"
+        if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
@@ -276,6 +281,12 @@ jobs:
           pacman -Sy --noconfirm mingw-w64-x86_64-toolchain || true
       - shell: msys2 {0}
         name: "Msys2 cargo build with dependencies"
+        if:
+          contains('
+          refs/heads/staging
+          refs/heads/test
+          refs/heads/main
+          ', github.ref)
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           uname -a
