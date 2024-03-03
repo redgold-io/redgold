@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest, NetworkEnvironment, ExternalTransactionId};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest, NetworkEnvironment, ExternalTransactionId, SupportedCurrency};
 use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, struct_metadata_new, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
@@ -572,9 +572,9 @@ impl CurrencyAmount {
             Err(ErrorInfo::error_info("Invalid transaction amount"))?
         }
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
-        Ok(CurrencyAmount{
-            amount
-        })
+        let mut a = CurrencyAmount::default();
+        a.amount = amount;
+        Ok(a)
     }
     pub fn to_fractional(&self) -> f64 {
         (self.amount as f64) / (DECIMAL_MULTIPLIER as f64)
@@ -584,10 +584,21 @@ impl CurrencyAmount {
         self.to_fractional() as i64
     }
     pub fn from(amount: i64) -> Self {
-        Self {
-            amount
-        }
+        let mut a = Self::default();
+        a.amount = amount;
+        a
     }
+    pub fn from_btc(amount: i64) -> Self {
+        let mut a = Self::from(amount);
+        a.currency = Some(SupportedCurrency::Bitcoin as i32);
+        a
+    }
+    pub fn from_rdg(amount: i64) -> Self {
+        let mut a = Self::from(amount);
+        a.currency = Some(SupportedCurrency::Redgold as i32);
+        a
+    }
+
     pub fn from_float_string(str: &String) -> Result<Self, ErrorInfo> {
         let amount = str.parse::<f64>()
             .error_info("Invalid transaction amount")?;

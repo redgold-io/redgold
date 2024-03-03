@@ -170,11 +170,10 @@ message TransportInfo {
   optional bool nat_restricted = 12;
 }
 
-message DepositAddress {
-  // Multi-sig / t-ECDSA address
-  Address address = 1;
-  // If present, the public key associated with the address coordinator, if empty, the address is
-  // coordinated by self.
+message PartyId {
+  // The t-ECDSA generated key used to derive Bitcoin, Ethereum, Redgold, etc. addresses.
+  PublicKey public_key = 1;
+  // Public key associated with the party initiator
   PublicKey owner = 2;
 }
 
@@ -197,7 +196,8 @@ message NodeMetadata {
   optional string node_name = 8;
   // Corresponding public key of the overall identity controlling this, and other nodes
   PeerId peer_id = 9;
-  repeated DepositAddress deposit_addresses = 10;
+  // Parties of participation. Used for multi-party computation and other multi-party operations.
+  repeated PartyId parties = 10;
 }
 
 /**
@@ -489,6 +489,10 @@ message TimeLockWindow {
 
 message CurrencyAmount {
   int64 amount = 1;
+  // Support for BigInts, used for multi-currency support
+  BytesData bytes = 2;
+  // The currency type associated with the amount, used for multi-currency support
+  optional SupportedCurrency currency = 3;
 }
 
 message TransactionData {
@@ -881,6 +885,10 @@ message GenesisRequest {
 
 }
 
+message GetPartiesInfoRequest {
+
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -911,6 +919,9 @@ message Request {
   Hash lookup_transaction_request = 27;
   RecentTransactionAndObservationRequest recent_transaction_and_observation_request = 28;
   GenesisRequest genesis_request = 29;
+  FaucetRequest faucet_request = 30;
+  GetPartiesInfoRequest get_parties_info_request = 31;
+  optional string origin = 32;
 }
 
 message HealthResponse {
@@ -955,6 +966,24 @@ message Response {
   Transaction lookup_transaction_response = 19;
   repeated TransactionAndObservations recent_transaction_and_observation_response = 20;
   Transaction genesis_response = 21;
+  FaucetResponse faucet_response = 22;
+  GetPartiesInfoResponse get_parties_info_response = 23;
+}
+
+message PartyMember {
+  PublicKey public_key = 1;
+  Weighting weight = 2;
+}
+
+message PartyInfo {
+  PartyId party_id = 1;
+  Weighting threshold = 2;
+  repeated PartyMember members = 3;
+  repeated CurrencyAmount balances = 4;
+}
+
+message GetPartiesInfoResponse {
+  repeated PartyInfo party_info = 1;
 }
 
 message QueryTransactionRequest {
@@ -1018,6 +1047,7 @@ enum AddressType {
   PUBLIC_KEY_DIRECT_ADDRESS = 4;
   UNKNOWN_ADDRESS_TYPE = 5;
   SCRIPT_HASH = 6;
+  Ethereum_External_String = 7;
 }
 
 message Address {
@@ -1036,6 +1066,7 @@ message QueryAddressesResponse {
 
 message FaucetRequest {
   Address address = 1;
+  optional string token = 2;
 }
 // Should this just be transactionInfo?
 message FaucetResponse {

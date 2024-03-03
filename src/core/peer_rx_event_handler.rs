@@ -17,7 +17,7 @@ use tokio::task::JoinHandle;
 use redgold_schema::{error_info, json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
 
 use crate::api::about;
 use crate::core::discovery::DiscoveryMessage;
@@ -34,6 +34,8 @@ use crate::schema::response_metadata;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::SameResult;
+use crate::api::faucet::faucet_request;
+use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::logging::Loggable;
 
 pub struct PeerRxEventHandler {
@@ -68,7 +70,6 @@ impl PeerRxEventHandler {
         }
 
         // Handle the request
-
         // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
         let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
             .map_err(|e| Response::from_error_info(e)).combine()
@@ -99,6 +100,24 @@ impl PeerRxEventHandler {
         let mut response = Response::empty_success();
 
         let auth_required = request.auth_required();
+
+        if let Some(fr) = &request.faucet_request {
+            response.faucet_response = Some(faucet_request(fr, &relay, request.origin.as_ref()).await?);
+        }
+
+        if let Some(_) = &request.get_parties_info_request {
+            let mut get_parties_info_response = GetPartiesInfoResponse::default();
+            let mut vec = vec![];
+            if let Some(c) = DepositWatcher::get_deposit_config(&relay.ds).await? {
+                for a in &c.deposit_allocations {
+                    if let Ok(pi) = a.party_info() {
+                        vec.push(pi)
+                    }
+                }
+            }
+            get_parties_info_response.party_info = vec;
+            response.get_parties_info_response = Some(get_parties_info_response);
+        }
 
         if let Some(r) = &request.lookup_transaction_request {
             let opt = relay.lookup_transaction(r).await?;

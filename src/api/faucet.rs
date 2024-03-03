@@ -1,10 +1,13 @@
 use std::collections::HashMap;
+use std::time::Duration;
 use itertools::Itertools;
 use log::info;
+use reqwest::ClientBuilder;
+use serde::{Deserialize, Serialize};
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{error_info, SafeOption};
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetResponse};
+use redgold_schema::{error_info, ErrorInfoContext, SafeOption};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::relay::Relay;
@@ -56,11 +59,18 @@ use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 //     Ok(FaucetResponse{ transaction_hash: None })
 // }
 
-pub async fn faucet_request(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
+pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origin: Option<&String>) -> Result<FaucetResponse, ErrorInfo> {
     if relay.node_config.network.is_main() {
         return Err(error_info("Faucet not supported on mainnet"))
     }
-    info!("Incoming faucet request on {}", address_input);
+    let option_token = faucet_request.token.clone();
+    let token = option_token.safe_get_msg("No recaptcha token found")?;
+    let origin = *origin.safe_get_msg("No origin found")?;
+    let faucet_addr = faucet_request.address.clone();
+    let addr = faucet_addr.safe_get_msg("No address found")?;
+
+
+    // info!("Incoming faucet request on {}", address_input);
     let node_config = relay.node_config.clone();
 
     let min_offset = 1;
@@ -99,14 +109,22 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         Err(error_info("No UTXOs found for faucet"))
     } else {
 
+        if !relay.check_rate_limit(origin)? {
+            return Err(error_info("Rate limit exceeded"));
+        }
+
+        let captcha = recaptcha_verify(token.clone(), None, Some(origin.clone())).await?;
+        if !captcha {
+            return Err(error_info("Recaptcha verification failed"));
+        }
+
         // TODO: We need to know this address is not currently in use -- i.e. local locker around
         // utxo in use.
         let utxo = utxos.get(0).safe_get()?.clone().clone();
-        let addr = Address::parse(&address_input)?;
         let mut builder = TransactionBuilder::new();
         let transaction = builder
             .with_utxo(&utxo.utxo_entry)?
-            .with_output(&addr, &CurrencyAmount::from_fractional(5 as f64)?)
+            .with_output(&addr, &CurrencyAmount::from_fractional(0.01f64)?)
             .with_message("faucet")?
             .build()?
             .sign(&utxo.key_pair)?;
@@ -118,5 +136,47 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         let mut faucet_response = FaucetResponse::default();
         faucet_response.submit_transaction_response = Some(r_err);
         Ok(faucet_response)
+    }
+}
+
+
+#[derive(Debug, Serialize)]
+struct RecaptchaRequestBody {
+    secret: String,
+    response: String,
+    remoteip: Option<String>, // Optional, include this only if you want to verify the user's IP
+}
+
+#[derive(Debug, Deserialize)]
+struct RecaptchaResponse {
+    success: bool,
+    // You can add more fields based on what you need from the response
+}
+
+pub async fn recaptcha_verify(token: String, secret: Option<String>, remoteip: Option<String>) -> Result<bool, ErrorInfo> {
+    let result = std::env::var("RECAPTCHA_SECRET").ok();
+    let secret = secret.or(result).ok_msg("No recaptcha secret found")?;
+    let client = ClientBuilder::new().timeout(Duration::from_secs(60)).build()
+        .map_err(|e| ErrorInfo::new(format!("Failed to build client for recaptcha verify: {}", e)))?;
+
+    let body = RecaptchaRequestBody {
+        secret,
+        response: token,
+        remoteip,
+    };
+
+    let response = client
+        .post("https://www.google.com/recaptcha/api/siteverify")
+        .form(&body)
+        .send()
+        .await
+        .map_err(|e| ErrorInfo::new(format!("Query request failed: {}", e)))?;
+
+    if response.status().is_success() {
+        let recaptcha_response = response.json::<RecaptchaResponse>().await
+            .map_err(|e| ErrorInfo::new(format!("Failed to parse response: {}", e)))?;
+        Ok(recaptcha_response.success)
+    } else {
+        Err(ErrorInfo::new(format!("Recaptcha verification failed with status: {}", response.status())))
     }
 }

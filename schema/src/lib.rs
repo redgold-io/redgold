@@ -52,6 +52,7 @@ pub mod transaction_info;
 pub mod exec;
 pub mod contract;
 pub mod local_stored_state;
+mod weighting;
 
 
 impl BytesData {
@@ -628,7 +629,10 @@ impl PeerMetadata {
 
 impl HashClear for Request {
     fn hash_clear(&mut self) {
+
         self.proof = None;
+        self.origin = None;
+
     }
 }
 

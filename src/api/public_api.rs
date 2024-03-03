@@ -154,6 +154,7 @@ impl PublicClient {
         let mut request = empty_public_request();
         request.faucet_request = Some(FaucetRequest {
             address: Some(t.clone()),
+            token: None
         });
         info!("Sending faucet request: {}", t.clone().render_string().expect("r"));
         let response = self.request(&request).await?.as_error()?;
@@ -342,12 +343,12 @@ async fn process_request_inner(request: PublicRequest, relay: Relay) -> Result<P
         response1.hash_search_response = Some(res);
     }
 
-    if let Some(f) = request.faucet_request {
-        if let Some(a) = f.address {
-            let fr = faucet_request(a.render_string()?, relay.clone()).await?;
-            response1.faucet_response = Some(fr);
-        }
-    }
+    // if let Some(f) = request.faucet_request {
+    //     if let Some(a) = f.address {
+    //         let fr = faucet_request(a.render_string()?, relay.clone()).await?;
+    //         response1.faucet_response = Some(fr);
+    //     }
+    // }
     Ok(response1)
 
     // info!("Public API response: {}", serde_json::to_string(&response1.clone()).unwrap());
@@ -405,23 +406,23 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             }
         });
 
-    let faucet_relay = relay.clone();
+    // let faucet_relay = relay.clone();
 
-    let faucet = warp::get()
-        .and(warp::path("faucet"))
-        .and(warp::path::param())
-        .and_then(move |address: String| {
-            let relay3 = faucet_relay.clone();
-            async move {
-                let res: Result<Json, warp::reject::Rejection> =
-                    Ok(faucet_request(address, relay3.clone()).await
-                        .map_err(|e| warp::reply::json(&e))
-                        .map(|r| warp::reply::json(&r))
-                        .combine()
-                    );
-                res
-            }
-        });
+    // let faucet = warp::get()
+    //     .and(warp::path("faucet"))
+    //     .and(warp::path::param())
+    //     .and_then(move |address: String| {
+    //         let relay3 = faucet_relay.clone();
+    //         async move {
+    //             let res: Result<Json, warp::reject::Rejection> =
+    //                 Ok(faucet_request(address, relay3.clone()).await
+    //                     .map_err(|e| warp::reply::json(&e))
+    //                     .map(|r| warp::reply::json(&r))
+    //                     .combine()
+    //                 );
+    //             res
+    //         }
+    //     });
     let qry_relay = relay.clone();
 
     let query_hash = warp::get()
@@ -643,7 +644,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .or(peer_id)
         .or(public)
         .or(transaction)
-        .or(faucet)
+        // .or(faucet)
         .or(query_hash)
         .or(about)
         .or(request_normal)
@@ -692,6 +693,11 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 pub struct Pagination {
     pub offset: Option<u32>,
     pub limit: Option<u32>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct TokenParam {
+    pub token: Option<String>,
 }
 
 pub fn start_server(relay: Relay

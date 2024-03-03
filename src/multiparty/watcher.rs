@@ -5,12 +5,13 @@ use itertools::Itertools;
 use log::{error, info};
 
 use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, LiquidityDeposit, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry};
+use redgold_schema::structs::{PartyId, Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, LiquidityDeposit, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, PartyInfo, Weighting};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::multiparty::initiate_mp;
 
 use serde::{Deserialize, Serialize};
+use redgold_data::data_store::DataStore;
 use redgold_keys::transaction_support::TransactionSupport;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
@@ -29,6 +30,7 @@ use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::RgArgs;
 use crate::util::current_time_millis_i64;
 
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {
     pub key: PublicKey,
@@ -36,6 +38,53 @@ pub struct DepositKeyAllocation {
     pub initiate: InitiateMultipartyKeygenRequest,
     pub balance_btc: u64,
     pub balance_rdg: u64,
+}
+
+impl DepositKeyAllocation {
+    pub fn is_self_initiated(&self, self_key: &PublicKey) -> RgResult<bool> {
+        let id = self.initiate.identifier.safe_get_msg("Missing identifier")?;
+        let head = id.party_keys.get(0);
+        let head_pk = head.safe_get_msg("Missing party keys")?;
+        Ok(head_pk == &self_key)
+    }
+
+    pub fn party_id(&self) -> RgResult<PartyId> {
+        let id = self.initiate.identifier.safe_get_msg("Missing identifier")?;
+        let head = id.party_keys.get(0);
+        let mut pid = PartyId::default();
+        pid.public_key = Some(self.key.clone());
+        pid.owner = head.cloned();
+        Ok(pid)
+    }
+
+    pub fn balances(&self) -> Vec<CurrencyAmount> {
+        vec![
+            CurrencyAmount::from_btc(self.balance_btc as i64),
+            CurrencyAmount::from_rdg(self.balance_btc as i64),
+            ]
+    }
+
+
+    pub fn party_info(&self) -> RgResult<PartyInfo> {
+        let ident = self.initiate.identifier.safe_get_msg("Missing identifier")?;
+        let id = self.party_id()?;
+        let size = ident.party_keys.len();
+        let mut pi = PartyInfo::default();
+        let w = Weighting::from_float((ident.threshold as f64) / (size as f64));
+        let mw = Weighting::from_float(1f64 / (size as f64));
+        pi.party_id = Some(id);
+        pi.threshold = Some(w);
+        pi.balances = self.balances();
+        pi.members = ident.party_keys.iter().map(|p| {
+            let mut pm = structs::PartyMember::default();
+            pm.public_key = Some(p.clone());
+            pm.weight = Some(mw.clone());
+            pm
+        }).collect_vec();
+        Ok(pi)
+    }
+
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -492,6 +541,10 @@ impl DepositWatcher {
             info!("No genesis funding possible to send");
         }
         Ok(())
+    }
+
+    pub async fn get_deposit_config(ds: &DataStore) -> Result<Option<DepositWatcherConfig>, ErrorInfo> {
+        ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await
     }
 }
 
@@ -1090,7 +1143,7 @@ impl IntervalFold for DepositWatcher {
         // }
 
 
-        let cfg = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
+        let cfg = Self::get_deposit_config(&ds).await?;
 
         //.ok.andthen?
         if let Some(mut cfg) = cfg {
@@ -1105,6 +1158,7 @@ impl IntervalFold for DepositWatcher {
             // Also check bitcoin transaction balances? Find the address they came from.
             // we'll need a guide saying to send from a single account
             if let Some(d) = cfg.deposit_allocations.get(0) {
+                self.relay.add_party_id(&d.party_id()?).await?;
                 // info!("Watcher checking deposit allocation pubkey hex: {}", d.key.hex()?);
                 if self.wallet.get(0).is_none() {
                     let key = &d.key;

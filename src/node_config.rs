@@ -1,7 +1,7 @@
 use std::fs;
 use std::hash::Hash;
 use redgold_data::data_store::DataStore;
-use crate::genesis;
+use crate::{genesis, util};
 use crate::schema::structs::{Block, NetworkEnvironment, Transaction};
 use redgold_schema::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::servers::Server;
 use redgold_schema::{ErrorInfoContext, RgResult, ShortString, structs};
-use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerId, PeerMetadata, Seed, TransportInfo, TrustData, VersionInfo};
+use redgold_schema::structs::{Address, DynamicNodeMetadata, ErrorInfo, NodeMetadata, NodeType, PeerId, PeerMetadata, PublicKey, Seed, TransportInfo, TrustData, VersionInfo};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
@@ -197,13 +197,26 @@ pub struct NodeConfig {
     pub observation: ObservationConfig,
     pub contract: ContractConfig,
     pub contention: ContentionConfig,
-    pub node_info: NodeInfoConfig
+    pub node_info: NodeInfoConfig,
+    pub(crate) default_timeout: Duration,
 }
 
 impl NodeConfig {
 
     pub fn seeds_at(&self, time: i64) -> Vec<Seed> {
         get_seeds_by_env_time(&self.network, time)
+    }
+
+    pub fn seeds_now(&self) -> Vec<Seed> {
+        get_seeds_by_env_time(&self.network, util::current_time_millis_i64())
+    }
+
+    pub fn seeds_now_pk(&self) -> Vec<Seed> {
+        self.seeds_now().iter().filter(|s| s.public_key.is_some()).cloned().collect()
+    }
+
+    pub fn is_seed(&self, pk: &PublicKey) -> bool {
+        self.seeds_now().iter().filter(|&s| s.public_key.as_ref() == Some(pk)).next().is_some()
     }
 
     pub fn seeds_pk(&self) -> Vec<structs::PublicKey> {
@@ -304,7 +317,7 @@ impl NodeConfig {
             partition_info: None,
             peer_id: Some(self.peer_id.clone()),
             node_name: None,
-            deposit_addresses: vec![],
+            parties: vec![],
         }
     }
 
@@ -498,6 +511,7 @@ impl NodeConfig {
             node_info: NodeInfoConfig::default(),
             contract: Default::default(),
             contention: Default::default(),
+            default_timeout: Duration::from_secs(60),
         }
     }
 

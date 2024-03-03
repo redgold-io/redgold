@@ -288,7 +288,7 @@ pub async fn setup_server_redgold(
      if let Some(a) = alias {
          env.insert("REDGOLD_ALIAS".to_string(), a);
      }
-    let copy_env = vec!["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
+    let copy_env = vec!["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "ETHERSCAN_API_KEY", "RECAPTCHA_SECRET"];
     for e in copy_env {
         for i in std::env::var(e).ok() {
             env.insert(e.to_string(), i);

@@ -3,6 +3,7 @@ use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchR
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
+use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 
 pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, offset: Option<i64>) -> Result<HashSearchResponse, ErrorInfo> {
@@ -17,9 +18,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
     let mut addr = None;
 
     // TODO: Move to unified parser function.
-    if let Ok(_a) = SingleKeyBitcoinWallet::parse_address(&hash_input) {
-        addr = Some(Address::from_bitcoin(&hash_input));
-    } else if let Ok(a) = Address::parse(hash_input.clone()) {
+    if let Ok(a) = hash_input.parse_address() {
         addr = Some(a);
     }
     if let Some(a) = addr {
