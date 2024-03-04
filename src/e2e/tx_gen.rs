@@ -74,13 +74,12 @@ impl TransactionGenerator {
     pub fn all_value_transaction(&mut self, prev: SpendableUTXO) -> TransactionWithKey {
         let kp = self.next_kp();
         let kp2 = kp.clone();
-        let tx = Transaction::new(
-            &prev.utxo_entry,
-            &kp.address(),
-            prev.utxo_entry.amount(),
-            &prev.key_pair.secret_key,
-            &prev.key_pair.public_key,
-        );
+
+        let tx = TransactionBuilder::new(&self.network)
+            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
+            .with_output(&kp.address_typed(), &CurrencyAmount::from(prev.utxo_entry.amount() as i64))
+            .build().expect("Failed to build transaction")
+            .sign(&prev.key_pair).expect("signed");
         TransactionWithKey {
             transaction: tx,
             key_pairs: vec![kp2],

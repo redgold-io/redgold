@@ -167,7 +167,7 @@ pub async fn balance_lookup(request: &BalanceCli, nc: &NodeConfig) -> Result<(),
 
 pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let response = p1.api_client().query_hash(p0.hash.clone()).await?;
-    println!("{}", json_pretty(&response)?);
+    println!("{}", json(&response)?);
     Ok(())
 }
 

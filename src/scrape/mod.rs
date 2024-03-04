@@ -72,6 +72,7 @@ pub async fn binance_trades_recent() -> RgResult<Vec<BinanceTradesResponse>> {
   }
 ]
  */
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BinanceAggTradesResponse {
     a: u64,
