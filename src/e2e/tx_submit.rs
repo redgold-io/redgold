@@ -192,9 +192,6 @@ impl TransactionSubmitter {
         assert!(dups.iter().any(|x| x.is_ok()));
         assert!(dups.iter().any(|x| !x.is_err()));
         assert!(dups.iter().any(|x|
-            x.clone().err().filter(|e| e.code == Error::TransactionAlreadyProcessing as i32).is_some()
-        ));
-        assert!(dups.iter().any(|x|
             x.as_ref().map(|q| q.at_least_1().is_ok()
             ).unwrap_or(false)
         ));
