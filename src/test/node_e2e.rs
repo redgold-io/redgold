@@ -368,7 +368,8 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let submit = TransactionSubmitter::default(client.clone(),
                                                // runtime.clone(),
-                                               spend_utxos
+                                               spend_utxos,
+        &NetworkEnvironment::Debug
     );
 
     submit.submit().await.expect("submit");

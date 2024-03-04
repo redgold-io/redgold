@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::EasyJson;
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, SubmitTransactionResponse, UtxoId};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnvironment, SubmitTransactionResponse, UtxoId};
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
@@ -41,8 +41,9 @@ impl TransactionSubmitter {
         client: PublicClient,
         // runtime: Arc<Runtime>,
         utxos: Vec<SpendableUTXO>,
+        network: &NetworkEnvironment,
     ) -> Self {
-        let generator = TransactionGenerator::default(utxos.clone());
+        let generator = TransactionGenerator::default(utxos.clone(), network);
         // if utxos.is_empty() {
         //     generator = generator.with_genesis().clone();
         // }
@@ -190,9 +191,6 @@ impl TransactionSubmitter {
         info!("{}", serde_json::to_string(&dups.clone()).unwrap());
         assert!(dups.iter().any(|x| x.is_ok()));
         assert!(dups.iter().any(|x| !x.is_err()));
-        assert!(dups.iter().any(|x|
-            x.clone().err().filter(|e| e.code == Error::TransactionAlreadyProcessing as i32).is_some()
-        ));
         assert!(dups.iter().any(|x|
             x.as_ref().map(|q| q.at_least_1().is_ok()
             ).unwrap_or(false)

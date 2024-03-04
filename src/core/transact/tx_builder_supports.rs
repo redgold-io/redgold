@@ -48,7 +48,7 @@ impl TransactionHelpBuildSupport for Transaction {
         // let fee = 0 as u64; //MIN_FEE_RAW;
         // amount_actual -= fee;
         let destination = Address::from_bytes(destination.clone()).unwrap();
-        let txb = TransactionBuilder::new()
+        let txb = TransactionBuilder::new(&NetworkEnvironment::Debug)
             .with_utxo(&source).expect("")
             .with_output(&destination, &amount)
             .build().expect("")
@@ -60,20 +60,22 @@ impl TransactionHelpBuildSupport for Transaction {
 
 
 pub trait TransactionBuilderSupport {
-    fn new() -> Self;
+    fn new(network: &NetworkEnvironment) -> Self;
 }
 
 impl TransactionBuilderSupport for TransactionBuilder {
-    fn new() -> Self {
+    fn new(network: &NetworkEnvironment) -> Self {
         let tx = Transaction::new_blank();
-        Self {
+        let mut s = Self {
             transaction: tx,
             utxos: vec![],
             used_utxos: vec![],
             ds: None,
             client: None,
-            network: None,
-        }
+            network: Some(network.clone()),
+        };
+        s.with_network(&network);
+        s
     }
 }
 

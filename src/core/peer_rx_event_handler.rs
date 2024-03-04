@@ -8,7 +8,7 @@ use futures::prelude::*;
 use itertools::Itertools;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use metrics::counter;
 // use svg::Node;
 use tokio::runtime::Runtime;
@@ -199,7 +199,7 @@ impl PeerRxEventHandler {
 
         if let Some(t) = request.gossip_transaction_request {
             if let Some(t) = t.transaction {
-                info!("Received gossip transaction request for {}", &t.hash_or().hex());
+                trace!("Received gossip transaction request for {}", &t.hash_or().hex());
                 relay.submit_transaction(SubmitTransactionRequest {
                     transaction: Some(t),
                     sync_query_response: false,

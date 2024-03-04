@@ -86,7 +86,7 @@ pub async fn send_test_rdg_btc_tx_withdrawal() {
             .utxo_entries.clone();
 
         let amount = CurrencyAmount::from_fractional(amount).expect("");
-        let tb = TransactionBuilder::new()
+        let tb = TransactionBuilder::new(&network)
             .with_network(&network)
             .with_utxos(&utxos).expect("utxos")
             .with_output(&amm_addr, &amount)

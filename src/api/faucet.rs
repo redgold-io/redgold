@@ -103,7 +103,7 @@ pub async fn faucet_request(address_input: String, relay: Relay) -> Result<Fauce
         // utxo in use.
         let utxo = utxos.get(0).safe_get()?.clone().clone();
         let addr = Address::parse(&address_input)?;
-        let mut builder = TransactionBuilder::new();
+        let mut builder = TransactionBuilder::new(&relay.node_config.network);
         let transaction = builder
             .with_utxo(&utxo.utxo_entry)?
             .with_output(&addr, &CurrencyAmount::from_fractional(5 as f64)?)

@@ -8,7 +8,7 @@ use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
+use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cmd::run_cmd;
@@ -340,7 +340,7 @@ async fn debug_sign_tx () {
         balance: 0,
         recent_transactions: vec![]
     };
-    let mut tb = TransactionBuilder::new();
+    let mut tb = TransactionBuilder::new(&NetworkEnvironment::Debug);
     tb.with_address_info(ai);
     let destination = address.clone();
     let amount = CurrencyAmount::from(5);

@@ -35,10 +35,24 @@ pub async fn attempt_start(nc: NodeConfig
     let bytes = resources.logo_bytes;
     let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
     let app = gui::ClientApp::from(ri, nc).await?;
-    let native_options = eframe::NativeOptions::default();
-    // native_options. = Some(egui::Vec2::new(1024., 632.));
+
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([800.0, 600.0])
+            .with_min_inner_size([800.0, 600.0])
+            .with_icon(
+                // NOE: Adding an icon is optional
+                eframe::icon_data::from_png_bytes(&include_bytes!("../resources/svg_rg_2_crop.png")[..])
+                    .unwrap(),
+            ),
+        ..Default::default()
+    };    // native_options. = Some(egui::Vec2::new(1024., 632.));
     // native_options.
-    
+    // .with_icon(
+    //                 // NOE: Adding an icon is optional
+    //                 eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
+    //                     .unwrap(),
+    //             ),
 
     // Doesn't seem to work?
     // native_options.icon_data = Some(load_icon());
@@ -46,6 +60,9 @@ pub async fn attempt_start(nc: NodeConfig
     eframe::run_native(
         "Redgold",
         native_options,
-        Box::new(|_cc| Box::<ClientApp>::new(app))
+        Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            Box::<ClientApp>::new(app)
+        })
     ).map_err(|e| error_info(format!("GUI failed to start: {}", e.to_string())))
 }

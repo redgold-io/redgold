@@ -74,9 +74,8 @@ impl IntervalFold for Mempool {
             .collect_vec();
         for message in messages {
             let h = message.transaction.hash_or();
-            let in_process = self.relay.transaction_channels.contains_key(&h);
-            let known = self.relay.ds.transaction_store.query_maybe_transaction(&h).await?.is_some();
-            if in_process || known {
+            let is_known = self.relay.transaction_known(&h).await?;
+            if is_known {
                 if let Some(r) = message.response_channel {
                     r.send_err(Response::from_error_info(error_info("Transaction already in process or known")))?;
                 }
