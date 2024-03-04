@@ -107,6 +107,7 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
         Err(error_info("No UTXOs found for faucet"))
     } else {
 
+        let mut amount = 5.0f64;
         if relay.node_config.network.is_main_stage_network() {
             let origin = *origin.safe_get_msg("No origin found")?;
             if !relay.check_rate_limit(origin)? {
@@ -117,6 +118,7 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
             if !captcha {
                 return Err(error_info("Recaptcha verification failed"));
             }
+            amount = 0.05f64;
         }
 
         // TODO: We need to know this address is not currently in use -- i.e. local locker around
@@ -125,7 +127,7 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
         let mut builder = TransactionBuilder::new();
         let transaction = builder
             .with_utxo(&utxo.utxo_entry)?
-            .with_output(&addr, &CurrencyAmount::from_fractional(0.01f64)?)
+            .with_output(&addr, &CurrencyAmount::from_fractional(amount)?)
             .with_message("faucet")?
             .build()?
             .sign(&utxo.key_pair)?;
