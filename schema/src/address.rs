@@ -22,6 +22,7 @@ impl Into<Address> for Vec<u8> {
 
 impl Address {
     pub fn parse<S: Into<String>>(addr: S) -> Result<Address, ErrorInfo> {
+
         let s = addr.into();
 
         Self::from_hex(s)
@@ -57,6 +58,13 @@ impl Address {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::BitcoinExternalString as i32,
             currency: Some(SupportedCurrency::Bitcoin as i32),
+        }
+    }
+    pub fn from_eth(address: &String) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: AddressType::EthereumExternalString as i32,
+            currency: Some(SupportedCurrency::Ethereum as i32),
         }
     }
 

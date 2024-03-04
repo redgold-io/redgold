@@ -5,24 +5,29 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::convert::identity;
 use std::hash::Hash;
+use std::net::SocketAddr;
+use std::time::Duration;
 use eframe::egui::accesskit::Role::Math;
+use futures::TryFutureExt;
 use itertools::Itertools;
 use log::info;
 use rocket::form::FromForm;
-use redgold_schema::{EasyJson, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_info, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
 use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Serialize, Deserialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, ErrorInfo, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, Transaction, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use tokio::time::Instant;
 use warp::get;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
-use crate::api::public_api::Pagination;
-use crate::multiparty::watcher::{BidAsk, DepositWatcherConfig};
+use crate::api::public_api::{Pagination, TokenParam};
+use crate::multiparty::watcher::{BidAsk, DepositWatcher, DepositWatcherConfig};
 use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
+use redgold_keys::address_support::AddressSupport;
+use crate::api::faucet::faucet_request;
 use crate::observability::logging::Loggable;
 use crate::util::current_time_millis_i64;
 
@@ -212,6 +217,12 @@ pub struct ExplorerHashSearchResponse {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct ExplorerFaucetResponse {
+    pub transaction_hash: Option<String>,
+}
+
+
+#[derive(Serialize, Deserialize)]
 pub struct RecentDashboardResponse {
     pub recent_transactions: Vec<BriefTransaction>,
     total_accepted_transactions: i64,
@@ -394,6 +405,142 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay, skip_recent_observat
         recent_observations: obs,
     })
 }
+
+pub async fn handle_explorer_faucet(hash_input: String, r: Relay, token: TokenParam, origin: Option<String>) -> RgResult<ExplorerFaucetResponse> {
+    let res = async { hash_input.parse_address() }.and_then(|a| {
+        let mut req = Request::default();
+        req.origin = origin;
+        let mut fr = FaucetRequest::default();
+        fr.address = Some(a);
+        fr.token = token.token;
+        req.faucet_request = Some(fr);
+        r.receive_request_send_internal(req, None)
+    }).await?;
+    res.as_error_info()?;
+    let fr: &FaucetResponse = res.faucet_response.safe_get_msg("Missing faucet response")?;
+    let submit = fr.submit_transaction_response.safe_get_msg("Missing submit transaction response")?;
+    let h = submit.transaction_hash.safe_get_msg("Missing transaction hash")?.hex();
+    Ok(ExplorerFaucetResponse{
+        transaction_hash: Some(h),
+    })
+}
+
+
+
+#[derive(Serialize, Deserialize)]
+pub struct ExplorerPoolsResponse {
+    pub pools: Vec<ExplorerPoolInfoResponse>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PoolMember {
+    pub peer_id: String,
+    pub public_key: String,
+    pub share_fraction: f64,
+    pub deposit_rating: f64,
+    pub security_rating: f64,
+    pub pool_stake_usd: Option<f64>,
+    pub weighted_overall_stake_rating: Option<f64>,
+    pub is_seed: bool
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExplorerPoolInfoResponse {
+    pub public_key: String,
+    pub owner: String,
+    pub balance_btc: f64,
+    pub balance_rdg: f64,
+    pub balance_eth: f64,
+    pub members: Vec<PoolMember>,
+    pub threshold: f64,
+}
+
+
+async fn render_pool_member(relay: &Relay, member: &PublicKey, party_len: usize) -> RgResult<PoolMember> {
+    Ok(PoolMember {
+        peer_id: relay.ds.peer_store.peer_id_for_node_pk(member).await?.map(|p| p.hex_or()).unwrap_or("".to_string()),
+        public_key: member.hex_or(),
+        share_fraction: 1f64/(party_len as f64),
+        deposit_rating: 10.0,
+        security_rating: 10.0,
+        pool_stake_usd: None,
+        weighted_overall_stake_rating: None,
+        is_seed: relay.is_seed(member).await,
+    })
+}
+
+
+async fn convert_party_info(relay: &Relay, pi: &PartyInfo) -> RgResult<ExplorerPoolInfoResponse> {
+    if let Some(pid) = pi.party_id.as_ref() {
+        if let Some(pk) = pid.public_key.as_ref() {
+            if let Some(owner) = pid.owner.as_ref() {
+                if let Some(thresh) = pi.threshold.as_ref() {
+                    let thresh = thresh.to_float();
+                    let num_members = pi.members.len();
+                    let mut members = vec![];
+                    for member in &pi.members {
+                        if let Some(member_pk) = &member.public_key {
+                            if let Some(weight) = &member.weight {
+                                let member = render_pool_member(&relay, &member_pk, num_members).await?;
+                                members.push(member);
+                            }
+                        }
+                    }
+                    let balance_btc = pi.balances.iter().filter(|b| b.currency == Some(SupportedCurrency::Bitcoin as i32)).next()
+                        .map(|b| b.amount).unwrap_or(0);
+
+                    let balance_rdg = pi.balances.iter().filter(|b| b.currency == Some(SupportedCurrency::Redgold as i32)).next()
+                        .map(|b| b.amount).unwrap_or(0);
+
+                    return Ok(ExplorerPoolInfoResponse {
+                        public_key: pk.hex_or(),
+                        owner: owner.hex_or(),
+                        balance_btc: (balance_btc as f64) / 1e8,
+                        balance_rdg: (balance_rdg as f64) / 1e8,
+                        balance_eth: 0.0,
+                        members,
+                        threshold: thresh
+                    })
+                }
+            }
+        }
+    }
+    Err(error_info("Missing party info"))
+
+}
+async fn handle_explorer_pool(relay: Relay) -> RgResult<ExplorerPoolsResponse> {
+    let mut pools = vec![];
+    if let Some(dw) = DepositWatcher::get_deposit_config(&relay.ds).await? {
+        let opt = dw.deposit_allocations.get(0);
+        if let Some(dk) = opt {
+           if let Ok(pi) = dk.party_info() {
+               let res = convert_party_info(&relay, &pi).await?;
+                pools.push(res);
+           }
+        }
+    };
+    let mut req = Request::default();
+    req.get_parties_info_request = Some(Default::default());
+    let nodes = relay.ds.peer_store.active_nodes(None).await?;
+    let res = relay.broadcast_async(nodes, req, Some(Duration::from_secs(5))).await?;
+    for r in res {
+        if let Ok(res) = r {
+            if let Some(pi) = res.get_parties_info_response {
+                for pi in pi.party_info {
+                    if let Ok(res) = convert_party_info(&relay, &pi).await {
+                        pools.push(res);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ExplorerPoolsResponse{
+        pools,
+    })
+}
+
+
 
 pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagination) -> RgResult<ExplorerHashSearchResponse> {
     // TODO: Math min

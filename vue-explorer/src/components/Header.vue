@@ -15,6 +15,12 @@
         <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
           Discord
         </a>
+        <a class="navbar-brand brand" href="/pools">
+          Pools
+        </a>
+        <a class="navbar-brand brand" href="/faucet">
+          Faucet
+        </a>
 
         <div class="navbar-right-links">
           <a class="navbar-brand brand" href="https://dev.explorer.redgold.io">

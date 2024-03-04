@@ -52,6 +52,7 @@ pub mod transaction_info;
 pub mod exec;
 pub mod contract;
 pub mod local_stored_state;
+mod weighting;
 
 
 impl BytesData {
@@ -628,7 +629,10 @@ impl PeerMetadata {
 
 impl HashClear for Request {
     fn hash_clear(&mut self) {
+
         self.proof = None;
+        self.origin = None;
+
     }
 }
 
@@ -693,6 +697,7 @@ impl NetworkEnvironment {
         vec![
             NetworkEnvironment::Main,
             NetworkEnvironment::Test,
+            NetworkEnvironment::Staging,
             NetworkEnvironment::Dev,
             NetworkEnvironment::Predev,
         ]
@@ -712,6 +717,10 @@ impl NetworkEnvironment {
         vec![
             NetworkEnvironment::Debug, NetworkEnvironment::Local
         ].contains(self)
+    }
+
+    pub fn is_main_stage_network(&self) -> bool {
+        Self::status_networks().contains(self)
     }
 
     pub fn is_all(&self) -> bool {

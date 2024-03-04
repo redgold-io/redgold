@@ -14,6 +14,7 @@ pub mod debug;
 pub mod xpub_wrapper;
 pub mod address_external;
 pub mod eth;
+pub mod address_support;
 
 
 pub struct TestConstants {

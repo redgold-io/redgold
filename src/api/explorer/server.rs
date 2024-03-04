@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use futures::TryFutureExt;
+use itertools::Itertools;
 use log::info;
 use tokio::task::JoinHandle;
 use warp::Filter;
-use redgold_schema::structs::ErrorInfo;
+use redgold_keys::address_support::AddressSupport;
+use redgold_schema::structs::{Address, ErrorInfo, FaucetRequest, Request};
 use crate::api::{as_warp_json_response, explorer};
-use crate::api::public_api::Pagination;
+use crate::api::explorer::{handle_explorer_faucet, handle_explorer_pool};
+use crate::api::public_api::{TokenParam, Pagination};
 use crate::core::relay::Relay;
 
 
@@ -16,6 +20,30 @@ pub fn start_server(relay: Relay) -> JoinHandle<Result<(), ErrorInfo>> {
     return handle;
 }
 
+pub fn extract_ip() -> impl Filter<Extract = (Option<String>,), Error = warp::Rejection> + Copy {
+    warp::header::optional("X-Real-IP")
+        .or(warp::header::optional("X-Forwarded-For"))
+        .unify()
+}
+
+pub fn allowed_proxy_origins() -> Vec<String> {
+    vec![
+        "209.159.152.2"
+    ].iter().map(|x| x.to_string()).collect_vec()
+}
+
+pub fn process_origin(socket: Option<SocketAddr>, remote: Option<String>) -> Option<String> {
+    if let Some(socket) = socket {
+        let socket_ip = socket.ip().to_string();
+        if allowed_proxy_origins().contains(&socket_ip) {
+            remote
+        } else {
+            Some(socket_ip)
+        }
+    } else {
+        None
+    }
+}
 
 pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     let relay2 = relay.clone();
@@ -36,6 +64,37 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             let relay3 = explorer_relay.clone();
             async move {
                 as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone(), pagination).await)
+            }
+        }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+
+    let explorer_relay3 = relay.clone();
+    let explorer_faucet = warp::get()
+        .and(warp::path("explorer"))
+        .and(warp::path("faucet"))
+        .and(warp::path::param())
+        .and(warp::query::<TokenParam>())
+        .and(warp::addr::remote())
+        .and(extract_ip())
+        .and_then(move |address: String, pagination: TokenParam, remote: Option<SocketAddr>, ip_header: Option<String>| {
+            let relay3 = explorer_relay3.clone();
+            let origin = process_origin(remote, ip_header);
+            async move {
+                as_warp_json_response(
+                    handle_explorer_faucet(address, relay3, pagination, origin).await
+                )
+            }
+        }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
+
+    let explorer_relay4 = relay.clone();
+    let explorer_pools = warp::get()
+        .and(warp::path("explorer"))
+        .and(warp::path("pools"))
+        .and_then(move || {
+            let relay3 = explorer_relay4.clone();
+            async move {
+                as_warp_json_response(
+                    handle_explorer_pool(relay3).await
+                )
             }
         }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
@@ -92,6 +151,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 
     let routes = explorer_hash
         .or(explorer_swap)
+        .or(explorer_faucet)
+        .or(explorer_pools)
         .or(explorer_recent)
         .or(home);
 

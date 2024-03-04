@@ -9,12 +9,16 @@ import App from './App.vue'
 import Dashboard from './components/DashboardScreen.vue'
 // import Header from './components/Header.vue'
 import HashDetails from "./components/HashDetails.vue";
-import store from './store'; // Assuming store.js is in the root directory alongside main.js
+import store from './store';
+import FaucetRequest from "@/components/FaucetRequest.vue";
+import PoolParties from "@/components/PoolParties.vue"; // Assuming store.js is in the root directory alongside main.js
 
 // Define routes
 const routes = [
     { path: '/hash/:param', component: HashDetails },
     { path: '/', component: Dashboard},
+    { path: '/faucet', component: FaucetRequest},
+    { path: '/pools', component: PoolParties},
 ]
 
 // Create router

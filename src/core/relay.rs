@@ -2,10 +2,10 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::core::internal_message;
-use crate::core::internal_message::Channel;
+use crate::core::internal_message::{Channel, new_channel};
 use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
@@ -19,7 +19,7 @@ use log::info;
 use tokio::runtime::Runtime;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, DepositAddress};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discovery::DiscoveryMessage;
 
@@ -130,6 +130,7 @@ pub struct Relay {
     pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
     pub unknown_resolved_inputs: Channel<ResolvedInput>,
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
+    pub faucet_rate_limiter: Arc<Mutex<HashMap<String, Instant>>>
 
 }
 
@@ -140,6 +141,31 @@ impl Relay {
 }
 
 impl Relay {
+
+    pub fn check_rate_limit(&self, ip: &String) -> RgResult<bool> {
+        let mut l = self.faucet_rate_limiter.lock()
+            .map_err(|e| error_info(format!("Failed to lock faucet_rate_limiter {}", e.to_string())))?;
+        if l.len() > 1_000_000 {
+            Err(error_info("Faucet rate limiter has exceeded 1 million entries, this is a problem"))?;
+        }
+        let now = Instant::now();
+        match l.get(ip) {
+            None => {
+                l.insert(ip.clone(), now);
+                Ok(true)
+            }
+            Some(v) => {
+                let greater_than_a_day = now.duration_since(v.clone()).as_secs() > (3600*24);
+                if greater_than_a_day {
+                    l.insert(ip.clone(), now);
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+        }
+    }
+
     pub async fn transaction_known(&self, hash: &Hash) -> RgResult<bool> {
         if self.mempool_entries.contains_key(hash) {
             return Ok(true);
@@ -414,14 +440,15 @@ impl Relay {
         Ok(())
     }
 
-    pub async fn add_deposit_address(&self, d: &DepositAddress) -> RgResult<()> {
+    pub async fn add_party_id(&self, d: &PartyId) -> RgResult<()> {
         let mut nmd = self.node_metadata().await?;
-        let mut addrs = nmd.deposit_addresses.iter()
-            .filter(|d2| d2.address != d.address)
-            .map(|d| d.clone())
-            .collect_vec();
-        addrs.push(d.clone());
-        nmd.deposit_addresses = addrs;
+        let contains = nmd.parties.iter()
+            .filter(|d2| d2.public_key == d.public_key)
+            .next().is_some();
+        if contains {
+            return Ok(());
+        }
+        nmd.parties.push(d.clone());
         self.update_node_metadata(&nmd).await
     }
 
@@ -538,9 +565,8 @@ impl Relay {
         Ok(res)
     }
 
-    pub async fn receive_message_sync(&self, request: Request, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
-        // let key = request.verify_auth()?;
-        let timeout = timeout.unwrap_or(Duration::from_secs(120));
+    pub async fn receive_request_send_internal(&self, request: Request, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
+        let timeout = timeout.unwrap_or(self.node_config.default_timeout.clone());
         let (s, r) = flume::bounded::<Response>(1);
         let key = request.proof.clone().and_then(|p| p.public_key);
         let mut pm = PeerMessage::empty();
@@ -837,6 +863,7 @@ impl Relay {
             predicted_trust_overall_rating_score: Arc::new(Mutex::new(Default::default())),
             unknown_resolved_inputs: internal_message::new_channel(),
             mempool_entries: Arc::new(Default::default()),
+            faucet_rate_limiter: Arc::new(Mutex::new(Default::default())),
         }
     }
 }

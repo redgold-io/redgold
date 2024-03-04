@@ -83,6 +83,11 @@ impl EthHistoricalClient {
             .and_then(|v| v.to_i64().ok_or(error_info("BigInt translation to i64 failure")))
     }
 
+    pub fn parse_address(value: &String) -> RgResult<structs::Address> {
+        let addr: Address = value.parse().error_info("address parse failure")?;
+        Ok(structs::Address::from_eth(value))
+    }
+
     // Workaround for dealing with u64's etc, drop from e18 precision to e8 precision
     fn bigint_offset() -> BigInt {
         BigInt::from(10_u64.pow(10))
