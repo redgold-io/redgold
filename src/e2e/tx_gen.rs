@@ -5,7 +5,7 @@ use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, TestContractRequest};
+use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, NetworkEnvironment, TestContractRequest};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::{TransactionBuilderSupport, TransactionHelpBuildSupport};
@@ -32,6 +32,7 @@ pub struct TransactionGenerator {
     min_offset: usize,
     max_offset: usize,
     pub wallet: WordsPass, // default_client: Option<PublicClient>
+    network: NetworkEnvironment,
 }
 
 impl TransactionGenerator {
@@ -49,14 +50,15 @@ impl TransactionGenerator {
         }
         self.clone()
     }
-    pub fn default(utxos: Vec<SpendableUTXO>) -> Self {
+    pub fn default(utxos: Vec<SpendableUTXO>, network: &NetworkEnvironment) -> Self {
         Self {
             finished_pool: utxos,
             pending_pool: vec![],
             offset: 1,
             min_offset: 1,
             max_offset: 49,
-            wallet: TestConstants::new().words_pass
+            wallet: TestConstants::new().words_pass,
+            network: network.clone()
         }
     }
 
@@ -72,13 +74,12 @@ impl TransactionGenerator {
     pub fn all_value_transaction(&mut self, prev: SpendableUTXO) -> TransactionWithKey {
         let kp = self.next_kp();
         let kp2 = kp.clone();
-        let tx = Transaction::new(
-            &prev.utxo_entry,
-            &kp.address(),
-            prev.utxo_entry.amount(),
-            &prev.key_pair.secret_key,
-            &prev.key_pair.public_key,
-        );
+
+        let tx = TransactionBuilder::new(&self.network)
+            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
+            .with_output(&kp.address_typed(), &CurrencyAmount::from(prev.utxo_entry.amount() as i64))
+            .build().expect("Failed to build transaction")
+            .sign(&prev.key_pair).expect("signed");
         TransactionWithKey {
             transaction: tx,
             key_pairs: vec![kp2],
@@ -89,7 +90,7 @@ impl TransactionGenerator {
     pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
         let prev = self.finished_pool.pop().safe_get()?.clone();
         let bytes = tokio::fs::read("./sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
-        let mut tb = TransactionBuilder::new();
+        let mut tb = TransactionBuilder::new(&self.network);
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
         let a = x.opt_amount().expect("a");
@@ -109,7 +110,7 @@ impl TransactionGenerator {
 
     pub async fn generate_deploy_test_contract_request(&mut self, address: Address) -> RgResult<TransactionWithKey> {
         let prev = self.finished_pool.pop().safe_get()?.clone();
-        let mut tb = TransactionBuilder::new();
+        let mut tb = TransactionBuilder::new(&self.network);
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
         let a = x.opt_amount().expect("a");
@@ -167,7 +168,7 @@ impl TransactionGenerator {
     pub fn drain_tx(&mut self, addr: &Address) -> Transaction {
         let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
         // TODO: Fee?
-        let txb = TransactionBuilder::new()
+        let txb = TransactionBuilder::new(&self.network)
             .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
             .with_output(addr, &CurrencyAmount::from( prev.utxo_entry.amount() as i64))
             .build().expect("Failed to build transaction")
@@ -213,7 +214,7 @@ impl TransactionGenerator {
 #[test]
 fn verify_signature() {
     let _tc = TestConstants::new();
-    let mut tx_gen = TransactionGenerator::default(vec![]).with_genesis();
+    let mut tx_gen = TransactionGenerator::default(vec![], &NetworkEnvironment::Debug).with_genesis();
     let tx = tx_gen.generate_simple_tx().expect("");
     let transaction = create_test_genesis_transaction();
     let vec1 = transaction.to_utxo_entries(0);

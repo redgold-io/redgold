@@ -107,6 +107,17 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn validate_network(&self, network: &NetworkEnvironment) -> RgResult<()> {
+        let opts = self.options()?;
+        let net = opts.network_type.safe_get_msg("Missing network type")?;
+        let net = NetworkEnvironment::from_i32(net.clone());
+        let net = net.safe_get_msg("Invalid network type")?;
+        if net != network {
+            Err(ErrorInfo::error_info("Invalid network type"))?
+        }
+        Ok(())
+    }
+
     pub fn new_blank() -> Self {
         let mut rng = rand::thread_rng();
         let mut tx = Self::default();

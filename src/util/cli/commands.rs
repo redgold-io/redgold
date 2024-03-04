@@ -136,7 +136,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let kp = option.safe_get_msg("keypair")?.clone().clone();
 
     let utxo = utxos.get(0).expect("first").clone();
-    let b = TransactionBuilder::new()
+    let b = TransactionBuilder::new(&p1.network)
         .with_utxo(&utxo)?
         .with_output(&destination, &CurrencyAmount::from_fractional(p0.amount)?)
         .build()?
@@ -167,7 +167,7 @@ pub async fn balance_lookup(request: &BalanceCli, nc: &NodeConfig) -> Result<(),
 
 pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let response = p1.api_client().query_hash(p0.hash.clone()).await?;
-    println!("{}", json_pretty(&response)?);
+    println!("{}", json(&response)?);
     Ok(())
 }
 
@@ -397,9 +397,8 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
         return Err(error_info("Cannot test transaction on mainnet unsupported".to_string()));
     }
     let client = p1.api_client();
-    let tx_submit = TransactionSubmitter::default(client.clone(),
-                                                      // arc.clone(),
-                                                      vec![]
+    let tx_submit = TransactionSubmitter::default(
+        client.clone(), vec![], &p1.network,
     );
     let faucet_tx = tx_submit.with_faucet().await?;
     // info!("Faucet response: {}", faucet_tx.json_or());

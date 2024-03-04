@@ -29,7 +29,7 @@ async fn local_e2e_it() -> Result<(), ErrorInfo> {
     assert_eq!(pc.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc2.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc3.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
-    let tx_sub = TransactionSubmitter::default(pc, vec![]);
+    let tx_sub = TransactionSubmitter::default(pc, vec![], &NetworkEnvironment::Local);
     tx_sub.with_faucet().await.expect("");
 
     let res = tx_sub.submit().await.expect("");

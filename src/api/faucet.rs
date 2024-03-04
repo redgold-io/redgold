@@ -124,7 +124,7 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
         // TODO: We need to know this address is not currently in use -- i.e. local locker around
         // utxo in use.
         let utxo = utxos.get(0).safe_get()?.clone().clone();
-        let mut builder = TransactionBuilder::new();
+        let mut builder = TransactionBuilder::new(&relay.node_config.network);
         let transaction = builder
             .with_utxo(&utxo.utxo_entry)?
             .with_output(&addr, &CurrencyAmount::from_fractional(amount)?)

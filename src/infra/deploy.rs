@@ -514,7 +514,7 @@ pub async fn derive_mnemonic_and_peer_id(
             net.clone()
         );
         peer_data.labels = trust.clone();
-        let mut tb = TransactionBuilder::new();
+        let mut tb = TransactionBuilder::new(&node_config.network);
         let address = pkey.address().expect("a");
         tb.with_output_peer_data(&address, peer_data, 0);
         tb.with_genesis_input(&address);

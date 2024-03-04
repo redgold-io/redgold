@@ -17,7 +17,6 @@ pub trait TransactionSupport {
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
     fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo>;
-    fn validate(&self) -> RgResult<()>;
     fn prevalidate(&self) -> Result<(), ErrorInfo>;
 
     fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool;
@@ -94,16 +93,23 @@ impl TransactionSupport for Transaction {
         )?)
     }
 
-
-    fn validate(&self) -> RgResult<()> {
-        self.prevalidate()?;
-        for i in &self.inputs {
-            i.verify(&self.signable_hash())?;
-        }
-        Ok(())
-    }
-
     fn prevalidate(&self) -> RgResult<()> {
+
+        let size_bytes = self.proto_serialize().len();
+        if size_bytes > 10_000 {
+            let mut info = error_info(format!("Transaction size: {} too large, expected {}", size_bytes, 10_000));
+            info.with_detail("size_bytes", size_bytes.to_string());
+            Err(info)?;
+        }
+
+        let options = self.options.safe_get_msg("Missing options on transaction")?;
+        let network_i32 = options.network_type.safe_get_msg("Missing network type on transaction")?;
+        let network = NetworkEnvironment::from_i32(network_i32.clone())
+            .ok_msg("Invalid network type on transaction")?;
+
+        if options.contract.is_some() && network.is_main() {
+            Err(error_info("Contract transactions not yet supported"))?
+        }
 
         let mut hs: HashSet<UtxoId> = HashSet::new();
         for i in &self.inputs {
@@ -137,20 +143,12 @@ impl TransactionSupport for Transaction {
                 }
             }
         }
-
-        // if self.fee < MIN_FEE_RAW {
-        //     return Err(RGError::InsufficientFee);
-        // }
         for input in self.inputs.iter() {
             if let Some(utxo) = input.utxo_id.as_ref() {
                 if utxo.output_index > (MAX_INPUTS_OUTPUTS as i64) {
                     Err(error_code(structs::Error::InvalidAddressInputIndex))?;
                 }
             }
-            // if input.transaction_hash.len() != 32 {
-            //     // println!("transaction id len : {:?}", input.id.len());
-            //     error_code(RGError::InvalidHashLength);
-            // }
             if input.proof.is_empty() {
                 let floating_non_consume_input = input.utxo_id.is_none() && input.floating_utxo_id.is_some();
                 if !floating_non_consume_input {

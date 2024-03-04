@@ -169,7 +169,7 @@ impl LiveE2E {
             return Ok(None);
         }
         let u = utxo.safe_get_msg("No utxo in e2e")?;
-        let mut tx_b = TransactionBuilder::new();
+        let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
         let destination = addresses.iter()
             .find(|a| u.key_pair.address_typed() != a.clone().clone())
             .safe_get_msg("No destination address")?.clone().clone();
