@@ -20,7 +20,7 @@ pub fn start_server(relay: Relay) -> JoinHandle<Result<(), ErrorInfo>> {
     return handle;
 }
 
-fn extract_ip() -> impl Filter<Extract = (Option<String>,), Error = warp::Rejection> + Copy {
+pub fn extract_ip() -> impl Filter<Extract = (Option<String>,), Error = warp::Rejection> + Copy {
     warp::header::optional("X-Real-IP")
         .or(warp::header::optional("X-Forwarded-For"))
         .unify()
@@ -32,7 +32,7 @@ pub fn allowed_proxy_origins() -> Vec<String> {
     ].iter().map(|x| x.to_string()).collect_vec()
 }
 
-fn process_origin(socket: Option<SocketAddr>, remote: Option<String>) -> Option<String> {
+pub fn process_origin(socket: Option<SocketAddr>, remote: Option<String>) -> Option<String> {
     if let Some(socket) = socket {
         let socket_ip = socket.ip().to_string();
         if allowed_proxy_origins().contains(&socket_ip) {

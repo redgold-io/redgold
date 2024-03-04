@@ -414,7 +414,7 @@ pub async fn handle_explorer_faucet(hash_input: String, r: Relay, token: TokenPa
         fr.address = Some(a);
         fr.token = token.token;
         req.faucet_request = Some(fr);
-        r.receive_request_internal(req, None)
+        r.receive_request_send_internal(req, None)
     }).await?;
     res.as_error_info()?;
     let fr: &FaucetResponse = res.faucet_response.safe_get_msg("Missing faucet response")?;

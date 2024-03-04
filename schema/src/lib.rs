@@ -697,6 +697,7 @@ impl NetworkEnvironment {
         vec![
             NetworkEnvironment::Main,
             NetworkEnvironment::Test,
+            NetworkEnvironment::Staging,
             NetworkEnvironment::Dev,
             NetworkEnvironment::Predev,
         ]
@@ -716,6 +717,10 @@ impl NetworkEnvironment {
         vec![
             NetworkEnvironment::Debug, NetworkEnvironment::Local
         ].contains(self)
+    }
+
+    pub fn is_main_stage_network(&self) -> bool {
+        Self::status_networks().contains(self)
     }
 
     pub fn is_all(&self) -> bool {

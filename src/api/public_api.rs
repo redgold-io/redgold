@@ -7,6 +7,7 @@ use futures::TryFutureExt;
 
 use itertools::Itertools;
 use log::{debug, error, info};
+use metrics::counter;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use reqwest::ClientBuilder;
@@ -41,6 +42,7 @@ use crate::api::hash_query::hash_query;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
+use crate::api::explorer::server::{extract_ip, process_origin};
 use crate::util::runtimes::build_runtime;
 
 // https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
@@ -151,16 +153,17 @@ impl PublicClient {
         &self,
         t: &Address
     ) -> Result<FaucetResponse, ErrorInfo> {
-        let mut request = empty_public_request();
+        let mut request = Request::default();
         request.faucet_request = Some(FaucetRequest {
             address: Some(t.clone()),
             token: None
         });
         info!("Sending faucet request: {}", t.clone().render_string().expect("r"));
-        let response = self.request(&request).await?.as_error()?;
+        let response = self.client_wrapper().proto_post_request(request, None, None).await?;
+        let fr = response.faucet_response.safe_get()?;
         let res = json(&response)?;
         info!("Faucet response: {}", res);
-        Ok(response.faucet_response.safe_get_msg(res)?.clone())
+        Ok(fr.clone())
     }
 
     #[allow(dead_code)]
@@ -362,17 +365,12 @@ pub async fn as_warp_proto_bytes<T: ProtoSerde>(response: Result<T, ErrorInfo>) 
     Response::builder().body(vec).expect("a")
 }
 
-pub async fn handle_proto_post(reqb: Bytes, _address: Option<SocketAddr>, relay: Relay) -> Result<RResponse, ErrorInfo> {
+pub async fn handle_proto_post(reqb: Bytes, _address: Option<SocketAddr>, relay: Relay, origin: Option<String>) -> Result<RResponse, ErrorInfo> {
+    counter!("redgold.api.handle_proto_post").increment(1);
     let vec_b = reqb.to_vec();
-    let request = Request::proto_deserialize(vec_b)?;
-    // info!{"Warp request from {:?}", address};
-    // TODO: increment metric?
-    let c = new_channel::<RResponse>();
-    let mut msg = PeerMessage::empty();
-    msg.request = request;
-    msg.response = Some(c.sender.clone());
-    relay.peer_message_rx.send(msg).await?;
-    c.receiver.recv_async_err_timeout(Duration::from_secs(40)).await
+    let mut request = Request::proto_deserialize(vec_b)?;
+    request.origin = origin;
+    relay.receive_request_send_internal(request, None).await
 }
 
 pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
@@ -579,7 +577,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
                 // TODO: Isn't this supposed to go to peerRX event handler?
                 // info!{"Warp request from {:?}", address};
                 let res: Result<Json, warp::reject::Rejection> = {
-                    let response = relay3.receive_message_sync(request, None).await;
+                    let response = relay3.receive_request_send_internal(request, None).await;
                     //PeerRxEventHandler::request_response(relay3, request, )
                     Ok(response
                         .map_err(|e| warp::reply::json(&e))
@@ -597,12 +595,14 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and(warp::path("request_proto"))
         .and(warp::body::bytes())
         .and(warp::addr::remote())
-        .and_then(move |reqb: Bytes, address: Option<SocketAddr>| {
+        .and(extract_ip())
+        .and_then(move |reqb: Bytes, address: Option<SocketAddr>, remote: Option<String>| {
             // TODO: verify auth and receive message sync from above
             let relay3 = bin_relay2.clone();
+            let origin = process_origin(address, remote);
             let result = async move {
                 let res: Result<Response<Vec<u8>>, warp::Rejection> =
-                    Ok(as_warp_proto_bytes(handle_proto_post(reqb, address, relay3.clone()).await).await);
+                    Ok(as_warp_proto_bytes(handle_proto_post(reqb, address, relay3.clone(), origin).await).await);
                 res
             };
             result

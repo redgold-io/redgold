@@ -64,8 +64,6 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
         return Err(error_info("Faucet not supported on mainnet"))
     }
     let option_token = faucet_request.token.clone();
-    let token = option_token.safe_get_msg("No recaptcha token found")?;
-    let origin = *origin.safe_get_msg("No origin found")?;
     let faucet_addr = faucet_request.address.clone();
     let addr = faucet_addr.safe_get_msg("No address found")?;
 
@@ -109,13 +107,16 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
         Err(error_info("No UTXOs found for faucet"))
     } else {
 
-        if !relay.check_rate_limit(origin)? {
-            return Err(error_info("Rate limit exceeded"));
-        }
-
-        let captcha = recaptcha_verify(token.clone(), None, Some(origin.clone())).await?;
-        if !captcha {
-            return Err(error_info("Recaptcha verification failed"));
+        if relay.node_config.network.is_main_stage_network() {
+            let origin = *origin.safe_get_msg("No origin found")?;
+            if !relay.check_rate_limit(origin)? {
+                return Err(error_info("Rate limit exceeded"));
+            }
+            let token = option_token.safe_get_msg("No recaptcha token found")?;
+            let captcha = recaptcha_verify(token.clone(), None, Some(origin.clone())).await?;
+            if !captcha {
+                return Err(error_info("Recaptcha verification failed"));
+            }
         }
 
         // TODO: We need to know this address is not currently in use -- i.e. local locker around

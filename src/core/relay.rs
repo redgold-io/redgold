@@ -166,14 +166,6 @@ impl Relay {
         }
     }
 
-    pub async fn receive_request_internal(&self, request: Request, timeout: Option<Duration>) -> RgResult<Response> {
-        let c = new_channel::<Response>();
-        let mut msg = PeerMessage::empty();
-        msg.request = request;
-        msg.response = Some(c.sender.clone());
-        self.peer_message_rx.send(msg).await?;
-        c.receiver.recv_async_err_timeout(timeout.unwrap_or(self.node_config.default_timeout.clone())).await
-    }
     pub async fn transaction_known(&self, hash: &Hash) -> RgResult<bool> {
         if self.mempool_entries.contains_key(hash) {
             return Ok(true);
@@ -573,9 +565,8 @@ impl Relay {
         Ok(res)
     }
 
-    pub async fn receive_message_sync(&self, request: Request, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
-        // let key = request.verify_auth()?;
-        let timeout = timeout.unwrap_or(Duration::from_secs(120));
+    pub async fn receive_request_send_internal(&self, request: Request, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
+        let timeout = timeout.unwrap_or(self.node_config.default_timeout.clone());
         let (s, r) = flume::bounded::<Response>(1);
         let key = request.proof.clone().and_then(|p| p.public_key);
         let mut pm = PeerMessage::empty();
