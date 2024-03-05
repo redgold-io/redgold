@@ -25,6 +25,9 @@
         <div>
           <HashLink v-if="successTransactionHash.length > 0" :hash="successTransactionHash" />
         </div>
+        <div>
+          <h3 v-if="errorMessage.length > 0">{{this.errorMessage}}</h3>
+        </div>
 
       </div>
 
@@ -54,7 +57,8 @@ export default {
   data() {
     return {
       searchValue: '',
-      successTransactionHash: ''
+      successTransactionHash: '',
+      errorMessage: ''
     }
   },
   mounted() {
@@ -85,15 +89,24 @@ export default {
       // document.getElementById("demo-form").submit();
       console.log('token for faucet submit:', token);
 
-      let url = fetchHashInfo.getUrl();
-
-      axios.get(`${url}/explorer/faucet/${this.searchValue}/&token=${token}`)
+      let url = this.getUrl();
+      let full = `${url}/explorer/faucet/${this.searchValue}/&token=${token}`
+      console.log('full url:', full);
+      axios.get(full)
           .then(response => {
             let data = response.data;
             console.log(data); // log the response data
             let datum = data['transaction_hash'];
             if (datum != null) {
               this.successTransactionHash = datum;
+            } else {
+              let msg = data['message'];
+              if (msg != null) {
+                this.errorMessage = msg;
+              } else {
+                this.errorMessage = data.toString()
+              }
+
             }
           })
           .catch(error => {

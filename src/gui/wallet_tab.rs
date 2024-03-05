@@ -272,7 +272,7 @@ pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalSt
             for mut update in updates {
                 info!("Received item of update, applying");
                 (update.update)(local_state);
-                info!("New wallet state faucet message: {}", local_state.wallet_state.faucet_success.clone());
+                // info!("New wallet state faucet message: {}", local_state.wallet_state.faucet_success.clone());
             }
         }
         Err(e) => { error!("Error receiving updates: {}", e.json_or()) }
@@ -634,14 +634,17 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
         // }
 
         let layout = egui::Layout::right_to_left(egui::Align::RIGHT);
+
         ui.with_layout(layout, |ui| {
-            if ui.button("Debug Faucet").clicked() {
-                let address = pk.address().expect("a");
-                handle_faucet(ls.node_config.clone(), address,
-                              NetworkEnvironment::Dev,
-                              ls.wallet_state.updates.sender.clone(),
-                );
+
+            let url_env = if ls.node_config.network.is_main() {
+                "".to_string()
+            } else {
+                format!("{}.",ls.node_config.network.to_std_string())
             };
+            // TODO: Format the address of some xpub.
+            let env_formatted_faucet = format!("https://{}explorer.redgold.io/faucet", url_env, );
+            ui.hyperlink_to("Faucet", env_formatted_faucet);
             ui.label(ls.wallet_state.faucet_success.clone());
             if ui.button("Refresh Balance").clicked() {
                 get_address_info(&ls.node_config, ls.wallet_state.public_key.clone().expect("pk"),
