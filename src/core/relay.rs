@@ -130,7 +130,7 @@ pub struct Relay {
     pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
     pub unknown_resolved_inputs: Channel<ResolvedInput>,
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
-    pub faucet_rate_limiter: Arc<Mutex<HashMap<String, Instant>>>
+    pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>
 
 }
 
@@ -151,16 +151,24 @@ impl Relay {
         let now = Instant::now();
         match l.get(ip) {
             None => {
-                l.insert(ip.clone(), now);
+                l.insert(ip.clone(), (now, 0));
                 Ok(true)
             }
-            Some(v) => {
+            Some((v, count)) => {
                 let greater_than_a_day = now.duration_since(v.clone()).as_secs() > (3600*24);
+                let count2 = count.clone();
+                let count_exceeded = count2 > 30i32;
+
                 if greater_than_a_day {
-                    l.insert(ip.clone(), now);
+                    l.insert(ip.clone(), (now, 1));
                     Ok(true)
                 } else {
-                    Ok(false)
+                    if count_exceeded {
+                        Ok(false)
+                    } else {
+                        l.insert(ip.clone(), (now, count2 + 1));
+                        Ok(true)
+                    }
                 }
             }
         }

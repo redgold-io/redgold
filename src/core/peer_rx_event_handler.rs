@@ -37,6 +37,7 @@ use redgold_schema::util::lang_util::SameResult;
 use crate::api::faucet::faucet_request;
 use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::logging::Loggable;
+use crate::observability::metrics_help::WithMetrics;
 
 pub struct PeerRxEventHandler {
     relay: Relay,
@@ -102,7 +103,7 @@ impl PeerRxEventHandler {
         let auth_required = request.auth_required();
 
         if let Some(fr) = &request.faucet_request {
-            response.faucet_response = Some(faucet_request(fr, &relay, request.origin.as_ref()).await?);
+            response.faucet_response = Some(faucet_request(fr, &relay, request.origin.as_ref()).await.log_error().with_err_count("redgold.faucet.error")?);
         }
 
         if let Some(_) = &request.get_parties_info_request {

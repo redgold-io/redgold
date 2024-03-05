@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
+use metrics::counter;
 use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use redgold_keys::KeyPair;
@@ -78,7 +79,7 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
     for i in min_offset..max_offset {
         let key = node_config.words().keypair_at_change(i).expect("works");
         let address = key.address_typed();
-        info!("Querying faucet address: {}", &address.json_or());
+        // info!("Querying faucet address: {}", &address.json_or());
         map.insert(address, key);
     }
 
@@ -133,6 +134,7 @@ pub async fn faucet_request(faucet_request: &FaucetRequest, relay: &Relay, origi
             .sign(&utxo.key_pair)?;
 
         info!("Faucet TX {}", transaction.json_or());
+        counter!("redgold.faucet").increment(1);
 
         let r_err = relay.submit_transaction_sync(&transaction).await?;
 
