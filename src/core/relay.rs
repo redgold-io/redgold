@@ -156,7 +156,8 @@ impl Relay {
             }
             Some((v, count)) => {
                 let greater_than_a_day = now.duration_since(v.clone()).as_secs() > (3600*24);
-                let count_exceeded = count.clone() > 30i32;
+                let count2 = count.clone();
+                let count_exceeded = count2 > 30i32;
 
                 if greater_than_a_day {
                     l.insert(ip.clone(), (now, 1));
@@ -165,7 +166,7 @@ impl Relay {
                     if count_exceeded {
                         Ok(false)
                     } else {
-                        l.insert(ip.clone(), (now, count.clone() + 1));
+                        l.insert(ip.clone(), (now, count2 + 1));
                         Ok(true)
                     }
                 }
