@@ -22,11 +22,19 @@
           </form>
         </div>
 
-        <div>
-          <HashLink v-if="successTransactionHash.length > 0" :hash="successTransactionHash" />
-        </div>
+
         <div>
           <h3 v-if="errorMessage.length > 0">{{this.errorMessage}}</h3>
+        </div>
+        <div>
+          <h3 v-if="loading">Awaiting transaction completion (~30 seconds)...</h3>
+        </div>
+        <div>
+          <h4 v-if="this.successTransactionHash.length > 1">Success! View transaction below:</h4>
+        </div>
+
+        <div>
+          <HashLink v-if="this.successTransactionHash.length > 1" :data="this.successTransactionHash" :shorten="false"/>
         </div>
 
       </div>
@@ -57,8 +65,9 @@ export default {
   data() {
     return {
       searchValue: '',
-      successTransactionHash: '',
-      errorMessage: ''
+      successTransactionHash: '1',
+      errorMessage: '',
+      loading: false,
     }
   },
   mounted() {
@@ -85,18 +94,22 @@ export default {
       }
     },
     onSubmit(token) {
+      this.loading = true;
+      this.successTransactionHash = '1';
       // You might want to do something with the token or directly submit the form
       // document.getElementById("demo-form").submit();
       console.log('token for faucet submit:', token);
 
       let url = this.getUrl();
-      let full = `${url}/explorer/faucet/${this.searchValue}/&token=${token}`
+      let full = `${url}/explorer/faucet/${this.searchValue}?token=${token}`
       console.log('full url:', full);
       axios.get(full)
           .then(response => {
+            this.loading = false;
             let data = response.data;
-            console.log(data); // log the response data
+            console.log("Response data", data); // log the response data
             let datum = data['transaction_hash'];
+            console.log("datum", datum);
             if (datum != null) {
               this.successTransactionHash = datum;
             } else {
@@ -110,8 +123,10 @@ export default {
             }
           })
           .catch(error => {
+            this.loading = false;
             console.error(error);
           });
+
     }
   }
 }
