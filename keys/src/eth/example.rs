@@ -61,6 +61,10 @@ impl EthHistoricalClient {
         })
     }
 
+    // pub fn query_contract(&self) {
+    //     self.client.
+    // }
+
     fn chain_id(network_environment: &NetworkEnvironment) -> Chain {
         let chain = if network_environment.is_main() {
             Chain::mainnet()
