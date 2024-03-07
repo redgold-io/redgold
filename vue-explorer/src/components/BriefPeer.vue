@@ -16,7 +16,7 @@
         <td> {{d.nodes[0].external_address}} </td>
         <td> {{d.nodes[0].port_offset}} </td>
         <td> {{shortenExeChecksum(d.nodes[0].executable_checksum)}} </td>
-        <td> {{d.nodes[0].alias}} </td>
+        <td> {{d.nodes[0].node_name}} </td>
       </tr>
       </tbody>
     </table>
@@ -53,7 +53,7 @@ export default {
         {key: 'Host'},
         {key: 'Port'},
         {key: 'Exe Checksum'},
-        {key: 'alias'},
+        {key: 'node_name'},
           // TODO: Last updated
           // Last observation, etc.
       ],
