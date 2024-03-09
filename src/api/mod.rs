@@ -23,12 +23,9 @@ use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
 
 pub mod control_api;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod p2p_io;
 pub mod public_api;
 pub mod rosetta;
 pub mod faucet;
-pub mod lp2p;
 pub mod hash_query;
 pub mod udp_api;
 pub mod about;
