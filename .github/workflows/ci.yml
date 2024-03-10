@@ -59,6 +59,7 @@ jobs:
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
       - run: cargo clean
+      - run: cargo build --release
       - run: cargo tree --workspace
       - run: export RUST_MIN_STACK=20485760; cargo test --lib -- --test-threads=1
       - run: ./bin/local_test.sh

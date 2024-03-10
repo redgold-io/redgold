@@ -15,6 +15,7 @@ pub mod xpub_wrapper;
 pub mod address_external;
 pub mod eth;
 pub mod address_support;
+mod hw_wallet_wrapper;
 
 
 pub struct TestConstants {

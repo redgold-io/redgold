@@ -74,7 +74,8 @@ pub struct LocalState {
     pub ds_env: DataStore,
     pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
-    pub updates: Channel<StateUpdate>
+    pub updates: Channel<StateUpdate>,
+    pub keytab_state: KeyTabState,
 }
 
 impl LocalState {
@@ -237,6 +238,7 @@ impl LocalState {
             ds_env_secure,
             local_stored_state,
             updates: new_channel(),
+            keytab_state: Default::default(),
         };
         Ok(ls)
     }
@@ -332,12 +334,13 @@ use redgold_keys::util::dhash_vec;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
-use crate::gui::tabs::keys_tab::KeygenState;
+use crate::gui::tabs::keygen_subtab::KeygenState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
-use crate::gui::tabs::{keys_tab, server_tab};
+use crate::gui::tabs::{keygen_subtab, server_tab};
+use crate::gui::tabs::keys_tab::{keys_tab, KeyTabState};
 use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
@@ -463,7 +466,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 home::home_screen(ui, ctx, local_state);
             }
             Tab::Keys => {
-                keys_tab::keys_screen(ui, ctx, local_state);
+                keys_tab(ui, ctx, local_state);
             }
             Tab::Settings => {
                 settings_tab(ui, ctx, local_state);
