@@ -29,6 +29,7 @@ pub mod hashviz;
 pub mod keys;
 pub mod test_util;
 pub mod argon_kdf;
+mod metadata;
 
 pub fn random_salt() -> i64 {
     let mut rng = rand::thread_rng();

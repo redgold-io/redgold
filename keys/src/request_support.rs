@@ -1,8 +1,7 @@
-use bdk::bitcoin::hashes::hex::ToHex;
-use log::info;
-use redgold_schema::{EasyJson, error_info, ProtoHashable, RgResult, SafeBytesAccess, SafeOption};
+
+use redgold_schema::{EasyJson, error_info, ProtoHashable, RgResult, SafeOption};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeResponse, ErrorInfo, NodeMetadata, Proof, PublicKey, Request, Response};
+use redgold_schema::structs::{AboutNodeResponse, NodeMetadata, Proof, PublicKey, Request, Response};
 use crate::{KeyPair, TestConstants};
 use crate::proof_support::ProofSupport;
 

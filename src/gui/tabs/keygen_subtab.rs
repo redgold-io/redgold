@@ -37,7 +37,7 @@ enum Rounds {
 // Recalculate these values on change of passphrase
 #[derive(Clone)]
 pub struct MnemonicWindowState {
-    open: bool,
+    pub open: bool,
     words: String,
     label: String,
     bitcoin_p2wpkh_84: String,
@@ -135,7 +135,7 @@ impl GenerateMnemonicState {
 }
 #[derive(Clone)]
 pub struct KeygenState {
-    mnemonic_window_state: MnemonicWindowState,
+    pub(crate) mnemonic_window_state: MnemonicWindowState,
     generate_mnemonic_state: GenerateMnemonicState,
 }
 
@@ -487,7 +487,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
 
 }
 
-fn mnemonic_window(
+pub(crate) fn mnemonic_window(
     ctx: &Context, ls: &mut LocalState
 ) {
 
@@ -534,10 +534,10 @@ fn mnemonic_window(
                         .clone();
                     text_table(ui, split);
                     ui.vertical(|ui| {
-                        medium_data_item(ui, "Redgold m/44'/0'/50'/0/0' Address", state.redgold_hardware_default_address.clone());
-                        medium_data_item(ui, "Redgold m/84'/16180'/0'/0/0 Address", state.redgold_node_address.clone());
-                        medium_data_item(ui, "Bitcoin m/84'/0'/0'/0/0 P2WPKH Address", state.bitcoin_p2wpkh_84.clone());
-                        medium_data_item(ui, "Ethereum m/44'/60'/0'/0/0 Address", state.ethereum_address_44.clone());
+                        medium_data_item(ui, "RDG m/44'/0'/50'/0/0'", state.redgold_hardware_default_address.clone());
+                        medium_data_item(ui, "RDG m/84'/16180'/0'/0/0", state.redgold_node_address.clone());
+                        medium_data_item(ui, "BTC m/84'/0'/0'/0/0 P2WPKH", state.bitcoin_p2wpkh_84.clone());
+                        medium_data_item(ui, "ETH m/44'/60'/0'/0/0", state.ethereum_address_44.clone());
                         ui.horizontal(|ui| {
                             medium_data_item(ui, "Words Checksum", state.words_checksum.clone());
                             if let Some(c) = &state.seed_checksum {

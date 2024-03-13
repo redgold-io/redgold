@@ -15,6 +15,7 @@ use crate::util::sym_crypt;
 use crate::gui::{ClientApp, home, top_panel};
 use crate::util;
 use rand::Rng;
+use rocket::form::validate::Contains;
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
@@ -79,6 +80,30 @@ pub struct LocalState {
 }
 
 impl LocalState {
+    pub(crate) fn process_tab_change(&mut self, p0: Tab) {
+        match p0 {
+            Tab::Home => {}
+            Tab::Keys => {
+                init_state(&mut self.wallet_state)
+            }
+            Tab::Transact => {}
+            Tab::Portfolio => {}
+            Tab::Identity => {}
+            Tab::Contacts => {}
+            Tab::Address => {}
+            Tab::Servers => {}
+            Tab::Ratings => {}
+            Tab::Settings => {
+                self.settings_state.lss_serialized = self.local_stored_state.json_or();
+            }
+            _ => {
+
+            }
+        }
+    }
+}
+
+impl LocalState {
 
     pub fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool) {
         self.updates.sender.send(StateUpdate {
@@ -108,26 +133,18 @@ impl LocalState {
             store.config_store.update_stored_state(state).await
         });
     }
-    pub fn add_named_xpub(&mut self, overwrite_name: bool, new_named: NamedXpub) -> RgResult<()> {
-        let updated_xpubs = if overwrite_name {
-            let mut new_xpubs = self.local_stored_state.xpubs.iter().filter(|x| {
-                x.name != new_named.name
-            }).map(|x| x.clone()).collect_vec();
-            new_xpubs.push(new_named);
-            new_xpubs
-        } else {
-            let has_existing = self.local_stored_state.xpubs.iter().find(|x| {
-                x.name == new_named.name
-            }).is_some();
-            if has_existing {
-                return Err(error_info("Xpub with name already exists"));
-            } else {
-                let mut new_xpubs = self.local_stored_state.xpubs.clone();
-                new_xpubs.push(new_named);
-                new_xpubs
-            }
-        };
-        self.local_stored_state.xpubs = updated_xpubs;
+    pub fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>) -> RgResult<()> {
+        let new_names = new_named.iter().map(|x| x.name.clone())
+            .collect_vec();
+        let existing = self.local_stored_state.xpubs.clone();
+        let mut filtered = existing.iter().filter(|x| {
+            !new_names.contains(&x.name)
+        }).map(|x| x.clone()).collect_vec();
+        if filtered.len() != existing.len() && !overwrite_name {
+            return Err(error_info("Xpub with name already exists"));
+        }
+        filtered.extend(new_named);
+        self.local_stored_state.xpubs = filtered;
         self.persist_local_state_store();
         Ok(())
     }
@@ -340,6 +357,7 @@ use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::{keygen_subtab, server_tab};
+use crate::gui::tabs::hot_wallet::init_state;
 use crate::gui::tabs::keys_tab::{keys_tab, KeyTabState};
 use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
@@ -392,6 +410,8 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     let img = logo;
     // let texture_id = img.texture_id(ctx);
 
+    let mut changed_tab: Option<Tab> = None;
+
     egui::SidePanel::left("side_panel")
         .resizable(false)
         .show(ctx, |ui| {
@@ -434,7 +454,9 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                     for tab_i in Tab::iter() {
                         let tab_str = format!("{:?}", tab_i);
                         if ui.button(tab_str).clicked() {
-                            local_state.active_tab = tab_i;
+                            local_state.active_tab = tab_i.clone();
+                            local_state.process_tab_change(tab_i.clone());
+                            changed_tab = Some(tab_i.clone());
                         }
                     }
                     //
@@ -466,7 +488,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 home::home_screen(ui, ctx, local_state);
             }
             Tab::Keys => {
-                keys_tab(ui, ctx, local_state);
+                keys_tab(ui, ctx, local_state, changed_tab.is_some());
             }
             Tab::Settings => {
                 settings_tab(ui, ctx, local_state);

@@ -113,6 +113,7 @@ pub enum RgTopLevelSubcommand {
     TestTransaction(TestTransactionCli),
     TestCapture(TestCaptureCli),
     TestBitcoinBalance(TestBitcoinBalanceCli),
+    ConvertMetadataXpub(ConvertMetadataXpub),
 }
 
 
@@ -291,6 +292,13 @@ pub struct TestCaptureCli {}
 #[derive(Args, Debug, Clone)]
 pub struct TestBitcoinBalanceCli {
 
+}
+
+/// Convert Xpub Metadata
+#[derive(Args, Debug, Clone)]
+pub struct ConvertMetadataXpub {
+    #[clap(value_parser)]
+    pub metadata_file: String,
 }
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)

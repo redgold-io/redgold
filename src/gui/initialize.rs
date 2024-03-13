@@ -36,10 +36,12 @@ pub async fn attempt_start(nc: NodeConfig
     let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
     let app = gui::ClientApp::from(ri, nc).await?;
 
+    let x = 900.0;
+    let y = 700.0;
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 600.0])
-            .with_min_inner_size([800.0, 600.0])
+            .with_inner_size([x,y])
+            .with_min_inner_size([x,y])
             .with_icon(
                 // NOE: Adding an icon is optional
                 eframe::icon_data::from_png_bytes(&include_bytes!("../resources/svg_rg_2_crop.png")[..])

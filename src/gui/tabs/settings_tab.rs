@@ -8,7 +8,7 @@ use crate::gui::common::{bounded_text_area, editable_text_input_copy, valid_labe
 
 #[derive(Clone)]
 pub struct SettingsState {
-    lss_serialized: String,
+    pub(crate) lss_serialized: String,
     last_lss_serialized: String,
     new_lss: Option<LocalStoredState>,
     valid_json: bool,
@@ -53,6 +53,7 @@ pub fn settings_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
         }
     }
 
+    // TODO: Change to separate window to isolate the immutable change
     if ui.button("Save Json").clicked() {
         if let Some(lss) = &ls.settings_state.new_lss {
             ls.local_stored_state = lss.clone();

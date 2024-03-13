@@ -1,2 +1,5 @@
 pub mod key_source_sel;
 pub mod save_key_window;
+pub mod xpub_req;
+pub(crate) mod derivation_path_sel;
+pub mod key_info;

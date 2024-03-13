@@ -1,10 +1,15 @@
-use eframe::egui::{ComboBox, Ui};
-use itertools::Either;
+use eframe::egui;
+use eframe::egui::{ComboBox, Context, TextEdit, Ui};
+use itertools::{Either, Itertools};
+use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::gui::app_loop::LocalState;
+use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item};
+use crate::gui::tables::text_table;
 
 
-pub fn key_source(ui: &mut Ui, ls: &mut LocalState) {
+pub fn key_source(ui: &mut Ui, ls: &mut LocalState) -> bool {
 
+    let mut has_changed = false;
     // Combo box to choose mnemonic
     ui.horizontal(|ui| {
 
@@ -18,30 +23,36 @@ pub fn key_source(ui: &mut Ui, ls: &mut LocalState) {
                 }
             });
         if ls.wallet_state.selected_key_name != ls.wallet_state.last_selected_key_name {
+            has_changed = true;
             ls.wallet_state.last_selected_key_name = string.clone();
             ls.wallet_state.active_hot_mnemonic = None;
-            ls.wallet_state.active_hot_kp = None;
+            ls.wallet_state.active_hot_private_key_hex = None;
+            ls.wallet_state.mnemonic_or_key_checksum = "".to_string();
+            // TODO: Really this could be refactored in an Enum that has multiple direct value
+            // structs, but for now we'll just use the Either type
+            // also the state storage should account for that as well.
             let opt = ls.local_stored_state.by_key(&string).map(|key| {
                 match key {
                     Either::Left(mnemonic) => {
                         ls.wallet_state.active_hot_mnemonic = Some(mnemonic.mnemonic.clone());
                     }
                     Either::Right(private_key) => {
-                        ls.wallet_state.active_hot_kp = Some(private_key.key_hex);
+                        ls.wallet_state.active_hot_private_key_hex = Some(private_key.key_hex);
                     }
                 }
             });
             if opt.is_none() {
                 ls.wallet_state.active_hot_mnemonic = Some(ls.wallet_state.hot_mnemonic_default.clone());
             }
-            ls.wallet_state.update_hot_mnemonic_info();
+            ls.wallet_state.update_hot_mnemonic_or_key_info();
         }
         // add_new_key_button(ls, ui);
     });
+    has_changed
 }
 
 pub fn add_new_key_button(ls: &mut LocalState, ui: &mut Ui) {
-    if ui.button("Add Mnemonic / Private Key").clicked() {
+    if ui.button("Add Hot Mnemonic / Private Key").clicked() {
         ls.wallet_state.add_new_key_window = true;
     }
 }

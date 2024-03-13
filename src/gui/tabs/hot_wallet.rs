@@ -14,11 +14,11 @@ pub fn hot_header(ls: &mut LocalState, ui: &mut Ui, _ctx: &egui::Context) {
 
     let state = &mut ls.wallet_state;
 
-    let check = state.mnemonic_checksum.clone();
+    let check = state.mnemonic_or_key_checksum.clone();
     ui.label(format!("Hot Wallet Checksum: {check}"));
 
     if state.public_key.is_none() {
-        state.update_hot_mnemonic_info();
+        state.update_hot_mnemonic_or_key_info();
     }
 
 }
