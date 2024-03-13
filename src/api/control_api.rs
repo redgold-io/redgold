@@ -9,6 +9,7 @@ use itertools::Itertools;
 use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
+use tracing::trace;
 use uuid::Uuid;
 use warp::{Filter, Rejection};
 use warp::reply::Json;
@@ -161,7 +162,7 @@ impl ControlServer {
             // runtime,
         } = self;
         let relay2 = relay.clone();
-        info!(
+        trace!(
             "Starting control server on port: {:?}",
             relay.node_config.control_port()
         );
