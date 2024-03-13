@@ -17,6 +17,7 @@ use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
+use tracing::trace;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId};
@@ -333,12 +334,12 @@ impl Relay {
             let matching_peer_tx = pd.node_metadata.iter().filter(
                 |nmd| nmd.public_key == Some(self.node_config.public_key())
             ).collect_vec();
-            info!("Node tx node metadata length: {}", pd.node_metadata.len());
+            trace!("Node tx node metadata length: {}", pd.node_metadata.len());
             let opt = matching_peer_tx.get(0).cloned();
             if opt.is_none() {
                 info!("No peer tx found for this node, generating new one");
             }
-            info!("First generation of node tx from peer tx: {:?}", opt.cloned());
+            trace!("First generation of node tx from peer tx: {:?}", opt.cloned());
             let tx = self.node_config.node_tx_fixed(opt);
             self.ds.config_store.set_node_tx(&tx).await?;
             Ok(tx)

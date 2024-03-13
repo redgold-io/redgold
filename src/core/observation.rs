@@ -5,7 +5,7 @@
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
-use log::info;
+use log::{debug, info};
 use metrics::{counter, gauge};
 use tokio::task::JoinHandle;
 // use futures::stream::StreamExt;
@@ -136,7 +136,7 @@ impl ObservationBuffer {
             .map(|a| a.hash_or())
             .collect_vec();
 
-        info!("Starting observation buffer with latest observation: {}", latest.json_or());
+        debug!("Starting observation buffer with latest observation hash: {}", latest.hash_or().hex());
 
         let interval1 = tokio::time::interval(relay.node_config.observation_formation_millis.clone());
         let mut o = Self {

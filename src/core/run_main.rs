@@ -30,7 +30,7 @@ pub async fn main_from_args(opts: RgArgs) {
     let _ = &arg_translate.translate_args().await.expect("arg translation");
     node_config = arg_translate.node_config.clone();
 
-    tracing::info!("Starting network environment: {}", node_config.clone().network.to_std_string());
+    tracing::trace!("Starting network environment: {}", node_config.clone().network.to_std_string());
 
     if arg_translate.abort {
         return;

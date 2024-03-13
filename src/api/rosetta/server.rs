@@ -9,6 +9,7 @@ use warp::reply::{Json, WithStatus};
 use serde::{Deserialize, Serialize};
 use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
+use tracing::trace;
 use warp::path::FullPath;
 use redgold_schema::{error_message, error_msg, ErrorInfoContext, RgResult, structs};
 use crate::api::{RgHttpClient, easy_post, rosetta, with_response_logger, with_response_logger_error};
@@ -209,7 +210,7 @@ pub async fn run_server(relay: Relay) -> RgResult<()> {
         .and_then(handle_warp_request);
 
     let port = relay2.node_config.rosetta_port();
-    info!("Running rosetta API on port: {:?}", port.clone());
+    trace!("Running rosetta API on port: {:?}", port.clone());
     warp::serve(endpoints.or(hello))
         .run(([0, 0, 0, 0], port))
         .await;

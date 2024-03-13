@@ -22,14 +22,14 @@ use crate::gui::wallet_tab::{derivation_path_section, hot_passphrase_section, wi
 
 #[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
 #[repr(i32)]
-enum KeygenSubTab {
+pub enum KeygenSubTab {
     Manage,
     Generate,
 }
 
 #[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
 #[repr(i32)]
-enum KeygenSubSubTab {
+pub enum KeygenSubSubTab {
     Keys,
     XPubs
 }
