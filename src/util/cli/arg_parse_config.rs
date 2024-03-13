@@ -729,6 +729,9 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                     commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
                     Ok(())
                 }
+                RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
+                    commands::convert_metadata_xpub(&b.metadata_file).await
+                }
                 _ => {
                     abort = false;
                     Ok(())

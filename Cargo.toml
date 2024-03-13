@@ -97,7 +97,7 @@ log = "0.4.14"
 hex = "0.4.3"
 #void = "1.0.2"
 # Is this used anymore?
-async-std = { version = "1.6.2", features = ["attributes"] }
+#async-std = { version = "1.6.2", features = ["attributes"] }
 async-trait = "0.1.56"
 env_logger = "0.10.0"
 #structopt = "0.3.21"
@@ -185,7 +185,7 @@ pkg-config = "0.3.27"
 
 [dev-dependencies]
 assert_cmd = "2.0.11"
-cargo-audit = "0.17.6"
+#cargo-audit = "0.17.6"
 
 
 #[dependencies.bitcoin]

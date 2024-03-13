@@ -19,7 +19,7 @@ use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
 use crate::util::btc_wallet::SingleKeyBitcoinWallet;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WordsPass {
     pub words: String,
     pub passphrase: Option<String>,
@@ -31,11 +31,11 @@ trait MnemonicSupport {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct WordsPassBtcMessageAccountMetadata {
-    derivation_path: String,
-    account: u32,
-    rdg_address: String,
-    rdg_btc_main_address: String,
-    rdg_btc_test_address: String,
+    pub derivation_path: String,
+    pub account: u32,
+    pub rdg_address: String,
+    pub rdg_btc_main_address: String,
+    pub rdg_btc_test_address: String,
     pub xpub: String,
     pub public_hex: String
 }
@@ -212,6 +212,10 @@ impl WordsPass {
         let xprv = self.key_from_path_str(path.into())?;
         let xpub = ExtendedPubKey::from_priv(&Secp256k1::new(), &xprv);
         Ok(xpub)
+    }
+
+    pub fn xpub_str(&self, path: impl Into<String>) -> RgResult<String> {
+        Ok(self.xpub(path)?.to_string())
     }
 
     pub fn key_from_path_str(&self, path: impl Into<String>) -> RgResult<ExtendedPrivKey> {

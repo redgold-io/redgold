@@ -12,18 +12,18 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
 use redgold_keys::address_external::ToBitcoinAddress;
-use redgold_keys::TestConstants;
+use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, RgResult, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_keys::xpub_wrapper::XpubWrapper;
+use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
@@ -32,6 +32,7 @@ use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::observability::logging::Loggable;
 use redgold_schema::local_stored_state::NamedXpub;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use crate::gui::components::xpub_req;
 use crate::gui::tabs::{cold_wallet, hot_wallet};
 
 
@@ -75,9 +76,9 @@ pub struct WalletState {
     tab: WalletTab,
     pub(crate) device_list_status: DeviceListStatus,
     pub(crate) public_key: Option<PublicKey>,
-    public_key_msg: Option<String>,
+    pub(crate) public_key_msg: Option<String>,
     // futs: Vec<impl Future>
-    updates: Channel<StateUpdate>,
+    pub(crate) updates: Channel<StateUpdate>,
     send_receive: Option<SendReceiveTabs>,
     destination_address: String,
     amount_input: String,
@@ -100,14 +101,15 @@ pub struct WalletState {
     pub hot_mnemonic_default: String,
     pub send_currency_type: SupportedCurrency,
     pub active_hot_mnemonic: Option<String>,
-    pub active_hot_kp: Option<String>,
+    pub active_hot_private_key_hex: Option<String>,
     pub derivation_path: String,
     pub xpub_derivation_path: String,
     pub derivation_path_valid: bool,
     pub xpub_derivation_path_valid: bool,
     pub derivation_path_last_check: String,
     pub xpub_derivation_path_last_check: String,
-    pub mnemonic_checksum: String,
+    pub mnemonic_or_key_checksum: String,
+    pub seed_checksum: Option<String>,
     pub active_xpub: String,
     pub active_derivation_path: String,
     pub xpub_save_name: String,
@@ -116,6 +118,7 @@ pub struct WalletState {
     pub is_mnemonic_or_kp: Option<bool>,
     pub valid_save_mnemonic: String,
     pub show_xpub_loader_window: bool,
+    pub last_selected_xpub_name: String,
     pub selected_xpub_name: String,
     pub selected_key_name: String,
     pub last_selected_key_name: String,
@@ -126,7 +129,9 @@ pub struct WalletState {
     pub xpub_loader_rows: String,
     pub xpub_loader_error_message: String,
     pub hot_passphrase: String,
+    pub hot_passphrase_last: String,
     pub hot_offset: String,
+    pub hot_offset_last: String,
     pub custom_tx_json: String,
     pub mnemonic_save_persist: bool,
     pub mark_output_as_stake: bool,
@@ -134,19 +139,38 @@ pub struct WalletState {
 }
 
 impl WalletState {
-    pub(crate) fn update_hot_mnemonic_info(&mut self) {
-        let state = self;
-        let m = state.hot_mnemonic();
-        let check = m.checksum_words().unwrap_or("".to_string());
-        // derivation_path_section(ui, &state, m);
-        let pk = m.public_at(state.derivation_path.clone());
-        state.public_key = pk.ok();
-        state.mnemonic_checksum = check;
+    pub(crate) fn update_hot_mnemonic_or_key_info(&mut self) {
+        self.mnemonic_or_key_checksum = self.checksum_key();
+        if let Some((pkhex, key_pair)) = self.active_hot_private_key_hex.as_ref()
+            .and_then(|kp| KeyPair::from_private_hex(kp.clone()).ok().map(|kp2| (kp.clone(), kp2))) {
+            self.public_key = Some(key_pair.public_key());
+            let hex = hex::decode(pkhex).unwrap_or(vec![]);
+            let check = Hash::new_checksum(&hex).unwrap_or("".to_string());
+            self.mnemonic_or_key_checksum = check;
+        } else {
+            let m = self.hot_mnemonic();
+            let check = m.checksum_words().unwrap_or("".to_string());
+            let pk = m.public_at(self.derivation_path.clone());
+            self.public_key = pk.ok();
+            self.mnemonic_or_key_checksum = check;
+            self.seed_checksum = m.checksum().ok().clone();
+        }
     }
 }
 
 
 impl WalletState {
+
+    pub fn checksum_key(&self) -> String {
+        if let Some(kp) = self.active_hot_private_key_hex.as_ref() {
+            if let Some(b) = hex::decode(kp).ok() {
+                if let Ok(h) = Hash::new_checksum(&b) {
+                    return h
+                }
+            }
+        }
+        return self.hot_mnemonic().checksum_words().unwrap_or("".to_string());
+    }
     pub fn clear_data(&mut self) {
         self.update_unsigned_tx(None);
         self.update_signed_tx(None);
@@ -226,14 +250,15 @@ impl WalletState {
             hot_mnemonic_default: hot_mnemonic,
             send_currency_type: SupportedCurrency::Redgold,
             active_hot_mnemonic: None,
-            active_hot_kp: None,
+            active_hot_private_key_hex: None,
             derivation_path: trezor::default_pubkey_path(),
             xpub_derivation_path: "m/44'/0'/0'".to_string(),
             derivation_path_valid: true,
             xpub_derivation_path_valid: false,
             derivation_path_last_check: "".to_string(),
             xpub_derivation_path_last_check: "".to_string(),
-            mnemonic_checksum: "".to_string(),
+            mnemonic_or_key_checksum: "".to_string(),
+            seed_checksum: None,
             active_xpub: "".to_string(),
             active_derivation_path: "".to_string(),
             xpub_save_name: "".to_string(),
@@ -250,13 +275,16 @@ impl WalletState {
             xpub_loader_rows: "".to_string(),
             xpub_loader_error_message: "".to_string(),
             hot_passphrase: "".to_string(),
+            hot_passphrase_last: "".to_string(),
             hot_offset: "".to_string(),
+            hot_offset_last: "".to_string(),
             custom_tx_json: "".to_string(),
             valid_save_mnemonic: "".to_string(),
             add_new_key_window: false,
             mnemonic_save_persist: true,
             mark_output_as_stake: false,
             mark_output_as_swap: false,
+            last_selected_xpub_name: "".to_string(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -283,19 +311,6 @@ pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalSt
     ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state));
 }
 
-
-pub trait ValidateDerivationPath {
-    fn valid_derivation_path(&self) -> bool;
-}
-
-impl ValidateDerivationPath for String {
-    fn valid_derivation_path(&self) -> bool {
-        WordsPass::words(TestConstants::new().words).public_at(self.clone()).is_ok()
-    }
-    // fn valid_xpub_path(&self) -> bool {
-    //     WordsPass::words(TestConstants::new().words).xprv(self.clone()).is_ok()
-    // }
-}
 
 
 pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState) {
@@ -331,7 +346,9 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
     }
 
     derivation_path_section(ui, ls);
-    hot_passphrase_section(ui, ls);
+    if ls.wallet_state.tab == WalletTab::Software {
+        hot_passphrase_section(ui, ls);
+    }
     xpub_path_section(ui, ls, ctx);
 
     if let Some(pk) = ls.wallet_state.public_key.clone() {
@@ -340,8 +357,19 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
     ui.spacing();
 }
 
-fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) {
-    if ls.wallet_state.tab == WalletTab::Software {
+pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
+
+    let mut update_clicked = false;
+
+    if &ls.wallet_state.hot_passphrase_last != &ls.wallet_state.hot_passphrase.clone() {
+        ls.wallet_state.hot_passphrase_last = ls.wallet_state.hot_passphrase.clone();
+        update_clicked = true;
+    }
+    if &ls.wallet_state.hot_offset_last != &ls.wallet_state.hot_offset.clone() {
+        ls.wallet_state.hot_offset_last = ls.wallet_state.hot_offset.clone();
+        update_clicked = true;
+    }
+
         ui.horizontal(|ui| {
             ui.label("Passphrase:");
             egui::TextEdit::singleline(&mut ls.wallet_state.hot_passphrase)
@@ -352,10 +380,13 @@ fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) {
                 .desired_width(150f32)
                 .show(ui);
             if ui.button("Update").clicked() {
-                ls.wallet_state.update_hot_mnemonic_info();
+                update_clicked = true;
             };
         });
-    }
+    if update_clicked {
+        ls.wallet_state.update_hot_mnemonic_or_key_info();
+    };
+    update_clicked
 }
 
 fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
@@ -667,32 +698,32 @@ pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
             valid_label(ui, ls.wallet_state.derivation_path_valid);
         });
         ui.spacing();
-        match ls.wallet_state.tab {
-            WalletTab::Hardware => {
-                if ui.button("Request Public Key").clicked() {
-                    ls.wallet_state.public_key = None;
-                    ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
-                    // This blocks the entire UI... ah jeez
-                    match trezor::get_public_node(ls.wallet_state.derivation_path.clone()).and_then(|x| x.public_key()) {
-                        Ok(pk) => {
-                            ls.wallet_state.public_key = Some(pk.clone());
-                            ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                            get_address_info(
-                                &ls.node_config,
-                                pk.clone(),
-                                ls.wallet_state.show_btc_info,
-                                ls.wallet_state.updates.sender.clone(),
-                            );
-                        }
-                        Err(e) => {
-                            ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
-                            error!("Error getting public key: {}", e.json_or());
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
+        // match ls.wallet_state.tab {
+        //     WalletTab::Hardware => {
+        //         if ui.button("Request Public Key").clicked() {
+        //             ls.wallet_state.public_key = None;
+        //             ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
+        //             // This blocks the entire UI... ah jeez
+        //             match trezor::get_public_node(ls.wallet_state.derivation_path.clone()).and_then(|x| x.public_key()) {
+        //                 Ok(pk) => {
+        //                     ls.wallet_state.public_key = Some(pk.clone());
+        //                     ls.wallet_state.public_key_msg = Some("Got public key".to_string());
+        //                     get_address_info(
+        //                         &ls.node_config,
+        //                         pk.clone(),
+        //                         ls.wallet_state.show_btc_info,
+        //                         ls.wallet_state.updates.sender.clone(),
+        //                     );
+        //                 }
+        //                 Err(e) => {
+        //                     ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
+        //                     error!("Error getting public key: {}", e.json_or());
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     _ => {}
+        // }
     });
 }
 
@@ -731,6 +762,11 @@ fn window_xpub(
                         } else {
                             None
                         },
+                        key_name_source: None,
+                        device_id: None,
+                        key_reference_source: None,
+                        key_nickname_source: None,
+                        request_type: None,
                     };
                     ls.updates.sender.send(StateUpdate {
                         update: Box::new(
@@ -769,7 +805,7 @@ fn parse_xpub_rows(str: &str) -> RgResult<Vec<NamedXpub>> {
 
 
 // TODO: This window exceeds the max size bound for some crazy reason??
-fn window_xpub_loader(
+pub fn window_xpub_loader(
     _ui: &mut Ui,
     ls: &mut LocalState,
     ctx: &egui::Context,
@@ -788,18 +824,24 @@ fn window_xpub_loader(
             // ui.with_layout(layout, |ui| {
             ui.vertical(|ui| {
                 ui.label("Enter CSV data with format name,derivation_path,xpub");
-                egui::TextEdit::multiline(&mut ls.wallet_state.xpub_loader_rows)
-                    .desired_rows(3)
-                    .desired_width(200.0)
-                    .ui(ui);
+
+                ScrollArea::vertical().show(ui, |ui| {
+                    egui::TextEdit::multiline(&mut ls.wallet_state.xpub_loader_rows)
+                        .desired_rows(3)
+                        .desired_width(200.0)
+                        .ui(ui);
+                });
+
                 ui.checkbox(&mut ls.wallet_state.purge_existing_xpubs_on_save, "Purge all existing xpubs on load");
                 ui.checkbox(&mut ls.wallet_state.allow_xpub_name_overwrite, "Allow overwrite of xpub by name");
+                ui.label(ls.wallet_state.xpub_loader_error_message.clone());
                 if ui.button("Save Internal").clicked() {
                     let data = ls.wallet_state.xpub_loader_rows.clone();
                     let parsed = parse_xpub_rows(&*data).ok();
                     if let Some(rows) = parsed {
                         LocalState::send_update(&ls.updates, move |lss| {
                             let rows2 = rows.clone();
+                            info!("Parsed Xpub rows: {:?}", rows2.json_or());
                             let names = rows2.iter().map(|n| n.name.clone()).collect_vec();
                             let has_existing = lss.local_stored_state.xpubs.iter().find(|n| names.contains(&n.name)).is_some();
                             if has_existing && !lss.wallet_state.allow_xpub_name_overwrite {
@@ -808,10 +850,8 @@ fn window_xpub_loader(
                                 if lss.wallet_state.purge_existing_xpubs_on_save {
                                     lss.local_stored_state.xpubs = vec![];
                                 }
-                                for p in rows2 {
-                                    lss.add_named_xpub(true, p.clone()).expect("added");
-                                }
-                                lss.persist_local_state_store();
+                                // TODO: Render error msg
+                                lss.add_named_xpubs(lss.wallet_state.allow_xpub_name_overwrite, rows2).ok();
                                 lss.wallet_state.show_xpub_loader_window = false;
                             }
                         });
@@ -844,30 +884,7 @@ pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
             if ls.wallet_state.tab == WalletTab::Hardware {
                 ui.spacing();
 
-                if ui.button("Request Xpub").clicked() {
-                    ls.wallet_state.public_key = None;
-                    ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
-                    // This blocks the entire UI... ah jeez
-                    match trezor::get_public_node(ls.wallet_state.xpub_derivation_path.clone()).map(|x| x.xpub) {
-                        Ok(xpub) => {
-                            ls.wallet_state.show_save_xpub_window = true;
-                            ls.wallet_state.active_xpub = xpub.clone();
-                            let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
-                            ls.wallet_state.public_key = Some(pk.clone());
-                            ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                            get_address_info(
-                                &ls.node_config,
-                                pk,
-                                             ls.wallet_state.show_btc_info.clone(),
-                                             ls.wallet_state.updates.sender.clone(),
-                            );
-                        }
-                        Err(e) => {
-                            ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
-                            error!("Error getting public key: {}", e.json_or());
-                        }
-                    }
-                }
+                xpub_req::request_xpub_hardware(ls, ui);
             }
         });
     });
