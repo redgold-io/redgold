@@ -86,7 +86,7 @@ fn endings_inclusions() -> Vec<String> {
 
 
 #[derive(Clone)]
-struct AccumFileData {
+pub struct AccumFileData {
     good_files: Vec<PathBuf>,
     unknown_files: Vec<PathBuf>
 }
@@ -121,13 +121,13 @@ fn process_file(
     accum.unknown_files.push(file.clone());
 }
 
-struct ScanConfig {
+pub struct ScanConfig {
     exclude_vue: bool,
     exclude_docs: bool
 }
 
 impl ScanConfig {
-    fn new() -> ScanConfig {
+    pub fn new() -> ScanConfig {
         ScanConfig {
             exclude_vue: false,
             exclude_docs: false,
@@ -199,7 +199,7 @@ impl AccumFileData {
             unknown_files: Vec::new()
         }
     }
-    fn from_config(config: ScanConfig) -> AccumFileData {
+    pub fn from_config(config: ScanConfig) -> AccumFileData {
         scan_tld(Some(config))
     }
     fn contents_all(&self) -> String {
@@ -217,7 +217,7 @@ impl AccumFileData {
         count_tokens(&content)
     }
 
-    fn contents_path(&self) -> Vec<(String, String)> {
+    pub fn contents_path(&self) -> Vec<(String, String)> {
         let mut vec = vec![];
         for gf in &self.good_files {
             let contents = fs::read_to_string(&gf).expect("Failed to read file");
