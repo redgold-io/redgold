@@ -32,3 +32,5 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 async-process = "2.1.0"
 flume = "0.11.0"
+serde = { version = "1.0.197", features = ["derive"] }
+octocrab = "0.34.3"

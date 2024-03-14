@@ -417,7 +417,7 @@ struct OkxHistoricalResponse {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct OkxParsedRow {
+pub struct OkxParsedRow {
     time: i64,
     open: f64,
     high: f64,

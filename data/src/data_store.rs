@@ -149,7 +149,7 @@ WHERE
      */
 
     pub async fn from_path(path: String) -> DataStore {
-        info!("Starting datastore with path {}", path.clone());
+        // info!("Starting datastore with path {}", path.clone());
 
         let options = SqliteConnectOptions::new()
             .create_if_missing(true)

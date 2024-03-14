@@ -20,6 +20,7 @@ use redgold_data::peer::PeerTrustQueryResult;
 use redgold_schema::structs::{AddressInfo, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use tokio::time::Instant;
+use tracing::trace;
 use warp::get;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::{Pagination, TokenParam};
@@ -731,20 +732,20 @@ fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
 pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult<RecentDashboardResponse>{
     let start = current_time_millis_i64();
     let recent = r.ds.transaction_store.query_recent_transactions(Some(10), is_test).await?;
-    info!("Dashboard query time elapsed: {:?}", current_time_millis_i64() - start);
+    trace!("Dashboard query time elapsed: {:?}", current_time_millis_i64() - start);
     let mut recent_transactions = Vec::new();
     for tx in recent {
         let brief_tx = brief_transaction(&tx)?;
         recent_transactions.push(brief_tx);
     }
-    info!("Brief transaction build time elapsed: {:?}", current_time_millis_i64() - start);
+    trace!("Brief transaction build time elapsed: {:?}", current_time_millis_i64() - start);
     // TODO: Rename this
     let total_accepted_transactions =
         r.ds.transaction_store.count_total_transactions().await?;
-    info!("count_total_transactions time elapsed: {:?}", current_time_millis_i64() - start);
+    trace!("count_total_transactions time elapsed: {:?}", current_time_millis_i64() - start);
 
     let peers = r.ds.peer_store.active_nodes(None).await?;
-    info!("active nodes ds query elapsed: {:?}", current_time_millis_i64() - start);
+    trace!("active nodes ds query elapsed: {:?}", current_time_millis_i64() - start);
 
     let num_active_peers = (peers.len() as i64) + 1;
 
@@ -754,7 +755,7 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
         handle_peer(&r.peer_id_info().await?, &r, true).await?
     );
 
-    info!("active nodes first handle peer elapsed: {:?}", current_time_millis_i64() - start);
+    trace!("active nodes first handle peer elapsed: {:?}", current_time_millis_i64() - start);
 
     for pk in &pks {
         if let Some(pid) = r.ds.peer_store.peer_id_for_node_pk(pk).await? {
@@ -767,20 +768,20 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     }
 
     active_peers_abridged = active_peers_abridged.iter().filter(|p| !p.nodes.is_empty()).cloned().collect_vec();
-    info!("active nodes and peers done time elapsed: {:?}", current_time_millis_i64() - start);
+    trace!("active nodes and peers done time elapsed: {:?}", current_time_millis_i64() - start);
 
 
     let obs = r.ds.observation.recent_observation(
         Some(10),
     ).await?;
-    info!("observation query: {:?}", current_time_millis_i64() - start);
+    trace!("observation query: {:?}", current_time_millis_i64() - start);
 
     let mut recent_observations = vec![];
     for i in obs[0..10.min(obs.len())].iter() {
         let o = handle_observation(&i, &r).await?;
         recent_observations.push(o);
     }
-    info!("observation format: {:?}", current_time_millis_i64() - start);
+    trace!("observation format: {:?}", current_time_millis_i64() - start);
 
 
     Ok(RecentDashboardResponse {
