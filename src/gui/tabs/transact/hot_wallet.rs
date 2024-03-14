@@ -3,7 +3,7 @@ use eframe::egui::Ui;
 use crate::gui::app_loop::LocalState;
 use crate::gui::components::key_source_sel::key_source;
 use crate::gui::components::save_key_window;
-use crate::gui::wallet_tab::WalletState;
+use crate::gui::tabs::transact::wallet_tab::WalletState;
 
 
 pub fn hot_header(ls: &mut LocalState, ui: &mut Ui, _ctx: &egui::Context) {

@@ -2,7 +2,7 @@ use std::str::FromStr;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeBytesAccess, structs};
 use redgold_schema::structs::{Address, Hash};
-use crate::util::{dhash_str, dhash_vec};
+use crate::util::dhash_vec;
 use crate::util::keys::ToPublicKeyFromLib;
 use crate::util::mnemonic_support::WordsPass;
 
@@ -15,7 +15,7 @@ pub mod xpub_wrapper;
 pub mod address_external;
 pub mod eth;
 pub mod address_support;
-mod hw_wallet_wrapper;
+pub mod hw_wallet_wrapper;
 
 
 pub struct TestConstants {

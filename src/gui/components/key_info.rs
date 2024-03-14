@@ -124,7 +124,7 @@ pub fn update_keys_key_info(ls: &mut LocalState) {
     let gui_key = extract_gui_key(ls);
     ls.keytab_state.keys_key_info.update_fields(
         &ls.node_config.network,
-        ls.keytab_state.dp_key_viewer.derivation_path.clone(),
+        ls.keytab_state.key_derivation_path_input.derivation_path.clone(),
         gui_key
     );
 }
@@ -135,7 +135,7 @@ pub fn update_xpub_key_info(ls: &mut LocalState) {
         let gui_key = GuiKey::XPub(xpub.xpub.clone());
         ls.keytab_state.xpub_key_info.update_fields(
             &ls.node_config.network,
-            ls.keytab_state.dp_xpub_viewer.derivation_path.clone(),
+            ls.keytab_state.derivation_path_xpub_input_account.derivation_path(),
             gui_key
         );
     }

@@ -74,17 +74,22 @@ impl EthHistoricalClient {
         chain
     }
 
-    pub async fn get_balance(&self, address: &String) -> RgResult<BigInt> {
+    pub async fn get_balance(&self, address: &String) -> RgResult<String> {
         let addr = address.parse().error_info("address parse failure")?;
         let metadata = self.client
             .get_ether_balance_single(&addr, None).await.error_info("balance fetch failure")?;
         let bal = metadata.balance;
-        BigInt::from_str(&bal).error_info("balance parse failure")
+        Ok(bal)
     }
     pub fn translate_value(value: &String) -> RgResult<i64> {
         BigInt::from_str(value).error_info("value parse failure")
             .map(|v| v / Self::bigint_offset())
             .and_then(|v| v.to_i64().ok_or(error_info("BigInt translation to i64 failure")))
+    }
+    pub fn translate_value_to_float(value: &String) -> RgResult<f64> {
+        let bi = BigInt::from_str(value).error_info("bigint value parse failure")?;
+        let f64 = bi.to_f64().ok_or(error_info("BigInt translation to f64 failure"))?;
+        Ok(f64 / 10_f64.powi(18))
     }
 
     pub fn parse_address(value: &String) -> RgResult<structs::Address> {
@@ -93,7 +98,7 @@ impl EthHistoricalClient {
     }
 
     // Workaround for dealing with u64's etc, drop from e18 precision to e8 precision
-    fn bigint_offset() -> BigInt {
+    pub fn bigint_offset() -> BigInt {
         BigInt::from(10_u64.pow(10))
     }
 

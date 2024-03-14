@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::fmt::format;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
@@ -133,7 +134,7 @@ impl LocalState {
             store.config_store.update_stored_state(state).await
         });
     }
-    pub fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>) -> RgResult<()> {
+    pub fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()> {
         let new_names = new_named.iter().map(|x| x.name.clone())
             .collect_vec();
         let existing = self.local_stored_state.xpubs.clone();
@@ -143,8 +144,14 @@ impl LocalState {
         if filtered.len() != existing.len() && !overwrite_name {
             return Err(error_info("Xpub with name already exists"));
         }
-        filtered.extend(new_named);
-        self.local_stored_state.xpubs = filtered;
+        let mut new_named2 = new_named.clone();
+        if !prepend {
+            filtered.extend(new_named);
+            self.local_stored_state.xpubs = filtered;
+        } else {
+            new_named2.extend(filtered);
+            self.local_stored_state.xpubs = new_named2;
+        }
         self.persist_local_state_store();
         Ok(())
     }
@@ -208,13 +215,14 @@ impl LocalState {
         ).await.expect("migrations");
         // DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
-        let local_stored_state = ds_or.config_store.get_stored_state().await?;
+        let mut local_stored_state = ds_or.config_store.get_stored_state().await?;
+
         let mut ss = crate::gui::tabs::server_tab::ServersState::default();
 
         ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
             .all().servers_path().to_str().expect("").to_string();
         ss.genesis = node_config.opts.development_mode;
-        let ls = LocalState {
+        let mut ls = LocalState {
             active_tab: Tab::Home,
             session_salt: random_bytes(),
             session_password_hashed: None,
@@ -240,13 +248,13 @@ impl LocalState {
             keygen_state: KeygenState::new(
                 node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
             ),
-            wallet_state: WalletState::new(hot_mnemonic),
+            wallet_state: WalletState::new(hot_mnemonic, local_stored_state.xpubs.first()),
             qr_state: Default::default(),
             qr_show_state: Default::default(),
             identity_state: IdentityState::new(),
             settings_state: SettingsState::new(local_stored_state.json_or(),
                                                node_config.data_folder.clone().path.parent().unwrap().to_str().unwrap().to_string(),
-                                               node_config.secure_data_folder.unwrap_or(node_config.data_folder.clone())
+                                               node_config.secure_data_folder.clone().unwrap_or(node_config.data_folder.clone())
                                                    .path.parent().unwrap().to_str().unwrap().to_string()
             ),
             address_state: Default::default(),
@@ -257,6 +265,50 @@ impl LocalState {
             updates: new_channel(),
             keytab_state: Default::default(),
         };
+
+        let mut new_xpubs = vec![];
+
+        if let Some(df) = node_config.secure_data_folder.as_ref() {
+            if let Ok(m) = df.all().mnemonic().await {
+                if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
+                    let key_name = "secure_df_all".to_string();
+                    ls.wallet_state.selected_key_name = key_name.clone();
+                    ls.add_mnemonic(key_name.clone(), m, false);
+                    if let Ok(xpub) = w.named_xpub(key_name, true) {
+                        new_xpubs.push(xpub);
+                    }
+                }
+            }
+        }
+
+        if let Ok(m) = node_config.data_folder.all().mnemonic().await {
+            if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
+                let key_name = "df_all".to_string();
+                ls.add_mnemonic(key_name.clone(), m, false);
+                if let Ok(xpub) = w.named_xpub(key_name, true) {
+                    new_xpubs.push(xpub);
+                }
+            }
+        }
+
+        if let Ok(m) = std::env::var("REDGOLD_TEST_WORDS") {
+            if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
+                let key_name = "test_words".to_string();
+                ls.add_mnemonic(key_name.clone(), m, false);
+                if let Ok(xpub) = w.named_xpub(key_name, true) {
+                    new_xpubs.push(xpub);
+                }
+            }
+        }
+
+        if !new_xpubs.is_empty() {
+            let first_xpub = new_xpubs.get(0).unwrap().clone();
+            ls.wallet_state.selected_xpub_name = first_xpub.name.clone();
+            ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
+        }
+
+        // TODO: Add from environment
+
         Ok(ls)
     }
 
@@ -348,20 +400,21 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::dhash_vec;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
-use crate::gui::tabs::keygen_subtab::KeygenState;
-use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey};
+use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
-use crate::gui::tabs::{keygen_subtab, server_tab};
-use crate::gui::tabs::hot_wallet::init_state;
-use crate::gui::tabs::keys_tab::{keys_tab, KeyTabState};
+use crate::gui::tabs::{server_tab};
+use crate::gui::tabs::keys::keygen_subtab::KeygenState;
+use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
 use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
-use crate::gui::wallet_tab::{StateUpdate, wallet_screen, WalletState};
+use crate::gui::tabs::transact::hot_wallet::init_state;
+use crate::gui::tabs::transact::wallet_tab::{StateUpdate, wallet_screen, WalletState};
 use crate::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
 
 static INIT: Once = Once::new();
@@ -480,6 +533,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     // if ctx.input().key_pressed(egui::Key::Escape) {
     //     local_state.session_locked = true;
     // }
+    let has_changed_tab = changed_tab.is_some();
 
     egui::CentralPanel::default().show(ctx, |ui| {
         // The central panel the region left after adding TopPanel's and SidePanel's
@@ -488,7 +542,8 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 home::home_screen(ui, ctx, local_state);
             }
             Tab::Keys => {
-                keys_tab(ui, ctx, local_state, changed_tab.is_some());
+
+                keys_tab(ui, ctx, local_state, has_changed_tab);
             }
             Tab::Settings => {
                 settings_tab(ui, ctx, local_state);
@@ -498,7 +553,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 server_tab::servers_tab(ui, ctx, local_state);
             }
             Tab::Transact => {
-                wallet_screen(ui, ctx, local_state);
+                wallet_screen(ui, ctx, local_state, has_changed_tab);
             }
             Tab::Identity => {
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);

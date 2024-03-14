@@ -1,9 +1,10 @@
 use std::future::Future;
 use std::time::Instant;
+use bdk::bitcoin::bech32::ToBase32;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
 use flume::Sender;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use serde::Deserialize;
 use crate::gui::app_loop::LocalState;
 
@@ -11,11 +12,12 @@ use strum::IntoEnumIterator;
 // 0.17.1
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
-use redgold_keys::address_external::ToBitcoinAddress;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::{KeyPair, TestConstants};
+use redgold_keys::eth::example::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, RgResult, WithMetadataHashable};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption, WithMetadataHashable};
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
@@ -30,10 +32,12 @@ use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::observability::logging::Loggable;
-use redgold_schema::local_stored_state::NamedXpub;
+use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use crate::gui::components::passphrase_input::PassphraseInput;
 use crate::gui::components::xpub_req;
-use crate::gui::tabs::{cold_wallet, hot_wallet};
+use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
+use crate::gui::tabs::transact::{cold_wallet, hot_wallet};
 
 
 #[derive(Debug, EnumIter, EnumString, PartialEq)]
@@ -89,6 +93,9 @@ pub struct WalletState {
     balance_btc: Option<String>,
     balance_btc_f64: Option<f64>,
 
+    balance_eth: Option<String>,
+    balance_eth_f64: Option<f64>,
+
     address_info: Option<AddressInfo>,
     prepared_transaction: Option<Result<Transaction, ErrorInfo>>,
     unsigned_transaction_hash: Option<String>,
@@ -135,7 +142,8 @@ pub struct WalletState {
     pub custom_tx_json: String,
     pub mnemonic_save_persist: bool,
     pub mark_output_as_stake: bool,
-    pub mark_output_as_swap: bool
+    pub mark_output_as_swap: bool,
+    pub passphrase_input: PassphraseInput,
 }
 
 impl WalletState {
@@ -223,7 +231,7 @@ impl WalletState {
         w
     }
 
-    pub fn new(hot_mnemonic: String) -> Self {
+    pub fn new(hot_mnemonic: String, option: Option<&NamedXpub>) -> Self {
         Self {
             tab: WalletTab::Hardware,
             device_list_status: DeviceListStatus::poll(),
@@ -238,6 +246,8 @@ impl WalletState {
             balance_f64: None,
             balance_btc: None,
             balance_btc_f64: None,
+            balance_eth: None,
+            balance_eth_f64: None,
             address_info: None,
             prepared_transaction: None,
             unsigned_transaction_hash: None,
@@ -268,7 +278,7 @@ impl WalletState {
             show_save_xpub_window: false,
             purge_existing_xpubs_on_save: false,
             allow_xpub_name_overwrite: true,
-            selected_xpub_name: "Select Xpub".to_string(),
+            selected_xpub_name: option.map(|o| o.name.clone()).unwrap_or("Select Xpub".to_string()),
             selected_key_name: "default".to_string(),
             last_selected_key_name: "default".to_string(),
             show_xpub_loader_window: false,
@@ -285,6 +295,7 @@ impl WalletState {
             mark_output_as_stake: false,
             mark_output_as_swap: false,
             last_selected_xpub_name: "".to_string(),
+            passphrase_input: Default::default(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -294,7 +305,7 @@ impl WalletState {
     }
 }
 
-pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool) {
     match local_state.wallet_state.updates.recv_while() {
         Ok(updates) => {
             for mut update in updates {
@@ -307,13 +318,107 @@ pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalSt
     }
     local_state.wallet_state.update_hardware();
     ui.style_mut().spacing.item_spacing.y = 2f32;
-    ui.heading("Wallet");
-    ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state));
+    ui.heading("Transact");
+    ui.separator();
+    ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state, has_changed_tab));
 }
 
 
+pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool) {
+    let (update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab);
+    let mut is_hot = false;
 
-pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState) {
+    if let Some(x) = xpub {
+
+        let mut passphrase_changed = false;
+
+        if x.request_type != Some(XPubRequestType::Hot) {
+            cold_wallet::hardware_connected(ui, &mut ls.wallet_state);
+        } else {
+            is_hot = true;
+            passphrase_changed = ls.wallet_state.passphrase_input.view(ui);
+        }
+
+        if update || passphrase_changed {
+            // Are either of these even used?
+            // ls.wallet_state.active_xpub = x.xpub.clone();
+            // ls.wallet_state.active_derivation_path = ls.keytab_state.derivation_path_xpub_input_account.derivation_path();
+            if let Ok(pk) = ls.keytab_state.xpub_key_info.public_key() {
+                ls.wallet_state.public_key = Some(pk.clone());
+                if is_hot {
+                    if check_assign_hot_key(ls, &x, &pk).is_err() {
+                        // Err, refuse to proceed. Show error message to user
+                        ls.wallet_state.public_key = None;
+                    } else {
+
+                    }
+                }
+            } else {
+                ls.wallet_state.public_key = None;
+            }
+        }
+    }
+
+    if let Some(pk) = ls.wallet_state.public_key.clone() {
+        ls.wallet_state.passphrase_input.err_msg = None;
+        if update || (ls.wallet_state.address_info.is_none() && has_changed_tab) {
+            ls.wallet_state.address_info = None;
+            refresh_balance(ls);
+        }
+        if update {
+            // let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.wallet_state.derivation_path.clone()).expect("kp");
+
+
+        }
+        proceed_from_pk(ui, ls, &pk, is_hot);
+    }
+
+}
+
+fn check_assign_hot_key(ls: &mut LocalState, x: &NamedXpub, pk: &PublicKey) -> RgResult<()> {
+    let key_name = x.key_name_source.as_ref().ok_msg("key_name")?;
+    let k = ls.local_stored_state.by_key(&key_name).ok_msg("key")?;
+
+    match k {
+        Either::Left(m) => {
+            let pass = ls.wallet_state.passphrase_input.passphrase.clone();
+            let words = m.mnemonic.clone();
+            let w = WordsPass::new(
+                &words,
+                Some(pass.clone())
+            );
+            w.validate()?;
+            let dp = ls.keytab_state.derivation_path_xpub_input_account.derivation_path();
+            let pk2 = w.public_at(
+                &dp
+            )?;
+            if &pk2 != pk {
+                ls.wallet_state.passphrase_input.err_msg = Some("Public key mismatch".to_string());
+                return Err(error_info("Public key mismatch".to_string()));
+            }
+            ls.wallet_state.active_hot_mnemonic = Some(words);
+            ls.wallet_state.hot_passphrase = pass;
+            ls.wallet_state.derivation_path = dp.clone();
+            ls.wallet_state.derivation_path_valid = true;
+            ls.wallet_state.active_derivation_path = dp.clone();
+            ls.wallet_state.xpub_derivation_path = dp.clone();
+        }
+        Either::Right(kpo) => {
+            // Eek, need to get the xpub diff combo box for private keys? Or include it somehow
+            // this is more complex here.
+            return Err(error_info("Not yet implemented".to_string()));
+            // let kp = KeyPair::from_private_hex(kpo.key_hex.clone())?;
+            // let pk2 = kp.public_key();
+            // if &pk2 != pk {
+            //     return Err(error_info("Public key mismatch".to_string()));
+            // }
+            // ls.wallet_state.active_hot_private_key_hex = Some(kpo.key_hex.clone());
+        }
+    };
+    Ok(())
+}
+
+pub fn wallet_screen_scrolled_deprecated(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState) {
 
     // local_state.wallet_state.updates.receiver.tr
     ui.separator();
@@ -338,7 +443,7 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
 
     match ls.wallet_state.tab {
         WalletTab::Hardware => {
-            cold_wallet::cold_header(ui, &mut ls.wallet_state);
+            cold_wallet::hardware_connected(ui, &mut ls.wallet_state);
         }
         WalletTab::Software => {
             hot_wallet::hot_header(ls, ui, ctx);
@@ -352,7 +457,7 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
     xpub_path_section(ui, ls, ctx);
 
     if let Some(pk) = ls.wallet_state.public_key.clone() {
-        proceed_from_pk(ui, ls, &pk);
+        // proceed_from_pk(ui, ls, &pk, );
     }
     ui.spacing();
 }
@@ -389,27 +494,34 @@ pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
     update_clicked
 }
 
-fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
-    data_item(ui, "Public Key:", pk.hex_or());
-    let address_str = pk.address()
-        .and_then(|a| a.render_string())
-        .unwrap_or("Address failure".to_string());
-    data_item(ui, "Address", address_str);
+fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool) {
+    // data_item(ui, "Public Key:", pk.hex_or());
+    // let address_str = pk.address()
+    //     .and_then(|a| a.render_string())
+    //     .unwrap_or("Address failure".to_string());
+    // data_item(ui, "Address", address_str);
 
     // TODO: Include bitcoin address / ETH address for path 0 here for verification.
     ui.separator();
 
+    let mut balance_str = format!("Balance RDG: {} ", ls.wallet_state.balance.clone());
+    if let Some(b) = ls.wallet_state.balance_btc.as_ref() {
+        balance_str = format!("{} BTC: {}", balance_str, b);
+    };
+    if let Some(b) = ls.wallet_state.balance_eth.as_ref() {
+        balance_str = format!("{} ETH: {}", balance_str, b);
+    };
 
-    ui.heading(RichText::new(format!("Balance: RDG: {} {}",
-                                     ls.wallet_state.balance.clone(),
-        ls.wallet_state.balance_btc.clone().map(|b| format!("BTC: {}", b)).unwrap_or("".to_string())
-    ))
-        .color(Color32::LIGHT_GREEN));
-
-    ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
-    if ls.wallet_state.show_btc_info {
-        data_item(ui, "BTC Address", pk.to_bitcoin_address(&ls.node_config.network).unwrap_or("".to_string()));
+    if ls.wallet_state.address_info.is_none() {
+        balance_str = "loading address info".to_string();
     }
+
+    ui.heading(RichText::new(balance_str).color(Color32::LIGHT_GREEN));
+
+    // ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
+    // if ls.wallet_state.show_btc_info {
+    //     data_item(ui, "BTC Address", pk.to_bitcoin_address(&ls.node_config.network).unwrap_or("".to_string()));
+    // }
 
     send_receive_bar(ui, ls, pk);
 
@@ -435,7 +547,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             // }
         }
         if show_prepared {
-            prepared_view(ui, ls, pk);
+            prepared_view(ui, ls, pk, is_hot);
         }
     }
 }
@@ -451,7 +563,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
             }
         });
     ui.horizontal(|ui| {
-        ui.label("Destination Address");
+        ui.label("To:");
         let string = &mut ls.wallet_state.destination_address;
         ui.add(egui::TextEdit::singleline(string).desired_width(460.0));
         common::copy_to_clipboard(ui, string.clone());
@@ -469,7 +581,6 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
         ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
         ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
         ui.checkbox(&mut ls.wallet_state.mark_output_as_swap, "Mark as Swap");
-
     });
 
 }
@@ -504,7 +615,7 @@ fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {
     // });
 }
 
-pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool) {
 
 
     if ui.button("Prepare Transaction").clicked() {
@@ -526,7 +637,9 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             }
         } else {
             match &ls.wallet_state.address_info {
-                None => {}
+                None => {
+                    ls.wallet_state.signing_flow_status = Some("Missing UTXO info".to_string());
+                }
                 Some(ai) => {
                     let result = prepare_transaction(
                         ai,
@@ -564,21 +677,19 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
         if let Some(t) = res.as_ref().ok() {
             ui.allocate_ui(egui::Vec2::new(500.0, 0.0), |ui| {
                 ui.centered_and_justified(|ui| {
-                    medium_data_item(ui, "Unsigned Transaction Hash:".to_string(), t.hash_hex_or_missing());
+                    data_item(ui, "Raw TX Hash:".to_string(), t.hash_hex_or_missing());
                 });
             });
             if ui.button("Sign Transaction").clicked() {
                 if ls.wallet_state.send_currency_type == SupportedCurrency::Redgold {
-                    match ls.wallet_state.tab {
-                        WalletTab::Hardware => {
+                    if !is_hot {
                             initiate_hardware_signing(
                                 t.clone(),
                                 ls.wallet_state.updates.sender.clone(),
                                 pk.clone().clone(),
                             );
                             ls.wallet_state.signing_flow_status = Some("Awaiting hardware response...".to_string());
-                        }
-                        WalletTab::Software => {
+                        } else {
                             let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.wallet_state.derivation_path.clone()).expect("kp");
                             let mut t2 = t.clone();
                             let signed = t2.sign(&kp);
@@ -588,10 +699,10 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 } else if ls.wallet_state.send_currency_type == SupportedCurrency::Bitcoin {
                     match ls.wallet_state.tab {
                         WalletTab::Hardware => {
-                            error!("Hardware signing not supported yet for btc");
+                            // error!("Hardware signing not supported yet for btc");
                         }
                         WalletTab::Software => {
-                            error!("Software signing not yet supported for btc");
+                            // error!("Software signing not yet supported for btc");
                             // let mut w = SingleKeyBitcoinWallet::new_wallet(
                             //     pk.clone(), ls.node_config.network, true
                             // ).expect("w");
@@ -606,19 +717,17 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                     }
                 }
             }
-        }
     }
     if let Some(m) = &ls.wallet_state.signing_flow_status {
         ui.label(m);
     }
     if let Some(t) = &ls.wallet_state.signed_transaction {
         if let Some(t) = t.as_ref().ok() {
-            medium_data_item(ui, "Signed TX Hash:", ls.wallet_state.signed_transaction_hash.clone().unwrap_or("error".to_string()));
+            data_item(ui, "Signed TX Hash:", ls.wallet_state.signed_transaction_hash.clone().unwrap_or("error".to_string()));
             if ui.button("Broadcast Transaction").clicked() {
                 broadcast_transaction(
                     ls.node_config.clone(),
                     t.clone(),
-                    NetworkEnvironment::Dev,
                     ls.wallet_state.updates.sender.clone(),
                 );
                 ls.wallet_state.signing_flow_status = Some("Awaiting broadcast response...".to_string());
@@ -678,13 +787,17 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             ui.hyperlink_to("Faucet", env_formatted_faucet);
             ui.label(ls.wallet_state.faucet_success.clone());
             if ui.button("Refresh Balance").clicked() {
-                get_address_info(&ls.node_config, ls.wallet_state.public_key.clone().expect("pk"),
-                                 ls.wallet_state.show_btc_info.clone(),
-                                 ls.wallet_state.updates.sender.clone(),
-                );
+                refresh_balance(ls);
             };
         });
     });
+}
+
+fn refresh_balance(ls: &mut LocalState) {
+    get_address_info(&ls.node_config,
+                     ls.wallet_state.public_key.clone().expect("pk"),
+                     ls.wallet_state.updates.sender.clone(),
+    );
 }
 
 pub fn derivation_path_section(ui: &mut Ui, ls: &mut LocalState) {
@@ -749,11 +862,11 @@ fn window_xpub(
                 editable_text_input_copy(ui, "Name", &mut ls.wallet_state.xpub_save_name, 150.0);
                 if ui.button("Save Internal").clicked() {
                     let xpub = ls.wallet_state.active_xpub.clone();
-                    let named_xpub = NamedXpub {
-                        name: ls.wallet_state.xpub_save_name.clone(),
-                        derivation_path: ls.wallet_state.xpub_derivation_path.clone(),
-                        xpub,
-                        hot_offset: if ls.wallet_state.tab == WalletTab::Software {
+                    let mut named_xpub = NamedXpub::default();
+                    named_xpub.name = ls.wallet_state.xpub_save_name.clone();
+                    named_xpub.derivation_path = ls.wallet_state.xpub_derivation_path.clone();
+                    named_xpub.xpub = xpub.clone();
+                    named_xpub.hot_offset = if ls.wallet_state.tab == WalletTab::Software {
                             if ls.wallet_state.hot_offset != "" {
                                 Some(ls.wallet_state.hot_offset.clone())
                             } else {
@@ -761,13 +874,7 @@ fn window_xpub(
                             }
                         } else {
                             None
-                        },
-                        key_name_source: None,
-                        device_id: None,
-                        key_reference_source: None,
-                        key_nickname_source: None,
-                        request_type: None,
-                    };
+                        };
                     ls.updates.sender.send(StateUpdate {
                         update: Box::new(
                             move |lss: &mut LocalState| {
@@ -851,7 +958,7 @@ pub fn window_xpub_loader(
                                     lss.local_stored_state.xpubs = vec![];
                                 }
                                 // TODO: Render error msg
-                                lss.add_named_xpubs(lss.wallet_state.allow_xpub_name_overwrite, rows2).ok();
+                                lss.add_named_xpubs(lss.wallet_state.allow_xpub_name_overwrite, rows2, false).ok();
                                 lss.wallet_state.show_xpub_loader_window = false;
                             }
                         });
@@ -948,10 +1055,9 @@ pub fn xpub_path_section(ui: &mut Ui, ls: &mut LocalState, ctx: &Context) {
 // }
 
 // TODO: Abstract over spawn/send updates
-fn broadcast_transaction(nc: NodeConfig, tx: Transaction, ne: NetworkEnvironment, send: Sender<StateUpdate>) {
+fn broadcast_transaction(nc: NodeConfig, tx: Transaction, send: Sender<StateUpdate>) {
     tokio::spawn(async move {
         let mut nc = nc.clone();
-        nc.network = ne;
         let res = nc.clone().api_client().send_transaction(&tx.clone(), true).await;
 
         let st = Some(res.clone());
@@ -1006,7 +1112,11 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
     let amount = CurrencyAmount::from_float_string(amount)?;
     let mut tb = TransactionBuilder::new(&nc.network);
     let a = ai.address.as_ref().expect("a");
-    tb.with_address_info(ai.clone());
+
+    tb.with_address_info(ai.clone())?;
+    // for u in tb.utxos {
+    //     info!("Address info UTXO in prepare transaction: {}", u.json_or());
+    // }
     tb.with_output(&destination, &amount);
     if x.mark_output_as_swap {
         tb.with_last_output_withdrawal_swap();
@@ -1022,26 +1132,47 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
     res
 }
 
+#[ignore]
+#[tokio::test]
+pub async fn prepare_tx_test() {
+    let nc = NodeConfig::dev_default().await;
+    let api = nc.api_client();
+    let pk_hex = "";
+    let pk = PublicKey::from_hex(pk_hex).expect("pk");
+    let addr = pk.address().expect("addr");
+    let ai = api.address_info(addr.clone()).await.expect("ai");
+    let mut tb = TransactionBuilder::new(&nc.network);
+    let a = ai.address.as_ref().expect("a");
+    tb.with_address_info(ai.clone())?;
+    for u in tb.utxos {
+        info!("Address info UTXO in prepare transaction: {}", u.json_or());
+    }
+}
+
 
 pub fn get_address_info(
     node_config: &NodeConfig,
     public_key: PublicKey,
-    show_btc_info: bool,
     update_channel: flume::Sender<StateUpdate>,
 ) {
     let node_config = node_config.clone();
     let address = public_key.address().expect("works");
     let _ = tokio::spawn(async move {
 
-        let btc_bal = if show_btc_info {
-            let w = SingleKeyBitcoinWallet::new_wallet(
+        let btc_bal = SingleKeyBitcoinWallet::new_wallet(
                 public_key.clone(), node_config.network.clone(), true)
-                .expect("worx");
-            let fb = w.get_wallet_balance().expect("b").confirmed as f64 / 100_000_000.0;
-            Some(fb)
-        } else {
-            None
-        };
+                .ok().and_then(|w| w.get_wallet_balance().ok())
+                .map(|b| b.confirmed as f64 / 1e8f64);
+
+        let mut eth_bal: Option<f64> = None;
+        if let Some(Ok(eth)) = EthHistoricalClient::new(&node_config.network) {
+            let eth_addr = public_key.to_ethereum_address().expect("eth");
+            if let Ok(bi) = eth.get_balance(&eth_addr).await {
+                if let Ok(v) = EthHistoricalClient::translate_value_to_float(&bi) {
+                    eth_bal = Some(v);
+                }
+            }
+        }
 
         let client = node_config.api_client();
         let response = client
@@ -1057,6 +1188,8 @@ pub fn get_address_info(
                     ls.wallet_state.address_info = Some(ai.clone());
                     ls.wallet_state.balance_btc_f64 = btc_bal.clone();
                     ls.wallet_state.balance_btc = btc_bal.clone().map(|b| b.to_string());
+                    ls.wallet_state.balance_eth_f64 = eth_bal.clone();
+                    ls.wallet_state.balance_eth = eth_bal.clone().map(|b| b.to_string());
                 })
             }
             Err(e) => {

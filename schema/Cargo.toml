@@ -32,6 +32,7 @@ csv = "1.1"
 num-traits = "0.2.15"
 tokio = { version = "1.36.0", features = ["rt"]}
 rand = { workspace = true }
+num-bigint = "0.4"
 
 # TODO: Change to feature only for not including in WASM
 

@@ -209,7 +209,7 @@ impl TransactionBuilder {
 
     pub fn with_address_info(&mut self, ai: AddressInfo) -> Result<&mut Self, ErrorInfo> {
         for u in ai.utxo_entries {
-            self.with_utxo(&u)?;
+            self.with_maybe_currency_utxo(&u)?;
         }
         Ok(self)
     }
