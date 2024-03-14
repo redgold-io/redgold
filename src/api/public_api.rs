@@ -14,6 +14,7 @@ use reqwest::ClientBuilder;
 use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
+use tracing::trace;
 use warp::reply::Json;
 use warp::{Filter, Server};
 use warp::http::Response;
@@ -634,9 +635,9 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     //     .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
     let port = relay2.node_config.public_port();
-    info!("Running public API on port: {:?}", port.clone());
+    // info!("Running public API on port: {:?}", port.clone());
 
-    let routes = hello
+    let mut routes = hello
         .or(seeds)
         .or(trust)
         .or(peer_tx)
@@ -654,6 +655,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .or(address_lookup)
         // .or(explorer_hash)
         // .or(explorer_recent)
+        .or(explorer::server::explorer_specific_routes(relay2.clone()))
         .or(home);
 
     // Create a warp Service using the filter
@@ -705,7 +707,7 @@ pub fn start_server(relay: Relay
 ) -> JoinHandle<Result<(), ErrorInfo>> {
 
     let handle = tokio::spawn(run_server(relay.clone()));
-    info!("Started PublicAPI server on port {:?}", relay.clone().node_config.public_port());
+    trace!("Started PublicAPI server on port {:?}", relay.clone().node_config.public_port());
     return handle;
 }
 
@@ -727,163 +729,6 @@ async fn mock_relay(relay: Relay) {
             .expect("send");
     }
 }
-//
-// #[tokio::test]
-// async fn run_warp_debug() {
-//     // Only for debug
-//     util::init_logger().expect("log");
-//     let relay = Relay::default().await;
-//     info!("Starting on: {:?}", relay.node_config.public_port);
-//     let runtimes = crate::node::NodeRuntimes::default();
-//     let res = crate::api::public_api::start_server(relay.clone(), runtimes.public_api.clone());
-//     res.await.expect("victree");
-//     // run_server(relay).await;
-// }
-
-// #[tokio::test]
-// #[ignore]
-// #[test]
-// fn test_warp_basic() {
-//     util::init_logger().expect("log");
-//
-//     let arc2 = build_runtime(2, "test-public-api");
-//
-//     let runtime = Arc::new(
-//         Builder::new_multi_thread()
-//             .worker_threads(2)
-//             .thread_name("public-api-test")
-//             .thread_stack_size(3 * 1024 * 1024)
-//             .enable_all()
-//             .build()
-//             .unwrap(),
-//     );
-//
-//     let mut relay = arc2.block_on(Relay::default());
-//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
-//     relay.node_config.public_port = Some(offset);
-//     start_server(relay.clone(), arc2.clone());
-//     runtime
-//         .clone()
-//         .block_on(async { sleep(Duration::new(3, 0)).await });
-//     let res = runtime.clone().block_on(async move {
-//         PublicClient::local(offset)
-//             .send_transaction(&create_genesis_transaction(), false)
-//             .await
-//             .unwrap()
-//     });
-//     let relay_t = relay.transaction.receiver.recv();
-//     assert_eq!(create_genesis_transaction(), relay_t.unwrap().transaction);
-//     let mut response = empty_public_response();
-//     response.submit_transaction_response = Some(SubmitTransactionResponse {
-//             transaction_hash: create_genesis_transaction().hash().into(),
-//             query_transaction_response: None,
-//         transaction: None,
-//     });
-//     // assert_eq!(
-//     //     response,
-//     //     res
-//     // );
-//
-//     let res2 = runtime.clone().block_on(async move {
-//         PublicClient::local(offset)
-//             .query_addresses(vec![])
-//             .await
-//             .unwrap()
-//     });
-//     println!("response: {:?}", res2);
-// }
-
-//
-// #[test]
-// fn test_warp_basic2() {
-//     util::init_logger().expect("log");
-//
-//     let arc2 = build_runtime(2, "test-public-api");
-//
-//     let runtime = Arc::new(
-//         Builder::new_multi_thread()
-//             .worker_threads(2)
-//             .thread_name("public-api-test")
-//             .thread_stack_size(3 * 1024 * 1024)
-//             .enable_all()
-//             .build()
-//             .unwrap(),
-//     );
-//
-//     let mut relay = arc2.block_on(Relay::default());
-//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
-//     relay.node_config.public_port = Some(offset);
-//     start_server(relay.clone(), arc2.clone());
-//     runtime
-//         .clone()
-//         .block_on(async { sleep(Duration::new(3, 0)).await });
-//     let request = Request::empty().about();
-//     let res = runtime.clone().block_on(async move {
-//         crate::api::Client::new("localhost".into(), offset)
-//             .proto_post(&request, "request_proto".into())
-//             .await
-//     });
-//
-//     println!("response: {:?}", res);
-// }
-//
-// #[test]
-// fn test_warp_basic3() {
-//     util::init_logger().expect("log");
-//
-//     let arc2 = build_runtime(2, "test-public-api");
-//
-//     let runtime = Arc::new(
-//         Builder::new_multi_thread()
-//             .worker_threads(2)
-//             .thread_name("public-api-test")
-//             .thread_stack_size(3 * 1024 * 1024)
-//             .enable_all()
-//             .build()
-//             .unwrap(),
-//     );
-//
-//     let mut relay = arc2.block_on(Relay::default());
-//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
-//     relay.node_config.public_port = Some(offset);
-//     start_server(relay.clone(), arc2.clone());
-//     runtime
-//         .clone()
-//         .block_on(async { sleep(Duration::new(3, 0)).await });
-//     let request = Request::empty().about();
-//     let res = runtime.clone().block_on(async move {
-//         crate::api::Client::new("localhost".into(), offset)
-//             .json_post::<Request, RResponse>(&request, "request_peer".into())
-//             .await
-//     });
-//
-//     println!("response: {:?}", res);
-// }
-
-
-//
-// #[tokio::test]
-// async fn test_warp_basic_timeout() {
-//     init_logger();
-//     info!("starting test");
-//     let mut relay = Relay::default();
-//     let offset = (3030 + OsRng::default().next_u32() % 40000) as u16;
-//     relay.node_config.public_port = Some(offset);
-//     start_server(relay.clone());
-//     info!("started server");
-//
-//     sleep(Duration::new(1, 0)).await;
-//     let client = PublicClient::local_timeout(offset, Duration::new(0, 1));
-//     info!("starting send");
-//     // outer timeout seems not to work properly.
-//     let res = timeout(
-//         Duration::from_secs(1),
-//         client.send_transaction(&create_genesis_transaction(), true),
-//     )
-//     .await
-//     .unwrap();
-//     assert!(res.is_err())
-// }
 
 #[ignore]
 #[test]

@@ -67,6 +67,18 @@ pub fn medium_data_item(ui: &mut Ui, label: impl Into<String>, text: impl Into<S
     });
 }
 
+pub fn medium_data_item_vertical(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>) {
+    ui.vertical(|ui| {
+        ui.label(label.into());
+        ui.spacing();
+        let x = text.into();
+        ui.label(x.clone());
+        let style = ui.style_mut();
+        style.override_text_style = Some(TextStyle::Small);
+        copy_to_clipboard(ui, x.clone());
+    });
+}
+
 pub fn big_button<S: Into<String>>(mut ui: Ui, lb: S) {
     ui.horizontal(|ui| {
         let style = ui.style_mut();

@@ -47,7 +47,7 @@ use crate::util::{auto_update, keys};
 use crate::schema::constants::EARLIEST_TIME;
 use redgold_keys::TestConstants;
 use tokio::task::spawn_blocking;
-use tracing::Span;
+use tracing::{Span, trace};
 use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::structs::TransactionState::Mempool;
 use crate::api::rosetta::models::Peer;
@@ -350,7 +350,7 @@ impl Node {
 
         }
 
-        info!("Node ready");
+        trace!("Node ready");
         counter!("redgold.node.node_started").increment(1);
 
         return Ok(node);
@@ -385,7 +385,7 @@ impl Node {
                     .await.expect("insert failed");
             // }
             let genesis_hash = tx.hash_or();
-            info!("Genesis hash {}", genesis_hash.json_or());
+            info!("Genesis hash {}", genesis_hash.hex());
             let _obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
             let _obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
             assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);

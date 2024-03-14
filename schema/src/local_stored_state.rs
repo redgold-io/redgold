@@ -1,14 +1,30 @@
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
+use strum_macros::{EnumIter, EnumString};
 use crate::servers::Server;
 use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
-#[derive(Serialize, Deserialize, Clone)]
+
+
+#[derive(Clone, Debug, EnumIter, EnumString, PartialEq, Serialize, Deserialize)]
+pub enum XPubRequestType {
+    Cold,
+    Hot,
+    QR
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NamedXpub {
     pub name: String,
     pub derivation_path: String,
     pub xpub: String,
-    pub hot_offset: Option<String>
+    pub hot_offset: Option<String>,
+    pub key_name_source: Option<String>,
+    pub device_id: Option<String>,
+    pub key_reference_source: Option<String>,
+    // Maybe should be same as 'name' but right now name references a hot key
+    pub key_nickname_source: Option<String>,
+    pub request_type: Option<XPubRequestType>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

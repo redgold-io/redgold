@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use itertools::Itertools;
 
 use log::{error, info};
 use rocket::form::FromForm;
@@ -24,6 +25,7 @@ use crate::infra::deploy::default_deploy;
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
+use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
     let ds = config.data_store().await;
@@ -469,7 +471,7 @@ async fn test_new_deploy() {
     deploy(&dep, &nc).await.expect("works").abort();
 }
 
-pub(crate) async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) {
+pub async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) {
     let hex = p0.clone().clone();
     let pk = PublicKey::from_hex(&hex).expect("hex");
     let w = SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("works");
@@ -480,4 +482,20 @@ pub(crate) async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) 
     for t in txs {
         println!("Tx: {:?}", t);
     }
+}
+pub async fn convert_metadata_xpub(path: &String) -> RgResult<()> {
+    let md = read_metadata_json(path).await?;
+    println!("name,derivation_path,xpub");
+    for x in md.rdg_btc_message_account_metadata {
+        let dp = x.derivation_path.split("/")
+            .map(|x| x.replace("'", ""))
+            .collect::<Vec<String>>();
+        let option = dp.get(1..4);
+        if let Some(strs) = option{
+            let name = strs.iter().join("_");
+            println!("account_{},{},{}", name, x.derivation_path.clone(), x.xpub.clone());
+        }
+
+    }
+    Ok(())
 }

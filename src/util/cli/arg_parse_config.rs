@@ -16,7 +16,9 @@ use crypto::sha2::Sha256;
 use futures::StreamExt;
 use itertools::Itertools;
 use log::{error, info};
+use metrics::{gauge, Label};
 use tokio::runtime::Runtime;
+use tracing::trace;
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -166,10 +168,10 @@ impl ArgTranslate {
         // Unnecessary for CLI commands, hence after immediate commands
         self.lookup_ip().await;
 
-        tracing::info!("Starting node with data store path: {}", self.node_config.data_store_path());
+        tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
         tracing::info!("Parsed args successfully with args: {:?}", self.args);
         tracing::info!("RgArgs options parsed: {:?}", self.opts);
-        info!("Development mode: {}", self.opts.development_mode);
+        // info!("Development mode: {}", self.opts.development_mode);
 
         Ok(())
     }
@@ -234,10 +236,10 @@ impl ArgTranslate {
 
         let buf1 = path_exec.clone();
         let path_str = buf1.to_str().expect("Path exec format failure");
-        info!("Path of current executable: {:?}", path_str);
+        trace!("Path of current executable: {:?}", path_str);
         let exec_name = path_exec.file_name().expect("filename access failure").to_str()
             .expect("Filename missing").to_string();
-        info!("Filename of current executable: {:?}", exec_name.clone());
+        trace!("Filename of current executable: {:?}", exec_name.clone());
         // This is somewhat slow for loading the GUI
         // let self_exe_bytes = fs::read(path_exec.clone()).expect("Read bytes of current exe");
         // let mut md5f = crypto::md5::Md5::new();
@@ -255,7 +257,9 @@ impl ArgTranslate {
         let shasum = calc_sha_sum(path_str.to_string()).log_error().ok();
 
         self.node_config.executable_checksum = shasum.clone();
-        info!("Executable checksum Sha256 from shell script: {:?}", shasum);
+        trace!("Executable checksum Sha256 from shell script: {:?}", shasum);
+        let or = shasum.unwrap_or("na".to_string());
+        gauge!("redgold.node.executable_checksum", &[("executable_checksum".to_string(), or)]).set(1.0);
     }
 
     async fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
@@ -340,14 +344,14 @@ impl ArgTranslate {
         }
 
         if self.node_config.peer_id.peer_id.is_none() {
-            tracing::info!("No peer_id found, attempting to generate a single key peer_id from existing mnemonic");
+            tracing::trace!("No peer_id found, attempting to generate a single key peer_id from existing mnemonic");
             // let string = self.node_config.mnemonic_words.clone();
             // TODO: we need to persist the merkle tree here as json or something
             // let tree = crate::node_config::peer_id_from_single_mnemonic(string)?;
             self.node_config.peer_id = self.node_config.default_peer_id()?;
         }
 
-        info!("Starting with peer id {}", self.node_config.peer_id.json_or());
+        trace!("Starting with peer id {}", self.node_config.peer_id.hex_or());
 
         Ok(())
 
@@ -562,7 +566,7 @@ impl ArgTranslate {
             self.node_config.seeds.push(self.node_config.self_seed())
         }
         if self.node_config.genesis {
-            info!("Starting node as genesis node");
+            // info!("Starting node as genesis node");
         }
     }
 
@@ -582,7 +586,7 @@ impl ArgTranslate {
     fn set_public_key(&mut self) {
         let pk = self.node_config.public_key();
         self.node_config.public_key = pk.clone();
-        info!("Starting node with public key: {}", pk.json_or());
+        info!("Public key: {}", pk.hex_or());
     }
     fn secure_data_folder(&mut self) {
         if let Some(pb) = Self::secure_data_path_buf() {
@@ -728,6 +732,9 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                 RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
                     commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
                     Ok(())
+                }
+                RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
+                    commands::convert_metadata_xpub(&b.metadata_file).await
                 }
                 _ => {
                     abort = false;
