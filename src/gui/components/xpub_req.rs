@@ -19,8 +19,8 @@ use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, editable_tex
 use crate::gui::components::derivation_path_sel::DerivationPathInputState;
 use crate::gui::components::key_source_sel::key_source;
 use crate::gui::tabs::transact::cold_wallet::hardware_connected;
-use crate::gui::tabs::transact::wallet_tab;
-use crate::gui::tabs::transact::wallet_tab::{StateUpdate};
+use crate::gui::tabs::transact::{address_query, wallet_tab};
+use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
 use crate::observability::logging::Loggable;
 
@@ -36,7 +36,7 @@ pub fn request_xpub_hardware(ls: &mut LocalState, ui: &mut Ui) {
                 let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
                 ls.wallet_state.public_key = Some(pk.clone());
                 ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                wallet_tab::get_address_info(
+                address_query::get_address_info(
                     &ls.node_config,
                     pk,
                     ls.wallet_state.updates.sender.clone(),

@@ -15,10 +15,11 @@ use crate::gui::components::derivation_path_sel::DerivationPathInputState;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
 use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
 use crate::gui::components::save_key_window;
-use crate::gui::components::xpub_req::{RequestXpubState};
+use crate::gui::components::xpub_req::RequestXpubState;
 use crate::gui::tabs::keys::keygen_subtab;
 use crate::gui::tabs::keys::show_xpub_window::show_xpub_window;
-use crate::gui::tabs::transact::wallet_tab::{derivation_path_section, hot_passphrase_section, window_xpub_loader};
+use crate::gui::tabs::keys::xpub_csv_loader::window_xpub_loader;
+use crate::gui::tabs::transact::wallet_tab::{hot_passphrase_section};
 
 
 #[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
