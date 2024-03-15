@@ -13,11 +13,13 @@ use serde::{Deserialize, Serialize};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
+use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
 use crate::util::btc_wallet::SingleKeyBitcoinWallet;
+use crate::xpub_wrapper::ValidateDerivationPath;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WordsPass {
@@ -109,6 +111,25 @@ impl WordsPass {
         self.kp_rg_account(0)
     }
 
+    pub fn default_xpub(&self) -> RgResult<String> {
+        let account_path = Self::default_rg_path(0).as_account_path().expect("works");
+        self.xpub_str(account_path)
+    }
+
+    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool) -> RgResult<NamedXpub> {
+        self.default_xpub().map(|xpub| {
+            let mut named = NamedXpub::default();
+            let key_into = key_name.into();
+            named.name = format!("{}0", key_into);
+            named.xpub = xpub;
+            named.key_name_source = Some(key_into);
+            named.request_type = Some(XPubRequestType::Hot);
+            named.skip_persist = Some(skip_persist);
+            named.derivation_path = Self::default_rg_path(0);
+            named
+        })
+    }
+
     pub fn default_pid_kp(&self) -> RgResult<KeyPair> {
         self.kp_rg_account(1)
     }
@@ -145,6 +166,17 @@ impl WordsPass {
             passphrase,
         }
     }
+
+    pub fn new_validated(words: impl Into<String>, passphrase: Option<String>) -> RgResult<Self> {
+        let s = Self {
+            words: words.into(),
+            passphrase: passphrase.map(|p| p.into()),
+        };
+        s.validate()?;
+        s.seed()?;
+        Ok(s)
+    }
+
     pub fn words(words: String) -> Self {
         Self {
             words,

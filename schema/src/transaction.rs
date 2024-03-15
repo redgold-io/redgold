@@ -587,7 +587,28 @@ impl CurrencyAmount {
         a.amount = amount;
         Ok(a)
     }
+
+    pub fn bigint_amount(&self)  {
+        todo!()
+    }
     pub fn to_fractional(&self) -> f64 {
+        let currency = self.currency
+            .and_then(|c| SupportedCurrency::from_i32(c))
+            .unwrap_or(SupportedCurrency::Redgold);
+        // match currency {
+        //     SupportedCurrency::Usdc => {}
+        //     SupportedCurrency::Bitcoin => {}
+        //     SupportedCurrency::Ethereum => {
+        //
+        //     }
+        //     SupportedCurrency::Redgold => {
+        //         self.to_fractional_std()
+        //     }
+        // }
+        self.to_fractional_std()
+    }
+
+    fn to_fractional_std(&self) -> f64 {
         (self.amount as f64) / (DECIMAL_MULTIPLIER as f64)
     }
 

@@ -13,7 +13,7 @@ pub enum XPubRequestType {
     QR
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct NamedXpub {
     pub name: String,
     pub derivation_path: String,
@@ -25,6 +25,7 @@ pub struct NamedXpub {
     // Maybe should be same as 'name' but right now name references a hot key
     pub key_nickname_source: Option<String>,
     pub request_type: Option<XPubRequestType>,
+    pub skip_persist: Option<bool>
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -66,6 +67,7 @@ pub struct Contact {
 pub struct StoredMnemonic {
     pub name: String,
     pub mnemonic: String,
+    // pub passphrase: Option<String>,
     pub persist_disk: Option<bool>,
 }
 
@@ -97,6 +99,10 @@ impl LocalStoredState {
                 mnemonic.persist_disk.unwrap_or(true)
             }).map(|d| d.clone()).collect_vec()
         });
+        self.xpubs = self.xpubs.iter().filter(|xpubs| {
+            !xpubs.skip_persist.unwrap_or(false)
+        }).map(|d| d.clone()).collect_vec();
+
     }
 }
 

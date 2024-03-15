@@ -18,9 +18,9 @@ use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy, valid_label};
 use crate::gui::components::derivation_path_sel::DerivationPathInputState;
 use crate::gui::components::key_source_sel::key_source;
-use crate::gui::tabs::cold_wallet::cold_header;
-use crate::gui::wallet_tab;
-use crate::gui::wallet_tab::{StateUpdate};
+use crate::gui::tabs::transact::cold_wallet::hardware_connected;
+use crate::gui::tabs::transact::{address_query, wallet_tab};
+use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
 use crate::observability::logging::Loggable;
 
@@ -36,10 +36,9 @@ pub fn request_xpub_hardware(ls: &mut LocalState, ui: &mut Ui) {
                 let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
                 ls.wallet_state.public_key = Some(pk.clone());
                 ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                wallet_tab::get_address_info(
+                address_query::get_address_info(
                     &ls.node_config,
                     pk,
-                    ls.wallet_state.show_btc_info.clone(),
                     ls.wallet_state.updates.sender.clone(),
                 );
             }
@@ -189,10 +188,11 @@ impl RequestXpubState {
                                     key_reference_source: None,
                                     key_nickname_source: None,
                                     request_type: Some(request_type.clone()),
+                                    skip_persist: None,
                                 };
                                 LocalState::send_update(&updates, move |lss| {
                                     let named2 = named.clone();
-                                    lss.add_named_xpubs(true, vec![named2]).log_error().ok();
+                                    lss.add_named_xpubs(true, vec![named2], false).log_error().ok();
                                     lss.persist_local_state_store();
                                 });
 

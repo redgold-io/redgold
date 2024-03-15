@@ -4,7 +4,7 @@ use redgold_keys::xpub_wrapper::ValidateDerivationPath;
 use crate::gui::common::{editable_text_input_copy, valid_label};
 
 
-const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
+const DEFAULT_DP: &str = "m/44'/16180'/0'/0/0";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DerivationPathInputState {

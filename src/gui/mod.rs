@@ -12,7 +12,6 @@ pub mod image_load;
 pub mod initialize;
 pub mod tables;
 pub mod home;
-pub mod wallet_tab;
 pub mod common;
 pub mod tabs;
 pub mod top_panel;
@@ -20,6 +19,7 @@ pub mod webcam;
 pub mod image_capture;
 pub mod qr_render;
 pub mod components;
+
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]

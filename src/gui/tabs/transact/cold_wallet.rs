@@ -1,7 +1,7 @@
 use eframe::egui::{Color32, RichText, Ui};
-use crate::gui::wallet_tab::WalletState;
+use crate::gui::tabs::transact::wallet_tab::WalletState;
 
-pub fn cold_header(ui: &mut Ui, state: &mut WalletState) {
+pub fn hardware_connected(ui: &mut Ui, state: &mut WalletState) {
     state.update_hardware();
     ui.horizontal(|ui| {
         ui.label("Hardware Wallet: ");

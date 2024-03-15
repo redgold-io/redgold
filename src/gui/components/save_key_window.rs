@@ -6,7 +6,7 @@ use std::str::FromStr;
 use eframe::egui;
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{editable_text_input_copy, valid_label};
-use crate::gui::wallet_tab::StateUpdate;
+use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 
 pub fn save_key_window(
     _ui: &mut Ui,

@@ -10,7 +10,7 @@ use redgold_schema::structs::{PeerMetadata, PublicKey, Transaction};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::gui::app_loop::{LocalState, PublicKeyStoredState};
 use crate::gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
-use crate::gui::wallet_tab::StateUpdate;
+use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 
 
 #[derive(Clone)]

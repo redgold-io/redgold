@@ -10,14 +10,16 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
+use crate::gui::components::account_deriv_sel::AccountDerivationPathInputState;
 use crate::gui::components::derivation_path_sel::DerivationPathInputState;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
 use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
 use crate::gui::components::save_key_window;
-use crate::gui::components::xpub_req::{RequestXpubState};
-use crate::gui::tabs::keygen_subtab;
-use crate::gui::tabs::keygen_subtab::keys_screen_scroll;
-use crate::gui::wallet_tab::{derivation_path_section, hot_passphrase_section, window_xpub_loader};
+use crate::gui::components::xpub_req::RequestXpubState;
+use crate::gui::tabs::keys::keygen_subtab;
+use crate::gui::tabs::keys::show_xpub_window::show_xpub_window;
+use crate::gui::tabs::keys::xpub_csv_loader::window_xpub_loader;
+use crate::gui::tabs::transact::wallet_tab::{hot_passphrase_section};
 
 
 #[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
@@ -39,8 +41,8 @@ pub struct KeyTabState {
     pub subsubtab: KeygenSubSubTab,
     pub show_private_key_window: bool,
     pub show_xpub: bool,
-    pub dp_key_viewer: DerivationPathInputState,
-    pub dp_xpub_viewer: DerivationPathInputState,
+    pub key_derivation_path_input: DerivationPathInputState,
+    pub derivation_path_xpub_input_account: AccountDerivationPathInputState,
     pub request_xpub: RequestXpubState,
     pub keys_key_info: KeyInfo,
     pub xpub_key_info: KeyInfo,
@@ -54,8 +56,8 @@ impl Default for KeyTabState {
             subsubtab: KeygenSubSubTab::XPubs,
             show_private_key_window: false,
             show_xpub: false,
-            dp_key_viewer: Default::default(),
-            dp_xpub_viewer: Default::default(),
+            key_derivation_path_input: Default::default(),
+            derivation_path_xpub_input_account: Default::default(),
             request_xpub: Default::default(),
             keys_key_info: Default::default(),
             xpub_key_info: Default::default(),
@@ -142,7 +144,7 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
         }
     });
 
-    let dp_has_changed_key = ls.keytab_state.dp_key_viewer.view(ui);
+    let dp_has_changed_key = ls.keytab_state.key_derivation_path_input.view(ui);
     // TODO: Hot passphrase should ONLY apply to mnemonics as it doesn't work for private keys
     if ls.wallet_state.active_hot_private_key_hex.is_none() {
         let update_clicked = hot_passphrase_section(ui, ls);
@@ -165,11 +167,11 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
         ui.horizontal(|ui| {
             editable_text_input_copy(ui, "Save XPub Account Name:", &mut ls.keytab_state.save_xpub_account_name, 150.0);
             if ui.button("Save").clicked() {
-                let derivation_path = ls.keytab_state.dp_key_viewer.derivation_path.as_account_path();
+                let derivation_path = ls.keytab_state.key_derivation_path_input.derivation_path.as_account_path();
                 if let Some(derivation_account_path) = derivation_path {
                     let m = ls.wallet_state.hot_mnemonic();
                     if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
-                        let dp2 = ls.keytab_state.dp_key_viewer.derivation_path.clone();
+                        let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
                         let check = m.checksum().unwrap_or("".to_string());
                         let words_public = m.public_at(&dp2).expect("Public at failed").hex_or();
                         let xpub_w = XpubWrapper::new(xpub.clone());
@@ -188,7 +190,8 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
                             key_reference_source: None,
                             key_nickname_source: None,
                             request_type: Some(XPubRequestType::Hot),
-                        }]).ok();
+                            skip_persist: None,
+                        }], false).ok();
                     }
                 }
             }
@@ -243,33 +246,8 @@ pub(crate) fn show_private_key_window(
 }
 
 
-pub(crate) fn show_xpub_window(
-    ctx: &Context, ls: &mut LocalState, xpub: NamedXpub
-) {
 
-    egui::Window::new("XPub")
-        .open(&mut ls.keytab_state.show_xpub)
-        .resizable(false)
-        .collapsible(false)
-        .min_width(300.0)
-        .default_width(300.0)
-        .show(ctx, |ui| {
-            ui.vertical(|ui| {
-                medium_data_item(ui, "Name", xpub.name.clone());
-                medium_data_item(ui, "Derivation Path", xpub.derivation_path.clone());
-                if let Some(ho) = xpub.hot_offset {
-                    medium_data_item(ui, "Hot Offset", ho);
-                }
-                let mut string = xpub.xpub.clone();
-                bounded_text_area_size(ui, &mut string, 300.0, 4);
-                copy_to_clipboard(ui, xpub.xpub.clone());
-
-            });
-        });
-}
-
-
-pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context, first_init: bool) {
+pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context, first_init: bool) -> (bool, Option<NamedXpub>) {
     let xpub =
         ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name)
             .cloned();
@@ -309,7 +287,8 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
 
         ui.horizontal(|ui| {
         if let Some(ap) = xp.derivation_path.as_account_path() {
-            medium_data_item(ui, "Account:", ap);
+            ls.keytab_state.derivation_path_xpub_input_account.account_derivation_path = ap;
+            // medium_data_item(ui, "Account:", ap);
         }
         if let Some(rt) = &xp.request_type {
             medium_data_item(ui, "Type:", format!("{:?}", rt));
@@ -325,7 +304,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
     }
 
     ui.horizontal(|ui| {
-        if ls.keytab_state.dp_xpub_viewer.view(ui) {
+        if ls.keytab_state.derivation_path_xpub_input_account.view(ui) {
             update = true;
         }
         if ui.button("Update").clicked() {
@@ -342,11 +321,9 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
         update_xpub_key_info(ls);
     }
 
-
-
     ls.keytab_state.xpub_key_info.view(ui);
 
-
+    (update, xpub2)
 }
 pub fn add_xpub_csv_button(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context) {
     window_xpub_loader(ui, ls, ctx);
