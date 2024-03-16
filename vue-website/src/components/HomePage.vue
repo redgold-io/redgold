@@ -4,7 +4,7 @@
       <!-- Intro text container -->
       <div class="col-12 col-md-6 order-1 order-md-1 px-md-3">
         <div class="intro-text">
-          <h2 style="margin-top: 10px">Peer-to-Peer Data Lake & Compute Engine</h2>
+          <h2 style="margin-top: 10px">Peer-to-Peer ETFs, Portfolios & Data Lake Engine</h2>
           <p class="sub-intro-text">
             Redgold is a decentralized platform for building data-oriented crypto applications and smart contracts, with
             a focus on ETFs & portfolio models.
@@ -16,6 +16,7 @@
           <div class="d-flex justify-content-center intro-buttons">
             <a href="https://dev.docs.redgold.io/introduction/getting-started" class="btn btn-primary intro-button">Get Started</a>
             <a href="https://dev.docs.redgold.io/whitepaper/introduction" class="btn btn-primary intro-button" >Whitepaper</a>
+            <a href="https://dev.docs.redgold.io/guides/amm-swaps-exchange" class="btn btn-primary intro-button" >Buy with AMM</a>
           </div>
         </div>
       </div>
@@ -109,10 +110,14 @@
         <div class="intro-text">
                     <h2>MARKETPLACE FOR NOTARIZATION</h2>
           <p class="sub-intro-text-section2">
-            Blockchains should not be companies, but instead reflect an openly audited market for validation
+            Blockchains should not be companies, but instead reflect an openly audited market for validation. Nodes
+            should compete to validate transactions, and fees should be set by market forces and ratings amongst each
+            other. Rather than Foundations or companies or closed DAOs, individual peer decisions should shape
+            the behavior.
           </p>
           <p class="sub-intro-text-section2">
-            Fees should not reflect ownership in a decentralized business, but rather user preferences and behavior
+            Fees should not reflect ownership in a decentralized business, but rather user preferences and behavior.
+            Large ownership interests shouldn't unfairly determine policy to the detriment of other users.
           </p>
           <div class="d-flex justify-content-center intro-buttons">
 <!--            <a href="https://dev.docs.redgold.io/introduction/about" class="btn btn-primary intro-button">Read more in the About section</a>-->
