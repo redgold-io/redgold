@@ -42,6 +42,16 @@ pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
 
 #[ignore]
 #[tokio::test]
+pub async fn debug_kp() {
+    if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
+        let path = "m/84'/0'/0'/0/0".to_string();
+        let w = WordsPass::words(w);
+        // w.xpub()
+    }
+}
+
+#[ignore]
+#[tokio::test]
 pub async fn send_test_btc_transaction_deposit() {
     let network = NetworkEnvironment::Staging;
     let amount_sats = 40000;

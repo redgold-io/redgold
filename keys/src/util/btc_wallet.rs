@@ -644,7 +644,7 @@ impl SingleKeyBitcoinWallet {
 
     // Used for rendering json for gui
     pub fn prepare_single(&mut self, dest: String, amount: f64) -> RgResult<String> {
-        let amount = (amount / (1e8f64)) as u64;
+        let amount = (amount * (1e8f64)) as u64;
         self.create_transaction_output_batch(vec![(dest, amount)])?;
         self.render_json()
     }
@@ -659,6 +659,14 @@ impl SingleKeyBitcoinWallet {
     pub fn prepare_single_sign(&mut self, dest: String, amount: f64, pkey_hex: String) -> RgResult<String> {
         self.prepare_single(dest, amount)?;
         self.local_sign_single(pkey_hex)
+    }
+
+    pub fn prepare_single_sign_and_broadcast(&mut self, dest: String, amount: f64, pkey_hex: String) -> RgResult<String> {
+        self.prepare_single(dest, amount)?;
+        self.local_sign_single(pkey_hex)?;
+        self.broadcast_tx()?;
+        let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid.to_string();
+        Ok(txid)
     }
 
     pub fn local_sign_single(&mut self, pkey_hex: String) -> RgResult<String> {

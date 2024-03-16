@@ -295,8 +295,20 @@ impl LocalState {
             if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
                 let key_name = "test_words".to_string();
                 ls.add_mnemonic(key_name.clone(), m, false);
-                if let Ok(xpub) = w.named_xpub(key_name, true) {
+                if let Ok(xpub) = w.named_xpub(&key_name, true) {
                     new_xpubs.push(xpub);
+                }
+                let dp_btc_faucet = "m/84'/0'/0'/0/0".to_string();
+                if let Ok(xpub) = w.xpub_str(&dp_btc_faucet.as_account_path().expect("acc")) {
+                    let mut named = NamedXpub::default();
+                    let key_into = key_name.clone();
+                    named.name = format!("{}_840", key_into);
+                    named.xpub = xpub;
+                    named.key_name_source = Some(key_into);
+                    named.request_type = Some(XPubRequestType::Hot);
+                    named.skip_persist = Some(true);
+                    named.derivation_path = dp_btc_faucet.clone();
+                    new_xpubs.push(named);
                 }
             }
         }
@@ -401,7 +413,7 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::dhash_vec;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_keys::xpub_wrapper::XpubWrapper;
+use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
