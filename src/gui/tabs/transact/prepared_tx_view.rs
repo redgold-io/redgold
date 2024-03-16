@@ -10,12 +10,14 @@ use crate::gui::common;
 use crate::gui::common::data_item;
 use crate::gui::tabs::transact::{broadcast_tx, hardware_signing, prepare_tx};
 use crate::gui::tabs::transact::wallet_tab::{SendReceiveTabs, WalletTab};
+use crate::observability::logging::Loggable;
 
 pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool) {
 
     if ui.button("Prepare Transaction").clicked() {
         if ls.wallet_state.send_currency_type == SupportedCurrency::Bitcoin {
             if let Ok(amount) = ls.wallet_state.amount_input.parse::<f64>() {
+
                 let mut w = SingleKeyBitcoinWallet::new_wallet(
                     pk.clone(), ls.node_config.network, true
                 ).expect("w");
@@ -26,9 +28,10 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: b
                 ls.wallet_state.signing_flow_transaction_box_msg = Some(
                     result.clone().json_or_combine()
                 );
-                let status = result.map(|_x| "Transaction Prepared".to_string())
+                let status = result.as_ref().map(|_x| "Transaction Prepared".to_string())
                     .unwrap_or("Preparation Failed".to_string());
                 ls.wallet_state.signing_flow_status = Some(status);
+                ls.wallet_state.transaction_prepared_success = result.is_ok();
             }
         } else {
             match &ls.wallet_state.address_info {
@@ -68,6 +71,76 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: b
         let string1 = &mut p.clone();
         common::bounded_text_area(ui, string1);
     }
+
+    if ls.wallet_state.send_currency_type != SupportedCurrency::Redgold && ls.wallet_state.transaction_prepared_success {
+        // BTC
+
+        if ui.button("Sign Transaction").clicked() {
+            match &ls.wallet_state.send_currency_type {
+                SupportedCurrency::Bitcoin => {
+                    if let Ok(amount) = ls.wallet_state.amount_input.parse::<f64>() {
+                        // TODO: Support single private key also
+                        let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path());
+                        if let Ok(pk_hex) = kp.map(|kp| kp.to_private_hex()) {
+                            let mut w = SingleKeyBitcoinWallet::new_wallet(
+                                pk.clone(), ls.node_config.network, true
+                            ).expect("w");
+                            let result = w.prepare_single_sign(
+                                ls.wallet_state.destination_address.clone(),
+                                amount,
+                                pk_hex
+                            ).log_error();
+
+                            ls.wallet_state.signing_flow_transaction_box_msg = Some(
+                                result.clone().json_or_combine()
+                            );
+                            let status = result.as_ref().map(|_x| "Transaction Signed".to_string())
+                                .unwrap_or("Signing Failed".to_string());
+                            ls.wallet_state.signing_flow_status = Some(status);
+                            ls.wallet_state.transaction_sign_success = result.is_ok();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if ls.wallet_state.transaction_sign_success {
+            if let Some(h) = ls.wallet_state.signed_transaction_hash.clone() {
+                data_item(ui, "TXID:", h);
+            }
+            if ui.button("Broadcast Transaction").clicked() {
+                match &ls.wallet_state.send_currency_type {
+                    SupportedCurrency::Bitcoin => {
+                        if let Ok(amount) = ls.wallet_state.amount_input.parse::<f64>() {
+                            // TODO: Support single private key also
+                            let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path());
+                            if let Ok(pk_hex) = kp.map(|kp| kp.to_private_hex()) {
+                                let mut w = SingleKeyBitcoinWallet::new_wallet(
+                                    pk.clone(), ls.node_config.network, true
+                                ).expect("w");
+                                let result = w.prepare_single_sign_and_broadcast(
+                                    ls.wallet_state.destination_address.clone(),
+                                    amount,
+                                    pk_hex
+                                ).log_error();
+                                if let Ok(r) = &result {
+                                    ls.wallet_state.signed_transaction_hash = Some(r.clone());
+                                }
+                                let status = result.map(|_x| "Transaction Broadcast".to_string())
+                                    .unwrap_or("Broadcast Failed".to_string());
+                                ls.wallet_state.signing_flow_status = Some(status);
+                                // ls.wallet_state.transaction_sign_success = result.is_ok();
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+
+    }
+
     if let Some(res) = &ls.wallet_state.prepared_transaction {
         if let Some(t) = res.as_ref().ok() {
             ui.allocate_ui(egui::Vec2::new(500.0, 0.0), |ui| {

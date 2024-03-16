@@ -7,6 +7,7 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use tracing::Instrument;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
+use redgold_schema::EasyJson;
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
@@ -153,7 +154,7 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
         }
     }
     if need_keys_update || first_init || dp_has_changed_key {
-        info!("Updating keys key info {} {}", need_keys_update, first_init);
+        // info!("Updating keys key info {} {}", need_keys_update, first_init);
         update_keys_key_info(ls);
     }
     // Show seed checksum (if mnemonic)
@@ -248,11 +249,9 @@ pub(crate) fn show_private_key_window(
 
 
 pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context, first_init: bool) -> (bool, Option<NamedXpub>) {
-    let xpub =
-        ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name)
-            .cloned();
 
-    let xpub2 = xpub.clone();
+
+    let mut xpub : Option<NamedXpub> = None;
 
     let mut update = false;
 
@@ -269,7 +268,9 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
                 ui.selectable_value(&mut ls.wallet_state.selected_xpub_name,
                                     "Select Xpub".to_string(), "Select Xpub".to_string());
             });
-        if let Some(xp) = xpub {
+        xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name)
+                .cloned();
+        if let Some(xp) = &xpub {
             let i = xp.xpub.len();
             if let Some(slice) = xp.xpub.get((i -8)..i) {
                 medium_data_item(ui, "Last 8:", slice);
@@ -282,7 +283,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
     });
 
 
-    if let Some(xp) = xpub2.as_ref() {
+    if let Some(xp) = xpub.as_ref() {
         show_xpub_window(ctx, ls, xp.clone());
 
         ui.horizontal(|ui| {
@@ -314,6 +315,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
 
     if ls.wallet_state.last_selected_xpub_name != ls.wallet_state.selected_xpub_name {
         ls.wallet_state.last_selected_xpub_name = ls.wallet_state.selected_xpub_name.clone();
+        info!("Selected xpub changed to {} returning {}", ls.wallet_state.selected_xpub_name.clone(), xpub.json_or());
         update = true;
     }
 
@@ -323,7 +325,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
 
     ls.keytab_state.xpub_key_info.view(ui);
 
-    (update, xpub2)
+    (update, xpub)
 }
 pub fn add_xpub_csv_button(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context) {
     window_xpub_loader(ui, ls, ctx);

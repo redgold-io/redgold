@@ -24,33 +24,6 @@ use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
 use crate::observability::logging::Loggable;
 
-pub fn request_xpub_hardware(ls: &mut LocalState, ui: &mut Ui) {
-    if ui.button("Request Xpub").clicked() {
-        ls.wallet_state.public_key = None;
-        ls.wallet_state.public_key_msg = Some("Awaiting input on device...".to_string());
-        // This blocks the entire UI... ah jeez
-        match trezor::get_public_node(ls.wallet_state.xpub_derivation_path.clone()).map(|x| x.xpub) {
-            Ok(xpub) => {
-                ls.wallet_state.show_save_xpub_window = true;
-                ls.wallet_state.active_xpub = xpub.clone();
-                let pk = XpubWrapper::new(xpub).public_at(0, 0).expect("xpub failure");
-                ls.wallet_state.public_key = Some(pk.clone());
-                ls.wallet_state.public_key_msg = Some("Got public key".to_string());
-                address_query::get_address_info(
-                    &ls.node_config,
-                    pk,
-                    ls.wallet_state.updates.sender.clone(),
-                );
-            }
-            Err(e) => {
-                ls.wallet_state.public_key_msg = Some("Error getting public key".to_string());
-                error!("Error getting public key: {}", e.json_or());
-            }
-        }
-    }
-}
-
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct RequestXpubState {
     save_name: String,
@@ -69,14 +42,16 @@ impl Default for RequestXpubState {
 
 impl RequestXpubState {
     pub fn new() -> Self {
-        Self {
+        let mut s = Self {
             save_name: "".to_string(),
             result: None,
             xpub_type: XPubRequestType::Cold,
             message: "".to_string(),
             derivation_path: Default::default(),
             show_window: false,
-        }
+        };
+        s.derivation_path.set_cold_default();
+        s
     }
 
     pub fn clear(&mut self) {

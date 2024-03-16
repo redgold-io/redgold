@@ -1,5 +1,7 @@
 use std::str::FromStr;
+use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::secp256k1::Secp256k1;
+use serde::Serialize;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeBytesAccess, structs};
 use redgold_schema::structs::{Address, Hash};
 use crate::util::dhash_vec;
@@ -113,5 +115,8 @@ impl KeyPair {
             secret_key,
             public_key,
         });
+    }
+    pub fn to_private_hex(&self) -> String {
+        self.secret_key.secret_bytes().to_hex()
     }
 }

@@ -83,9 +83,9 @@ impl KeyInfo {
             self.btc_address = pk.to_bitcoin_address(&self.network).unwrap_or("".to_string());
             self.eth_address = pk.to_ethereum_address().unwrap_or("".to_string());
 
-            info!("Public key found in update_public_key_info {}", self.btc_address);
+            // info!("Public key found in update_public_key_info {}", self.btc_address);
         } else {
-            info!("No public key found in update_public_key_info");
+            // info!("No public key found in update_public_key_info");
         }
     }
 
@@ -94,7 +94,7 @@ impl KeyInfo {
                          derivation_path: String,
                          key: GuiKey
     ) {
-        info!("Updating fields called");
+        // info!("Updating fields called");
         self.network = network_environment.clone();
         self.derivation_path = derivation_path;
         self.key = Some(key);

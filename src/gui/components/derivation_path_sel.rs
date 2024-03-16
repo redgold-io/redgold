@@ -5,6 +5,7 @@ use crate::gui::common::{editable_text_input_copy, valid_label};
 
 
 const DEFAULT_DP: &str = "m/44'/16180'/0'/0/0";
+const COLD_DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DerivationPathInputState {
@@ -26,6 +27,11 @@ impl DerivationPathInputState {
             last_derivation_path: DEFAULT_DP.to_string(),
             valid: true
         }
+    }
+    pub fn set_cold_default(&mut self) {
+        self.derivation_path = COLD_DEFAULT_DP.to_string();
+        self.last_derivation_path = COLD_DEFAULT_DP.to_string();
+        self.valid = true;
     }
     pub fn validation(&mut self) -> bool {
         let has_changed = self.derivation_path != self.last_derivation_path;

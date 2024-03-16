@@ -14,6 +14,7 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::{KeyPair, TestConstants};
+use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::example::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
@@ -99,6 +100,8 @@ pub struct WalletState {
     pub signed_transaction: Option<Result<Transaction, ErrorInfo>>,
     pub signed_transaction_hash: Option<String>,
     pub signing_flow_status: Option<String>,
+    pub transaction_prepared_success: bool,
+    pub transaction_sign_success: bool,
     pub signing_flow_transaction_box_msg: Option<String>,
     pub broadcast_transaction_response: Option<Result<SubmitTransactionResponse, ErrorInfo>>,
     pub show_btc_info: bool,
@@ -251,6 +254,8 @@ impl WalletState {
             signed_transaction: None,
             signed_transaction_hash: None,
             signing_flow_status: None,
+            transaction_prepared_success: false,
+            transaction_sign_success: false,
             signing_flow_transaction_box_msg: None,
             broadcast_transaction_response: None,
             show_btc_info: false,
@@ -322,8 +327,11 @@ pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalSt
 
 
 pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool) {
-    let (update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab);
+    let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab);
     let mut is_hot = false;
+    if has_changed_tab {
+        update = true;
+    }
 
     if let Some(x) = xpub {
 
@@ -386,10 +394,16 @@ fn check_assign_hot_key(ls: &mut LocalState, x: &NamedXpub, pk: &PublicKey) -> R
             );
             w.validate()?;
             let dp = ls.keytab_state.derivation_path_xpub_input_account.derivation_path();
+            let dp_xpub =  ls.keytab_state.xpub_key_info.derivation_path.clone();
             let pk2 = w.public_at(
                 &dp
             )?;
             if &pk2 != pk {
+                info!("Setting public key mismatch error for keyname {} checksum {} {} {} {} {} ",
+                    key_name.clone(),
+                    w.checksum().expect(""), dp.clone(), dp_xpub.clone(),
+                    pk2.hex_or(), pk.hex_or()
+                );
                 ls.wallet_state.passphrase_input.err_msg = Some("Public key mismatch".to_string());
                 return Err(error_info("Public key mismatch".to_string()));
             }
@@ -520,7 +534,7 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
         let string = &mut ls.wallet_state.destination_address;
         ui.add(egui::TextEdit::singleline(string).desired_width(460.0));
         common::copy_to_clipboard(ui, string.clone());
-        let valid_addr = Address::parse(string.clone()).is_ok();
+        let valid_addr = string.parse_address().is_ok();
         if valid_addr {
             ui.label(RichText::new("Valid").color(Color32::GREEN));
         } else {
