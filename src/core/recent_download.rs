@@ -31,7 +31,7 @@ impl RecentDownload {
                 .flat_map(|o| o.proof.as_ref()
                     .and_then(|p| p.public_key.as_ref())
                 ) {
-                let t = self.relay.get_trust_of_node(&pk).await?;
+                let t = self.relay.get_security_rating_trust_of_node(&pk).await?;
                 if let Some(t) = t {
                     // TODO: Better summation based on total peers and distance and so on
                     if t > 0.5 {

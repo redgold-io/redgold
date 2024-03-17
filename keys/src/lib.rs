@@ -73,7 +73,7 @@ impl TestConstants {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct KeyPair {
     pub secret_key: bdk::bitcoin::secp256k1::SecretKey,
     pub public_key: bdk::bitcoin::secp256k1::PublicKey,
