@@ -41,28 +41,39 @@ fn validate_utxos(all_txs: &mut Vec<TransactionEntry>, mut valid_utxos: HashMap<
 
     for (idx, t) in all_txs.iter().dropping(1).enumerate() {
         if let Some(t) = t.transaction.as_ref() {
+
             let has_amount = t.output_amounts_opt().filter(|&a| a.amount > 0).next().is_some();
             if !has_amount {
                 println!("no amount: skipping tx {}", t.json_or());
                 continue;
             }
+
             validated_count += 1;
             let fraction = (idx as f64 / total as f64)*100f64;
             if idx % 1000 == 0 {
                 println!("idx {}, fraction: {} validated_count: {}", idx, fraction, validated_count);
             }
             let time = t.time().expect("time");
-            t.input_utxo_ids().for_each(|utxo_id| {
-                assert!(valid_utxos.contains_key(utxo_id));
-                let prev = valid_utxos.get(utxo_id).expect("prev");
-                let prev_time = prev.time;
-                assert!(time.clone() > prev_time);
+            for utxo_id in t.input_utxo_ids() {
+                if !valid_utxos.contains_key(utxo_id) {
+                    println!("failure on transaction input utxo_id: {} for tx {}", utxo_id.json_or(), t.json_or());
+                } else {
+                    let prev = valid_utxos.get(utxo_id).expect("prev");
+                    let prev_time = prev.time;
+                    let correct_time = time.clone() > prev_time;
+                    if !correct_time {
+                        println!("failure on transaction input utxo_id: {} for tx {}", utxo_id.json_or(), t.json_or());
+                    }
+                }
                 valid_utxos.remove(utxo_id);
-            });
+            };
             let outputs = t.utxo_outputs().expect("outputs");
             for utxo_entry in outputs {
                 let utxo_id = utxo_entry.utxo_id.clone().expect("utxo_id");
-                assert!(!valid_utxos.contains_key(&utxo_id));
+                let in_valid_set_already = valid_utxos.contains_key(&utxo_id);
+                if in_valid_set_already {
+                    println!("failure on transaction output utxo_id: {} for tx {}", utxo_id.json_or(), t.json_or());
+                }
                 valid_utxos.insert(utxo_id.clone(), utxo_entry.clone());
             };
         }
