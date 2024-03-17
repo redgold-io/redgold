@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use metrics::{counter, gauge};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::{RgResult, SafeOption};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo};
@@ -138,6 +140,21 @@ impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
 
         let mut map: HashMap<Address, KeyPair> = HashMap::new();
+        let seed_addrs = self.relay.node_config.seeds.iter()
+            .flat_map(|s| s.peer_id.as_ref())
+            .flat_map(|p| p.peer_id.as_ref())
+            .flat_map(|p| p.address().ok())
+            .collect_vec();
+
+
+        // Randomly choose an item from the vector
+        // `choose` returns an Option, so we use match to handle it
+        let destination_choice = {
+            let mut rng = thread_rng(); // Get a random number generator
+            seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone()
+        };
+
+
         if !self.relay.node_config.network.is_main() {
             let min_offset = 20;
             let max_offset = 30;
@@ -152,35 +169,40 @@ impl LiveE2E {
             map.insert(address, key);
         }
         let addresses = map.keys().map(|a| a.clone()).collect_vec();
-        let mut utxo: Option<SpendableUTXO> = None;
+        let mut spendable_utxos = vec![];
         for (a, k) in map.iter() {
             let result = self.relay.ds.transaction_store.query_utxo_address(a).await?;
             let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
             let utxo_m = vec.get(0);
             if let Some(u) = utxo_m {
-                utxo = Some(SpendableUTXO {
+                spendable_utxos.push(Some(SpendableUTXO {
                     utxo_entry: u.clone().clone(),
                     key_pair: k.clone(),
-                });
-                break;
+                }));
             }
         }
-        if utxo.is_none() {
+        if spendable_utxos.is_empty() {
             return Ok(None);
         }
-        let u = utxo.safe_get_msg("No utxo in e2e")?;
+
         let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
-        let destination = addresses.iter()
-            .find(|a| u.key_pair.address_typed() != a.clone().clone())
-            .safe_get_msg("No destination address")?.clone().clone();
-        let amount = CurrencyAmount::from_fractional(1f64).expect("");
-        let tx = tx_b
+        let destination = destination_choice;
+        let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
+        let first_utxos = spendable_utxos.iter().take(10).flatten().cloned().collect_vec();
+
+        let tx_builder = tx_b
             .with_output(&destination, &amount)
-            .with_unsigned_input(u.utxo_entry.clone())?
-            .with_is_test()
-            .build()?
-            .sign(&u.key_pair)?;
-        return Ok(Some(tx));
+            .with_is_test();
+        for u in &first_utxos {
+            tx_builder.with_unsigned_input(u.utxo_entry.clone())?;
+        }
+        let mut tx = tx_builder
+            .build()?;
+
+        for u in &first_utxos {
+            tx.sign(&u.key_pair)?;
+        }
+        return Ok(Some(tx.clone()));
     }
 }
 
