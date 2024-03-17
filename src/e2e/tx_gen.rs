@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
@@ -5,12 +6,12 @@ use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::constants::MIN_FEE_RAW;
-use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, NetworkEnvironment, TestContractRequest};
+use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, NetworkEnvironment, TestContractRequest, UtxoId};
 use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::{TransactionBuilderSupport, TransactionHelpBuildSupport};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct SpendableUTXO {
     pub utxo_entry: UtxoEntry,
     pub key_pair: KeyPair,
@@ -33,9 +34,18 @@ pub struct TransactionGenerator {
     max_offset: usize,
     pub wallet: WordsPass, // default_client: Option<PublicClient>
     network: NetworkEnvironment,
+    pub used_utxos: Vec<UtxoId>,
+    pub pop_finished: Vec<SpendableUTXO>
 }
 
 impl TransactionGenerator {
+
+    pub fn used_spendable(&self) -> Vec<SpendableUTXO> {
+        self.pop_finished.iter()
+            .filter(|x| !self.finished_pool.contains(x))
+            .cloned()
+            .collect_vec()
+    }
 
     pub fn with_genesis(&mut self) -> TransactionGenerator {
         let vec = create_test_genesis_transaction()
@@ -58,7 +68,9 @@ impl TransactionGenerator {
             min_offset: 1,
             max_offset: 49,
             wallet: TestConstants::new().words_pass,
-            network: network.clone()
+            network: network.clone(),
+            used_utxos: vec![],
+            pop_finished: vec![],
         }
     }
 
@@ -88,7 +100,7 @@ impl TransactionGenerator {
 
 
     pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
-        let prev = self.finished_pool.pop().safe_get()?.clone();
+        let prev = self.pop_finished().safe_get()?.clone();
         let bytes = tokio::fs::read("./sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
         let mut tb = TransactionBuilder::new(&self.network);
         let x = &prev.utxo_entry;
@@ -109,7 +121,7 @@ impl TransactionGenerator {
     }
 
     pub async fn generate_deploy_test_contract_request(&mut self, address: Address) -> RgResult<TransactionWithKey> {
-        let prev = self.finished_pool.pop().safe_get()?.clone();
+        let prev = self.pop_finished().safe_get()?.clone();
         let mut tb = TransactionBuilder::new(&self.network);
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;
@@ -156,7 +168,25 @@ impl TransactionGenerator {
 
     pub fn generate_simple_tx(&mut self) -> Result<TransactionWithKey, ErrorInfo> {
         // TODO: This can cause a panic
-        let prev = self.finished_pool.pop().safe_get()?.clone();
+        let prev = self.pop_finished().safe_get()?.clone();
+        let key = self.all_value_transaction(prev.clone());
+        use redgold_schema::WithMetadataHashable;
+        // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
+        // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
+        // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
+        Ok(key)
+    }
+
+    pub fn pop_finished(&mut self) -> Option<SpendableUTXO> {
+        let spendable = self.finished_pool.pop();
+        self.pop_finished.push(spendable.clone().unwrap());
+        spendable
+    }
+
+    pub fn generate_simple_used_utxo_tx_otherwise_valid(&mut self) -> Result<TransactionWithKey, ErrorInfo> {
+        // TODO: This can cause a panic
+        let used = self.used_spendable();
+        let prev = used.get(0).expect("works").clone();
         let key = self.all_value_transaction(prev.clone());
         use redgold_schema::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
@@ -166,7 +196,7 @@ impl TransactionGenerator {
     }
 
     pub fn drain_tx(&mut self, addr: &Address) -> Transaction {
-        let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
+        let prev: SpendableUTXO = self.pop_finished().unwrap();
         // TODO: Fee?
         let txb = TransactionBuilder::new(&self.network)
             .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
@@ -190,24 +220,27 @@ impl TransactionGenerator {
     }
 
     pub fn generate_double_spend_tx(&mut self) -> (TransactionWithKey, TransactionWithKey) {
-        let prev: SpendableUTXO = self.finished_pool.pop().unwrap();
+        let prev: SpendableUTXO = self.pop_finished().unwrap();
         let tx1 = self.all_value_transaction(prev.clone());
         let tx2 = self.all_value_transaction(prev);
         (tx1, tx2)
     }
 
     pub fn completed(&mut self, tx: TransactionWithKey) {
+        let used_utxos = tx.transaction.fixed_utxo_ids_of_inputs().expect("fixed_utxo_ids_of_inputs");
         let vec = tx.transaction.to_utxo_entries(0 as u64);
         let iter = vec.iter().filter(|v| {
             v.opt_amount().map(|a| a.amount > (MIN_FEE_RAW)).unwrap_or(false)
                 && !(v.address().expect("a").address_type == AddressType::ScriptHash as i32)
         });
         for (i, v) in iter.enumerate() {
-            self.finished_pool.push(SpendableUTXO {
+            let spendable_utxo = SpendableUTXO {
                 utxo_entry: v.clone(),
                 key_pair: tx.key_pairs.get(i).or(tx.key_pairs.get(0)).unwrap().clone(),
-            });
+            };
+            self.finished_pool.push(spendable_utxo.clone());
         }
+        self.used_utxos.extend(used_utxos);
     }
 }
 

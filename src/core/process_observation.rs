@@ -8,6 +8,7 @@ use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::relay::Relay;
 use redgold_schema::EasyJson;
 use crate::core::process_transaction::{ProcessTransactionMessage, RequestProcessor};
+use crate::observability::logging::Loggable;
 
 #[derive(Clone)]
 pub struct ObservationHandler {
@@ -49,8 +50,35 @@ impl ObservationHandler {
         // Distinguish if we have validated this entirely before observing, some we will be
         // able to.
 
-        self.notify_subscribers(&o).await;
-        self.relay.ds.observation.insert_observation_and_edges(&o).await?;
+        let mut valid = false;
+        let opk = o.observation_public_key().ok();
+        if let Some(opk) = opk {
+            let t = self.relay.get_security_rating_trust_of_node(&opk).await?;
+            if let Some(t) = t {
+                if t > 0.1 {
+                    valid = true;
+                } else {
+                    counter!("redgold.observation.peer.rejected.low_trust").increment(1);
+                }
+            } else {
+                counter!("redgold.observation.peer.rejected.no_trust").increment(1);
+                // let pid = self.relay.ds.peer_store.peer_id_for_node_pk(&opk).await?;
+                // let pid_s = pid.map(|p| p.json_or()).unwrap_or("Missing peer id".to_string());
+                // let scores = self.relay.get_trust().await?;
+                // info!("No trust for observation public key: {} peer_id: {} all_scores {}", opk, pid_s, scores.json_or());
+            }
+        } else {
+            counter!("redgold.observation.peer.rejected.no_pk").increment(1);
+            // info!("No observation public key in observation: {}", o.json_or());
+        }
+        if valid {
+            counter!("redgold.observation.peer.added").increment(1);
+            self.notify_subscribers(&o).await;
+            self.relay.ds.observation.insert_observation_and_edges(&o).await?;
+        } else {
+            counter!("redgold.observation.peer.rejected").increment(1);
+            // info!("Rejected peer observation: {}", o.json_or());
+        }
 
         Ok(())
     }

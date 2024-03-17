@@ -87,6 +87,11 @@ pub struct ObservationMetadataInternalSigning {
 }
 
 #[derive(Clone)]
+pub struct ReadManyWriteOne<T> {
+    pub inner: Arc<AtomicCell<T>>
+}
+
+#[derive(Clone)]
 pub struct Relay {
     /// Internal configuration
     pub node_config: NodeConfig,
@@ -231,9 +236,7 @@ pub struct StrictRelay {}
 impl Relay {
 
     pub async fn get_trust(&self) -> RgResult<HashMap<PeerId, f64>> {
-        let _seeds = self.node_config.seeds.iter().filter_map(|s|
-            s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
-        ).collect::<HashMap<PeerId, f64>>();
+
         let peer_tx = self.peer_tx().await?;
         let pd = peer_tx.peer_data()?;
 
@@ -254,6 +257,17 @@ impl Relay {
                 }
             }
         }
+
+        let seed_scores = self.node_config.seeds.iter().filter_map(|s|
+            s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
+        ).collect::<HashMap<PeerId, f64>>();
+
+        for (k, v) in seed_scores {
+            if !hm.contains_key(&k) {
+                hm.insert(k, v);
+            }
+        }
+
         Ok(hm)
         // Err(error_info("test"))
     }
@@ -276,7 +290,7 @@ impl Relay {
         Ok(hm.get(peer_id).cloned())
     }
 
-    pub async fn get_trust_of_node(&self, public_key: &PublicKey) -> RgResult<Option<f64>> {
+    pub async fn get_security_rating_trust_of_node(&self, public_key: &PublicKey) -> RgResult<Option<f64>> {
         let hm = self.get_trust().await?;
         Ok(self.ds.peer_store.peer_id_for_node_pk(public_key).await?
             .and_then(|p| hm.get(&p).cloned()))
@@ -621,7 +635,7 @@ impl Relay {
                 if let Some(pk) = r.proof.as_ref().and_then(|p| p.public_key.as_ref()) {
                     if let Some(utxo_r) = &r.utxo_valid_response {
                         if let Some(r) = &utxo_r.valid {
-                            if let Some(t) = self.get_trust_of_node(pk).await? {
+                            if let Some(t) = self.get_security_rating_trust_of_node(pk).await? {
                                 if r.clone() {
                                     sum += t;
                                 } else {

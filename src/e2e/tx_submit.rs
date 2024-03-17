@@ -6,6 +6,7 @@ use itertools::Itertools;
 use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
+use redgold_keys::transaction_support::TransactionSupport;
 
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
@@ -20,7 +21,7 @@ use crate::schema::WithMetadataHashable;
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
     // runtime: Arc<Runtime>,
-    client: PublicClient,
+    pub(crate) client: PublicClient
 }
 
 impl TransactionSubmitter {
@@ -33,6 +34,29 @@ impl TransactionSubmitter {
         assert!(res.is_err());
         let _err = res.unwrap_err();
     }
+    pub(crate) async fn submit_used_mismatched_utxo(&self) {
+        let mut gen = self.generator.lock().unwrap();
+        let transaction = gen.generate_simple_tx().clone().expect("tx");
+        let mut tx = transaction.transaction.clone();
+        let used_utxo = gen.used_utxos.get(0);
+        let used = used_utxo.expect("used");
+        let input0 = tx.inputs.get_mut(0).expect("sig");
+        input0.utxo_id = Some(used.clone());
+        // i think?
+        assert!(tx.prevalidate().is_err());
+        let res = self.client.clone().send_transaction(&tx, true).await;
+        assert!(res.is_err());
+        let _err = res.unwrap_err();
+    }
+    pub(crate) async fn submit_used_utxo(&self) {
+        let mut gen = self.generator.lock().unwrap();
+        let transaction = gen.generate_simple_used_utxo_tx_otherwise_valid().clone().expect("tx");
+        let mut tx = transaction.transaction.clone();
+        assert!(tx.prevalidate().is_ok());
+        let res = self.client.clone().send_transaction(&tx, true).await;
+        assert!(res.is_err());
+    }
+
 }
 
 

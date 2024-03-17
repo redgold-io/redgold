@@ -25,6 +25,7 @@ pub mod shuffle;
 pub mod test;
 pub mod qr_window;
 pub mod scrape;
+pub mod sanity;
 
 pub use redgold_schema as schema;
 pub use redgold_data as datas;

@@ -110,7 +110,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     // let peer_publics = relay.ds.select_broadcast_peers().unwrap();
     let mut map = HashMap::<Vec<u8>, f64>::new();
     for peer in &an {
-        let t = relay.get_trust_of_node(peer).await?.unwrap_or(0.0);
+        let t = relay.get_security_rating_trust_of_node(peer).await?.unwrap_or(0.0);
         map.insert(peer.bytes.safe_bytes()?, t);
     }
 

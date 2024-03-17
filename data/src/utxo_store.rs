@@ -26,4 +26,20 @@ impl UtxoStore {
                 r.map(|r| structs::UtxoEntry::proto_deserialize(r.raw)).transpose()
             )
     }
+
+
+    pub async fn utxo_id_valid(
+        &self,
+        utxo: &UtxoId
+    ) -> Result<bool, ErrorInfo> {
+        let b = utxo.transaction_hash.safe_bytes()?;
+        // TODO: Select present
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT output_index FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            b,
+            utxo.output_index
+        )
+            .fetch_optional(&mut *self.ctx.pool().await?).await)?
+            .is_some())
+    }
 }

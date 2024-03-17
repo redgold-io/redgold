@@ -2,12 +2,15 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use itertools::Itertools;
 use log::info;
+use log::kv::Source;
+use serde::Serialize;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::eth::example::{dev_ci_kp, EthHistoricalClient, EthWalletWrapper};
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{bytes_data, EasyJson, ProtoHashable, ProtoSerde, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, TestContractInternalState};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, TestContractInternalState, Transaction};
 use crate::api::control_api::ControlClient;
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
@@ -106,8 +109,8 @@ impl LocalNodes {
     }
     fn seeds() -> Vec<Seed> {
         let mut seeds = vec![];
-        for _i in 0..3 {
-            let mut seed = NodeConfig::from_test_id(&0).self_seed();
+        for idx in 0..3 {
+            let mut seed = NodeConfig::from_test_id(&idx).self_seed();
             seed.port_offset = Some(util::random_port() as u32);
             seeds.push(seed);
         }
@@ -164,13 +167,13 @@ impl LocalNodes {
     }
 
     async fn verify_data_equivalent(&self) {
-        let mut txs: Vec<HashSet<Vec<u8>>> = vec![];
+        let mut txs: Vec<HashSet<Transaction>> = vec![];
         let mut obs: Vec<HashSet<Vec<u8>>> = vec![];
         let mut oes: Vec<HashSet<Vec<Vec<u8>>>> = vec![];
         let mut utxos: Vec<HashSet<Vec<u8>>> = vec![];
         let end_time = util::current_time_millis();
         for n in &self.nodes {
-            let tx: HashSet<Vec<u8>> = n
+            let tx: HashSet<Transaction> = n
                 .node
                 .relay
                 .ds
@@ -178,7 +181,7 @@ impl LocalNodes {
                 .query_time_transaction(0, end_time as i64).await
                 .unwrap()
                 .into_iter()
-                .map(|x| x.transaction.unwrap().hash_vec())
+                .flat_map(|x| x.transaction.clone())
                 .collect();
 
             info!("Num tx: {:?} node_id: {:?}", tx.len(), n.id);
@@ -239,9 +242,7 @@ impl LocalNodes {
 
             utxos.push(utxo);
         }
-        for x in txs.clone() {
-            assert_eq!(x, txs.get(0).unwrap().clone());
-        }
+        Self::diff_check(&mut txs);
         for x in obs.clone() {
             assert_eq!(x, obs.get(0).unwrap().clone());
         }
@@ -250,6 +251,21 @@ impl LocalNodes {
         }
         for x in utxos.clone() {
             assert_eq!(x, utxos.get(0).unwrap().clone());
+        }
+    }
+
+    fn diff_check<T: Serialize + Clone + PartialEq + Eq + std::hash::Hash>(txs: &mut Vec<HashSet<T>>) {
+        let node_0_set = txs.get(0).unwrap().clone();
+        for x in txs.clone() {
+            let diff1 = node_0_set.difference(&x).collect_vec();
+            let diff2 = x.difference(&node_0_set).collect_vec();
+            let x2 = diff1.len() > 0 || diff2.len() > 0;
+            if x2 {
+                info!("Difference found in verify");
+                info!("Diff1: {}", diff1.json_or());
+                info!("Diff2: {}", diff2.json_or());
+                assert!(false);
+            }
         }
     }
 
@@ -340,6 +356,9 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let _tc = TestConstants::new();
 
     let mut local_nodes = LocalNodes::new(None).await;
+
+    let seed_json = local_nodes.seeds.json_or();
+    info!("Seeds: {}", seed_json);
     let start_node = local_nodes.start();
     // info!("Started initial node");
     let client1 = start_node.control_client.clone();
@@ -416,7 +435,29 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         submit.submit_double_spend(None).await;
     }
 
+    // TODO: Submit invalid UTXO
     submit.submit_invalid_signature().await;
+    // submit.submit_used_mismatched_utxo().await;
+    // submit.submit_used_utxo().await;
+
+    //  let tx_s = {
+    //     let mut gen = submit.generator.lock().unwrap();
+    //     let transaction = gen.generate_simple_used_utxo_tx_otherwise_valid().clone().expect("tx");
+    //     let mut tx = transaction.transaction.clone();
+    //     tx
+    // };
+    // let inputs = tx_s.inputs.clone();
+    // let option1 = inputs.iter().next();
+    // let option = option1.cloned().expect("input").utxo_id;
+    // let utxo_id= option.expect("utxo");
+    // info!("Utxo id: {}", utxo_id.json_or());
+    // assert!(tx_s.prevalidate().is_ok());
+    // let is_valid = _ds.utxo.utxo_id_valid(&utxo_id).await.expect("utxo valid");
+    // assert!(!is_valid);
+    // let res = submit.client.clone().send_transaction(&tx_s, true).await;
+
+
+    // assert!(res.is_err());
 
     // info!("Num utxos after double spend submit {:?}", utxos.len());
 
@@ -444,6 +485,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     local_nodes.add_node(
         // runtime.clone()
     ).await;
+
     local_nodes.verify_data_equivalent().await;
 
     tokio::time::sleep(Duration::from_secs(2)).await;

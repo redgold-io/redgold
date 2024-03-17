@@ -234,6 +234,7 @@ impl Transaction {
     }
 
 
+    // This doesn't really need to return an error?
     pub fn fixed_utxo_ids_of_inputs(&self) -> Result<Vec<UtxoId>, ErrorInfo> {
         let mut utxo_ids = Vec::new();
         for input in &self.inputs {
@@ -242,6 +243,11 @@ impl Transaction {
             }
         }
         Ok(utxo_ids)
+    }
+
+    // This doesn't really need to return an error?
+    pub fn input_utxo_ids(&self) -> impl Iterator<Item = &UtxoId> {
+        self.inputs.iter().flat_map(|i| i.utxo_id.as_ref())
     }
 
     pub fn output_amounts(&self) -> Vec<AddressBalance> {
@@ -253,6 +259,12 @@ impl Transaction {
                 rounded_balance: o.rounded_amount()
             })
             .collect()
+    }
+
+    pub fn output_amounts_opt(&self) -> impl Iterator<Item = &CurrencyAmount> {
+        self.outputs
+            .iter()
+            .flat_map(|o| o.data.as_ref().and_then(|d| d.amount.as_ref()))
     }
 
     pub fn output_amount_map<'a>(&'a self) -> HashMap<&'a Address, i64> {
@@ -460,6 +472,10 @@ impl Transaction {
     pub fn utxo_outputs(&self) -> RgResult<Vec<UtxoEntry>> {
         let t = self.time()?;
         return Ok(UtxoEntry::from_transaction(self, t.clone()));
+    }
+
+    pub fn output_utxo_ids(&self) -> impl Iterator<Item = &UtxoId>{
+        self.outputs.iter().flat_map(|o| o.utxo_id.as_ref())
     }
 
     pub fn head_utxo(&self) -> RgResult<UtxoEntry> {
