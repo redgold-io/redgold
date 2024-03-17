@@ -146,11 +146,13 @@ impl LiveE2E {
             .flat_map(|p| p.address().ok())
             .collect_vec();
 
-        let mut rng = thread_rng(); // Get a random number generator
 
         // Randomly choose an item from the vector
         // `choose` returns an Option, so we use match to handle it
-        let destination_choice = seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone();
+        let destination_choice = {
+            let mut rng = thread_rng(); // Get a random number generator
+            seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone()
+        };
 
 
         if !self.relay.node_config.network.is_main() {
@@ -191,16 +193,16 @@ impl LiveE2E {
         let tx_builder = tx_b
             .with_output(&destination, &amount)
             .with_is_test();
-        for u in first_utxos {
-            tx_builder.with_unsigned_input(u.utxo_entry.clone())?
+        for u in &first_utxos {
+            tx_builder.with_unsigned_input(u.utxo_entry.clone())?;
         }
         let mut tx = tx_builder
             .build()?;
 
-        for u in first_utxos {
+        for u in &first_utxos {
             tx.sign(&u.key_pair)?;
         }
-        return Ok(Some(tx));
+        return Ok(Some(tx.clone()));
     }
 }
 
