@@ -6,6 +6,7 @@ use std::future::Future;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use backtrace::Backtrace;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
@@ -17,6 +18,7 @@ use structs::{
     Address, BytesData, Error, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
     StructMetadata, Transaction,
 };
+use crate::errors::EnhanceErrorInfo;
 
 use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerMetadata, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
 
@@ -779,11 +781,13 @@ impl PublicResponse {
     }
 }
 
+// #[async_trait]
 pub trait EasyJson {
     fn json(&self) -> Result<String, ErrorInfo>;
     fn json_or(&self) -> String;
     fn json_pretty(&self) -> Result<String, ErrorInfo>;
     fn json_pretty_or(&self) -> String;
+    fn write_json(&self, path: &str) -> RgResult<()>;
 }
 
 pub trait EasyJsonDeser {
@@ -796,6 +800,7 @@ impl EasyJsonDeser for String {
     }
 }
 
+// #[async_trait]
 impl<T> EasyJson for T
 where T: Serialize {
     fn json(&self) -> Result<String, ErrorInfo> {
@@ -812,6 +817,12 @@ where T: Serialize {
     fn json_pretty_or(&self) -> String {
         json_pretty(&self).unwrap_or("json pretty failure".to_string())
     }
+
+    fn write_json(&self, path: &str) -> RgResult<()> {
+        let string = self.json_or();
+        std::fs::write(path, string.clone()).error_info("error write json to path ").add(path.to_string()).add(" ").add(string)
+    }
+
 }
 
 #[test]

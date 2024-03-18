@@ -73,6 +73,30 @@ impl TransactionStore {
         Ok(res)
     }
 
+    pub async fn query_time_transaction_accepted_ordered(
+        &self,
+        start: i64,
+        end: i64
+    ) -> RgResult<Vec<TransactionEntry>> {
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw, time FROM transactions WHERE time >= ?1 AND time < ?2 AND rejection_reason IS NULL AND accepted = 1 ORDER BY time ASC"#,
+            start,
+            end
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?;
+        rows.iter()
+            .map(|row| {
+                Transaction::proto_deserialize(row.raw.clone())
+                    .map(|deser| {
+                        TransactionEntry {
+                            time: row.time as u64,
+                            transaction: Some(deser),
+                        }
+                    })
+            }).collect()
+    }
+
     pub async fn query_accepted_transaction(
         &self,
         transaction_hash: &Hash,

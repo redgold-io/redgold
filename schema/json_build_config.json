@@ -308,6 +308,11 @@
         "structs.Response.about_node_response",
         "structs.Response.query_addresses_response",
         "structs.NodeMetadata.node_name",
+        "structs.TransactionAmount.bytes",
+        "structs.TransactionAmount.currency",
+        "structs.Signature.rsv",
+        "structs.StructMetadata.hash",
+        "structs.TransactionOptions.data",
         "structs.ObservationMetadata.liveness_confidence"
       ]
     },

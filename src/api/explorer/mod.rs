@@ -17,7 +17,7 @@ use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Serialize, Deserialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{AddressInfo, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use tokio::time::Instant;
 use tracing::trace;
@@ -79,7 +79,8 @@ pub struct NodeSignerDetailed {
 pub struct DetailedInput {
     pub transaction_hash: String,
     pub output_index: i64,
-    pub address: String
+    pub address: String,
+    pub input_amount: Option<f64>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -88,6 +89,10 @@ pub struct DetailedOutput {
     pub address: String,
     pub available: bool,
     pub amount: f64,
+    pub used_by_tx: Option<String>,
+    pub used_by_tx_input_index: Option<i32>,
+    pub is_swap: bool,
+    pub is_liquidity: bool,
 }
 
 
@@ -569,144 +574,170 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
     }
 
     if let Some(t) = hq.transaction_info {
-        let tx = t.transaction.safe_get_msg("Missing transaction but have transactionInfo")?;
-        // For confirmation score, should we store that internally in the database or re-calculate it?
-        let message = tx.options
-            .clone()
-            .and_then(|o| o.data.and_then(|d| d.message))
-            .unwrap_or("".to_string());
+        let detailed = convert_detailed_transaction(r, &t).await?;
+        h.transaction = Some(detailed)
+    }
+    Ok(h)
+}
 
-        let mut public_to_peer: HashMap<PublicKey, (PeerTrustQueryResult, NodeSignerDetailed)> = HashMap::new();
+async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<DetailedTransaction, ErrorInfo> {
+    let tx = t.transaction.safe_get_msg("Missing transaction but have transactionInfo")?;
+    // For confirmation score, should we store that internally in the database or re-calculate it?
+    let message = tx.options
+        .clone()
+        .and_then(|o| o.data.and_then(|d| d.message))
+        .unwrap_or("".to_string());
 
-        for s in &t.observation_proofs {
-            if let (Some(p), Some(metadata), Some(observed)) = (&s.proof, &s.metadata, &s.observation_hash) {
-                if let (Some(pk), Some(sig)) = (&p.public_key, &p.signature) {
+    let mut public_to_peer: HashMap<PublicKey, (PeerTrustQueryResult, NodeSignerDetailed)> = HashMap::new();
 
-                    let observation_timestamp = metadata.struct_metadata.safe_get_msg("Missing struct metadata")?.time
-                        .safe_get_msg("Missing time")?.clone();
+    for s in &t.observation_proofs {
+        if let (Some(p), Some(metadata), Some(observed)) = (&s.proof, &s.metadata, &s.observation_hash) {
+            if let (Some(pk), Some(sig)) = (&p.public_key, &p.signature) {
+                let observation_timestamp = metadata.struct_metadata.safe_get_msg("Missing struct metadata")?.time
+                    .safe_get_msg("Missing time")?.clone();
 
-                    let _ = if let Some((_peer_id, _existing)) = public_to_peer.get_mut(pk) {
-                        // existing
-                    } else {
-                        let pid = r.peer_id_for_node_pk(pk).await.ok().and_then(identity);
-                        let query_result = r.get_trust_of_node_as_query(pk).await?.clone();
-                        let q = query_result.or(pid.map(|p| PeerTrustQueryResult{ peer_id: p, trust: 1.0 }));
+                let _ = if let Some((_peer_id, _existing)) = public_to_peer.get_mut(pk) {
+                    // existing
+                } else {
+                    let pid = r.peer_id_for_node_pk(pk).await.ok().and_then(identity);
+                    let query_result = r.get_trust_of_node_as_query(pk).await?.clone();
+                    let q = query_result.or(pid.map(|p| PeerTrustQueryResult { peer_id: p, trust: 1.0 }));
 
-                        if let Some(query_result) = q {
-                            let validation: f64 = metadata.validation_confidence
-                                .clone()
-                                .map(|v| v.label())
-                                .unwrap_or(1.0) * 10.0;
+                    if let Some(query_result) = q {
+                        let validation: f64 = metadata.validation_confidence
+                            .clone()
+                            .map(|v| v.label())
+                            .unwrap_or(1.0) * 10.0;
 
-                            let i33 = ValidationType::from_i32(metadata.observation_type.clone());
-                            let obs_type: ValidationType = i33
-                                .safe_get_msg("validationtype")?.clone();
+                        let i33 = ValidationType::from_i32(metadata.observation_type.clone());
+                        let obs_type: ValidationType = i33
+                            .safe_get_msg("validationtype")?.clone();
 
-                            let ns = NodeSignerDetailed {
-                                signature: hex::encode(sig.bytes.safe_bytes()?),
-                                node_id: pk.hex_or(),
-                                signed_pending_time: None,
-                                observation_hash: observed.hex(),
-                                observation_type: format!("{:?}", obs_type),
-                                observation_timestamp: observation_timestamp.clone(),
-                                validation_confidence_score: validation,
-                                signed_finalized_time: None,
-                            };
+                        let ns = NodeSignerDetailed {
+                            signature: hex::encode(sig.bytes.safe_bytes()?),
+                            node_id: pk.hex_or(),
+                            signed_pending_time: None,
+                            observation_hash: observed.hex(),
+                            observation_type: format!("{:?}", obs_type),
+                            observation_timestamp: observation_timestamp.clone(),
+                            validation_confidence_score: validation,
+                            signed_finalized_time: None,
+                        };
 
-                            public_to_peer.insert(pk.clone(), (query_result.clone(), ns.clone()));
+                        public_to_peer.insert(pk.clone(), (query_result.clone(), ns.clone()));
+                    }
+                };
+
+                let state: State = State::from_i32(metadata.state.clone())
+                    .safe_get_msg("state")?.clone();
+
+                if let Some((_pk, ns)) = public_to_peer.get_mut(pk) {
+                    match state {
+                        State::Pending => {
+                            ns.signed_pending_time = Some(observation_timestamp);
                         }
-                    };
-
-                    let state: State = State::from_i32(metadata.state.clone())
-                        .safe_get_msg("state")?.clone();
-
-                    if let Some((_pk, ns)) = public_to_peer.get_mut(pk) {
-                        match state {
-                            State::Pending => {
-                                ns.signed_pending_time = Some(observation_timestamp);
-                            }
-                            State::Accepted => {
-                                ns.signed_finalized_time = Some(observation_timestamp);
-                            }
-                            _ => {}
+                        State::Accepted => {
+                            ns.signed_finalized_time = Some(observation_timestamp);
                         }
+                        _ => {}
                     }
                 }
             }
         }
+    }
 
-        let mut map: HashMap<PeerId, PeerSignerDetailed> = HashMap::new();
+    let mut map: HashMap<PeerId, PeerSignerDetailed> = HashMap::new();
 
-        for (_pk, (pt, ns)) in public_to_peer.iter_mut() {
-            if let Some(e) = map.get_mut(&pt.peer_id) {
-                e.nodes.push(ns.clone());
-            } else {
-                let peer_signer = PeerSignerDetailed {
-                    // TODO: query peer ID from peer store
-                    peer_id: hex::encode(pt.peer_id.peer_id.safe_get()?.bytes.safe_bytes()?),
-                    trust: pt.trust.clone() * 10.0,
-                    nodes: vec![ns.clone()],
-                };
-                map.insert(pt.peer_id.clone(), peer_signer);
+    for (_pk, (pt, ns)) in public_to_peer.iter_mut() {
+        if let Some(e) = map.get_mut(&pt.peer_id) {
+            e.nodes.push(ns.clone());
+        } else {
+            let peer_signer = PeerSignerDetailed {
+                // TODO: query peer ID from peer store
+                peer_id: hex::encode(pt.peer_id.peer_id.safe_get()?.bytes.safe_bytes()?),
+                trust: pt.trust.clone() * 10.0,
+                nodes: vec![ns.clone()],
+            };
+            map.insert(pt.peer_id.clone(), peer_signer);
+        }
+    }
+
+    let mut vec = map.values().collect_vec();
+    vec.sort_by(|a, b|
+        a.trust.partial_cmp(&b.trust).unwrap_or(Ordering::Equal)
+    );
+    vec.reverse();
+    let signers = vec.iter().map(|x| x.clone().clone()).collect_vec();
+
+    let mut inputs = vec![];
+    for i in &tx.inputs {
+        let u = i.utxo_id.safe_get()?;
+        let mut input_amount = None;
+        if let Some(h) = &u.transaction_hash {
+            if let Some((t, e)) = r.ds.transaction_store.query_maybe_transaction(h).await? {
+                input_amount = t.outputs.get(u.output_index as usize)
+                    .map(|o| o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0));
+            }
+        }
+        let input = DetailedInput {
+            transaction_hash: u.transaction_hash.clone().map(|t| t.hex()).safe_get_msg("Missing transaction hash?")?.clone(),
+            output_index: u.output_index.clone(),
+            address: i.address()?.render_string()?,
+            input_amount,
+        };
+        inputs.push(input);
+    }
+    let mut outputs = vec![];
+    for (i, o) in tx.outputs.iter().enumerate() {
+        let mut used_by_tx = None;
+        let mut used_by_tx_input_index = None;
+        if let Some(u) = o.utxo_id.as_ref() {
+            let child = r.ds.utxo.utxo_child(u).await?;
+            if let Some((h, index)) = child {
+                used_by_tx = Some(h.hex());
+                used_by_tx_input_index = Some(index as i32);
             }
         }
 
-        let mut vec = map.values().collect_vec();
-        vec.sort_by(|a, b|
-            a.trust.partial_cmp(&b.trust).unwrap_or(Ordering::Equal)
-        );
-        vec.reverse();
-        let signers = vec.iter().map(|x| x.clone().clone()).collect_vec();
-
-        let mut inputs = vec![];
-        for i in &tx.inputs {
-            let u = i.utxo_id.safe_get()?;
-            let input = DetailedInput{
-                transaction_hash: u.transaction_hash.clone().map(|t| t.hex()).safe_get_msg("Missing transaction hash?")?.clone(),
-                output_index: u.output_index.clone(),
-                address: i.address()?.render_string()?,
-            };
-            inputs.push(input);
-        }
-        let mut outputs = vec![];
-        for (i, o) in tx.outputs.iter().enumerate() {
-            let output = DetailedOutput{
-                output_index: i.clone() as i32,
-                address: o.address.safe_get()?.render_string()?,
-                available: t.valid_utxo_index.contains(&(i as i32)),
-                amount: o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0)
-            };
-            outputs.push(output);
-        }
-
-        // TODO: Make this over Vec<ObservationProof> Instead
-        let mut submit_response = SubmitTransactionResponse::default();
-        let mut query_transaction_response = QueryTransactionResponse::default();
-        query_transaction_response.observation_proofs = t.observation_proofs.clone().iter().map(|o| o.clone()).collect_vec();
-        submit_response.query_transaction_response = Some(query_transaction_response);
-        submit_response.transaction = Some(tx.clone());
-        let counts = submit_response.count_unique_by_state()?;
-
-        let num_pending_signers = counts.get(&(State::Pending as i32)).unwrap_or(&0).clone() as i64;
-        let num_accepted_signers = counts.get(&(State::Accepted as i32)).unwrap_or(&0).clone() as i64;
-        let detailed = DetailedTransaction{
-            info: brief_transaction(tx)?,
-            confirmation_score: 1.0,
-            acceptance_score: 1.0,
-            message,
-            num_pending_signers,
-            num_accepted_signers,
-            accepted: t.accepted,
-            signers,
-            inputs,
-            outputs,
-            rejection_reason: t.rejection_reason,
-            signable_hash: tx.signable_hash().hex(),
-            raw_transaction: tx.clone(),
+        let output = DetailedOutput {
+            output_index: i.clone() as i32,
+            address: o.address.safe_get()?.render_string()?,
+            available: t.valid_utxo_index.contains(&(i as i32)),
+            amount: o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0),
+            used_by_tx,
+            used_by_tx_input_index,
+            is_swap: o.is_swap(),
+            is_liquidity: o.is_liquidity(),
         };
-        h.transaction = Some(detailed)
+        outputs.push(output);
     }
-    Ok(h)
+
+    // TODO: Make this over Vec<ObservationProof> Instead
+    let mut submit_response = SubmitTransactionResponse::default();
+    let mut query_transaction_response = QueryTransactionResponse::default();
+    query_transaction_response.observation_proofs = t.observation_proofs.clone().iter().map(|o| o.clone()).collect_vec();
+    submit_response.query_transaction_response = Some(query_transaction_response);
+    submit_response.transaction = Some(tx.clone());
+    let counts = submit_response.count_unique_by_state()?;
+
+    let num_pending_signers = counts.get(&(State::Pending as i32)).unwrap_or(&0).clone() as i64;
+    let num_accepted_signers = counts.get(&(State::Accepted as i32)).unwrap_or(&0).clone() as i64;
+    let detailed = DetailedTransaction {
+        info: brief_transaction(tx)?,
+        confirmation_score: 1.0,
+        acceptance_score: 1.0,
+        message,
+        num_pending_signers,
+        num_accepted_signers,
+        accepted: t.accepted,
+        signers,
+        inputs,
+        outputs,
+        rejection_reason: t.rejection_reason.clone(),
+        signable_hash: tx.signable_hash().hex(),
+        raw_transaction: tx.clone(),
+    };
+    Ok(detailed)
 }
 
 
