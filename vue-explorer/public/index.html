@@ -5,7 +5,31 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <link rel="icon" href="<%= BASE_URL %>favicon.ico">
-    <title><%= htmlWebpackPlugin.options.title %></title>
+    <title>Redgold Explorer</title>
+
+      <!-- Open Graph / Facebook Meta Tags -->
+      <meta property="og:type" content="website">
+      <meta property="og:url" content="<%= BASE_URL %>">
+      <meta property="og:title" content="Redgold Explorer">
+      <meta property="og:description" content="Peer-to-Peer Data Lake & Compute Engine">
+      <meta property="og:image" content="https://redgold-public.s3.us-west-1.amazonaws.com/dalle-social-preview.webp">
+      <!-- Twitter Meta Tags -->
+      <meta property="twitter:card" content="summary_large_image">
+      <meta property="twitter:url" content="<%= BASE_URL %>">
+      <meta property="twitter:title" content="Redgold Explorer">
+      <meta property="twitter:description" content="Peer-to-Peer Data Lake & Compute Engine">
+      <meta property="twitter:image" content="https://redgold-public.s3.us-west-1.amazonaws.com/dalle-social-preview.webp">
+
+      <!-- Google tag (gtag.js) -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-8MFHGQ6KVB"></script>
+      <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+
+          gtag('config', 'G-8MFHGQ6KVB');
+      </script>
+
   </head>
   <body>
     <noscript>
