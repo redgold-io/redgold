@@ -20,6 +20,22 @@ pub fn current_time_millis() -> i64 {
         .as_millis() as i64
 }
 
+
+use chrono::{DateTime, Local, TimeZone, Utc};
+
+pub trait ToTimeString {
+    fn to_time_string(&self) -> String;
+}
+
+impl ToTimeString for i64 {
+    fn to_time_string(&self) -> String {
+        let utc_datetime = Utc.timestamp_millis(*self);
+        let pacific_datetime: DateTime<Local> = utc_datetime.with_timezone(&Local);
+        let formatted_datetime = pacific_datetime.format("%Y-%m-%d %H:%M:%S %.3f %:z").to_string();
+        return formatted_datetime;
+    }
+}
+
 pub fn make_ascii_titlecase(s: &mut str) -> String {
     if let Some(r) = s.get_mut(0..1) {
         r.make_ascii_uppercase();

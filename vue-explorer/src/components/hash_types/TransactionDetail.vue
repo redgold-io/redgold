@@ -75,6 +75,8 @@
                 <div><strong>{{ input.output_index }}</strong></div>
                 <div><strong>Address</strong></div>
                 <div><HashLink :data="input.address" :shorten="false" /></div>
+                <div v-if="input.input_amount"><strong>Amount</strong></div>
+                <div v-if="input.input_amount"><strong>{{ input.input_amount }}</strong></div>
               </div>
             </div>
           </div>
@@ -90,6 +92,17 @@
                 <div><strong>{{ output.amount }}</strong></div>
                 <div><strong>Available</strong></div>
                 <div><strong>{{ output.available }}</strong></div>
+                <div v-if="output.used_by_tx"><strong>Used By Transaction</strong></div>
+                <div v-if="output.used_by_tx"><HashLink :data="output.used_by_tx"></HashLink></div>
+                <div v-if="output.used_by_tx_input_index"><strong>Used Input Index</strong></div>
+                <div v-if="output.used_by_tx_input_index"><strong>{{ output.used_by_tx_input_index }}</strong></div>
+                <div v-if="output.is_swap"><strong> Is Swap </strong></div>
+                <div v-if="output.is_swap"><strong>{{ output.is_swap }}</strong></div>
+                <div v-if="output.is_liquidity"><strong> Is Liquidity </strong></div>
+                <div v-if="output.is_liquidity"><strong>{{ output.is_liquidity }}</strong></div>
+<!--                pub used_by_tx: Option<String>,-->
+<!--                pub used_by_tx_input_index: Option<i32>,-->
+
               </div>
             </div>
           </div>

@@ -817,7 +817,6 @@ impl DepositWatcher {
         let cutoff_time = current_time_millis_i64() - 30_000; //
         let identifier = alloc.initiate.identifier.safe_get().cloned()?;
 
-
         let environment = self.relay.node_config.network.clone();
         let btc_address = w.lock()
             .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?

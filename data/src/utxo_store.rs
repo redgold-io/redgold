@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use itertools::Itertools;
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
@@ -42,4 +43,42 @@ impl UtxoStore {
             .fetch_optional(&mut *self.ctx.pool().await?).await)?
             .is_some())
     }
+
+
+    pub async fn utxo_children(
+        &self,
+        utxo_id: &UtxoId,
+    ) -> RgResult<Vec<(Hash, i64)>> {
+        let bytes = utxo_id.transaction_hash.safe_bytes()?;
+        let output_index = utxo_id.output_index;
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT child_transaction_hash, child_input_index FROM transaction_edge
+            WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?
+            .iter().map(|o| (Hash::new(o.child_transaction_hash.clone()), o.child_input_index))
+            .collect_vec())
+    }
+
+
+    pub async fn utxo_child(
+        &self,
+        utxo_id: &UtxoId,
+    ) -> RgResult<Option<(Hash, i64)>> {
+        let bytes = utxo_id.transaction_hash.safe_bytes()?;
+        let output_index = utxo_id.output_index;
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT child_transaction_hash, child_input_index FROM transaction_edge
+            WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .fetch_optional(&mut *self.ctx.pool().await?)
+            .await)?
+            .map(|o| (Hash::new(o.child_transaction_hash), o.child_input_index)))
+    }
+
 }
