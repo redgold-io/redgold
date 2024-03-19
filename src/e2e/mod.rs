@@ -173,12 +173,24 @@ impl LiveE2E {
         for (a, k) in map.iter() {
             let result = self.relay.ds.transaction_store.query_utxo_address(a).await?;
             let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
-            let utxo_m = vec.get(0);
-            if let Some(u) = utxo_m {
-                spendable_utxos.push(Some(SpendableUTXO {
-                    utxo_entry: u.clone().clone(),
-                    key_pair: k.clone(),
-                }));
+            let mut err_str = format!("Address {}", a.render_string().expect(""));
+            for u in vec {
+                if let Ok(id) = u.utxo_id() {
+                    err_str.push_str(&format!(" UTXO ID: {}", id.json_or()));
+                    if self.relay.ds.utxo.utxo_id_valid(id).await? {
+                        let childs = self.relay.ds.utxo.utxo_children(id).await?;
+                        if childs.len() == 0 {
+                            spendable_utxos.push(Some(SpendableUTXO {
+                                utxo_entry: u.clone(),
+                                key_pair: k.clone(),
+                            }));
+                        } else {
+                            error!("UTXO has children not valid! {} {}", err_str, childs.json_or());
+                        }
+                    } else {
+                        error!("UTXO ID not valid! {}", err_str);
+                    }
+                }
             }
         }
         if spendable_utxos.is_empty() {
@@ -255,7 +267,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                 Err(e) => {
                     counter!("redgold.e2e.failure").increment(1);
                     let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
-                    error!("Canary failure: {}", failure_msg.clone());
+                    error!("Live E2E failure: {}", failure_msg.clone());
                     let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
                     if !c.failed_once || recovered {
                         alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;

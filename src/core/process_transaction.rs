@@ -541,10 +541,16 @@ impl TransactionProcessContext {
 
         // Sanity check here, instead use a tombstone on Pending, or otherwise trigger a conflict resolution process.
         for u in transaction.utxo_inputs() {
+            if !self.relay.ds.utxo.utxo_id_valid(&u).await? {
+                Err(error_info("Aborting process transaction due to \
+                UTXO id considered invalid immediately prior to acceptance after pending"))
+                    .add(u.json_or())?
+            }
             let child_opt = self.relay.ds.utxo.utxo_child(&u).await?;
             if let Some((child_hash, child_idx)) = child_opt {
                 Err(error_info("Aborting process transaction due to \
                 UTXO has child invocation immediately prior to acceptance after pending with child"))
+                    .add(u.json_or())
                     .add(child_hash.hex())
                     .add(child_idx.to_string())?
             }
