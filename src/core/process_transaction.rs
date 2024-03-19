@@ -562,7 +562,7 @@ impl TransactionProcessContext {
                 sender: s
             })
         )?;
-        r.recv_async_err().await??;
+        r.recv_async_err_timeout(Duration::from_secs(30)).await??;
         counter!("redgold.transaction.accepted").increment(1);
         tracing::info!("Accepted transaction");
 
