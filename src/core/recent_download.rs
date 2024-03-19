@@ -80,7 +80,7 @@ impl RecentDownload {
                                 false
                             ).await;
                             if let Ok(resolved_input) = resolved_input {
-                                self.relay.unknown_resolved_inputs.sender.send_err(resolved_input)?;
+                                self.relay.unknown_resolved_inputs.sender.send_rg_err(resolved_input)?;
                             } else {
                                 counter!("redgold.recent_download.resolve_input_error").increment(1);
                             }

@@ -226,7 +226,7 @@ impl ContractStateManager {
                 self.relay.ds.state.insert_state(csm.clone()).await?;
                 if let Some(subs) = self.subscribers.remove(k) {
                     for sub in &subs {
-                        sub.send_err(Ok(csm.clone()))?;
+                        sub.send_rg_err(Ok(csm.clone()))?;
                     }
                 }
                 v.remove(idx);
@@ -247,7 +247,7 @@ impl IntervalFoldOrReceive<ContractStateMessage> for ContractStateManager {
                 match m {
                     ContractStateMessage::ProcessTransaction { transaction, output, response } => {
                         if let Err(e) = self.process_tx(&transaction, &output, &response).await {
-                            response.send_err(Err(e))?;
+                            response.send_rg_err(Err(e))?;
                         }
                     }
                 }

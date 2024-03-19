@@ -38,7 +38,9 @@ use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
+use redgold_schema::errors::EnhanceErrorInfo;
 use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
+use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::observability::logging::Loggable;
 
 #[derive(Clone)]
@@ -282,7 +284,7 @@ impl TransactionProcessContext {
                 // let details = ErrorInfo::error_info("Missing response channel for transaction");
                 // error!("Missing response channel for transaction {:?}", json_or(&details));
             }
-            Some(r) => if let Some(e) = r.send_err(pr).err() {
+            Some(r) => if let Some(e) = r.send_rg_err(pr).err() {
                 error!("Error sending transaction response to channel {}", json_or(&e));
             }
         };
@@ -401,7 +403,7 @@ impl TransactionProcessContext {
                         active_request
                             .request_processer
                             .sender
-                            .send_err(self_conflict.clone())?
+                            .send_rg_err(self_conflict.clone())?
                     }
                     entry.get_mut().active_requests.push(self_conflict.clone());
                 }
@@ -532,8 +534,19 @@ impl TransactionProcessContext {
                 for c in &conflicts {
                     c.request_processer
                         .sender
-                        .send_err(this_as_conflict.clone())?;
+                        .send_rg_err(this_as_conflict.clone())?;
                 }
+            }
+        }
+
+        // Sanity check here, instead use a tombstone on Pending, or otherwise trigger a conflict resolution process.
+        for u in transaction.utxo_inputs() {
+            let child_opt = self.relay.ds.utxo.utxo_child(&u).await?;
+            if let Some((child_hash, child_idx)) = child_opt {
+                Err(error_info("Aborting process transaction due to \
+                UTXO has child invocation immediately prior to acceptance after pending with child"))
+                    .add(child_hash.hex())
+                    .add(child_idx.to_string())?
             }
         }
 
@@ -541,7 +554,15 @@ impl TransactionProcessContext {
 
         let prf = self.observe(validation_type, State::Accepted).await?;
         observation_proofs.insert(prf);
-        self.insert_transaction(&transaction).await?;
+        // self.insert_transaction(&transaction).await?;
+        let (s,r) = flume::bounded(1);
+        self.relay.tx_writer.sender.send_rg_err(
+            TxWriterMessage::WriteTransaction(TransactionWithSender {
+                transaction: transaction.clone(),
+                sender: s
+            })
+        )?;
+        r.recv_async_err().await??;
         counter!("redgold.transaction.accepted").increment(1);
         tracing::info!("Accepted transaction");
 

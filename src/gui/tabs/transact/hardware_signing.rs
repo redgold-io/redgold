@@ -31,6 +31,6 @@ pub fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, publ
         let up = StateUpdate {
             update: Box::new(fun),
         };
-        send.send_err(up).log_error().ok();
+        send.send_rg_err(up).log_error().ok();
     });
 }
