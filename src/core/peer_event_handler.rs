@@ -106,7 +106,7 @@ impl PeerOutgoingEventHandler {
             Response::from_error_info(e2)
         }).combine();
         if let Some(response_channel) = &message.response {
-            response_channel.send_rg_err(r).add("Error sending message back on response channel").log_error().ok();
+            response_channel.send_err(r).add("Error sending message back on response channel").log_error().ok();
         }
         Ok(())
     }

@@ -158,7 +158,7 @@ impl ObservationBuffer {
             if let Some(oh) = o.metadata.clone().and_then(|m| m.observed_hash) {
                 if let Some(s) = self.subscribers.get(&oh) {
                     // info!("Responding to sender with observation proof");
-                    s.send_rg_err(o.clone())?;
+                    s.send_err(o.clone())?;
                 }
             }
         }

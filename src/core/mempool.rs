@@ -77,7 +77,7 @@ impl IntervalFold for Mempool {
             let is_known = self.relay.transaction_known(&h).await?;
             if is_known {
                 if let Some(r) = message.response_channel {
-                    r.send_rg_err(Response::from_error_info(error_info("Transaction already in process or known")))?;
+                    r.send_err(Response::from_error_info(error_info("Transaction already in process or known")))?;
                 }
                 // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
                 // Notify subscribers for transaction channel rather than just dropping and returning error

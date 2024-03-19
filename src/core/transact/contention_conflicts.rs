@@ -142,7 +142,7 @@ impl IntervalFoldOrReceive<ContentionMessage> for ContentionConflictManager {
     async fn interval_fold_or_recv(&mut self, message: Either<ContentionMessage, ()>) -> RgResult<()> {
         match message {
             Either::Left(m) => {
-                m.response.send_rg_err(self.process_message(&m.key, &m.message, &m.response).await)?;
+                m.response.send_err(self.process_message(&m.key, &m.message, &m.response).await)?;
             }
             Either::Right(_) => {
                 self.interval().await?;

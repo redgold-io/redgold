@@ -112,7 +112,7 @@ where
 
 #[async_trait]
 pub trait SendErrorInfo<T> {
-    fn send_rg_err(&self, t: T) -> Result<(), ErrorInfo>;
+    fn send_err(&self, t: T) -> Result<(), ErrorInfo>;
 }
 
 #[async_trait]
@@ -120,7 +120,7 @@ impl<T> SendErrorInfo<T> for flume::Sender<T>
 where
     T: Send,
 {
-    fn send_rg_err(&self, t: T) -> Result<(), ErrorInfo> {
+    fn send_err(&self, t: T) -> Result<(), ErrorInfo> {
         self.send(t)
             .map_err(|e| error_message(Error::InternalChannelReceiveError, e.to_string()))
     }

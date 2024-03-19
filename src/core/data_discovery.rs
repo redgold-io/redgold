@@ -29,7 +29,7 @@ impl IntervalFold for DataDiscovery {
                         if self.relay.tx_hash_distance(&h).await? {
                             let t = self.relay.lookup_transaction_serial(&h).await?;
                             if let Some(tx) = t {
-                                self.relay.mempool.sender.send_rg_err(
+                                self.relay.mempool.sender.send_err(
                                      TransactionMessage{
                                          transaction: tx,
                                          response_channel: None,

@@ -136,8 +136,8 @@ pub struct Relay {
     pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
     pub unknown_resolved_inputs: Channel<ResolvedInput>,
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
-    pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>,
-    pub tx_writer: Channel<TxWriterMessage>,
+    pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>
+
 }
 
 impl Relay {
@@ -229,7 +229,6 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::core::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
 use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
-use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -322,7 +321,7 @@ impl Relay {
         let (s, r) = flume::bounded::<RgResult<ContentionResult>>(1);
         let msg = ContentionMessage::new(&key, msg, s);
         let index = key.div_mod(self.node_config.contention.bucket_parallelism.clone());
-        self.contention[index as usize].sender.send_rg_err(msg)?;
+        self.contention[index as usize].sender.send_err(msg)?;
         Ok(r)
     }
 
@@ -336,7 +335,7 @@ impl Relay {
                 output: output.clone(),
                 response: s
         };
-        c.sender.send_rg_err(msg)?;
+        c.sender.send_err(msg)?;
         r.recv_async_err().await?
     }
 
@@ -534,7 +533,7 @@ impl Relay {
             observation_metadata: om,
             sender,
         };
-        self.observation_metadata.sender.send_rg_err(omi)?;
+        self.observation_metadata.sender.send_err(omi)?;
         let res = tokio::time::timeout(
             Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 10),
             r.recv_async_err()
@@ -567,7 +566,7 @@ impl Relay {
         let (s, r) = flume::unbounded::<Response>();
         let mut pm = PeerMessage::from_pk(&request, &node.clone());
         pm.response = Some(s);
-        self.peer_message_tx.sender.send_rg_err(pm)?;
+        self.peer_message_tx.sender.send_err(pm)?;
         let res = tokio::time::timeout(timeout, r.recv_async_err()).await
             .map_err(|e| error_info(e.to_string()))??;
         // Is this necessary?? Or have we already handled this elsewhere?
@@ -583,7 +582,7 @@ impl Relay {
         if let Some(t) = timeout {
             pm.send_timeout = t;
         }
-        relay.peer_message_tx.sender.send_rg_err(pm)?;
+        relay.peer_message_tx.sender.send_err(pm)?;
         let res = r.recv_async_err().await?;
         res.as_error_info()?;
         Ok(res)
@@ -597,7 +596,7 @@ impl Relay {
         pm.request = request;
         pm.response = Some(s);
         pm.public_key = key;
-        self.peer_message_rx.sender.send_rg_err(pm).add("receive_message_sync")?;
+        self.peer_message_rx.sender.send_err(pm).add("receive_message_sync")?;
         let res = r.recv_async_err_timeout(timeout).await?;
         Ok(res)
     }
@@ -745,7 +744,7 @@ impl Relay {
 
     pub async fn send_message(&self, request: Request, node: structs::PublicKey) -> Result<(), ErrorInfo> {
         let pm = PeerMessage::from_pk(&request, &node);
-        self.peer_message_tx.sender.send_rg_err(pm)?;
+        self.peer_message_tx.sender.send_err(pm)?;
         Ok(())
     }
 
@@ -762,7 +761,7 @@ impl Relay {
         if let Some(t) = timeout {
             pm.send_timeout = t;
         }
-        self.peer_message_tx.sender.send_rg_err(pm)?;
+        self.peer_message_tx.sender.send_err(pm)?;
         Ok(r)
     }
 
@@ -888,7 +887,6 @@ impl Relay {
             unknown_resolved_inputs: internal_message::new_channel(),
             mempool_entries: Arc::new(Default::default()),
             faucet_rate_limiter: Arc::new(Mutex::new(Default::default())),
-            tx_writer: new_channel(),
         }
     }
 }

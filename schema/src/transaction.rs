@@ -220,9 +220,19 @@ impl Transaction {
             .collect_vec()
     }
 
-    pub fn utxo_inputs(&self) -> impl Iterator<Item = &UtxoId> {
-        self.inputs.iter().filter_map(|i| i.utxo_id.as_ref())
+    pub fn iter_utxo_inputs(&self) -> Vec<(Vec<u8>, i64)> {
+        self.inputs
+            .iter()
+            .filter_map(|y| y.utxo_id.as_ref())
+            .map(|y| {
+                (
+                    y.transaction_hash.safe_bytes().expect("a").clone(),
+                    y.output_index,
+                )
+            })
+            .collect_vec()
     }
+
 
     // This doesn't really need to return an error?
     pub fn fixed_utxo_ids_of_inputs(&self) -> Result<Vec<UtxoId>, ErrorInfo> {

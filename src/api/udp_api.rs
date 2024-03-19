@@ -278,7 +278,7 @@ impl UdpServer {
         pm.public_key = Some(node_pk.clone());
         pm.socket_addr = Some(addr);
         pm.request = req;
-        self.relay.peer_message_rx.sender.send_rg_err(pm)?;
+        self.relay.peer_message_rx.sender.send_err(pm)?;
         Ok(())
     }
 

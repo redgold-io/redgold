@@ -27,6 +27,6 @@ pub fn broadcast_transaction(nc: NodeConfig, tx: Transaction, send: Sender<State
         let up = StateUpdate {
             update: Box::new(fun),
         };
-        send.send_rg_err(up).log_error().ok();
+        send.send_err(up).log_error().ok();
     });
 }

@@ -15,7 +15,7 @@ use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
 use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
-use crate::core::transact::tx_writer::TxWriter;
+
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
 // use crate::api::p2p_io::P2P;
@@ -56,7 +56,7 @@ use crate::core::data_discovery::DataDiscovery;
 use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::recent_download::RecentDownload;
-use crate::core::stream_handlers::{IntervalFold, run_recv_single};
+use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::DepositWatcher;
@@ -99,7 +99,6 @@ impl Node {
             // Main transaction processing loop, watches over lifecycle of a given transaction
             // as it's drawn from the mem-pool
             TransactionProcessContext::new(relay.clone()),
-            run_recv_single(TxWriter::new(relay.clone()), relay.tx_writer.receiver.clone()).await,
         ];
         // TODO: Filter out any join handles that have terminated immediately with success due to disabled services.
 
@@ -178,7 +177,7 @@ impl Node {
         ).await);
 
 
-        join_handles.push(stream_handlers::run_recv_concurrent(
+        join_handles.push(stream_handlers::run_recv(
             discovery, relay.discovery.receiver.clone(), 100
         ).await);
 
