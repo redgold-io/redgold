@@ -33,6 +33,7 @@ use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
 use redgold_executor::extism_wrapper;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
@@ -325,6 +326,8 @@ impl TransactionProcessContext {
 
         transaction.validate_network(&self.relay.node_config.network)?;
 
+        transaction.validate_signatures()?;
+
         Ok(())
 
     }
@@ -541,10 +544,16 @@ impl TransactionProcessContext {
 
         // Sanity check here, instead use a tombstone on Pending, or otherwise trigger a conflict resolution process.
         for u in transaction.utxo_inputs() {
+            if !self.relay.ds.utxo.utxo_id_valid(&u).await? {
+                Err(error_info("Aborting process transaction due to \
+                UTXO id considered invalid immediately prior to acceptance after pending"))
+                    .add(u.json_or())?
+            }
             let child_opt = self.relay.ds.utxo.utxo_child(&u).await?;
             if let Some((child_hash, child_idx)) = child_opt {
                 Err(error_info("Aborting process transaction due to \
                 UTXO has child invocation immediately prior to acceptance after pending with child"))
+                    .add(u.json_or())
                     .add(child_hash.hex())
                     .add(child_idx.to_string())?
             }
@@ -562,7 +571,7 @@ impl TransactionProcessContext {
                 sender: s
             })
         )?;
-        r.recv_async_err().await??;
+        r.recv_async_err_timeout(Duration::from_secs(30)).await??;
         counter!("redgold.transaction.accepted").increment(1);
         tracing::info!("Accepted transaction");
 

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
+use log::info;
 use metrics::counter;
-use redgold_schema::{EasyJson, RgResult, SafeOption};
+use redgold_schema::{EasyJson, RgResult, SafeOption, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, Transaction};
 use crate::core::internal_message::SendErrorInfo;
@@ -28,14 +29,15 @@ pub struct TxWriter {
 }
 
 impl TxWriter {
-    pub fn new(relay: Relay) -> Self {
+    pub fn new(relay: &Relay) -> Self {
         Self {
-            relay
+            relay: relay.clone()
         }
     }
 
     pub async fn write_transaction(&self, transaction: &Transaction) -> RgResult<()> {
 
+        info!("Writing transaction: {}", transaction.hash_or());
         counter!("redgold.transaction.tx_writer.write_transaction").increment(1);
         // Validate again immediately
         for utxo_id in transaction.utxo_inputs() {
@@ -77,8 +79,9 @@ impl TxWriter {
                 .insert_transaction(
                     &transaction, util::current_time_millis_i64(), true, None, true
                 ).await.mark_abort()?;
+        info!("Wrote transaction: {}", transaction.hash_or());
 
-            return Ok(());
+        return Ok(());
 
     }
     pub async fn process_message(&mut self, message: TxWriterMessage) -> RgResult<()> {

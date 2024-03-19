@@ -99,7 +99,7 @@ impl Node {
             // Main transaction processing loop, watches over lifecycle of a given transaction
             // as it's drawn from the mem-pool
             TransactionProcessContext::new(relay.clone()),
-            run_recv_single(TxWriter::new(relay.clone()), relay.tx_writer.receiver.clone()).await,
+            run_recv_single(TxWriter::new(&relay), relay.tx_writer.receiver.clone()).await,
         ];
         // TODO: Filter out any join handles that have terminated immediately with success due to disabled services.
 

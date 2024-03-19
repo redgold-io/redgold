@@ -21,6 +21,7 @@ pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
 use redgold_schema::EasyJson;
+use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::transaction::amount_to_raw_amount;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -135,7 +136,7 @@ struct LiveE2E {
     num_success: u64,
 }
 
-
+use redgold_keys::tx_proof_validate::TransactionProofValidator;
 impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
 
@@ -154,7 +155,6 @@ impl LiveE2E {
             seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone()
         };
 
-
         if !self.relay.node_config.network.is_main() {
             let min_offset = 20;
             let max_offset = 30;
@@ -168,17 +168,28 @@ impl LiveE2E {
             let address = key.address_typed();
             map.insert(address, key);
         }
-        let addresses = map.keys().map(|a| a.clone()).collect_vec();
         let mut spendable_utxos = vec![];
         for (a, k) in map.iter() {
             let result = self.relay.ds.transaction_store.query_utxo_address(a).await?;
             let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
-            let utxo_m = vec.get(0);
-            if let Some(u) = utxo_m {
-                spendable_utxos.push(Some(SpendableUTXO {
-                    utxo_entry: u.clone().clone(),
-                    key_pair: k.clone(),
-                }));
+            let mut err_str = format!("Address {}", a.render_string().expect(""));
+            for u in vec {
+                if let Ok(id) = u.utxo_id() {
+                    err_str.push_str(&format!(" UTXO ID: {}", id.json_or()));
+                    if self.relay.ds.utxo.utxo_id_valid(id).await? {
+                        let childs = self.relay.ds.utxo.utxo_children(id).await?;
+                        if childs.len() == 0 {
+                            spendable_utxos.push(Some(SpendableUTXO {
+                                utxo_entry: u.clone(),
+                                key_pair: k.clone(),
+                            }));
+                        } else {
+                            error!("UTXO has children not valid! {} {}", err_str, childs.json_or());
+                        }
+                    } else {
+                        error!("UTXO ID not valid! {}", err_str);
+                    }
+                }
             }
         }
         if spendable_utxos.is_empty() {
@@ -188,7 +199,7 @@ impl LiveE2E {
         let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
-        let first_utxos = spendable_utxos.iter().take(10).flatten().cloned().collect_vec();
+        let first_utxos = spendable_utxos.iter().take(1).flatten().cloned().collect_vec();
 
         let tx_builder = tx_b
             .with_output(&destination, &amount)
@@ -202,6 +213,10 @@ impl LiveE2E {
         for u in &first_utxos {
             tx.sign(&u.key_pair)?;
         }
+
+        tx.validate_signatures().add("Immediate validation live E2E")?;
+
+
         return Ok(Some(tx.clone()));
     }
 }
@@ -255,7 +270,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                 Err(e) => {
                     counter!("redgold.e2e.failure").increment(1);
                     let failure_msg = serde_json::to_string(&e).unwrap_or("ser failure".to_string());
-                    error!("Canary failure: {}", failure_msg.clone());
+                    error!("Live E2E failure: {}", failure_msg.clone());
                     let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
                     if !c.failed_once || recovered {
                         alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
