@@ -5,8 +5,7 @@ use std::fmt::Display;
 use std::future::Future;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Result};
-use async_trait::async_trait;
+use anyhow::{Context, Result};
 use backtrace::Backtrace;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
@@ -20,7 +19,7 @@ use structs::{
 };
 use crate::errors::EnhanceErrorInfo;
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, HashType, KeyType, NetworkEnvironment, NodeMetadata, PeerMetadata, PeerId, Proof, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -55,6 +54,7 @@ pub mod exec;
 pub mod contract;
 pub mod local_stored_state;
 mod weighting;
+pub mod pow;
 
 
 impl BytesData {
@@ -671,8 +671,6 @@ impl Request {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn it_works() {
         // let result = add(2, 2);
