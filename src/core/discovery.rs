@@ -13,7 +13,7 @@ use redgold_schema::{RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo, Response};
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::{IntervalFold, RecvForEachConcurrent};
+use crate::core::stream_handlers::{IntervalFold, TryRecvForEach};
 use crate::e2e::run;
 use crate::observability::logging::Loggable;
 use redgold_schema::EasyJson;
@@ -123,9 +123,9 @@ impl DiscoveryMessage {
 }
 
 #[async_trait]
-impl RecvForEachConcurrent<DiscoveryMessage> for Discovery {
+impl TryRecvForEach<DiscoveryMessage> for Discovery {
     // TODO: Ensure discovery message is not for self
-    async fn recv_for_each(&mut self, message: DiscoveryMessage) -> RgResult<()> {
+    async fn try_recv_for_each(&mut self, message: DiscoveryMessage) -> RgResult<()> {
         counter!("redgold.peer.discovery.recv_for_each").increment(1);
         let mut request = structs::Request::default();
         request.about_node_request = Some(structs::AboutNodeRequest::default());

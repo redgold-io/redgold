@@ -340,7 +340,7 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     ).collect_vec()).await {
         let result = result??;
         if !result.internal_accepted {
-            relay.unknown_resolved_inputs.sender.send_err(result.clone()).mark_abort()?;
+            relay.unknown_resolved_inputs.sender.send_rg_err(result.clone()).mark_abort()?;
             resolved_internally = false;
         }
         vec.push(result)

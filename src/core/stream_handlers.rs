@@ -41,21 +41,35 @@ pub async fn run_interval_inner(
 
 
 #[async_trait]
-pub trait RecvForEachConcurrent<T> {
-    async fn recv_for_each(&mut self, message: T) -> RgResult<()>;
+pub trait TryRecvForEach<T> {
+    async fn try_recv_for_each(&mut self, message: T) -> RgResult<()>;
 }
+
 //
 // pub async fn recv_run_inner<T: 'static>(recv_impl: impl RecvForEachConcurrent<T> + Clone + 'static + Send, recv: Receiver<T>, limit: usize) -> RgResult<()> {
 //
 // }
 
-pub async fn run_recv<T: 'static + Send>(recv_impl: impl RecvForEachConcurrent<T>
+pub async fn run_recv_concurrent<T: 'static + Send>(recv_impl: impl TryRecvForEach<T>
 + Clone + 'static + Send + Sync, recv: Receiver<T>, limit: usize) -> JoinHandle<RgResult<()>> {
     let fut = recv.into_stream().map(|x| Ok(x))
         .try_for_each_concurrent(limit, move |m| {
             let mut s = recv_impl.clone();
             async move {
-                s.recv_for_each(m).await
+                s.try_recv_for_each(m).await
+            }
+        });
+    tokio::spawn(fut)
+}
+
+
+pub async fn run_recv_single<T: 'static + Send>(recv_impl: impl TryRecvForEach<T>
++ Clone + 'static + Send + Sync, recv: Receiver<T>) -> JoinHandle<RgResult<()>> {
+    let fut = recv.into_stream().map(|x| Ok(x))
+        .try_for_each(move |m| {
+            let mut s = recv_impl.clone();
+            async move {
+                s.try_recv_for_each(m).await
             }
         });
     tokio::spawn(fut)
