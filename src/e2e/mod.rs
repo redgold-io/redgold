@@ -21,6 +21,7 @@ pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
 use redgold_schema::EasyJson;
+use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::transaction::amount_to_raw_amount;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -154,7 +155,6 @@ impl LiveE2E {
             seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone()
         };
 
-
         if !self.relay.node_config.network.is_main() {
             let min_offset = 20;
             let max_offset = 30;
@@ -168,7 +168,6 @@ impl LiveE2E {
             let address = key.address_typed();
             map.insert(address, key);
         }
-        let addresses = map.keys().map(|a| a.clone()).collect_vec();
         let mut spendable_utxos = vec![];
         for (a, k) in map.iter() {
             let result = self.relay.ds.transaction_store.query_utxo_address(a).await?;
@@ -200,7 +199,7 @@ impl LiveE2E {
         let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
-        let first_utxos = spendable_utxos.iter().take(10).flatten().cloned().collect_vec();
+        let first_utxos = spendable_utxos.iter().take(1).flatten().cloned().collect_vec();
 
         let tx_builder = tx_b
             .with_output(&destination, &amount)
@@ -214,6 +213,10 @@ impl LiveE2E {
         for u in &first_utxos {
             tx.sign(&u.key_pair)?;
         }
+
+        tx.validate_signatures().add("Immediate validation live E2E")?;
+
+
         return Ok(Some(tx.clone()));
     }
 }
