@@ -40,6 +40,7 @@ impl HashClear for ErrorInfo {
 pub trait EnhanceErrorInfo<T> {
     fn add(self, message: impl Into<String>) -> RgResult<T>;
     fn mark_abort(self) -> RgResult<T>;
+    fn bubble_abort(self) -> RgResult<RgResult<T>>;
     fn with_detail(self, k: impl Into<String>, v: impl Into<String>) -> RgResult<T>;
 }
 
@@ -53,6 +54,19 @@ impl<T> EnhanceErrorInfo<T> for RgResult<T> {
             e
         })
     }
+    fn bubble_abort(self) -> RgResult<RgResult<T>> {
+        match self {
+            Ok(r) => {Ok(Ok(r))}
+            Err(e) => {
+                if e.abort {
+                    Ok(Err(e))
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
     fn with_detail(self, k: impl Into<String>, v: impl Into<String>) -> RgResult<T> {
         self.map_err(|mut e| {
             e.with_detail(k, v);
