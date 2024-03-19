@@ -18,7 +18,7 @@ pub mod address_external;
 pub mod eth;
 pub mod address_support;
 pub mod hw_wallet_wrapper;
-mod tx_proof_validate;
+pub mod tx_proof_validate;
 
 
 pub struct TestConstants {
