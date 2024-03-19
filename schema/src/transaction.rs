@@ -267,6 +267,14 @@ impl Transaction {
             .flat_map(|o| o.data.as_ref().and_then(|d| d.amount.as_ref()))
     }
 
+    pub fn output_address_amounts_opt(&self) -> impl Iterator<Item = (&Address, CurrencyAmount)> {
+        self.outputs
+            .iter()
+            .flat_map(|o| o.opt_amount_typed()
+                .and_then(|a| o.address.as_ref().map(|addr| (addr, a)))
+            )
+    }
+
     pub fn output_amount_map<'a>(&'a self) -> HashMap<&'a Address, i64> {
         self.outputs
             .iter()
