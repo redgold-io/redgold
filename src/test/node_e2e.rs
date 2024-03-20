@@ -9,7 +9,7 @@ use redgold_keys::eth::example::{dev_ci_kp, EthHistoricalClient, EthWalletWrappe
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{bytes_data, EasyJson, ProtoHashable, ProtoSerde, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, EasyJson, ErrorInfoContext, ProtoHashable, ProtoSerde, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, TestContractInternalState, Transaction};
 use crate::api::control_api::ControlClient;
 use crate::api::public_api::PublicClient;
@@ -51,8 +51,11 @@ impl LocalTestNodeContext {
         // info!("Test starting node services");
         let futures = Node::start_services(relay.clone()).await;
         tokio::spawn(async move {
+            // TODO: Get the join errors here
             let (res, _, _) = futures::future::select_all(futures).await;
-            panic!("Node service failed in test: {:?}", res);
+            let result = res.error_info("Join error on main start services threads in node")
+                .and_then(|x| x).log_error();
+            panic!("Node service failed in test: {:?}", result);
         });
         // info!("Test completed starting node services");
 
@@ -342,7 +345,9 @@ impl LocalNodes {
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[tokio::test]
 async fn e2e() {
-    e2e_async(false).await.expect("");
+    let result = e2e_async(false).await.log_error();
+    // Allow time to catch main service error
+    tokio::time::sleep(Duration::from_secs(2)).await;
     // let runtime = build_runtime(8, "e2e");
     // runtime.block_on(e2e_async()).expect("e2e");
 }
