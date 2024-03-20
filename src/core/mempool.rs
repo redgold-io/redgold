@@ -6,6 +6,8 @@ use itertools::Itertools;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::pow::TransactionPowValidate;
 use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse, Transaction};
 use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
@@ -24,6 +26,7 @@ impl Mempool {
         message.transaction.prevalidate()?;
         message.transaction.validate_signatures()?;
         message.transaction.validate_network(&self.relay.node_config.network)?;
+        message.transaction.pow_validate()?;
         Ok(())
 
     }
@@ -48,6 +51,23 @@ impl Mempool {
             self.relay.mempool_entries.remove(&me.transaction.transaction.hash_or());
         }
         o
+    }
+
+    async fn verify_and_form_entry(&mut self, addrs: &Vec<Address>, message: &TransactionMessage) -> RgResult<MempoolEntry> {
+        let h = message.transaction.hash_or();
+        let is_known = self.relay.transaction_known(&h).await.mark_abort()?;
+        if is_known {
+            Err(error_info("Transaction already in process or known"))?
+            // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
+            // Notify subscribers for transaction channel rather than just dropping and returning error
+        }
+        self.initial_validation(&message)?;
+
+        let entry = MempoolEntry {
+            transaction: message.clone(),
+            fee_acceptable_address: addrs.clone()
+        };
+        Ok(entry)
     }
 }
 
@@ -89,29 +109,17 @@ impl IntervalFold for Mempool {
             .filter_map(|s| s.address().ok())
             .collect_vec();
         for message in messages {
-            let h = message.transaction.hash_or();
-            let is_known = self.relay.transaction_known(&h).await?;
 
-            if is_known {
-                if let Some(r) = message.response_channel {
-                    r.send_rg_err(Response::from_error_info(error_info("Transaction already in process or known")))?;
+            match self.verify_and_form_entry(&addrs, &message).await.bubble_abort()? {
+                Err(e) => {
+                    if let Some(r) = message.response_channel {
+                        r.send_rg_err(Response::from_error_info(e))?;
+                    }
                 }
-                // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
-                // Notify subscribers for transaction channel rather than just dropping and returning error
-                continue
-            }
-            if let Err(e) = self.initial_validation(&message) {
-                if let Some(r) = message.response_channel {
-                    r.send_rg_err(Response::from_error_info(e))?;
+                Ok(entry) => {
+                    self.push(entry);
                 }
-                continue
             }
-
-            let entry = MempoolEntry {
-                transaction: message,
-                fee_acceptable_address: addrs.clone()
-            };
-            self.push(entry);
         }
         loop {
             let option = self.pop();
