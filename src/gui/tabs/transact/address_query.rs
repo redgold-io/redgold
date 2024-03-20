@@ -63,6 +63,6 @@ pub fn get_address_info(
         let up = StateUpdate {
             update: fun,
         };
-        update_channel.send_err(up).log_error().ok();
+        update_channel.send_rg_err(up).log_error().ok();
     });
 }

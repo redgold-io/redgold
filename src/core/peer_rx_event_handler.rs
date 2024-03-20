@@ -63,7 +63,7 @@ impl PeerRxEventHandler {
             } else {
                 if let Some(nmd) = &pm.request.node_metadata {
                     info!("Attempting immediate discovery on peer {}", pk.short_id());
-                    relay.discovery.sender.send_err(
+                    relay.discovery.sender.send_rg_err(
                         DiscoveryMessage::new(nmd.clone(), pm.dynamic_node_metadata.clone())
                     ).log_error().ok();
                 }
@@ -81,7 +81,7 @@ impl PeerRxEventHandler {
             // let _ser = response.clone().json_or();
             // let _peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
             // debug!("Sending response to peer {} contents {}", peer, ser);
-            c.send_err(response).add("Send message to response channel failed in handle incoming message")
+            c.send_rg_err(response).add("Send message to response channel failed in handle incoming message")
                 .log_error().ok();
         }
 

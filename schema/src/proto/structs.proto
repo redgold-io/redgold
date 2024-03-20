@@ -518,8 +518,6 @@ message TransactionContract {
   optional TimeLockWindow time_lock_window = 6;
   repeated KeyValueOption options = 7;
 
-  // Used only for anti-spam limiting at low limits.
-  optional PoWProof pow_proof = 8;
 }
 
 enum NetworkEnvironment {
@@ -567,6 +565,8 @@ message TransactionOptions {
   // Used for marking a test transaction for filtering from indexes
   // Primarily used by the live E2E but also appropriate for small, user initiated tests
   optional bool is_test = 7;
+  // Used only for anti-spam limiting at low limits.
+  PoWProof pow_proof = 8;
 }
 
 message Transaction {
