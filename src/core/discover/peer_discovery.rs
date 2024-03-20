@@ -30,7 +30,7 @@ Probably both.
 impl IntervalFold for Discovery {
     async fn interval_fold(&mut self) -> RgResult<()> {
 
-        // self.clear_dead_peers().await?;
+        self.clear_dead_peers().await?;
 
         // What happens if the peer is non-responsive?
         let node_tx_all = self.relay.ds.peer_store.active_node_info(None)
@@ -168,7 +168,7 @@ impl Discovery {
         let failures = self.relay.peer_send_failures.safe_lock().await?;
         for (pk, fails) in failures.iter() {
             let delta = ct - fails.1;
-            if delta > 1000 * 60 * 10 { // 10 mins
+            if delta > 1000 * 60 * 25 { // 25 mins, 2 e2e intervals
                 self.relay.ds.peer_store.remove_node(pk).await?;
                 info!("Removed dead peer with delta {}: {}", delta, pk.hex().expect("hex"));
                 counter!("redgold.peer.discovery.clear_dead_peers").increment(1);
