@@ -20,7 +20,7 @@ use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
 
 use crate::api::about;
-use crate::core::peer_discovery::DiscoveryMessage;
+use crate::core::discovery::DiscoveryMessage;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;

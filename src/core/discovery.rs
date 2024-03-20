@@ -12,13 +12,12 @@ use tracing::{debug, error};
 use redgold_schema::{RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo, Response};
-use crate::core::relay::{Relay, SafeLock};
+use crate::core::relay::Relay;
 use crate::core::stream_handlers::{IntervalFold, TryRecvForEach};
 use crate::e2e::run;
 use crate::observability::logging::Loggable;
 use redgold_schema::EasyJson;
 use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo};
-use crate::util;
 
 /**
 Big question here is should discovery happen as eager push on Observation buffer
@@ -29,8 +28,6 @@ Probably both.
 #[async_trait]
 impl IntervalFold for Discovery {
     async fn interval_fold(&mut self) -> RgResult<()> {
-
-        self.clear_dead_peers().await?;
 
         // What happens if the peer is non-responsive?
         let node_tx_all = self.relay.ds.peer_store.active_node_info(None)
@@ -160,22 +157,6 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
 #[derive(Clone)]
 pub struct Discovery {
     relay: Relay,
-}
-
-impl Discovery {
-    pub async fn clear_dead_peers(&self) -> RgResult<()> {
-        let ct = util::current_time_millis_i64();
-        let failures = self.relay.peer_send_failures.safe_lock().await?;
-        for (pk, fails) in failures.iter() {
-            if let Some(last) = fails.last() {
-                let delta = ct - last.1;
-                if delta > 1000 * 60 * 10 { // 10 mins
-                    self.relay.ds.peer_store.remove_node(pk).await?;
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 impl Discovery {

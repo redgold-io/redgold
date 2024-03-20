@@ -97,23 +97,13 @@ impl PeerOutgoingEventHandler {
                 Err(e)
             }
         };
-
-        let added_details = result.map_err(|e| {
+        let r = result.map_err(|e| {
             counter!("redgold.peer.rest.send.error").increment(1);
             let mut e2 = e.clone();
             e2.with_detail("node_metadata", nmd.json_or());
             e2.with_detail("message", message.request.json_or());
             log::error!("Error sending message to peer: {}", e2.json_or());
-            e2
-        });
-
-        if let Err(e) = &added_details {
-            if let Some(pk) = nmd.public_key.as_ref() {
-                relay.mark_peer_send_failure(pk, &e).await?;
-            }
-        }
-        let r = added_details.map_err(|e| {
-            Response::from_error_info(e)
+            Response::from_error_info(e2)
         }).combine();
         if let Some(response_channel) = &message.response {
             response_channel.send_rg_err(r).add("Error sending message back on response channel").log_error().ok();

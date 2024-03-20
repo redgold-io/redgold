@@ -53,7 +53,7 @@ use redgold_schema::structs::TransactionState::Mempool;
 use crate::api::rosetta::models::Peer;
 use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::data_discovery::DataDiscovery;
-use crate::core::peer_discovery::{Discovery, DiscoveryMessage};
+use crate::core::discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::recent_download::RecentDownload;
 use crate::core::stream_handlers::{IntervalFold, run_recv_single};
