@@ -115,29 +115,29 @@ pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>, network: &Network
     x.clone()
 }
 
-pub fn create_test_genesis_transaction() -> Transaction {
-    let tc = TestConstants::new();
-    Transaction {
-        inputs: vec![],
-        outputs: vec![output_data(tc.addr, REWARD_AMOUNT as u64)],
-        struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
-        options: None
-    }
-    .with_hash()
-    .clone()
-}
-
-// This is out of date.
-pub fn create_genesis_block() -> Block {
-    let mut b = Block {
-        merkle_root: None,
-        transactions: vec![create_test_genesis_transaction()],
-        struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
-        previous_block_hash: None,
-        metadata: None,
-        height: 0,
-    };
-    b.with_hash();
-    b.previous_block_hash = Some(b.hash_or());
-    b.clone()
-}
+// pub fn create_test_genesis_transaction() -> Transaction {
+//     let tc = TestConstants::new();
+//     Transaction {
+//         inputs: vec![],
+//         outputs: vec![output_data(tc.addr, REWARD_AMOUNT as u64)],
+//         struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
+//         options: None
+//     }
+//     .with_hash()
+//     .clone()
+// }
+//
+// // This is out of date.
+// pub fn create_genesis_block() -> Block {
+//     let mut b = Block {
+//         merkle_root: None,
+//         transactions: vec![create_test_genesis_transaction()],
+//         struct_metadata: struct_metadata(constants::EARLIEST_TIME as i64),
+//         previous_block_hash: None,
+//         metadata: None,
+//         height: 0,
+//     };
+//     b.with_hash();
+//     b.previous_block_hash = Some(b.hash_or());
+//     b.clone()
+// }

@@ -25,7 +25,7 @@ use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
-use crate::genesis::create_test_genesis_transaction;
+// use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{
     Address, AddressType, ErrorInfo, QueryAddressesRequest, QueryTransactionResponse,
 };
@@ -710,25 +710,25 @@ pub fn start_server(relay: Relay
     trace!("Started PublicAPI server on port {:?}", relay.clone().node_config.public_port());
     return handle;
 }
-
-#[allow(dead_code)]
-async fn mock_relay(relay: Relay) {
-    loop {
-        let tm = relay.mempool.receiver.recv().unwrap();
-        let mut response = structs::Response::default();
-        response.submit_transaction_response = Some(SubmitTransactionResponse {
-                transaction_hash: create_test_genesis_transaction().hash_or().into(),
-                query_transaction_response: Some(QueryTransactionResponse {
-                    observation_proofs: vec![]
-                }),
-            transaction: None,
-        });
-        tm.response_channel
-            .unwrap()
-            .send(response)
-            .expect("send");
-    }
-}
+//
+// #[allow(dead_code)]
+// async fn mock_relay(relay: Relay) {
+//     loop {
+//         let tm = relay.mempool.receiver.recv().unwrap();
+//         let mut response = structs::Response::default();
+//         response.submit_transaction_response = Some(SubmitTransactionResponse {
+//                 transaction_hash: create_test_genesis_transaction().hash_or().into(),
+//                 query_transaction_response: Some(QueryTransactionResponse {
+//                     observation_proofs: vec![]
+//                 }),
+//             transaction: None,
+//         });
+//         tm.response_channel
+//             .unwrap()
+//             .send(response)
+//             .expect("send");
+//     }
+// }
 
 #[ignore]
 #[test]

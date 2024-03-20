@@ -13,7 +13,7 @@ use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, RgResult, SafeOption, WithMetadataHashable};
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
-use crate::genesis::create_test_genesis_transaction;
+// use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
 use crate::core::internal_message::SendErrorInfo;
@@ -354,14 +354,14 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     Ok(resolved)
     }
 // }
-
-#[test]
-fn test_hashmap() {
-    let tx = create_test_genesis_transaction();
-    let h = tx.calculate_hash();
-    let mut m: HashMap<Hash, Transaction> = HashMap::default();
-    m.insert(h.clone(), tx.clone());
-    let result = m.get(&h);
-    let t2 = result.expect("transaction not found");
-    assert_eq!(t2, &tx);
-}
+//
+// #[test]
+// fn test_hashmap() {
+//     let tx = create_test_genesis_transaction();
+//     let h = tx.calculate_hash();
+//     let mut m: HashMap<Hash, Transaction> = HashMap::default();
+//     m.insert(h.clone(), tx.clone());
+//     let result = m.get(&h);
+//     let t2 = result.expect("transaction not found");
+//     assert_eq!(t2, &tx);
+// }
