@@ -58,7 +58,7 @@ impl<T> EnhanceErrorInfo<T> for RgResult<T> {
         match self {
             Ok(r) => {Ok(Ok(r))}
             Err(e) => {
-                if e.abort {
+                if !e.abort {
                     Ok(Err(e))
                 } else {
                     Err(e)
