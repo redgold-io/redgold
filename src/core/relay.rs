@@ -23,7 +23,7 @@ use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::peer_discovery::DiscoveryMessage;
+use crate::core::discover::peer_discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -139,7 +139,7 @@ pub struct Relay {
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
     pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>,
     pub tx_writer: Channel<TxWriterMessage>,
-    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, Vec<(ErrorInfo, i64)>>>>
+    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>
 }
 
 impl Relay {
@@ -166,8 +166,8 @@ impl Relay {
 
     pub async fn mark_peer_send_failure(&self, pk: &PublicKey, error: &ErrorInfo) -> RgResult<()> {
         let mut l = self.peer_send_failures.safe_lock().await?;
-        let mut v = l.get(pk).map(|v| v.clone()).unwrap_or(vec![]);
-        v.push((error.clone(), util::current_time_millis_i64()));
+        let mut v = l.get(pk).map(|v| v.clone()).unwrap_or(
+            (error.clone(), util::current_time_millis_i64()));
         l.insert(pk.clone(), v);
         Ok(())
     }
@@ -250,7 +250,7 @@ are instantiated by the node
 */
 
 use crate::core::internal_message::SendErrorInfo;
-use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
 use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};

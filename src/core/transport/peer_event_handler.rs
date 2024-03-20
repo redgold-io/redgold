@@ -120,6 +120,7 @@ impl PeerOutgoingEventHandler {
         }
         Ok(())
     }
+
     pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<Response, ErrorInfo> {
         let port = nmd.port_or(relay.node_config.network) + 1;
         let request = message.request.clone();
