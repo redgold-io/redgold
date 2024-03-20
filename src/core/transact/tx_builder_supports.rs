@@ -4,7 +4,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
 use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, Transaction, TransactionData, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, StandardContractType, StandardData, Transaction, TransactionData, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 
@@ -92,13 +92,6 @@ pub struct TransactionBuilder {
 
 impl TransactionBuilder {
 
-    pub fn with_pow(&mut self) -> RgResult<&mut Self> {
-        let hash = self.transaction.signable_hash();
-        let proof = PoWProof::from_hash_sha3_256(&hash, 1)?;
-        let opts = self.transaction.options.as_mut().expect("");
-        opts.pow_proof = Some(proof);
-        Ok(self)
-    }
     pub fn with_ds(&mut self, ds: DataStore) -> &mut Self {
         self.ds = Some(ds);
         self
@@ -226,6 +219,7 @@ impl TransactionBuilder {
         self.transaction.outputs.push(output);
         self
     }
+
 
 
     pub fn with_contract_request_output(&mut self,
@@ -356,8 +350,6 @@ impl TransactionBuilder {
         if self.balance() > 0 {
             self.with_remainder();
         }
-
-        self.with_pow()?;
 
         Ok(self.transaction.clone())
         // self.balance

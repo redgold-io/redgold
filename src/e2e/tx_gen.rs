@@ -112,7 +112,7 @@ impl TransactionGenerator {
         tb.with_contract_deploy_output_and_predicate_input(bytes, c_amount, true)?;
         // tb.with_fee(fee_amount);
         tb.with_remainder();
-        let tx= tb.build()?.sign(&prev.key_pair)?;
+        let tx= tb.transaction.sign(&prev.key_pair)?;
         let tk = TransactionWithKey {
             transaction: tx,
             key_pairs: vec![prev.key_pair.clone()],
@@ -142,7 +142,7 @@ impl TransactionGenerator {
         tb.with_contract_request_output(&address, &req.proto_serialize())?;
         // tb.with_fee(fee_amount);
         tb.with_remainder();
-        let tx= tb.build()?.sign(&prev.key_pair)?;
+        let tx= tb.transaction.sign(&prev.key_pair)?;
         let tk = TransactionWithKey {
             transaction: tx,
             key_pairs: vec![prev.key_pair.clone()],
@@ -153,14 +153,13 @@ impl TransactionGenerator {
     pub fn split_value_transaction(&mut self, prev: &SpendableUTXO) -> TransactionWithKey {
         let kp = self.next_kp();
         let kp2 = kp.clone();
-        let amount = prev.utxo_entry.amount() / 2;
-        let tx = TransactionBuilder::new(&self.network)
-            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
-            .with_output(&kp.address_typed(), &CurrencyAmount::from(amount as i64))
-            .with_output(&kp2.address_typed(), &CurrencyAmount::from(amount as i64))
-            .build().expect("Failed to build transaction")
-            .sign(&prev.key_pair).expect("signed");
-
+        let tx = Transaction::new(
+            &prev.utxo_entry,
+            &kp.address(),
+            prev.utxo_entry.amount() / 2,
+            &prev.key_pair.secret_key,
+            &prev.key_pair.public_key,
+        );
         TransactionWithKey {
             transaction: tx,
             key_pairs: vec![kp2, prev.key_pair],

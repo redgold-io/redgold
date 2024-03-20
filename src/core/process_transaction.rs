@@ -33,7 +33,6 @@ use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
 use redgold_executor::extism_wrapper;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
@@ -325,8 +324,6 @@ impl TransactionProcessContext {
         transaction.prevalidate()?;
 
         transaction.validate_network(&self.relay.node_config.network)?;
-
-        transaction.validate_signatures()?;
 
         Ok(())
 

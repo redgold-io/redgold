@@ -136,7 +136,7 @@ struct LiveE2E {
     num_success: u64,
 }
 
-use redgold_keys::tx_proof_validate::TransactionProofValidator;
+
 impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
 

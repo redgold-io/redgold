@@ -4,7 +4,7 @@ use redgold_schema::structs::Transaction;
 use crate::transaction_support::InputSupport;
 
 pub trait TransactionProofValidator {
-    fn validate_signatures(&self) -> RgResult<()>;
+    fn validate_signatures(&self) -> bool;
 }
 
 impl TransactionProofValidator for Transaction {
