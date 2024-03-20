@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use async_trait::async_trait;
 
 use crate::core::internal_message;
 use crate::core::internal_message::{Channel, new_channel};
@@ -22,7 +23,7 @@ use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::discovery::DiscoveryMessage;
+use crate::core::discover::peer_discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
 use crate::core::internal_message::RecvAsyncErrorInfo;
@@ -138,6 +139,7 @@ pub struct Relay {
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
     pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>,
     pub tx_writer: Channel<TxWriterMessage>,
+    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>
 }
 
 impl Relay {
@@ -146,7 +148,29 @@ impl Relay {
     }
 }
 
+
+
+#[async_trait]
+pub trait SafeLock<T> where T: ?Sized + std::marker::Send {
+    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>>;
+}
+#[async_trait]
+impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Send {
+    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>> {
+        // May need a timeout here in the future, hence wrapping it
+        Ok(self.lock().await)
+    }
+}
+
 impl Relay {
+
+    pub async fn mark_peer_send_failure(&self, pk: &PublicKey, error: &ErrorInfo) -> RgResult<()> {
+        let mut l = self.peer_send_failures.safe_lock().await?;
+        let mut v = l.get(pk).map(|v| v.clone()).unwrap_or(
+            (error.clone(), util::current_time_millis_i64()));
+        l.insert(pk.clone(), v);
+        Ok(())
+    }
 
     pub fn check_rate_limit(&self, ip: &String) -> RgResult<bool> {
         let mut l = self.faucet_rate_limiter.lock()
@@ -226,7 +250,7 @@ are instantiated by the node
 */
 
 use crate::core::internal_message::SendErrorInfo;
-use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
 use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
@@ -890,6 +914,7 @@ impl Relay {
             mempool_entries: Arc::new(Default::default()),
             faucet_rate_limiter: Arc::new(Mutex::new(Default::default())),
             tx_writer: new_channel(),
+            peer_send_failures: Arc::new(Default::default()),
         }
     }
 }
