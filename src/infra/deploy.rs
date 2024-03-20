@@ -358,11 +358,11 @@ pub async fn deploy_ops_services(
     ssh.copy(
         include_str!("../resources/infra/ops_services/services-all.yml"),
         format!("{}/services-all.yml", remote_path)
-    );
+    ).await?;
     ssh.copy(
         include_str!("../resources/infra/ops_services/filebeat.docker.yml"),
         format!("{}/filebeat.docker.yml", remote_path)
-    );
+    ).await?;
 
     let prometheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
 //     match std::env::var("GRAFANA_CLOUD_USER") {
@@ -382,16 +382,16 @@ pub async fn deploy_ops_services(
     ssh.copy(
         prometheus_yml,
         format!("{}/prometheus.yml", remote_path)
-    );
+    ).await?;
     ssh.copy(
         include_str!("../resources/infra/ops_services/prometheus-datasource.yaml"),
         format!("{}/prometheus-datasource.yaml", remote_path)
-    );
+    ).await?;
 
     ssh.copy(
         grafana_pass.unwrap_or("debug".to_string()),
         format!("{}/grafana_password", remote_path)
-    );
+    ).await?;
 
     ssh.exes(format!("rm -r {}/dashboards", remote_path), p).await?;
     ssh.exes(format!("mkdir {}/dashboards", remote_path), p).await?;
@@ -400,25 +400,25 @@ pub async fn deploy_ops_services(
     ssh.copy(
         x,
         format!("{}/dashboards/node-exporter.json", remote_path)
-    );
+    ).await?;
 
     let x = include_str!("../resources/infra/ops_services/dashboards/redgold_rev0.json");
     ssh.copy(
         x,
         format!("{}/dashboards/redgold.json", remote_path)
-    );
+    ).await?;
 
     // println!("Copying node exporter dashboard: {}", x);
 
     ssh.copy(
         include_str!("../resources/infra/ops_services/dashboards/dashboard_config.yaml"),
         format!("{}/dashboards/dashboard_config.yaml", remote_path)
-    );
+    ).await?;
 
     ssh.copy(
         include_str!("../resources/infra/ops_services/grafana/grafana.ini"),
         format!("{}/grafana.ini", remote_path)
-    );
+    ).await?;
 
     // Environment
     let mut env = _additional_env.unwrap_or(Default::default());
@@ -432,7 +432,7 @@ pub async fn deploy_ops_services(
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
     }).join("\n");
-    ssh.copy(env_contents.clone(), format!("{}/ops_var.env", remote_path));
+    ssh.copy(env_contents.clone(), format!("{}/ops_var.env", remote_path)).await?;
 
     ssh.exes(format!("cd {}; docker-compose -f services-all.yml down", remote_path), p).await?;
 
@@ -453,7 +453,7 @@ pub async fn deploy_ops_services(
     ssh.copy(
         include_str!("../resources/infra/ops_services/kibana_setup.sh"),
         kibana_setup_path
-    );
+    ).await?;
 
     ssh.exes(format!("chmod +x {}; {}", remote_path, remote_path), p).await?;
 
