@@ -139,7 +139,7 @@ pub struct Relay {
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
     pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>,
     pub tx_writer: Channel<TxWriterMessage>,
-    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, Vec<(ErrorInfo, i64)>>>>
+    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>
 }
 
 impl Relay {
@@ -166,12 +166,8 @@ impl Relay {
 
     pub async fn mark_peer_send_failure(&self, pk: &PublicKey, error: &ErrorInfo) -> RgResult<()> {
         let mut l = self.peer_send_failures.safe_lock().await?;
-        let mut v = l.get(pk).map(|v| v.clone()).unwrap_or(vec![]);
-        if v.len() > 10 {
-            let slice_start = v.len() - 10;
-            v = v[slice_start..].to_vec();
-        }
-        v.push((error.clone(), util::current_time_millis_i64()));
+        let mut v = l.get(pk).map(|v| v.clone()).unwrap_or(
+            (error.clone(), util::current_time_millis_i64()));
         l.insert(pk.clone(), v);
         Ok(())
     }
