@@ -32,7 +32,7 @@ use crate::core::process_transaction::TransactionProcessContext;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use crate::data::download;
-use crate::genesis::{create_test_genesis_transaction, genesis_transaction, genesis_tx_from, GenesisDistribution};
+use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};

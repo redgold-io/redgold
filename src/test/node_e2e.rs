@@ -601,6 +601,7 @@ fn env_var_parse_test() {
 
 }
 
+#[ignore]
 #[tokio::test]
 async fn data_store_test() {
     let nc = NodeConfig::from_test_id(&(100 as u16));

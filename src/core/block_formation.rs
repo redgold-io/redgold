@@ -1,6 +1,6 @@
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
-use crate::genesis::create_genesis_block;
+// use crate::genesis::create_genesis_block;
 use crate::schema::error_message;
 use crate::schema::structs::{Address, AddressBlock, Block, Error, ErrorInfo, Output};
 use crate::schema::WithMetadataHashable;
@@ -86,10 +86,10 @@ impl BlockFormationProcess {
         //
         let last_block = match last_block_opt {
             None => {
-                let block = create_genesis_block();
+                // let block = create_genesis_block();
                 // TODO: only if historical balance tracking enabled
                 // relay.ds.insert_block_update_historicals(&block).await?;
-                block
+                panic!("Genesis block created")
             }
             Some(b) => {b}
         };

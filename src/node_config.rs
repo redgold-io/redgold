@@ -31,16 +31,16 @@ pub struct CanaryConfig {}
 
 #[derive(Clone, Debug)]
 pub struct GenesisConfig {
-    block: Block,
+    // block: Block,
 }
-
-impl Default for GenesisConfig {
-    fn default() -> Self {
-        Self {
-            block: genesis::create_genesis_block(),
-        }
-    }
-}
+//
+// impl Default for GenesisConfig {
+//     fn default() -> Self {
+//         Self {
+//             block: genesis::create_genesis_block(),
+//         }
+//     }
+// }
 
 
 #[derive(Clone, Debug)]
@@ -397,14 +397,6 @@ impl NodeConfig {
         self.public_key().address().expect("address")
     }
 
-    pub fn genesis_transaction(&self) -> Transaction {
-        self.genesis_config
-            .block
-            .transactions
-            .get(0)
-            .expect("filled")
-            .clone()
-    }
 
     pub fn control_port(&self) -> u16 {
         self.control_port.unwrap_or(self.port_offset - 3)
@@ -488,7 +480,8 @@ impl NodeConfig {
             disable_auto_update: false,
             auto_update_poll_interval: Duration::from_secs(60),
             block_formation_interval: Duration::from_secs(10),
-            genesis_config: Default::default(),
+            genesis_config: GenesisConfig{
+            },
             faucet_enabled: true,
             e2e_enabled: true,
             load_balancer_url: "lb.redgold.io".to_string(),
