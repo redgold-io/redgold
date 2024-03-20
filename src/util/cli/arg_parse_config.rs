@@ -389,7 +389,7 @@ impl ArgTranslate {
         }
     }
 
-    fn debug_id_port_offset(offset: u16, debug_id: i32) -> u16 {
+    pub fn debug_id_port_offset(offset: u16, debug_id: i32) -> u16 {
         offset + ((debug_id * 1000) as u16)
     }
 
