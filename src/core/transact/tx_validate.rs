@@ -12,7 +12,7 @@ impl TransactionValidator for Transaction {
         self.validate_keys(network)?;
         if let Some(addrs) = fee_addrs {
             // Temporary bypass for node config updates, to be removed later
-            let allow_bypass = self.outputs.iter().all(|o| o.is_metadata());
+            let allow_bypass = self.outputs.iter().all(|o| o.is_metadata() || o.observation().is_ok());
             if !self.validate_fee(addrs) && !allow_bypass {
                 return Err(error_info("Transaction fee is too low or to unsupported fee address"));
             };

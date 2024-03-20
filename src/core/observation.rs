@@ -119,6 +119,7 @@ impl ObservationBuffer {
             tx
         } else {
             let mut tx = TransactionBuilder::new(&relay.node_config);
+            tx.allow_bypass_fee = true;
             let address = relay.node_config.public_key().address().expect("address");
             tx.with_genesis_input(&address);
             tx.with_observation(&Observation::default(), 0, &address);

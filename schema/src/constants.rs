@@ -28,7 +28,7 @@ pub const VERSION: i32 = 0;
 
 pub const REDGOLD: &str = "redgold";
 
-pub const SYMBOL: &str = "RDG";
+pub const RDG_SYMBOL: &str = "RDG";
 
 pub const STANDARD_VERSION: i64 = 0;
 
