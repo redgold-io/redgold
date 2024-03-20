@@ -40,7 +40,7 @@ use crate::{api, schema, util};
 use crate::api::{about, as_warp_json_response, explorer};
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
-use crate::core::peer_rx_event_handler::PeerRxEventHandler;
+use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
 use crate::api::explorer::server::{extract_ip, process_origin};
