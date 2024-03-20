@@ -9,7 +9,7 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
                            -> Result<Transaction, ErrorInfo> {
     let destination = Address::parse(destination.clone())?;
     let amount = CurrencyAmount::from_float_string(amount)?;
-    let mut tb = TransactionBuilder::new(&nc.network);
+    let mut tb = TransactionBuilder::new(&nc);
     let a = ai.address.as_ref().expect("a");
 
     tb.with_address_info(ai.clone())?;
@@ -40,7 +40,7 @@ pub async fn prepare_tx_test() {
     let pk = PublicKey::from_hex(pk_hex).expect("pk");
     let addr = pk.address().expect("addr");
     let ai = api.address_info(addr.clone()).await.expect("ai");
-    let mut tb = TransactionBuilder::new(&nc.network);
+    let mut tb = TransactionBuilder::new(&nc);
     let a = ai.address.as_ref().expect("a");
     tb.with_address_info(ai.clone()).expect("with_address_info");
     for u in tb.utxos {

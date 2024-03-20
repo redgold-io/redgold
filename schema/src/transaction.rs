@@ -7,6 +7,7 @@ use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, struct_metadata_new, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use rand::Rng;
+use crate::fee_validator::MIN_RDG_SATS_FEE;
 
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
 
@@ -600,6 +601,10 @@ impl CurrencyAmount {
         let mut a = CurrencyAmount::default();
         a.amount = amount;
         Ok(a)
+    }
+
+    pub fn min_fee() -> Self {
+        Self::from(MIN_RDG_SATS_FEE)
     }
 
     pub fn bigint_amount(&self)  {

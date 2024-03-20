@@ -438,7 +438,8 @@ impl Relay {
 
     pub async fn update_node_metadata(&self, node_metadata: &NodeMetadata) -> RgResult<()> {
         let tx = self.node_tx().await?;
-        let mut tx_b = TransactionBuilder::new(&self.node_config.network);
+        let mut tx_b = TransactionBuilder::new(&self.node_config);
+        tx_b.allow_bypass_fee = true;
         let utxo = tx.head_utxo()?;
         let h = utxo.height()?;
         let address = self.node_config.public_key().address()?;

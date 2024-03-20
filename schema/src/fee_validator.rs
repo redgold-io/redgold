@@ -1,15 +1,15 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use redgold_schema::structs::{Address, Seed, SupportedCurrency, Transaction};
+use crate::structs::{Address, Seed, SupportedCurrency, Transaction};
 
-const MIN_RDG_SATS_FEE: i64 = 1000;
+pub const MIN_RDG_SATS_FEE: i64 = 1000;
 
-trait TransactionFeeValidator {
-    fn validate_fee(&self, seeds: Vec<&Address>) -> bool;
+pub trait TransactionFeeValidator {
+    fn validate_fee(&self, addresses: &Vec<Address>) -> bool;
 }
 
 impl TransactionFeeValidator for Transaction {
-    fn validate_fee(&self, addresses: Vec<&Address>) -> bool {
+    fn validate_fee(&self, addresses: &Vec<Address>) -> bool {
         let value = self.output_address_amounts_opt()
             .filter(|(address, amount)| {
                 addresses.contains(address) && amount.currency() == SupportedCurrency::Redgold

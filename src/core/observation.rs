@@ -118,7 +118,7 @@ impl ObservationBuffer {
                 .await.expect("Error loading observation initial") {
             tx
         } else {
-            let mut tx = TransactionBuilder::new(&relay.node_config.network);
+            let mut tx = TransactionBuilder::new(&relay.node_config);
             let address = relay.node_config.public_key().address().expect("address");
             tx.with_genesis_input(&address);
             tx.with_observation(&Observation::default(), 0, &address);
@@ -211,7 +211,7 @@ impl ObservationBuffer {
             parent_id: Some(utxo_id.clone()),
             ancestor_merkle_roots: ancestor_roots,
         };
-        let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
+        let mut tx_b = TransactionBuilder::new(&self.relay.node_config);
         let utxo_e = self.latest.observation_output_as()?;
         tx_b.with_observation(&o, height, &self.relay.node_config.address());
         tx_b.with_input(&utxo_e.to_input());

@@ -7,6 +7,7 @@ use log::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::tx_proof_validate::TransactionProofValidator;
 
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
@@ -15,6 +16,7 @@ use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnviron
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
+use crate::node_config::NodeConfig;
 use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transaction};
 use crate::schema::WithMetadataHashable;
 
@@ -43,7 +45,7 @@ impl TransactionSubmitter {
         let input0 = tx.inputs.get_mut(0).expect("sig");
         input0.utxo_id = Some(used.clone());
         // i think?
-        assert!(tx.prevalidate().is_err());
+        assert!(tx.validate_keys(None).is_err());
         let res = self.client.clone().send_transaction(&tx, true).await;
         assert!(res.is_err());
         let _err = res.unwrap_err();
@@ -52,7 +54,7 @@ impl TransactionSubmitter {
         let mut gen = self.generator.lock().unwrap();
         let transaction = gen.generate_simple_used_utxo_tx_otherwise_valid().clone().expect("tx");
         let mut tx = transaction.transaction.clone();
-        assert!(tx.prevalidate().is_ok());
+        assert!(tx.validate_keys(None).is_ok());
         let res = self.client.clone().send_transaction(&tx, true).await;
         assert!(res.is_err());
     }
@@ -65,7 +67,7 @@ impl TransactionSubmitter {
         client: PublicClient,
         // runtime: Arc<Runtime>,
         utxos: Vec<SpendableUTXO>,
-        network: &NetworkEnvironment,
+        network: &NodeConfig,
     ) -> Self {
         let generator = TransactionGenerator::default(utxos.clone(), network);
         // if utxos.is_empty() {

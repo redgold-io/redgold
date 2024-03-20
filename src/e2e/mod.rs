@@ -196,7 +196,7 @@ impl LiveE2E {
             return Ok(None);
         }
 
-        let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
+        let mut tx_b = TransactionBuilder::new(&self.relay.node_config);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
         let first_utxos = spendable_utxos.iter().take(1).flatten().cloned().collect_vec();

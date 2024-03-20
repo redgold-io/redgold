@@ -138,7 +138,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let kp = option.safe_get_msg("keypair")?.clone().clone();
 
     let utxo = utxos.get(0).expect("first").clone();
-    let b = TransactionBuilder::new(&p1.network)
+    let b = TransactionBuilder::new(&p1)
         .with_utxo(&utxo)?
         .with_output(&destination, &CurrencyAmount::from_fractional(p0.amount)?)
         .build()?
@@ -400,7 +400,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
     }
     let client = p1.api_client();
     let tx_submit = TransactionSubmitter::default(
-        client.clone(), vec![], &p1.network,
+        client.clone(), vec![], &p1,
     );
     let faucet_tx = tx_submit.with_faucet().await?;
     // info!("Faucet response: {}", faucet_tx.json_or());

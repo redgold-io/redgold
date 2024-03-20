@@ -22,4 +22,3 @@ pub mod contract;
 pub mod recent_download;
 pub mod data_discovery;
 pub mod balances_all;
-pub mod fee_validator;
