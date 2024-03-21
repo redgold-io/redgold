@@ -119,6 +119,7 @@ impl ObservationBuffer {
             tx
         } else {
             let mut tx = TransactionBuilder::new(&relay.node_config);
+            // relay.get_self_fee_utxo()
             tx.allow_bypass_fee = true;
             let address = relay.node_config.public_key().address().expect("address");
             tx.with_genesis_input(&address);
@@ -213,6 +214,7 @@ impl ObservationBuffer {
             ancestor_merkle_roots: ancestor_roots,
         };
         let mut tx_b = TransactionBuilder::new(&self.relay.node_config);
+        tx_b.allow_bypass_fee = true;
         let utxo_e = self.latest.observation_output_as()?;
         tx_b.with_observation(&o, height, &self.relay.node_config.address());
         tx_b.with_input(&utxo_e.to_input());

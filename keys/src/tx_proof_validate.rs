@@ -15,7 +15,7 @@ impl TransactionProofValidator for Transaction {
     }
 
     fn validate_keys(&self, network_opt: Option<&NetworkEnvironment>) -> RgResult<()> {
-        self.validate_schema(network_opt)?;
+        self.validate_schema(network_opt, true)?;
         self.validate_signatures()?;
         Ok(())
     }

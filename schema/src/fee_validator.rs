@@ -12,8 +12,8 @@ impl TransactionFeeValidator for Transaction {
     fn validate_fee(&self, addresses: &Vec<Address>) -> bool {
         let value = self.output_address_amounts_opt()
             .filter(|(address, amount)| {
-                addresses.contains(address) && amount.currency() == SupportedCurrency::Redgold
+                addresses.contains(address) && amount.currency_or() == SupportedCurrency::Redgold
         }).map(|(address, amount)| amount.amount).sum::<i64>();
-        value > MIN_RDG_SATS_FEE
+        value >= MIN_RDG_SATS_FEE
     }
 }

@@ -108,6 +108,9 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn is_metadata_or_obs(&self) -> bool {
+        self.outputs.iter().all(|o| o.is_metadata() || o.observation().is_ok())
+    }
     pub fn validate_network(&self, network: &NetworkEnvironment) -> RgResult<()> {
         let opts = self.options()?;
         let net = opts.network_type.safe_get_msg("Missing network type")?;
@@ -484,6 +487,15 @@ impl Transaction {
         Ok(utxo.clone().clone())
     }
 
+    pub fn nmd_utxo(&self) -> RgResult<UtxoEntry> {
+        let utxos = self.utxo_outputs()?.iter().filter(|u|
+            u.output.as_ref().map(|o| o.is_node_metadata()).unwrap_or(false)
+        ).cloned().collect_vec();
+        let head_utxo = utxos.get(0);
+        let utxo = head_utxo.safe_get_msg("Missing UTXO output for node metadata")?;
+        Ok(utxo.clone().clone())
+    }
+
     pub fn height(&self) -> RgResult<i64> {
         let h = self.options.as_ref()
             .and_then(|o| o.data.as_ref())
@@ -601,6 +613,12 @@ impl CurrencyAmount {
         let mut a = CurrencyAmount::default();
         a.amount = amount;
         Ok(a)
+    }
+
+    pub fn currency_or(&self) -> SupportedCurrency {
+        self.currency
+            .and_then(|c| SupportedCurrency::from_i32(c))
+            .unwrap_or(SupportedCurrency::Redgold)
     }
 
     pub fn min_fee() -> Self {

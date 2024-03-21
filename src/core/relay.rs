@@ -16,12 +16,12 @@ use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
 use itertools::Itertools;
-use log::info;
+use log::{error, info};
 use tokio::runtime::Runtime;
 use tracing::trace;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId, UtxoEntry, CurrencyAmount};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
@@ -32,6 +32,8 @@ use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
+use redgold_keys::transaction_support::TransactionSupport;
+use redgold_schema::transaction::amount_to_raw_amount;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
@@ -254,6 +256,7 @@ use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
 use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
+use crate::e2e::tx_gen::SpendableUTXO;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -460,16 +463,59 @@ impl Relay {
         Ok(())
     }
 
+    // TODO: Unify with liveE2E, something weird going on between these functions
+    pub async fn get_self_fee_utxo(&self) -> RgResult<Option<UtxoEntry>> {
+        let address = self.node_config.public_key().address()?;
+        let result = self.ds.transaction_store.query_utxo_address(&address).await?;
+        let vec = result.iter()
+            .filter(|r| r.opt_amount().map(|a| a.amount > CurrencyAmount::min_fee().amount).unwrap_or(false))
+            .collect_vec();
+        let mut err_str = format!("Address {}", address.render_string().expect(""));
+        let mut res = None;
+        for u in vec {
+            if let Ok(id) = u.utxo_id() {
+                if self.utxo_channels.contains_key(id) {
+                    continue
+                }
+                err_str.push_str(&format!(" UTXO ID: {}", id.json_or()));
+                if self.ds.utxo.utxo_id_valid(id).await? {
+                    let childs = self.ds.utxo.utxo_children(id).await?;
+                    if childs.len() == 0 {
+                        res = Some(u.clone());
+                        break
+                    } else {
+                        error!("UTXO has children not valid! {} {}", err_str, childs.json_or());
+                    }
+                } else {
+                    error!("UTXO ID not valid! {}", err_str);
+                }
+            }
+        }
+        Ok(res)
+    }
+
     pub async fn update_node_metadata(&self, node_metadata: &NodeMetadata) -> RgResult<()> {
         let tx = self.node_tx().await?;
         let mut tx_b = TransactionBuilder::new(&self.node_config);
         tx_b.allow_bypass_fee = true;
-        let utxo = tx.head_utxo()?;
+
+        let option = self.get_self_fee_utxo().await?;
+        let has_currency = option.is_some();
+        if let Some(utxo) = option {
+            tx_b.with_unsigned_input(utxo)?;
+        }
+
+        let utxo = tx.nmd_utxo()?;
         let h = utxo.height()?;
         let address = self.node_config.public_key().address()?;
-        tx_b.with_maybe_currency_utxo(&utxo)?;
+        tx_b.with_nmd_utxo(&utxo)?;
         tx_b.with_output_node_metadata(&address, node_metadata.clone(), h+1);
-        let updated = tx_b.build()?;
+        // TODO: Add fee here from internal node wallet
+        if has_currency {
+            tx_b.with_default_fee()?;
+        };
+
+        let updated = tx_b.build()?.sign(&self.node_config.keypair())?;
         self.ds.config_store.set_node_tx(&updated).await?;
         // TODO:
         // Really we should just gossip the transaction here.. or rely on discovery

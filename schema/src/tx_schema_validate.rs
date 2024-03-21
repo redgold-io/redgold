@@ -7,14 +7,14 @@ use crate::structs::{NetworkEnvironment, Transaction, UtxoId};
 use crate::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 
 pub trait SchemaValidationSupport {
-    fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>) -> RgResult<()>;
+    fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()>;
 }
 
 const DUST_LIMIT : i64 = 1000;
 
 impl SchemaValidationSupport for Transaction  {
 
-    fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>) -> RgResult<()> {
+    fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()> {
 
         for output in self.outputs.iter() {
             if let Some(a) = output.opt_amount_typed() {
@@ -56,8 +56,12 @@ impl SchemaValidationSupport for Transaction  {
                 hs.insert(f.clone());
             }
         }
+        // TODO: Deal with this later for genesis / nmd
         if self.inputs.is_empty() {
-            Err(error_code(structs::Error::MissingInputs))?;
+            // if all nmd or
+            if !self.is_metadata_or_obs() {
+                Err(error_code(structs::Error::MissingInputs))?;
+            }
         }
         if self.outputs.is_empty() {
             Err(error_code(structs::Error::MissingOutputs))?;
@@ -85,12 +89,14 @@ impl SchemaValidationSupport for Transaction  {
                     Err(error_code(structs::Error::InvalidAddressInputIndex))?;
                 }
             }
-            if input.proof.is_empty() {
-                let floating_non_consume_input = input.utxo_id.is_none() && input.floating_utxo_id.is_some();
-                if !floating_non_consume_input {
-                    Err(error_message(structs::Error::MissingProof,
-                                      format!("Input proof is missing on input {}", input.json_or()
-                                      )))?;
+            if expect_signed {
+                if input.proof.is_empty() {
+                    let floating_non_consume_input = input.utxo_id.is_none() && input.floating_utxo_id.is_some();
+                    if !floating_non_consume_input {
+                        Err(error_message(structs::Error::MissingProof,
+                                          format!("Input proof is missing on input {}", input.json_or()
+                                          )))?;
+                    }
                 }
             }
         }
