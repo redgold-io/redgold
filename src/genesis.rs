@@ -13,6 +13,7 @@ use redgold_schema::constants::{DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPP
 use redgold_schema::output::tx_output_data;
 use redgold_schema::structs::{Address, BlockMetadata, CurrencyAmount, NetworkEnvironment, PublicKey, Seed};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use crate::node::Node;
 use crate::node_config::NodeConfig;
 
 pub struct GenesisDistribution{
@@ -92,20 +93,20 @@ fn lower_distribution(_network: &NetworkEnvironment, words_pass: &WordsPass, see
 }
 
 pub fn genesis_transaction(
-    network: &NetworkEnvironment,
+    nc: &NodeConfig,
     words: &WordsPass,
     seeds: &Vec<Seed>
 ) -> Transaction {
-    let distribution = if network.is_main() {
+    let distribution = if nc.network.is_main() {
         main_distribution(&words.default_public_key().expect("default_kp").address().expect("address"))
     } else {
-        lower_distribution(network, words, seeds)
+        lower_distribution(&nc.network, words, seeds)
     };
-    genesis_tx_from(distribution, network)
+    genesis_tx_from(distribution, nc)
 }
 
 
-pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>, network: &NetworkEnvironment) -> Transaction {
+pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>, network: &NodeConfig) -> Transaction {
     let mut txb = TransactionBuilder::new(network);
     for d in distribution {
         txb.with_output(&d.address, &d.amount);

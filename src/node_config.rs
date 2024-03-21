@@ -330,7 +330,9 @@ impl NodeConfig {
         pd.node_metadata = vec![self.node_metadata_fixed()];
         pd.version_info = Some(self.version_info());
 
-        let tx = TransactionBuilder::new(&self.network)
+        let mut builder = TransactionBuilder::new(&self);
+        builder.allow_bypass_fee = true;
+        let tx = builder
             .with_output_peer_data(&pair.address_typed(), pd, 0)
             .with_genesis_input(&pair.address_typed())
             .transaction.sign(&pair).expect("Failed signing?").clone();
@@ -354,7 +356,9 @@ impl NodeConfig {
     pub fn node_tx_fixed(&self, opt: Option<&NodeMetadata>) -> Transaction {
         let pair = self.words().default_kp().expect("");
         let metadata = opt.cloned().unwrap_or(self.node_metadata_fixed());
-        let mut tx = TransactionBuilder::new(&self.network).with_output_node_metadata(
+        let mut builder = TransactionBuilder::new(&self);
+        builder.allow_bypass_fee = true;
+        let mut tx = builder.with_output_node_metadata(
             &pair.address_typed(), metadata, 0
         ).with_genesis_input(&pair.address_typed())
             .transaction.clone();

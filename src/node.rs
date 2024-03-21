@@ -265,7 +265,7 @@ impl Node {
     }
 
     pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
-        let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
+        let tx = genesis_transaction(&node_config, &node_config.words(), &node_config.seeds);
         let outputs = tx.utxo_outputs().expect("utxos");
         let mut res = vec![];
         for i in 0..50 {
@@ -373,7 +373,7 @@ impl Node {
         if existing.is_none() {
             counter!("redgold.node.genesis_created").increment(1);
             info!("No genesis transaction found, generating new one");
-            let tx = genesis_transaction(&node_config.network, &node_config.words(), &node_config.seeds);
+            let tx = genesis_transaction(&node_config, &node_config.words(), &node_config.seeds);
             // let tx = Node::genesis_from(node_config.clone()).0;
             // runtimes.auxiliary.block_on(
             relay.ds.config_store.store_proto("genesis", tx.clone()).await?;

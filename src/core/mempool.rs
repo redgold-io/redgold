@@ -9,28 +9,17 @@ use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::pow::TransactionPowValidate;
 use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse, Transaction};
+use redgold_schema::fee_validator::TransactionFeeValidator;
 use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
+use crate::core::transact::tx_validate::TransactionValidator;
 
 pub struct Mempool {
     relay: Relay,
     heap: BinaryHeap<MempoolEntry>
 }
 
-impl Mempool {
-    pub(crate) fn initial_validation(
-        &self,
-        message: &TransactionMessage,
-    ) -> RgResult<()> {
-        message.transaction.prevalidate()?;
-        message.transaction.validate_signatures()?;
-        message.transaction.validate_network(&self.relay.node_config.network)?;
-        message.transaction.pow_validate()?;
-        Ok(())
-
-    }
-}
 
 impl Mempool {
     pub fn new(relay: &Relay) -> Self {
@@ -61,11 +50,10 @@ impl Mempool {
             // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
             // Notify subscribers for transaction channel rather than just dropping and returning error
         }
-        self.initial_validation(&message)?;
+        message.transaction.validate(Some(addrs), Some(&self.relay.node_config.network))?;
 
         let entry = MempoolEntry {
-            transaction: message.clone(),
-            fee_acceptable_address: addrs.clone()
+            transaction: message.clone()
         };
         Ok(entry)
     }
@@ -95,8 +83,7 @@ impl Ord for MempoolEntry {
 
 #[derive(Debug, Clone)]
 pub struct MempoolEntry {
-    pub transaction: TransactionMessage,
-    pub fee_acceptable_address: Vec<Address>
+    pub transaction: TransactionMessage
 }
 
 

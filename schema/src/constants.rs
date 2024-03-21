@@ -13,8 +13,6 @@ pub const REWARD_AMOUNT_RAW: i64 = REWARD_AMOUNT * DECIMAL_MULTIPLIER;
 
 
 pub const MAX_INPUTS_OUTPUTS: u32 = 5000;
-pub const MIN_FEE_RAW: i64 = DECIMAL_MULTIPLIER / 100;
-
 
 pub const STANDARD_FINALIZATION_INTERVAL_MILLIS: u64 = 4_000;
 pub const DEBUG_FINALIZATION_INTERVAL_MILLIS: u64 = 4000;
@@ -30,7 +28,7 @@ pub const VERSION: i32 = 0;
 
 pub const REDGOLD: &str = "redgold";
 
-pub const SYMBOL: &str = "RDG";
+pub const RDG_SYMBOL: &str = "RDG";
 
 pub const STANDARD_VERSION: i64 = 0;
 
