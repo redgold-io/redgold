@@ -49,6 +49,7 @@ use redgold_keys::TestConstants;
 use tokio::task::spawn_blocking;
 use tracing::{Span, trace};
 use redgold_keys::proof_support::ProofSupport;
+use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::TransactionState::Mempool;
 use crate::api::rosetta::models::Peer;
 use crate::core::contract::contract_state_manager::ContractStateManager;
@@ -63,6 +64,7 @@ use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use crate::observability::logging::Loggable;
+use crate::sanity::historical_parity;
 
 /**
 * Node is the main entry point for the application /
@@ -249,6 +251,10 @@ impl Node {
         relay.ds.count_gauges().await?;
 
         relay.ds.check_consistency_apply_fixes().await?;
+
+        historical_parity::apply_migrations(&relay).await
+            .log_error()
+            .add("Historical parity manual migration failed")?;
 
         Ok(())
     }

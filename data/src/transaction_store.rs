@@ -442,7 +442,7 @@ impl TransactionStore {
             .execute(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        gauge!("redgold.utxo.total").increment(1.0);
+        gauge!("redgold.utxo.total").decrement(1.0);
         Ok(rows_m.rows_affected())
     }
 
