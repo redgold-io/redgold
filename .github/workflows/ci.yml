@@ -58,11 +58,14 @@ jobs:
         run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
-      - run: cargo clean
+#      - run: cargo clean
 #      - run: cargo build --release
       - run: cargo tree --workspace
-      - run: ./bin/test.sh
-      - run: ./bin/local_test.sh
+      - run: cargo test --no-run
+      - run: |
+          ./bin/test.sh &
+          ./bin/local_test.sh &
+          wait
   build-vue:
     runs-on: self-hosted
     if: ${{ github.event_name != 'pull_request_target' && contains('
@@ -149,7 +152,7 @@ jobs:
       - run: rustup default nightly
       - run: rustup update
       - run: rustup -V
-      - run: cargo clean
+#      - run: cargo clean
       - run: ./bin/test.sh
       - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: cargo build --release

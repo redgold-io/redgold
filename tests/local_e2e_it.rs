@@ -21,9 +21,9 @@ async fn local_e2e_it() -> Result<(), ErrorInfo> {
     println!("Local E2E IT from inside test");
 
     let port_offset = NetworkEnvironment::Local.default_port_offset();
-    let pc = PublicClient::from("127.0.0.1".to_string(), port_offset + 1, None);
-    let pc2 = PublicClient::from("127.0.0.1".to_string(), port_offset + 1 + 1000, None);
-    let pc3 = PublicClient::from("127.0.0.1".to_string(), port_offset + 1 + 2000,None);
+    let pc = PublicClient::from("127.0.0.1".to_string(), port_offset + 1 + 1000*10, None);
+    let pc2 = PublicClient::from("127.0.0.1".to_string(), port_offset + 1 + 1000*11, None);
+    let pc3 = PublicClient::from("127.0.0.1".to_string(), port_offset + 1 + 1000*12,None);
 
     assert_eq!(pc.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc2.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
