@@ -7,8 +7,7 @@ use rocket::form::validate::Len;
 use redgold::api::public_api::PublicClient;
 
 use redgold::e2e::tx_submit::TransactionSubmitter;
-
-
+use redgold::node_config::NodeConfig;
 
 
 use redgold_schema::{SafeOption};
@@ -29,7 +28,8 @@ async fn local_e2e_it() -> Result<(), ErrorInfo> {
     assert_eq!(pc.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc2.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
     assert_eq!(pc3.client_wrapper().get_peers().await?.get_peers_info_response.safe_get()?.peer_info.len(), 2);
-    let tx_sub = TransactionSubmitter::default(pc, vec![], &NetworkEnvironment::Local);
+    let nc = NodeConfig::default_env(NetworkEnvironment::Local).await;
+    let tx_sub = TransactionSubmitter::default(pc, vec![], &nc);
     tx_sub.with_faucet().await.expect("");
 
     let res = tx_sub.submit().await.expect("");
