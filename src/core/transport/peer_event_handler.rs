@@ -107,9 +107,11 @@ impl PeerOutgoingEventHandler {
             e2
         });
 
-        if let Err(e) = &added_details {
-            if let Some(pk) = nmd.public_key.as_ref() {
+        if let Some(pk) = nmd.public_key.as_ref() {
+            if let Err(e) = &added_details {
                 relay.mark_peer_send_failure(pk, &e).await?;
+            } else {
+                relay.mark_peer_send_success(pk).await?;
             }
         }
         let r = added_details.map_err(|e| {
