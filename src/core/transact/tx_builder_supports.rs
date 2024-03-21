@@ -345,10 +345,10 @@ impl TransactionBuilder {
         self.utxos.sort_by(|a, b| a.amount().cmp(&b.amount()));
 
         for u in self.utxos.clone() {
-            self.with_unsigned_input(u.clone())?;
             if self.balance() > 0 {
                 break
             }
+            self.with_unsigned_input(u.clone())?;
         }
 
         if self.balance() < 0 {
