@@ -203,6 +203,14 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
+    pub fn seed_addresses(&self) -> Vec<Address> {
+        self.seeds.iter()
+            .flat_map(|s| s.peer_id.as_ref())
+            .flat_map(|p| p.peer_id.as_ref())
+            .flat_map(|p| p.address().ok())
+            .collect_vec()
+    }
+
     pub fn seeds_at(&self, time: i64) -> Vec<Seed> {
         get_seeds_by_env_time(&self.network, time)
     }
