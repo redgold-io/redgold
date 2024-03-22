@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
+use metrics::gauge;
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
 use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
@@ -79,6 +80,58 @@ impl UtxoStore {
             .fetch_optional(&mut *self.ctx.pool().await?)
             .await)?
             .map(|o| (Hash::new(o.child_transaction_hash), o.child_input_index)))
+    }
+
+    pub async fn delete_utxo(
+        &self,
+        fixed_utxo_id: &UtxoId
+    ) -> Result<u64, ErrorInfo> {
+
+        let transaction_hash = fixed_utxo_id.transaction_hash.safe_get()?;
+        let output_index = fixed_utxo_id.output_index.clone();
+        let bytes = transaction_hash.safe_bytes()?;
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"DELETE FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .execute(&mut *self.ctx.pool().await?)
+            .await)?.rows_affected();
+        gauge!("redgold.utxo.total").decrement(rows as f64);
+        Ok(rows)
+    }
+
+    pub async fn utxo_for_address(
+        &self,
+        address: &Address
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let bytes = address.address.safe_bytes()?;
+        DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM utxo WHERE address = ?1"#,
+            bytes
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?
+            .iter().map(|row| UtxoEntry::proto_deserialize_ref(&row.raw)).collect()
+    }
+
+    // This should really only ever return 1 value, otherwise there's an error
+    pub async fn utxo_for_id(
+        &self,
+        fixed_utxo_id: &UtxoId
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+        let transaction_hash = fixed_utxo_id.transaction_hash.safe_get()?;
+        let output_index = fixed_utxo_id.output_index.clone();
+        let bytes = transaction_hash.safe_bytes()?;
+        DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
+            bytes,
+            output_index
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?
+            .iter().map(|row| UtxoEntry::proto_deserialize_ref(&row.raw)).collect()
     }
 
 }

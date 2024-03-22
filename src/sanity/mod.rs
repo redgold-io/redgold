@@ -1,1 +1,1 @@
-mod historical_parity;
+pub mod historical_parity;

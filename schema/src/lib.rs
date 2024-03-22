@@ -732,6 +732,9 @@ impl NetworkEnvironment {
     pub fn is_main(&self) -> bool {
         self == &NetworkEnvironment::Main
     }
+    pub fn is_dev(&self) -> bool {
+        self == &NetworkEnvironment::Dev
+    }
 
     pub fn default_port_offset(&self) -> u16 {
         let port = match self {

@@ -166,7 +166,8 @@ pub async fn resolve_input(
 )
                            -> Result<ResolvedInput, ErrorInfo> {
     metrics::counter!("redgold.transaction.resolve.input").increment(1);
-    let u = input.utxo_id.safe_get_msg("Missing utxo id")?;
+    let utxo_id = input.utxo_id.safe_get_msg("Missing utxo id")?;
+    let u = utxo_id;
     let hash = u.transaction_hash.safe_get_msg("Missing transaction hash on input")?;
 
     // TODO this check can be skipped if we check our XOR distance first.
@@ -184,9 +185,8 @@ pub async fn resolve_input(
     }
 
     // Check if the UTXO is still valid (even if the transaction is known, it's output may have been used already)
-    let internal_valid_index = relay.ds.transaction_store.query_utxo_id_valid(
-        hash,
-        u.output_index
+    let internal_valid_index = relay.ds.utxo.utxo_id_valid(
+        utxo_id
     ).await?;
 
     // We have the transaction accepted locally
