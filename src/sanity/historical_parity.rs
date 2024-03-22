@@ -2,11 +2,110 @@ use std::collections::{HashMap, HashSet};
 use bdk::Utxo;
 use bytes::Buf;
 use itertools::Itertools;
-use redgold_schema::{EasyJson, EasyJsonDeser, ProtoHashable, WithMetadataHashable};
+use log::{error, info};
+use rocket::form::validate::Contains;
+use serde::{Deserialize, Serialize};
+use redgold_schema::{EasyJson, EasyJsonDeser, ProtoHashable, RgResult, WithMetadataHashable};
+use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Hash, Transaction, TransactionEntry, UtxoEntry, UtxoId};
 use redgold_schema::util::ToTimeString;
 use crate::core::relay::Relay;
+use crate::observability::logging::Loggable;
 use crate::util;
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ManualMigration {
+    id: i64,
+    name: String,
+    time: i64
+}
+impl ManualMigration {
+    pub fn new(id: i64, name: String) -> ManualMigration {
+        ManualMigration {
+            id,
+            name,
+            time: util::current_time_millis_i64()
+        }
+    }
+}
+
+pub async fn apply_migrations(relay: &Relay) -> RgResult<()> {
+    let mut migrations =
+        relay.ds.config_store.get_json::<Vec<ManualMigration>>("migrations").await?
+            .unwrap_or(vec![]);
+
+    apply_dev_amm_utxo_migration_0(relay, &migrations).await?
+        .iter()
+        .for_each(|m| { migrations.push(m.clone())});
+
+    relay.ds.config_store.insert_update_json("migrations", migrations).await?;
+
+    Ok(())
+}
+
+async fn safe_remove_transaction_utxos(relay: &Relay, hash: &Hash) -> RgResult<()> {
+    for utxo_id in find_all_transaction_and_children_utxo_ids(relay, hash).await? {
+        let num_rows = relay.ds.transaction_store.delete_utxo(&utxo_id).await?;
+        info!("Migration removed {} rows for utxo_id: {}", num_rows, utxo_id.json_or());
+        let valid = relay.ds.utxo.utxo_id_valid(&utxo_id).await?;
+        if !valid {
+            error!("Migration failed to remove utxo_id: {}", utxo_id.json_or());
+        }
+        let utxo_resolved = relay.ds.utxo.utxo_for_id(&utxo_id).await?;
+        if !utxo_resolved.is_empty() {
+            for u in utxo_resolved {
+                if let Ok(a) = u.address() {
+                    let entries_for_address = relay.ds.utxo.utxo_for_address(a).await?
+                        .iter().flat_map(|u| u.utxo_id.as_ref()).cloned().collect_vec();
+                    let address_entry_deletion_failed = entries_for_address.contains(&utxo_id);
+                    if address_entry_deletion_failed {
+                        error!("Migration failed to remove utxo_id: {} from address: {}", utxo_id.json_or(), a.json_or());
+                    }
+                }
+            }
+        }
+    };
+    Ok(())
+}
+
+async fn find_all_transaction_and_children_utxo_ids(r: &Relay, hash: &Hash) -> RgResult<Vec<UtxoId>> {
+    let mut remaining_hashes_to_explore = vec![];
+    remaining_hashes_to_explore.push(hash.clone());
+    let mut all_utxo_ids = vec![];
+    while remaining_hashes_to_explore.len() > 0 {
+        let entry = remaining_hashes_to_explore.pop();
+        if let Some(c) = entry {
+            if let Some((tx, None)) = r.ds.transaction_store.query_maybe_transaction(&c).await? {
+                for u in tx.output_utxo_ids() {
+                    all_utxo_ids.push(u.clone());
+                    let option = r.ds.utxo.utxo_child(&u).await.unwrap();
+                    if let Some(child) = &option {
+                        if !remaining_hashes_to_explore.contains(&child.0) {
+                            remaining_hashes_to_explore.push(child.0.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(all_utxo_ids)
+}
+
+
+async fn apply_dev_amm_utxo_migration_0(relay: &Relay, finished: &Vec<ManualMigration>) -> RgResult<Option<ManualMigration>> {
+    if finished.iter().filter(|m| m.id == 0).count() > 0 || !relay.node_config.network.is_dev()  {
+        return Ok(None);
+    }
+    let raw = include_str!("../resources/migrations/0/remove_tx_hashes.json");
+    let hash = raw.to_string().json_from::<Vec<Hash>>()?;
+    for h in hash {
+        safe_remove_transaction_utxos(relay, &h).await?;
+    }
+
+    Ok(Some(ManualMigration::new(0, "dev_amm_remove_utxo_hashes".to_string())))
+}
+
 
 #[ignore]
 #[tokio::test]
@@ -52,14 +151,16 @@ async fn historical_parity_debug2() {
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
-async fn historical_parity_debug3() {
+async fn historical_parity_debug_cached() {
     let r = Relay::dev_default().await;
     let bad_txs = tokio::fs::read_to_string("bad_txs.json").await.unwrap().json_from::<Vec<Transaction>>()
         .unwrap();
 
     let bad_txs_unique = bad_txs.iter().unique_by(|tx| tx.hash_or()).collect_vec();
+
+    let mut children_to_explore = vec![];
 
     for tx in bad_txs_unique.iter() {
         let h = tx.hash_or().hex();
@@ -77,7 +178,11 @@ async fn historical_parity_debug3() {
         for (output_index, o) in tx.outputs.iter().enumerate() {
             let utxo_id = UtxoId::new(&tx.hash_or(), output_index as i64);
             let mut valid_utxo = r.ds.utxo.utxo_id_valid(&utxo_id).await.unwrap();
-            let mut child = r.ds.utxo.utxo_child(&utxo_id).await.unwrap().json_or();
+            let option = r.ds.utxo.utxo_child(&utxo_id).await.unwrap();
+            if let Some(child) = &option {
+                children_to_explore.push(child.0.clone());
+            }
+            let mut child = option.json_or();
             let output_addr = o.address.as_ref().expect("").render_string().unwrap_or("MISSING ADDRESS OUTPUT".to_string());
             let amt = o.opt_amount();
             let is_swap = o.is_swap();
@@ -94,6 +199,40 @@ async fn historical_parity_debug3() {
 
     println!("bad_txs: {:?}", bad_txs.len());
     println!("bad_txs_unique: {:?}", bad_txs_unique.len());
+
+    println!("children_to_explore_len: {:?}", children_to_explore.len());
+    let children_to_explore_unique = children_to_explore.iter().unique().cloned().collect_vec();
+
+    let mut remaining = vec![];
+    children_to_explore_unique.iter().for_each(|c| {
+        remaining.push(c.clone());
+    });
+
+    let mut all = vec![];
+    all.extend(children_to_explore_unique);
+    all.extend(bad_txs_unique.iter().map(|tx| tx.hash_or().clone()).collect_vec());
+
+    while remaining.len() > 0 {
+        let entry = remaining.pop();
+        if let Some(c) = entry {
+            let tx = r.ds.transaction_store.query_maybe_transaction(&c).await.unwrap().unwrap().0;
+            for u in tx.output_utxo_ids() {
+                let option = r.ds.utxo.utxo_child(&u).await.unwrap();
+                if let Some(child) = &option {
+                    if !remaining.contains(&child.0) {
+                        remaining.push(child.0.clone());
+                        all.push(child.0.clone())
+                    }
+                }
+            }
+        }
+    }
+
+    let all_unique = all.iter().unique().cloned().collect_vec();
+
+    println!("all tx: {:?}", all_unique.len());
+
+    all_unique.write_json("all_unique.json").expect("write_json");
 
     // let tx_hash = Hash::from_hex("3780424d7c3f351706529f999c923189426d9ce65aea00af34270c663b4baf12").unwrap();
     // let res = r.ds.transaction_store.query_maybe_transaction(&tx_hash).await.unwrap().unwrap();

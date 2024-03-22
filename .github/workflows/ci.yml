@@ -58,7 +58,7 @@ jobs:
         run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
       - run: echo "Testing version = ${{ env.VERSION }}"
       - run: ./bin/install_build_deps.sh
-#      - run: cargo clean
+      - run: cargo clean
 #      - run: cargo build --release
       - run: cargo tree --workspace
       - run: cargo test --no-run
