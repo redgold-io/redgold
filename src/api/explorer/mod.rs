@@ -688,15 +688,18 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
         inputs.push(input);
     }
     let mut outputs = vec![];
+    let tx_hash = tx.hash_or();
     for (i, o) in tx.outputs.iter().enumerate() {
         let mut used_by_tx = None;
         let mut used_by_tx_input_index = None;
-        if let Some(u) = o.utxo_id.as_ref() {
-            let child = r.ds.utxo.utxo_child(u).await?;
-            if let Some((h, index)) = child {
-                used_by_tx = Some(h.hex());
-                used_by_tx_input_index = Some(index as i32);
-            }
+
+        let utxo_e = o.utxo_entry(&tx_hash, i as i64, 0);
+        let u = utxo_e.utxo_id.safe_get_msg("Missing utxo id")?;
+
+        let child = r.ds.utxo.utxo_child(u).await?;
+        if let Some((h, index)) = child {
+            used_by_tx = Some(h.hex());
+            used_by_tx_input_index = Some(index as i32);
         }
 
         let output = DetailedOutput {

@@ -11,9 +11,10 @@ use rand::thread_rng;
 use tokio_stream::wrappers::IntervalStream;
 use redgold_schema::{RgResult, SafeOption};
 use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo};
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, SubmitTransactionRequest, Transaction};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, NetworkEnvironment, SubmitTransactionRequest, Transaction};
 use crate::core::relay::Relay;
 use tokio_stream::StreamExt;
+use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 
@@ -129,7 +130,7 @@ use crate::observability::logging::Loggable;
 // }
 
 
-struct LiveE2E {
+pub struct LiveE2E {
     relay: Relay,
     last_failure: i64,
     failed_once: bool,
@@ -137,10 +138,12 @@ struct LiveE2E {
 }
 
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
+use redgold_keys::util::mnemonic_support::WordsPass;
+use crate::node_config::NodeConfig;
+
 impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
 
-        let mut map: HashMap<Address, KeyPair> = HashMap::new();
         let seed_addrs = self.relay.node_config.seeds.iter()
             .flat_map(|s| s.peer_id.as_ref())
             .flat_map(|p| p.peer_id.as_ref())
@@ -155,48 +158,22 @@ impl LiveE2E {
             seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone()
         };
 
-        if !self.relay.node_config.network.is_main() {
-            let min_offset = 20;
-            let max_offset = 30;
-            for i in min_offset..max_offset {
-                let key = self.relay.node_config.words().keypair_at_change(i).expect("");
-                let address = key.address_typed();
-                map.insert(address, key);
-            }
-        } else {
-            let key = self.relay.node_config.words().default_kp()?;
-            let address = key.address_typed();
-            map.insert(address, key);
-        }
-        let mut spendable_utxos = vec![];
-        for (a, k) in map.iter() {
-            let result = self.relay.ds.transaction_store.query_utxo_address(a).await?;
-            let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
-            let mut err_str = format!("Address {}", a.render_string().expect(""));
-            for u in vec {
-                if let Ok(id) = u.utxo_id() {
-                    err_str.push_str(&format!(" UTXO ID: {}", id.json_or()));
-                    if self.relay.ds.utxo.utxo_id_valid(id).await? {
-                        let childs = self.relay.ds.utxo.utxo_children(id).await?;
-                        if childs.len() == 0 {
-                            spendable_utxos.push(Some(SpendableUTXO {
-                                utxo_entry: u.clone(),
-                                key_pair: k.clone(),
-                            }));
-                        } else {
-                            error!("UTXO has children not valid! {} {}", err_str, childs.json_or());
-                        }
-                    } else {
-                        error!("UTXO ID not valid! {}", err_str);
-                    }
-                }
-            }
-        }
+
+        let map = Self::live_e2e_address_kps(
+            &self.relay.node_config.words(), &self.relay.node_config.network
+        )?;
+        let spendable_utxos = Self::get_spendable_utxos(&self.relay.ds, map).await?;
         if spendable_utxos.is_empty() {
             return Ok(None);
         }
 
-        let mut tx_b = TransactionBuilder::new(&self.relay.node_config);
+        let tx = Self::build_live_tx(&self.relay.node_config, destination_choice, spendable_utxos)?;
+
+        return Ok(Some(tx.clone()));
+    }
+
+    pub fn build_live_tx(nc: &NodeConfig, destination_choice: Address, spendable_utxos: Vec<Option<SpendableUTXO>>) -> Result<Transaction, ErrorInfo> {
+        let mut tx_b = TransactionBuilder::new(&nc);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
         let first_utxos = spendable_utxos.iter().take(1).flatten().cloned().collect_vec();
@@ -216,9 +193,54 @@ impl LiveE2E {
         }
 
         tx.validate_signatures().add("Immediate validation live E2E")?;
+        Ok(tx)
+    }
 
+    pub async fn get_spendable_utxos(ds: &DataStore, map: HashMap<Address, KeyPair>) -> Result<Vec<Option<SpendableUTXO>>, ErrorInfo> {
+        let mut spendable_utxos = vec![];
+        for (a, k) in map.iter() {
+            let result = ds.transaction_store.query_utxo_address(a).await?;
+            let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
+            let mut err_str = format!("Address {}", a.render_string().expect(""));
+            for u in vec {
+                if let Ok(id) = u.utxo_id() {
+                    err_str.push_str(&format!(" UTXO ID: {}", id.json_or()));
+                    if ds.utxo.utxo_id_valid(id).await? {
+                        let childs = ds.utxo.utxo_children(id).await?;
+                        if childs.len() == 0 {
+                            spendable_utxos.push(Some(SpendableUTXO {
+                                utxo_entry: u.clone(),
+                                key_pair: k.clone(),
+                            }));
+                        } else {
+                            error!("UTXO has children not valid! {} children: {}", err_str, childs.json_or());
+                        }
+                    } else {
+                        error!("UTXO ID not valid! {}", err_str);
+                    }
+                }
+            }
+        }
+        Ok(spendable_utxos)
+    }
 
-        return Ok(Some(tx.clone()));
+    pub fn live_e2e_address_kps(wp: &WordsPass, network: &NetworkEnvironment) -> Result<HashMap<Address, KeyPair>, ErrorInfo> {
+        let mut map: HashMap<Address, KeyPair> = HashMap::new();
+
+        if !network.is_main() {
+            let min_offset = 20;
+            let max_offset = 30;
+            for i in min_offset..max_offset {
+                let key = wp.keypair_at_change(i).expect("");
+                let address = key.address_typed();
+                map.insert(address, key);
+            }
+        } else {
+            let key = wp.default_kp()?;
+            let address = key.address_typed();
+            map.insert(address, key);
+        }
+        Ok(map)
     }
 }
 
