@@ -252,9 +252,9 @@ impl Node {
 
         relay.ds.check_consistency_apply_fixes().await?;
 
-        // historical_parity::apply_migrations(&relay).await
-        //     .log_error()
-        //     .add("Historical parity manual migration failed")?;
+        historical_parity::apply_migrations(&relay).await
+            .log_error()
+            .add("Historical parity manual migration failed")?;
 
         Ok(())
     }
