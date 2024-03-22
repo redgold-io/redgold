@@ -45,7 +45,8 @@ pub async fn apply_migrations(relay: &Relay) -> RgResult<()> {
 }
 
 async fn safe_remove_transaction_utxos(relay: &Relay, hash: &Hash) -> RgResult<()> {
-    for utxo_id in find_all_transaction_and_children_utxo_ids(relay, hash).await? {
+    let ids = find_all_transaction_and_children_utxo_ids(relay, hash).await?;
+    for utxo_id in ids {
         let num_rows = relay.ds.transaction_store.delete_utxo(&utxo_id).await?;
         info!("Migration removed {} rows for utxo_id: {}", num_rows, utxo_id.json_or());
         let valid = relay.ds.utxo.utxo_id_valid(&utxo_id).await?;
@@ -101,6 +102,18 @@ async fn apply_dev_amm_utxo_migration_0(relay: &Relay, finished: &Vec<ManualMigr
     let hash = raw.to_string().json_from::<Vec<Hash>>()?;
     for h in hash {
         safe_remove_transaction_utxos(relay, &h).await?;
+    }
+
+    let raw_utxos = include_str!("../resources/migrations/0/remove_utxos.json");
+    let utxos = raw_utxos.to_string().json_from::<Vec<UtxoId>>()?;
+
+    for utxo_id in utxos {
+        let num_rows = relay.ds.transaction_store.delete_utxo(&utxo_id).await?;
+        info!("Migration removed {} rows for utxo_id: {}", num_rows, utxo_id.json_or());
+        let valid = relay.ds.utxo.utxo_id_valid(&utxo_id).await?;
+        if !valid {
+            error!("Migration failed to remove utxo_id: {}", utxo_id.json_or());
+        }
     }
 
     Ok(Some(ManualMigration::new(0, "dev_amm_remove_utxo_hashes".to_string())))
@@ -334,5 +347,35 @@ async fn historical_parity_detect_duplicate_hashes() {
     ).count();
     println!("res dedupe: {:?}", dedupe);
     // duplicate_hash_check(&all_txs);
+
+}
+
+
+
+// #[ignore]
+#[tokio::test]
+async fn historical_parity_utxo() {
+    let r = Relay::dev_default().await;
+    let start = util::current_time_millis_i64();
+    let mut all_utxo = r.ds.transaction_store.utxo_all_debug().await.expect("utxo_all_debug");
+    all_utxo.sort_by(|a, b| a.time.cmp(&b.time));
+    let end = util::current_time_millis_i64();
+    let delta = (end - start) as f64;
+    println!("delta: {}", delta/1000f64);
+    println!("res: {:?}", all_utxo.len());
+
+    let mut is_valid_but_has_kids = vec![];
+
+    for utxo in all_utxo {
+        let id = utxo.utxo_id.as_ref().expect("utxo_id");
+        let valid = r.ds.utxo.utxo_id_valid(id).await.expect("utxo_id_valid");
+        let children = r.ds.utxo.utxo_children(id).await.expect("utxo_children");
+        if children.len() > 0 {
+            println!("utxo_id: {} valid: {} children: {}", id.json_or(), valid, children.json_or());
+            is_valid_but_has_kids.push(utxo.clone());
+        }
+
+    }
+
 
 }
