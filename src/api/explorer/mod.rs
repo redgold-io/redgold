@@ -697,8 +697,6 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
     let mut outputs = vec![];
     let tx_hash = tx.hash_or();
     for (i, o) in tx.outputs.iter().enumerate() {
-        let mut used_by_tx = None;
-        let mut used_by_tx_input_index = None;
 
         let utxo_e = o.utxo_entry(&tx_hash, i as i64, 0);
         let u = utxo_e.utxo_id.safe_get_msg("Missing utxo id")?;
