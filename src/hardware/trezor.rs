@@ -11,6 +11,7 @@ use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, 
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use crate::node_config::NodeConfig;
 use crate::util::cmd::run_cmd;
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use crate::util::init_logger_once;
@@ -340,7 +341,8 @@ async fn debug_sign_tx () {
         balance: 0,
         recent_transactions: vec![]
     };
-    let mut tb = TransactionBuilder::new(&NetworkEnvironment::Debug);
+    let mut nc = NodeConfig::default();
+    let mut tb = TransactionBuilder::new(&nc);
     tb.with_address_info(ai);
     let destination = address.clone();
     let amount = CurrencyAmount::from(5);

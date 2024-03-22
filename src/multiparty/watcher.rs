@@ -251,11 +251,6 @@ pub struct BidAsk{
 
 impl BidAsk {
 
-    pub fn validate(&self) -> RgResult<()> {
-
-        Ok(())
-    }
-
     pub fn asking_price(&self) -> f64 {
         self.asks.get(0).map(|v| v.price).unwrap_or(0.)
     }
@@ -382,7 +377,7 @@ impl OrderFulfillment {
     pub async fn build_rdg_ask_swap_tx(
         &self,
         utxos: Vec<UtxoEntry>,
-        network: &NetworkEnvironment
+        network: &NodeConfig
     )
         -> RgResult<Transaction> {
         let mut tb = TransactionBuilder::new(network);
@@ -531,7 +526,7 @@ impl DepositWatcher {
         let uu = u.utxo_entry.clone().json_or();
         if res {
             info!("Sending genesis funding to multiparty address from origin {a_str} using utxo {uu}");
-            let mut tb = TransactionBuilder::new(&self.relay.node_config.network);
+            let mut tb = TransactionBuilder::new(&self.relay.node_config);
             tb.with_utxo(&u.utxo_entry)?;
             tb.with_output(&destination, &CurrencyAmount::from(u.utxo_entry.amount() as i64));
             tb.with_stake_usd_bounds(Some(100f64), Some(1000f64), &a);
@@ -864,7 +859,7 @@ impl DepositWatcher {
         tb.with_last_output_deposit_swap(option.identifier);
         tb.build()
          */
-        let mut tb = TransactionBuilder::new(&self.relay.node_config.network);
+        let mut tb = TransactionBuilder::new(&self.relay.node_config);
         tb.with_utxos(&utxos)?;
 
         let rdg_fulfillment_txb = with_cutoff.iter()

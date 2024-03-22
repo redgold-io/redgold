@@ -196,17 +196,18 @@ impl LiveE2E {
             return Ok(None);
         }
 
-        let mut tx_b = TransactionBuilder::new(&self.relay.node_config.network);
+        let mut tx_b = TransactionBuilder::new(&self.relay.node_config);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
         let first_utxos = spendable_utxos.iter().take(1).flatten().cloned().collect_vec();
 
-        let tx_builder = tx_b
-            .with_output(&destination, &amount)
-            .with_is_test();
+        let mut tx_builder = tx_b;
         for u in &first_utxos {
             tx_builder.with_unsigned_input(u.utxo_entry.clone())?;
         }
+        tx_builder.with_output(&destination, &amount)
+            .with_is_test();
+        tx_builder.with_default_fee()?;
         let mut tx = tx_builder
             .build()?;
 

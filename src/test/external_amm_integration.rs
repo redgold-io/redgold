@@ -77,6 +77,7 @@ pub async fn send_test_btc_transaction_deposit() {
 pub async fn send_test_rdg_btc_tx_withdrawal() {
 
     let network = NetworkEnvironment::Staging;
+    let nc = NodeConfig::default_env(network).await;
     let amm_addr = amm_public_key(&network).address().expect("address");
     let amount = 1.0;
 
@@ -89,14 +90,14 @@ pub async fn send_test_rdg_btc_tx_withdrawal() {
         let rdg_address = pk.address().expect("");
         println!("pk: {}", rdg_address.render_string().expect(""));
 
-        let client = NodeConfig::default_env(network).await.api_client();
+        let client = nc.api_client();
         client.faucet(&rdg_address).await.expect("faucet");
         let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
 
         let amount = CurrencyAmount::from_fractional(amount).expect("");
-        let tb = TransactionBuilder::new(&network)
+        let tb = TransactionBuilder::new(&nc)
             .with_network(&network)
             .with_utxos(&utxos).expect("utxos")
             .with_output(&amm_addr, &amount)

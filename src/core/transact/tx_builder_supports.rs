@@ -1,12 +1,18 @@
 use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
+use itertools::Itertools;
+use log::info;
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, Transaction, TransactionData, TransactionOptions, UtxoEntry};
+use redgold_schema::{bytes_data, EasyJson, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
+use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
+use redgold_schema::tx_schema_validate::SchemaValidationSupport;
+use crate::node_config::NodeConfig;
 
 // Really just move the transaction builder to the main thing??
 
@@ -20,52 +26,15 @@ use crate::api::public_api::PublicClient;
 // }
 
 
-pub trait TransactionHelpBuildSupport {
-    fn new(
-        source: &UtxoEntry,
-        destination: &Vec<u8>,
-        amount: u64,
-        secret: &SecretKey,
-        public: &PublicKey,
-    ) -> Self;
-}
-
-impl TransactionHelpBuildSupport for Transaction {
-    // TODO: Move all of this to TransactionBuilder
-    fn new(
-        source: &UtxoEntry,
-        destination: &Vec<u8>,
-        amount: u64,
-        secret: &SecretKey,
-        public: &PublicKey,
-    ) -> Self {
-
-        let mut amount_actual = amount;
-        if amount < (MAX_COIN_SUPPLY as u64) {
-            amount_actual = amount * (DECIMAL_MULTIPLIER as u64);
-        }
-        let amount = CurrencyAmount::from(amount as i64);
-        // let fee = 0 as u64; //MIN_FEE_RAW;
-        // amount_actual -= fee;
-        let destination = Address::from_bytes(destination.clone()).unwrap();
-        let txb = TransactionBuilder::new(&NetworkEnvironment::Debug)
-            .with_utxo(&source).expect("")
-            .with_output(&destination, &amount)
-            .build().expect("")
-            .sign(&KeyPair::new(&secret.clone(), &public.clone())).expect("");
-        txb
-    }
-
-}
-
-
 pub trait TransactionBuilderSupport {
-    fn new(network: &NetworkEnvironment) -> Self;
+    fn new(network: &NodeConfig) -> Self;
 }
 
 impl TransactionBuilderSupport for TransactionBuilder {
-    fn new(network: &NetworkEnvironment) -> Self {
+    fn new(config: &NodeConfig) -> Self {
         let tx = Transaction::new_blank();
+        let network = config.network.clone();
+        let fee_addrs = config.seeds.iter().flat_map(|s| s.addresses()).collect_vec();
         let mut s = Self {
             transaction: tx,
             utxos: vec![],
@@ -73,6 +42,9 @@ impl TransactionBuilderSupport for TransactionBuilder {
             ds: None,
             client: None,
             network: Some(network.clone()),
+            nc: Some(config.clone()),
+            fee_addrs,
+            allow_bypass_fee: false,
         };
         s.with_network(&network);
         s
@@ -86,7 +58,10 @@ pub struct TransactionBuilder {
     // TODO: These can be injected as traits to get utxos.
     pub ds: Option<DataStore>,
     pub client: Option<PublicClient>,
-    pub network: Option<NetworkEnvironment>
+    pub network: Option<NetworkEnvironment>,
+    pub nc: Option<NodeConfig>,
+    pub fee_addrs: Vec<Address>,
+    pub allow_bypass_fee: bool
 }
 
 
@@ -174,6 +149,13 @@ impl TransactionBuilder {
         o.output_type = Some(OutputType::Fee as i32);
         Ok(self)
     }
+
+    pub fn with_default_fee(&mut self) -> RgResult<&mut Self> {
+        let first_fee_addr = self.fee_addrs.get(0).safe_get_msg("Missing fee address")?.clone().clone();
+        self.with_fee(&first_fee_addr, &CurrencyAmount::min_fee())?;
+        Ok(self)
+    }
+
     pub fn with_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let entry = utxo_entry.clone();
         let o = utxo_entry.output.safe_get_msg("Missing output")?;
@@ -184,6 +166,18 @@ impl TransactionBuilder {
         self.utxos.push(entry);
         Ok(self)
     }
+
+    pub fn with_nmd_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
+        let o = utxo_entry.output.safe_get_msg("Missing output")?;
+        o.address.safe_get_msg("Missing address")?;
+        if !o.is_node_metadata() {
+            return Err(ErrorInfo::error_info("Not a node metadata output"));
+        }
+        self.with_unsigned_input(utxo_entry.clone())?;
+        Ok(self)
+    }
+
+
     pub fn with_utxos(&mut self, utxo_entry: &Vec<UtxoEntry>) -> Result<&mut Self, ErrorInfo> {
         for x in utxo_entry {
             self.with_maybe_currency_utxo(x)?;
@@ -278,6 +272,14 @@ impl TransactionBuilder {
         }
         self
     }
+
+    pub fn with_last_output_type(&mut self, output_type: OutputType) -> &mut Self {
+        if let Some(o) = self.transaction.outputs.last_mut() {
+            o.output_type = Some(output_type as i32);
+        };
+        self
+    }
+
     pub fn with_last_output_withdrawal_swap(&mut self) -> &mut Self {
         if let Some(o) = self.transaction.outputs.last_mut() {
             let mut oc = OutputContract::default();
@@ -343,10 +345,10 @@ impl TransactionBuilder {
         self.utxos.sort_by(|a, b| a.amount().cmp(&b.amount()));
 
         for u in self.utxos.clone() {
-            self.with_unsigned_input(u.clone())?;
             if self.balance() > 0 {
                 break
             }
+            self.with_unsigned_input(u.clone())?;
         }
 
         if self.balance() < 0 {
@@ -357,9 +359,33 @@ impl TransactionBuilder {
             self.with_remainder();
         }
 
+        if !self.transaction.validate_fee(&self.fee_addrs) {
+            let mut found_fee = false;
+            for o in self.transaction.outputs.iter_mut().rev() {
+                if let Some(a) = o.data.as_mut().and_then(|data| data.amount.as_mut()) {
+                    if a.currency_or() == SupportedCurrency::Redgold && a.amount > MIN_RDG_SATS_FEE {
+                        a.amount -= MIN_RDG_SATS_FEE;
+                        found_fee = true;
+                        info!("builder Found fee deduction");
+                        break;
+                    }
+                }
+            }
+            if found_fee {
+                self.with_default_fee()?;
+            }
+            if !self.transaction.validate_fee(&self.fee_addrs) && !self.allow_bypass_fee {
+                return Err(ErrorInfo::error_info("Insufficient fee")).add(self.transaction.json_or())
+                    .add("Valid Fee Addresses:")
+                    .add(self.fee_addrs.iter().map(|a| a.render_string().expect("works")).join(", "));
+            };
+        }
+
         self.with_pow()?;
 
-        Ok(self.transaction.clone())
+        self.transaction.validate_schema(self.network.as_ref(), false)?;
+        let transaction = self.transaction.clone();
+        Ok(transaction)
         // self.balance
     }
 

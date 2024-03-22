@@ -1,12 +1,16 @@
 use itertools::Itertools;
 use crate::from_hex;
-use crate::structs::{NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, TrustRatingLabel};
+use crate::structs::{Address, NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, TrustRatingLabel};
 use crate::util::current_time_millis;
 
 
 impl Seed {
     pub fn port_or(&self, default: u16) -> u16 {
         self.port_offset.map(|p| p as u16).unwrap_or(default)
+    }
+    pub fn addresses(&self) -> Vec<Address> {
+        let pid = self.peer_id.as_ref().and_then(|p| p.peer_id.as_ref());
+        vec![self.public_key.as_ref(), pid].iter().flatten().flat_map(|pk| pk.address().ok()).collect_vec()
     }
 }
 

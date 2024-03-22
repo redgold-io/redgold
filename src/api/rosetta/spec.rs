@@ -15,7 +15,7 @@ impl Rosetta {
 
     pub fn redgold_currency() -> Currency {
         Currency {
-            symbol: constants::SYMBOL.to_string(),
+            symbol: constants::RDG_SYMBOL.to_string(),
             decimals: constants::DECIMALS as u32,
             metadata: None,
         }

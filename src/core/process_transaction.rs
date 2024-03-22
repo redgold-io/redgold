@@ -322,9 +322,7 @@ impl TransactionProcessContext {
         }
 
         // Validate obvious schema related errors / local errors requiring no other context information
-        transaction.prevalidate()?;
-
-        transaction.validate_network(&self.relay.node_config.network)?;
+        transaction.validate_keys(Some(&self.relay.node_config.network))?;
 
         transaction.validate_signatures()?;
 
@@ -353,7 +351,7 @@ impl TransactionProcessContext {
                                                 self.relay.clone(),
                                                 // self.tx_process.clone()
         ).await?;
-        resolver_data.validate()?;
+        resolver_data.validate_input_output_amounts_match()?;
 
         let fixed_utxo_ids = transaction.fixed_utxo_ids_of_inputs()?;
         self.utxo_ids = Some(fixed_utxo_ids.clone());
@@ -426,7 +424,7 @@ impl TransactionProcessContext {
                                                 self.relay.clone(),
                                                 // self.tx_process.clone()
         ).await?;
-        resolver_data.validate()?;
+        resolver_data.validate_input_output_amounts_match()?;
         // Change this to 'revalidate' and only issue some queries again not all of them.
 
         let validation_type = if resolver_data.resolved_internally {

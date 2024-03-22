@@ -101,6 +101,14 @@ impl Output {
         self.data.as_ref().and_then(|c| c.peer_data.as_ref()).is_some()
     }
 
+    pub fn is_node_metadata(&self) -> bool {
+        self.data.as_ref().and_then(|c| c.node_metadata.as_ref()).is_some()
+    }
+
+    pub fn is_metadata(&self) -> bool {
+        self.is_node_metadata() || self.is_peer_data()
+    }
+
     pub fn is_liquidity(&self) -> bool {
         self.data.as_ref().and_then(|c| c.liquidity_request.as_ref()).is_some()
     }
@@ -143,6 +151,10 @@ impl Output {
 
     pub fn opt_amount_typed(&self) -> Option<CurrencyAmount> {
         self.data.safe_get_msg("Missing data field on output").ok().and_then(|data| data.amount.clone())
+    }
+
+    pub fn opt_amount_typed_ref(&self) -> Option<&CurrencyAmount> {
+        self.data.as_ref().and_then(|data| data.amount.as_ref())
     }
 
     pub fn rounded_amount(&self) -> f64 {

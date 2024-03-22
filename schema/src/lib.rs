@@ -55,6 +55,8 @@ pub mod contract;
 pub mod local_stored_state;
 mod weighting;
 pub mod pow;
+pub mod tx_schema_validate;
+pub mod fee_validator;
 
 
 impl BytesData {

@@ -303,7 +303,7 @@ impl ResolvedTransaction {
         Ok(total)
     }
 
-    pub fn validate(&self) -> Result<(), ErrorInfo> {
+    pub fn validate_input_output_amounts_match(&self) -> Result<(), ErrorInfo> {
         let requested_total = self.transaction.total_output_amount();
         let available_total = self.total_parent_amount_available()?;
         if available_total != requested_total {
