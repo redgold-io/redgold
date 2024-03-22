@@ -92,14 +92,22 @@
                 <div><strong>{{ output.amount }}</strong></div>
                 <div><strong>Available</strong></div>
                 <div><strong>{{ output.available }}</strong></div>
-                <div v-if="output.used_by_tx"><strong>Used By Transaction</strong></div>
-                <div v-if="output.used_by_tx"><HashLink :data="output.used_by_tx"></HashLink></div>
-                <div v-if="output.used_by_tx_input_index"><strong>Used Input Index</strong></div>
-                <div v-if="output.used_by_tx_input_index"><strong>{{ output.used_by_tx_input_index }}</strong></div>
                 <div v-if="output.is_swap"><strong> Is Swap </strong></div>
                 <div v-if="output.is_swap"><strong>{{ output.is_swap }}</strong></div>
                 <div v-if="output.is_liquidity"><strong> Is Liquidity </strong></div>
                 <div v-if="output.is_liquidity"><strong>{{ output.is_liquidity }}</strong></div>
+                <div v-if="output.children"><strong>Children</strong></div>
+                <div class="grid-container">
+                  <div v-for="child in output.children">
+                    <div><strong>Used By Transaction</strong></div>
+                    <div><HashLink :data="child.used_by_tx"></HashLink></div>
+                    <div><strong>Used Input Index</strong></div>
+                    <div><strong>{{ child.used_by_tx_input_index }}</strong></div>
+                    <div><strong>Status</strong></div>
+                    <div><strong>{{ child.status }}</strong></div>
+                  </div>
+                </div>
+
 <!--                pub used_by_tx: Option<String>,-->
 <!--                pub used_by_tx_input_index: Option<i32>,-->
 

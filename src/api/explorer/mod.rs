@@ -83,14 +83,21 @@ pub struct DetailedInput {
     pub input_amount: Option<f64>
 }
 
+
+#[derive(Serialize, Deserialize)]
+pub struct UtxoChild {
+    pub used_by_tx: String,
+    pub used_by_tx_input_index: i32,
+    pub status: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct DetailedOutput {
     pub output_index: i32,
     pub address: String,
     pub available: bool,
     pub amount: f64,
-    pub used_by_tx: Option<String>,
-    pub used_by_tx_input_index: Option<i32>,
+    pub children: Vec<UtxoChild>,
     pub is_swap: bool,
     pub is_liquidity: bool,
 }
@@ -696,19 +703,21 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
         let utxo_e = o.utxo_entry(&tx_hash, i as i64, 0);
         let u = utxo_e.utxo_id.safe_get_msg("Missing utxo id")?;
 
-        let child = r.ds.utxo.utxo_child(u).await?;
-        if let Some((h, index)) = child {
-            used_by_tx = Some(h.hex());
-            used_by_tx_input_index = Some(index as i32);
-        }
+        let children = r.ds.utxo.utxo_children(u).await?
+            .iter().map(|(h, i)| {
+                UtxoChild {
+                    used_by_tx: h.hex(),
+                    used_by_tx_input_index: i.clone() as i32,
+                    status: "Confirmed".to_string(),
+                }
+            }).collect_vec();
 
         let output = DetailedOutput {
             output_index: i.clone() as i32,
             address: o.address.safe_get()?.render_string()?,
             available: t.valid_utxo_index.contains(&(i as i32)),
             amount: o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0),
-            used_by_tx,
-            used_by_tx_input_index,
+            children,
             is_swap: o.is_swap(),
             is_liquidity: o.is_liquidity(),
         };
