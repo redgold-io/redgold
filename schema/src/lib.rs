@@ -239,7 +239,7 @@ pub trait ProtoSerde
     fn proto_serialize(&self) -> Vec<u8>;
     fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
 
-    fn proto_deserialize_hex(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
+    fn proto_deserialize_hex(s: impl Into<String>) -> Result<Self, ErrorInfo>;
     fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo>;
 }
 

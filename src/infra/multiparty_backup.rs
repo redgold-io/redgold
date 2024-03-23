@@ -1,4 +1,6 @@
-use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption};
+use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use redgold_schema::{ErrorInfoContext, from_hex, ProtoSerde, RgResult, SafeOption};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{InitiateMultipartyKeygenRequest, NetworkEnvironment, PublicKey};
 use crate::core::relay::Relay;
@@ -44,24 +46,9 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
 }
 
 pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> RgResult<()> {
-
     let net_str = p0.network.to_std_string();
-    let secure_or = p0.secure_or().by_env(p0.network);
-    let bk = secure_or.backups();
 
-    // List bk directory and select the latest
-
-    // Read the directory entries
-    let mut entries = tokio::fs::read_dir(bk).await.error_info("FS read error")?;
-
-    // Collect the entries into a vector of paths
-    let mut paths = Vec::new();
-    while let Some(entry) = entries.next_entry().await.error_info("Missing dir entry")? {
-        paths.push(entry.path());
-    }
-    paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
-
-    let latest = paths.last().expect("No backup found");
+    let latest = get_backup_latest_path(p0).await?;
     let mp_csv = latest.join("multiparty.csv");
 
     let mut ssh = DeployMachine::new(&server, None);
@@ -96,7 +83,28 @@ pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> 
     Ok(())
 }
 
+async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<PathBuf> {
+    let secure_or = p0.secure_or().by_env(p0.network);
+    let bk = secure_or.backups();
 
+    // List bk directory and select the latest
+
+    // Read the directory entries
+    let mut entries = tokio::fs::read_dir(bk).await.error_info("FS read error")?;
+
+    // Collect the entries into a vector of paths
+    let mut paths = Vec::new();
+    while let Some(entry) = entries.next_entry().await.error_info("Missing dir entry")? {
+        paths.push(entry.path());
+    }
+    paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+    let latest = paths.last().expect("No backup found");
+    Ok(latest.clone())
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ParsedMultiparty {
     room_id: String,
     keygen_time: i64,
@@ -137,30 +145,28 @@ pub fn parse_mp_csv(contents: String) -> RgResult<Vec<ParsedMultiparty>> {
     //     net_str,
     //     fnm_export
     // );
-    /*
-    pub async fn add_keygen(&self, local_share: String, room_id: String,
-                            initiate_keygen: InitiateMultipartyKeygenRequest,
-        self_initiated: bool, time
-    )
-     */
     let mut res = vec![];
 
     for e in contents.split("\n") {
+        if e.trim().is_empty() {
+            continue;
+        }
         let mut parts = e.split("|");
-        let room_id = parts.next().safe_get_msg("Missing room_id")?;
-        let keygen_time = parts.next().safe_get_msg("Missing keygen_time")?;
-        let keygen_public_key = parts.next().safe_get_msg("Missing keygen_public_key")?;
-        let host_public_key = parts.next().safe_get_msg("Missing host_public_key")?;
-        let self_initiated = parts.next().safe_get_msg("Missing self_initiated")?;
-        let local_share = parts.next().safe_get_msg("Missing local_share")?;
-        let initiate_keygen = parts.next().safe_get_msg("Missing initiate_keygen")?;
+        let room_id = parts.next().ok_msg("Missing room_id")?;
+        let keygen_time = parts.next().ok_msg("Missing keygen_time")?.trim();
+        let keygen_public_key = parts.next().ok_msg("Missing keygen_public_key")?;
+        let host_public_key = parts.next().ok_msg("Missing host_public_key")?;
+        let self_initiated = parts.next().ok_msg("Missing self_initiated")?;
+        let self_initiated = self_initiated == "1";
+        let local_share = parts.next().ok_msg("Missing local_share")?;
+        let initiate_keygen = parts.next().ok_msg("Missing initiate_keygen")?;
         let mp = ParsedMultiparty {
             room_id: room_id.to_string(),
             keygen_time: keygen_time.parse::<i64>().error_info("Bad keygen_time")?,
             keygen_public_key: PublicKey::from_hex(keygen_public_key.to_string())?,
             host_public_key: PublicKey::from_hex(host_public_key.to_string())?,
-            self_initiated: self_initiated.parse::<bool>().error_info("Bad self_initiated")?,
-            local_share: local_share.to_string(),
+            self_initiated,
+            local_share: String::from_utf8(from_hex(local_share.to_string())?).error_info("Bad local_share")?,
             initiate_keygen: InitiateMultipartyKeygenRequest::proto_deserialize_hex(initiate_keygen.to_string())?,
         };
         res.push(mp);
@@ -177,4 +183,22 @@ pub async fn debug_fix_server() {
     let servers = sdf.all().servers().expect("servers");
     let s = servers.iter().filter(|s| s.index == 4).next().expect("server 4");
     restore_multiparty_share(r.node_config.clone(), s.clone()).await.expect("");
+}
+
+#[ignore]
+#[tokio::test]
+pub async fn manual_parse_test() {
+    let r = Relay::dev_default().await;
+
+    let latest = get_backup_latest_path(r.node_config.clone()).await.expect("latest");
+    let mp_csv = latest.join("4");
+    let mp_csv = mp_csv.join("multiparty.csv");
+
+    println!("Reading multiparty csv: {:?}", mp_csv);
+    let raw = tokio::fs::read_to_string(mp_csv).await.expect("read mp csv");
+
+    let result = parse_mp_csv(raw);
+    for row in result.expect("parsed") {
+        println!("Parsed row: {:?}", row);
+    }
 }

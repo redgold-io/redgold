@@ -258,8 +258,8 @@ impl Node {
             .add("Historical parity manual migration failed")?;
 
         check_updated_multiparty_csv(&relay).await
-            .add("Multiparty CSV update failed")?
-            .log_error();
+            .add("Multiparty CSV update failed")
+            .log_error()?;
 
         Ok(())
     }
