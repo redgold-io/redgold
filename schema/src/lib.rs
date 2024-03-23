@@ -238,6 +238,8 @@ pub trait ProtoSerde
 {
     fn proto_serialize(&self) -> Vec<u8>;
     fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
+
+    fn proto_deserialize_hex(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
     fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo>;
 }
 
@@ -252,6 +254,11 @@ where T: Message + Default {
             .map_err(|e|
                 error_message(Error::ProtoDecoderFailure, e.to_string()))
     }
+
+    fn proto_deserialize_hex(s: impl Into<String>) -> Result<Self, ErrorInfo> {
+        hex::decode(s.into()).error_info("hex decode").and_then(|v| T::proto_deserialize(v))
+    }
+
     fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo> {
         T::decode(&**bytes)
             .map_err(|e|

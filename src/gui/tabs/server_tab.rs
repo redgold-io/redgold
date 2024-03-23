@@ -12,7 +12,7 @@ use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use crate::gui::tables;
 use crate::infra::deploy::{default_deploy, DeployMachine};
-use crate::infra::{deploy};
+use crate::infra::{deploy, multiparty_backup};
 use crate::util::cli::args::Deploy;
 
 pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
@@ -250,7 +250,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     });
 
     if ui.button("Backup Multiparty Local Shares").clicked() {
-        tokio::spawn(deploy::backup_multiparty_local_shares(
+        tokio::spawn(multiparty_backup::backup_multiparty_local_shares(
             local_state.node_config.clone(),
             local_state.local_stored_state.servers.clone(),
         ));

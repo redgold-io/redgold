@@ -5,6 +5,7 @@ pub mod bitcoind;
 pub mod matrix;
 pub mod netmaker;
 pub mod deploy;
+pub mod multiparty_backup;
 //
 // use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 // use bdk::bitcoin::Network;

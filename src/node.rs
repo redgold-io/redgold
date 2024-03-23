@@ -59,6 +59,7 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::core::recent_download::RecentDownload;
 use crate::core::stream_handlers::{IntervalFold, run_recv_single};
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
+use crate::infra::multiparty_backup::check_updated_multiparty_csv;
 use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
@@ -255,6 +256,10 @@ impl Node {
         historical_parity::apply_migrations(&relay).await
             .log_error()
             .add("Historical parity manual migration failed")?;
+
+        check_updated_multiparty_csv(&relay).await
+            .add("Multiparty CSV update failed")?
+            .log_error();
 
         Ok(())
     }
