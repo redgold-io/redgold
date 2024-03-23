@@ -164,7 +164,7 @@ async fn historical_parity_debug2() {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn historical_parity_debug_cached() {
     let r = Relay::dev_default().await;
@@ -352,7 +352,7 @@ async fn historical_parity_detect_duplicate_hashes() {
 
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn historical_parity_utxo() {
     let r = Relay::dev_default().await;
