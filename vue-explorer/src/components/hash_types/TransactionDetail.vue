@@ -98,7 +98,7 @@
                 <div v-if="output.is_liquidity"><strong>{{ output.is_liquidity }}</strong></div>
                 <div v-if="output.children"><strong>Children</strong></div>
                 <div class="grid-container">
-                  <div v-for="child in output.children">
+                  <div v-for="(child, index) in output.children" :key="index">
                     <div><strong>Used By Transaction</strong></div>
                     <div><HashLink :data="child.used_by_tx"></HashLink></div>
                     <div><strong>Used Input Index</strong></div>

@@ -105,7 +105,7 @@ async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<PathBuf> {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct ParsedMultiparty {
+pub struct ParsedMultiparty {
     room_id: String,
     keygen_time: i64,
     keygen_public_key: PublicKey,
