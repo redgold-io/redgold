@@ -58,6 +58,19 @@ impl EnvDataFolder {
         Server::parse_from_file(self.servers_path())
     }
 
+    pub async fn multiparty_import_str(&self) -> RgResult<String> {
+        let mp_import = self.multiparty_import();
+        tokio::fs::read_to_string(mp_import).await.error_info("Failed to read multiparty import")
+    }
+
+    pub fn multiparty_import(&self) -> PathBuf {
+        self.path.join("multiparty-import.csv")
+    }
+
+    pub async fn remove_multiparty_import(&self) -> RgResult<()> {
+        tokio::fs::remove_file(self.multiparty_import()).await.error_info("Failed to remove multiparty import")
+    }
+
     // Change to cert.pem
     pub fn cert_path(&self) -> PathBuf {
         //self.path.join("certificate.crt")

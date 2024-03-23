@@ -41,11 +41,12 @@ impl MultipartyStore {
      */
     pub async fn add_keygen(&self, local_share: String, room_id: String,
                             initiate_keygen: InitiateMultipartyKeygenRequest,
-        self_initiated: bool
+                            self_initiated: bool,
+        time: Option<i64>
     ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
-        let time = util::current_time_millis();
+        let time = time.unwrap_or(util::current_time_millis());
         let init = initiate_keygen.proto_serialize();
         let id = initiate_keygen.identifier.safe_get_msg("ident missing in keygen sql add")?;
         let option = id.party_keys.get(0);

@@ -169,7 +169,8 @@ pub async fn initiate_mp_keygen_authed(
             local_share.clone(),
             room_id.clone(),
             base_request.clone(),
-            true
+            true,
+            None
         ).await?;
         let query_check = relay.ds.multiparty_store.local_share_and_initiate(room_id.clone()).await?;
         query_check.safe_get_msg("Unable to query local store for room_id on keygen")?;
@@ -221,7 +222,8 @@ pub async fn initiate_mp_keygen_follower(
 
     info!("Storing local share on follower for room: {}", room_id.clone());
     relay.ds.multiparty_store.add_keygen(
-        res, room_id.clone(), mp_req.clone(), false).await?;
+        res, room_id.clone(), mp_req.clone(), false, None
+    ).await?;
     let query_check = relay.ds.multiparty_store.local_share_and_initiate(room_id.clone()).await?;
     query_check.safe_get_msg("Unable to query local store for room_id on keygen")?;
     info!("Local share confirmed on follower ");
