@@ -52,9 +52,12 @@ impl LocalTestNodeContext {
         let futures = Node::start_services(relay.clone()).await;
         tokio::spawn(async move {
             // TODO: Get the join errors here
-            let (res, _, _) = futures::future::select_all(futures).await;
-            let result = res.error_info("Join error on main start services threads in node")
-                .and_then(|x| x).log_error();
+            let mut fut2 = vec![];
+            for f in futures {
+                fut2.push(Box::pin(f.result()));
+            }
+            let (res, _, _) = futures::future::select_all(fut2).await;
+            let result = res.log_error();
             panic!("Node service failed in test: {:?}", result);
         });
         // info!("Test completed starting node services");
