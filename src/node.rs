@@ -13,7 +13,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, EasyJson, error_info, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::{bytes_data, EasyJson, error_info, ErrorInfoContext, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
@@ -79,30 +79,51 @@ pub struct Node {
     pub relay: Relay,
 }
 
+pub struct NamedHandle {
+    pub name: String,
+    pub handle: JoinHandle<RgResult<()>>
+}
+
+impl NamedHandle {
+    pub fn new(name: impl Into<String>, handle: JoinHandle<RgResult<()>>) -> Self {
+        Self {
+            name: name.into(),
+            handle,
+        }
+    }
+
+    pub async fn result(self) -> RgResult<String> {
+        self.handle.await.error_info("Join error")??;
+        Ok(self.name)
+    }
+}
+
 impl Node {
 
     /**
     * Start all background thread application services. REST APIs, event processors, transaction process, etc.
     * Each of these application background services communicates via channels instantiated by the relay
+    TODO: Refactor this into multiple start routines, or otherwise delay service start until after preliminary setup.
     */
     #[tracing::instrument(skip(relay), fields(node_id = %relay.node_config.public_key().short_id()))]
-    pub async fn start_services(relay: Relay) -> Vec<JoinHandle<Result<(), ErrorInfo>>> {
+    pub async fn start_services(relay: Relay) -> Vec<NamedHandle> {
 
         let node_config = relay.node_config.clone();
 
         let mut join_handles = vec![
             // Internal RPC control equivalent, used for issuing commands to node
             // Disabled in high security mode
-            control_api::ControlServer {
+            // Only needs to run on certain environments?
+            NamedHandle::new("ControlServer", control_api::ControlServer {
             relay: relay.clone(),
-            }.start(),
+            }.start()),
             // Stream processor for sending external peer messages
             // Negotiates appropriate protocol depending on peer
-            PeerOutgoingEventHandler::new(relay.clone()),
+            NamedHandle::new("PeerOutgoingEventHandler", PeerOutgoingEventHandler::new(relay.clone())),
             // Main transaction processing loop, watches over lifecycle of a given transaction
             // as it's drawn from the mem-pool
-            TransactionProcessContext::new(relay.clone()),
-            run_recv_single(TxWriter::new(&relay), relay.tx_writer.receiver.clone()).await,
+            NamedHandle::new("TransactionProcessContext", TransactionProcessContext::new(relay.clone())),
+            NamedHandle::new("TxWriter", run_recv_single(TxWriter::new(&relay), relay.tx_writer.receiver.clone()).await),
         ];
         // TODO: Filter out any join handles that have terminated immediately with success due to disabled services.
 
@@ -117,25 +138,25 @@ impl Node {
 
 
         let ojh = ObservationBuffer::new(relay.clone()).await;
-        join_handles.push(ojh);
+        join_handles.push(NamedHandle::new("ObservationBuffer", ojh));
 
         // Rewards::new(relay.clone(), runtimes.auxiliary.clone());
 
-        join_handles.push(PeerRxEventHandler::new(
+        join_handles.push(NamedHandle::new("PeerRxEventHandler", PeerRxEventHandler::new(
             relay.clone(),
             // runtimes.auxiliary.clone(),
-        ));
+        )));
 
-        join_handles.push(public_api::start_server(relay.clone(),
+        join_handles.push(NamedHandle::new("public_api", public_api::start_server(relay.clone(),
                                                    // runtimes.public_api.clone()
-        ));
+        )));
 
-        join_handles.push(explorer::server::start_server(relay.clone(),
+        join_handles.push(NamedHandle::new("explorer", explorer::server::start_server(relay.clone(),
                                                    // runtimes.public_api.clone()
-        ));
+        )));
 
         let obs_handler = ObservationHandler{relay: relay.clone()};
-        join_handles.push(tokio::spawn(async move { obs_handler.run().await }));
+        join_handles.push(NamedHandle::new("obs_handler", tokio::spawn(async move { obs_handler.run().await })));
         //
         // let mut mph = MultipartyHandler::new(
         //     relay.clone(),
@@ -145,8 +166,8 @@ impl Node {
 
         let sm_port = relay.node_config.mparty_port();
         let sm_relay = relay.clone();
-        join_handles.push(tokio::spawn(async move { gg20_sm_manager::run_server(sm_port, sm_relay)
-                .await.map_err(|e| error_info(e.to_string())) }));
+        join_handles.push(NamedHandle::new("gg20_sm_manager", tokio::spawn(async move { gg20_sm_manager::run_server(sm_port, sm_relay)
+                .await.map_err(|e| error_info(e.to_string())) })));
 
 
         // let relay_c = relay.clone();
@@ -165,36 +186,36 @@ impl Node {
         let c_config = relay.clone();
         if node_config.e2e_enabled {
             // TODO: Distinguish errors here
-            let _cwh = tokio::spawn(e2e::run(c_config));
-            // join_handles.push(cwh);
+            let cwh = tokio::spawn(e2e::run(c_config));
+            join_handles.push(NamedHandle::new("e2e", cwh));
         }
 
-        join_handles.push(update_prometheus_configs(relay.clone()).await);
+        join_handles.push(NamedHandle::new("update_prometheus_configs", update_prometheus_configs(relay.clone()).await));
 
         let discovery = Discovery::new(relay.clone()).await;
-        join_handles.push(stream_handlers::run_interval_fold(
+        join_handles.push(NamedHandle::new("discovery.interval", stream_handlers::run_interval_fold(
             discovery.clone(), relay.node_config.discovery_interval, false
-        ).await);
-
-        join_handles.push(stream_handlers::run_interval_fold(
-            DepositWatcher::new(relay.clone()), relay.node_config.watcher_interval, false
-        ).await);
+        ).await));
 
 
-        join_handles.push(stream_handlers::run_recv_concurrent(
+        join_handles.push(NamedHandle::new("discovery.receiver", stream_handlers::run_recv_concurrent(
             discovery, relay.discovery.receiver.clone(), 100
-        ).await);
+        ).await));
+
+        join_handles.push(NamedHandle::new("DepositWatcher", stream_handlers::run_interval_fold(
+            DepositWatcher::new(relay.clone()), relay.node_config.watcher_interval, false
+        ).await));
 
 
-        join_handles.push(tokio::spawn(api::rosetta::server::run_server(relay.clone())));
+        join_handles.push(NamedHandle::new("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone()))));
 
-        join_handles.push(stream_handlers::run_interval_fold(
+        join_handles.push(NamedHandle::new("Shuffle", stream_handlers::run_interval_fold(
             Shuffle::new(&relay), relay.node_config.shuffle_interval, false
-        ).await);
+        ).await));
 
-        join_handles.push(stream_handlers::run_interval_fold(
+        join_handles.push(NamedHandle::new("Mempool", stream_handlers::run_interval_fold(
             crate::core::mempool::Mempool::new(&relay), relay.node_config.mempool.interval.clone(), false
-        ).await);
+        ).await));
 
         for i in 0..relay.node_config.contract.bucket_parallelism {
             let opt_c = relay.contract_state_manager_channels.get(i);
@@ -205,7 +226,7 @@ impl Node {
                 false,
                 c.receiver.clone()
             ).await;
-            join_handles.push(handle);
+            join_handles.push(NamedHandle::new("ContractStateManager", handle));
 
             let opt_c = relay.contention.get(i);
             let c = opt_c.expect("bucket partition creation error");
@@ -215,24 +236,24 @@ impl Node {
                 false,
                 c.receiver.clone()
             ).await;
-            join_handles.push(handle);
+            join_handles.push(NamedHandle::new("ContentionConflictManager", handle));
 
 
         }
 
-        join_handles.push(stream_handlers::run_interval_fold(
-            RecentDownload {
-                relay: relay.clone(),
-            }, Duration::from_secs(60), false
-        ).await);
-
-
-        // TODO: Change all join handles to a single vec![] instantiation?
-        join_handles.push(stream_handlers::run_interval_fold(
+        join_handles.push(NamedHandle::new("DataDiscovery", stream_handlers::run_interval_fold(
             DataDiscovery {
                 relay: relay.clone(),
             }, Duration::from_secs(60), false
-        ).await);
+        ).await));
+
+
+        // TODO: Change all join handles to a single vec![] instantiation?
+        join_handles.push(NamedHandle::new("DataDiscovery", stream_handlers::run_interval_fold(
+            DataDiscovery {
+                relay: relay.clone(),
+            }, Duration::from_secs(60), false
+        ).await));
 
 
         join_handles

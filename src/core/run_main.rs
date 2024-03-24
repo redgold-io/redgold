@@ -7,6 +7,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use log::{error, info};
 use metrics::counter;
+use redgold_schema::SafeOption;
 
 use redgold_schema::structs::ErrorInfo;
 
@@ -49,14 +50,16 @@ pub async fn main_from_args(opts: RgArgs) {
     let join_handles = Node::start_services(relay.clone()).await;
     let mut futures = FuturesUnordered::new();
     for jhi in join_handles {
-        futures.push(jhi);
+        futures.push(jhi.result())
     }
     match Node::from_config(relay).await {
-        Ok(_) => {
+        Ok(n) => {
             info!("Node startup successful");
-            match internal_message::map_fut(futures.next().await) {
-                Ok(_) => {
-                    error!("Some sub-service has terminated cleanly");
+            let result = futures.next().await.ok_msg("No future result?").and_then(|e| e);
+            match result {
+                Ok(e) => {
+                    error!("Some sub-service has terminated cleanly {}", e.clone());
+                    panic!("Some sub-service has terminated cleanly {}", e.clone());
                 }
                 Err(e) => {
                     error!("Main service error: {}", crate::schema::json(&e).expect("json render of error failed?"));
