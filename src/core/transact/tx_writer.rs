@@ -55,7 +55,7 @@ impl TxWriter {
         // TODO: Handle graceful rollback on failure here.
         for fixed in transaction.utxo_inputs() {
             // This should maybe just put the whole node into a corrupted state? Or a retry?
-            self.relay.ds.transaction_store.delete_utxo(&fixed).await.mark_abort()?;
+            self.relay.ds.utxo.delete_utxo(&fixed).await.mark_abort()?;
             let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
                 &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
             ).await.mark_abort()?;

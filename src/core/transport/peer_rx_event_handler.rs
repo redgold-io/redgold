@@ -226,13 +226,9 @@ impl PeerRxEventHandler {
                 }).await?;
             }
         }
+        // TODO: Merge this into gossip transaction when process tx handles obs.
         if let Some(o) = request.gossip_observation_request {
-            // info!("Received gossip observation request");
-            relay
-                .observation
-                .sender
-                .send(o.observation.unwrap())
-                .expect("gossip send failure");
+            relay.observation.sender.send_rg_err(o.observation.unwrap())?;
         }
 
         if let Some(download_request) = request.download_request {

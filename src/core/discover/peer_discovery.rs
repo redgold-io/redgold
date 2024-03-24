@@ -167,10 +167,10 @@ impl Discovery {
         let ct = util::current_time_millis_i64();
         let failures = self.relay.peer_send_failures.safe_lock().await?;
         for (pk, fails) in failures.iter() {
-            let delta = ct - fails.1;
-            if delta > 1000 * 60 * 25 { // 25 mins, 2 e2e intervals
+            let delta = (ct - fails.1) / 1000;
+            if delta > 60 * 25 { // 25 mins, 2 e2e intervals
                 self.relay.ds.peer_store.remove_node(pk).await?;
-                info!("Removed dead peer with delta {}: {}", delta, pk.hex().expect("hex"));
+                info!("Removed dead peer with delta seconds {}: {} last_err {}", delta, pk.hex().expect("hex"), fails.0.json_or());
                 counter!("redgold.peer.discovery.clear_dead_peers").increment(1);
             }
         }

@@ -730,7 +730,7 @@ impl TransactionProcessContext {
         for fixed in transaction.fixed_utxo_ids_of_inputs()? {
             // This should maybe just put the whole node into a corrupted state? Or a retry?
             tracing::trace!("Attempting to delete utxo: {}", fixed.format_str());
-            self.relay.ds.transaction_store.delete_utxo(&fixed).await?;
+            self.relay.ds.utxo.delete_utxo(&fixed).await?;
             let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
                 &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
             ).await?;
