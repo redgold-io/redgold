@@ -73,7 +73,7 @@ pub async fn download_all(
             if let Some(utxo_id) = utxo.utxo_id.as_ref() {
                 got_data = true;
                 if !relay.utxo_channels.contains_key(utxo_id) {
-                    relay.ds.transaction_store.insert_utxo(&utxo).await.with_err_count("redgold.download.utxo_insert_error").ok();
+                    relay.ds.transaction_store.insert_utxo(&utxo, None).await.with_err_count("redgold.download.utxo_insert_error").ok();
                 }
             }
         }
@@ -94,9 +94,7 @@ pub async fn download_all(
                 got_data = true;
                 if !relay.transaction_known(&tx.calculate_hash()).await? {
                     relay
-                        .ds
-                        .transaction_store
-                        .insert_transaction(&tx, txe.time as i64, true, None, false)
+                        .write_transaction(&tx, txe.time as i64, None, true)
                         .await?;
                 }
             }
@@ -251,7 +249,7 @@ async fn download_genesis(relay: &Relay, bootstrap_pks: Vec<PublicKey>) -> Resul
         let result = gen_actual.time();
         let g_time = result?.clone();
         if relay.ds.transaction_store.query_maybe_transaction(&gen_actual.calculate_hash()).await?.is_none() {
-            relay.ds.transaction_store.insert_transaction(&gen_actual, g_time, true, None, false).await?;
+            relay.write_transaction(&gen_actual, g_time, None, true).await?;
         }
         return Ok(Some(g_time))
     }

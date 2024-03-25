@@ -412,9 +412,7 @@ impl Node {
             let _res_err =
                 // runtimes.auxiliary.block_on(
                 relay
-                    .ds
-                    .transaction_store
-                    .insert_transaction(&tx.clone(), EARLIEST_TIME, true, None, true)
+                    .write_transaction(&tx.clone(), EARLIEST_TIME, None, true)
                     .await.expect("insert failed");
             // }
             let genesis_hash = tx.hash_or();

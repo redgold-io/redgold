@@ -616,7 +616,7 @@ async fn data_store_test() {
     for i in 0..10 {
         let nci = NodeConfig::from_test_id(&(i + 200 as u16));
         let tx = nci.peer_tx_fixed();
-        relay.ds.transaction_store.insert_transaction(&tx, 0,true, None, true).await.expect("");
+        relay.write_transaction(&tx, 0, None, true).await.expect("");
         txs.push(tx.clone());
     }
 
