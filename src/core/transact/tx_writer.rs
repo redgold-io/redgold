@@ -44,18 +44,18 @@ impl TxWriter {
         info!("Writing transaction: {}", transaction.hash_or());
         counter!("redgold.transaction.tx_writer.write_transaction").increment(1);
         // Validate again immediately
-        for utxo_id in transaction.utxo_inputs() {
-            let valid = self.relay.ds.utxo.utxo_id_valid(utxo_id).await?;
-            if !valid {
-                return Err(ErrorInfo::new("Invalid UTXO")).add(utxo_id.json_or());
-            }
-            let child = self.relay.ds.utxo.utxo_children(utxo_id).await?;
-            if child.len() > 0 {
-                return Err(ErrorInfo::new("UTXO has children"))
-                    .add(utxo_id.json_or())
-                    .add(child.json_or());
-            }
-        }
+        // for utxo_id in transaction.utxo_inputs() {
+        //     let valid = self.relay.ds.utxo.utxo_id_valid(utxo_id).await?;
+        //     if !valid {
+        //         return Err(ErrorInfo::new("Invalid UTXO")).add(utxo_id.json_or());
+        //     }
+        //     let child = self.relay.ds.utxo.utxo_children(utxo_id).await?;
+        //     if child.len() > 0 {
+        //         return Err(ErrorInfo::new("UTXO has children"))
+        //             .add(utxo_id.json_or())
+        //             .add(child.json_or());
+        //     }
+        // }
 
         // TODO: Should each UTXO key handler thread handle the deletion of the UTXO? Should we 'block' the utxo entry?
         // with a message? Or should we just delete it here?
