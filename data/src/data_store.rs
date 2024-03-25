@@ -6,7 +6,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 use log::info;
 use metrics::gauge;
-use sqlx::SqlitePool;
+use sqlx::{Acquire, Sqlite, SqlitePool};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
 use crate::address_block::AddressBlockStore;
@@ -16,8 +16,9 @@ use crate::mp_store::MultipartyStore;
 use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
-use redgold_schema::{error_info, RgResult, structs};
-use redgold_schema::structs::{AddressInfo, Hash, TransactionInfo, TransactionState};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry};
 
 use crate::schema::structs::{
     Address, ErrorInfo,
@@ -42,6 +43,77 @@ pub struct DataStore {
 }
 
 impl DataStore {
+
+
+    // TODO: Do this as a single sqlite transaction.
+    pub async fn accept_transaction(&self,
+                                    tx: &Transaction,
+                                    time: i64,
+                                    rejection_reason: Option<ErrorInfo>,
+                                    update_utxo: bool
+    ) -> RgResult<()> {
+
+        let mut pool = self.ctx.pool().await?;
+        let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;
+        let result = self.accept_transaction_inner(tx, time, rejection_reason, update_utxo, &mut sqlite_tx).await;
+        match result {
+            Ok(_) => {
+                sqlite_tx.commit().await.error_info("Sqlite commit failure")?;
+                Ok(())
+            }
+            Err(e) => {
+                sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or())
+            }
+        }
+    }
+
+    async fn accept_transaction_inner(
+        &self,
+        tx: &Transaction, time: i64, rejection_reason: Option<ErrorInfo>, update_utxo: bool,
+        mut sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>) -> RgResult<()> {
+        self.insert_transaction(
+            tx, time, rejection_reason.clone(), update_utxo, Some(&mut sqlite_tx)
+        ).await?;
+
+        if rejection_reason.is_none() {
+            for utxo_id in tx.input_utxo_ids() {
+                self.utxo.delete_utxo(utxo_id).await?;
+                if self.utxo.utxo_id_valid(utxo_id).await? {
+                    return Err(error_info("UTXO not deleted"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+
+    pub async fn insert_transaction(
+        &self,
+        tx: &Transaction,
+        time: i64,
+        rejection_reason: Option<ErrorInfo>,
+        update_utxo: bool,
+        sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>
+    ) -> Result<i64, ErrorInfo> {
+        let i = self.transaction_store.insert_transaction_raw(tx, time.clone(), rejection_reason.clone(), sqlite_tx).await?;
+        if update_utxo && rejection_reason.is_none() {
+            for entry in UtxoEntry::from_transaction(tx, time.clone()) {
+                let id = entry.utxo_id.safe_get_msg("malfored utxoid on formation in insert transaction")?;
+                if self.utxo.utxo_child(id).await?.is_none() {
+                    self.transaction_store.insert_utxo(&entry).await?;
+                }
+            }
+        }
+        if rejection_reason.is_none() {
+            self.transaction_store.insert_transaction_indexes(&tx, time).await?;
+            gauge!("redgold.transaction.accepted.total").increment(1.0);
+        } else {
+            gauge!("redgold.transaction.rejected.total").increment(1.0);
+        }
+
+        return Ok(i);
+    }
+
     pub async fn resolve_code(&self, address: &Address) -> RgResult<structs::ResolveCodeResponse> {
         let res = self.utxo.code_utxo(address, true).await?;
         let mut resp = structs::ResolveCodeResponse::default();

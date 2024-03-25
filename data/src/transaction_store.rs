@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 use itertools::Itertools;
 use metrics::gauge;
+use sqlx::Sqlite;
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
-use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -479,22 +480,26 @@ impl TransactionStore {
         &self,
         tx: &Transaction,
         time: i64,
-        accepted: bool,
         rejection_reason: Option<ErrorInfo>,
+        sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>
     ) -> Result<i64, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let rejection_ser = rejection_reason.map(|x| json_or(&x));
+        let rejection_ser = rejection_reason.clone().map(|x| x.json_or());
+        let accepted = rejection_reason.is_none();
         let is_test = tx.is_test();
         let hash_vec = tx.hash_bytes()?;
         let ser = tx.proto_serialize();
 
+        let mut pool = self.ctx.pool().await?;
         let rows = sqlx::query!(
             r#"
         INSERT OR REPLACE INTO transactions
         (hash, raw, time, rejection_reason, accepted, is_test) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
            hash_vec, ser, time, rejection_ser, accepted, is_test
         )
-            .execute(&mut *pool)
+            .execute(match sqlite_tx {
+                Some(tx) => tx,
+                None => &mut *pool,
+            })
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -625,27 +630,8 @@ impl TransactionStore {
 
     }
 
-    pub async fn insert_transaction(
-        &self,
-        tx: &Transaction,
-        time: i64,
-        accepted: bool,
-        rejection_reason: Option<ErrorInfo>,
-        update_utxo: bool
-    ) -> Result<i64, ErrorInfo> {
-        let i = self.insert_transaction_raw(tx, time.clone(), accepted, rejection_reason).await?;
-        let vec = UtxoEntry::from_transaction(tx, time.clone() as i64);
-        if update_utxo {
-            for entry in vec {
-                self.insert_utxo(&entry).await?;
-            }
-        }
-        self.insert_transaction_indexes(&tx, time).await?;
-        gauge!("redgold.transaction.accepted.total").increment(1.0);
-        return Ok(i);
-    }
 
-    async fn insert_transaction_indexes(&self, tx: &&Transaction, time: i64) -> Result<(), ErrorInfo> {
+    pub(crate) async fn insert_transaction_indexes(&self, tx: &&Transaction, time: i64) -> Result<(), ErrorInfo> {
         for (i, x) in tx.inputs.iter().enumerate() {
             if let Some(utxo) = &x.utxo_id {
                 self.insert_transaction_edge(

@@ -41,13 +41,11 @@ impl RecentDownload {
             }
             if store {
                 counter!("redgold.recent_download.accepted_transactions").increment(1);
-                // TODO: Determine time from seed or peers view.
-                self.relay.ds.transaction_store.insert_transaction(
+                self.relay.write_transaction(
                     &update.parent_transaction,
                     update.parent_transaction.time()?.clone(),
-                    true,
                     None,
-                    false
+                    true
                 ).await?;
 
                 for u in &update.parent_transaction.utxo_outputs().unwrap_or(vec![]) {

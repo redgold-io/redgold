@@ -15,12 +15,15 @@ use crate::util;
 #[derive(Clone)]
 pub struct TransactionWithSender {
     pub transaction: Transaction,
-    pub sender: flume::Sender<RgResult<()>>
+    pub sender: flume::Sender<RgResult<()>>,
+    pub time: i64,
+    pub rejection_reason: Option<ErrorInfo>,
+    pub update_utxo: bool
 }
 
 #[derive(Clone)]
 pub enum TxWriterMessage {
-    WriteTransaction(TransactionWithSender)
+    WriteTransaction(TransactionWithSender),
 }
 
 #[derive(Clone)]
@@ -52,6 +55,21 @@ impl TxWriter {
                     .add(child.json_or());
             }
         }
+
+
+        // Do as a single commit with a rollback.
+        // Preserve all old data / inputs while committing new transaction, or do retries?
+        // or fail the entire node?
+        // TODO: Should each UTXO key handler thread handle the deletion of the UTXO? Should we 'block' the utxo entry?
+        // with a message? Or should we just delete it here?
+        // Commit transaction internally to database.
+
+        self.relay
+                .ds
+                .accept_transaction(
+                    &transaction, util::current_time_millis_i64(), None, true
+                ).await.mark_abort()?;
+
         // TODO: Handle graceful rollback on failure here.
         for fixed in transaction.utxo_inputs() {
             // This should maybe just put the whole node into a corrupted state? Or a retry?
@@ -66,20 +84,9 @@ impl TxWriter {
             }
         }
 
-        // Do as a single commit with a rollback.
-        // Preserve all old data / inputs while committing new transaction, or do retries?
-        // or fail the entire node?
-        // TODO: Should each UTXO key handler thread handle the deletion of the UTXO? Should we 'block' the utxo entry?
-        // with a message? Or should we just delete it here?
-        // Commit transaction internally to database.
-
-        self.relay
-                .ds
-                .transaction_store
-                .insert_transaction(
-                    &transaction, util::current_time_millis_i64(), true, None, true
-                ).await.mark_abort()?;
         info!("Wrote transaction: {}", transaction.hash_or());
+
+
 
         return Ok(());
 

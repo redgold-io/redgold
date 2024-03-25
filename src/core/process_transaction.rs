@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 // use crossbeam_channel::{unbounded, Receiver, Sender};
 use dashmap::mapref::entry::Entry;
-use flume::TryRecvError;
+use flume::{Sender, TryRecvError};
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
@@ -562,14 +562,9 @@ impl TransactionProcessContext {
         let prf = self.observe(validation_type, State::Accepted).await?;
         observation_proofs.insert(prf);
         // self.insert_transaction(&transaction).await?;
-        let (s,r) = flume::bounded(1);
-        self.relay.tx_writer.sender.send_rg_err(
-            TxWriterMessage::WriteTransaction(TransactionWithSender {
-                transaction: transaction.clone(),
-                sender: s
-            })
-        )?;
-        r.recv_async_err_timeout(Duration::from_secs(30)).await??;
+        // TODO: Use observation times and update later -- also add a txWriter type to update
+        // tx time
+        self.relay.write_transaction(transaction, transaction.time()?.clone(), None, true).await?;
         counter!("redgold.transaction.accepted").increment(1);
         tracing::info!("Accepted transaction");
 
@@ -707,38 +702,6 @@ impl TransactionProcessContext {
             done
         } {}
         None
-    }
-
-    async fn insert_transaction(
-        &self,
-        transaction: &Transaction,
-    ) -> Result<(), ErrorInfo> {
-        // self.observation_buffer.push();
-        // Commit transaction internally to database.
-
-        // TODO: Handle these errors properly.
-        // Add loggers, do as a single commit with a rollback.
-        // Preserve all old data / inputs while committing new transaction, or do retries?
-        // or fail the entire node?
-        self.relay
-                .ds
-                .transaction_store
-                .insert_transaction(
-                    &transaction, util::current_time_millis_i64(), true, None, true
-                ).await?;
-
-        for fixed in transaction.fixed_utxo_ids_of_inputs()? {
-            // This should maybe just put the whole node into a corrupted state? Or a retry?
-            tracing::trace!("Attempting to delete utxo: {}", fixed.format_str());
-            self.relay.ds.utxo.delete_utxo(&fixed).await?;
-            let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
-                &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
-            ).await?;
-            let deleted = !utxo_valid;
-            tracing::trace!("Utxo should be deleted: {}", deleted);
-        }
-
-        return Ok(());
     }
 
     fn clean_utxo(

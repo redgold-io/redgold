@@ -11,7 +11,7 @@ use crate::schema::structs::{
     Error, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
-use flume::Receiver;
+use flume::{Receiver, Sender};
 use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
@@ -165,6 +165,28 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 }
 
 impl Relay {
+    pub async fn write_transaction(
+        &self,
+        transaction: &Transaction,
+        time: i64,
+        rejection_reason: Option<ErrorInfo>,
+        update_utxo: bool
+    ) -> Result<(), ErrorInfo> {
+        let (s,r) = flume::bounded(1);
+        self.tx_writer.sender.send_rg_err(
+            TxWriterMessage::WriteTransaction(TransactionWithSender {
+                transaction: transaction.clone(),
+                sender: s,
+                time,
+                rejection_reason,
+                update_utxo,
+            })
+        )?;
+        // TODO: NodeConfig specific timeout
+        r.recv_async_err_timeout(self.node_config.default_timeout).await??;
+        Ok(())
+    }
+
 
     pub async fn mark_peer_send_failure(&self, pk: &PublicKey, error: &ErrorInfo) -> RgResult<()> {
         let mut l = self.peer_send_failures.safe_lock().await?;
