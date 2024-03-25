@@ -58,7 +58,7 @@ chrono = "0.4.33"
 #features = ["serde", "bitcoinconsensus"]
 
 [build-dependencies]
-prost-build = "0.8"
+prost-build = "0.12"
 prost-serde = "0.3.0"
 prost-helper = "0.2.0"
 serde = "1.0.130"
