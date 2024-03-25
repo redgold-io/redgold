@@ -54,10 +54,9 @@ impl RecentDownload {
                             let valid = self.relay.utxo_id_valid_peers(id).await?;
                             // TODO: Check the conflict manager to see if this UTXO is under contention?
                             if valid.is_none() {
-                                self.relay.ds.transaction_store.insert_utxo(u).await?;
-
+                                self.relay.ds.transaction_store.insert_utxo(u, None).await?;
                                 if !(self.relay.utxo_channels.contains_key(id)) {
-                                    self.relay.ds.transaction_store.insert_utxo(u).await?;
+                                    self.relay.ds.transaction_store.insert_utxo(u, None).await?;
                                 }
                             }
                         }

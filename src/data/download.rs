@@ -73,7 +73,7 @@ pub async fn download_all(
             if let Some(utxo_id) = utxo.utxo_id.as_ref() {
                 got_data = true;
                 if !relay.utxo_channels.contains_key(utxo_id) {
-                    relay.ds.transaction_store.insert_utxo(&utxo).await.with_err_count("redgold.download.utxo_insert_error").ok();
+                    relay.ds.transaction_store.insert_utxo(&utxo, None).await.with_err_count("redgold.download.utxo_insert_error").ok();
                 }
             }
         }

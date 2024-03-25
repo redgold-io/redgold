@@ -38,8 +38,9 @@ impl TxWriter {
         }
     }
 
-    pub async fn write_transaction(&self, transaction: &Transaction) -> RgResult<()> {
+    pub async fn write_transaction(&self, message: &TransactionWithSender) -> RgResult<()> {
 
+        let transaction = &message.transaction;
         info!("Writing transaction: {}", transaction.hash_or());
         counter!("redgold.transaction.tx_writer.write_transaction").increment(1);
         // Validate again immediately
@@ -56,32 +57,31 @@ impl TxWriter {
             }
         }
 
-
-        // Do as a single commit with a rollback.
-        // Preserve all old data / inputs while committing new transaction, or do retries?
-        // or fail the entire node?
         // TODO: Should each UTXO key handler thread handle the deletion of the UTXO? Should we 'block' the utxo entry?
         // with a message? Or should we just delete it here?
         // Commit transaction internally to database.
 
+        info!("Accepting transaction: {}", transaction.hash_or());
         self.relay
                 .ds
                 .accept_transaction(
-                    &transaction, util::current_time_millis_i64(), None, true
+                    &transaction, message.time, message.rejection_reason.clone(), message.update_utxo
                 ).await.mark_abort()?;
 
-        // TODO: Handle graceful rollback on failure here.
+        info!("Sanity check on transaction: {}", transaction.hash_or());
+        // Additional sanity check here
         for fixed in transaction.utxo_inputs() {
-            // This should maybe just put the whole node into a corrupted state? Or a retry?
-            self.relay.ds.utxo.delete_utxo(&fixed).await.mark_abort()?;
-            let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
-                &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
-            ).await.mark_abort()?;
-            let deleted = !utxo_valid;
-            if !deleted {
-                return Err(ErrorInfo::new("UTXO not deleted")).add(fixed.json_or())
-                    .mark_abort();
+            if message.rejection_reason.is_none() && message.update_utxo {
+                let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
+                    &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
+                ).await.mark_abort()?;
+                let deleted = !utxo_valid;
+                if !deleted {
+                    return Err(ErrorInfo::new("UTXO not deleted")).add(fixed.json_or())
+                        .mark_abort();
+                }
             }
+
         }
 
         info!("Wrote transaction: {}", transaction.hash_or());
@@ -95,9 +95,9 @@ impl TxWriter {
         counter!("redgold.transaction.tx_writer.process_message").increment(1);
         match message {
             TxWriterMessage::WriteTransaction(tws) => {
-                let result = self.write_transaction(&tws.transaction).await
-                    .bubble_abort()?
+                let result = self.write_transaction(&tws).await
                     .log_error()
+                    .bubble_abort()?
                     .with_err_count("redgold.transaction.tx_writer.write_transaction.error");
                 tws.sender.send_rg_err(result)
             }

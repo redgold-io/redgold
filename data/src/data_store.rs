@@ -53,26 +53,28 @@ impl DataStore {
                                     update_utxo: bool
     ) -> RgResult<()> {
 
-        let mut pool = self.ctx.pool().await?;
-        let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;
-        let result = self.accept_transaction_inner(tx, time, rejection_reason, update_utxo, &mut sqlite_tx).await;
-        match result {
-            Ok(_) => {
-                sqlite_tx.commit().await.error_info("Sqlite commit failure")?;
-                Ok(())
-            }
-            Err(e) => {
-                sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or())
-            }
-        }
+        // let mut pool = self.ctx.pool().await?;
+        // let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;
+        let mut sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>> = None;
+        let result = self.accept_transaction_inner(tx, time, rejection_reason, update_utxo, sqlite_tx).await;
+        result
+        // match result {
+        //     Ok(_) => {
+        //         sqlite_tx.commit().await.error_info("Sqlite commit failure")?;
+        //         Ok(())
+        //     }
+        //     Err(e) => {
+        //         sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or())
+        //     }
+        // }
     }
 
     async fn accept_transaction_inner(
         &self,
         tx: &Transaction, time: i64, rejection_reason: Option<ErrorInfo>, update_utxo: bool,
-        mut sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>) -> RgResult<()> {
+        mut sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>) -> RgResult<()> {
         self.insert_transaction(
-            tx, time, rejection_reason.clone(), update_utxo, Some(&mut sqlite_tx)
+            tx, time, rejection_reason.clone(), update_utxo, None
         ).await?;
 
         if rejection_reason.is_none() {
@@ -100,7 +102,7 @@ impl DataStore {
             for entry in UtxoEntry::from_transaction(tx, time.clone()) {
                 let id = entry.utxo_id.safe_get_msg("malfored utxoid on formation in insert transaction")?;
                 if self.utxo.utxo_child(id).await?.is_none() {
-                    self.transaction_store.insert_utxo(&entry).await?;
+                    self.transaction_store.insert_utxo(&entry, None).await?;
                 }
             }
         }

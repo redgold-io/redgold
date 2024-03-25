@@ -673,7 +673,8 @@ impl TransactionStore {
 impl TransactionStore {
     pub async fn insert_utxo(
         &self,
-        utxo_entry: &UtxoEntry
+        utxo_entry: &UtxoEntry,
+        sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>
     ) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
         let id = utxo_entry.utxo_id.safe_get_msg("missing utxo id")?;
@@ -700,7 +701,10 @@ impl TransactionStore {
             raw,
             has_code
         )
-            .execute(&mut *pool)
+            .execute(match sqlite_tx {
+                Some(tx) => tx,
+                None => &mut *pool,
+            })
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         gauge!("redgold.utxo.total").increment(1.0);
