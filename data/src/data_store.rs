@@ -7,6 +7,7 @@ use itertools::Itertools;
 use log::info;
 use metrics::gauge;
 use sqlx::{Acquire, Sqlite, SqlitePool};
+use sqlx::{Row};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
 use crate::address_block::AddressBlockStore;
@@ -115,6 +116,43 @@ impl DataStore {
 
         return Ok(i);
     }
+
+
+    pub async fn table_size(&self, table_name: impl Into<String>) -> RgResult<Vec<i64>> {
+        let string = table_name.into();
+        let string1 = format!(r#"SELECT sum("pgsize") as aggregate FROM dbstat WHERE name='{}'"#, string.as_str());
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query(
+            // r#"select aggregate from dbstat('main',1) where name='utxo'"#,
+            string1.as_str(),
+
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?;
+        let mut res = vec![];
+        for r in rows {
+            // let name: String = DataStoreContext::map_err_sqlx(r.try_get("name"))?;
+            let aggregate: i64 = DataStoreContext::map_err_sqlx(r.try_get("aggregate"))?;
+            res.push(aggregate);
+        }
+        Ok(res)
+    }
+
+
+    pub async fn table_sizes(&self) -> RgResult<Vec<(String,i64)>> {
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query(
+            r#"SELECT name, sum("pgsize") as aggregate FROM dbstat GROUP BY name"#
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?;
+        let mut res = vec![];
+        for r in rows {
+            let name: String = DataStoreContext::map_err_sqlx(r.try_get("name"))?;
+            let aggregate: i64 = DataStoreContext::map_err_sqlx(r.try_get("aggregate"))?;
+            res.push((name, aggregate));
+        }
+        Ok(res)
+    }
+
 
     pub async fn resolve_code(&self, address: &Address) -> RgResult<structs::ResolveCodeResponse> {
         let res = self.utxo.code_utxo(address, true).await?;

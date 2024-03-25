@@ -42,8 +42,9 @@ use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::node_config::NodeConfig;
-use redgold_schema::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::{AnyPrinter, SameResult};
 use crate::api::explorer::server::{extract_ip, process_origin};
+use crate::api::v1::v1_api_routes;
 use crate::util::runtimes::build_runtime;
 
 // https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
@@ -637,6 +638,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     let port = relay2.node_config.public_port();
     // info!("Running public API on port: {:?}", port.clone());
 
+    let relay_arc = Arc::new(relay2.clone());
+
     let mut routes = hello
         .or(seeds)
         .or(trust)
@@ -656,6 +659,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         // .or(explorer_hash)
         // .or(explorer_recent)
         .or(explorer::server::explorer_specific_routes(relay2.clone()))
+        .or(v1_api_routes(relay_arc))
         .or(home);
 
     // Create a warp Service using the filter
@@ -688,6 +692,8 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             .run(addr)
             .await;
     // };
+     relay2.node_config.network.to_std_string().print();
+
     Ok(server)
 }
 
