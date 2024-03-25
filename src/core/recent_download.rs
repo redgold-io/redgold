@@ -42,6 +42,8 @@ impl RecentDownload {
             if store {
                 counter!("redgold.recent_download.accepted_transactions").increment(1);
                 // TODO: Determine time from seed or peers view.
+                // TODO: TransactionWriterHistorical invocation, where we only store UTXOs
+                // if we don't know about them?
                 self.relay.ds.transaction_store.insert_transaction(
                     &update.parent_transaction,
                     update.parent_transaction.time()?.clone(),
