@@ -49,14 +49,22 @@ pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> 
     let net_str = p0.network.to_std_string();
 
     let latest = get_backup_latest_path(p0).await?;
+    if latest.is_none() {
+        return Ok(());
+    }
+    let latest = latest.expect("latest");
     let mp_csv = latest.join("multiparty.csv");
 
     let mut ssh = DeployMachine::new(&server, None);
     let remote_mp_import_path = format!("/root/.rg/{}/multiparty-import.csv", net_str);
     let local_backup_path = mp_csv.to_str().expect("").to_string();
 
+    let contents = tokio::fs::read_to_string(&local_backup_path)
+        .await
+        .error_info("Failed to read multiparty csv")?;
+
     println!("Copying {} to {}", local_backup_path, remote_mp_import_path);
-    ssh.copy(&local_backup_path, remote_mp_import_path).await.expect("");
+    ssh.copy(&contents, remote_mp_import_path).await.expect("");
 
     // This was the original command used for making the csv export
     // let cmd = format!(
@@ -83,7 +91,7 @@ pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> 
     Ok(())
 }
 
-async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<PathBuf> {
+async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<Option<PathBuf>> {
     let secure_or = p0.secure_or().by_env(p0.network);
     let bk = secure_or.backups();
 
@@ -99,8 +107,8 @@ async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<PathBuf> {
     }
     paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
 
-    let latest = paths.last().expect("No backup found");
-    Ok(latest.clone())
+    let latest = paths.last().cloned();
+    Ok(latest)
 }
 
 
@@ -185,12 +193,12 @@ pub async fn debug_fix_server() {
     restore_multiparty_share(r.node_config.clone(), s.clone()).await.expect("");
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn manual_parse_test() {
     let r = Relay::dev_default().await;
 
-    let latest = get_backup_latest_path(r.node_config.clone()).await.expect("latest");
+    let latest = get_backup_latest_path(r.node_config.clone()).await.expect("latest").expect("latest");
     let mp_csv = latest.join("4");
     let mp_csv = mp_csv.join("multiparty.csv");
 
