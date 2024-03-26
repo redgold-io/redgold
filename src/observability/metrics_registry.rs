@@ -6,11 +6,14 @@
 //! We demonstrate the various permutations of values that can be passed in the macro calls, all of
 //! which are documented in detail for the respective macro.
 
-use log::info;
+use std::net::SocketAddrV4;
+use log::{error, info};
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
-use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
 use std::sync::Arc;
+use tracing_subscriber::Registry;
+use redgold_schema::{EasyJson, ErrorInfoContext, RgResult};
 
 pub fn register_metric_names() {
     describe_counter!("redgold.p2p.request_peer_info", "");
@@ -156,10 +159,8 @@ impl HistogramFn for PrintHandle {
 //     metrics::set_boxed_recorder(Box::new(recorder)).unwrap()
 // }
 pub fn init_prometheus(port_offset: u16) {
-    let builder = PrometheusBuilder::new();
     use std::net::{Ipv4Addr, SocketAddrV4};
-    let socket = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port_offset - 1);
-    let socket_fallback = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port_offset - 2);
+
     // Normally, most users will want to "install" the exporter which sets it as the
     // global recorder for all `metrics` calls, and installs either an HTTP listener
     // when running as a scrape endpoint, or a simple asynchronous task which pushes
@@ -169,19 +170,40 @@ pub fn init_prometheus(port_offset: u16) {
     // exporter on that runtime, and otherwise, a new background thread will be
     // spawned which a Tokio single-threaded runtime is launched on to, where we then
     // finally launch the exporter:
-    let err = builder.with_http_listener(socket).install();
     // TODO: Change the port here by first parsing args associated with metrics / logs
-    if err.is_err() {
-        info!(
-            "Failed to install Prometheus exporter, falling back to {:?}",
-            socket_fallback
+    let addr_all = Ipv4Addr::new(0, 0, 0, 0);
+    let socket = SocketAddrV4::new(addr_all, port_offset - 1);
+    if let Err(e) = install_prometheus(socket) {
+        let socket_fallback = SocketAddrV4::new(addr_all, socket.port() - 1);
+        error!(
+            "Failed to install Prometheus exporter, falling back to {} {}",
+            socket_fallback,
+            e.json_or()
         );
-        let builder2 = PrometheusBuilder::new();
-        builder2
-            .with_http_listener(socket_fallback)
-            .install()
+        install_prometheus(socket_fallback)
             .expect("failed to install recorder/exporter on fallback socket");
     }
+}
+
+fn install_prometheus(socket: SocketAddrV4) -> RgResult<()> {
+    // Use the custom registry with the PrometheusBuilder
+
+    let builder = PrometheusBuilder::new();
+    let result = with_buckets(builder).error_info("Failed to set buckets")?;
+    result
+        .with_http_listener(socket).install()
+        .error_info("Failed to install Prometheus exporter")
+}
+
+fn with_buckets(builder: PrometheusBuilder) -> Result<PrometheusBuilder, BuildError> {
+    Ok(builder
+        .set_buckets_for_metric(
+            Matcher::Full("redgold.transaction.size_bytes".to_string()),
+            &[0.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0])?
+        .set_buckets_for_metric(
+            Matcher::Full("redgold.peer.message.recent_transactions_request".to_string()),
+            &[0.0, 0.2, 0.8, 1.5, 3.0, 10.0, 100.0])?
+        )
 }
 
 enum MetricType {

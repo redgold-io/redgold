@@ -9,7 +9,7 @@ use itertools::Itertools;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
 use log::{debug, error, info, trace};
-use metrics::counter;
+use metrics::{counter, histogram};
 // use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
@@ -83,7 +83,8 @@ impl PeerRxEventHandler {
         let response_time_secs = pt.seconds();
 
         if pm.request.recent_transactions_request.is_some() {
-            info!("Recent transactions request took {} seconds", response_time_secs);
+            // info!("Recent transactions request took {} seconds", response_time_secs);
+            histogram!("redgold.peer.message.recent_transactions_request");
         }
 
         if let Some(c) = pm.response {

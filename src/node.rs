@@ -238,7 +238,6 @@ impl Node {
             ).await;
             join_handles.push(NamedHandle::new("ContentionConflictManager", handle));
 
-
         }
 
         join_handles.push(NamedHandle::new("DataDiscovery", stream_handlers::run_interval_fold(
