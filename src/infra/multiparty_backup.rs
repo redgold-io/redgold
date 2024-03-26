@@ -193,7 +193,7 @@ pub async fn debug_fix_server() {
     restore_multiparty_share(r.node_config.clone(), s.clone()).await.expect("");
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn manual_parse_test() {
     let r = Relay::dev_default().await;
