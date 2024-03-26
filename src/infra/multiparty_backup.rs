@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{ErrorInfoContext, from_hex, ProtoSerde, RgResult, SafeOption};
+use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{InitiateMultipartyKeygenRequest, NetworkEnvironment, PublicKey};
 use crate::core::relay::Relay;
@@ -53,17 +54,19 @@ pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> 
         return Ok(());
     }
     let latest = latest.expect("latest");
+    let latest = latest.join(server.index.to_string());
     let mp_csv = latest.join("multiparty.csv");
 
     let mut ssh = DeployMachine::new(&server, None);
     let remote_mp_import_path = format!("/root/.rg/{}/multiparty-import.csv", net_str);
     let local_backup_path = mp_csv.to_str().expect("").to_string();
+    println!("Copying {} to {}", local_backup_path.clone(), remote_mp_import_path);
 
     let contents = tokio::fs::read_to_string(&local_backup_path)
         .await
-        .error_info("Failed to read multiparty csv")?;
+        .error_info("Failed to read multiparty csv")
+        .add(local_backup_path)?;
 
-    println!("Copying {} to {}", local_backup_path, remote_mp_import_path);
     ssh.copy(&contents, remote_mp_import_path).await.expect("");
 
     // This was the original command used for making the csv export

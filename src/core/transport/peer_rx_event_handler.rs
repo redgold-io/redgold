@@ -26,7 +26,7 @@ use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use crate::data::download::process_download_request;
+use crate::data::download::{PerfTimer, process_download_request};
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
 use crate::schema::json;
@@ -50,6 +50,8 @@ impl PeerRxEventHandler {
         relay: Relay, pm: PeerMessage
         // , rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
+
+        let pt = PerfTimer::new();
         counter!("redgold.peer.message.received").increment(1);
 
         // This is important for some requests but not others, use in case by case basis
@@ -77,11 +79,21 @@ impl PeerRxEventHandler {
             .with_metadata(relay.node_metadata().await?)
             .with_auth(&relay.node_config.keypair())
             .verify_auth(Some(&relay.node_config.public_key())).expect("immediate verify");
+
+        let response_time_secs = pt.seconds();
+
+        if pm.request.recent_transactions_request.is_some() {
+            info!("Recent transactions request took {} seconds", response_time_secs);
+        }
+
         if let Some(c) = pm.response {
             // let _ser = response.clone().json_or();
             // let _peer = verified.clone().map(|p| p.short_id()).unwrap_or("unknown".to_string());
             // debug!("Sending response to peer {} contents {}", peer, ser);
-            c.send_rg_err(response).add("Send message to response channel failed in handle incoming message")
+            c.send_rg_err(response)
+                .add("Send message to response channel failed in handle incoming message")
+                .with_detail("response_time_secs", response_time_secs.to_string())
+                .with_detail("request", pm.request.json_or())
                 .log_error().ok();
         }
 
@@ -130,7 +142,7 @@ impl PeerRxEventHandler {
         }
 
         if let Some(r) = &request.recent_transactions_request {
-            let from_mempool = relay.mempool_entries.iter().map(|t| t.hash_or()).collect_vec();
+            let from_mempool = relay.mempool_entries.clone().iter().map(|t| t.hash_or()).collect_vec();
             let in_process = relay.transaction_channels.iter().map(|c| c.transaction_hash.clone()).collect_vec();
             let accepted = relay.ds.transaction_store
                 .recent_transaction_hashes(r.limit, r.min_time).await?;
