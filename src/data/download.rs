@@ -183,6 +183,7 @@ Actual future download process should start with getting the current parquet par
 snapshot through IPFS for all the different data types. The compacted format.
 */
 pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> RgResult<()> {
+    let mut perf_timer = PerfTimer::new();
 
     // First bootstrap off UTXO set within peer distance
     let start_time = util::current_time_millis_i64();
@@ -219,37 +220,36 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
 
     batch_resolve_txs(&relay, missing_obs_hashes, &bootstrap_pks, true).await?;
 
-
-    let recent = relay.ds.transaction_store.query_recent_transactions(Some(1), None).await?;
-    let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
-
-    // Time slice by days backwards.
-    let mut no_data_count = 0;
-
-    // TODO: Not this, also a maximum earliest lookback period.
-    let bootstrap = bootstrap_pks.get(0).expect("bootstrap").clone();
-
-    if let Some(g_time) = download_genesis(&relay, bootstrap_pks).await? {
-        // Workaround to get genesis currently valid UTXOs
-        download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
-    }
-
-    let mut cur_end = start_time;
-
-    let mut perf_timer = PerfTimer::new();
-
-    while no_data_count < 3 && cur_end > min_time{
-        let prev_day = cur_end - 1000 * 60 * 60 * 24;
-
-        let got_data = download_all(&relay, prev_day, cur_end, &bootstrap).await?;
-
-        if got_data {
-            no_data_count = 0;
-        } else {
-            no_data_count += 1;
-        }
-        cur_end = prev_day;
-    }
+    //
+    // let recent = relay.ds.transaction_store.query_recent_transactions(Some(1), None).await?;
+    // let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
+    //
+    // // Time slice by days backwards.
+    // let mut no_data_count = 0;
+    //
+    // // TODO: Not this, also a maximum earliest lookback period.
+    // let bootstrap = bootstrap_pks.get(0).expect("bootstrap").clone();
+    //
+    // if let Some(g_time) = download_genesis(&relay, bootstrap_pks).await? {
+    //     // Workaround to get genesis currently valid UTXOs
+    //     download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
+    // }
+    //
+    // let mut cur_end = start_time;
+    //
+    //
+    // while no_data_count < 3 && cur_end > min_time{
+    //     let prev_day = cur_end - 1000 * 60 * 60 * 24;
+    //
+    //     let got_data = download_all(&relay, prev_day, cur_end, &bootstrap).await?;
+    //
+    //     if got_data {
+    //         no_data_count = 0;
+    //     } else {
+    //         no_data_count += 1;
+    //     }
+    //     cur_end = prev_day;
+    // }
 
     let secs = perf_timer.millis() / 1000;
     gauge!("redgold.download.time_seconds").set(secs as f64);
