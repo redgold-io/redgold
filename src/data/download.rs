@@ -142,7 +142,7 @@ pub async fn download_all(
     Ok(got_data)
 }
 
-struct PerfTimer {
+pub struct PerfTimer {
     start: std::time::Instant,
     latest: std::time::Instant,
     map: std::collections::HashMap<String, i64>,
@@ -173,6 +173,12 @@ impl PerfTimer {
         let millis = elapsed.as_millis() as i64;
         millis
     }
+
+    pub fn seconds(&self) -> f64 {
+        let elapsed = self.start.elapsed();
+        elapsed.as_secs_f64()
+    }
+
 }
 
 /**

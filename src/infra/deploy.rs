@@ -447,16 +447,16 @@ pub async fn deploy_ops_services(
 
     ssh.exes(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), p).await?;
 
-    tokio::time::sleep(Duration::from_secs(15)).await;
+    tokio::time::sleep(Duration::from_secs(25)).await;
 
     let kibana_setup_path = format!("{}/kibana_setup.sh", remote_path);
     ssh.copy(
         include_str!("../resources/infra/ops_services/kibana_setup.sh"),
-        kibana_setup_path
+        kibana_setup_path.clone()
     ).await?;
 
-    ssh.exes(format!("chmod +x {}; {}", remote_path, remote_path), p).await?;
-
+    ssh.exes(format!("chmod +x {}", kibana_setup_path.clone()), p).await?;
+    ssh.exes(format!("{}", kibana_setup_path), p).await?;
 
     Ok(())
 }

@@ -21,7 +21,7 @@ impl IntervalFold for DataDiscovery {
                 limit: None,
                 min_time: None
             });
-            let res = self.relay.send_message_async(&r, &node, Some(Duration::from_secs(5))).await?;
+            let res = self.relay.send_message_async(&r, &node, Some(Duration::from_secs(60))).await?;
             let res = res.recv_async_err().await?;
             if let Some(res) = res.recent_discovery_transactions_response {
                 for h in res.transaction_hashes {
