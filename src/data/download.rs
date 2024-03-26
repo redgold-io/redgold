@@ -220,6 +220,12 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
 
     batch_resolve_txs(&relay, missing_obs_hashes, &bootstrap_pks, true).await?;
 
+    // Force genesis configuration
+    if let Some(g_time) = download_genesis(&relay, bootstrap_pks).await? {
+        // Workaround to get genesis currently valid UTXOs
+        // download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
+    }
+
     //
     // let recent = relay.ds.transaction_store.query_recent_transactions(Some(1), None).await?;
     // let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
@@ -230,10 +236,7 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
     // // TODO: Not this, also a maximum earliest lookback period.
     // let bootstrap = bootstrap_pks.get(0).expect("bootstrap").clone();
     //
-    // if let Some(g_time) = download_genesis(&relay, bootstrap_pks).await? {
-    //     // Workaround to get genesis currently valid UTXOs
-    //     download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
-    // }
+
     //
     // let mut cur_end = start_time;
     //
