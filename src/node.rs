@@ -244,17 +244,8 @@ impl Node {
         join_handles.push(NamedHandle::new("DataDiscovery", stream_handlers::run_interval_fold(
             DataDiscovery {
                 relay: relay.clone(),
-            }, Duration::from_secs(60), false
+            }, Duration::from_secs(300), false
         ).await));
-
-
-        // TODO: Change all join handles to a single vec![] instantiation?
-        join_handles.push(NamedHandle::new("DataDiscovery", stream_handlers::run_interval_fold(
-            DataDiscovery {
-                relay: relay.clone(),
-            }, Duration::from_secs(60), false
-        ).await));
-
 
         join_handles
     }
