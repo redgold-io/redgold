@@ -21,6 +21,7 @@ use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
+use crate::infra::multiparty_backup::restore_multiparty_share;
 use crate::node_config::NodeConfig;
 use crate::resources::Resources;
 use crate::util::cli::arg_parse_config::ArgTranslate;
@@ -692,6 +693,8 @@ pub async fn default_deploy(
             let words_read = std::fs::read_to_string(words_path).expect("offline info");
             words_opt = Some(words_read);
         }
+
+        restore_multiparty_share(node_config.clone(), ss.clone()).await?;
 
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None);
