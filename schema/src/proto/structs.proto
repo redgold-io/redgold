@@ -744,6 +744,7 @@ message ResolveHashResponse {
 
 
 enum DownloadDataType {
+  // May be able to remove
   UTXO_ENTRY = 0;
   TRANSACTION_ENTRY = 1;
   OBSERVATION_ENTRY = 2;
@@ -752,6 +753,11 @@ enum DownloadDataType {
   // Currently unsupported
   BLOCK_ENTRY = 4;
   SNAPSHOT_ENTRY = 5;
+  // Beginning of download process
+  UTXO_HASH = 6;
+  // Historical transactions / archival data
+  TRANSACTION_HASH = 7;
+  OBSERVATION_TX_HASH = 8;
 }
 
 message DownloadRequest {
@@ -759,6 +765,7 @@ message DownloadRequest {
     uint64 end_time = 2;
     DownloadDataType data_type = 3;
     optional uint64 offset = 4;
+    PartitionInfo partition_info = 5;
 }
 
 // Only used temporarily for download, not reliable 'time' value
@@ -778,6 +785,7 @@ message DownloadResponse {
   repeated ObservationEntry observations = 3;
   repeated ObservationEdge observation_edges = 4;
   bool complete_response = 5;
+  repeated Hash hashes = 6;
 }
 
 message GetPeersInfoRequest {
@@ -889,6 +897,15 @@ message GetPartiesInfoRequest {
 
 }
 
+message BatchTransactionResolveRequest {
+  repeated Hash hashes = 1;
+  optional bool is_observation = 2;
+}
+
+message BatchTransactionResolveResponse {
+  repeated TransactionEntry transactions = 1;
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -922,6 +939,7 @@ message Request {
   FaucetRequest faucet_request = 30;
   GetPartiesInfoRequest get_parties_info_request = 31;
   optional string origin = 32;
+  BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
 }
 
 message HealthResponse {
@@ -968,6 +986,7 @@ message Response {
   Transaction genesis_response = 21;
   FaucetResponse faucet_response = 22;
   GetPartiesInfoResponse get_parties_info_response = 23;
+  BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
 }
 
 message PartyMember {

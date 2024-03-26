@@ -655,7 +655,7 @@ impl Relay {
     }
 
     // TODO: add timeout
-    pub async fn send_message_sync(&self, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
+    pub async fn send_message_await_response(&self, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
         let timeout = timeout.unwrap_or(Duration::from_secs(60));
         let (s, r) = flume::unbounded::<Response>();
         let mut pm = PeerMessage::from_pk(&request, &node.clone());
@@ -663,8 +663,6 @@ impl Relay {
         self.peer_message_tx.sender.send_rg_err(pm)?;
         let res = tokio::time::timeout(timeout, r.recv_async_err()).await
             .map_err(|e| error_info(e.to_string()))??;
-        // Is this necessary?? Or have we already handled this elsewhere?
-        // res.verify_auth(&node)
         Ok(res)
     }
 
@@ -790,7 +788,7 @@ impl Relay {
         let mut request = Request::empty();
         request.lookup_transaction_request = Some(h.clone());
         for p in peers {
-            let res = self.send_message_sync(request.clone(), p, Some(Duration::from_secs(10))).await;
+            let res = self.send_message_await_response(request.clone(), p, Some(Duration::from_secs(10))).await;
             if let Ok(r) = res {
                 if let Some(t) = r.lookup_transaction_response {
                     if &t.hash_or() == h {

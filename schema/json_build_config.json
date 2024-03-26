@@ -8,6 +8,8 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "structs.BatchTransactionResolveRequest",
+        "structs.BatchTransactionResolveResponse",
         "structs.GenesisRequest",
         "structs.PartyMember",
         "structs.PartyInfo",
@@ -204,6 +206,7 @@
       "attr": "#[serde(skip_serializing_if = \"Option::is_none\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
       "paths": [
         "structs.Input.product_id",
+        "structs.Request.batch_transaction_resolve_request",
         "structs.Input.floating_utxo_id",
         "structs.TransportInfo.external_ipv6",
         "structs.Input.input_type",

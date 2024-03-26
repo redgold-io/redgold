@@ -231,6 +231,15 @@ impl NodeConfig {
         self.seeds.iter().flat_map(|s| s.public_key.clone()).collect()
     }
 
+    pub fn non_self_seeds(&self) -> Vec<Seed> {
+        self.seeds.iter().filter(|s| s.public_key != Some(self.public_key())).cloned().collect()
+    }
+
+    pub fn non_self_seeds_pk(&self) -> Vec<PublicKey> {
+        self.seeds.iter().filter(|s| s.public_key != Some(self.public_key())).cloned()
+            .flat_map(|s| s.public_key).collect()
+    }
+
     pub fn secure_or(&self) -> &DataFolder {
         match &self.secure_data_folder {
             Some(folder) => folder,

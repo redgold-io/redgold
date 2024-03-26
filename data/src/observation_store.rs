@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use redgold_keys::TestConstants;
-use redgold_schema::structs::{ErrorInfo, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction};
+use redgold_schema::structs::{ErrorInfo, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction, TransactionEntry};
 use redgold_schema::{ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, util, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -109,6 +110,20 @@ impl ObservationStore {
         Ok(res)
     }
 
+    pub async fn accepted_time_observation_hashes(
+        &self,
+        start: i64,
+        end: i64
+    ) -> RgResult<Vec<Hash>> {
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT hash FROM observation WHERE time >= ?1 AND time < ?2"#,
+            start,
+            end
+        ).fetch_all(&mut *self.ctx.pool().await?)
+            .await)?.into_iter().flat_map(|row| row.hash.map(|h| Hash::new(h))).collect_vec();
+        Ok(rows)
+    }
+
     pub async fn query_observation(&self, hash: &Hash) -> RgResult<Option<Transaction>> {
         let hash = hash.safe_bytes()?;
         let rows =  DataStoreContext::map_err_sqlx(sqlx::query!(
@@ -120,6 +135,20 @@ impl ObservationStore {
         )?;
         let option = rows
             .map(|row| Transaction::proto_deserialize(row.raw)).transpose();
+        option
+    }
+
+    pub async fn query_observation_entry(&self, hash: &Hash) -> RgResult<Option<TransactionEntry>> {
+        let hash = hash.safe_bytes()?;
+        let rows =  DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw, time FROM observation WHERE hash = ?1"#,
+            hash
+        ).fetch_optional(&mut *self.ctx.pool().await?).await)?;
+        let option = rows
+            .map(|row| Transaction::proto_deserialize(row.raw).map(|t| TransactionEntry{
+                transaction: Some(t),
+                time: row.time as u64
+            })).transpose();
         option
     }
 

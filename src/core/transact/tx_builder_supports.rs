@@ -366,7 +366,7 @@ impl TransactionBuilder {
                     if a.currency_or() == SupportedCurrency::Redgold && a.amount > MIN_RDG_SATS_FEE {
                         a.amount -= MIN_RDG_SATS_FEE;
                         found_fee = true;
-                        info!("builder Found fee deduction");
+                        // info!("builder Found fee deduction");
                         break;
                     }
                 }
