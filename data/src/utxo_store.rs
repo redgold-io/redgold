@@ -134,4 +134,19 @@ impl UtxoStore {
             .iter().map(|row| UtxoEntry::proto_deserialize_ref(&row.raw)).collect()
     }
 
+
+    pub async fn utxo_tx_hashes_time(
+        &self,
+        start: i64,
+        end: i64
+    ) -> RgResult<Vec<Hash>> {
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT DISTINCT transaction_hash FROM utxo WHERE time >= ?1 AND time < ?2"#,
+            start,
+            end
+        ).fetch_all(&mut *self.ctx.pool().await?).await)?
+            .into_iter()
+            .map(|row| Hash::new(row.transaction_hash)).collect_vec())
+    }
+
 }

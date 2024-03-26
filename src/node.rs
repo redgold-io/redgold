@@ -338,10 +338,12 @@ impl Node {
             };
 
 
-            let seeds = all_seeds.iter().filter(|s| s.public_key != Some(node_config.public_key())).collect_vec();
+            let seeds = relay.node_config.non_self_seeds();
 
             let seed_results = stream::iter(seeds)
-                .then(|seed| Self::query_seed(&relay, &node_config, seed))
+                .then(|seed| {
+                    Self::query_seed(&relay, &node_config, seed)
+                })
                 .filter_map(|x| async {
                     let res = x.ok();
                     if res.is_none() {
@@ -389,7 +391,7 @@ impl Node {
         return Ok(node);
     }
 
-    async fn query_seed(relay: &Relay, node_config: &NodeConfig, seed: &Seed) -> Result<PeerNodeInfo, ErrorInfo> {
+    async fn query_seed(relay: &Relay, node_config: &NodeConfig, seed: Seed) -> Result<PeerNodeInfo, ErrorInfo> {
         let api_port = seed.port_or(node_config.port_offset) + 1;
         let client = PublicClient::from(seed.external_address.clone(), api_port, Some(relay.clone()));
         info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, api_port);

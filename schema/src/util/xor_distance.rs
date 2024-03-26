@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use crate::RgResult;
 use crate::structs::{Hash, NodeMetadata, PartitionInfo, PublicKey};
 
 pub fn xor_distance(v1: &Vec<u8>, v2: &Vec<u8>) -> i64 {
@@ -38,6 +39,18 @@ pub fn xorfc_hash(query_hash: &Hash, pk: &PublicKey) -> i64 {
     let query_hash = query_hash.vec();
     let pk_bytes = pk.bytes().expect("bytes");
     xorf_conv_distance(&query_hash, &pk_bytes)
+}
+
+pub trait XorDistancePartitionInfo {
+    fn tx_hash_distance(&self, hash: &Hash, pk: &PublicKey) -> bool;
+}
+
+impl XorDistancePartitionInfo for Option<PartitionInfo> {
+     fn tx_hash_distance(&self, hash: &Hash, pk: &PublicKey) -> bool {
+        let d = xorfc_hash(hash, &pk);
+        self.as_ref().and_then(|pi| pi.transaction_hash.as_ref())
+            .map(|d_max| &d < d_max).unwrap_or(true)
+    }
 }
 
 pub trait XorfConvDistanceSubset<T> {

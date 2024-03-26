@@ -17,7 +17,7 @@ use tokio::task::JoinHandle;
 use redgold_schema::{error_info, json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
 
 use crate::api::about;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
@@ -38,7 +38,7 @@ use crate::api::faucet::faucet_request;
 use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::logging::Loggable;
 use crate::observability::metrics_help::WithMetrics;
-
+use redgold_schema::structs::BatchTransactionResolveResponse;
 pub struct PeerRxEventHandler {
     relay: Relay,
     // rt: Arc<Runtime>
@@ -90,7 +90,7 @@ impl PeerRxEventHandler {
     }
 
 
-    pub async fn request_response(relay: Relay, request: Request, _verified: RgResult<PublicKey>
+    pub async fn request_response(relay: Relay, request: Request, verified: RgResult<PublicKey>
                                   // , arc: Arc<Runtime>
     ) -> RgResult<Response> {
 
@@ -233,7 +233,7 @@ impl PeerRxEventHandler {
 
         if let Some(download_request) = request.download_request {
             // info!("Received download request");
-            let result = process_download_request(&relay, download_request).await?;
+            let result = process_download_request(&relay, download_request, verified.as_ref().ok()).await?;
             response.download_response = Some(result);
         }
 
@@ -242,9 +242,31 @@ impl PeerRxEventHandler {
             response.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
         }
 
+        if let Some(r) = request.batch_transaction_resolve_request {
+            let h: Vec<Hash> = r.hashes.clone();
+            let mut resp = vec![];
+            for hh in h.iter() {
+                // TODO: Remove this after historical obs tx also in tx db.
+                if r.is_observation.unwrap_or(false) {
+                    if let Some(tx) = relay.ds.observation.query_observation_entry(hh).await? {
+                        resp.push(tx)
+                    }
+                } else {
+                    let res = relay.ds.transaction_store.accepted_tx_time(hh).await?;
+                    if let Some(tx) = res {
+                        resp.push(tx)
+                    }
+                }
+            }
+            let res = BatchTransactionResolveResponse {
+                transactions: resp
+            };
+            response.batch_transaction_resolve_response = Some(res);
+        }
+
         // Verified requests only below here
         if auth_required {
-            match _verified {
+            match verified {
                 Ok(pk) => {
                     if let Some(r) = &request.initiate_keygen {
                         // TODO Track future with loop poll pattern

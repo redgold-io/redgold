@@ -74,6 +74,21 @@ impl TransactionStore {
         Ok(res)
     }
 
+    pub async fn accepted_time_tx_hashes(
+        &self,
+        start: i64,
+        end: i64
+    ) -> RgResult<Vec<Hash>> {
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT hash FROM transactions WHERE time >= ?1 AND time < ?2 AND accepted = 1"#,
+            start,
+            end
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?.into_iter().map(|row| Hash::new(row.hash)).collect_vec();
+        Ok(rows)
+    }
+
     pub async fn query_time_transaction_accepted_ordered(
         &self,
         start: i64,
@@ -261,6 +276,26 @@ impl TransactionStore {
         }
         let option = res.get(0).map(|x| x.clone());
         Ok(option)
+    }
+
+    pub async fn accepted_tx_time(
+        &self,
+        transaction_hash: &Hash,
+    ) -> RgResult<Option<TransactionEntry>> {
+        let bytes = transaction_hash.safe_bytes()?;
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT raw, time FROM transactions WHERE hash = ?1 AND accepted=1"#,
+            bytes
+        )
+            .fetch_optional(&mut *self.ctx.pool().await?)
+            .await)?
+            .map(|r| Transaction::proto_deserialize(r.raw)
+                .map(|t| TransactionEntry {
+                    time: r.time as u64,
+                    transaction: Some(t),
+                })
+            ).transpose();
+        rows
     }
 
     pub async fn transaction_known(
