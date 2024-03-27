@@ -1201,11 +1201,11 @@ impl IntervalFold for DepositWatcher {
             let min_seeds = if self.relay.node_config.network.is_local_debug() {
                 3
             } else {
-                4
+                3
             };
 
             if seeds.len() <= min_seeds {
-                error!("Not enough seeds to initiate MP keygen");
+                error!("Not enough seeds to initiate MP keygen {} {}", seeds.len(), seeds.json_or());
                 return Ok(())
             }
 
