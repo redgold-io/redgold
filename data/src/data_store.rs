@@ -17,9 +17,9 @@ use crate::mp_store::MultipartyStore;
 use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry};
+use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
 
 use crate::schema::structs::{
     Address, ErrorInfo,
@@ -56,10 +56,16 @@ impl DataStore {
 
         counter!("redgold_transaction_accept_called").increment(1);
 
+        let mut option: Option<&mut sqlx::Transaction<'_, Sqlite>> = None;
         // let mut pool = self.ctx.pool().await?;
         // let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;
-        let mut sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>> = None;
-        let result = self.accept_transaction_inner(tx, time, rejection_reason, update_utxo, sqlite_tx).await;
+        // let option = Some(&mut sqlite_tx);
+        let result = self
+            .accept_transaction_inner(tx, time, rejection_reason.clone(), update_utxo, option).await
+            .with_detail("transaction", tx.json_or())
+            .with_detail("rejection_reason", rejection_reason.json_or())
+            .with_detail("time", time.to_string())
+            .with_detail("update_utxo", update_utxo.to_string());
         result
         // match result {
         //     Ok(_) => {
@@ -77,7 +83,7 @@ impl DataStore {
         tx: &Transaction, time: i64, rejection_reason: Option<ErrorInfo>, update_utxo: bool,
         mut sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>) -> RgResult<()> {
         self.insert_transaction(
-            tx, time, rejection_reason.clone(), update_utxo, None
+            tx, time, rejection_reason.clone(), update_utxo, sqlite_tx
         ).await?;
 
         if rejection_reason.is_none() {
@@ -104,13 +110,13 @@ impl DataStore {
         if update_utxo && rejection_reason.is_none() {
             for entry in UtxoEntry::from_transaction(tx, time.clone()) {
                 let id = entry.utxo_id.safe_get_msg("malfored utxoid on formation in insert transaction")?;
-                if self.utxo.utxo_child(id).await?.is_none() {
+                if self.utxo.utxo_children(id).await?.len() == 0 {
                     self.transaction_store.insert_utxo(&entry, None).await?;
                 }
             }
         }
         if rejection_reason.is_none() {
-            self.transaction_store.insert_transaction_indexes(&tx, time).await?;
+            self.insert_transaction_indexes(&tx, time).await?;
             gauge!("redgold.transaction.accepted.total").increment(1.0);
         } else {
             gauge!("redgold.transaction.rejected.total").increment(1.0);
@@ -119,6 +125,62 @@ impl DataStore {
         return Ok(i);
     }
 
+    pub async fn insert_transaction_indexes(&self, tx: &Transaction, time: i64) -> Result<(), ErrorInfo> {
+        let hash = &tx.hash_or();
+        for (i, input) in tx.inputs.iter().enumerate() {
+            if let Some(utxo) = &input.utxo_id {
+                self.insert_transaction_edge(
+                    utxo,
+                    &input.address()?,
+                    hash,
+                    i as i64,
+                    time
+                ).await?;
+                // Ensure UTXO deleted
+                self.utxo.delete_utxo(utxo).await?;
+                if self.utxo.utxo_id_valid(utxo).await? {
+                    return Err(error_info("UTXO not deleted"));
+                }
+                if self.utxo.utxo_children(utxo).await?.len() == 0 {
+                    return Err(error_info("UTXO has no children after insert"));
+                }
+
+            }
+        }
+        self.transaction_store.insert_address_transaction(tx).await?;
+        Ok(())
+    }
+
+
+    pub async fn insert_transaction_edge(
+        &self,
+        utxo_id: &UtxoId,
+        address: &Address,
+        child_transaction_hash: &Hash,
+        child_input_index: i64,
+        time: i64
+    ) -> Result<i64, ErrorInfo> {
+
+        let hash = utxo_id.transaction_hash.safe_get_msg("No transaction hash on utxo_id")?.vec();
+        let child_hash = child_transaction_hash.safe_bytes()?;
+        let output_index = utxo_id.output_index;
+        let address = address.address.safe_bytes()?;
+        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"
+        INSERT OR REPLACE INTO transaction_edge
+        (transaction_hash, output_index, address, child_transaction_hash, child_input_index, time)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+            hash,
+            output_index,
+            address,
+            child_hash,
+            child_input_index,
+            time
+        )
+            .execute(&mut *self.ctx.pool().await?)
+            .await)?;
+        Ok(rows.last_insert_rowid())
+    }
 
     pub async fn table_size(&self, table_name: impl Into<String>) -> RgResult<Vec<i64>> {
         let string = table_name.into();

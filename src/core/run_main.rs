@@ -6,8 +6,8 @@ use clap::Parser;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use log::{error, info};
-use metrics::counter;
-use redgold_schema::SafeOption;
+use metrics::{counter, gauge};
+use redgold_schema::{EasyJson, json_or, SafeOption};
 
 use redgold_schema::structs::ErrorInfo;
 
@@ -41,8 +41,11 @@ pub async fn main_from_args(opts: RgArgs) {
         crate::gui::initialize::attempt_start(node_config.clone()).await.expect("GUI to start");
         return;
     }
+    gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);
+    gauge!("redgold_start_fail", &node_config.gauge_id()).set(0);
 
     let relay = Relay::new(node_config.clone()).await;
+
 
     Node::prelim_setup(relay.clone()).await.expect("prelim");
 
@@ -52,25 +55,28 @@ pub async fn main_from_args(opts: RgArgs) {
     for jhi in join_handles {
         futures.push(jhi.result())
     }
-    match Node::from_config(relay).await {
+    let err = match Node::from_config(relay).await {
         Ok(n) => {
             info!("Node startup successful");
             let result = futures.next().await.ok_msg("No future result?").and_then(|e| e);
-            match result {
+            let str_res = match result {
                 Ok(e) => {
-                    error!("Some sub-service has terminated cleanly {}", e.clone());
-                    panic!("Some sub-service has terminated cleanly {}", e.clone());
+                    format!("Some sub-service has terminated cleanly {}", e.clone())
                 }
                 Err(e) => {
-                    error!("Main service error: {}", crate::schema::json(&e).expect("json render of error failed?"));
-                    panic!("Error in sub-service in main thread");
+                    format!("Error in sub-service in main thread: {}", e.json_or())
                 }
-            }
+            };
+            gauge!("redgold_service_crash", &node_config.gauge_id()).set(1.0);
+            format!("Node service crash failure: {}", str_res)
         }
         Err(e) => {
-            error!("Node startup failure: {}", crate::schema::json(&e).expect("json render of error failed?"));
+            gauge!("redgold_start_fail", &node_config.gauge_id()).set(1.0);
+            format!("Node startup failure: {}", e.json_or())
         }
-    }
+    };
+    error!("{}", err);
+    panic!("{}", err);
 }
 
 pub async fn main() {

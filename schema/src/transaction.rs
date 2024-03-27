@@ -293,6 +293,22 @@ impl Transaction {
         ).sum::<i64>()
     }
 
+    // TODO: Return as currency amount with plus operators
+    pub fn remainder_amount(&self) -> i64 {
+        let inputs = self.input_address_set();
+        self.outputs.iter().filter_map(|o| {
+            o.address.as_ref()
+                .filter(|&a| inputs.contains(a))
+                .and_then(|_| o.opt_amount())}
+        ).sum::<i64>()
+    }
+    pub fn fee_amount(&self) -> i64 {
+        self.outputs.iter()
+            .filter(|o| o.is_fee())
+            .flat_map(|o| o.opt_amount())
+            .sum::<i64>()
+    }
+
     pub fn first_output_external_txid(&self) -> Option<&ExternalTransactionId> {
         self.outputs
             .iter()

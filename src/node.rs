@@ -19,7 +19,7 @@ use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
 // use crate::api::p2p_io::rgnetwork::Event;
 // use crate::api::p2p_io::P2P;
-use crate::api::{RgHttpClient, public_api, explorer};
+use crate::api::{explorer, public_api, RgHttpClient};
 use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
 use crate::e2e::tx_submit::TransactionSubmitter;
@@ -27,14 +27,14 @@ use crate::core::{block_formation, stream_handlers};
 use crate::core::block_formation::BlockFormationProcess;
 use crate::core::observation::ObservationBuffer;
 use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
-use crate::core::transport::peer_rx_event_handler::{PeerRxEventHandler};
+use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::process_transaction::TransactionProcessContext;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use crate::data::download;
 use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::node_config::NodeConfig;
-use crate::schema::structs::{ ControlRequest, ErrorInfo, NodeState};
+use crate::schema::structs::{ControlRequest, ErrorInfo, NodeState};
 use crate::schema::{ProtoHashable, WithMetadataHashable};
 // use crate::trust::rewards::Rewards;
 use crate::{api, e2e, util};
@@ -65,7 +65,7 @@ use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use crate::observability::logging::Loggable;
-use crate::sanity::historical_parity;
+use crate::sanity::{historical_parity, migrations};
 
 /**
 * Node is the main entry point for the application /
@@ -264,7 +264,7 @@ impl Node {
 
         relay.ds.check_consistency_apply_fixes().await?;
 
-        historical_parity::apply_migrations(&relay).await
+        migrations::apply_migrations(&relay).await
             .log_error()
             .add("Historical parity manual migration failed")?;
 

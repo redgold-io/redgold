@@ -33,6 +33,9 @@
             <div><strong>First Amount</strong></div>
             <div>{{ hashData.info.first_amount }} RDG</div>
 
+            <div><strong>Remainder Amount</strong></div>
+            <div>{{ hashData.remainder_amount }} RDG</div>
+
             <div><strong>Total Amount</strong></div>
             <div>{{ hashData.info.amount }} RDG</div>
 

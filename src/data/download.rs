@@ -198,10 +198,13 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
         &relay, bootstrap_pks.clone(), start_time, DownloadDataType::UtxoHash
     ).await?;
 
+    gauge!("redgold_download_utxo_hashes", &relay.node_config.gauge_id()).set(utxo_hashes.len() as f64);
 
     // TODO: FP
 
     let missing_utxo_tx_hashes = filter_known_hashes(&relay, &utxo_hashes).await?;
+
+    gauge!("redgold_download_utxo_missing_hashes", &relay.node_config.gauge_id()).set(missing_utxo_tx_hashes.len() as f64);
 
     // Live UTXO transactions merged
     batch_resolve_txs(&relay, missing_utxo_tx_hashes, &bootstrap_pks, false).await?;
@@ -212,7 +215,11 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
         &relay, bootstrap_pks.clone(), start_time, DownloadDataType::TransactionHash
     ).await?;
 
+    gauge!("redgold_download_tx_hashes", &relay.node_config.gauge_id()).set(historical_tx_hashes.len() as f64);
+
     let missing_historical_tx_hashes = filter_known_hashes(&relay, &historical_tx_hashes).await?;
+
+    gauge!("redgold_download_tx_missing_hashes", &relay.node_config.gauge_id()).set(missing_historical_tx_hashes.len() as f64);
 
     batch_resolve_txs(&relay, missing_historical_tx_hashes, &bootstrap_pks, false).await?;
 
@@ -222,14 +229,18 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
         &relay, bootstrap_pks.clone(), start_time, DownloadDataType::ObservationTxHash
     ).await?;
 
+    gauge!("redgold_download_obs_hashes", &relay.node_config.gauge_id()).set(observation_hashes.len() as f64);
+
     let missing_obs_hashes = filter_known_observation_hashes(&relay, &observation_hashes).await?;
+
+    gauge!("redgold_download_obs_missing_hashes", &relay.node_config.gauge_id()).set(missing_obs_hashes.len() as f64);
 
     batch_resolve_txs(&relay, missing_obs_hashes, &bootstrap_pks, true).await?;
 
 
 
-    let recent = relay.ds.transaction_store.query_recent_transactions(Some(1), None).await?;
-    let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
+    // let recent = relay.ds.transaction_store.query_recent_transactions(Some(1), None).await?;
+    // let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
 
     // Time slice by days backwards.
     let mut no_data_count = 0;
@@ -240,28 +251,27 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
     // Force genesis configuration
     if let Some(g_time) = download_genesis(&relay, bootstrap_pks).await? {
         // Workaround to get genesis currently valid UTXOs
-        download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
+        // download_all(&relay, g_time - 1, g_time + 1, &bootstrap).await?;
     }
 
-
-    let mut cur_end = start_time;
-
-
-    while no_data_count < 3 && cur_end > min_time{
-        let prev_day = cur_end - 1000 * 60 * 60 * 24;
-
-        let got_data = download_all(&relay, prev_day, cur_end, &bootstrap).await?;
-
-        if got_data {
-            no_data_count = 0;
-        } else {
-            no_data_count += 1;
-        }
-        cur_end = prev_day;
-    }
-
+    //
+    // let mut cur_end = start_time;
+    //
+    // while no_data_count < 3 && cur_end > min_time{
+    //     let prev_day = cur_end - 1000 * 60 * 60 * 24;
+    //
+    //     let got_data = download_all(&relay, prev_day, cur_end, &bootstrap).await?;
+    //
+    //     if got_data {
+    //         no_data_count = 0;
+    //     } else {
+    //         no_data_count += 1;
+    //     }
+    //     cur_end = prev_day;
+    // }
+    //
     let secs = perf_timer.millis() / 1000;
-    gauge!("redgold.download.time_seconds").set(secs as f64);
+    gauge!("redgold.download.time_seconds", &relay.node_config.gauge_id()).set(secs as f64);
     info!("Download time seconds {}", secs);
 
     Ok(())
@@ -411,7 +421,7 @@ async fn download_hashes_all_time(
     let mut hashes = HashSet::new();
 
     while no_data_count < 3 {
-        let prev = cur_end - 1000 * 60 * 60 * 24 * 20; // 20 days per request
+        let prev = cur_end - 1000 * 60 * 60 * 24 * 5; // 5 days per request
 
         let response = download_msg(
             &r, prev, cur_end, download_data_type, pk.clone()

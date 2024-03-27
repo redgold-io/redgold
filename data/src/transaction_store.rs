@@ -462,37 +462,6 @@ impl TransactionStore {
     }
 // TODO: Add productId to utxo amount
 
-
-    pub async fn insert_transaction_edge(
-        &self,
-        utxo_id: &UtxoId,
-        address: &Address,
-        child_transaction_hash: &Hash,
-        child_input_index: i64,
-        time: i64
-    ) -> Result<i64, ErrorInfo> {
-
-        let hash = utxo_id.transaction_hash.safe_get_msg("No transaction hash on utxo_id")?.vec();
-        let child_hash = child_transaction_hash.safe_bytes()?;
-        let output_index = utxo_id.output_index;
-        let address = address.address.safe_bytes()?;
-        let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
-            r#"
-        INSERT OR REPLACE INTO transaction_edge
-        (transaction_hash, output_index, address, child_transaction_hash, child_input_index, time)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
-            hash,
-            output_index,
-            address,
-            child_hash,
-            child_input_index,
-            time
-        )
-            .execute(&mut *self.ctx.pool().await?)
-            .await)?;
-        Ok(rows.last_insert_rowid())
-    }
-
     pub async fn utxo_used(
         &self,
         utxo_id: &UtxoId,
@@ -666,20 +635,6 @@ impl TransactionStore {
     }
 
 
-    pub(crate) async fn insert_transaction_indexes(&self, tx: &&Transaction, time: i64) -> Result<(), ErrorInfo> {
-        for (i, x) in tx.inputs.iter().enumerate() {
-            if let Some(utxo) = &x.utxo_id {
-                self.insert_transaction_edge(
-                    utxo,
-                    &x.address()?,
-                    &tx.hash_or(),
-                    i as i64,
-                    time.clone()).await?;
-            }
-        }
-        self.insert_address_transaction(tx).await?;
-        Ok(())
-    }
     //
     // // This doesn't seem to work correctly, not returning proper xor
     // pub async fn xor_transaction_order(&self, hash: &Hash) -> RgResult<Vec<(Vec<u8>, Vec<u8>)>> {

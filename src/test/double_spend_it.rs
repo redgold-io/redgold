@@ -1,6 +1,7 @@
+use itertools::Itertools;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{EasyJson, ErrorInfoContext, SafeOption};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SubmitTransactionResponse};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::public_api::PublicClient;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
@@ -49,15 +50,24 @@ pub async fn double_spend_debug() {
                     sic.port_or(nc.port_offset) + 1,
                     None
                 );
-                pc.send_transaction(&tb, true).await.json_or()
+                pc.send_transaction(&tb, true).await
             });
             res.push(results);
         }
-        let results = futures::future::join_all(res).await;
-
+        let results = futures::future::join_all(res).await
+            .into_iter().flat_map(|r| r.error_info("join error")).collect_vec();
+        let success_count = results.iter().filter(|r| r.is_ok()).count();
         for x in results {
-            x.error_info("Join error").json_or().print();
+            match x {
+                Ok(r) => {
+                    println!("success: {}", r.json_or());
+                }
+                Err(_) => {
+                    println!("error: {}", x.json_or());
+                }
+            }
         }
+        assert_eq!(success_count, 1);
 
     }
 }

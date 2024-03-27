@@ -11,7 +11,7 @@ pub trait SchemaValidationSupport {
 }
 
 const DUST_LIMIT : i64 = 1000;
-
+const MAX_TX_BYTE_SIZE: usize = 100_000;
 impl SchemaValidationSupport for Transaction  {
 
     fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()> {
@@ -26,7 +26,8 @@ impl SchemaValidationSupport for Transaction  {
         self.pow_validate()?;
 
         let size_bytes = self.proto_serialize().len();
-        if size_bytes > 10_000 {
+
+        if size_bytes > MAX_TX_BYTE_SIZE {
             let mut info = error_info(format!("Transaction size: {} too large, expected {}", size_bytes, 10_000));
             info.with_detail("size_bytes", size_bytes.to_string());
             Err(info)?;

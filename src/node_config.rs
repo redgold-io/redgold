@@ -307,6 +307,10 @@ impl NodeConfig {
         self.public_key().hex()?.short_string()
     }
 
+    pub fn gauge_id(&self) -> [(String, String); 1] {
+        [("public_key".to_string(), self.short_id().expect("short id"))]
+    }
+
     pub fn version_info(&self) -> VersionInfo {
         VersionInfo{
             executable_checksum: self.executable_checksum.clone().unwrap_or("".to_string()),

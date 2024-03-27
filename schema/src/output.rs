@@ -113,6 +113,10 @@ impl Output {
         self.data.as_ref().and_then(|c| c.liquidity_request.as_ref()).is_some()
     }
 
+    pub fn is_fee(&self) -> bool {
+        self.output_type == Some(OutputType::Fee as i32)
+    }
+
     pub fn utxo_entry(
         &self,
         transaction_hash: &Hash,

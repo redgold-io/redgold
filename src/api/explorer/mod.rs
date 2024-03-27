@@ -17,7 +17,7 @@ use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Serialize, Deserialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use tokio::time::Instant;
 use tracing::trace;
@@ -46,11 +46,11 @@ pub struct BriefTransaction {
     pub from: String,
     pub to: String,
     pub amount: f64,
-    pub fee: f64,
     pub bytes: i64,
     pub timestamp: i64,
     pub first_amount: f64,
-    pub is_test: bool
+    pub is_test: bool,
+    pub fee: i64
 }
 
 
@@ -119,7 +119,10 @@ pub struct DetailedTransaction {
     pub outputs: Vec<DetailedOutput>,
     pub rejection_reason: Option<ErrorInfo>,
     pub signable_hash: String,
-    pub raw_transaction: Transaction
+    pub raw_transaction: Transaction,
+    // pub first_amount: f64,
+    pub remainder_amount: f64,
+    // pub fee_amount: i64,
 }
 
 
@@ -746,6 +749,7 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
         rejection_reason: t.rejection_reason.clone(),
         signable_hash: tx.signable_hash().hex(),
         raw_transaction: tx.clone(),
+        remainder_amount: CurrencyAmount::from(tx.remainder_amount()).to_fractional(),
     };
     Ok(detailed)
 }
@@ -760,7 +764,7 @@ fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
             .unwrap_or("".to_string()),
         to: tx.first_output_address().safe_get_msg("Missing output address")?.render_string()?,
         amount: tx.total_output_amount_float(),
-        fee: 0f64, // Replace with find fee address?
+        fee: tx.fee_amount(),
         bytes: tx.proto_serialize().len() as i64,
         timestamp: tx.struct_metadata.clone().and_then(|s| s.time).safe_get_msg("Missing tx timestamp")?.clone(),
         first_amount: tx.first_output_amount().safe_get_msg("Missing first output amount")?.clone(),
