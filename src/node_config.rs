@@ -171,6 +171,8 @@ pub struct NodeConfig {
     pub check_observations_done_poll_interval: Duration,
     pub check_observations_done_poll_attempts: u64,
     pub seeds: Vec<Seed>,
+    pub manually_added_seeds: Vec<Seed>,
+    pub ignore_default_seeds: bool,
     pub executable_checksum: Option<String>,
     pub disable_auto_update: bool,
     pub auto_update_poll_interval: Duration,
@@ -204,7 +206,7 @@ pub struct NodeConfig {
 impl NodeConfig {
 
     pub fn seed_addresses(&self) -> Vec<Address> {
-        self.seeds.iter()
+        self.seeds_now().iter()
             .flat_map(|s| s.peer_id.as_ref())
             .flat_map(|p| p.peer_id.as_ref())
             .flat_map(|p| p.address().ok())
@@ -212,11 +214,19 @@ impl NodeConfig {
     }
 
     pub fn seeds_at(&self, time: i64) -> Vec<Seed> {
-        get_seeds_by_env_time(&self.network, time)
+        // TODO: Merge with CLI option seeds, allow disabling also
+        let mut all_seeds = vec![];
+        let hardcoded_seeds = get_seeds_by_env_time(&self.network, time);
+        if !self.ignore_default_seeds {
+            all_seeds.extend(hardcoded_seeds);
+        }
+        all_seeds.extend(self.seeds.clone());
+        all_seeds.iter().unique().cloned().collect_vec()
     }
 
+    // This may cause a problem with manually configured seeds
     pub fn seeds_now(&self) -> Vec<Seed> {
-        get_seeds_by_env_time(&self.network, util::current_time_millis_i64())
+        self.seeds_at(util::current_time_millis_i64())
     }
 
     pub fn seeds_now_pk(&self) -> Vec<Seed> {
@@ -228,15 +238,15 @@ impl NodeConfig {
     }
 
     pub fn seeds_pk(&self) -> Vec<structs::PublicKey> {
-        self.seeds.iter().flat_map(|s| s.public_key.clone()).collect()
+        self.seeds_now().iter().flat_map(|s| s.public_key.clone()).collect()
     }
 
     pub fn non_self_seeds(&self) -> Vec<Seed> {
-        self.seeds.iter().filter(|s| s.public_key != Some(self.public_key())).cloned().collect()
+        self.seeds_now().iter().filter(|s| s.public_key != Some(self.public_key())).cloned().collect()
     }
 
     pub fn non_self_seeds_pk(&self) -> Vec<PublicKey> {
-        self.seeds.iter().filter(|s| s.public_key != Some(self.public_key())).cloned()
+        self.seeds_now().iter().filter(|s| s.public_key != Some(self.public_key())).cloned()
             .flat_map(|s| s.public_key).collect()
     }
 
@@ -497,6 +507,8 @@ impl NodeConfig {
             check_observations_done_poll_interval: Duration::from_secs(1),
             check_observations_done_poll_attempts: 3,
             seeds: vec![],
+            manually_added_seeds: vec![],
+            ignore_default_seeds: false,
             executable_checksum: None,
             disable_auto_update: false,
             auto_update_poll_interval: Duration::from_secs(60),

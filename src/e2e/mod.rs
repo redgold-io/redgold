@@ -144,7 +144,7 @@ use crate::node_config::NodeConfig;
 impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
 
-        let seed_addrs = self.relay.node_config.seeds.iter()
+        let seed_addrs = self.relay.node_config.seeds_now().iter()
             .flat_map(|s| s.peer_id.as_ref())
             .flat_map(|p| p.peer_id.as_ref())
             .flat_map(|p| p.address().ok())

@@ -25,7 +25,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::EasyJson;
-use redgold_schema::seeds::get_seeds_by_env;
+use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
 
@@ -478,13 +478,32 @@ impl ArgTranslate {
     }
     async fn configure_seeds(&mut self) {
 
-        let seeds = get_seeds_by_env(&self.node_config.network);
+        let seeds = get_seeds_by_env_time(&self.node_config.network, util::current_time_millis_i64());
         for seed in seeds {
-            self.node_config.seeds.push(seed);
+            if !self.node_config.ignore_default_seeds {
+                self.node_config.seeds.push(seed);
+            }
         }
 
-
         let port = self.node_config.public_port();
+
+        if let Some(a) = &self.opts.seed_address {
+            let default_port = self.node_config.network.default_port_offset();
+            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            info!("Adding seed from command line arguments {a}:{port}");
+            // TODO: replace this with the other seed class.
+            let cli_seed_arg = Seed {
+                external_address: a.clone(),
+                environments: vec![self.node_config.network as i32],
+                port_offset: Some(port as u32),
+                trust: vec![TrustData::from_label(1.0)],
+                peer_id: None, // Some(self.node_config.peer_id()),
+                public_key: None, //Some(self.node_config.public_key()),
+            };
+            self.node_config.seeds.push(cli_seed_arg.clone());
+            self.node_config.manually_added_seeds.push(cli_seed_arg);
+        }
+
         // Enrich keys for missing seed info
         if self.is_node() {
             for seed in self.node_config.seeds.iter_mut() {
@@ -513,35 +532,9 @@ impl ArgTranslate {
                 }
             }
         }
-        let mut remove_index = vec![];
-        for (i, seed) in self.node_config.seeds.iter().enumerate() {
-            if let Some(pk) = &seed.public_key {
-                if &self.node_config.public_key() == pk {
-                    info!("Removing self from seeds");
-                    remove_index.push(i);
-                }
-            }
-        }
-        for i in remove_index {
-            self.node_config.seeds.remove(i);
-        }
-
+        // We should enrich this too
         // TODO: Test config should pass ids so we get ids for local_test
-        if let Some(a) = &self.opts.seed_address {
 
-            let default_port = self.node_config.network.default_port_offset();
-            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
-            info!("Adding seed from command line arguments {a}:{port}");
-            // TODO: replace this with the other seed class.
-            self.node_config.seeds.push(Seed {
-                external_address: a.clone(),
-                environments: vec![self.node_config.network as i32],
-                port_offset: Some(port as u32),
-                trust: vec![TrustData::from_label(1.0)],
-                peer_id: None, // Some(self.node_config.peer_id()),
-                public_key: None, //Some(self.node_config.public_key()),
-            });
-        }
 
 
     }

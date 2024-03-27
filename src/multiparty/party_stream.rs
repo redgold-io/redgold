@@ -339,7 +339,8 @@ impl PartyEvents {
         let mut n = Self::new(pk_address, relay);
         // transactions
 
-        let seeds = relay.node_config.seeds.iter().flat_map(|s| s.public_key.clone()).collect_vec();
+        // TODO: Seeds at time
+        let seeds = relay.node_config.seeds_now().iter().flat_map(|s| s.public_key.clone()).collect_vec();
 
         // First get all transactions associated with the address, both incoming or outgoing.
 

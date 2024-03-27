@@ -41,6 +41,7 @@ use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
 use redgold_schema::errors::EnhanceErrorInfo;
 use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
+use crate::core::transact::tx_validate::TransactionValidator;
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::observability::logging::Loggable;
 
@@ -326,10 +327,7 @@ impl TransactionProcessContext {
         }
 
         // Validate obvious schema related errors / local errors requiring no other context information
-        transaction.validate_keys(Some(&self.relay.node_config.network))?;
-
-        transaction.validate_signatures()?;
-
+        transaction.validate(Some(&self.relay.node_config.seed_addresses()), Some(&self.relay.node_config.network))?;
         Ok(())
 
     }

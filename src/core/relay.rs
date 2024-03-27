@@ -315,7 +315,7 @@ impl Relay {
             }
         }
 
-        let seed_scores = self.node_config.seeds.iter().filter_map(|s|
+        let seed_scores = self.node_config.seeds_now().iter().filter_map(|s|
             s.peer_id.clone().map(|p| (p, s.trust.get(0).map(|t| t.label()).unwrap_or(0.8)))
         ).collect::<HashMap<PeerId, f64>>();
 
@@ -330,13 +330,13 @@ impl Relay {
     }
 
     pub async fn is_seed(&self, pk: &PublicKey) -> bool {
-        self.node_config.seeds.iter()
+        self.node_config.seeds_now().iter()
             .filter(|s| s.public_key.as_ref().filter(|&p| p == pk).is_some())
             .next().is_some()
     }
 
     pub async fn seed_trust(&self, pk: &PublicKey) -> Option<Vec<TrustData>> {
-        self.node_config.seeds.iter()
+        self.node_config.seeds_now().iter()
             .filter(|s| s.public_key.as_ref().filter(|&p| p == pk).is_some())
             .next().map(|s| s.trust.clone())
     }
