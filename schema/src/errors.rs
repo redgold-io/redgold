@@ -42,6 +42,8 @@ pub trait EnhanceErrorInfo<T> {
     fn mark_abort(self) -> RgResult<T>;
     fn bubble_abort(self) -> RgResult<RgResult<T>>;
     fn with_detail(self, k: impl Into<String>, v: impl Into<String>) -> RgResult<T>;
+    fn with_detail_fn<F>(self, k: impl Into<String>, v: impl Fn() -> F) -> RgResult<T>
+    where F: Into<String> + Sized;
 }
 
 impl<T> EnhanceErrorInfo<T> for RgResult<T> {
@@ -69,6 +71,15 @@ impl<T> EnhanceErrorInfo<T> for RgResult<T> {
 
     fn with_detail(self, k: impl Into<String>, v: impl Into<String>) -> RgResult<T> {
         self.map_err(|mut e| {
+            e.with_detail(k, v);
+            e
+        })
+    }
+
+    fn with_detail_fn<F>(self, k: impl Into<String>, v: impl Fn() -> F) -> RgResult<T>
+    where F: Into<String> + Sized{
+        self.map_err(|mut e| {
+            let v = v().into();
             e.with_detail(k, v);
             e
         })

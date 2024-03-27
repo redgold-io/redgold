@@ -7,6 +7,7 @@ use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transact
 use redgold_schema::{EasyJson, from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
+use sqlx::Executor; // Make sure this is at the top of your file
 
 #[derive(Clone)]
 pub struct TransactionStore {
@@ -485,7 +486,7 @@ impl TransactionStore {
         tx: &Transaction,
         time: i64,
         rejection_reason: Option<ErrorInfo>,
-        sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
     ) -> Result<i64, ErrorInfo> {
         let rejection_ser = rejection_reason.clone().map(|x| x.json_or());
         let accepted = rejection_reason.is_none();
@@ -493,17 +494,15 @@ impl TransactionStore {
         let hash_vec = tx.hash_bytes()?;
         let ser = tx.proto_serialize();
 
-        let mut pool = self.ctx.pool().await?;
-        let rows = sqlx::query!(
+        // let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query_as!(
+                    sqlx::sqlite::SqliteQueryResult,
             r#"
         INSERT OR REPLACE INTO transactions
         (hash, raw, time, rejection_reason, accepted, is_test) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
            hash_vec, ser, time, rejection_ser, accepted, is_test
         )
-            .execute(match sqlite_tx {
-                Some(tx) => tx,
-                None => &mut *pool,
-            })
+            .execute(&mut **sqlite_tx)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -515,9 +514,10 @@ impl TransactionStore {
         address: &Address,
         tx_hash: &Hash,
         time: i64,
-        incoming: bool
+        incoming: bool,
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
     ) -> Result<i64, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
+        // let mut pool = self.ctx.pool().await?;
         let hash_vec = tx_hash.safe_bytes()?;
         let address_vec = address.address.safe_bytes()?;
         let rows = sqlx::query!(
@@ -526,7 +526,7 @@ impl TransactionStore {
         (address, tx_hash, time, incoming) VALUES (?1, ?2, ?3, ?4)"#,
            address_vec, hash_vec, time, incoming
         )
-            .execute(&mut *pool)
+            .execute(&mut **sqlite_tx)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
@@ -611,7 +611,7 @@ impl TransactionStore {
         Ok(0)
     }
 
-    pub async fn insert_address_transaction(&self, tx: &Transaction) -> RgResult<()> {
+    pub async fn insert_address_transaction(&self, tx: &Transaction, sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>) -> RgResult<()> {
         let mut addr_incoming = HashSet::new();
         let mut addr_outgoing = HashSet::new();
         for i in &tx.inputs {
@@ -624,10 +624,10 @@ impl TransactionStore {
         let time = tx.struct_metadata.as_ref().and_then(|s| s.time)
             .safe_get_msg("No time on transaction for insert_address_transaction")?.clone();
         for address in addr_incoming {
-            self.insert_address_transaction_single(&address, &hash, time.clone(), true).await?;
+            self.insert_address_transaction_single(&address, &hash, time.clone(), true, sqlite_tx).await?;
         }
         for address in addr_outgoing {
-            self.insert_address_transaction_single(&address, &hash, time.clone(), false).await?;
+            self.insert_address_transaction_single(&address, &hash, time.clone(), false, sqlite_tx).await?;
         }
 
         Ok(())
@@ -664,9 +664,9 @@ impl TransactionStore {
     pub async fn insert_utxo(
         &self,
         utxo_entry: &UtxoEntry,
-        sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
     ) -> Result<i64, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
+        // let mut pool = self.ctx.pool().await?;
         let id = utxo_entry.utxo_id.safe_get_msg("missing utxo id")?;
         let hash = id.transaction_hash.safe_bytes()?;
         let output_index = id.output_index;
@@ -678,7 +678,7 @@ impl TransactionStore {
         let address = addr.address.safe_bytes()?;
 
         let has_code = output.validate_deploy_code().is_ok();
-        let rows = sqlx::query!(
+        let qry = sqlx::query!(
             r#"
         INSERT OR REPLACE INTO utxo (transaction_hash, output_index,
         address, output, time, amount, raw, has_code) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
@@ -690,11 +690,9 @@ impl TransactionStore {
             amount,
             raw,
             has_code
-        )
-            .execute(match sqlite_tx {
-                Some(tx) => tx,
-                None => &mut *pool,
-            })
+        );
+        let rows = qry
+            .execute(&mut **sqlite_tx)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         gauge!("redgold.utxo.total").increment(1.0);
