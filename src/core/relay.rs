@@ -197,6 +197,12 @@ impl Relay {
         Ok(())
     }
 
+    pub async fn mark_peer_send_success(&self, pk: &PublicKey) -> RgResult<()> {
+        let mut l = self.peer_send_failures.safe_lock().await?;
+        l.remove(pk);
+        Ok(())
+    }
+
     pub fn check_rate_limit(&self, ip: &String) -> RgResult<bool> {
         let mut l = self.faucet_rate_limiter.lock()
             .map_err(|e| error_info(format!("Failed to lock faucet_rate_limiter {}", e.to_string())))?;
