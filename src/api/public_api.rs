@@ -556,17 +556,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             }
         });
 
-    let tmp_relay = relay.clone();
-    let seeds = warp::get()
-        .and(warp::path("seeds"))
-        .and_then(move || {
-            let relay3 = tmp_relay.clone();
-            async move {
-                let ps: RgResult<Vec<Seed>> = Ok(relay3.node_config.seeds);
-                as_warp_json_response(ps)
-            }
-        });
-
     let bin_relay = relay.clone();
 
     let request_normal = warp::post()
@@ -609,31 +598,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             };
             result
         });
-    //
-    // let explorer_relay = relay.clone();
-    // let explorer_hash = warp::get()
-    //     .and(warp::path("explorer"))
-    //     .and(warp::path("hash"))
-    //     .and(warp::path::param())
-    //     .and(warp::query::<Pagination>())
-    //     .and_then(move |hash: String, pagination: Pagination| {
-    //         let relay3 = explorer_relay.clone();
-    //         async move {
-    //             as_warp_json_response( explorer::handle_explorer_hash(hash, relay3.clone(), pagination).await)
-    //         }
-    //     }).with(warp::cors().allow_any_origin());  // add this line to enable CORS;
-    //
-    //
-    // let explorer_relay2 = relay.clone();
-    // let explorer_recent = warp::get()
-    //     .and(warp::path("explorer"))
-    //     .and_then(move || {
-    //         let relay3 = explorer_relay2.clone();
-    //         async move {
-    //             as_warp_json_response( explorer::handle_explorer_recent(relay3.clone()).await)
-    //         }
-    //     })
-    //     .with(warp::cors().allow_any_origin());  // add this line to enable CORS;
 
     let port = relay2.node_config.public_port();
     // info!("Running public API on port: {:?}", port.clone());
@@ -641,7 +605,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     let relay_arc = Arc::new(relay2.clone());
 
     let mut routes = hello
-        .or(seeds)
         .or(trust)
         .or(peer_tx)
         .or(node_tx)

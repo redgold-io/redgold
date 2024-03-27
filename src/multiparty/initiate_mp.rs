@@ -72,7 +72,13 @@ pub async fn initiate_mp_keygen(
                     default_identifier(relay.clone()).await?
                 }
                 Some(pks) => {
-                    default_half_identifier(pks).await?
+                    let non_self_pks = pks.iter()
+                        .filter(|&pk| pk != &relay.node_config.public_key())
+                        .cloned()
+                        .collect_vec();
+                    let mut ids_pks = vec![relay.node_config.public_key()];
+                    ids_pks.extend(non_self_pks);
+                    default_half_identifier(ids_pks).await?
                 }
             }
         }

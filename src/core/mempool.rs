@@ -15,6 +15,7 @@ use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;
+use crate::observability::logging::Loggable;
 use crate::util;
 
 pub struct Mempool {
@@ -92,17 +93,16 @@ pub struct MempoolEntry {
 #[async_trait]
 impl IntervalFold for Mempool {
     async fn interval_fold(&mut self) -> RgResult<()> {
-        gauge!("redgold_mempool_size").set(self.heap.len() as f64);
         let messages = self.relay.mempool.recv_while()?;
         gauge!("redgold_mempool_messages_recv").set(self.heap.len() as f64);
 
-        let addrs = self.relay.node_config.seeds.iter()
-            .filter_map(|s| s.public_key.as_ref())
-            .filter_map(|s| s.address().ok())
-            .collect_vec();
+        let addrs = self.relay.node_config.seed_addresses();
         for message in messages {
 
-            match self.verify_and_form_entry(&addrs, &message).await.bubble_abort()? {
+            match self.verify_and_form_entry(&addrs, &message)
+                .await
+                .log_error()
+                .bubble_abort()? {
                 Err(e) => {
                     counter!("redgold_mempool_rejected").increment(1);
                     // TODO: Why does this break the E2E test?
@@ -119,6 +119,8 @@ impl IntervalFold for Mempool {
                 }
             }
         }
+        gauge!("redgold_mempool_size").set(self.heap.len() as f64);
+
         loop {
             let option = self.pop();
             if let Some(entry) = option {

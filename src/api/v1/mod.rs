@@ -133,9 +133,17 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
                 api_data.relay.ds.table_sizes().await
             });
 
+    let seeds = warp::get()
+        .with_v1()
+        .and(warp::path("seeds"))
+        .with_relay_and_ip(r.clone())
+        .and_then_as(move |api_data: ApiData| async move {
+            Ok(api_data.relay.node_config.seeds_now())
+        });
 
     hello
         .or(table_sizes)
+        .or(seeds)
 }
 
 

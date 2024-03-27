@@ -15,7 +15,7 @@ pub async fn double_spend_debug() {
     let network = NetworkEnvironment::Dev;
     let nc = NodeConfig::default_env(network).await;
 
-    let seed = nc.seeds.get(0).cloned().expect("seed address");
+    let seed = nc.seeds_now().get(0).cloned().expect("seed address");
 
     if let Some((_privk, keypair)) = dev_ci_kp() {
         let pk = keypair.public_key();
@@ -32,7 +32,7 @@ pub async fn double_spend_debug() {
         let single_utxo_amount = single_utxo.amount() as i64;
         let amt = CurrencyAmount::from(single_utxo_amount);
         let mut res = vec![];
-        for si in &nc.seeds {
+        for si in &nc.seeds_now() {
             let sic = si.clone();
             let addr = si.clone().public_key.expect("").address().expect("");
             let s_utxo = single_utxo.clone();
