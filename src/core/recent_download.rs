@@ -47,21 +47,21 @@ impl RecentDownload {
                     None,
                     true
                 ).await?;
-
-                for u in &update.parent_transaction.utxo_outputs().unwrap_or(vec![]) {
-                    if let Some(id) = &u.utxo_id {
-                        if self.relay.ds.transaction_store.utxo_used(id).await?.is_none() {
-                            let valid = self.relay.utxo_id_valid_peers(id).await?;
-                            // TODO: Check the conflict manager to see if this UTXO is under contention?
-                            if valid.is_none() {
-                                self.relay.ds.transaction_store.insert_utxo(u, None).await?;
-                                if !(self.relay.utxo_channels.contains_key(id)) {
-                                    self.relay.ds.transaction_store.insert_utxo(u, None).await?;
-                                }
-                            }
-                        }
-                    }
-                }
+                //
+                // for u in &update.parent_transaction.utxo_outputs().unwrap_or(vec![]) {
+                //     if let Some(id) = &u.utxo_id {
+                //         if self.relay.ds.transaction_store.utxo_used(id).await?.is_none() {
+                //             let valid = self.relay.utxo_id_valid_peers(id).await?;
+                //             // TODO: Check the conflict manager to see if this UTXO is under contention?
+                //             if valid.is_none() {
+                //                 self.relay.ds.transaction_store.insert_utxo(u, None).await?;
+                //                 if !(self.relay.utxo_channels.contains_key(id)) {
+                //                     self.relay.ds.transaction_store.insert_utxo(u, None).await?;
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
 
                 // TODO: Check all UTXOs and see if they are in range and known
 

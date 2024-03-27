@@ -52,95 +52,95 @@ pub async fn download_msg(
     response.as_error_info()?;
     response.download_response.ok_msg("Missing download response")
 }
-
-pub async fn download_all(
-    relay: &Relay,
-    start_time: i64,
-    end_time: i64,
-    key: &structs::PublicKey,
-) -> Result<bool, ErrorInfo> {
-
-    let mut got_data = false;
-
-    if let Ok(dr) = download_msg(
-        &relay,
-        start_time,
-        end_time,
-        DownloadDataType::UtxoEntry,
-        key.clone(),
-    ).await.log_error().with_err_count("redgold.download.utxo_error") {
-        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
-        let utxo_entries = dr.utxo_entries;
-        counter!("redgold.download.utxo").increment(utxo_entries.len() as u64);
-        for utxo in utxo_entries {
-            if let Some(utxo_id) = utxo.utxo_id.as_ref() {
-                got_data = true;
-                if !relay.utxo_channels.contains_key(utxo_id) {
-                    relay.ds.transaction_store.insert_utxo(&utxo, None).await.with_err_count("redgold.download.utxo_insert_error").ok();
-                }
-            }
-        }
-    }
-
-    if let Ok(dr) = download_msg(
-        &relay,
-        start_time,
-        end_time,
-        DownloadDataType::TransactionEntry,
-        key.clone(),
-    ).await.log_error().with_err_count("redgold.download.transaction_error") {
-        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
-        let txs = dr.transactions;
-        counter!("redgold.download.transaction").increment(txs.len() as u64);
-        for txe in txs {
-            if let Some(tx) = txe.transaction.as_ref() {
-                got_data = true;
-                if !relay.transaction_known(&tx.calculate_hash()).await? {
-                    relay
-                        .write_transaction(&tx, txe.time as i64, None, true)
-                        .await?;
-                }
-            }
-        }
-    }
-
-    if let Ok(dr) = download_msg(
-        &relay,
-        start_time,
-        end_time,
-        DownloadDataType::ObservationEntry,
-        key.clone(),
-    ).await.log_error().with_err_count("redgold.download.observation_error") {
-        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
-        let obes = dr.observations;
-        counter!("redgold.download.observation").increment(obes.len() as u64);
-        for obe in obes {
-            got_data = true;
-            if let Some(tx) = obe.observation.as_ref() {
-                relay.ds.observation.insert_observation_and_edges(tx).await
-                    .with_err_count("redgold.download.observation_insert_error").ok();;
-            }
-        }
-    }
-
-    if let Ok(dr) = download_msg(
-        &relay,
-        start_time,
-        end_time,
-        DownloadDataType::ObservationEdgeEntry,
-        key.clone(),
-    ).await.log_error().with_err_count("redgold.download.observation_edge_error") {
-        // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
-        let obes = dr.observation_edges;
-        counter!("redgold.download.observation").increment(obes.len() as u64);
-        for obe in obes {
-            got_data = true;
-            relay.ds.observation.insert_observation_edge(&obe).await
-                .with_err_count("redgold.download.oe_insert_error").ok();;
-        }
-    }
-    Ok(got_data)
-}
+//
+// pub async fn download_all(
+//     relay: &Relay,
+//     start_time: i64,
+//     end_time: i64,
+//     key: &structs::PublicKey,
+// ) -> Result<bool, ErrorInfo> {
+//
+//     let mut got_data = false;
+//
+//     if let Ok(dr) = download_msg(
+//         &relay,
+//         start_time,
+//         end_time,
+//         DownloadDataType::UtxoEntry,
+//         key.clone(),
+//     ).await.log_error().with_err_count("redgold.download.utxo_error") {
+//         // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+//         let utxo_entries = dr.utxo_entries;
+//         counter!("redgold.download.utxo").increment(utxo_entries.len() as u64);
+//         for utxo in utxo_entries {
+//             if let Some(utxo_id) = utxo.utxo_id.as_ref() {
+//                 got_data = true;
+//                 if !relay.utxo_channels.contains_key(utxo_id) {
+//                     relay.ds.transaction_store.insert_utxo(&utxo, None).await.with_err_count("redgold.download.utxo_insert_error").ok();
+//                 }
+//             }
+//         }
+//     }
+//
+//     if let Ok(dr) = download_msg(
+//         &relay,
+//         start_time,
+//         end_time,
+//         DownloadDataType::TransactionEntry,
+//         key.clone(),
+//     ).await.log_error().with_err_count("redgold.download.transaction_error") {
+//         // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+//         let txs = dr.transactions;
+//         counter!("redgold.download.transaction").increment(txs.len() as u64);
+//         for txe in txs {
+//             if let Some(tx) = txe.transaction.as_ref() {
+//                 got_data = true;
+//                 if !relay.transaction_known(&tx.calculate_hash()).await? {
+//                     relay
+//                         .write_transaction(&tx, txe.time as i64, None, true)
+//                         .await?;
+//                 }
+//             }
+//         }
+//     }
+//
+//     if let Ok(dr) = download_msg(
+//         &relay,
+//         start_time,
+//         end_time,
+//         DownloadDataType::ObservationEntry,
+//         key.clone(),
+//     ).await.log_error().with_err_count("redgold.download.observation_error") {
+//         // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+//         let obes = dr.observations;
+//         counter!("redgold.download.observation").increment(obes.len() as u64);
+//         for obe in obes {
+//             got_data = true;
+//             if let Some(tx) = obe.observation.as_ref() {
+//                 relay.ds.observation.insert_observation_and_edges(tx).await
+//                     .with_err_count("redgold.download.observation_insert_error").ok();;
+//             }
+//         }
+//     }
+//
+//     if let Ok(dr) = download_msg(
+//         &relay,
+//         start_time,
+//         end_time,
+//         DownloadDataType::ObservationEdgeEntry,
+//         key.clone(),
+//     ).await.log_error().with_err_count("redgold.download.observation_edge_error") {
+//         // TODO: Change this to include peer observations as well to determine if it's sufficient to accept.
+//         let obes = dr.observation_edges;
+//         counter!("redgold.download.observation").increment(obes.len() as u64);
+//         for obe in obes {
+//             got_data = true;
+//             relay.ds.observation.insert_observation_edge(&obe).await
+//                 .with_err_count("redgold.download.oe_insert_error").ok();;
+//         }
+//     }
+//     Ok(got_data)
+// }
 
 pub struct PerfTimer {
     start: std::time::Instant,

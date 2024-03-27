@@ -43,7 +43,7 @@ pub async fn apply_migrations(relay: &Relay) -> RgResult<()> {
 async fn safe_remove_transaction_utxos(relay: &Relay, hash: &Hash) -> RgResult<()> {
     let ids = find_all_transaction_and_children_utxo_ids(relay, hash).await?;
     for utxo_id in ids {
-        let num_rows = relay.ds.utxo.delete_utxo(&utxo_id).await?;
+        let num_rows = relay.ds.utxo.delete_utxo(&utxo_id, None).await?;
         info!("Migration removed {} rows for utxo_id: {}", num_rows, utxo_id.json_or());
         let valid = relay.ds.utxo.utxo_id_valid(&utxo_id).await?;
         if !valid {
@@ -116,7 +116,7 @@ async fn remove_utxos(relay: &Relay, raw_utxos: &str, name: String) -> RgResult<
     let utxos = raw_utxos.to_string().json_from::<Vec<UtxoId>>()?;
 
     for utxo_id in utxos {
-        let num_rows = relay.ds.utxo.delete_utxo(&utxo_id).await?;
+        let num_rows = relay.ds.utxo.delete_utxo(&utxo_id, None).await?;
         info!("{name} remove_utxos.json direct Migration removed {} rows for utxo_id: {}", num_rows, utxo_id.json_or());
         let valid = relay.ds.utxo.utxo_id_valid(&utxo_id).await?;
         if !valid {

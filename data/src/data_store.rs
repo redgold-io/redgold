@@ -56,40 +56,39 @@ impl DataStore {
 
         counter!("redgold_transaction_accept_called").increment(1);
 
-        let mut option: Option<&mut sqlx::Transaction<'_, Sqlite>> = None;
-        // let mut pool = self.ctx.pool().await?;
-        // let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;
-        // let option = Some(&mut sqlite_tx);
+        let mut pool = self.ctx.pool().await?;
+        let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;
         let result = self
-            .accept_transaction_inner(tx, time, rejection_reason.clone(), update_utxo, option).await
-            .with_detail("transaction", tx.json_or())
+            .accept_transaction_inner(tx, time, rejection_reason.clone(), update_utxo, &mut sqlite_tx).await
+            .with_detail_fn("transaction", || tx.json_or())
             .with_detail("rejection_reason", rejection_reason.json_or())
             .with_detail("time", time.to_string())
             .with_detail("update_utxo", update_utxo.to_string());
-        result
-        // match result {
-        //     Ok(_) => {
-        //         sqlite_tx.commit().await.error_info("Sqlite commit failure")?;
-        //         Ok(())
-        //     }
-        //     Err(e) => {
-        //         sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or())
-        //     }
-        // }
+        // result
+        match result {
+            Ok(_) => {
+                sqlite_tx.commit().await.error_info("Sqlite commit failure")?;
+                Ok(())
+            }
+            Err(e) => {
+                sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or())
+            }
+        }
     }
 
     async fn accept_transaction_inner(
         &self,
         tx: &Transaction, time: i64, rejection_reason: Option<ErrorInfo>, update_utxo: bool,
-        mut sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>) -> RgResult<()> {
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
+    ) -> RgResult<()> {
         self.insert_transaction(
             tx, time, rejection_reason.clone(), update_utxo, sqlite_tx
         ).await?;
 
         if rejection_reason.is_none() {
             for utxo_id in tx.input_utxo_ids() {
-                self.utxo.delete_utxo(utxo_id).await?;
-                if self.utxo.utxo_id_valid(utxo_id).await? {
+                self.utxo.delete_utxo(utxo_id, Some(sqlite_tx)).await?;
+                if self.utxo.utxo_id_valid_opt(utxo_id, Some(sqlite_tx)).await? {
                     return Err(error_info("UTXO not deleted"));
                 }
             }
@@ -104,19 +103,19 @@ impl DataStore {
         time: i64,
         rejection_reason: Option<ErrorInfo>,
         update_utxo: bool,
-        sqlite_tx: Option<&mut sqlx::Transaction<'_, Sqlite>>
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
     ) -> Result<i64, ErrorInfo> {
         let i = self.transaction_store.insert_transaction_raw(tx, time.clone(), rejection_reason.clone(), sqlite_tx).await?;
         if update_utxo && rejection_reason.is_none() {
             for entry in UtxoEntry::from_transaction(tx, time.clone()) {
-                let id = entry.utxo_id.safe_get_msg("malfored utxoid on formation in insert transaction")?;
-                if self.utxo.utxo_children(id).await?.len() == 0 {
-                    self.transaction_store.insert_utxo(&entry, None).await?;
+                let id = entry.utxo_id.safe_get_msg("malformed utxo_id on formation in insert transaction")?;
+                if self.utxo.utxo_children_pool_opt(id, Some(sqlite_tx)).await?.len() == 0 {
+                    self.transaction_store.insert_utxo(&entry, sqlite_tx).await?;
                 }
             }
         }
         if rejection_reason.is_none() {
-            self.insert_transaction_indexes(&tx, time).await?;
+            self.insert_transaction_indexes(&tx, time, sqlite_tx).await?;
             gauge!("redgold.transaction.accepted.total").increment(1.0);
         } else {
             gauge!("redgold.transaction.rejected.total").increment(1.0);
@@ -125,7 +124,12 @@ impl DataStore {
         return Ok(i);
     }
 
-    pub async fn insert_transaction_indexes(&self, tx: &Transaction, time: i64) -> Result<(), ErrorInfo> {
+    pub async fn insert_transaction_indexes(
+        &self,
+        tx: &Transaction,
+        time: i64,
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
+    ) -> Result<(), ErrorInfo> {
         let hash = &tx.hash_or();
         for (i, input) in tx.inputs.iter().enumerate() {
             if let Some(utxo) = &input.utxo_id {
@@ -134,20 +138,21 @@ impl DataStore {
                     &input.address()?,
                     hash,
                     i as i64,
-                    time
+                    time,
+                    sqlite_tx
                 ).await?;
                 // Ensure UTXO deleted
-                self.utxo.delete_utxo(utxo).await?;
-                if self.utxo.utxo_id_valid(utxo).await? {
+                self.utxo.delete_utxo(utxo, Some(sqlite_tx)).await?;
+                if self.utxo.utxo_id_valid_opt(utxo, Some(sqlite_tx)).await? {
                     return Err(error_info("UTXO not deleted"));
                 }
-                if self.utxo.utxo_children(utxo).await?.len() == 0 {
+                if self.utxo.utxo_children_pool_opt(utxo, Some(sqlite_tx)).await?.len() == 0 {
                     return Err(error_info("UTXO has no children after insert"));
                 }
 
             }
         }
-        self.transaction_store.insert_address_transaction(tx).await?;
+        self.transaction_store.insert_address_transaction(tx, sqlite_tx).await?;
         Ok(())
     }
 
@@ -158,7 +163,8 @@ impl DataStore {
         address: &Address,
         child_transaction_hash: &Hash,
         child_input_index: i64,
-        time: i64
+        time: i64,
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
     ) -> Result<i64, ErrorInfo> {
 
         let hash = utxo_id.transaction_hash.safe_get_msg("No transaction hash on utxo_id")?.vec();
@@ -177,7 +183,7 @@ impl DataStore {
             child_input_index,
             time
         )
-            .execute(&mut *self.ctx.pool().await?)
+            .execute(&mut **sqlite_tx)
             .await)?;
         Ok(rows.last_insert_rowid())
     }
