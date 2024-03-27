@@ -232,6 +232,7 @@ impl PeerRxEventHandler {
 
         if let Some(t) = request.gossip_transaction_request {
             if let Some(t) = t.transaction {
+                counter!("redgold_gossip_transaction_received").increment(1);
                 trace!("Received gossip transaction request for {}", &t.hash_or().hex());
                 relay.submit_transaction(SubmitTransactionRequest {
                     transaction: Some(t),

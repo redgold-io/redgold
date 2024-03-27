@@ -3,6 +3,7 @@ use std::collections::BinaryHeap;
 use async_trait::async_trait;
 use flume::{SendError, TrySendError};
 use itertools::Itertools;
+use metrics::{counter, gauge};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
@@ -14,6 +15,7 @@ use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;
+use crate::util;
 
 pub struct Mempool {
     relay: Relay,
@@ -90,7 +92,10 @@ pub struct MempoolEntry {
 #[async_trait]
 impl IntervalFold for Mempool {
     async fn interval_fold(&mut self) -> RgResult<()> {
+        gauge!("redgold_mempool_size").set(self.heap.len() as f64);
         let messages = self.relay.mempool.recv_while()?;
+        gauge!("redgold_mempool_messages_recv").set(self.heap.len() as f64);
+
         let addrs = self.relay.node_config.seeds.iter()
             .filter_map(|s| s.public_key.as_ref())
             .filter_map(|s| s.address().ok())
@@ -99,11 +104,16 @@ impl IntervalFold for Mempool {
 
             match self.verify_and_form_entry(&addrs, &message).await.bubble_abort()? {
                 Err(e) => {
+                    counter!("redgold_mempool_rejected").increment(1);
+                    self.relay.ds.accept_transaction(
+                        &message.transaction, util::current_time_millis_i64(), Some(e.clone()), false
+                    ).await?;
                     if let Some(r) = message.response_channel {
                         r.send_rg_err(Response::from_error_info(e))?;
                     }
                 }
                 Ok(entry) => {
+                    counter!("redgold_mempool_added").increment(1);
                     self.push(entry);
                 }
             }
@@ -111,8 +121,11 @@ impl IntervalFold for Mempool {
         loop {
             let option = self.pop();
             if let Some(entry) = option {
+                counter!("redgold_mempool_pop").increment(1);
                 match self.relay.transaction_process.sender.try_send(entry.transaction.clone()) {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        counter!("redgold_mempool_sent").increment(1);
+                    }
                     Err(e) => {
                         match e {
                             TrySendError::Full(_) => {

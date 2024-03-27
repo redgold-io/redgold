@@ -17,6 +17,7 @@ use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::{error, info};
+use metrics::counter;
 use tokio::runtime::Runtime;
 use tracing::trace;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
@@ -694,7 +695,9 @@ impl Relay {
     }
 
     pub async fn gossip(&self, tx: &Transaction) -> Result<(), ErrorInfo> {
+        counter!("redgold_gossip_outgoing").increment(1);
         let all = self.ds.peer_store.select_gossip_peers(tx).await?;
+        info!("Gossiping transaction to {} peers {}", all.len(), all.json_or());
         for p in all {
             let mut req = Request::default();
             let mut gtr = GossipTransactionRequest::default();
@@ -905,10 +908,11 @@ impl Relay {
         } else {
             None
         };
-        let tx = tx_req
+        let mut tx = tx_req
             .transaction
-            .safe_get_msg("Missing transaction field on submit request")?;
-        tx.calculate_hash();
+            .safe_get_msg("Missing transaction field on submit request")?
+            .clone();
+        tx.with_hash();
         // info!("Relay submitting transaction");
         self.mempool
             .send(TransactionMessage {

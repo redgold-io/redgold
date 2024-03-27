@@ -5,7 +5,7 @@ use std::sync::Arc;
 //use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::info;
-use metrics::gauge;
+use metrics::{counter, gauge};
 use sqlx::{Acquire, Sqlite, SqlitePool};
 use sqlx::{Row};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
@@ -53,6 +53,8 @@ impl DataStore {
                                     rejection_reason: Option<ErrorInfo>,
                                     update_utxo: bool
     ) -> RgResult<()> {
+
+        counter!("redgold_transaction_accept_called").increment(1);
 
         // let mut pool = self.ctx.pool().await?;
         // let mut sqlite_tx = DataStoreContext::map_err_sqlx(pool.begin().await)?;

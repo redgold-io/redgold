@@ -196,6 +196,8 @@ impl TransactionProcessContext {
     }
 
     async fn scoped_process_and_respond(&mut self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
+
+        counter!("redgold_process_transaction_called").increment(1);
         let request_uuid = Uuid::new_v4().to_string();
         let hex = transaction_message.transaction.calculate_hash().hex();
         let time = transaction_message.transaction.time().map(|x| x.clone()).unwrap_or(0);
@@ -270,10 +272,12 @@ impl TransactionProcessContext {
         match result_or_error {
             Ok(o) => {
                 metadata.success = true;
+                counter!("redgold_process_transaction_success").increment(1);
                 pr.submit_transaction_response = Some(o);
             }
             Err(ee) => {
                 metadata.success = false;
+                counter!("redgold_process_transaction_failure").increment(1);
                 metadata.error_info = Some(ee);
             }
         }
