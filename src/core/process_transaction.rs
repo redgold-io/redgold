@@ -270,15 +270,15 @@ impl TransactionProcessContext {
         let mut metadata = ResponseMetadata::default();
         // Change these to raw Response instead of public response
         let mut pr = structs::Response::default();
-        match result_or_error {
+        match result_or_error.log_error() {
             Ok(o) => {
                 metadata.success = true;
-                counter!("redgold_process_transaction_success").increment(1);
+                counter!("redgold_process_transaction_success", &self.relay.node_config.gauge_id()).increment(1);
                 pr.submit_transaction_response = Some(o);
             }
             Err(ee) => {
                 metadata.success = false;
-                counter!("redgold_process_transaction_failure").increment(1);
+                counter!("redgold_process_transaction_failure", &self.relay.node_config.gauge_id()).increment(1);
                 metadata.error_info = Some(ee);
             }
         }
@@ -327,7 +327,7 @@ impl TransactionProcessContext {
         }
 
         // Validate obvious schema related errors / local errors requiring no other context information
-        transaction.validate(Some(&self.relay.node_config.seed_addresses()), Some(&self.relay.node_config.network))?;
+        transaction.validate(Some(&self.relay.node_config.seed_peer_addresses()), Some(&self.relay.node_config.network))?;
         Ok(())
 
     }

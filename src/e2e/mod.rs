@@ -158,10 +158,10 @@ impl LiveE2E {
             seed_addrs.choose(&mut rng).ok_msg("No seed address")?.clone()
         };
 
-
         let map = Self::live_e2e_address_kps(
             &self.relay.node_config.words(), &self.relay.node_config.network
         )?;
+
         let spendable_utxos = Self::get_spendable_utxos(&self.relay.ds, map).await?;
         if spendable_utxos.is_empty() {
             return Ok(None);
@@ -172,12 +172,12 @@ impl LiveE2E {
         return Ok(Some(tx.clone()));
     }
 
-    pub fn build_live_tx(nc: &NodeConfig, destination_choice: Address, spendable_utxos: Vec<Option<SpendableUTXO>>) -> Result<Transaction, ErrorInfo> {
+    pub fn build_live_tx(nc: &NodeConfig, destination_choice: Address, spendable_utxos: Vec<SpendableUTXO>) -> Result<Transaction, ErrorInfo> {
         let mut tx_b = TransactionBuilder::new(&nc);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
-        let first_utxos = spendable_utxos.iter().take(100).flatten().cloned().collect_vec();
-
+        let first_utxos = spendable_utxos.iter().take(100).cloned().collect_vec();
+        // info!("Spendable utxos in E2E tx builder: {}", first_utxos.len());
         let mut tx_builder = tx_b;
         for u in &first_utxos {
             tx_builder.with_unsigned_input(u.utxo_entry.clone())?;
@@ -189,6 +189,9 @@ impl LiveE2E {
             .build()?;
 
         for u in &first_utxos {
+            // info!("Live E2E Signing address: {} UTXOEntry: {}",
+            //     u.key_pair.address_typed().render_string().expect(""),
+            //     u.utxo_entry.json_or());
             tx.sign(&u.key_pair)?;
         }
 
@@ -196,11 +199,15 @@ impl LiveE2E {
         Ok(tx)
     }
 
-    pub async fn get_spendable_utxos(ds: &DataStore, map: HashMap<Address, KeyPair>) -> Result<Vec<Option<SpendableUTXO>>, ErrorInfo> {
+    pub async fn get_spendable_utxos(ds: &DataStore, map: HashMap<Address, KeyPair>) -> Result<Vec<SpendableUTXO>, ErrorInfo> {
         let mut spendable_utxos = vec![];
         for (a, k) in map.iter() {
             let result = ds.transaction_store.query_utxo_address(a).await?;
-            let vec = result.iter().filter(|r| r.amount() > amount_to_raw_amount(1)).collect_vec();
+            // info!("UTXO query result address {}: {}", a.render_string().expect(""),  result.len());
+            let vec = result.iter()
+                .take(100)
+                // .filter(|r| r.amount() > amount_to_raw_amount(1))
+                .collect_vec();
             let mut err_str = format!("Address {}", a.render_string().expect(""));
             for u in vec {
                 if let Ok(id) = u.utxo_id() {
@@ -208,10 +215,10 @@ impl LiveE2E {
                     if ds.utxo.utxo_id_valid(id).await? {
                         let childs = ds.utxo.utxo_children(id).await?;
                         if childs.len() == 0 {
-                            spendable_utxos.push(Some(SpendableUTXO {
+                            spendable_utxos.push(SpendableUTXO {
                                 utxo_entry: u.clone(),
                                 key_pair: k.clone(),
-                            }));
+                            });
                         } else {
                             error!("UTXO has children not valid! {} children: {}", err_str, childs.json_or());
                         }
@@ -296,7 +303,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                     error!("Live E2E failure: {}", failure_msg.clone());
                     let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
                     if !c.failed_once || recovered {
-                        alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await?;
+                        alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await.log_error();
                     }
                     let failure_time = util::current_time_millis_i64();
                     c.num_success = 0;

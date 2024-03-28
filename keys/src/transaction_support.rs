@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use itertools::Itertools;
+use log::info;
 use redgold_schema::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
 use redgold_schema::structs::{Address, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
@@ -52,12 +54,18 @@ impl TransactionSupport for Transaction {
         Ok(x.clone())
     }
 
+    // Simple signing function, this won't work for multi-sig, construct separately
     fn sign(&mut self, key_pair: &KeyPair) -> RgResult<Transaction> {
+        let pk = key_pair.public_key();
         let hash = self.signable_hash();
         let addr = key_pair.address_typed();
         let mut signed = false;
         for i in self.inputs.iter_mut() {
             if let Some(o) = i.output.as_ref() {
+                if i.proof.iter().flat_map(|p| p.public_key.as_ref()).contains(&pk) {
+                    // info!("Already signed");
+                    continue;
+                }
                 let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
                 if &addr == input_addr {
                     let proof = Proof::from_keypair_hash(&hash, &key_pair);
@@ -66,9 +74,9 @@ impl TransactionSupport for Transaction {
                 }
             }
         }
-        if !signed {
-            return Err(error_info("Couldn't find appropriate input address to sign"));
-        }
+        // if !signed {
+        //     return Err(error_info("Couldn't find appropriate input address to sign"));
+        // }
         let x = self.with_hash();
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())

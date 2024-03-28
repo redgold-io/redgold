@@ -15,9 +15,9 @@ use uuid::Uuid;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use redgold_schema::{EasyJson, error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::{EasyJson, empty_public_request, error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -179,6 +179,18 @@ impl RgHttpClient {
         let response = self.proto_post_request(req, None, None).await?;
         response.genesis_response.ok_msg("Missing genesis response")
     }
+
+    // #[allow(dead_code)]
+    // pub async fn address_utxos(
+    //     &self,
+    //     addresses: Vec<Address>,
+    // ) -> Result<PublicResponse, ErrorInfo> {
+    //     let mut request = Request::default();
+    //     request.query_addresses_request = Some(QueryAddressesRequest {
+    //         addresses
+    //     });
+    //     self.proto_post_request(&request).await
+    // }
 
 
     #[allow(dead_code)]

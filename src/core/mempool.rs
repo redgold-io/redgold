@@ -96,7 +96,7 @@ impl IntervalFold for Mempool {
         let messages = self.relay.mempool.recv_while()?;
         gauge!("redgold_mempool_messages_recv").set(self.heap.len() as f64);
 
-        let addrs = self.relay.node_config.seed_addresses();
+        let addrs = self.relay.node_config.seed_peer_addresses();
         for message in messages {
 
             match self.verify_and_form_entry(&addrs, &message)

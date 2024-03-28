@@ -1,5 +1,6 @@
 use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
-use redgold_schema::{error_info, error_message, from_hex, RgResult, SafeBytesAccess, SafeOption, signature_data, structs};
+use log::info;
+use redgold_schema::{EasyJson, error_info, error_message, from_hex, RgResult, SafeBytesAccess, SafeOption, signature_data, structs};
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Proof};
 use crate::{KeyPair, TestConstants, util};
 use crate::util::{public_key_ser, ToPublicKey};

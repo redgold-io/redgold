@@ -205,12 +205,23 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
-    pub fn seed_addresses(&self) -> Vec<Address> {
+    pub fn seed_peer_addresses(&self) -> Vec<Address> {
         self.seeds_now().iter()
             .flat_map(|s| s.peer_id.as_ref())
             .flat_map(|p| p.peer_id.as_ref())
             .flat_map(|p| p.address().ok())
             .collect_vec()
+    }
+
+    pub fn seed_node_addresses(&self) -> Vec<Address> {
+        self.seeds_now().iter()
+            .flat_map(|s| s.public_key.as_ref())
+            .flat_map(|p| p.address().ok())
+            .collect_vec()
+    }
+
+    pub fn seed_addresses_all(&self) -> Vec<Address> {
+        self.seed_node_addresses().iter().chain(self.seed_peer_addresses().iter()).cloned().collect_vec()
     }
 
     pub fn seeds_at(&self, time: i64) -> Vec<Seed> {

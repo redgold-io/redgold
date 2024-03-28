@@ -34,7 +34,7 @@ impl TransactionBuilderSupport for TransactionBuilder {
     fn new(config: &NodeConfig) -> Self {
         let tx = Transaction::new_blank();
         let network = config.network.clone();
-        let fee_addrs = config.seed_addresses();
+        let fee_addrs = config.seed_peer_addresses();
         let mut s = Self {
             transaction: tx,
             utxos: vec![],

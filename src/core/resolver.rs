@@ -59,7 +59,9 @@ impl ResolvedInput {
         let prior_output = self.prior_output()?;
         // TODO: Actually verify parent transaction hash matches input here right ?
         // Or is this done already?
-        self.input.verify_proof(prior_output.address.safe_get()?, &self.signable_hash)?;
+        let address = prior_output.address.safe_get()?;
+        let signable_hash = &self.signable_hash;
+        self.input.verify_proof(address, signable_hash)?;
 
         Ok(())
     }
@@ -208,7 +210,7 @@ pub async fn resolve_input(
     let mut peer_invalid_index = HashSet::default();
 
     let oe = relay.ds.observation.select_observation_edge(hash).await?;
-    info!("Num internal observation proofs {} {}", oe.len(), hash.json_or());
+    // info!("Num internal observation proofs {} {}", oe.len(), hash.json_or());
     for o in oe {
         observation_proofs.insert(o);
     }
