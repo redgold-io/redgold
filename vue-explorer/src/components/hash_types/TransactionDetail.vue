@@ -40,7 +40,7 @@
             <div>{{ hashData.info.amount }} RDG</div>
 
             <div><strong>Fee</strong></div>
-            <div>{{ hashData.info.fee }} RDG</div>
+            <div>{{ hashData.info.fee }} sats RDG</div>
 
             <div><strong>Bytes</strong></div>
             <div>{{ hashData.info.bytes }}</div>
