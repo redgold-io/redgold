@@ -249,10 +249,11 @@ pub struct RecentDashboardResponse {
 
 pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
     let id = u.utxo_id.safe_get_msg("missing utxo id")?;
+    let amt = u.opt_amount().map(|a| a.to_fractional()).unwrap_or(0.0);
     Ok(BriefUtxoEntry {
         transaction_hash: id.transaction_hash.safe_get_msg("Missing transaction hash")?.hex(),
         output_index: id.output_index.clone(),
-        amount: rounded_balance(u.amount()),
+        amount: amt,
         time: u.time.clone(),
     })
 }
