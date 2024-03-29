@@ -6,7 +6,7 @@ use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
 use redgold_schema::structs::{Address, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
 use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use crate::KeyPair;
-use crate::proof_support::ProofSupport;
+use crate::proof_support::{ProofSupport, PublicKeySupport};
 
 
 
@@ -58,7 +58,7 @@ impl TransactionSupport for Transaction {
     fn sign(&mut self, key_pair: &KeyPair) -> RgResult<Transaction> {
         let pk = key_pair.public_key();
         let hash = self.signable_hash();
-        let addr = key_pair.address_typed();
+        let all_key_pair_addresses = pk.to_all_addresses()?;
         let mut signed = false;
         for i in self.inputs.iter_mut() {
             if let Some(o) = i.output.as_ref() {
@@ -67,7 +67,7 @@ impl TransactionSupport for Transaction {
                     continue;
                 }
                 let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
-                if &addr == input_addr {
+                if all_key_pair_addresses.contains(input_addr) {
                     let proof = Proof::from_keypair_hash(&hash, &key_pair);
                     i.proof.push(proof);
                     signed = true;

@@ -3,11 +3,12 @@ use std::str::FromStr;
 use std::string::ToString;
 use bdk::bitcoin::util::bip32::ExtendedPubKey;
 use bdk::bitcoin::util::psbt::serialize::Serialize;
-use itertools::Itertools;
-use redgold_keys::proof_support::ProofSupport;
+use itertools::{all, Itertools};
+use redgold_keys::proof_support::{ProofSupport, PublicKeySupport};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::InputSupport;
-use redgold_schema::{error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -288,18 +289,22 @@ pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Re
 pub async fn sign_transaction(transaction: &mut Transaction, public: structs::PublicKey, path: String)
     -> Result<Transaction, ErrorInfo> {
     let hash: Hash = transaction.hash_or();
-    let addr = public.address()?;
+    let ser_transaction = transaction.json_or();
+    let all_addrs = public.to_all_addresses()?;
 
     for i in transaction.inputs.iter_mut() {
-        let proof = trezor_proof(&hash, public.clone(), path.clone())?;
-        let output = i.output
-            .safe_get_msg("Failed to get output")?;
-        let o = output.address
+
+        let enriched_output = i.output
+            .safe_get_msg("Failed to get output on transaction input")
+            .with_detail("input", i.json_or())
+            .with_detail("transaction", ser_transaction.clone())?;
+        let output_enriched_address = enriched_output.address
             .safe_get_msg("Failed to get address")?;
-        if o == &addr {
+        if all_addrs.contains(&output_enriched_address) {
+            let proof = trezor_proof(&hash, public.clone(), path.clone())?;
             let proof1 = proof.clone();
             i.proof.push(proof1);
-            i.verify_proof(&addr, &hash)?;
+            i.verify_proof(&output_enriched_address, &hash)?;
         }
     }
     Ok(transaction.clone())
