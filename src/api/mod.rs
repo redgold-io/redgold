@@ -17,7 +17,7 @@ use warp::{Filter, Rejection};
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_schema::{EasyJson, empty_public_request, error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest, AddressInfo};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -39,6 +39,15 @@ pub struct RgHttpClient {
     pub port: u16,
     pub timeout: Duration,
     pub relay: Option<Relay>
+}
+
+impl RgHttpClient {
+    pub(crate) async fn address_info_for_pk(&self, p0: &PublicKey) -> RgResult<AddressInfo> {
+        let mut req = Request::default();
+        req.get_address_info_public_key_request = Some(p0.clone());
+        let resp = self.proto_post_request(req, None, None).await?;
+        resp.get_address_info_public_key_response.ok_or(error_info("Missing get_address_info_response"))
+    }
 }
 
 impl RgHttpClient {

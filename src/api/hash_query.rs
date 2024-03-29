@@ -3,6 +3,7 @@ use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchR
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 
@@ -22,11 +23,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
         addr = Some(a);
     }
     if let Some(a) = addr {
-        let res = relay.ds.transaction_store.query_utxo_address(&a).await?;
-        let mut info = AddressInfo::from_utxo_entries(a.clone(), res);
-        let limit = limit.unwrap_or(10);
-        let offset = offset.unwrap_or(0);
-        info.recent_transactions = relay.ds.transaction_store.get_all_tx_for_address(&a, limit, offset).await?;
+        let info = get_address_info(&relay, limit, offset, &a).await?;
         response.address_info = Some(info);
         return Ok(response);
     } else {
@@ -76,4 +73,33 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
 
     // Err(error_info("Hash not found"))
     Ok(response)
+}
+
+pub async fn get_address_info(relay: &Relay, limit: Option<i64>, offset: Option<i64>, a: &Address) -> Result<AddressInfo, ErrorInfo> {
+    let res = relay.ds.transaction_store.query_utxo_address(&a).await?;
+    let mut info = AddressInfo::from_utxo_entries(a.clone(), res);
+    let limit = limit.unwrap_or(10);
+    let offset = offset.unwrap_or(0);
+    info.recent_transactions = relay.ds.transaction_store.get_all_tx_for_address(&a, limit, offset).await?;
+    Ok(info)
+}
+
+// TODO: Generalize this and use new stricter type when utxo entries are not required.
+// Also update balance calculation to take into account multiple currencies or products.
+pub async fn get_address_info_public_key(relay: &Relay, pk: &PublicKey, limit: Option<i64>, offset: Option<i64>) -> Result<AddressInfo, ErrorInfo> {
+    let address = pk.address()?;
+    let mut info = get_address_info(relay, limit, offset, &address).await?;
+    let address_btc = pk.to_bitcoin_address_typed(&relay.node_config.network)?;
+    let eth_info = get_address_info(relay, limit, offset, &address_btc).await?;
+    let address_eth = pk.to_ethereum_address_typed()?;
+    let btc_info = get_address_info(relay, limit, offset, &address_eth).await?;
+
+    info.balance += eth_info.balance;
+    info.balance += btc_info.balance;
+    info.recent_transactions.extend(eth_info.recent_transactions);
+    info.recent_transactions.extend(btc_info.recent_transactions);
+    info.utxo_entries.extend(eth_info.utxo_entries);
+    info.utxo_entries.extend(btc_info.utxo_entries);
+
+    Ok(info)
 }

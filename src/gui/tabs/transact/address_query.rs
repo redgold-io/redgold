@@ -35,18 +35,18 @@ pub fn get_address_info(
             }
         }
 
-        let client = node_config.api_client();
+        let client = node_config.api_rg_client();
         let response = client
-            .address_info(address).await;
+            .address_info_for_pk(&public_key).await;
         let fun: Box<dyn FnMut(&mut LocalState) + Send> = match response {
             Ok(ai) => {
                 info!("balance success: {}", ai.json_or());
                 Box::new(move |ls: &mut LocalState| {
                     info!("Applied update function inside closure for balance thing");
                     let o = rounded_balance_i64(ai.balance.clone());
+                    ls.wallet_state.address_info = Some(ai.clone());
                     ls.wallet_state.balance = o.to_string();
                     ls.wallet_state.balance_f64 = Some(o.clone());
-                    ls.wallet_state.address_info = Some(ai.clone());
                     ls.wallet_state.balance_btc_f64 = btc_bal.clone();
                     ls.wallet_state.balance_btc = btc_bal.clone().map(|b| b.to_string());
                     ls.wallet_state.balance_eth_f64 = eth_bal.clone();

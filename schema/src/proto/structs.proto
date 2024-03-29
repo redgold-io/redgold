@@ -940,6 +940,7 @@ message Request {
   GetPartiesInfoRequest get_parties_info_request = 31;
   optional string origin = 32;
   BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
+  PublicKey get_address_info_public_key_request = 34;
 }
 
 message HealthResponse {
@@ -987,6 +988,7 @@ message Response {
   FaucetResponse faucet_response = 22;
   GetPartiesInfoResponse get_parties_info_response = 23;
   BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
+  AddressInfo get_address_info_public_key_response = 25;
 }
 
 message PartyMember {

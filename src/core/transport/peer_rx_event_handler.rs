@@ -39,6 +39,8 @@ use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::logging::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveResponse;
+use crate::api::hash_query::get_address_info_public_key;
+
 pub struct PeerRxEventHandler {
     relay: Relay,
     // rt: Arc<Runtime>
@@ -117,6 +119,13 @@ impl PeerRxEventHandler {
 
         if let Some(fr) = &request.faucet_request {
             response.faucet_response = Some(faucet_request(fr, &relay, request.origin.as_ref()).await.log_error().with_err_count("redgold.faucet.error")?);
+        }
+
+        if let Some(pk) = &request.get_address_info_public_key_request {
+            response.get_address_info_public_key_response = Some(get_address_info_public_key(&relay, pk, None, None)
+                .await
+                .log_error()
+                .with_err_count("redgold_get_address_info_public_key_error")?);
         }
 
         if let Some(_) = &request.get_parties_info_request {

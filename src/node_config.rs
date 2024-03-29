@@ -23,6 +23,7 @@ use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
 use redgold_schema::util::lang_util::JsonCombineResult;
+use crate::api::RgHttpClient;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::observability::logging::Loggable;
@@ -421,6 +422,10 @@ impl NodeConfig {
         };
         info!("Load balancer host: {} port: {:?}", host, port);
         PublicClient::from(host, port, None)
+    }
+
+    pub fn api_rg_client(&self) -> RgHttpClient {
+        self.api_client().client_wrapper()
     }
 
     pub fn is_local_debug(&self) -> bool {
