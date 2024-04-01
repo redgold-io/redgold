@@ -49,9 +49,9 @@ jobs:
         with:
           profile: minimal
           toolchain: ${{ env.TOOLCHAIN }}
-      - uses: Swatinem/rust-cache@v1
-        with:
-          cache-on-failure: true
+#      - uses: Swatinem/rust-cache@v1
+#        with:
+#          cache-on-failure: true
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
@@ -60,7 +60,7 @@ jobs:
       - run: echo "Testing version = ${{ env.VERSION }}"
         # TODO: sudo permissions on self hosted runner? this was run manually for now
 #      - run: ./bin/install_build_deps.sh
-      - run: cargo clean
+#      - run: cargo clean
 #      - run: cargo build --release
       - run: cargo tree --workspace
       - run: cargo test --no-run
