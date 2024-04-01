@@ -2,12 +2,13 @@ use std::collections::{HashMap, HashSet};
 use std::iter::FilterMap;
 use std::slice::Iter;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest, NetworkEnvironment, ExternalTransactionId, SupportedCurrency};
+use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest, NetworkEnvironment, ExternalTransactionId, SupportedCurrency, StandardContractType};
 use crate::utxo_id::OldUtxoId;
 use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, struct_metadata_new, structs, WithMetadataHashable, WithMetadataHashableFields};
 use itertools::Itertools;
 use rand::Rng;
 use crate::fee_validator::MIN_RDG_SATS_FEE;
+use crate::structs::TransactionType;
 
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
 
@@ -108,6 +109,16 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn sponsored_time(&self) -> RgResult<i64> {
+        let t = self.options()?.time_sponsor.safe_get_msg("Missing sponsored time")?.time;
+        Ok(t)
+    }
+
+    pub fn transaction_type(&self) -> RgResult<structs::TransactionType> {
+        let t = self.options()?.transaction_type.safe_get_msg("Missing sponsored time")?;
+        TransactionType::from_i32(t.clone()).ok_msg("Invalid transaction type")
+    }
+
     pub fn is_metadata_or_obs(&self) -> bool {
         self.outputs.iter().all(|o| o.is_metadata() || o.observation().is_ok())
     }
@@ -129,6 +140,7 @@ impl Transaction {
 
         let mut opts = TransactionOptions::default();
         opts.salt = Some(rng.gen::<i64>());
+        opts.transaction_type = Some(TransactionType::Standard as i32);
         tx.options = Some(opts);
         tx
     }
@@ -469,13 +481,21 @@ impl Transaction {
         clone.clear_confirmation_proofs();
         return clone.calculate_hash();
     }
+
     #[allow(dead_code)]
-    fn counter_party_hash(&self) -> Hash {
+    pub fn signed_hash(&self) -> Hash {
         let mut clone = self.clone();
         clone.clear_counter_party_proofs();
         clone.clear_confirmation_proofs();
         return clone.calculate_hash();
     }
+
+
+    #[allow(dead_code)]
+    fn pre_counter_party_hash(&self) -> Hash {
+        self.signed_hash()
+    }
+
     #[allow(dead_code)]
     fn confirmation_hash(&self) -> Hash {
         let mut clone = self.clone();
@@ -611,12 +631,30 @@ impl Transaction {
         self.outputs.first().as_ref().map(|o| o.rounded_amount())
     }
 
+    pub fn first_output_amount_i64(&self) -> Option<i64> {
+        self.outputs.iter()
+            .flat_map(|o| o.opt_amount_typed_ref()).next()
+            .map(|a| a.amount)
+    }
+
+    pub fn first_contract_type(&self) -> Option<StandardContractType> {
+        self.outputs.iter()
+            .flat_map(|o| o.contract.as_ref())
+            .flat_map(|c| c.standard_contract_type.as_ref())
+            .flat_map(|c| StandardContractType::from_i32(c.clone()))
+            .next()
+    }
+
 }
 
 // #[derive(Clone)]
 // pub struct LiquidityInfo
 
 impl CurrencyAmount {
+
+    pub fn amount_i64(&self) -> i64 {
+        self.amount
+    }
     pub fn from_fractional(a: impl Into<f64>) -> Result<Self, ErrorInfo> {
         let a = a.into();
         if a <= 0f64 {

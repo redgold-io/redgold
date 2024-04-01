@@ -35,6 +35,7 @@ rand = { workspace = true }
 num-bigint = "0.4"
 async-trait = "0.1.78"
 chrono = "0.4.33"
+log = "0.4.21"
 
 # TODO: Change to feature only for not including in WASM
 

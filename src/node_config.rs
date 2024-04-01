@@ -424,6 +424,12 @@ impl NodeConfig {
         PublicClient::from(host, port, None)
     }
 
+    pub fn self_client(&self) -> PublicClient {
+        let host = "127.0.0.1".to_string();
+        let port = self.public_port();
+        PublicClient::from(host, port, None)
+    }
+
     pub fn api_rg_client(&self) -> RgHttpClient {
         self.api_client().client_wrapper()
     }

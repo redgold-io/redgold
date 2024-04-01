@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::convert::Infallible;
 use crate::schema::structs::ErrorInfo;
 use crate::util;
@@ -9,13 +10,14 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use itertools::Itertools;
+use reqwest::ClientBuilder;
 use serde::__private::de::Borrowed;
 use tracing::info;
 use uuid::Uuid;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use redgold_schema::{EasyJson, empty_public_request, error_info, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::{EasyJson, EasyJsonDeser, empty_public_request, error_info, ErrorInfoContext, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest, AddressInfo};
 use crate::core::relay::Relay;
@@ -64,6 +66,41 @@ impl RgHttpClient {
         return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();
     }
 
+    fn metrics_url(&self) -> String {
+        format!("http://{}:{}/metrics", self.url, self.port - 2)
+    }
+
+    pub async fn metrics(&self) -> RgResult<Vec<(String, String)>>  {
+        let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
+        let sent = client
+            .get(self.metrics_url())
+            .send();
+        let response = sent.await.map_err(|e | error_info(e.to_string()))?;
+        let x = response.text().await;
+        let text = x.map_err(|e | error_info(e.to_string()))?;
+        let res = text.split("\n")
+            .filter(|x| !x.starts_with("#"))
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| x.split(" "))
+            .map(|x| x.collect_vec())
+            .flat_map(|x| x.get(0).as_ref().and_then(|k| x.get(1).as_ref().map(|v| (k.to_string(), v.to_string()))))
+            // .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect_vec();
+        Ok(res)
+    }
+
+    pub async fn table_sizes(&self) -> RgResult<Vec<(String, i64)>> {
+        self.json_get("v1/tables").await
+    }
+
+    pub async fn table_sizes_map(&self) -> RgResult<HashMap<String, i64>> {
+        self.table_sizes().await.map(|v| v.into_iter().collect())
+    }
+    pub async fn metrics_map(&self) -> RgResult<HashMap<String, String>> {
+        self.metrics().await.map(|v| v.into_iter().collect())
+    }
+
+
     #[allow(dead_code)]
     pub async fn json_post_request<Req: Serialize + ?Sized, Resp: DeserializeOwned>(
         &self,
@@ -96,7 +133,24 @@ impl RgHttpClient {
             Err(e) => Err(error_info(e.to_string())),
         }
     }
-    #[allow(dead_code)]
+
+    pub fn client(&self) -> RgResult<reqwest::Client> {
+        ClientBuilder::new().timeout(self.timeout).build().error_info("Failed to build client")
+    }
+
+    pub async fn json_get<Resp: DeserializeOwned>(
+        &self,
+        endpoint: impl Into<String>,
+    ) -> RgResult<Resp> {
+        self.client()?
+            .get(format!("{}/{}", self.formatted_url(), endpoint.into()))
+            .send()
+            .await
+            .error_info("Failed to send get request")?
+            .text().await.error_info("Failed to get response text")?
+            .json_from::<Resp>()
+    }
+
     pub async fn proto_post<Req: Sized + ProtoSerde>(
         &self,
         r: &Req,

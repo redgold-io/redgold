@@ -114,12 +114,14 @@ message Input {
   repeated Proof proof = 3;
   // The identifier associated with the currency or product being used, for multi-currency support.
   ProductId product_id = 4;
-  // Hydration purposes only! Not used for hashes
+  FloatingUtxoId floating_utxo_id = 6;
+  optional InputType input_type = 7;
+
+  // Enriched / calculated field from proof -- not necessary to store, must recalculate this always;
+  Address address = 8;
+  // Hydration purposes only! Not used for hashes, this represents the previous output.
   Output output = 5;
 
-  FloatingUtxoId floating_utxo_id = 6;
-
-  optional InputType input_type = 7;
 }
 
 enum RatingType {
@@ -467,6 +469,13 @@ enum OutputType {
   RequestCall = 2;
 }
 
+enum TransactionType {
+  Standard = 0;
+  ObservationType = 1;
+  Stake = 2;
+  Swap = 3;
+}
+
 message Output {
   // Basic unlock condition for using this as a consumable input. Script hash or hash of a public key.
   Address address = 1;
@@ -567,6 +576,7 @@ message TransactionOptions {
   optional bool is_test = 7;
   // Used only for anti-spam limiting at low limits.
   PoWProof pow_proof = 8;
+  optional TransactionType transaction_type = 9;
 }
 
 message Transaction {

@@ -57,19 +57,29 @@ pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
     let a = c.about().await?;
     println!("{}", json_pretty(&a)?);
 
-    let m = c.metrics().await?;
+    let m = c.metrics().await?.json_or();
 
     println!("metrics: {}", m);
 
     Ok(())
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
-async fn status_debug() {
+async fn metrics_debug() {
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
-    status(&nc).await.expect("");
+    let c = nc.api_client();
+    // let a = c.about().await?;
+    // println!("{}", json_pretty(&a)?);
+
+    let m = c.metrics().await.expect("");
+    let t = c.client_wrapper().table_sizes().await.expect("");
+
+    println!("metrics: {}", m.json_or());
+
+    println!("table sizes: {}", t.json_or());
+
 
 }
 

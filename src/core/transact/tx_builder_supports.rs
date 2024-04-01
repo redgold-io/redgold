@@ -74,6 +74,11 @@ impl TransactionBuilder {
         opts.pow_proof = Some(proof);
         Ok(self)
     }
+    pub fn with_type(&mut self, transaction_type: structs::TransactionType) -> &mut Self {
+        let opts = self.transaction.options.as_mut().expect("");
+        opts.transaction_type = Some(transaction_type as i32);
+        self
+    }
     pub fn with_ds(&mut self, ds: DataStore) -> &mut Self {
         self.ds = Some(ds);
         self
@@ -125,6 +130,7 @@ impl TransactionBuilder {
         let mut output = Output::from_data(sd);
         output.address = Some(address.clone());
         self.transaction.outputs.push(output);
+        self.with_type(structs::TransactionType::ObservationType);
         self
     }
 
@@ -270,6 +276,7 @@ impl TransactionBuilder {
                 d.external_transaction_id = Some(structs::ExternalTransactionId {identifier: btc_txid.clone()});
             }
         }
+        self.with_last_output_swap_type();
         self
     }
 
@@ -280,13 +287,9 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn with_last_output_withdrawal_swap(&mut self) -> &mut Self {
-        if let Some(o) = self.transaction.outputs.last_mut() {
-            let mut oc = OutputContract::default();
-            oc.standard_contract_type = Some(structs::StandardContractType::Swap as i32);
-            o.contract = Some(oc);
-            assert!(o.is_swap())
-        }
+    pub fn with_last_output_swap_type(&mut self) -> &mut Self {
+        let contract_type = structs::StandardContractType::Swap;
+        self.with_last_output_contract_type(contract_type);
         self
     }
 

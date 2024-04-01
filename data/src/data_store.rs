@@ -1,11 +1,14 @@
 use std::path::{Path, PathBuf};
 use std::result;
 use std::sync::Arc;
+use futures::future::Either;
+use futures::{Stream, StreamExt};
 
 //use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::info;
 use metrics::{counter, gauge};
+use serde_json::de::Read;
 use sqlx::{Acquire, Sqlite, SqlitePool};
 use sqlx::{Row};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
@@ -17,7 +20,7 @@ use crate::mp_store::MultipartyStore;
 use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs, util, WithMetadataHashable};
 use redgold_schema::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
 
@@ -45,9 +48,64 @@ pub struct DataStore {
 
 impl DataStore {
 
+    //
+    // pub async fn parquet_export_archive_historical(&self, path: &str) -> RgResult<()> {
+    //     let mut obs_stream = self.observation.accepted_time_observation_ordered(0, util::current_time_millis()).await?;
+    //     let mut transaction_stream = self.transaction_store
+    //         .transaction_accepted_ordered_stream(0, util::current_time_millis()).await?;
+    //
+    //     let mut results = vec![];
+    //
+    //     let mut latest_tx = transaction_stream.next().await;
+    //     let mut latest_obs = obs_stream.next().await;
+    //     let mut is_tx_next = true;
+    //
+    //     let mut remainder: Option<(Transaction, i64)> = {
+    //         // TODO: if let Some
+    //         let t = latest_tx.safe_get_msg("No latest transaction")?.clone()?;
+    //         let o = latest_obs.safe_get_msg("No latest observation")?.clone()?;
+    //         let tt = t.time()?.clone();
+    //         let ot = o.time()?;
+    //         if tt < ot {
+    //             is_tx_next = true;
+    //             // Observation is remainder due to higher time.
+    //             Some((o, tt))
+    //         } else {
+    //             Some((t, tt))
+    //         }
+    //     };
+    //
+    //     loop {
+    //         if latest_tx.is_none() && latest_obs.is_none() {
+    //             break;
+    //         }
+    //         let tx = if is_tx_next {
+    //             transaction_stream.next().await
+    //         } else {
+    //             obs_stream.next().await
+    //         };
+    //
+    //         if let Some(tx) = tx {
+    //             let tx = tx?;
+    //             let time = tx.time()?.clone();
+    //             if let Some((r, rt)) = remainder.as_ref() {
+    //                 if rt < time {
+    //                     results.push(r);
+    //                     remainder = (tx, time);
+    //                     // Switch streams
+    //                     is_tx_next = !is_tx_next;
+    //                 }
+    //             }
+    //         } else {
+    //             is_tx_next = !is_tx_next;
+    //         }
+    //     }
+    //
+    //     Ok(())
+    // }
 
     // TODO: Do this as a single sqlite transaction.
-    pub async fn accept_transaction(&self,
+                                pub async fn accept_transaction(&self,
                                     tx: &Transaction,
                                     time: i64,
                                     rejection_reason: Option<ErrorInfo>,
@@ -301,12 +359,10 @@ impl DataStore {
 impl DataStore {
 
     pub async fn count_gauges(&self) -> RgResult<()> {
-        let tx_count = self.transaction_store.count_total_accepted_transactions().await?;
-        gauge!("redgold.transaction.accepted.total").set(tx_count as f64);
-        let obs_count = self.observation.count_total_observations().await?;
-        gauge!("redgold.observation.total").set(obs_count as f64);
-        let utxo_total = self.transaction_store.count_total_utxos().await?;
-        gauge!("redgold.utxo.total").set(utxo_total as f64);
+        gauge!("redgold_transaction_accepted_total").set(self.transaction_store.count_total_accepted_transactions().await? as f64);
+        gauge!("redgold_observation_total").set(self.observation.count_total_observations().await? as f64);
+        gauge!("redgold_utxo_total").set(self.transaction_store.count_total_utxos().await? as f64);
+        gauge!("redgold_utxo_distinct_addresses").set(self.utxo.count_distinct_address_utxo().await? as f64);
         Ok(())
     }
 

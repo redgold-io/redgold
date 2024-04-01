@@ -17,6 +17,18 @@ use crate::schema::json_or;
 
 impl UtxoStore {
 
+
+    pub async fn count_distinct_address_utxo(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT COUNT(DISTINCT(address)) as count FROM utxo"#
+        )
+            .fetch_one(&mut *self.ctx.pool().await?)
+            .await)?.count as i64)
+    }
+
+
     // Good template example to copy elsewhere.
     pub async fn code_utxo(
         &self, _address: &Address, has_code: bool
