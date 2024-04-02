@@ -32,13 +32,14 @@ jobs:
         github.event.pull_request.head.repo.full_name != github.repository
       )
     runs-on: ubuntu-latest-m
+#    runs-on: self-hosted
     timeout-minutes: 60
     permissions:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
 #    env:
-#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+#      DATABASE_URL: "sqlite:///home/actions/actions-runner/_work/redgold/redgold/.rg/sqlx/data_store.sqlite"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
@@ -57,11 +58,15 @@ jobs:
       - id: version
         run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
       - run: echo "Testing version = ${{ env.VERSION }}"
+        # TODO: sudo permissions on self hosted runner? this was run manually for now
       - run: ./bin/install_build_deps.sh
-      - run: cargo clean
+#      - run: cargo clean
+
 #      - run: cargo build --release
       - run: cargo tree --workspace
-      - run: cargo test --no-run
+      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
+      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo build --profile ci
+#      - run: cargo test --no-run # --profile ci
       - run: |
           ./bin/test.sh &
           ./bin/local_test.sh &

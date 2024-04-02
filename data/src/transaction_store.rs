@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use futures::{Stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use metrics::gauge;
 use sqlx::Sqlite;
@@ -113,6 +114,26 @@ impl TransactionStore {
                     })
             }).collect()
     }
+
+    // This query stream really needs to be done all in the same function to deal with ownership
+    // issues. If using this in the future, then do it directly in line.
+    // pub async fn transaction_accepted_ordered_stream(
+    //     &self,
+    //     start: i64,
+    //     end: i64,
+    // ) -> RgResult<impl Stream<Item = RgResult<Transaction>>> {
+    //
+    //     let stream = sqlx::query!(
+    //     r#"SELECT raw FROM transactions WHERE rejection_reason IS NULL AND accepted = 1 ORDER BY time ASC"#,
+    //     // start, time >= ?1 AND time < ?2 AND
+    //     // end
+    // )
+    //         .fetch(&mut *self.ctx.pool().await?) // Use the awaited pool directly
+    //         .map(|row_result| DataStoreContext::map_err_sqlx(row_result)
+    //             .and_then(|row| Transaction::proto_deserialize(row.raw))
+    //         );
+    //     Ok(stream)
+    // }
 
     pub async fn query_accepted_transaction(
         &self,

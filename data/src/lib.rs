@@ -21,6 +21,9 @@ pub mod observation_store;
 pub mod data_store;
 pub mod state_store;
 pub mod utxo_store;
+pub mod parquet_export;
+mod parquet_min_index;
+mod parquet_full_index;
 
 #[derive(Clone)]
 pub struct DataStoreContext {

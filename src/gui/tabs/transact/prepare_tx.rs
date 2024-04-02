@@ -18,7 +18,7 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
     // }
     tb.with_output(&destination, &amount);
     if x.mark_output_as_swap {
-        tb.with_last_output_withdrawal_swap();
+        tb.with_last_output_swap_type();
     }
     if x.mark_output_as_stake {
         tb.with_last_output_stake();

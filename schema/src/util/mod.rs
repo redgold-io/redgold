@@ -12,6 +12,7 @@ To avoid this property, Ferguson and Schneier suggested using SHA256d = SHA256(S
 pub mod merkle;
 pub mod xor_distance;
 pub mod lang_util;
+pub mod timers;
 
 pub fn current_time_millis() -> i64 {
     std::time::SystemTime::now()

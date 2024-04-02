@@ -120,7 +120,7 @@ impl PublicClient {
         }
     }
 
-    pub async fn metrics(&self) -> Result<String, ErrorInfo>  {
+    pub async fn metrics(&self) -> RgResult<Vec<(String, String)>>  {
         let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
         let sent = client
             .get(self.formatted_url_metrics() + "/metrics")
@@ -128,7 +128,15 @@ impl PublicClient {
         let response = sent.await.map_err(|e | error_info(e.to_string()))?;
         let x = response.text().await;
         let text = x.map_err(|e | error_info(e.to_string()))?;
-        Ok(text)
+        let res = text.split("\n")
+            .filter(|x| !x.starts_with("#"))
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| x.split(" "))
+            .map(|x| x.collect_vec())
+            .flat_map(|x| x.get(0).as_ref().and_then(|k| x.get(1).as_ref().map(|v| (k.to_string(), v.to_string()))))
+            // .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect_vec();
+        Ok(res)
     }
 
     pub async fn send_transaction(

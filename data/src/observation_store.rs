@@ -1,3 +1,4 @@
+use futures::{Stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use redgold_keys::TestConstants;
 use redgold_schema::structs::{ErrorInfo, Hash, Observation, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction, TransactionEntry};
@@ -123,6 +124,21 @@ impl ObservationStore {
             .await)?.into_iter().flat_map(|row| row.hash.map(|h| Hash::new(h))).collect_vec();
         Ok(rows)
     }
+    //
+    // pub async fn accepted_time_observation_ordered(
+    //     &self,
+    //     start: i64,
+    //     end: i64
+    // ) -> RgResult<impl Stream<Item = RgResult<Transaction>>> {
+    //     let stream = sqlx::query!(
+    //         r#"SELECT raw FROM observation WHERE time >= ?1 AND time < ?2 ORDER BY time ASC"#,
+    //         start,
+    //         end
+    //     ).fetch(&mut *self.ctx.pool().await?)
+    //         .map(|r| DataStoreContext::map_err_sqlx(r))
+    //         .and_then(|r| Transaction::proto_deserialize(r.raw));
+    //     Ok(stream)
+    // }
 
     pub async fn query_observation(&self, hash: &Hash) -> RgResult<Option<Transaction>> {
         let hash = hash.safe_bytes()?;

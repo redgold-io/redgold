@@ -26,7 +26,7 @@ use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use crate::data::download::{PerfTimer, process_download_request};
+use crate::data::download::process_download_request;
 use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
 use crate::schema::json;
@@ -39,6 +39,7 @@ use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::logging::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveResponse;
+use redgold_schema::util::timers::PerfTimer;
 use crate::api::hash_query::get_address_info_public_key;
 
 pub struct PeerRxEventHandler {

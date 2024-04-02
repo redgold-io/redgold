@@ -26,8 +26,10 @@ metrics = { workspace = true }
 hex = { workspace = true }
 log = { workspace = true }
 tracing = { workspace = true }
-
-polars = "0.32.1"
+futures = {workspace = true}
+async-trait = {workspace = true}
+polars = { features = ["parquet"], version = "0.38.3" }
+chrono = "0.4.35"
 
 
 [build-dependencies]

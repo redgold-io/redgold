@@ -1,0 +1,67 @@
+http:
+  routers:
+    redgold-io-www:
+      entryPoints:
+        - web-secure
+      rule: Host(`www.redgold.io`)
+      tls:
+        certResolver: default
+      service: redgold-io-www
+
+    redgold-io-dev-api:
+      entryPoints:
+        - web-secure
+      rule: Host(`dev.api.redgold.io`)
+      tls:
+        certResolver: default
+      service: redgold-io-dev-api
+
+    redgold-io-staging-api:
+      entryPoints:
+        - web-secure
+      rule: Host(`staging.api.redgold.io`)
+      tls:
+        certResolver: default
+      service: redgold-io-staging-api
+
+    redgold-io-test-api:
+      entryPoints:
+        - web-secure
+      rule: Host(`test.api.redgold.io`)
+      tls:
+        certResolver: default
+      service: redgold-io-test-api
+
+    redgold-io-api:
+      entryPoints:
+        - web-secure
+      rule: Host(`api.redgold.io`)
+      tls:
+        certResolver: default
+      service: redgold-io-api
+
+  services:
+    redgold-io-www:
+      loadBalancer:
+        servers:
+          - url: http://matrix-nginx-proxy:8080
+
+    redgold-io-dev-api:
+      loadBalancer:
+        servers:
+          - url: http://matrix-nginx-proxy:8080
+
+    redgold-io-staging-api:
+      loadBalancer:
+        servers:
+          - url: http://matrix-nginx-proxy:8080
+
+    redgold-io-test-api:
+      loadBalancer:
+        servers:
+          - url: http://matrix-nginx-proxy:8080
+
+    redgold-io-api:
+      loadBalancer:
+        servers:
+          - url: http://matrix-nginx-proxy:8080

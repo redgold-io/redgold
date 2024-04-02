@@ -101,7 +101,7 @@ pub async fn send_test_rdg_btc_tx_withdrawal() {
             .with_network(&network)
             .with_utxos(&utxos).expect("utxos")
             .with_output(&amm_addr, &amount)
-            .with_last_output_withdrawal_swap()
+            .with_last_output_swap_type()
             .build().expect("build")
             .sign(&keypair).expect("sign");
 

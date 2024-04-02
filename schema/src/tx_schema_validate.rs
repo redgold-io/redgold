@@ -1,5 +1,6 @@
+use std::cmp::max;
 use std::collections::HashSet;
-use crate::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs};
+use crate::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, util, WithMetadataHashable};
 use crate::constants::MAX_INPUTS_OUTPUTS;
 use crate::errors::EnhanceErrorInfo;
 use crate::pow::TransactionPowValidate;
@@ -8,12 +9,12 @@ use crate::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 
 pub trait SchemaValidationSupport {
     fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()>;
+    fn validate_current_time(&self, max_delta: Option<i64>) -> RgResult<()>;
 }
 
 const DUST_LIMIT : i64 = 1000;
 const MAX_TX_BYTE_SIZE: usize = 100_000;
 impl SchemaValidationSupport for Transaction  {
-
     fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()> {
 
         for output in self.outputs.iter() {
@@ -118,6 +119,23 @@ impl SchemaValidationSupport for Transaction  {
         // TODO: Sum by product Id
 
         return Ok(());
+    }
+
+    fn validate_current_time(&self, max_delta: Option<i64>) -> RgResult<()> {
+        let current_time = util::current_time_millis();
+        let max_delta = max_delta.unwrap_or(1000 * 60 * 15); // 15 minutes delay
+        let this_time = self.time()?.clone();
+        if this_time > current_time {
+            Err(error_info("Transaction timestamp is too far in the future"))?;
+        }
+        if current_time - this_time > max_delta {
+            Err(error_info("Transaction timestamp is too far in the past"))
+                .with_detail("current_time", current_time.to_string())
+                .with_detail("this_time", this_time.to_string())
+                .with_detail("max_delta", max_delta.to_string())
+                ?;
+        }
+        Ok(())
     }
 
 }

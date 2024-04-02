@@ -23,6 +23,8 @@ use redgold_schema::util::xor_distance::XorDistancePartitionInfo;
 use crate::observability::logging::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveRequest;
+use redgold_schema::util::timers::PerfTimer;
+
 #[derive(Clone, Debug)]
 pub struct DownloadMaxTimes {
     pub utxo: i64,
@@ -141,45 +143,6 @@ pub async fn download_msg(
 //     }
 //     Ok(got_data)
 // }
-
-pub struct PerfTimer {
-    start: std::time::Instant,
-    latest: std::time::Instant,
-    map: std::collections::HashMap<String, i64>,
-}
-
-impl PerfTimer {
-    pub fn new() -> Self {
-        let start = std::time::Instant::now();
-        Self {
-            start,
-            latest: start,
-            map: Default::default(),
-        }
-    }
-    pub fn mark(&mut self) {
-        self.latest = std::time::Instant::now();
-    }
-
-    pub fn record(&mut self, name: impl Into<String>) {
-        let millis = self.millis();
-        self.map.insert(name.into(), millis);
-    }
-
-    pub fn millis(&mut self) -> i64 {
-        let now = std::time::Instant::now();
-        let elapsed = now.duration_since(self.latest);
-        self.latest = now;
-        let millis = elapsed.as_millis() as i64;
-        millis
-    }
-
-    pub fn seconds(&self) -> f64 {
-        let elapsed = self.start.elapsed();
-        elapsed.as_secs_f64()
-    }
-
-}
 
 /**
 Current 'direct trusted' download process to bootstrap historical data.

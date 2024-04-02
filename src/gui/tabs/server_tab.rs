@@ -1,6 +1,6 @@
 use redgold_schema::servers::Server;
 use std::sync::{Arc, Mutex};
-use eframe::egui::{Color32, RichText, TextEdit, Ui};
+use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
 use log::{error, info};
@@ -49,8 +49,8 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             "SSH status".to_string(),
             "Index".to_string(),
             "PeerId Index".to_string(),
-        "SSH User".to_string(),
-        "SSH Key Path".to_string(),
+        // "SSH User".to_string(),
+        // "SSH Key Path".to_string(),
     ]);
 
     for (i, server) in servers.iter().enumerate() {
@@ -64,8 +64,8 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             status,
             server.index.to_string(),
             server.peer_id_index.to_string(),
-            server.username.clone().unwrap_or("".to_string()).clone(),
-            "".to_string()
+            // server.username.clone().unwrap_or("".to_string()).clone(),
+            // "".to_string()
         ]
         );
     }
@@ -77,7 +77,14 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.spacing();
     });
     ui.separator();
-    tables::text_table(ui, table_rows);
+
+    ScrollArea::vertical().id_source("tabletext")
+        .max_height(150.0)
+        .min_scrolled_height(150.0)
+        .auto_shrink(true)
+        .show(ui, |ui| {
+        tables::text_table(ui, table_rows);
+    });
 
     editable_text_input_copy(
         ui,"Server CSV Load Path", &mut local_state.server_state.csv_edit_path, 400.0
@@ -110,13 +117,17 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.checkbox(&mut local_state.server_state.ops, "Ops");
         ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
         ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
-        if local_state.node_config.opts.development_mode {
-            ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
-            ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
-        }
-        ui.label("Single Server Index:");
+
+        ui.label("Server Filter:");
         TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
     });
+
+    if local_state.node_config.opts.development_mode {
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
+            ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
+        });
+    }
 
     password_single(&mut local_state.server_state.mixing_password,"Mixing Password", ui,
                     &mut local_state.server_state.show_mixing_password);
@@ -144,6 +155,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         d.debug_skip_start = local_state.server_state.skip_start;
         d.purge = local_state.server_state.purge;
         d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
+        d.server_filter = Some(local_state.server_state.server_index_edit.clone());
         d.genesis = local_state.server_state.genesis;
         d.mixing_password = Some(local_state.server_state.mixing_password.clone()).filter(|s| !s.is_empty());
         d.words_and_id = local_state.server_state.words_and_id;

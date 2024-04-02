@@ -241,8 +241,14 @@ pub struct ExplorerFaucetResponse {
 #[derive(Serialize, Deserialize)]
 pub struct RecentDashboardResponse {
     pub recent_transactions: Vec<BriefTransaction>,
-    total_accepted_transactions: i64,
-    num_active_peers: i64,
+    pub total_accepted_transactions: i64,
+    pub size_transactions_gb: f64,
+    pub total_accepted_utxos: i64,
+    pub size_utxos_gb: f64,
+    pub total_accepted_observations: i64,
+    pub size_observations_gb: f64,
+    pub total_distinct_utxo_addresses: i64,
+    pub num_active_peers: i64,
     pub active_peers_abridged: Vec<DetailedPeer>,
     pub recent_observations: Vec<DetailedObservation>
 }
@@ -775,7 +781,10 @@ fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
 
 
 // #[tracing::instrument()]
-pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult<RecentDashboardResponse>{
+pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult<RecentDashboardResponse> {
+
+    // r.node_config.self_client().metrics()
+
     let start = current_time_millis_i64();
     let recent = r.ds.transaction_store.query_recent_transactions(Some(10), is_test).await?;
     trace!("Dashboard query time elapsed: {:?}", current_time_millis_i64() - start);
@@ -785,10 +794,10 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
         recent_transactions.push(brief_tx);
     }
     trace!("Brief transaction build time elapsed: {:?}", current_time_millis_i64() - start);
-    // TODO: Rename this
-    let total_accepted_transactions =
-        r.ds.transaction_store.count_total_transactions().await?;
-    trace!("count_total_transactions time elapsed: {:?}", current_time_millis_i64() - start);
+    // // TODO: Rename this
+    // let total_accepted_transactions =
+    //     r.ds.transaction_store.count_total_transactions().await?;
+    // trace!("count_total_transactions time elapsed: {:?}", current_time_millis_i64() - start);
 
     let peers = r.ds.peer_store.active_nodes(None).await?;
     trace!("active nodes ds query elapsed: {:?}", current_time_millis_i64() - start);
@@ -830,9 +839,34 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     trace!("observation format: {:?}", current_time_millis_i64() - start);
 
 
+    let client = r.node_config.self_client().client_wrapper();
+    let tables = client.table_sizes_map().await?;
+    let metrics = client.metrics_map().await?;
+
+    /*
+      gauge!("redgold_transaction_accepted_total").set(self.transaction_store.count_total_accepted_transactions().await? as f64);
+        gauge!("redgold_observation_total").set(self.observation.count_total_observations().await? as f64);
+        gauge!("redgold_utxo_total").set(self.transaction_store.count_total_utxos().await? as f64);
+        gauge!("redgold_utxo_distinct_addresses").set(self.utxo.count_distinct_address_utxo().await? as f64);
+        Ok(())
+     */
     Ok(RecentDashboardResponse {
         recent_transactions,
-        total_accepted_transactions,
+        total_accepted_transactions: metrics.get("redgold_transaction_accepted_total")
+            .and_then(|v| v.parse::<i64>().ok()).unwrap_or(0),
+        size_transactions_gb: tables.get("transactions")
+            .map(|v| (v.clone() as f64) / (1024*1024*1024) as f64).unwrap_or(0.0),
+        total_accepted_utxos: metrics.get("redgold_utxo_total")
+            .and_then(|v| v.parse::<i64>().ok()).unwrap_or(0),
+        size_utxos_gb: tables.get("utxo")
+            .map(|v| (v.clone() as f64) / (1024*1024*1024) as f64).unwrap_or(0.0),
+        total_accepted_observations: metrics.get("redgold_observation_total")
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(0),
+        size_observations_gb: tables.get("observation")
+            .map(|v| (v.clone() as f64) / (1024*1024*1024) as f64).unwrap_or(0.0),
+        total_distinct_utxo_addresses: metrics.get("redgold_utxo_distinct_addresses")
+            .and_then(|v| v.parse::<i64>().ok()).unwrap_or(0),
         num_active_peers,
         active_peers_abridged,
         recent_observations

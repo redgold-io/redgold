@@ -15,8 +15,8 @@ pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
     let mut table = TableBuilder::new(ui)
         .striped(true)
         .resizable(false)
-        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-        .min_scrolled_height(0.0);
+        .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
+        // .min_scrolled_height(0.0);
 
     for _ in 0..columns {
         table = table.column(Column::auto());
