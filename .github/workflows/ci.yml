@@ -31,15 +31,15 @@ jobs:
         github.event_name == 'pull_request_target' && 
         github.event.pull_request.head.repo.full_name != github.repository
       )
-#    runs-on: ubuntu-latest-m
-    runs-on: self-hosted
+    runs-on: ubuntu-latest-m
+#    runs-on: self-hosted
     timeout-minutes: 60
     permissions:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-    env:
-      DATABASE_URL: "sqlite:///home/actions/actions-runner/_work/redgold/redgold/.rg/sqlx/data_store.sqlite"
+#    env:
+#      DATABASE_URL: "sqlite:///home/actions/actions-runner/_work/redgold/redgold/.rg/sqlx/data_store.sqlite"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
@@ -49,9 +49,9 @@ jobs:
         with:
           profile: minimal
           toolchain: ${{ env.TOOLCHAIN }}
-#      - uses: Swatinem/rust-cache@v1
-#        with:
-#          cache-on-failure: true
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
@@ -59,13 +59,13 @@ jobs:
         run: echo "version=${{env.VERSION}}" >> "$GITHUB_OUTPUT"
       - run: echo "Testing version = ${{ env.VERSION }}"
         # TODO: sudo permissions on self hosted runner? this was run manually for now
-#      - run: ./bin/install_build_deps.sh
+      - run: ./bin/install_build_deps.sh
 #      - run: cargo clean
 
 #      - run: cargo build --release
       - run: cargo tree --workspace
-#      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
-      - run: cargo test --no-run # --profile ci
+      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
+#      - run: cargo test --no-run # --profile ci
       - run: |
           ./bin/test.sh &
           ./bin/local_test.sh &
