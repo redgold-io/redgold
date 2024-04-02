@@ -63,7 +63,7 @@ jobs:
 #      - run: cargo clean
 #      - run: cargo build --release
       - run: cargo tree --workspace
-      - run: cargo test --no-run
+      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
       - run: |
           ./bin/test.sh &
           ./bin/local_test.sh &
