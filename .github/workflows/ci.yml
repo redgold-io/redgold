@@ -61,6 +61,7 @@ jobs:
         # TODO: sudo permissions on self hosted runner? this was run manually for now
 #      - run: ./bin/install_build_deps.sh
 #      - run: cargo clean
+
 #      - run: cargo build --release
       - run: cargo tree --workspace
       - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
