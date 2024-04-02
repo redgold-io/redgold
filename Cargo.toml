@@ -198,6 +198,14 @@ opt-level = 3
 
 #openssl = { version = "0.10", features = ["vendored"] }
 
+[profile.dev]
+rustc-args = [
+    "-C", "link-arg=-Wl,--no-as-needed",
+    "-C", "link-arg=-Wl,--strip-debug",
+    "-C", "link-arg=-Wl,--gc-sections",
+    "-C", "codegen-units=1",
+    "-C", "opt-level=z",
+]
 
 #[dependencies.openssl-sys]
 #version = "0.9.101"
@@ -207,6 +215,13 @@ opt-level = 3
 codegen-units=1
 lto = true
 opt-level = 1
+rustc-args = [
+    "-C", "link-arg=-Wl,--no-as-needed",
+    "-C", "link-arg=-Wl,--strip-debug",
+    "-C", "link-arg=-Wl,--gc-sections",
+    "-C", "codegen-units=1",
+    "-C", "opt-level=z",
+]
 # Only enable for debugging performance with heap dumps of remote cluster,
 # Bloats the binary size a lot
 #debug = true
