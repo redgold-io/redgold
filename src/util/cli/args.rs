@@ -194,6 +194,9 @@ pub struct Deploy {
     /// Update server index
     #[clap(long)]
     pub server_index: Option<i32>,
+    /// Update server index
+    #[clap(long)]
+    pub server_filter: Option<String>,
     /// Exclude server index
     #[clap(long)]
     pub exclude_server_index: Option<i32>,

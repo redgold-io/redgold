@@ -4,7 +4,7 @@
 if [ -z "$1" ]
 then
     echo "No argument supplied, building the binary."
-    cargo build
+    export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo build --profile ci
     REDGOLD_BINARY_PATH="./target/debug/redgold"
 else
     REDGOLD_BINARY_PATH="$1"

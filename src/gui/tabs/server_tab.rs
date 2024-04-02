@@ -117,13 +117,17 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.checkbox(&mut local_state.server_state.ops, "Ops");
         ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
         ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
-        if local_state.node_config.opts.development_mode {
-            ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
-            ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
-        }
-        ui.label("Single Server Index:");
+
+        ui.label("Server Filter:");
         TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
     });
+
+    if local_state.node_config.opts.development_mode {
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
+            ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
+        });
+    }
 
     password_single(&mut local_state.server_state.mixing_password,"Mixing Password", ui,
                     &mut local_state.server_state.show_mixing_password);
@@ -151,6 +155,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         d.debug_skip_start = local_state.server_state.skip_start;
         d.purge = local_state.server_state.purge;
         d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
+        d.server_filter = Some(local_state.server_state.server_index_edit.clone());
         d.genesis = local_state.server_state.genesis;
         d.mixing_password = Some(local_state.server_state.mixing_password.clone()).filter(|s| !s.is_empty());
         d.words_and_id = local_state.server_state.words_and_id;

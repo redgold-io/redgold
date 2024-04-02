@@ -221,7 +221,7 @@ impl LocalState {
 
         ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
             .all().servers_path().to_str().expect("").to_string();
-        ss.genesis = node_config.opts.development_mode;
+        // ss.genesis = node_config.opts.development_mode;
         let mut ls = LocalState {
             active_tab: Tab::Home,
             session_salt: random_bytes(),

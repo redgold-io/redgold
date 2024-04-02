@@ -40,7 +40,8 @@ pub trait SSHLike {
 pub struct SSHProcessInvoke {
     user: Option<String>,
     identity_path: Option<String>,
-    host: String
+    host: String,
+    strict_host_key_checking: bool
 }
 
 #[async_trait]
@@ -50,7 +51,8 @@ impl SSHLike for SSHProcessInvoke {
         let identity_opt = self.identity_opt();
         let user = self.user_opt();
         let cmd = format!(
-            "ssh {} {}@{} \"bash -c '{}'\"",
+            "ssh {} {} {}@{} \"bash -c '{}'\"",
+            self.strict_host_key_checking_opt(),
             identity_opt, user, self.host, command.into()
         );
         output_handler.clone().map(|s|
@@ -65,7 +67,8 @@ impl SSHLike for SSHProcessInvoke {
         let first_arg = if to_dest { lf.clone() } else { "".to_string() };
         let last_arg = if to_dest { "".to_string() } else { lf };
         let cmd = format!(
-            "scp {} {} {}@{}:{} {}",
+            "scp {} {} {} {}@{}:{} {}",
+            self.strict_host_key_checking_opt(),
             identity_opt, first_arg, user, self.host, remote_file.into(), last_arg
         );
         self.run_cmd(output_handler, cmd).await
@@ -82,6 +85,13 @@ impl SSHProcessInvoke {
         let identity_opt = self.identity_path.clone()
             .map(|i| format!("-i {}", i)).unwrap_or("".to_string());
         identity_opt
+    }
+    fn strict_host_key_checking_opt(&self) -> String {
+        if !self.strict_host_key_checking {
+            "-o StrictHostKeyChecking=no".to_string()
+        } else {
+            "".to_string()
+        }
     }
 
     fn user_opt(&self) -> String {
@@ -114,6 +124,7 @@ async fn debug_ssh_invoke() {
         user: None,
         identity_path: None,
         host: host.clone(),
+        strict_host_key_checking: false,
     };
     let result = ssh.execute("ls", None).await.expect("ssh");
     println!("Result: {}", result);
@@ -149,11 +160,12 @@ impl DeployMachine<SSHProcessInvoke> {
             // TODO: Home dir .join(".ssh").join("id_rsa")
             // Or override with a different path
             identity_path,
-            host: s.host.clone()
+            host: s.host.clone(),
+            strict_host_key_checking: false,
         };
         Self {
             server: s.clone(),
-            ssh
+            ssh,
         }
     }
 }
@@ -208,7 +220,7 @@ They must be manually deployed.
 
  This whole thing should really have a streaming output for the lines and stuff.
  */
-pub async fn setup_server_redgold(
+pub async fn deploy_redgold(
      mut ssh: DeployMachine<SSHProcessInvoke>,
      network: NetworkEnvironment,
      is_genesis: bool,
@@ -633,6 +645,16 @@ pub async fn default_deploy(
         let x = servers.iter().filter(|s| s.index == (i as i64)).next().expect("").clone();
         servers = vec![x]
     }
+    if let Some(csv_filter) = &deploy.server_filter {
+        let split = csv_filter.split(",").collect_vec();
+        if split.len() > 1 {
+            let res = split.iter().map(|s| s.parse::<i64>()
+                .error_info("parsing")).collect::<RgResult<Vec<i64>>>();
+            if let Ok(r) = res {
+                servers = servers.iter().filter(|s| r.contains(&s.index)).cloned().collect_vec();
+            }
+        }
+    }
 
     let mut peer_id_index: HashMap<i64, String> = HashMap::default();
 
@@ -699,7 +721,7 @@ pub async fn default_deploy(
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None);
         if !deploy.ops {
-            let _t = tokio::time::timeout(Duration::from_secs(120), setup_server_redgold(
+            let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
                 ssh, net, gen, Some(hm), purge,
                 words_opt,
                 peer_id_hex_opt,
