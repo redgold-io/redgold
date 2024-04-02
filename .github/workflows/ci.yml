@@ -38,8 +38,8 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-#    env:
-#      DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
+    env:
+      DATABASE_URL: "sqlite:///home/actions/actions-runner/_work/redgold/redgold/.rg/sqlx/data_store.sqlite"
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
