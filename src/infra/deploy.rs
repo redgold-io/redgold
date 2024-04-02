@@ -694,7 +694,7 @@ pub async fn default_deploy(
             words_opt = Some(words_read);
         }
 
-        restore_multiparty_share(node_config.clone(), ss.clone()).await?;
+        // restore_multiparty_share(node_config.clone(), ss.clone()).await?;
 
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None);

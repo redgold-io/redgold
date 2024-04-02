@@ -79,8 +79,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     ui.separator();
 
     ScrollArea::vertical().id_source("tabletext")
-        .max_height(400.0)
-        .max_width(600.0)
+        .max_height(150.0)
+        .min_scrolled_height(150.0)
+        .auto_shrink(true)
         .show(ui, |ui| {
         tables::text_table(ui, table_rows);
     });
