@@ -4,7 +4,7 @@ use std::fmt::format;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
-use eframe::egui::{Align, TextStyle};
+use eframe::egui::{Align, ScrollArea, TextStyle};
 use eframe::egui;
 use itertools::Itertools;
 use log::{error, info};
@@ -562,7 +562,9 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             }
             Tab::Ratings => {}
             Tab::Servers => {
-                server_tab::servers_tab(ui, ctx, local_state);
+                ScrollArea::vertical().id_source("wtf").show(ui, |ui| {
+                    server_tab::servers_tab(ui, ctx, local_state);
+                });
             }
             Tab::Transact => {
                 wallet_screen(ui, ctx, local_state, has_changed_tab);
