@@ -207,6 +207,8 @@ rustc-args = [
     "-C", "link-arg=-Wl,--no-keep-memory",
     "-C", "link-arg=-Wl,--no-undefined",
     "-C", "link-arg=-Wl,--warn-common",
+    "-C", "link-arg=-undefined",
+    "-C", "link-arg=dynamic_lookup",
     "-C", "codegen-units=1",
     "-C", "opt-level=z",
     "-C", "prefer-dynamic",
