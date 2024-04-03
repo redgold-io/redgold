@@ -87,25 +87,28 @@ impl IntervalFold for Discovery {
 
         // debug!("Discovery found {} total peers", results.len());
         let _new_peers_count = 0;
+
+        let potential_new_peers =
         for r in &results {
-            if let Some(pk) = r.latest_node_transaction.clone()
+            if let Some((pk, nmd)) = r.latest_node_transaction.clone()
                 .and_then(|t| t.node_metadata().ok())
-                .and_then(|t| t.public_key) {
+                .and_then(|t| t.public_key.clone().map(|x| (x, t.clone()))) {
                 if pk != self.relay.node_config.public_key() {
                     let known = self.relay.ds.peer_store.query_public_key_node(&pk).await?.is_some();
                     if !known {
-                        debug!("Discovery invoking database add for new peer {}", pk.hex().expect("hex"));
+                        debug!("Batch Discovery sending discovery query to new peer {}", pk.hex_or());
                         // TODO: we need to validate this peerNodeInfo first BEFORE adding it to peer store
                         // For now just dropping errors to log
                         // TODO: Query trust for this peerId first, before updating trust score.
                         // Security thing here needs to be fixed later.
-                        self.relay.ds.peer_store.add_peer_new(r, &self.relay.node_config.public_key()).await.log_error().ok();
+                        // self.relay.ds.peer_store.add_peer_new(r, &self.relay.node_config.public_key()).await.log_error().ok();
+                        self.relay.discovery.send(DiscoveryMessage::new(nmd, None)).await?;
                     }
                 }
             } else {
-                error!("Discovery found peer with no public key: {}", r.json_or())
+                error!("Discovery found peer with no public key: {}", r.json_or());
             }
-        }
+        };
         Ok(())
     }
 }
