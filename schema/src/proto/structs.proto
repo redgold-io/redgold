@@ -240,6 +240,7 @@ message IdentityMetadata {
 
 message Weighting {
   int64 value = 1;
+  optional int64 basis = 2;
 }
 
 message PortfolioWeighting {
@@ -318,6 +319,30 @@ message ExternalTransactionId {
   string identifier = 1;
 }
 
+message InterestRate {
+  Weighting fixed_rate_apy = 1;
+}
+
+// This is essentially a request for a loan.
+message CollateralizedLoanInitiation {
+  Address destination_caller = 1;
+  InterestRate interest_rate = 2;
+}
+
+message CollateralizedLoanFulfillment {
+  UtxoId initiation = 1;
+}
+message CollateralizedLoanCall {
+
+}
+
+message CollateralizedLoanRepayment {}
+
+
+message CollateralizedLoanData {
+    CollateralizedLoanInitiation initiation = 1;
+}
+
 // Generic data structure designed to hold arbitrary data in a common format.
 // This should be considered supplementary to using a regular schema, not a
 // complete substitute.
@@ -363,6 +388,8 @@ message StandardData {
   Hash aggregate_state_hash = 24;
   // A bitcoin txid for example
   ExternalTransactionId external_transaction_id = 25;
+  // Used for collateralized loan outputs
+  CollateralizedLoanData collateralized_loan_data = 26;
 }
 
 // Native staking range to provide liquidity within. Trades cannot be executed outside of this range
@@ -433,6 +460,7 @@ enum StandardContractType {
   DEPOSIT = 1;
   SWAP = 2;
   STAKE = 3;
+  CollateralizedLoan = 4;
 }
 
 message KeyValueOption {
@@ -467,6 +495,7 @@ enum OutputType {
   Fee = 0;
   Deploy = 1;
   RequestCall = 2;
+  Loan = 3;
 }
 
 enum TransactionType {

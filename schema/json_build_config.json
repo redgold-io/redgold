@@ -8,6 +8,12 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "structs.CollateralizedLoanData",
+        "structs.CollateralizedLoanInitiation",
+        "structs.CollateralizedLoanFulfillment",
+        "structs.CollateralizedLoanCall",
+        "structs.CollateralizedLoanRepayment",
+        "structs.InterestRate",
         "structs.BatchTransactionResolveRequest",
         "structs.BatchTransactionResolveResponse",
         "structs.GenesisRequest",

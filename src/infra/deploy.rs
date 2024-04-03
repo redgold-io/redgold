@@ -356,7 +356,8 @@ pub async fn deploy_ops_services(
     remote_path_prefix: Option<String>,
     grafana_pass: Option<String>,
     purge_data: bool,
-    p: &Option<Sender<String>>
+    p: &Option<Sender<String>>,
+    skip_start: bool
 ) -> Result<(), ErrorInfo> {
     let remote_path = remote_path_prefix.unwrap_or("/root/.rg/all".to_string());
     ssh.verify().await?;
@@ -457,18 +458,21 @@ pub async fn deploy_ops_services(
 
     ssh.exes(format!("chmod -R 777 {}/data/esdata", remote_path), p).await?;
 
-    ssh.exes(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), p).await?;
-
-    tokio::time::sleep(Duration::from_secs(25)).await;
-
     let kibana_setup_path = format!("{}/kibana_setup.sh", remote_path);
     ssh.copy(
         include_str!("../resources/infra/ops_services/kibana_setup.sh"),
         kibana_setup_path.clone()
     ).await?;
-
     ssh.exes(format!("chmod +x {}", kibana_setup_path.clone()), p).await?;
-    ssh.exes(format!("{}", kibana_setup_path), p).await?;
+
+
+    if !skip_start {
+        ssh.exes(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), p).await?;
+        // Wait for ES to come online
+        tokio::time::sleep(Duration::from_secs(60)).await;
+
+        ssh.exes(format!("{}", kibana_setup_path), p).await?;
+    }
 
     Ok(())
 }
@@ -734,7 +738,8 @@ pub async fn default_deploy(
         gen = false;
         if !deploy.skip_ops || deploy.ops {
             let ssh = DeployMachine::new(ss, None);
-            deploy_ops_services(ssh, None, None, None, deploy.purge_ops, &output_handler).await.expect("")
+            let grafana_password = env::var("GRAFANA_PASSWORD").ok();
+            deploy_ops_services(ssh, None, None, grafana_password, deploy.purge_ops, &output_handler, deploy.debug_skip_start).await.expect("")
         }
     }
     Ok(())

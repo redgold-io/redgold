@@ -178,7 +178,7 @@ impl ArgTranslate {
 
     fn set_discovery_interval(&mut self) {
         if !self.node_config.is_local_debug() {
-            self.node_config.discovery_interval = Duration::from_secs(60)
+            self.node_config.discovery_interval = Duration::from_secs(300)
         }
     }
 
