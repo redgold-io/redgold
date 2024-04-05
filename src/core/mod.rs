@@ -20,3 +20,4 @@ pub mod recent_download;
 pub mod balances_all;
 pub mod discover;
 pub mod transport;
+pub mod misc_periodic;

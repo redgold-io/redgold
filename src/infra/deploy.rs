@@ -826,8 +826,13 @@ pub async fn default_deploy(
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None, output_handler.clone());
         if !deploy.skip_redgold_process {
+            let mut this_hm = hm.clone();
+            // TODO: Change to _main
+            if ss.index == 0 && node_config.opts.development_mode {
+                this_hm.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
+            }
             let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
-                ssh, net, gen, Some(hm), purge,
+                ssh, net, gen, Some(this_hm), purge,
                 words_opt,
                 peer_id_hex_opt,
                 !deploy.debug_skip_start,

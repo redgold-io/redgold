@@ -23,8 +23,9 @@ use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
+use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::NodeConfig;
-use crate::util::cli::args::{AddServer, BalanceCli, Deploy, FaucetCli, GenerateMnemonic, QueryCli, TestTransactionCli, WalletAddress, WalletSend};
+use crate::util::cli::args::{AddServer, BalanceCli, DebugCommand, Deploy, FaucetCli, GenerateMnemonic, QueryCli, RgDebugCommand, TestTransactionCli, WalletAddress, WalletSend};
 use crate::util::cmd::run_cmd;
 use crate::util::metadata::read_metadata_json;
 
@@ -514,4 +515,19 @@ pub async fn convert_metadata_xpub(path: &String) -> RgResult<()> {
 
     }
     Ok(())
+}
+
+pub(crate) async fn debug_commands(p0: &DebugCommand, p1: &&NodeConfig) -> RgResult<()> {
+    if let Some(cmd) = &p0.subcmd {
+        match cmd {
+            RgDebugCommand::GrafanaPublicDeploy(_) => {
+                manual_deploy_grafana_public().await
+            }
+            _ => {
+                Ok(())
+            }
+        }
+    } else {
+        Ok(())
+    }
 }

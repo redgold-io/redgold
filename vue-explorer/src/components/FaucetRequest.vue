@@ -6,9 +6,9 @@
       <div class="col-1"></div>
 
       <!-- Main content div -->
-      <div class="col-10">
+      <div class="col-10 d-flex flex-column align-items-center content-center">
 
-        <h4>Enter Address</h4>
+        <h4>Faucet Request</h4>
         <div class="jumbotron search-bar py-4">
           <h5 class="text-light">Funds will be sent to this address:</h5>
           <form class="d-flex align-items-center demo-form">
@@ -153,6 +153,11 @@ h4 {
 }
 .search-input::placeholder {
   color: #ccc;
+}
+
+.content-center {
+  margin: 0 auto;
+  text-align: center;
 }
 
 </style>

@@ -733,6 +733,9 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                 RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
                     commands::convert_metadata_xpub(&b.metadata_file).await
                 }
+                RgTopLevelSubcommand::DebugCommand(d) => {
+                    commands::debug_commands(d, &config).await
+                }
                 _ => {
                     abort = false;
                     Ok(())

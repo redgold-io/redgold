@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use log::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
@@ -200,7 +200,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     ui.horizontal(|ui| {
     if ui.button("Deploy").clicked() {
         local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
-        local_state.server_state.deployment_result = Arc::new(Mutex::new(None));
+        local_state.server_state.deployment_result = Arc::new(Mutex::new(Either::Left(None)));
         info!("Deploying");
         let mut d = Deploy::default();
         if local_state.server_state.load_offline_deploy {
@@ -266,7 +266,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             let nc = config.clone();
             let _res = default_deploy(&mut d2, &nc, f, None).await;
             info!("Deploy complete {}", _res.json_or());
-            arc.lock().expect("").replace(_res);
+            *arc.lock().expect("") = Either::Left(Some(_res));
             if hard {
                 d3.debug_skip_start = false;
                 let _res = default_deploy(&mut d3, &nc, f2, None).await;
@@ -279,14 +279,21 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     };
 
     match local_state.server_state.deployment_result.lock().expect("").as_ref() {
-        None => {
-            ui.label(RichText::new("Running").color(Color32::WHITE));
+        Either::Left(l) => {
+            match l {
+                None => {
+                    ui.label(RichText::new("Running").color(Color32::WHITE));
+                }
+                Some(Ok(_)) => {
+                    ui.label(RichText::new("Success").color(Color32::GREEN));
+                }
+                Some(Err(e)) => {
+                    ui.label(RichText::new("Deployment Error").color(Color32::RED));
+                }
+            }
         }
-        Some(Ok(_)) => {
-            ui.label(RichText::new("Success").color(Color32::GREEN));
-        }
-        Some(Err(e)) => {
-            ui.label(RichText::new("Deployment Error").color(Color32::RED));
+        Either::Right(_) => {
+            ui.label(RichText::new("Click to Deploy").color(Color32::WHITE));
         }
     }
 
@@ -300,7 +307,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     });
 
     let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
-    bounded_text_area_size_focus(ui, &mut arc1, 600., 15);
+    bounded_text_area_size_focus(ui, &mut arc1, 700., 30);
 
     let last_env = local_state.node_config.network.clone();
 
@@ -359,7 +366,7 @@ pub struct ServersState {
     hard_coord_reset: bool,
     words_and_id: bool,
     cold: bool,
-    deployment_result: Arc<Mutex<Option<RgResult<()>>>>,
+    deployment_result: Arc<Mutex<Either<Option<RgResult<()>>, ()>>>,
     deploy_process: Option<Arc<JoinHandle<()>>>,
     mixing_password: String,
     generate_offline_path: String,
@@ -388,7 +395,7 @@ impl Default for ServersState {
             hard_coord_reset: false,
             words_and_id: false,
             cold: false,
-            deployment_result: Arc::new(Mutex::new(None)),
+            deployment_result: Arc::new(Mutex::new(Either::Right(()))),
             deploy_process: None,
             mixing_password: "".to_string(),
             generate_offline_path: "./servers".to_string(),

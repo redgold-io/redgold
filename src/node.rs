@@ -65,6 +65,7 @@ use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use redgold_schema::observability::errors::Loggable;
+use crate::core::misc_periodic::MiscPeriodic;
 use crate::sanity::{historical_parity, migrations};
 
 /**
@@ -244,6 +245,10 @@ impl Node {
             DataDiscovery {
                 relay: relay.clone(),
             }, Duration::from_secs(300), false
+        ).await));
+
+        join_handles.push(NamedHandle::new("MiscPeriodic", stream_handlers::run_interval_fold(
+            MiscPeriodic::new(&relay), Duration::from_secs(300), false
         ).await));
 
         join_handles

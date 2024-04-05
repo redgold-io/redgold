@@ -21,6 +21,7 @@ pub fn empty_args() -> RgArgs {
         disable_e2e: false,
         log_level: None,
         development_mode: false,
+        development_mode_main: false,
     }
 }
 
@@ -84,6 +85,9 @@ pub struct RgArgs {
     /// Instead of Main for network for instance.
     #[clap(long, env = "REDGOLD_DEVELOPMENT_MODE")]
     pub development_mode: bool,
+    /// Only for use by main developers
+    #[clap(long, env = "REDGOLD_MAIN_DEVELOPMENT_MODE")]
+    pub development_mode_main: bool,
 
 }
 
@@ -114,6 +118,7 @@ pub enum RgTopLevelSubcommand {
     TestCapture(TestCaptureCli),
     TestBitcoinBalance(TestBitcoinBalanceCli),
     ConvertMetadataXpub(ConvertMetadataXpub),
+    DebugCommand(DebugCommand)
 }
 
 
@@ -293,6 +298,23 @@ pub struct TestTransactionCli {}
 /// Debug webcam capture
 #[derive(Args, Debug, Clone)]
 pub struct TestCaptureCli {}
+
+
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum RgDebugCommand {
+    #[clap(version = "1.3", author = "Redgold")]
+    GrafanaPublicDeploy(GrafanaPublicDeploy)
+}
+#[derive(Args, Debug, Clone)]
+pub struct GrafanaPublicDeploy {}
+
+/// Debug Commands
+#[derive(Args, Debug, Clone)]
+pub struct DebugCommand {
+    #[clap(subcommand)]
+    pub subcmd: Option<RgDebugCommand>
+}
 
 /// Debug btc sync functionality
 #[derive(Args, Debug, Clone)]

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use futures::TryStreamExt;
+use log::info;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;
@@ -87,12 +88,14 @@ async fn update_tick(relay: &Relay) -> Result<(), ErrorInfo> {
 
     fs::write(folder.targets(), ser2.json()?).error_info("write failure")?;
     if std::env::var("REDGOLD_GRAFANA_PUBLIC_WRITER").is_ok() {
+
         let targets_path = folder.targets().to_str().expect("str").to_string();
-        SSHProcessInvoke::new("public-grafana-node.redgold.io", None)
+        info!("Updating grafana public targets {}", targets_path.clone());
+        SSHProcessInvoke::new("grafana-public-node.redgold.io", None)
             .scp(targets_path.clone(), targets_path.clone(), true, None).await
             .add("Failed to update grafana public targets at")
             .add(targets_path)
-            .log_error()?;
+            .log_error().ok();
     };
     Ok(())
 }

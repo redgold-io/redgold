@@ -113,6 +113,9 @@ jobs:
         run: aws s3 rm --recursive ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}} && aws s3 cp --recursive ./vue-explorer/dist/ ${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}/
 
       - name: Upload Website Distribution to S3
+        if: contains('
+          refs/heads/dev
+          ', github.ref)
         run: aws s3 rm --recursive ${{env.S3_WEBSITE_PREFIX}} && aws s3 cp --recursive ./vue-website/dist/ ${{env.S3_WEBSITE_PREFIX}}/
 
       - name: Upload Docs Distribution to S3
@@ -170,6 +173,7 @@ jobs:
         with:
           name: redgold_linux
           path: ./redgold_linux
+
 # Potential Alternative if the other build starts failing again, requires compiling lgmp from source for mingw64
 #  build-linux-windows:
 ##    if: ${{ github.event_name != 'pull_request_target' && contains('
@@ -643,3 +647,13 @@ jobs:
           
           "
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update Grafana Public Node
+        if: contains('
+          refs/heads/dev
+          ', github.ref)
+        run: |
+          echo ${{ secrets.SSH_KEY }} > ~/.ssh/id_rsa
+          ssh-add ~/.ssh/id_rsa
+          chmod +x ./redgold_linux;
+          ./redgold_linux debug-command grafana-public-deploy
+
