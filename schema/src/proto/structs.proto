@@ -1215,6 +1215,8 @@ message ErrorInfo {
   string stacktrace = 7;
   string lib_message = 8;
   bool abort = 9;
+  bool skip_logging = 10;
+  optional string internal_log_level = 11;
 }
 
 message TaskLocalDetails {

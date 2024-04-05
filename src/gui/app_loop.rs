@@ -266,6 +266,10 @@ impl LocalState {
             keytab_state: Default::default(),
         };
 
+        if node_config.opts.development_mode {
+            ls.server_state.ops = false;
+        }
+
         let mut new_xpubs = vec![];
 
         if let Some(df) = node_config.secure_data_folder.as_ref() {

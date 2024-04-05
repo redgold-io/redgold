@@ -33,7 +33,7 @@ use crate::{e2e, gui, util};
 use crate::api::RgHttpClient;
 use crate::node_config::NodeConfig;
 // use crate::gui::image_capture::debug_capture;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::observability::metrics_registry;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
@@ -261,7 +261,9 @@ impl ArgTranslate {
         let or = shasum.unwrap_or("na".to_string());
         let last_8 = or.chars().take(8).collect::<String>();
         gauge!("redgold.node.executable_checksum", &[("executable_checksum".to_string(), or)]).set(1.0);
-        gauge!("redgold.node.executable_checksum_last_8", &[("executable_checksum_last_8".to_string(), last_8)]).set(1.0);
+        let id = self.node_config.gauge_id().to_vec();
+        let labels = [("executable_checksum_last_8".to_string(), last_8), id.get(0).cloned().expect("id")];
+        gauge!("redgold.node.executable_checksum_last_8", &labels).set(1.0);
     }
 
     async fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {

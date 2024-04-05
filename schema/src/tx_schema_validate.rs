@@ -2,7 +2,7 @@ use std::cmp::max;
 use std::collections::HashSet;
 use crate::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, util, WithMetadataHashable};
 use crate::constants::MAX_INPUTS_OUTPUTS;
-use crate::errors::EnhanceErrorInfo;
+use crate::observability::errors::EnhanceErrorInfo;
 use crate::pow::TransactionPowValidate;
 use crate::structs::{NetworkEnvironment, Transaction, UtxoId};
 use crate::transaction::MAX_TRANSACTION_MESSAGE_SIZE;

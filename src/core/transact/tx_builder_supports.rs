@@ -6,7 +6,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
 use redgold_schema::{bytes_data, EasyJson, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;

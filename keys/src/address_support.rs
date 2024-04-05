@@ -1,5 +1,5 @@
 use redgold_schema::{error_info, RgResult};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::Address;
 use crate::eth::example::EthHistoricalClient;
 use crate::util::btc_wallet::SingleKeyBitcoinWallet;

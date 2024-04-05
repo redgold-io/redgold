@@ -10,7 +10,7 @@ use crate::gui::common;
 use crate::gui::common::data_item;
 use crate::gui::tabs::transact::{broadcast_tx, hardware_signing, prepare_tx};
 use crate::gui::tabs::transact::wallet_tab::{SendReceiveTabs, WalletTab};
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool) {
 

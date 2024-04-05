@@ -6,6 +6,7 @@ pub mod matrix;
 pub mod netmaker;
 pub mod deploy;
 pub mod multiparty_backup;
+mod grafana_public_manual_deploy;
 //
 // use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 // use bdk::bitcoin::Network;

@@ -2,12 +2,12 @@ use async_trait::async_trait;
 use log::info;
 use metrics::counter;
 use redgold_schema::{EasyJson, RgResult, SafeOption, WithMetadataHashable};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, Transaction};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::TryRecvForEach;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use crate::util;
 

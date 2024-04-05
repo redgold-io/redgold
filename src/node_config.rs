@@ -26,7 +26,7 @@ use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::api::RgHttpClient;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 pub struct CanaryConfig {}
 

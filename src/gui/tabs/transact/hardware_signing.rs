@@ -5,7 +5,7 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 pub fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, public: PublicKey) {
     tokio::spawn(async move {

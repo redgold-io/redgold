@@ -11,8 +11,8 @@ use futures::TryStreamExt;
 use tokio_stream::StreamExt;
 use redgold_schema::structs::{ErrorInfo, GetPeersInfoRequest};
 use tracing::error;
-use redgold_schema::errors::EnhanceErrorInfo;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::Loggable;
 
 #[async_trait]
 pub trait IntervalFold  {

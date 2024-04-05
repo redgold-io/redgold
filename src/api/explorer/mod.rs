@@ -29,7 +29,7 @@ use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::address_support::AddressSupport;
 use crate::api::faucet::faucet_request;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::util::current_time_millis_i64;
 
 #[derive(Serialize, Deserialize)]
@@ -843,13 +843,6 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     let tables = client.table_sizes_map().await?;
     let metrics = client.metrics_map().await?;
 
-    /*
-      gauge!("redgold_transaction_accepted_total").set(self.transaction_store.count_total_accepted_transactions().await? as f64);
-        gauge!("redgold_observation_total").set(self.observation.count_total_observations().await? as f64);
-        gauge!("redgold_utxo_total").set(self.transaction_store.count_total_utxos().await? as f64);
-        gauge!("redgold_utxo_distinct_addresses").set(self.utxo.count_distinct_address_utxo().await? as f64);
-        Ok(())
-     */
     Ok(RecentDashboardResponse {
         recent_transactions,
         total_accepted_transactions: metrics.get("redgold_transaction_accepted_total")

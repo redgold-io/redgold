@@ -49,7 +49,7 @@ use redgold_keys::TestConstants;
 use tokio::task::spawn_blocking;
 use tracing::{Span, trace};
 use redgold_keys::proof_support::ProofSupport;
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::TransactionState::Mempool;
 use crate::api::rosetta::models::Peer;
 use crate::core::contract::contract_state_manager::ContractStateManager;
@@ -64,7 +64,7 @@ use crate::multiparty::initiate_mp::default_room_id_signing;
 use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::sanity::{historical_parity, migrations};
 
 /**

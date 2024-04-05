@@ -7,7 +7,9 @@ use tokio_stream::StreamExt;
 use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, json_from};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata};
 use serde::{Serialize, Deserialize};
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use crate::core::relay::Relay;
+use crate::infra::deploy::{SSHLike, SSHProcessInvoke};
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 
@@ -84,6 +86,14 @@ async fn update_tick(relay: &Relay) -> Result<(), ErrorInfo> {
     }
 
     fs::write(folder.targets(), ser2.json()?).error_info("write failure")?;
+    if std::env::var("REDGOLD_GRAFANA_PUBLIC_WRITER").is_ok() {
+        let targets_path = folder.targets().to_str().expect("str").to_string();
+        SSHProcessInvoke::new("public-grafana-node.redgold.io", None)
+            .scp(targets_path.clone(), targets_path.clone(), true, None).await
+            .add("Failed to update grafana public targets at")
+            .add(targets_path)
+            .log_error()?;
+    };
     Ok(())
 }
 

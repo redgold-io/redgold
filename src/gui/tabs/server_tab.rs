@@ -1,12 +1,15 @@
+use std::collections::HashMap;
 use redgold_schema::servers::Server;
 use std::sync::{Arc, Mutex};
 use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
+use itertools::Itertools;
 use log::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
 use redgold_schema::{EasyJson, RgResult};
+use crate::api::RgHttpClient;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
@@ -15,17 +18,42 @@ use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};
 use crate::util::cli::args::Deploy;
 
-pub async fn update_server_status(servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>) {
-    let mut results = vec![];
+pub trait ServerClient {
+    fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient;
+}
+
+impl ServerClient for Server {
+    fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient {
+        RgHttpClient::from_env(self.host.clone(), network_environment)
+    }
+}
+
+pub async fn update_server_status(
+    servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>,
+    network_environment: NetworkEnvironment
+) {
 
     for server in servers {
-        let mut ssh = DeployMachine::new(&server, None);
+        let mut ssh = DeployMachine::new(&server, None, None);
         let reachable = ssh.verify().await.is_ok();
-        results.push(ServerStatus{ ssh_reachable: reachable});
+        let docker_ps_online = ssh.verify_docker_running(&network_environment).await.is_ok();
+        let client = server.client(&network_environment);
+        let metrics = client.metrics_map().await.ok();
+        let tables = client.table_sizes_map().await.ok();
+        let this_status = ServerStatus{
+            server_index: server.index,
+            ssh_reachable: reachable,
+            docker_ps_online,
+            tables,
+            metrics,
+        };
+        {
+            let mut guard = status.lock().expect("lock");
+            guard.retain(|x| x.server_index != server.index);
+            guard.push(this_status);
+        }
     };
-    let mut guard = status.lock().expect("lock");
-    guard.clear();
-    guard.extend(results);
+
 }
 
 pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
@@ -37,7 +65,8 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         tokio::spawn(
             update_server_status(
                 servers.clone(),
-        local_state.server_state.info.clone()
+                local_state.server_state.info.clone(),
+                local_state.node_config.network.clone()
             )
         );
     }
@@ -45,11 +74,12 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
 
     let mut table_rows: Vec<Vec<String>> = vec![];
     table_rows.push(vec![
-            "Hostname".to_string(),
-            "SSH status".to_string(),
-            "Index".to_string(),
-            "PeerId Index".to_string(),
-        // "SSH User".to_string(),
+        "Hostname".to_string(),
+        "Index".to_string(),
+        "PeerId Index".to_string(),
+        "SSH status".to_string(),
+        "Process Up".to_string(),
+        "TX Total".to_string(),
         // "SSH Key Path".to_string(),
     ]);
 
@@ -59,11 +89,23 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             true => {"Online"}
             false => {"Offline"}
         }).unwrap_or("querying").to_string();
+        let tx_total = status_i.map(|s| match s.metrics.as_ref()
+            .and_then(|m| m.get("redgold_transaction_accepted_total")) {
+            Some(t) => {t.as_str()}
+            None => {"failure"}
+        }).unwrap_or("querying").to_string();
+        let process_up = status_i.map(|s| match s.ssh_reachable {
+            true => {"Online"}
+            false => {"Offline"}
+        }).unwrap_or("querying").to_string();
+
         table_rows.push(vec![
             server.host.clone(),
-            status,
             server.index.to_string(),
             server.peer_id_index.to_string(),
+            status,
+            process_up,
+            tx_total
             // server.username.clone().unwrap_or("".to_string()).clone(),
             // "".to_string()
         ]
@@ -78,28 +120,41 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     });
     ui.separator();
 
+    ui.horizontal(|ui| {
+
     ScrollArea::vertical().id_source("tabletext")
         .max_height(150.0)
         .min_scrolled_height(150.0)
+        .max_width(600.0)
+        .min_scrolled_width(600.0)
         .auto_shrink(true)
         .show(ui, |ui| {
-        tables::text_table(ui, table_rows);
+            ui.vertical(|ui| {
+            tables::text_table(ui, table_rows);
+            });
+        });
+
+        if ui.button("Refresh").clicked() {
+            local_state.server_state.needs_update = true;
+        }
     });
 
-    editable_text_input_copy(
-        ui,"Server CSV Load Path", &mut local_state.server_state.csv_edit_path, 400.0
-    );
-    if ui.button("Load Servers from CSV").clicked() {
-        let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
-        let res = Server::parse_from_file(buf);
-        if let Ok(res) = res {
-            local_state.local_stored_state.servers = res;
-            local_state.persist_local_state_store();
-            local_state.server_state.parse_success = Some(true);
-        } else {
-            local_state.server_state.parse_success = Some(false);
+    ui.horizontal(|ui| {
+        editable_text_input_copy(
+            ui,"Server CSV Load Path", &mut local_state.server_state.csv_edit_path, 300.0
+        );
+        if ui.button("Load").clicked() {
+            let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
+            let res = Server::parse_from_file(buf);
+            if let Ok(res) = res {
+                local_state.local_stored_state.servers = res;
+                local_state.persist_local_state_store();
+                local_state.server_state.parse_success = Some(true);
+            } else {
+                local_state.server_state.parse_success = Some(false);
+            }
         }
-    }
+    });
     if let Some(p) = local_state.server_state.parse_success {
         ui.horizontal(|ui| {
             ui.label("Parse result: ");
@@ -111,19 +166,23 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     ui.label("Deploy Options");
 
     ui.horizontal(|ui| {
+        ui.checkbox(&mut local_state.server_state.redgold_process, "Redgold Process");
         ui.checkbox(&mut local_state.server_state.words_and_id, "Words/Id");
         ui.checkbox(&mut local_state.server_state.cold, "Cold");
         ui.checkbox(&mut local_state.server_state.purge, "Purge");
-        ui.checkbox(&mut local_state.server_state.ops, "Ops");
-        ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
-        ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
-
         ui.label("Server Filter:");
         TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
     });
 
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut local_state.server_state.ops, "Ops");
+        ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
+        ui.checkbox(&mut local_state.server_state.skip_logs, "Skip Logging");
+    });
+
     if local_state.node_config.opts.development_mode {
         ui.horizontal(|ui| {
+            ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
             ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
             ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
         });
@@ -138,7 +197,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             editable_text_input_copy(ui, "Load Offline Path", &mut local_state.server_state.load_offline_path, 250.0);
         }
     });
-
+    ui.horizontal(|ui| {
     if ui.button("Deploy").clicked() {
         local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
         local_state.server_state.deployment_result = Arc::new(Mutex::new(None));
@@ -151,6 +210,8 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         if d.ops == false {
             d.skip_ops = true;
         }
+        d.skip_redgold_process = !local_state.server_state.redgold_process;
+        d.skip_logs = local_state.server_state.skip_logs;
         d.purge_ops = local_state.server_state.purge_ops;
         d.debug_skip_start = local_state.server_state.skip_start;
         d.purge = local_state.server_state.purge;
@@ -203,12 +264,12 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             let mut d2 = d.clone();
             let mut d3 = d2.clone();
             let nc = config.clone();
-            let _res = default_deploy(&mut d2, &nc, f).await;
+            let _res = default_deploy(&mut d2, &nc, f, None).await;
             info!("Deploy complete {}", _res.json_or());
             arc.lock().expect("").replace(_res);
             if hard {
                 d3.debug_skip_start = false;
-                let _res = default_deploy(&mut d3, &nc, f2).await;
+                let _res = default_deploy(&mut d3, &nc, f2, None).await;
             }
             default_fun.abort();
             // Update final deploy result here.
@@ -236,6 +297,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             j.abort();
         }
     }
+    });
 
     let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
     bounded_text_area_size_focus(ui, &mut arc1, 600., 15);
@@ -248,7 +310,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     }
 
     ui.horizontal(|ui| {
-       editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
+        editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
             let config1 = local_state.node_config.clone();
             tokio::spawn(deploy::offline_generate_keys_servers(
@@ -272,7 +334,11 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
 
 #[derive(Clone)]
 pub struct ServerStatus {
-    pub ssh_reachable: bool
+    pub server_index: i64,
+    pub ssh_reachable: bool,
+    pub docker_ps_online: bool,
+    pub tables: Option<HashMap<String, i64>>,
+    pub metrics: Option<HashMap<String, String>>
 }
 
 #[derive(Clone)]
@@ -286,7 +352,9 @@ pub struct ServersState {
     server_index_edit: String,
     skip_start: bool,
     pub(crate) genesis: bool,
-    ops: bool,
+    pub ops: bool,
+    pub redgold_process: bool,
+    pub skip_logs: bool,
     purge_ops: bool,
     hard_coord_reset: bool,
     words_and_id: bool,
@@ -313,7 +381,9 @@ impl Default for ServersState {
             server_index_edit: "".to_string(),
             skip_start: false,
             genesis: false,
-            ops: false,
+            ops: true,
+            redgold_process: true,
+            skip_logs: false,
             purge_ops: false,
             hard_coord_reset: false,
             words_and_id: false,

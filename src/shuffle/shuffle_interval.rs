@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::util::cmd::{run_bash, run_cmd};

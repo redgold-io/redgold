@@ -32,7 +32,7 @@ use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::gui::components::passphrase_input::PassphraseInput;

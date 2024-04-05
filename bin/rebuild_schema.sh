@@ -1,0 +1,1 @@
+cargo build -p redgold-schema

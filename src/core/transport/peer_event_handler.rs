@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 use tracing::debug;
 
 use redgold_schema::{error_info, ErrorInfoContext, json_or, SafeOption, structs};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request};
 
 use crate::api::RgHttpClient;
@@ -26,7 +26,7 @@ use crate::util;
 
 use redgold_schema::EasyJson;
 use redgold_schema::util::lang_util::SameResult;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {

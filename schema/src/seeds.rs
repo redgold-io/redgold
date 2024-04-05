@@ -76,6 +76,11 @@ pub fn get_seeds() -> Vec<Seed> {
         "03219cb61b1463c1c507501f6621d18092cf44ee9c49c8e998a56c638da5b03b07", false),
         simple_seed("n2.redgold.io", "02935aad7a0fb43eef3c5d662c80c412acd16e8203814dcbbe5a39616cfd007abb",
         "02df70737b5e4a42ad5b623f41b7357494c54fddab864623a47880737b5c524335", true),
+       // 2
+        simple_seed("n3.redgold.io", "03dc0949cb7027639a8500b43986e34fd5eff774d968cb84133160b3b330c259aa",
+                    "03413bfd6768962e291e57047459baff1be8869e185b75c06c99fde66899aeb787", false),
+        // simple_seed("n2.redgold.io", "02935aad7a0fb43eef3c5d662c80c412acd16e8203814dcbbe5a39616cfd007abb",
+        //             "02df70737b5e4a42ad5b623f41b7357494c54fddab864623a47880737b5c524335", true),
        // 3
        simple_seed("n4.redgold.io", "022ac18c9106276a154abe929b1bb0f3b7004db924d62a2d37fc9c2a3f4f996c28",
         "0274a5a0382173ab16706782caaa9c9b4c2bca8dcd5d6321460c8e5619be830913", false),

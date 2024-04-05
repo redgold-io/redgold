@@ -8,9 +8,16 @@
       <!-- Main content div -->
       <div class="col-10">
 
-        <div><strong>Total Transactions {{total_transactions}}</strong></div>
-        <div><strong>Total Peers {{num_active_peers}}</strong></div>
-
+        <div class="stats-container">
+          <div><strong>Peers: {{this.getFieldValue('num_active_peers')}}</strong></div>
+          <div><strong>Transactions: {{this.getFieldValue('total_accepted_transactions')}}</strong></div>
+          <div><strong>UTXOs: {{this.getFieldValue('total_accepted_utxos')}}</strong></div>
+          <div><strong>Observations: {{this.getFieldValue('total_accepted_observations')}}</strong></div>
+          <div><strong>Distinct UTXO Address: {{this.getFieldValue('total_distinct_utxo_addresses')}}</strong></div>
+          <div><strong>Transaction Size: {{this.getFieldValue('size_transactions_gb')}} GB</strong></div>
+          <div><strong>UTXOs Size: {{this.getFieldValue('size_utxos_gb')}} GB</strong></div>
+          <div><strong>Observation Size: {{this.getFieldValue('size_observations_gb')}} GB</strong></div>
+        </div>
         <h4>Recent Transactions</h4>
         <BriefTransaction :transactions="transactions"/>
 
@@ -60,22 +67,33 @@ export default {
   mixins: [fetchHashInfo],
   data() {
     return {
-      transactions: [
-        {
-          hash: 'fc5159bd8626cf2b19c4d3ed6395fef2ba04a5fb062b64d333224afeabd3b9f9',
-          from: 'fc5159bd8626cf2b19c4d3ed6395fef2ba04a5fb062b64d333224afeabd3b9f9',
-          to: 'fc5159bd8626cf2b19c4d3ed6395fef2ba04a5fb062b64d333224afeabd3b9f9',
-          amount: 50,
-          fee: 0.0,
-          bytes: 400,
-          timestamp: 1580000000,
-          first_amount: 1,
-        },
-      ],
-      peers: [],
-      observations: [],
-      total_transactions: 0,
-      num_active_peers: 0
+      data: {
+        transactions: [
+          {
+            hash: 'fc5159bd8626cf2b19c4d3ed6395fef2ba04a5fb062b64d333224afeabd3b9f9',
+            from: 'fc5159bd8626cf2b19c4d3ed6395fef2ba04a5fb062b64d333224afeabd3b9f9',
+            to: 'fc5159bd8626cf2b19c4d3ed6395fef2ba04a5fb062b64d333224afeabd3b9f9',
+            amount: 50,
+            fee: 0.0,
+            bytes: 400,
+            timestamp: 1580000000,
+            first_amount: 1,
+          },
+        ],
+        peers: [],
+        observations: []
+      }
+    }
+  },
+  methods: {
+    getFieldValue(field) {
+      const value = this.data && this.data.data ? this.data.data[field] : '';
+      // Check if the value is a number and not an integer (thus, a float)
+      if (typeof value === 'number' && !Number.isInteger(value)) {
+        // Format to a maximum of 5 decimal places and remove trailing zeros
+        return parseFloat(value.toFixed(5));
+      }
+      return value;
     }
   },
   mounted() {
@@ -89,15 +107,11 @@ export default {
     axios.get(`${url}/explorer`)
         .then(response => {
           let data = response.data;
+          this.data.data = data;
           console.log(data); // log the response data
           this.transactions = data['recent_transactions'];
-          // for (let i = 0; i < peers.length; i++) {
-          //   peers[i].nodes = peers[i].nodes.slice(0, 1);
-          // }
           this.peers = data['active_peers_abridged'];
           this.observations = data['recent_observations'];
-          this.total_transactions = data.total_accepted_transactions
-          this.num_active_peers = data.num_active_peers
         })
         .catch(error => {
           console.error(error);
@@ -111,6 +125,15 @@ export default {
 h4 {
   margin-top: 20px;
   margin-bottom: 20px;
+}
+
+.stats-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr; /* Adjust as needed */
+  gap: 10px; /* Adjust as needed */
+  padding-top: 5px;
+  padding-bottom: 5px;
+  word-wrap: break-word; /* allows long words to be able to be broken and wrap onto the next line */
 }
 
 

@@ -126,7 +126,7 @@ impl DataStore {
 
 use polars::prelude::*;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::util::current_time_millis;
 use redgold_schema::util::timers::PerfTimer;
 use crate::parquet_min_index::{transaction_simple_parquet_schema, translate_tx_simple};

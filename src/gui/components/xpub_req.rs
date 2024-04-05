@@ -22,7 +22,7 @@ use crate::gui::tabs::transact::cold_wallet::hardware_connected;
 use crate::gui::tabs::transact::{address_query, wallet_tab};
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct RequestXpubState {

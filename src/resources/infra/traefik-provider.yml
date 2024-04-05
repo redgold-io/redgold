@@ -39,6 +39,13 @@ http:
       tls:
         certResolver: default
       service: redgold-io-api
+    redgold-io-grafana:
+      entryPoints:
+        - web-secure
+      rule: Host(`grafana.redgold.io`)
+      tls:
+        certResolver: default
+      service: redgold-io-grafana
 
   services:
     redgold-io-www:
@@ -60,8 +67,11 @@ http:
       loadBalancer:
         servers:
           - url: http://matrix-nginx-proxy:8080
-
     redgold-io-api:
+      loadBalancer:
+        servers:
+          - url: http://matrix-nginx-proxy:8080
+    redgold-io-grafana:
       loadBalancer:
         servers:
           - url: http://matrix-nginx-proxy:8080

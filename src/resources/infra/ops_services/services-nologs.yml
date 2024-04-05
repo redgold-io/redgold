@@ -1,0 +1,59 @@
+version: "3.7"
+volumes:
+  prometheus_data: {}
+services:
+  node-exporter:
+    image: prom/node-exporter:latest
+    user: root
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+#    expose:
+#      - 9100
+    network_mode: host
+  prometheus:
+    image: prom/prometheus:latest
+    user: root
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ~/.rg/all/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ~/.rg/all/targets.json:/etc/prometheus/targets.json
+      - ~/.rg/all/data/prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+#    expose:
+#      - 9090
+#    ports:
+#      - 9090:9090
+    network_mode: host
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    user: root
+#    expose:
+#      - 3000
+#    ports:
+#      - "3000:3000"
+    env_file:
+      - ./ops_var.env
+    volumes:
+      - ~/.rg/all/grafana_password:/etc/grafana/grafana_secret
+      - ~/.rg/all/grafana.ini:/etc/grafana/grafana.ini
+      - ~/.rg/all/data/grafana:/var/lib/grafana
+      - ~/.rg/all/prometheus-datasource.yaml:/etc/grafana/provisioning/datasources/prometheus.yaml
+      - ~/.rg/all/dashboards:/etc/grafana/provisioning/dashboards
+    network_mode: host

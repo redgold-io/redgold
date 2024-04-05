@@ -18,7 +18,7 @@ fn debug() {
 
 }
 use redgold_schema::EasyJson;
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::node_config::NodeConfig;
 
 #[derive(Clone, Debug)]

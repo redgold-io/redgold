@@ -20,7 +20,7 @@
 use std::process::Command;
 use itertools::Itertools;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 
 pub fn run_cmd(cmd: impl Into<String>, args: Vec<impl Into<String>>) -> (String, String) {
     let mut echo_hello = Command::new(cmd.into());

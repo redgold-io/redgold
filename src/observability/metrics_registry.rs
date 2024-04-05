@@ -36,7 +36,7 @@ pub fn register_metric_names() {
     describe_gauge!("redgold.utxo.total", "");
 
     describe_counter!("redgold.transaction.accepted", "");
-    describe_gauge!("redgold.transaction.accepted.total", "");
+    describe_gauge!("redgold_transaction_accepted_total", "");
     describe_counter!("redgold.transaction.received", "");
     describe_counter!("redgold.transaction.missing_response_channel", "");
     describe_counter!("redgold.transaction.resolve.input", "");

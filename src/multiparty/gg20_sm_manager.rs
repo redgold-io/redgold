@@ -19,7 +19,7 @@ use tokio::sync::{Notify, RwLock};
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{EasyJsonDeser, structs};
 use crate::core::relay::Relay;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 #[rocket::get("/rooms/<room_id>/subscribe")]
 async fn subscribe(

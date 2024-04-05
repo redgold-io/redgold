@@ -15,7 +15,7 @@ use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, RgResult, Safe
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::EasyJson;
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::core::internal_message::SendErrorInfo;
 
 #[async_trait]

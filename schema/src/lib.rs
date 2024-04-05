@@ -17,7 +17,7 @@ use structs::{
     Address, BytesData, Error, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
     StructMetadata, Transaction,
 };
-use crate::errors::EnhanceErrorInfo;
+use observability::errors::EnhanceErrorInfo;
 
 use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
 
@@ -36,7 +36,6 @@ pub mod util;
 pub mod utxo_entry;
 pub mod utxo_id;
 pub mod merkle_proof;
-pub mod errors;
 pub mod response;
 pub mod servers;
 pub mod peers;
@@ -57,6 +56,7 @@ mod weighting;
 pub mod pow;
 pub mod tx_schema_validate;
 pub mod fee_validator;
+pub mod observability;
 
 
 impl BytesData {
@@ -580,7 +580,9 @@ pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_
         retriable: false,
         stacktrace: stack,
         lib_message: lib_message.into(),
-        abort: false
+        abort: false,
+        skip_logging: false,
+        internal_log_level: None
     }
 }
 

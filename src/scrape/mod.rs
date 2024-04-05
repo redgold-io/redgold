@@ -2,7 +2,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{EasyJson, EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::SupportedCurrency;
 use crate::util;
 use crate::util::{current_time_millis_i64, current_time_unix};

@@ -217,8 +217,9 @@ impl ObservationBuffer {
         tx_b.allow_bypass_fee = true;
         let utxo_e = self.latest.observation_output_as()?;
         tx_b.with_observation(&o, height, &self.relay.node_config.address());
-        tx_b.with_input(&utxo_e.to_input());
-        let signed_tx = tx_b.transaction.sign(&self.relay.node_config.words().default_kp()?)?;
+        tx_b.with_input(&utxo_e.to_input()).with_pow()?;
+        let signed_tx = tx_b.transaction
+            .sign(&self.relay.node_config.words().default_kp()?)?;
 
 
         self.relay.ds.observation.insert_observation_and_edges(&signed_tx).await?;

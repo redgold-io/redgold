@@ -20,7 +20,7 @@ use redgold_schema::{ProtoHashable, RgResult, SafeOption, structs, WithMetadataH
 use redgold_schema::structs::{ErrorInfo, Hash, PublicKey, Transaction, TransactionEntry, UtxoId};
 use redgold_schema::EasyJson;
 use redgold_schema::util::xor_distance::XorDistancePartitionInfo;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveRequest;
 use redgold_schema::util::timers::PerfTimer;

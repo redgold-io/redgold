@@ -21,7 +21,7 @@ use crate::multiparty::watcher::DepositWatcherConfig;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::observability::metrics_registry;
 
 #[allow(dead_code)]

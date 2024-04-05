@@ -39,11 +39,11 @@ use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_validate::TransactionValidator;
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 #[derive(Clone)]
 pub struct Conflict {

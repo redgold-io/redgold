@@ -8,7 +8,7 @@ use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::relay::Relay;
 use redgold_schema::EasyJson;
 use crate::core::process_transaction::{ProcessTransactionMessage, RequestProcessor};
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 
 #[derive(Clone)]
 pub struct ObservationHandler {

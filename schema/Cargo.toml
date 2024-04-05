@@ -36,6 +36,7 @@ num-bigint = "0.4"
 async-trait = "0.1.78"
 chrono = "0.4.33"
 log = "0.4.21"
+tracing = { workspace = true }
 
 # TODO: Change to feature only for not including in WASM
 

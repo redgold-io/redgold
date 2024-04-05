@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{ErrorInfoContext, from_hex, ProtoSerde, RgResult, SafeOption};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{InitiateMultipartyKeygenRequest, NetworkEnvironment, PublicKey};
 use crate::core::relay::Relay;
@@ -20,7 +20,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
     for s in p1 {
         let server_dir = time_back.join(s.index.to_string());
         std::fs::create_dir_all(server_dir.clone()).expect("");
-        let mut ssh = DeployMachine::new(&s, None);
+        let mut ssh = DeployMachine::new(&s, None, None);
         let fnm_export = "multiparty.csv";
         std::fs::remove_file(fnm_export).ok();
         let cmd = format!(
@@ -57,7 +57,7 @@ pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> 
     let latest = latest.join(server.index.to_string());
     let mp_csv = latest.join("multiparty.csv");
 
-    let mut ssh = DeployMachine::new(&server, None);
+    let mut ssh = DeployMachine::new(&server, None, None);
     let remote_mp_import_path = format!("/root/.rg/{}/multiparty-import.csv", net_str);
     let local_backup_path = mp_csv.to_str().expect("").to_string();
     println!("Copying {} to {}", local_backup_path.clone(), remote_mp_import_path);

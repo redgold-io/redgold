@@ -21,7 +21,9 @@
         <a class="navbar-brand brand" href="/faucet">
           Faucet
         </a>
-
+        <a class="navbar-brand brand" href="https://grafana.redgold.io">
+          Grafana
+        </a>
         <div class="navbar-right-links">
           <a class="navbar-brand brand" href="https://dev.explorer.redgold.io">
             Dev
@@ -184,7 +186,12 @@ export default {
   margin-left: auto; /* This will push the .navbar-right-links to the right */
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
+}
+
+.navbar-brand {
+  margin-right: 7px;
+  margin-left: 7px;
 }
 
 </style>

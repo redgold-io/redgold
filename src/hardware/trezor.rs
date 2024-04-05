@@ -8,7 +8,7 @@ use redgold_keys::proof_support::{ProofSupport, PublicKeySupport};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;

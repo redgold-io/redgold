@@ -18,8 +18,8 @@ use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_schema::{EasyJson, EasyJsonDeser, empty_public_request, error_info, ErrorInfoContext, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
-use redgold_schema::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest, AddressInfo};
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest, AddressInfo, NetworkEnvironment};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::SameResult;
@@ -61,6 +61,15 @@ impl RgHttpClient {
             relay,
         }
     }
+    pub fn from_env(url: String, network_environment: &NetworkEnvironment) -> Self {
+        Self {
+            url,
+            port: network_environment.default_port_offset() + 1,
+            timeout: Duration::from_secs(60),
+            relay: None,
+        }
+    }
+
     #[allow(dead_code)]
     fn formatted_url(&self) -> String {
         return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();

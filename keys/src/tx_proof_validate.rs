@@ -1,4 +1,4 @@
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::{EasyJson, RgResult};
 use redgold_schema::structs::{NetworkEnvironment, Transaction};
 use crate::transaction_support::InputSupport;

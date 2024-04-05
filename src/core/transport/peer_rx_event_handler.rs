@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 
 use redgold_schema::{error_info, json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
 use redgold_schema::EasyJson;
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
 
 use crate::api::about;
@@ -36,7 +36,7 @@ use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::SameResult;
 use crate::api::faucet::faucet_request;
 use crate::multiparty::watcher::DepositWatcher;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveResponse;
 use redgold_schema::util::timers::PerfTimer;

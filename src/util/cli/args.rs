@@ -226,7 +226,10 @@ pub struct Deploy {
     pub mixing_password: Option<String>,
     #[clap(long)]
     pub server_offline_info: Option<String>,
-
+    #[clap(long)]
+    pub skip_redgold_process: bool,
+    #[clap(long)]
+    pub skip_logs: bool
 }
 
 // Wallet commands

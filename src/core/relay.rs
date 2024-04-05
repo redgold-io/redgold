@@ -21,7 +21,7 @@ use metrics::counter;
 use tokio::runtime::Runtime;
 use tracing::trace;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId, UtxoEntry, CurrencyAmount};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;

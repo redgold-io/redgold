@@ -21,7 +21,7 @@ use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs, util, WithMetadataHashable};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
 
 use crate::schema::structs::{
@@ -174,7 +174,7 @@ impl DataStore {
         }
         if rejection_reason.is_none() {
             self.insert_transaction_indexes(&tx, time, sqlite_tx).await?;
-            gauge!("redgold.transaction.accepted.total").increment(1.0);
+            gauge!("redgold_transaction_accepted_total").increment(1.0);
         } else {
             gauge!("redgold.transaction.rejected.total").increment(1.0);
         }

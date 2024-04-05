@@ -6,7 +6,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use serde::Deserialize;
 use crate::{error_info, ErrorInfoContext, json_or, json_pretty, RgResult};
-use crate::errors::EnhanceErrorInfo;
+use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PeerId, PublicKey, TransportInfo, VersionInfo};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -85,10 +85,11 @@ fn parse_servers(str: &str) -> RgResult<Vec<Server>> {
 }
 
 impl Server {
-    pub fn new(host: String) -> Self {
+    pub fn new(host: impl Into<String>) -> Self {
+        let host_str = host.into();
         Self {
             name: "".to_string(),
-            host: host.clone(),
+            host: host_str.clone(),
             username: None,
             ipv4: None,
             node_name: None,
@@ -96,7 +97,7 @@ impl Server {
             peer_id_index: 0,
             // TODO: Change to mainnet later
             network_environment: NetworkEnvironment::All.to_std_string(),
-            external_host: Some(host),
+            external_host: Some(host_str),
         }
     }
 

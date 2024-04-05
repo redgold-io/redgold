@@ -16,6 +16,7 @@ use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, struct
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
+use crate::core::internal_message::SendErrorInfo;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
@@ -34,6 +35,7 @@ use crate::util::cmd::{run_bash_async, run_powershell_async};
 pub trait SSHLike {
     async fn execute(&self, command: impl Into<String> + Send, output_handler: Option<Sender<String>>) -> RgResult<String>;
     async fn scp(&self, from: impl Into<String> + Send, to: impl Into<String> + Send, to_dest: bool, output_handler: Option<Sender<String>>) -> RgResult<String>;
+    fn output(&self, o: impl Into<String>) -> RgResult<()>;
 
 }
 
@@ -41,7 +43,8 @@ pub struct SSHProcessInvoke {
     user: Option<String>,
     identity_path: Option<String>,
     host: String,
-    strict_host_key_checking: bool
+    strict_host_key_checking: bool,
+    output_handler: Option<Sender<String>>
 }
 
 #[async_trait]
@@ -74,6 +77,12 @@ impl SSHLike for SSHProcessInvoke {
         self.run_cmd(output_handler, cmd).await
     }
 
+    fn output(&self, o: impl Into<String>) -> RgResult<()> {
+        if let Some(s) = self.output_handler.clone() {
+            s.send_rg_err(o.into())?;
+        };
+        Ok(())
+    }
 }
 
 pub fn is_windows() -> bool {
@@ -81,6 +90,16 @@ pub fn is_windows() -> bool {
 }
 
 impl SSHProcessInvoke {
+
+    pub(crate) fn new(host: impl Into<String>, output_handler: Option<Sender<String>>) -> Self {
+        Self {
+            user: None,
+            identity_path: None,
+            host: host.into(),
+            strict_host_key_checking: false,
+            output_handler,
+        }
+    }
     fn identity_opt(&self) -> String {
         let identity_opt = self.identity_path.clone()
             .map(|i| format!("-i {}", i)).unwrap_or("".to_string());
@@ -109,8 +128,8 @@ impl SSHProcessInvoke {
             run_powershell_async(cmd).await?
         };
         if let Some(s) = output_handler {
-            s.send(stdout.clone()).expect("send");
-            s.send(stderr.clone()).expect("send");
+            self.output(stdout.clone())?;
+            self.output(stderr.clone())?;
         }
         Ok(format!("{}\n{}", stdout, stderr).to_string())
     }
@@ -125,6 +144,7 @@ async fn debug_ssh_invoke() {
         identity_path: None,
         host: host.clone(),
         strict_host_key_checking: false,
+        output_handler: None,
     };
     let result = ssh.execute("ls", None).await.expect("ssh");
     println!("Result: {}", result);
@@ -141,7 +161,7 @@ async fn debug_ssh_invoke() {
         external_host: None,
     };
 
-    let mut dm = DeployMachine::new(&s, None);
+    let mut dm = DeployMachine::new(&s, None, None);
     // dm.verify().expect("verify");
     let res = dm.exes("ls ~/.rg", &None).await.expect("ls");
     println!("Result2: {}", res);
@@ -154,7 +174,7 @@ pub struct DeployMachine<S: SSHLike> {
 
 impl DeployMachine<SSHProcessInvoke> {
 
-    pub fn new(s: &Server, identity_path: Option<String>) -> Self {
+    pub fn new(s: &Server, identity_path: Option<String>, output_handler: Option<Sender<String>>) -> Self {
         let ssh = SSHProcessInvoke {
             user: s.username.clone(),
             // TODO: Home dir .join(".ssh").join("id_rsa")
@@ -162,6 +182,7 @@ impl DeployMachine<SSHProcessInvoke> {
             identity_path,
             host: s.host.clone(),
             strict_host_key_checking: false,
+            output_handler: output_handler.clone()
         };
         Self {
             server: s.clone(),
@@ -180,6 +201,31 @@ impl<S: SSHLike> DeployMachine<S> {
             .contains("Filesystem")
             .then(|| Ok(()))
             .unwrap_or(Err(info))
+    }
+
+    pub async fn verify_docker_running(&mut self, network_environment: &NetworkEnvironment) -> RgResult<()> {
+        let mut info = ErrorInfo::error_info("Cannot find redgold docker container running");
+        info.with_detail("server", self.server.json_or());
+        let result = self.ssh.execute(
+            format!("docker ps | grep redgold-{}",
+                    network_environment.to_std_string()
+            ), None)
+            .await?;
+        info.with_detail("docker_ps_result", result.clone());
+        let valid = result.contains("Up") && result.contains("redgold-");
+        valid
+            .then(|| Ok(()))
+            .unwrap_or(Err(info))
+    }
+
+    // TODO: Migrate output handler to stored in class
+    pub async fn install_docker(&mut self, p: &Option<Sender<String>>) -> RgResult<()> {
+        let compose = self.exes("docker-compose", p).await?;
+        if !(compose.contains("applications")) {
+            self.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
+            self.exes("sudo apt install -y docker-compose", p).await?;
+        }
+        Ok(())
     }
 
     pub async fn exes(&mut self, command: impl Into<String> + Send, output_handler: &Option<Sender<String>>) -> RgResult<String> {
@@ -357,8 +403,15 @@ pub async fn deploy_ops_services(
     grafana_pass: Option<String>,
     purge_data: bool,
     p: &Option<Sender<String>>,
-    skip_start: bool
+    skip_start: bool,
+    node_exporter_template: Option<Vec<Server>>,
+    skip_logs: bool,
+    include_smtp: bool,
+    allow_anon_read: bool
 ) -> Result<(), ErrorInfo> {
+
+    let node_exporter_template = node_exporter_template
+        .map(|n| n.iter().map(|s| format!("'{}:9100'", s.host.clone())).join(","));
     let remote_path = remote_path_prefix.unwrap_or("/root/.rg/all".to_string());
     ssh.verify().await?;
     //
@@ -373,11 +426,15 @@ pub async fn deploy_ops_services(
         format!("{}/services-all.yml", remote_path)
     ).await?;
     ssh.copy(
+        include_str!("../resources/infra/ops_services/services-nologs.yml"),
+        format!("{}/services-nologs.yml", remote_path)
+    ).await?;
+
+    ssh.copy(
         include_str!("../resources/infra/ops_services/filebeat.docker.yml"),
         format!("{}/filebeat.docker.yml", remote_path)
     ).await?;
 
-    let prometheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
 //     match std::env::var("GRAFANA_CLOUD_USER") {
 //         Ok(u) => {
 //             promtheus_yml += &*format!("remote_write:
@@ -392,8 +449,18 @@ pub async fn deploy_ops_services(
 //         }
 //         Err(_) => {}
 //     }
+    let prometheus_yml = include_str!("../resources/infra/ops_services/prometheus.yml").to_string();
+    let replaced_prometheus_yml = match node_exporter_template {
+        None => {
+            prometheus_yml
+        }
+        Some(templ) => {
+            prometheus_yml.replace("'localhost:9100'", format!("'localhost:9100', {}", templ).as_str())
+        }
+    };
+
     ssh.copy(
-        prometheus_yml,
+        replaced_prometheus_yml,
         format!("{}/prometheus.yml", remote_path)
     ).await?;
     ssh.copy(
@@ -428,8 +495,17 @@ pub async fn deploy_ops_services(
         format!("{}/dashboards/dashboard_config.yaml", remote_path)
     ).await?;
 
+    let mut grafana_ini = include_str!("../resources/infra/ops_services/grafana/grafana.ini").to_string();
+    if allow_anon_read {
+        let anon_str =
+            "[auth.anonymous]
+enabled = true
+org_role = Viewer
+";
+        grafana_ini = grafana_ini.replace("[auth.anonymous]", anon_str);
+    }
     ssh.copy(
-        include_str!("../resources/infra/ops_services/grafana/grafana.ini"),
+        grafana_ini,
         format!("{}/grafana.ini", remote_path)
     ).await?;
 
@@ -439,15 +515,22 @@ pub async fn deploy_ops_services(
     let copy_env = vec!["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM_ADDRESS", "SMTP_FROM_NAME"];
     for e in copy_env {
         for i in std::env::var(e).ok() {
-            env.insert(e.to_string(), i);
+            let ii = if !include_smtp && e == "SMTP_PASSWORD" {
+                "".to_string()
+            } else {
+                i
+            };
+            env.insert(e.to_string(), ii);
         }
     }
+
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
     }).join("\n");
     ssh.copy(env_contents.clone(), format!("{}/ops_var.env", remote_path)).await?;
 
     ssh.exes(format!("cd {}; docker-compose -f services-all.yml down", remote_path), p).await?;
+    ssh.exes(format!("cd {}; docker-compose -f services-nologs.yml down", remote_path), p).await?;
 
     for s in vec!["grafana", "prometheus", "esdata"] {
         if purge_data {
@@ -467,11 +550,15 @@ pub async fn deploy_ops_services(
 
 
     if !skip_start {
-        ssh.exes(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), p).await?;
-        // Wait for ES to come online
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        if skip_logs {
+            ssh.exes(format!("cd {}; docker-compose -f services-nologs.yml up -d", remote_path), p).await?;
+        } else {
+            ssh.exes(format!("cd {}; docker-compose -f services-all.yml up -d", remote_path), p).await?;
+            // Wait for ES to come online
+            tokio::time::sleep(Duration::from_secs(60)).await;
 
-        ssh.exes(format!("{}", kibana_setup_path), p).await?;
+            ssh.exes(format!("{}", kibana_setup_path), p).await?;
+        }
     }
 
     Ok(())
@@ -590,14 +677,17 @@ pub async fn offline_generate_keys_servers(
 
 
 pub async fn default_deploy(
-    deploy: &mut Deploy, node_config: &NodeConfig, output_handler: Option<Sender<String>>
+    deploy: &mut Deploy,
+    node_config: &NodeConfig,
+    output_handler: Option<Sender<String>>,
+    servers_opt: Option<Vec<Server>>
 ) -> RgResult<()> {
 
     // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
-    if node_config.opts.development_mode {
-        // Also set environment here to dev if not main
-        deploy.skip_ops = true;
-    }
+    // if node_config.opts.development_mode {
+    //     // Also set environment here to dev if not main
+    //     deploy.skip_ops = true;
+    // }
     let net = node_config.network;
 
     if net == NetworkEnvironment::Main {
@@ -607,10 +697,10 @@ pub async fn default_deploy(
         deploy.words_and_id = true;
     }
 
+
     let sd = ArgTranslate::secure_data_path_buf().expect("");
     let sd = sd.join(".rg");
     let df = DataFolder::from_path(sd);
-    let buf = df.all().servers_path();
     let m = df.all().mnemonic().await.expect("");
     let passphrase = deploy.mixing_password.clone().or_else(|| {
         if deploy.ask_pass {
@@ -632,9 +722,17 @@ pub async fn default_deploy(
     // So check to see if the peer id exists, if not, generate it according to hardware signer
     // ONLY IF mainnet do we use hardware signer?
     //WordsPass::new(m)
-    println!("Reading servers file: {:?}", buf);
-    let s = ArgTranslate::read_servers_file(buf).expect("servers");
-    println!("Setting up servers: {:?}", s);
+
+    let servers_original = if let Some(servers_preload) = servers_opt {
+        servers_preload
+    } else {
+        let buf = df.all().servers_path();
+        println!("Reading servers file: {:?}", buf);
+        ArgTranslate::read_servers_file(buf)?
+    };
+
+    // TODO: Filter servers by environment, also optionally pass them from the GUI?
+    println!("Setting up servers: {:?}", servers_original);
     // let mut gen = true;
     let purge = deploy.purge;
     let mut gen = deploy.genesis;
@@ -644,7 +742,7 @@ pub async fn default_deploy(
     let mut hm = HashMap::new();
     hm.insert("RUST_BACKTRACE".to_string(), "1".to_string());
 
-    let mut servers = s.to_vec();
+    let mut servers = servers_original.to_vec();
     if let Some(i) = deploy.server_index {
         let x = servers.iter().filter(|s| s.index == (i as i64)).next().expect("").clone();
         servers = vec![x]
@@ -659,6 +757,9 @@ pub async fn default_deploy(
             }
         }
     }
+    servers = servers.iter().filter(|s| s.network_environment.to_lowercase() == net.to_std_string() ||
+        s.network_environment.to_lowercase() == "all"
+    ).cloned().collect_vec();
 
     let mut peer_id_index: HashMap<i64, String> = HashMap::default();
 
@@ -723,8 +824,8 @@ pub async fn default_deploy(
         // restore_multiparty_share(node_config.clone(), ss.clone()).await?;
 
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
-        let ssh = DeployMachine::new(ss, None);
-        if !deploy.ops {
+        let ssh = DeployMachine::new(ss, None, output_handler.clone());
+        if !deploy.skip_redgold_process {
             let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
                 ssh, net, gen, Some(hm), purge,
                 words_opt,
@@ -736,10 +837,25 @@ pub async fn default_deploy(
             )).await.error_info("Timeout")??;
         }
         gen = false;
-        if !deploy.skip_ops || deploy.ops {
-            let ssh = DeployMachine::new(ss, None);
+        if deploy.ops {
+            let node_exporter_template = if ss.index == 0 {
+                Some(
+                    servers_original.iter().filter(|s| s.index != 0)
+                        .cloned().collect_vec()
+                )
+            }  else {
+                None
+            };
+            let ssh = DeployMachine::new(ss, None, output_handler.clone());
             let grafana_password = env::var("GRAFANA_PASSWORD").ok();
-            deploy_ops_services(ssh, None, None, grafana_password, deploy.purge_ops, &output_handler, deploy.debug_skip_start).await.expect("")
+            deploy_ops_services(
+                ssh, None, None, grafana_password, deploy.purge_ops,
+                &output_handler, deploy.debug_skip_start,
+                node_exporter_template,
+                deploy.skip_logs,
+                true,
+                false
+            ).await.expect("")
         }
     }
     Ok(())

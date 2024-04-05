@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use flume::Sender;
 use itertools::Itertools;
 
 use log::{error, info};
@@ -256,6 +257,14 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
     nc.network = net;
 
 
+    let (default_fun, output_handler) = log_handler();
+
+    default_deploy(&mut deploy, &nc, output_handler, None).await?;
+
+    Ok(default_fun)
+}
+
+pub fn log_handler() -> (JoinHandle<()>, Option<Sender<String>>) {
     let c: Channel::<String> = Channel::new();
     let r = c.receiver.clone();
     let default_fun = tokio::spawn(async move {
@@ -277,10 +286,7 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
     });
 
     let output_handler = Some(c.sender.clone());
-
-    default_deploy(&mut deploy, &nc, output_handler).await?;
-
-    Ok(default_fun)
+    (default_fun, output_handler)
 }
 
 pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {

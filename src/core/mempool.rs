@@ -3,11 +3,12 @@ use std::collections::BinaryHeap;
 use async_trait::async_trait;
 use flume::{SendError, TrySendError};
 use itertools::Itertools;
+use log::Level;
 use metrics::{counter, gauge};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::{error_info, error_message, RgResult, WithMetadataHashable};
-use redgold_schema::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::pow::TransactionPowValidate;
 use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse, Transaction};
 use redgold_schema::fee_validator::TransactionFeeValidator;
@@ -15,7 +16,7 @@ use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;
-use crate::observability::logging::Loggable;
+use redgold_schema::observability::errors::Loggable;
 use crate::util;
 
 pub struct Mempool {
@@ -49,7 +50,9 @@ impl Mempool {
         let h = message.transaction.hash_or();
         let is_known = self.relay.transaction_known(&h).await.mark_abort()?;
         if is_known {
-            Err(error_info("Transaction already in process or known"))?
+            Err(error_info("Transaction already in process or known"))
+                .level(Level::Trace)
+                .mark_skip_log()?
             // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
             // Notify subscribers for transaction channel rather than just dropping and returning error
         }
