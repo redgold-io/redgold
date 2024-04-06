@@ -67,6 +67,42 @@ impl MultipartyStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.last_insert_rowid())
     }
+
+
+    pub async fn count_multiparty_total(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM multiparty"#
+        )
+            .fetch_one(&mut *self.ctx.pool().await?)
+            .await)?.count as i64)
+    }
+
+    pub async fn count_multiparty_pk(
+        &self, initiator: &PublicKey
+    ) -> Result<i64, ErrorInfo> {
+
+        let pk = initiator.bytes()?;
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM multiparty WHERE host_public_key = ?1"#,
+            pk
+        )
+            .fetch_one(&mut *self.ctx.pool().await?)
+            .await)?.count as i64)
+    }
+
+    pub async fn count_self_multiparty(
+        &self
+    ) -> Result<i64, ErrorInfo> {
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT COUNT(*) as count FROM multiparty WHERE self_initiated = 1"#,
+        )
+            .fetch_one(&mut *self.ctx.pool().await?)
+            .await)?.count as i64)
+    }
+
     pub async fn update_room_id_key(&self, room_id: String, key: PublicKey,
     ) -> Result<(), ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
@@ -125,6 +161,7 @@ impl MultipartyStore {
         Ok(r.count > 0)
     }
 
+    // TODO: Remove this
     pub async fn insert_bridge_tx(
         &self,
         txid: &Vec<u8>,
@@ -159,39 +196,6 @@ impl MultipartyStore {
         Ok(r.last_insert_rowid())
     }
 
-    //
-    // pub async fn query_transaction_hex(
-    //     &self,
-    //     hex: String,
-    // ) -> Result<Option<Transaction>, ErrorInfo> {
-    //     let vec = from_hex(hex)?;
-    //     self.query_transaction(&vec).await
-    // }
-    //
-    // pub async fn query_transaction(
-    //     &self,
-    //     transaction_hash: &Vec<u8>,
-    // ) -> Result<Option<Transaction>, ErrorInfo> {
-    //
-    //     let mut pool = self.ctx.pool().await?;
-    //     let rows = sqlx::query!(
-    //         r#"SELECT raw_transaction FROM transactions WHERE hash = ?1"#,
-    //         transaction_hash
-    //     )
-    //         .fetch_all(&mut *pool)
-    //         .await;
-    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-    //     let mut res = vec![];
-    //     for row in rows_m {
-    //         let option1 = row.raw_transaction;
-    //         if let Some(o) = option1 {
-    //             let deser = Transaction::proto_deserialize(o)?;
-    //             res.push(deser);
-    //         }
-    //     }
-    //     let option = res.get(0).map(|x| x.clone());
-    //     Ok(option)
-    // }
 
 }
 

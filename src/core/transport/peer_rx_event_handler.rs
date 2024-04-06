@@ -33,7 +33,7 @@ use crate::schema::json;
 use crate::schema::response_metadata;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
-use redgold_schema::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use crate::api::faucet::faucet_request;
 use crate::multiparty::watcher::DepositWatcher;
 use redgold_schema::observability::errors::Loggable;
@@ -97,7 +97,7 @@ impl PeerRxEventHandler {
             c.send_rg_err(response)
                 .add("Send message to response channel failed in handle incoming message")
                 .with_detail("response_time_secs", response_time_secs.to_string())
-                .with_detail("request", pm.request.json_or())
+                .with_detail("request", pm.request.json_or().with_max_length(1000))
                 .log_error().ok();
         }
 

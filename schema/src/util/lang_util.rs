@@ -59,3 +59,17 @@ impl<T> AnyPrinter for T where T: std::fmt::Display {
         println!("{}", self);
     }
 }
+
+pub trait WithMaxLengthString {
+    fn with_max_length(&self, max: usize) -> String;
+}
+
+impl WithMaxLengthString for String {
+    fn with_max_length(&self, max: usize) -> String {
+        if self.len() > max {
+            format!("{}", &self[..max])
+        } else {
+            self.clone()
+        }
+    }
+}

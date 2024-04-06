@@ -25,7 +25,7 @@ use crate::util;
 // use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
 use redgold_schema::EasyJson;
-use redgold_schema::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::observability::errors::Loggable;
 
 #[derive(Clone)]
@@ -102,7 +102,7 @@ impl PeerOutgoingEventHandler {
             counter!("redgold.peer.rest.send.error").increment(1);
             let mut e2 = e.clone();
             e2.with_detail("node_metadata", nmd.json_or());
-            e2.with_detail("message", message.request.json_or());
+            e2.with_detail("message", message.request.json_or().with_max_length(1000));
             log::error!("Error sending message to peer: {}", e2.json_or());
             e2
         });

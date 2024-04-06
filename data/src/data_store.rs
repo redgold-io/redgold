@@ -368,6 +368,9 @@ impl DataStore {
         gauge!("redgold_data_store_size_gigabytes").set(file_size_bytes(self.ctx.file_path.clone()).log_error().unwrap_or(0) as f64  / (1024f64*1024f64*1024f64));
         gauge!("redgold_memory_total").set(memory_total_kb().log_error().unwrap_or(0) as f64  / (1024f64*1024f64));
         gauge!("redgold_cores_total").set(cores_total().log_error().unwrap_or(0) as f64);
+        gauge!("redgold_multiparty_total").set(self.multiparty_store.count_multiparty_total().await? as f64);
+        gauge!("redgold_multiparty_self").set(self.multiparty_store.count_self_multiparty().await? as f64);
+        // self.multiparty_store
         Ok(())
     }
 
