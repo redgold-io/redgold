@@ -652,7 +652,8 @@ jobs:
           refs/heads/dev
           ', github.ref)
         run: |
-          echo ${{ secrets.SSH_KEY }} > ~/.ssh/id_rsa;
+          echo -e "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           chmod +x ./redgold_linux;
           ./redgold_linux debug-command grafana-public-deploy
 
