@@ -647,6 +647,7 @@ jobs:
           
           "
           token: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}" >> $GITHUB_ENV
       - name: Update Grafana Public Node
         if: contains('
           refs/heads/dev
