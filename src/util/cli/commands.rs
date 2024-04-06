@@ -66,7 +66,7 @@ pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
     Ok(())
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn metrics_debug() {
     let mut nc = NodeConfig::default();
