@@ -307,7 +307,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     });
 
     let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
-    bounded_text_area_size_focus(ui, &mut arc1, 700., 30);
+    bounded_text_area_size_focus(ui, &mut arc1, 500., 10);
 
     let last_env = local_state.node_config.network.clone();
 
@@ -364,7 +364,7 @@ pub struct ServersState {
     pub skip_logs: bool,
     purge_ops: bool,
     hard_coord_reset: bool,
-    words_and_id: bool,
+    pub words_and_id: bool,
     cold: bool,
     deployment_result: Arc<Mutex<Either<Option<RgResult<()>>, ()>>>,
     deploy_process: Option<Arc<JoinHandle<()>>>,
@@ -393,7 +393,7 @@ impl Default for ServersState {
             skip_logs: false,
             purge_ops: false,
             hard_coord_reset: false,
-            words_and_id: false,
+            words_and_id: true,
             cold: false,
             deployment_result: Arc::new(Mutex::new(Either::Right(()))),
             deploy_process: None,

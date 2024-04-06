@@ -6,6 +6,7 @@
 //! We demonstrate the various permutations of values that can be passed in the macro calls, all of
 //! which are documented in detail for the respective macro.
 
+use std::collections::HashMap;
 use std::net::SocketAddrV4;
 use log::{error, info};
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
@@ -14,6 +15,38 @@ use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
 use std::sync::Arc;
 use tracing_subscriber::Registry;
 use redgold_schema::{EasyJson, ErrorInfoContext, RgResult};
+
+
+pub struct WrappedMetrics {
+    metrics: Vec<(String, String)>,
+    metrics_map: HashMap<String, String>
+}
+
+impl WrappedMetrics {
+    pub fn new(metrics: Vec<(String, String)>) -> Self {
+        let mut metrics_map = HashMap::new();
+        for (key, value) in metrics.iter() {
+            metrics_map.insert(key.clone(), value.clone());
+        }
+        Self {
+            metrics,
+            metrics_map
+        }
+    }
+
+    // Node exporter
+    // pub fn get_cpu_count(&self) -> RgResult<i64> {
+    //     self.metrics.iter().map(|(key, value)| {
+    //         if key.starts_with("node_cpu_seconds_total") {
+    //             return value.parse::<i64>().error_info("Failed to parse cpu_count")
+    //         }
+    //         Ok(0)
+    //     }).collect::<RgResult<Vec<i64>>>()?.pop().ok_or_else(|| ErrorInfoContext::new("Failed to get cpu_count"))
+    // }
+}
+
+
+
 
 pub fn register_metric_names() {
     describe_counter!("redgold.p2p.request_peer_info", "");

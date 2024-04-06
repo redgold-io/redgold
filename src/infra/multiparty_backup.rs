@@ -34,7 +34,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
         ssh.exes("sudo apt install -y sqlite3", &None).await.expect("");
         ssh.exes(cmd, &None).await.expect("");
         let user = s.username.unwrap_or("root".to_string());
-        let res = util::cmd::run_bash_async(
+        let res = redgold_schema::util::cmd::run_bash_async(
             format!(
                 "scp {}@{}:~/.rg/{}/{} {}",
                 user, s.host.clone(), net_str, fnm_export, fnm_export)

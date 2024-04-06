@@ -622,7 +622,7 @@ There's internal libraries for getting the current exe path and calculating chec
 seem to produce a different result than the shell script.
 */
 fn calc_sha_sum(path: String) -> RgResult<String> {
-    util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
+    redgold_schema::util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
         .and_then(|x|
             x.0
              .split_whitespace()

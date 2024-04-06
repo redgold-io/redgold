@@ -135,10 +135,10 @@ pub fn bounded_text_area_size_focus(ui: &mut Ui, string1: &mut String, width: f3
         let area = area1.stick_to_bottom(true)
             .id_source("bounded_text_area_size_focus")
             .max_height(height_lines)
-            .min_scrolled_height(height_lines)
-            .max_width(width)
-            .min_scrolled_width(width)
-            .auto_shrink(true);
+            .min_scrolled_height(height_lines/2.0);
+            // .max_width(width)
+            // .min_scrolled_width(width)
+            // .auto_shrink(true);
         let res = area.show(ui, |ui| {
             egui::TextEdit::multiline(string1)
                 .desired_width(width)

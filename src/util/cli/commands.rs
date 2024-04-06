@@ -26,7 +26,7 @@ use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::NodeConfig;
 use crate::util::cli::args::{AddServer, BalanceCli, DebugCommand, Deploy, FaucetCli, GenerateMnemonic, QueryCli, RgDebugCommand, TestTransactionCli, WalletAddress, WalletSend};
-use crate::util::cmd::run_cmd;
+use redgold_schema::util::cmd::run_cmd;
 use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -302,6 +302,7 @@ pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {
     }
 }
 
+// TODO: All this code is out of date, need to update it.
 // Move to own file
 pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
 
@@ -341,7 +342,7 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
 
         // Query to find if any existing servers
         let store_path = data_dir.join("data_store.sqlite").to_str().expect("str").to_string();
-        let _ds = DataStore::from_path(store_path).await;
+        // let _ds = DataStore::from_path(store_path, store_path).await;
 
         // Check to see if we have a mnemonic stored in backup for generating a random seed
 

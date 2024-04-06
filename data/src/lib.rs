@@ -27,6 +27,7 @@ mod parquet_full_index;
 
 #[derive(Clone)]
 pub struct DataStoreContext {
+    pub file_path: String,
     pub connection_path: String,
     pub pool: Arc<SqlitePool>,
 }

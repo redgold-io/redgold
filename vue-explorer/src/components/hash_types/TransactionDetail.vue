@@ -57,6 +57,9 @@
             <div><strong>Acceptance Score</strong></div>
             <div>{{ hashData.acceptance_score }}</div>
 
+            <div><strong>Num Signers</strong></div>
+            <div>{{ hashData.signers.length }}</div>
+
             <div v-if="hashData.message"><strong>Message</strong></div>
             <div v-if="hashData.message">{{ hashData.message }}</div>
 
@@ -65,6 +68,12 @@
 
             <div><strong>Signable Hash</strong></div>
             <div>{{ hashData.signable_hash }}</div>
+
+            <div><strong>Num Inputs</strong></div>
+            <div>{{ hashData.inputs.length }}</div>
+
+            <div><strong>Num Outputs</strong></div>
+            <div>{{ hashData.outputs.length }}</div>
 
           </div>
           <h3 class="detail-group">Inputs</h3>

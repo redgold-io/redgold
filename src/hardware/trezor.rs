@@ -13,7 +13,7 @@ use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Inpu
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::node_config::NodeConfig;
-use crate::util::cmd::run_cmd;
+use redgold_schema::util::cmd::run_cmd;
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use crate::util::init_logger_once;
 

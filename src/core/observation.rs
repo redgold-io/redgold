@@ -123,7 +123,8 @@ impl ObservationBuffer {
             tx.allow_bypass_fee = true;
             let address = relay.node_config.public_key().address().expect("address");
             tx.with_genesis_input(&address);
-            tx.with_observation(&Observation::default(), 0, &address);
+            tx.with_observation(&Observation::default(), 0, &address)
+                .with_pow().expect("pow");
             let tx = tx.transaction.sign(&relay.node_config.words().default_kp().expect("kp")).expect("sign");
             tx
         };

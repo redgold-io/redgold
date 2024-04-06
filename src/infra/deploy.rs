@@ -16,20 +16,18 @@ use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, struct
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
+use redgold_schema::util::cmd::{run_bash_async, run_powershell_async};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
-use crate::infra::multiparty_backup::restore_multiparty_share;
 use crate::node_config::NodeConfig;
 use crate::resources::Resources;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::Deploy;
 use crate::util::cli::data_folder::DataFolder;
-use crate::util::cmd::{run_bash_async, run_powershell_async};
-
 
 #[async_trait]
 pub trait SSHLike {

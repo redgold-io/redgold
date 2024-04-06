@@ -1,6 +1,6 @@
 use redgold_schema::structs::{Address, ErrorInfo};
 use crate::util;
-use crate::util::cmd::run_cmd;
+use redgold_schema::util::cmd::run_cmd;
 
 pub mod trezor;
 // pub mod debug;

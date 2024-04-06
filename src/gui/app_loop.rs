@@ -268,6 +268,9 @@ impl LocalState {
 
         if node_config.opts.development_mode {
             ls.server_state.ops = false;
+            if node_config.network.is_main()  {
+                ls.server_state.words_and_id = false;
+            }
         }
 
         let mut new_xpubs = vec![];

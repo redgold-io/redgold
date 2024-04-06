@@ -21,8 +21,9 @@ use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs, util, WithMetadataHashable};
-use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
+use redgold_schema::util::machine_info::{available_bytes, cores_total, file_size_bytes, memory_total_kb};
 
 use crate::schema::structs::{
     Address, ErrorInfo,
@@ -363,6 +364,10 @@ impl DataStore {
         gauge!("redgold_observation_total").set(self.observation.count_total_observations().await? as f64);
         gauge!("redgold_utxo_total").set(self.transaction_store.count_total_utxos().await? as f64);
         gauge!("redgold_utxo_distinct_addresses").set(self.utxo.count_distinct_address_utxo().await? as f64);
+        gauge!("redgold_disk_available_gigabytes").set(available_bytes(self.ctx.file_path.clone(), false).log_error().unwrap_or(0) as f64 / (1024f64*1024f64*1024f64));
+        gauge!("redgold_data_store_size_gigabytes").set(file_size_bytes(self.ctx.file_path.clone()).log_error().unwrap_or(0) as f64  / (1024f64*1024f64*1024f64));
+        gauge!("redgold_memory_total").set(memory_total_kb().log_error().unwrap_or(0) as f64  / (1024f64*1024f64));
+        gauge!("redgold_cores_total").set(cores_total().log_error().unwrap_or(0) as f64);
         Ok(())
     }
 
@@ -386,7 +391,7 @@ WHERE
     name NOT LIKE 'sqlite_%';",
      */
 
-    pub async fn from_path(path: String) -> DataStore {
+    pub async fn from_path(path: String, original_path: String) -> DataStore {
         // info!("Starting datastore with path {}", path.clone());
 
         let options = SqliteConnectOptions::new()
@@ -402,7 +407,7 @@ WHERE
             .expect("Connection failure");
         // info!("Opened pool");
         let pl = Arc::new(pool);
-        let ctx = DataStoreContext { connection_path: path.clone(), pool: pl.clone() };
+        let ctx = DataStoreContext { file_path: original_path.clone(), connection_path: path.clone(), pool: pl.clone() };
         DataStore {
             ctx: ctx.clone(),
             connection_path: path.clone(),
@@ -421,11 +426,12 @@ WHERE
 
     // node_config.env_data_folder().data_store_path()
     pub async fn from_config_path(path: &PathBuf) -> DataStore {
-        DataStore::from_path(format!("{}{}", "file:", path.to_str().expect("").to_string())).await
+        let original_path = path.to_str().expect("").to_string();
+        DataStore::from_path(format!("{}{}", "file:", original_path.clone()), original_path).await
     }
 
     pub async fn from_file_path(path: String) -> DataStore {
-        DataStore::from_path(format!("{}{}", "file:", path)).await
+        DataStore::from_path(format!("{}{}", "file:", path.clone()), path).await
     }
 
 

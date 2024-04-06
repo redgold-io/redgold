@@ -6,6 +6,7 @@ mod utxo_dev_e2e_debug;
 mod double_spend_it;
 mod database_table_size;
 mod parquet_testing;
+mod debug_n3_observations;
 
 fn asdf() {
 
