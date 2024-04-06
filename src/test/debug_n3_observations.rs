@@ -1,7 +1,7 @@
 use redgold_schema::EasyJson;
 use crate::core::relay::Relay;
 
-//#[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_obs() {
     let r = Relay::dev_default().await;
