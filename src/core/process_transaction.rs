@@ -196,9 +196,10 @@ impl TransactionProcessContext {
         }).await
     }
 
-    async fn scoped_process_and_respond(&mut self, transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
+    async fn scoped_process_and_respond(&mut self, mut transaction_message: TransactionMessage) -> Result<(), ErrorInfo> {
 
         counter!("redgold_process_transaction_called").increment(1);
+        transaction_message.transaction.with_hashes();
         let request_uuid = Uuid::new_v4().to_string();
         let hex = transaction_message.transaction.calculate_hash().hex();
         let time = transaction_message.transaction.time().map(|x| x.clone()).unwrap_or(0);
@@ -255,7 +256,7 @@ impl TransactionProcessContext {
         let result_or_error = {
             let result = match self.immediate_validation(&transaction_message.transaction).await {
                 Ok(_) => {
-                    let res = self.process(&transaction_message.transaction.clone(), current_time, request_uuid).await;
+                    let res = self.process(transaction_message.transaction.clone(), current_time, request_uuid).await;
                     res
                 }
                 Err(e) => {
@@ -333,7 +334,7 @@ impl TransactionProcessContext {
     }
 
     // TODO: Add a debug info thing here? to include data about debug calls? Thread local info? something ?
-    async fn process(&mut self, transaction: &Transaction, processing_time_start: i64, request_uuid: String) -> Result<SubmitTransactionResponse, ErrorInfo> {
+    async fn process(&mut self, mut transaction: Transaction, processing_time_start: i64, request_uuid: String) -> Result<SubmitTransactionResponse, ErrorInfo> {
         counter!("redgold.transaction.received").increment(1);
         let hash = transaction.hash_or();
         self.transaction_hash = Some(hash.clone());
@@ -354,6 +355,7 @@ impl TransactionProcessContext {
                                                 // self.tx_process.clone()
         ).await?;
         resolver_data.validate_input_output_amounts_match()?;
+        transaction = resolver_data.with_enriched_inputs()?;
 
         let fixed_utxo_ids = transaction.fixed_utxo_ids_of_inputs()?;
         self.utxo_ids = Some(fixed_utxo_ids.clone());
@@ -456,7 +458,7 @@ impl TransactionProcessContext {
         // A request type to handle that that'll alert this thread? OR should that just be the same
         // As transaction request? We might benefit from including additional information.
         // TODO: Replace all this with a relay method.
-        self.relay.gossip(transaction).await?;
+        self.relay.gossip(&transaction).await?;
 
         // tracing::info!("Gossiped transaction");
 
@@ -566,7 +568,7 @@ impl TransactionProcessContext {
         // self.insert_transaction(&transaction).await?;
         // TODO: Use observation times and update later -- also add a txWriter type to update
         // tx time
-        self.relay.write_transaction(transaction, transaction.time()?.clone(), None, true).await?;
+        self.relay.write_transaction(&transaction, transaction.time()?.clone(), None, true).await?;
         counter!("redgold.transaction.accepted").increment(1);
         tracing::info!("Accepted transaction");
 

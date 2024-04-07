@@ -49,6 +49,15 @@ impl EnvDataFolder {
     pub fn targets(&self) -> PathBuf {
         self.path.join("targets.json")
     }
+    pub fn parquet_exports(&self) -> PathBuf {
+        self.path.join("parquet_exports")
+    }
+    pub fn parquet_tx(&self) -> PathBuf {
+        self.parquet_exports().join("transactions")
+    }
+    pub fn parquet_self_observations(&self) -> PathBuf {
+        self.parquet_exports().join("observations")
+    }
 
     pub fn servers_path(&self) -> PathBuf {
         self.path.join("servers")

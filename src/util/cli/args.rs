@@ -24,7 +24,8 @@ pub fn empty_args() -> RgArgs {
         development_mode_main: false,
         aws_access_key_id: None,
         aws_secret_access_key: None,
-        s3_backup_path: None,
+        s3_backup_bucket: None,
+        server_index: None,
         etherscan_api_key: None,
     }
 }
@@ -98,9 +99,13 @@ pub struct RgArgs {
     /// Used for AWS email / backups
     #[clap(long, env = "AWS_SECRET_ACCESS_KEY")]
     pub aws_secret_access_key: Option<String>,
-    #[clap(long, env = "REDGOLD_S3_BACKUP_PATH")]
-    pub s3_backup_path: Option<String>,
     /// Used for AWS email / backups
+    #[clap(long, env = "REDGOLD_S3_BACKUP_BUCKET")]
+    pub s3_backup_bucket: Option<String>,
+    /// Used for backups
+    #[clap(long, env = "REDGOLD_SERVER_INDEX")]
+    pub server_index: Option<String>,
+    /// Price oracles
     #[clap(long, env = "ETHERSCAN_API_KEY")]
     pub etherscan_api_key: Option<String>,
 

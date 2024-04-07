@@ -250,6 +250,9 @@ impl Node {
         join_handles.push(NamedHandle::new("MiscPeriodic", stream_handlers::run_interval_fold(
             MiscPeriodic::new(&relay), Duration::from_secs(300), false
         ).await));
+        join_handles.push(NamedHandle::new("AwsBackup", stream_handlers::run_interval_fold(
+            crate::core::backup::aws_backup::AwsBackup::new(&relay), Duration::from_secs(86400), false
+        ).await));
 
         join_handles
     }

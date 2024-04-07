@@ -46,7 +46,7 @@ pub async fn manual_deploy_grafana_public() -> RgResult<()> {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_test() {
     manual_deploy_grafana_public().await.unwrap();

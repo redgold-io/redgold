@@ -62,10 +62,15 @@ impl TxWriter {
         // Commit transaction internally to database.
 
         info!("Accepting transaction: {}", transaction.hash_or());
+        let time = if message.rejection_reason.is_none() {
+            transaction.time()?.clone()
+        } else {
+            message.time
+        };
         self.relay
                 .ds
                 .accept_transaction(
-                    &transaction, message.time, message.rejection_reason.clone(), message.update_utxo
+                    &transaction, time, message.rejection_reason.clone(), message.update_utxo
                 ).await.mark_abort()?;
 
         info!("Sanity check on transaction: {}", transaction.hash_or());

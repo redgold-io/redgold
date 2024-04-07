@@ -12,8 +12,8 @@ use crate::data_store::DataStore;
 #[async_trait]
 pub trait ParquetExporter {
     async fn get_time_ordered_transactions(&self) -> RgResult<Vec<Transaction>>;
-    async fn parquet_export_archive_historical(&self, path: &PathBuf) -> RgResult<()>;
-    async fn parquet_export_archive_historical_ym(&self, path: &PathBuf) -> RgResult<()>;
+    async fn parquet_export_archive_historical_tx(&self, tx_path: &PathBuf) -> RgResult<()>;
+    // async fn parquet_export_archive_historical_ym(&self, path: &PathBuf) -> RgResult<()>;
 }
 
 #[async_trait]
@@ -43,26 +43,78 @@ impl ParquetExporter for DataStore {
         // Ok(all2)
         Ok(txs)
     }
-    async fn parquet_export_archive_historical(&self, path: &PathBuf) -> RgResult<()> {
-        std::fs::create_dir_all(path).error_info("Failed to create directory for Parquet export")?;
+    async fn parquet_export_archive_historical_tx(&self, tx_path: &PathBuf) -> RgResult<()> {
+        std::fs::remove_dir(tx_path).ok();
+        std::fs::create_dir_all(tx_path).error_info("Failed to create directory for Parquet export")?;
         let all2 = self.get_time_ordered_transactions().await?;
+        Self::write_transactions_partitioned(tx_path, all2)?;
+
+        Ok(())
+    }
+    // async fn parquet_export_archive_historical_ym(&self, path: &PathBuf) -> RgResult<()> {
+    //     let all2 = self.get_time_ordered_transactions().await?;
+    //
+    //     let mut cur_ym: Option<String> = None;
+    //
+    //     let mut buf = Vec::new();
+    //     let max_byte_count = 128 * 1024 * 1024; // 128 MiB
+    //     let mut byte_count = 0;
+    //     let mut part = 0;
+    //
+    //     for (tx) in all2 {
+    //         let time = tx.clone().time()?.clone();
+    //         let year_month = millis_to_year_month(time);
+    //         if cur_ym.is_none() {
+    //             cur_ym = Some(year_month.clone());
+    //         }
+    //         let ser = tx.proto_serialize();
+    //         let ym_change = cur_ym != Some(year_month.clone());
+    //         if byte_count + ser.len() > max_byte_count || ym_change {
+    //             let path_ym = path.join(cur_ym.clone().unwrap());
+    //             let part_fnm = index_to_part_file(part);
+    //             let path_file = path_ym.join(part_fnm);
+    //             write_parquet_file(&path_file, &buf)?;
+    //             buf.clear();
+    //             byte_count = 0;
+    //             part += 1;
+    //         }
+    //         if ym_change {
+    //             cur_ym = Some(year_month);
+    //             part = 0;
+    //         }
+    //         buf.push(tx);
+    //     }
+    //
+    //     Ok(())
+    // }
+}
+
+impl DataStore {
+    fn write_part(path: &PathBuf, buf: &mut Vec<Transaction>, mut part: i32) -> RgResult<()> {
+        let part_fnm = index_to_part_file(part);
+        let path_file = path.join(part_fnm);
+        write_parquet_file(&path_file, &buf)?;
+        Ok(())
+    }
+
+    pub fn write_transactions_partitioned(tx_path: &PathBuf, all2: Vec<Transaction>) -> RgResult<()> {
         let mut buf = Vec::new();
-        let max_byte_count = 1 * 1024 * 1024; // 128 MiB default
+        let max_byte_count = 128 * 1024 * 1024; // 128 MiB default
         let mut byte_count = 0;
         let mut part = 0;
 
-        info!("Starting export");
+        // info!("Starting export");
         for (i, tx) in all2.into_iter().enumerate() {
             let ser = tx.proto_serialize();
-            let mut write_condition = false;
-            if i % 2000 == 0 && i > 0 {
-                info!("Exporting transaction {}", i);
-                write_condition = true;
-            }
-            // let write_condition = byte_count + ser.len() > max_byte_count;
+            // let mut write_condition = false;
+            // if i % 2000 == 0 && i > 0 {
+            //     info!("Exporting transaction {}", i);
+            //     write_condition = true;
+            // }
+            let write_condition = byte_count + ser.len() > max_byte_count;
             if write_condition {
                 info!("Starting write part {}", part);
-                Self::write_part(path, &mut buf, part)?;
+                Self::write_part(tx_path, &mut buf, part)?;
                 buf.clear();
                 byte_count = 0;
                 part += 1;
@@ -71,54 +123,8 @@ impl ParquetExporter for DataStore {
             byte_count += ser.len();
         }
         if !buf.is_empty() {
-            Self::write_part(path, &mut buf, part)?;
+            Self::write_part(tx_path, &mut buf, part)?;
         }
-
-        Ok(())
-    }
-    async fn parquet_export_archive_historical_ym(&self, path: &PathBuf) -> RgResult<()> {
-        let all2 = self.get_time_ordered_transactions().await?;
-
-        let mut cur_ym: Option<String> = None;
-
-        let mut buf = Vec::new();
-        let max_byte_count = 128 * 1024 * 1024; // 128 MiB
-        let mut byte_count = 0;
-        let mut part = 0;
-
-        for (tx) in all2 {
-            let time = tx.clone().time()?.clone();
-            let year_month = millis_to_year_month(time);
-            if cur_ym.is_none() {
-                cur_ym = Some(year_month.clone());
-            }
-            let ser = tx.proto_serialize();
-            let ym_change = cur_ym != Some(year_month.clone());
-            if byte_count + ser.len() > max_byte_count || ym_change {
-                let path_ym = path.join(cur_ym.clone().unwrap());
-                let part_fnm = index_to_part_file(part);
-                let path_file = path_ym.join(part_fnm);
-                write_parquet_file(&path_file, &buf)?;
-                buf.clear();
-                byte_count = 0;
-                part += 1;
-            }
-            if ym_change {
-                cur_ym = Some(year_month);
-                part = 0;
-            }
-            buf.push(tx);
-        }
-
-        Ok(())
-    }
-}
-
-impl DataStore {
-    fn write_part(path: &PathBuf, buf: &mut Vec<Transaction>, mut part: i32) -> RgResult<()> {
-        let part_fnm = index_to_part_file(part);
-        let path_file = path.join(part_fnm);
-        write_parquet_file(&path_file, &buf)?;
         Ok(())
     }
 }

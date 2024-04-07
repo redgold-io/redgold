@@ -42,6 +42,7 @@ pub struct ResolvedInput {
     pub peer_valid_index: HashSet<PublicKey>,
     pub peer_invalid_index: HashSet<PublicKey>,
     pub signable_hash: Hash,
+    pub parent_output: Output,
 }
 
 
@@ -164,7 +165,8 @@ pub fn validate_single_result(
 
 pub async fn resolve_input(
     input: Input, relay: Relay, _peers: Vec<PublicKey>, signable_hash: Hash,
-    check_liveness: bool
+    check_liveness: bool,
+    time: i64
 )
                            -> Result<ResolvedInput, ErrorInfo> {
     metrics::counter!("redgold.transaction.resolve.input").increment(1);
@@ -244,15 +246,24 @@ pub async fn resolve_input(
 
     }
 
+    let parent_tx = res.ok_or(ErrorInfo::error_info("Missing parent transaction"))?;
+    let parent_output = parent_tx.outputs.get(u.output_index as usize).cloned()
+        .ok_or(ErrorInfo::error_info("Output index out of bounds on parent transaction"))?;
+    let parent_time = parent_tx.time()?.clone();
+    // TODO: Add parent info to error message.
+    if parent_time > time {
+        return Err(ErrorInfo::error_info("Parent transaction is newer than child"));
+    }
     let resolved = ResolvedInput {
         input: input.clone(),
-        parent_transaction: res.ok_or(ErrorInfo::error_info("Missing parent transaction"))?,
+        parent_transaction: parent_tx,
         internal_accepted,
         internal_valid_index,
         observation_proofs,
         peer_valid_index,
         peer_invalid_index,
-        signable_hash
+        signable_hash,
+        parent_output,
     };
     resolved.verify_proof()?;
     Ok(resolved)
@@ -294,6 +305,16 @@ pub struct ResolvedTransaction {
 
 impl ResolvedTransaction {
 
+    pub fn with_enriched_inputs(&self) -> RgResult<Transaction> {
+        let mut t = self.transaction.clone();
+        for (idx, ri) in self.fixed_resolutions.iter().enumerate() {
+            if let Some(input) = t.inputs.get_mut(idx) {
+                input.output = Some(ri.prior_output()?.clone());
+            }
+        }
+        Ok(t)
+    }
+
     pub fn total_parent_amount_available(&self) -> Result<i64, ErrorInfo> {
         let mut total = 0;
         for r in &self.fixed_resolutions {
@@ -330,6 +351,7 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
     let peers = relay.ds.peer_store.active_nodes(None).await?;
     let mut resolved_internally = true;
     let mut vec = vec![];
+    let time = tx.time()?.clone();
 
     // TODO: Have we verified this input contains all the signatures?
     for result in future::join_all(tx.inputs.iter()
@@ -337,7 +359,7 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
         .map(|input|
         async{tokio::spawn(resolve_input(input.clone(), relay.clone(),
                                         // runtime.clone(),
-                                         peers.clone(), tx.signable_hash().clone(), true))
+                                         peers.clone(), tx.signable_hash().clone(), true, time))
             .await.map_err(|e| error_info(e.to_string()))}
     ).collect_vec()).await {
         let result = result??;

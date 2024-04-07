@@ -259,4 +259,5 @@ redgold-keys = {workspace = true}
 redgold-executor = {workspace = true}
 aws-config = "0.55.1" #Dependencies for email sending
 aws-sdk-sesv2 = "0.28.0" #Dependencies for email sending
+aws-sdk-s3 = "0.28.0" #Dependencies for email sending
 dns-lookup = "2.0.2" #Dependencies for email sending

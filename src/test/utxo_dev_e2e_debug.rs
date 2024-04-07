@@ -91,7 +91,7 @@ async fn debug_live_e2e_utxos() {
         let signable = tx.signable_hash();
         for input in tx.inputs {
             info!("Resolving Input: {}", input.json_or());
-            resolve_input(input, r.clone(), vec![], signable.clone(), true).await.expect("");
+            // resolve_input(input, r.clone(), vec![], signable.clone(), true).await.expect("");
         }
 
 

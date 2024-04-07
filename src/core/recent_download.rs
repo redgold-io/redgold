@@ -74,7 +74,8 @@ impl RecentDownload {
                                 vec![],
                                 // Not needed here
                                 update.parent_transaction.signable_hash(),
-                                false
+                                false,
+                                update.parent_transaction.time()?.clone(),
                             ).await;
                             if let Ok(resolved_input) = resolved_input {
                                 self.relay.unknown_resolved_inputs.sender.send_rg_err(resolved_input)?;

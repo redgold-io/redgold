@@ -341,6 +341,10 @@ pub async fn deploy_redgold(
     env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
     env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
     env.insert("RUST_BACKTRACE".to_string(), "full".to_string());
+    env.insert("REDGOLD_SERVER_INDEX".to_string(), ssh.server.index.to_string());
+    env.insert("REDGOLD_SERVER_PEER_INDEX".to_string(), ssh.server.peer_id_index.to_string());
+    env.insert("REDGOLD_SERVER_NODE_NAME".to_string(), ssh.server.node_name.clone().unwrap_or("anon".to_string()));
+
      if let Some(a) = alias {
          env.insert("REDGOLD_ALIAS".to_string(), a);
      }
@@ -828,6 +832,11 @@ pub async fn default_deploy(
             // TODO: Change to _main
             if ss.index == 0 && node_config.opts.development_mode {
                 this_hm.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
+            }
+            if node_config.opts.development_mode_main {
+                // REDGOLD_MAIN_DEVELOPMENT_MODE
+                this_hm.insert("REDGOLD_MAIN_DEVELOPMENT_MODE".to_string(), "true".to_string());
+                this_hm.insert("REDGOLD_S3_BACKUP_BUCKET".to_string(), "redgold-backups".to_string());
             }
             let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
                 ssh, net, gen, Some(this_hm), purge,
