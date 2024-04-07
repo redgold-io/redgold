@@ -263,6 +263,8 @@ impl TransactionSubmitter {
             x.as_ref().map(|q| q.accepted(1).is_ok()).unwrap_or(false)));
         let one_rejected = doubles.iter().any(|x| !x.is_ok());
 
+        info!("Double spend test output 1 {}", doubles.get(0).json_or());
+        info!("Double spend test output 2 {}", doubles.get(1).json_or());
         // if !one_rejected {
         //     show_balances()
         // }
