@@ -1,21 +1,17 @@
 export default {
     methods: {
         getUrl() {
-            let url = process.env.VUE_APP_API_URL
-            let port = "16186"
+            let url = "https://api.redgold.io"
             const hostname = window.location.hostname;
 
             if (hostname.includes('dev') || hostname.includes('localhost')) {
-                port = "16486";
+                url = "https://dev.api.redgold.io"
             } else if (hostname.includes('staging')) {
-                port = "16386";
+                url = "https://staging.api.redgold.io"
             } else if (hostname.includes('test')) {
-                port = "16286";
-            } else { // default main
-                port = "16186"
+                url = "https://test.api.redgold.io"
             }
 
-            url += ":" + port
             return url
         },
         async btcUsdPrice() {

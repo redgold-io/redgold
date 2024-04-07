@@ -99,11 +99,6 @@ export default {
   mounted() {
 
     let url = this.getUrl()
-    // let url = process.env.VUE_APP_API_URL;
-    // let port = "16486";
-    //
-    // url += ":" + port
-
     axios.get(`${url}/explorer`)
         .then(response => {
           let data = response.data;
