@@ -311,7 +311,7 @@ impl NodeConfig {
     }
 
     // TODO: this can be fixed at arg parse time
-    pub fn public_key(&self) -> structs::PublicKey {
+    pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
     }
 

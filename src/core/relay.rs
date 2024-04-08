@@ -544,25 +544,26 @@ impl Relay {
     }
 
     pub async fn update_node_metadata(&self, node_metadata: &NodeMetadata) -> RgResult<()> {
-        let tx = self.node_tx().await?;
+        // let tx = self.node_tx().await?;
         let mut tx_b = TransactionBuilder::new(&self.node_config);
         tx_b.allow_bypass_fee = true;
 
-        let option = self.get_self_fee_utxo().await?;
-        let has_currency = option.is_some();
-        if let Some(utxo) = option {
-            tx_b.with_unsigned_input(utxo)?;
-        }
-
-        let utxo = tx.nmd_utxo()?;
-        let h = utxo.height()?;
+        // let option = self.get_self_fee_utxo().await?;
+        // let has_currency = option.is_some();
+        // if let Some(utxo) = option {
+        //     tx_b.with_unsigned_input(utxo)?;
+        // }
+        //
+        // let utxo = tx.nmd_utxo()?;
+        // let h = utxo.height()?;
         let address = self.node_config.public_key().address()?;
-        tx_b.with_nmd_utxo(&utxo)?;
-        tx_b.with_output_node_metadata(&address, node_metadata.clone(), h+1);
+        // tx_b.with_nmd_utxo(&utxo)?;
+        // tx_b.with_output_node_metadata(&address, node_metadata.clone(), h+1);
+        tx_b.with_output_node_metadata(&address, node_metadata.clone(), 1);
         // TODO: Add fee here from internal node wallet
-        if has_currency {
-            tx_b.with_default_fee()?;
-        };
+        // if has_currency {
+        //     tx_b.with_default_fee()?;
+        // };
 
         let updated = tx_b.build()?.sign(&self.node_config.keypair())?;
         self.ds.config_store.set_node_tx(&updated).await?;
@@ -573,25 +574,30 @@ impl Relay {
     }
 
     // Don't use this until everything else is updated.
-    pub async fn update_nmd_auto(&self) -> RgResult<()> {
-        let mut nmd = self.node_metadata().await?;
+    // pub async fn update_nmd_auto(&self) -> RgResult<()> {
+    //     let nmd = self.update_with_version_info().await?;
+    //     self.update_node_metadata(&nmd).await?;
+    //     Ok(())
+    // }
+
+    pub async fn update_with_live_info(&self, nmd: NodeMetadata) -> RgResult<NodeMetadata> {
+        let mut nmd = nmd.clone();
         let vii = self.node_config.version_info();
         if let Some(vi) = nmd.version_info.as_mut() {
             vi.commit_hash = vii.commit_hash;
             vi.executable_checksum = vii.executable_checksum;
             vi.build_number = vii.build_number;
         };
-        self.update_node_metadata(&nmd).await?;
-        Ok(())
+        Ok(nmd)
     }
 
-    pub async fn force_update_nmd_auto_peer_tx(&self) -> RgResult<()> {
-        let tx = self.node_config.peer_tx_fixed();
-        self.ds.config_store.set_peer_tx(&tx).await?;
-        let nmd = self.node_config.node_tx_fixed(None);
-        self.ds.config_store.set_node_tx(&nmd).await?;
-        Ok(())
-    }
+    // pub async fn force_update_nmd_auto_peer_tx(&self) -> RgResult<()> {
+    //     let tx = self.node_config.peer_tx_fixed();
+    //     self.ds.config_store.set_peer_tx(&tx).await?;
+    //     let nmd = self.node_config.node_tx_fixed(None);
+    //     self.ds.config_store.set_node_tx(&nmd).await?;
+    //     Ok(())
+    // }
 
     pub async fn add_party_id(&self, d: &PartyId) -> RgResult<()> {
         let mut nmd = self.node_metadata().await?;

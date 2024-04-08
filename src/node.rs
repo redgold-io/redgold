@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, EasyJson, error_info, ErrorInfoContext, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::{bytes_data, EasyJson, EasyJsonDeser, error_info, ErrorInfoContext, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
@@ -281,6 +282,22 @@ impl Node {
             .add("Multiparty CSV update failed")
             .log_error()?;
 
+        relay.ds.peer_store.clear_all_peers().await?;
+
+        if let Some(p) = fs::read_to_string(relay2.node_config.env_data_folder().peer_tx_path()).ok() {
+            if let Ok(tx) = p.json_from::<Transaction>() {
+                relay.ds.config_store.set_peer_tx(&tx).await?;
+                let pd = tx.peer_data()?;
+                let key = node_config.public_key();
+                let self_pk = Some(key);
+                let nmd = pd.node_metadata.iter()
+                    .filter(|x| { x.public_key == self_pk }).next().cloned().ok_msg("No node metadata found")?;
+                let nmd = relay2.update_with_live_info(nmd).await?;
+                relay2.update_node_metadata(&nmd).await?;
+            }
+        }
+
+
         Ok(())
     }
 
@@ -322,10 +339,9 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
-        relay.force_update_nmd_auto_peer_tx().await?;
+        // relay.force_update_nmd_auto_peer_tx().await?;
 
         // Temp mechanism, clear all peers, allow seeds to refresh them.
-        relay.ds.peer_store.clear_all_peers().await?;
 
         // relay.update_nmd_auto().await?;
 

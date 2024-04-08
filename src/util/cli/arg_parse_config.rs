@@ -22,12 +22,12 @@ use tracing::trace;
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::EasyJson;
 use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, TrustData};
+use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, Transaction, TrustData};
 
 use crate::{e2e, gui, util};
 use crate::api::RgHttpClient;
@@ -148,7 +148,7 @@ impl ArgTranslate {
         self.secure_data_folder();
         self.load_mnemonic().await?;
         self.load_peer_id()?;
-        // self.load_peer_tx()?;
+        self.load_peer_tx()?;
         self.set_public_key();
         self.load_internal_servers()?;
         self.calculate_executable_checksum_hash();
@@ -611,6 +611,9 @@ impl ArgTranslate {
                 _ => {}
             }
         }
+    }
+    fn load_peer_tx(&self) -> RgResult<()> {
+        Ok(())
     }
 }
 
