@@ -76,9 +76,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     table_rows.push(vec![
         "Hostname".to_string(),
         "Index".to_string(),
-        "PeerId Index".to_string(),
-        "SSH status".to_string(),
-        "Process Up".to_string(),
+        "Peer".to_string(),
+        "SSH".to_string(),
+        "Docker".to_string(),
         "TX Total".to_string(),
         // "SSH Key Path".to_string(),
     ]);

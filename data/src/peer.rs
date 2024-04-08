@@ -424,6 +424,19 @@ impl PeerStore {
         Ok(())
     }
 
+    pub async fn clear_all_peers(&self) -> RgResult<()> {
+        let mut pool = self.ctx.pool().await?;
+        let _rows = DataStoreContext::map_err_sqlx(sqlx::query!("DELETE FROM nodes")
+            .execute(&mut *pool)
+            .await)?.rows_affected();
+
+        let _rows = DataStoreContext::map_err_sqlx(sqlx::query!("DELETE FROM peers")
+            .execute(&mut *pool)
+            .await)?.rows_affected();
+
+        Ok(())
+    }
+
     pub async fn query_public_key_node(
         &self,
         public: &PublicKey,

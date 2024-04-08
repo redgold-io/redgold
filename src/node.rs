@@ -323,6 +323,10 @@ impl Node {
         let node_config = relay.node_config.clone();
 
         relay.force_update_nmd_auto_peer_tx().await?;
+
+        // Temp mechanism, clear all peers, allow seeds to refresh them.
+        relay.ds.peer_store.clear_all_peers().await?;
+
         // relay.update_nmd_auto().await?;
 
         gauge!("redgold_peer_id", &relay.gauge_labels().await?).set(1.0);
