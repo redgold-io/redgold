@@ -552,6 +552,7 @@ impl Relay {
         Ok(())
     }
 
+    // Don't use this until everything else is updated.
     pub async fn update_nmd_auto(&self) -> RgResult<()> {
         let mut nmd = self.node_metadata().await?;
         let vii = self.node_config.version_info();
@@ -561,6 +562,14 @@ impl Relay {
             vi.build_number = vii.build_number;
         };
         self.update_node_metadata(&nmd).await?;
+        Ok(())
+    }
+
+    pub async fn force_update_nmd_auto_peer_tx(&self) -> RgResult<()> {
+        let tx = self.node_config.peer_tx_fixed();
+        self.ds.config_store.set_peer_tx(&tx).await?;
+        let nmd = self.node_config.node_tx_fixed(None);
+        self.ds.config_store.set_node_tx(&nmd).await?;
         Ok(())
     }
 

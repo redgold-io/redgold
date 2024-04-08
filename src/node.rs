@@ -321,7 +321,8 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
-        relay.update_nmd_auto().await?;
+        relay.force_update_nmd_auto_peer_tx().await?;
+        // relay.update_nmd_auto().await?;
 
         if node_config.genesis {
             Self::genesis_start(&relay, &node_config).await?;
