@@ -867,7 +867,7 @@ pub async fn default_deploy(
                 deploy.skip_logs,
                 true,
                 false
-            ).await.expect("")
+            ).await?
         }
     }
     Ok(())

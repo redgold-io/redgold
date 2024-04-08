@@ -71,6 +71,8 @@ impl AwsBackup {
             let parquet_exports = format!("{}/{}", daily_key, "parquet_exports");
             Self::s3_upload_directory(&self.relay.node_config.env_data_folder().parquet_exports(), bucket.clone(), parquet_exports).await?;
             // let weekly_keys = Self::s3_ls(bucket, weekly_prefix).await?;
+        } else {
+            info!("No s3_backup_bucket or server_index set")
         };
         Ok(())
 

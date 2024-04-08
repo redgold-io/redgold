@@ -65,7 +65,7 @@ impl IntervalFold for Discovery {
                         if let Some(info) = info {
                             if let Some(latest_node_tx) = info.latest_node_transaction.as_ref() {
                                 if latest_node_tx != &node_tx_original {
-                                    error!("Discovery response node transaction does not match original");
+                                    error!("Discovery response node transaction does not match original, removing latest_node_tx {} node_tx_original {}", latest_node_tx.json_or(), node_tx_original.json_or());
                                     let pk_o = node_tx_original.node_metadata().expect("nmd").public_key.expect("pk");
                                     self.relay.ds.peer_store.remove_node(&pk_o).await?;
                                 }
@@ -77,10 +77,17 @@ impl IntervalFold for Discovery {
                     }
                 }
                 Err(e) => {
-                    error!("Error in discovery: {}", e.json_or());
-                    self.relay.ds.peer_store.remove_node(
-                        &node_tx_original.node_metadata().expect("nmd").public_key.expect("")
-                    ).await?;
+                    error!("Error in discovery query: {} removing node", e.json_or());
+                    let nmd = node_tx_original.node_metadata();
+                    if let Ok(nmd) = nmd {
+                        if let Some(key) = nmd.public_key.as_ref() {
+                            info!("Removing node in discovery query with error: {} {}", key.hex_or(), nmd.json_or());
+                            self.relay.ds.peer_store.remove_node(
+                                &key
+                            ).await?;
+                        }
+                    }
+
                 }
             }
         }
