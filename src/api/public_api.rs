@@ -526,7 +526,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move || {
             let relay3 = tmp_relay.clone();
             async move {
-                let ps = relay3.peer_id().await;
+                let ps = relay3.peer_id_from_node_tx().await;
                 as_warp_json_response(ps)
             }
         });

@@ -35,6 +35,7 @@ use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::transaction::amount_to_raw_amount;
+use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
@@ -166,6 +167,10 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 }
 
 impl Relay {
+
+    pub async fn discover_peer(&self, nmd: &NodeMetadata) -> RgResult<()> {
+        self.discovery.send(DiscoveryMessage::new(nmd.clone(), None)).await
+    }
     pub async fn write_transaction(
         &self,
         transaction: &Transaction,
@@ -355,7 +360,7 @@ impl Relay {
 
     pub async fn peer_id_for_node_pk(&self, public_key: &PublicKey) -> RgResult<Option<PeerId>> {
         if &self.node_config.public_key() == public_key {
-            return Ok(Some(self.peer_id().await?))
+            return Ok(Some(self.peer_id_from_node_tx().await?))
         }
         self.ds.peer_store.peer_id_for_node_pk(public_key).await
     }
@@ -448,7 +453,22 @@ impl Relay {
         }
     }
 
-    pub async fn peer_id(&self) -> RgResult<PeerId> {
+    pub async fn last_6_peer_id(&self) -> RgResult<String> {
+        Ok(self.peer_tx().await?.peer_data()?
+            .peer_id.ok_msg("Peer ID not found")?.peer_id.ok_msg("Peer ID not found")?
+            .hex_or().last_n(6))
+    }
+
+    pub async fn gauge_labels(&self) -> RgResult<[(String, String); 2]> {
+        let last_6 = self.last_6_peer_id().await?;
+        let labels = [
+            ("public_key".to_string(), self.node_config.short_id().expect("short id")),
+            ("peer_id".to_string(), last_6),
+        ];
+        Ok(labels)
+    }
+
+    pub async fn peer_id_from_node_tx(&self) -> RgResult<PeerId> {
         let res = self.node_tx()
             .await
             .and_then(|n| n.node_metadata())

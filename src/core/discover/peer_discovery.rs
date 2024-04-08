@@ -146,14 +146,20 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
         let done = match result {
             Ok(r) => {
                 let res = self.process(message.clone(), r).await;
-                tracing::debug!("Got discovery response for peer: {}", message.node_metadata.long_identifier());
+                debug!("Got discovery response for peer: {}", message.node_metadata.long_identifier());
                 res
             }
-            Err(e) => { Err(e) }
+            Err(e) => {
+                // Check to remove this peer as dead if it already existed before?
+                if let Some(pk) = message.node_metadata.public_key.as_ref() {
+                    self.relay.ds.peer_store.remove_node(&pk).await?;
+                }
+                Err(e)
+            }
         };
         done.log_error().ok();
         if done.is_ok() {
-            tracing::debug!("Discovery success for peer: {}", message.node_metadata.long_identifier());
+            debug!("Discovery success for peer: {}", message.node_metadata.long_identifier());
         }
         Ok(())
     }

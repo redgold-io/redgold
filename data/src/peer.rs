@@ -4,6 +4,7 @@ use redgold_schema::{ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHa
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use itertools::Itertools;
+use metrics::{counter, gauge};
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::TestConstants;
 use redgold_schema::EasyJson;
@@ -404,6 +405,7 @@ impl PeerStore {
 
 
     pub async fn remove_node(&self, p0: &PublicKey) -> RgResult<()> {
+        counter!("redgold_peer_store_remove_node").increment(1);
         let pid = self.peer_id_for_node_pk(p0).await?;
         if let Some(p) = pid {
             let mut pool = self.ctx.pool().await?;
@@ -411,7 +413,8 @@ impl PeerStore {
             let rows = sqlx::query!("DELETE FROM nodes WHERE public_key = ?1", vec)
                 .execute(&mut *pool)
                 .await;
-            let _rows_m = DataStoreContext::map_err_sqlx(rows)?;
+            let num_peers = DataStoreContext::map_err_sqlx(rows)?.rows_affected();
+            counter!("redgold_peer_store_nodes_deleted").increment(num_peers);
             let c = self.peer_id_count_node_pk(p0).await?;
             if c > 0 {
                 self.remove_peer_id(&p).await?;

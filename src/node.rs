@@ -65,6 +65,7 @@ use crate::multiparty::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
 use crate::sanity::{historical_parity, migrations};
 
@@ -323,6 +324,8 @@ impl Node {
 
         relay.force_update_nmd_auto_peer_tx().await?;
         // relay.update_nmd_auto().await?;
+
+        gauge!("redgold_peer_id", &relay.gauge_labels().await?).set(1.0);
 
         if node_config.genesis {
             Self::genesis_start(&relay, &node_config).await?;

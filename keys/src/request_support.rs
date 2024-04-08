@@ -94,7 +94,9 @@ impl ResponseSupport for Response {
         }
         if let Some(intended) = intended_pk {
             if proof_pk != intended {
-                return Err(error_info("Intended public key and proof public key mismatch on response authentication verification"));
+                return
+                    Err(error_info("Intended public key and proof public key mismatch on response authentication verification"
+                    )).with_detail("intended_pk", intended.hex_or()).with_detail("proof_pk", proof_pk.hex_or());
             }
         }
         Ok(self)

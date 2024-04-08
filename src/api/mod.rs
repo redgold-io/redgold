@@ -22,7 +22,7 @@ use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, UtxoId, GetPeersInfoRequest, GetPeersInfoResponse, Request, Response, HashSearchResponse, HashSearchRequest, Transaction, PublicKey, PublicResponse, QueryAddressesRequest, AddressInfo, NetworkEnvironment};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
-use redgold_schema::util::lang_util::SameResult;
+use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 
 pub mod control_api;
 pub mod public_api;
@@ -199,7 +199,7 @@ impl RgHttpClient {
         let result = self.proto_post(&r, "request_proto".to_string()).await?;
         result.as_error_info().add("Response metadata found as errorInfo")?;
         let string = result.json_or();
-        result.verify_auth(intended_pk).add("Response authentication verification failure").add(string)
+        result.verify_auth(intended_pk).add("Response authentication verification failure").add(string.with_max_length(1000))
     }
 
     pub async fn test_request<Req, Resp>(port: u16, req: &Req, endpoint: String) -> Result<Resp, ErrorInfo>

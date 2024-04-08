@@ -27,7 +27,19 @@ impl AwsBackup {
             relay: relay.clone()
         }
     }
+
+    pub async fn can_do_backup(&self) -> bool {
+        if let (Some(bucket), Some(server_index)) =
+            (self.relay.node_config.opts.s3_backup_bucket.as_ref(),
+             self.relay.node_config.opts.server_index.as_ref()) {
+            return Self::s3_ls(bucket, "".to_string()).await.is_ok()
+        }
+        false
+    }
+
     pub async fn backup_s3(&self) -> RgResult<()> {
+        let ct = util::current_time_unix() as i64;
+
         if let (Some(bucket), Some(server_index)) =
             (self.relay.node_config.opts.s3_backup_bucket.as_ref(),
              self.relay.node_config.opts.server_index.as_ref()){
@@ -35,7 +47,17 @@ impl AwsBackup {
             let daily_prefix = format!("daily/{}", server_index);
             // let weekly_prefix = format!("weekly/{}", server_index);
             // let monthly_prefix = format!("monthly/{}", server_index);
+            info!("Listing keys in bucket {}", bucket);
             let daily_keys = Self::s3_ls(bucket, daily_prefix.clone()).await?;
+            if !daily_keys.is_empty() {
+                let newest = daily_keys.iter().max().unwrap();
+                let newest = newest.split('/').last().unwrap();
+                let newest = newest.parse::<i64>().unwrap();
+                if ct - newest < (86400 / 2) {
+                    info!("Not enough time has passed since last backup");
+                    return Ok(());
+                }
+            }
             if daily_keys.len() >= 7 {
                 let oldest = daily_keys.iter().min().unwrap();
                 let oldest = oldest.split('/').last().unwrap();
@@ -45,7 +67,6 @@ impl AwsBackup {
                 // Self::s3_cp(bucket, oldest, ).await?;
                 Self::s3_rm(bucket, oldest).await?;
             }
-            let ct = util::current_time_unix();
             let daily_key = format!("{}/{}", daily_prefix.clone(), ct);
             let parquet_exports = format!("{}/{}", daily_key, "parquet_exports");
             Self::s3_upload_directory(&self.relay.node_config.env_data_folder().parquet_exports(), bucket.clone(), parquet_exports).await?;

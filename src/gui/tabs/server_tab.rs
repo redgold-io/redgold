@@ -117,6 +117,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.spacing();
         ui.separator();
         ui.spacing();
+        if ui.button("Refresh").clicked() {
+            local_state.server_state.needs_update = true;
+        }
     });
     ui.separator();
 
@@ -134,9 +137,6 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             });
         });
 
-        if ui.button("Refresh").clicked() {
-            local_state.server_state.needs_update = true;
-        }
     });
 
     ui.horizontal(|ui| {
