@@ -162,10 +162,13 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
             }
             Err(e) => {
                 // Check to remove this peer as dead if it already existed before?
+                info!("Error in discovery try_recv_for_each query: {} removing node {}", message.node_metadata.long_identifier(), e.json_or());
                 if let Some(pk) = message.node_metadata.public_key.as_ref() {
                     self.relay.ds.peer_store.remove_node(&pk).await?;
                 }
-                Err(e)
+                // TODO: Tasklocal error handling
+                Err(e).with_detail("long_identifier", message.node_metadata.long_identifier())
+                    .with_detail("node_metadata", message.node_metadata.json_or())
             }
         };
         done.log_error().ok();
