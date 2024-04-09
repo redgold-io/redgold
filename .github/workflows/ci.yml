@@ -656,5 +656,10 @@ jobs:
           echo -e "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           chmod +x ./redgold_linux;
+          export SMTP_USER='AKIA6HKSSMZBDKECBSUK';
+          export SMTP_PASSWORD='empty';
+          export SMTP_HOST='email-smtp.us-east-1.amazonaws.com:587';
+          export SMTP_FROM_ADDRESS='info@redgold.io';
+          export SMTP_FROM_NAME='redgold';
           ./redgold_linux debug-command grafana-public-deploy
 
