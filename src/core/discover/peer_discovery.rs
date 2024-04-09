@@ -17,6 +17,7 @@ use crate::core::stream_handlers::{IntervalFold, TryRecvForEach};
 use crate::e2e::run;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::EasyJson;
+use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo};
 use crate::util;
 
@@ -152,8 +153,11 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
         let result = self.relay.send_message_sync_pm(msg, None).await;
         let done = match result {
             Ok(r) => {
-                let res = self.process(message.clone(), r).await;
-                debug!("Got discovery response for peer: {}", message.node_metadata.long_identifier());
+                let res = self.process(message.clone(), r).await
+                    .with_detail("long_identifier", message.node_metadata.long_identifier())
+                    .with_detail("response", r.json_or().with_max_length(3000))
+                    .with_detail("node_metadata", message.node_metadata.json_or());
+                debug!("Got discovery response for peer: {} {}", message.node_metadata.long_identifier(), r.json_or().with_max_length(3000));
                 res
             }
             Err(e) => {
