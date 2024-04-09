@@ -153,7 +153,7 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
         let result = self.relay.send_message_sync_pm(msg, None).await;
         let done = match result {
             Ok(r) => {
-                let res = self.process(message.clone(), r).await
+                let res = self.process(message.clone(), r.clone()).await
                     .with_detail("long_identifier", message.node_metadata.long_identifier())
                     .with_detail("response", r.json_or().with_max_length(3000))
                     .with_detail("node_metadata", message.node_metadata.json_or());
