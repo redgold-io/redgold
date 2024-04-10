@@ -168,6 +168,10 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 
 impl Relay {
 
+    pub fn default_fee_addrs(&self) -> Vec<Address> {
+        self.node_config.seed_peer_addresses()
+    }
+
     pub async fn discover_peer(&self, nmd: &NodeMetadata) -> RgResult<()> {
         self.discovery.send(DiscoveryMessage::new(nmd.clone(), None)).await
     }

@@ -348,7 +348,17 @@ pub async fn deploy_redgold(
      if let Some(a) = alias {
          env.insert("REDGOLD_ALIAS".to_string(), a);
      }
-    let copy_env = vec!["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "ETHERSCAN_API_KEY", "RECAPTCHA_SECRET"];
+    // TODO: Inherit from node_config?
+    let copy_env = vec![
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "ETHERSCAN_API_KEY",
+        "RECAPTCHA_SECRET",
+        "REDGOLD_MAIN_DEVELOPMENT_MODE",
+        "REDGOLD_DEVELOPMENT_MODE",
+        "REDGOLD_TO_EMAIL",
+        "REDGOLD_FROM_EMAIL",
+    ];
     for e in copy_env {
         for i in std::env::var(e).ok() {
             env.insert(e.to_string(), i);

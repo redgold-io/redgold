@@ -4,3 +4,4 @@ pub mod metrics_registry;
 pub mod logging;
 pub mod trace_setup;
 pub mod metrics_help;
+pub mod send_email;

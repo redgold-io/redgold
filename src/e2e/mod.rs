@@ -140,6 +140,7 @@ pub struct LiveE2E {
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::node_config::NodeConfig;
+use crate::observability::send_email;
 
 impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {
@@ -303,7 +304,10 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
                     error!("Live E2E failure: {}", failure_msg.clone());
                     let recovered = c.num_success > 10 && util::current_time_millis_i64() - c.last_failure > 1000 * 60 * 30;
                     if !c.failed_once || recovered {
-                        alert::email(format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg).await.log_error();
+                        send_email::email_cfg(
+                            format!("{} e2e failure", c.relay.node_config.network.to_std_string()), &failure_msg,
+                            &c.relay.node_config
+                        ).await.log_error().ok();
                     }
                     let failure_time = util::current_time_millis_i64();
                     c.num_success = 0;

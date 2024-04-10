@@ -23,6 +23,7 @@ use tokio::task::JoinError;
 #[derive(Clone)]
 pub struct PeerMessage {
     pub request: Request,
+    // TODO: Change this to RgResult<Response> to disambiguate?
     pub response: Option<flume::Sender<Response>>,
     pub public_key: Option<structs::PublicKey>,
     pub socket_addr: Option<SocketAddr>,

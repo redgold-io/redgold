@@ -27,6 +27,8 @@ pub fn empty_args() -> RgArgs {
         s3_backup_bucket: None,
         server_index: None,
         etherscan_api_key: None,
+        from_email: None,
+        to_email: None,
     }
 }
 
@@ -108,6 +110,12 @@ pub struct RgArgs {
     /// Price oracles
     #[clap(long, env = "ETHERSCAN_API_KEY")]
     pub etherscan_api_key: Option<String>,
+    /// Alerts / watched data emails
+    #[clap(long, env = "REDGOLD_FROM_EMAIL")]
+    pub from_email: Option<String>,
+    /// Alerts / watched data emails
+    #[clap(long, env = "REDGOLD_TO_EMAIL")]
+    pub to_email: Option<String>,
 
 }
 

@@ -69,6 +69,7 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
 use crate::sanity::{historical_parity, migrations};
+use crate::sanity::recent_parity::RecentParityCheck;
 
 /**
 * Node is the main entry point for the application /
@@ -254,6 +255,9 @@ impl Node {
         ).await));
         join_handles.push(NamedHandle::new("AwsBackup", stream_handlers::run_interval_fold(
             crate::core::backup::aws_backup::AwsBackup::new(&relay), Duration::from_secs(86400), false
+        ).await));
+        join_handles.push(NamedHandle::new("RecentParityCheck", stream_handlers::run_interval_fold(
+            RecentParityCheck::new(&relay), Duration::from_secs(3600), false
         ).await));
 
         join_handles
