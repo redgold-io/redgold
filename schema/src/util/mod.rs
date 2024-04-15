@@ -1,4 +1,4 @@
-use crate::{ErrorInfoContext, SafeBytesAccess};
+use crate::{ErrorInfoContext};
 // TODO: Should we just switch to truncated SHA512?
 
 // https://bitcoin.stackexchange.com/questions/8443/where-is-double-hashing-performed-in-bitcoin

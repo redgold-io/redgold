@@ -11,11 +11,13 @@ use itertools::Itertools;
 use log::info;
 use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
-use redgold_schema::{error_info, ErrorInfoContext, ProtoHashable, RgResult, SafeOption, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoHashable;
 use crate::core::internal_message::SendErrorInfo;
 
 #[async_trait]
@@ -241,7 +243,8 @@ pub async fn resolve_input(
 
         let utxo_invalid = peer_valid_index.is_empty() && !internal_valid_index;
         if utxo_invalid && check_liveness {
-            return Err(ErrorInfo::error_info("No peers considered UTXO valid"));
+            return Err(ErrorInfo::error_info("No peers considered UTXO valid"))
+                .with_detail("utxo_id", u.json_or());
         }
 
     }

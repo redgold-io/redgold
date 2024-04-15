@@ -2,7 +2,8 @@ use eframe::egui;
 use eframe::egui::Ui;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{EasyJsonDeser, WithMetadataHashable};
+use redgold_schema::EasyJsonDeser;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::util::lang_util::JsonCombineResult;
 use crate::gui::app_loop::LocalState;
@@ -11,6 +12,7 @@ use crate::gui::common::data_item;
 use crate::gui::tabs::transact::{broadcast_tx, hardware_signing, prepare_tx};
 use crate::gui::tabs::transact::wallet_tab::{SendReceiveTabs, WalletTab};
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 
 pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool) {
 
@@ -145,7 +147,7 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: b
         if let Some(t) = res.as_ref().ok() {
             ui.allocate_ui(egui::Vec2::new(500.0, 0.0), |ui| {
                 ui.centered_and_justified(|ui| {
-                    data_item(ui, "Raw TX Hash:".to_string(), t.hash_hex_or_missing());
+                    data_item(ui, "Raw TX Hash:".to_string(), t.hash_hex());
                 });
             });
             if ui.button("Sign Transaction").clicked() {

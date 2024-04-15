@@ -13,4 +13,11 @@ impl Weighting {
             basis: None
         }
     }
+    pub fn from_int_basis(int: i64, basis: i64) -> Weighting {
+        Weighting {
+            value: int,
+            basis: Some(basis)
+        }
+    }
+
 }

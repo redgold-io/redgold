@@ -9,7 +9,7 @@ use metrics::counter;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error};
-use redgold_schema::{RgResult, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo, Response};
 use crate::core::relay::{Relay, SafeLock};
@@ -17,6 +17,8 @@ use crate::core::stream_handlers::{IntervalFold, TryRecvForEach};
 use crate::e2e::run;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo};
 use crate::util;
@@ -82,7 +84,7 @@ impl IntervalFold for Discovery {
                     let nmd = node_tx_original.node_metadata();
                     if let Ok(nmd) = nmd {
                         if let Some(key) = nmd.public_key.as_ref() {
-                            info!("Removing node in discovery query with error: {} {}", key.hex_or(), nmd.json_or());
+                            info!("Removing node in discovery query with error: {} {}", key.hex(), nmd.json_or());
                             self.relay.ds.peer_store.remove_node(
                                 &key
                             ).await?;
@@ -104,7 +106,7 @@ impl IntervalFold for Discovery {
                 if pk != self.relay.node_config.public_key() {
                     let known = self.relay.ds.peer_store.query_public_key_node(&pk).await?.is_some();
                     if !known {
-                        debug!("Batch Discovery sending discovery query to new peer {}", pk.hex_or());
+                        debug!("Batch Discovery sending discovery query to new peer {}", pk.hex());
                         // TODO: we need to validate this peerNodeInfo first BEFORE adding it to peer store
                         // For now just dropping errors to log
                         // TODO: Query trust for this peerId first, before updating trust score.
@@ -193,7 +195,7 @@ impl Discovery {
             let delta = (ct - fails.1) / 1000;
             if delta > 60 * 5 { // 5 mins, 2 e2e intervals
                 self.relay.ds.peer_store.remove_node(pk).await?;
-                info!("Removed dead peer with delta seconds {}: {} last_err {}", delta, pk.hex().expect("hex"), fails.0.json_or());
+                info!("Removed dead peer with delta seconds {}: {} last_err {}", delta, pk.hex(), fails.0.json_or());
                 counter!("redgold.peer.discovery.clear_dead_peers").increment(1);
             }
         }

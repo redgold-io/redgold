@@ -9,19 +9,21 @@ use redgold_keys::eth::example::{dev_ci_kp, EthHistoricalClient, EthWalletWrappe
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{bytes_data, EasyJson, ErrorInfoContext, ProtoHashable, ProtoSerde, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, EasyJson, ErrorInfoContext, SafeOption, structs};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, TestContractInternalState, Transaction};
 use crate::api::control_api::ControlClient;
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
-use crate::multiparty::initiate_mp::default_room_id_signing;
-use crate::multiparty::watcher::DepositWatcherConfig;
+use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
+use crate::multiparty_gg20::watcher::DepositWatcherConfig;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use crate::observability::metrics_registry;
 
 #[allow(dead_code)]
@@ -48,8 +50,14 @@ impl LocalTestNodeContext {
         Node::prelim_setup(relay.clone()
                            // , runtimes.clone()
         ).await.expect("prelim");
+
+
         // info!("Test starting node services");
+        info!("Test starting node services for node id {id}");
+
         let futures = Node::start_services(relay.clone()).await;
+
+        info!("Test completed starting node services for node id {id}");
         tokio::spawn(async move {
             // TODO: Get the join errors here
             let mut fut2 = vec![];
@@ -187,7 +195,6 @@ impl LocalNodes {
                 .query_time_transaction(0, end_time as i64).await
                 .unwrap()
                 .into_iter()
-                .flat_map(|x| x.transaction.clone())
                 .collect();
 
             info!("Num tx: {:?} node_id: {:?}", tx.len(), n.id);
@@ -230,7 +237,7 @@ impl LocalNodes {
                 .node
                 .relay
                 .ds
-                .transaction_store
+                .utxo
                 .utxo_filter_time(0, end_time as i64)
                 .await
                 .unwrap()
@@ -383,7 +390,9 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let client = start_node.public_client.clone();
 
-    for u in start_node.node.relay.ds.transaction_store.utxo_all_debug().await.expect("utxo all debug") {
+    let vec = start_node.node.relay.ds.utxo.utxo_all_debug().await.expect("utxo all debug");
+    assert!(vec.len() > 0);
+    for u in vec {
         info!("utxo at start: {}", u.json_or());
     }
     //
@@ -404,7 +413,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     if contract_tests {
         let res = submit.submit_test_contract().await.expect("submit test contract");
         let ct = res.transaction.expect("tx");
-        let contract_address = ct.first_output_address().expect("cont");
+        let contract_address = ct.first_output_address_non_input_or_fee().expect("cont");
         let _o = ct.outputs.get(0).expect("O");
         let state = client.client_wrapper().contract_state(&contract_address).await.expect("res");
         let state_json = TestContractInternalState::proto_deserialize(state.state.clone().expect("").value).expect("").json_or();
@@ -565,7 +574,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
         let mut tx = eth.create_transaction(&mp_eth_addr, &dev_faucet_rx_addr, fee_value * 3).await.expect("works");
         let data = EthWalletWrapper::signing_data(&tx).expect("works");
-        let h = Hash::new(data);
+        let h = Hash::new_from_proto(data).expect("works");
         let res = do_signing(keygen2.clone(), h.clone(), client1.clone()).await;
         let sig = res.signature.expect("sig");
         let raw = EthWalletWrapper::process_signature(sig, &mut tx).expect("works");
@@ -650,7 +659,7 @@ async fn do_signing(party: ControlMultipartyKeygenResponse, signing_data: Hash, 
         let mut signing_request = ControlMultipartySigningRequest::default();
         let mut init_signing = InitiateMultipartySigningRequest::default();
         let identifier = party.multiparty_identifier.expect("");
-        init_signing.signing_room_id = default_room_id_signing(identifier.uuid.clone());
+        init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
         init_signing.data_to_sign = Some(vec);
         init_signing.identifier = Some(identifier.clone());
         signing_request.signing_request = Some(init_signing);

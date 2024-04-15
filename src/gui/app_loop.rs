@@ -508,7 +508,7 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                     // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);
                     // ui.image(texture_id); //, size);
-                    let image = egui::Image::new(egui::include_image!("../resources/svg_rg_2_crop.png"));
+                    let image = egui::Image::new(egui::include_image!("../resources/images/historical/design_one/logo_orig_crop.png"));
                     // image.load_for_size(ctx, size).expect("works");
                     ui.add(
                         image

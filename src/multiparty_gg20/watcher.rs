@@ -1,238 +1,42 @@
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use bdk::database::MemoryDatabase;
 use futures::TryFutureExt;
 use itertools::Itertools;
 use log::{error, info};
 
-use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{PartyId, Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, LiquidityDeposit, MultipartyIdentifier, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, PartyInfo, Weighting};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeOption, structs};
+use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, LiquidityDeposit, MultipartyIdentifier, NetworkEnvironment, PartyId, PartyInfo, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, Weighting};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
-use crate::multiparty::initiate_mp;
+use crate::multiparty_gg20::initiate_mp;
 
 use serde::{Deserialize, Serialize};
 use redgold_data::data_store::DataStore;
 use redgold_keys::transaction_support::TransactionSupport;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
-use crate::multiparty::initiate_mp::initiate_mp_keysign;
+use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use crate::node::Node;
 use redgold_keys::address_external::ToBitcoinAddress;
+use redgold_keys::address_support::AddressSupport;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::multiparty::party_stream::PartyEvents;
+use crate::party::party_stream::PartyEvents;
 use crate::node_config::NodeConfig;
+use crate::party::bid_ask::BidAsk;
+use crate::party::deposit_key_allocation::DepositKeyAllocation;
+use crate::party::price_volume::{PriceVolume, PriceVolumeBroken};
 use crate::scrape::coinbase_btc_spot_latest;
 use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::args::RgArgs;
 use crate::util::current_time_millis_i64;
 
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct DepositKeyAllocation {
-    pub key: PublicKey,
-    pub allocation: f64,
-    pub initiate: InitiateMultipartyKeygenRequest,
-    pub balance_btc: u64,
-    pub balance_rdg: u64,
-}
-
-impl DepositKeyAllocation {
-    pub fn is_self_initiated(&self, self_key: &PublicKey) -> RgResult<bool> {
-        let id = self.initiate.identifier.safe_get_msg("Missing identifier")?;
-        let head = id.party_keys.get(0);
-        let head_pk = head.safe_get_msg("Missing party keys")?;
-        Ok(head_pk == &self_key)
-    }
-
-    pub fn party_id(&self) -> RgResult<PartyId> {
-        let id = self.initiate.identifier.safe_get_msg("Missing identifier")?;
-        let head = id.party_keys.get(0);
-        let mut pid = PartyId::default();
-        pid.public_key = Some(self.key.clone());
-        pid.owner = head.cloned();
-        Ok(pid)
-    }
-
-    pub fn balances(&self) -> Vec<CurrencyAmount> {
-        vec![
-            CurrencyAmount::from_btc(self.balance_btc as i64),
-            CurrencyAmount::from_rdg(self.balance_btc as i64),
-            ]
-    }
-
-
-    pub fn party_info(&self) -> RgResult<PartyInfo> {
-        let ident = self.initiate.identifier.safe_get_msg("Missing identifier")?;
-        let id = self.party_id()?;
-        let size = ident.party_keys.len();
-        let mut pi = PartyInfo::default();
-        let w = Weighting::from_float((ident.threshold as f64) / (size as f64));
-        let mw = Weighting::from_float(1f64 / (size as f64));
-        pi.party_id = Some(id);
-        pi.threshold = Some(w);
-        pi.balances = self.balances();
-        pi.members = ident.party_keys.iter().map(|p| {
-            let mut pm = structs::PartyMember::default();
-            pm.public_key = Some(p.clone());
-            pm.weight = Some(mw.clone());
-            pm
-        }).collect_vec();
-        Ok(pi)
-    }
-
-
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PriceVolume {
-    pub price: f64, // RDG/BTC (in satoshis for both) for now
-    pub volume: u64, // Volume of RDG available
-}
-
 pub const DUST_LIMIT: u64 = 2500;
-
-impl PriceVolume {
-
-    pub fn generate(
-        available_volume: u64,
-        center_price: f64,
-        divisions: i32,
-        price_width: f64,
-        scale: f64
-    ) -> Vec<PriceVolume> {
-
-        if available_volume < DUST_LIMIT {
-            return vec![];
-        }
-
-        let divisions_f64 = divisions as f64;
-
-        // Calculate the common ratio
-        let ratio = (1.0 / scale).powf(1.0 / (divisions_f64 - 1.0));
-
-        // Calculate the first term
-        let first_term = available_volume as f64 * scale / (1.0 - ratio.powf(divisions_f64));
-
-        let mut price_volumes = Vec::new();
-
-        for i in 0..divisions {
-            let price_offset = (i+1) as f64;
-            let price = center_price + (price_offset * (price_width/divisions_f64));
-            if price.is_nan() || price.is_infinite()  || price.is_sign_negative() {
-                error!("Price is invalid: {} center_price: {} price_offset: {} price_width: {} divisions_f64: {}",
-                       price, center_price, price_offset, price_width, divisions_f64);
-            } else {
-                let volume = (first_term * ratio.powi(divisions - i)) as u64;
-                price_volumes.push(PriceVolume { price, volume });
-            }
-        }
-
-        // Normalize the volumes so their sum equals available_volume
-        Self::normalize_volumes(available_volume, &mut price_volumes);
-
-
-// Re-calculate the total after normalization
-        let adjusted_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
-
-        // Adjust volumes to ensure total equals available_volume
-        let mut adjustment = available_volume as i64 - adjusted_total_volume as i64;
-        for pv in &mut price_volumes {
-            if adjustment == 0 {
-                break;
-            }
-
-            if adjustment > 0 && pv.volume > 0 {
-                pv.volume += 1;
-                adjustment -= 1;
-            } else if adjustment < 0 && pv.volume > 1 {
-                pv.volume -= 1;
-                adjustment += 1;
-            }
-        }
-
-        // Final assert
-        let final_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
-        assert!(final_total_volume <= available_volume, "Total volume should equal available volume or be less than");
-
-
-        //
-        // let total_volume = price_volumes.iter().map(|v| v.volume).sum::<u64>();
-        //
-        // // Normalize the volumes so their sum equals available_volume
-        // for pv in &mut price_volumes {
-        //     pv.volume = ((pv.volume as f64 / total_volume as f64) * available_volume as f64) as u64;
-        // }
-        //
-        // if total_volume != available_volume {
-        //     let delta = total_volume as i64 - available_volume as i64;
-        //     if let Some(last) = price_volumes.last_mut() {
-        //         if delta > 0 && (last.volume as u64) > delta as u64 {
-        //             last.volume = ((last.volume as i64) - delta) as u64;
-        //         } else if delta < 0 {
-        //             last.volume = ((last.volume as i64) - delta) as u64;
-        //         }
-        //     }
-        // }
-        //
-        // let total_volume = price_volumes.iter().map(|v| v.volume).sum::<u64>();
-        // assert_eq!(total_volume, available_volume, "Total volume should equal available volume");
-
-        let mut fpv = vec![];
-
-        for pv in price_volumes {
-            if pv.volume <= 0 || pv.volume > available_volume {
-                error!("Volume is invalid: {:?}", pv);
-            } else {
-                fpv.push(pv);
-            }
-        }
-        fpv
-    }
-    // 
-    // fn normalize_volumes(available_volume: u64, price_volumes: &mut Vec<PriceVolume>) {
-    //     let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
-    //     for pv in price_volumes.iter_mut() {
-    //         pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
-    //     }
-    // }
-
-    fn normalize_volumes(available_volume: u64, price_volumes: &mut Vec<PriceVolume>) {
-        let current_total_volume: u64 = price_volumes.iter().map(|pv| pv.volume).sum();
-
-        // Initially normalize volumes
-        for pv in price_volumes.iter_mut() {
-            pv.volume = ((pv.volume as f64 / current_total_volume as f64) * available_volume as f64).round() as u64;
-        }
-
-        let mut dust_trigger = false;
-
-        for pv in price_volumes.iter_mut() {
-            if pv.volume < DUST_LIMIT {
-                dust_trigger = true;
-            }
-        }
-
-        if dust_trigger {
-            let mut new_price_volumes = vec![];
-            let divs = (available_volume / DUST_LIMIT) as usize;
-            for (i,pv) in price_volumes.iter_mut().enumerate() {
-                if i < divs {
-                    new_price_volumes.push(PriceVolume {
-                        price: pv.price,
-                        volume: DUST_LIMIT
-                    });
-                }
-            }
-            price_volumes.clear();
-            price_volumes.extend(new_price_volumes);
-        }
-    }
-
-}
 
 // #[test]
 // fn inspect_price_volume() {
@@ -241,111 +45,6 @@ impl PriceVolume {
 //         println!("{}, {}", p.price, p.volume);
 //     }
 // }
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct BidAsk{
-    pub bids: Vec<PriceVolume>,
-    pub asks: Vec<PriceVolume>,
-    pub center_price: f64
-}
-
-impl BidAsk {
-
-    pub fn asking_price(&self) -> f64 {
-        self.asks.get(0).map(|v| v.price).unwrap_or(0.)
-    }
-
-    pub fn sum_bid_volume(&self) -> u64 {
-        self.bids.iter().map(|v| v.volume).sum::<u64>()
-    }
-
-    pub fn sum_ask_volume(&self) -> u64 {
-        self.asks.iter().map(|v| v.volume).sum::<u64>()
-    }
-
-    pub fn volume_empty(&self) -> bool {
-        self.bids.iter().find(|v| v.volume == 0).is_some() ||
-        self.asks.iter().find(|v| v.volume == 0).is_some()
-    }
-
-    pub fn regenerate(&self, price: f64, min_ask: f64) -> BidAsk {
-        BidAsk::generate_default(
-            self.sum_ask_volume() as i64,
-            self.sum_bid_volume(),
-            price,
-            min_ask
-        )
-    }
-
-    pub fn generate_default(
-        available_balance: i64,
-        pair_balance: u64,
-        last_exchange_price: f64,
-        min_ask: f64,
-    ) -> BidAsk {
-        BidAsk::generate(
-            available_balance,
-            pair_balance,
-            last_exchange_price,
-            40,
-            20.0f64,
-            min_ask
-        )
-    }
-
-    pub fn generate(
-        available_balance_rdg: i64,
-        pair_balance_btc: u64,
-        last_exchange_price: f64, // this is for available type / pair type
-        divisions: i32,
-        scale: f64,
-        // BTC / RDG
-        min_ask: f64
-    ) -> BidAsk {
-
-        // A bid is an offer to buy RDG with BTC
-        // The volume should be denominated in BTC because this is how much is staked natively
-        let bids = if pair_balance_btc > 0 {
-            PriceVolume::generate(
-                pair_balance_btc,
-                last_exchange_price, // Price here is RDG/BTC
-                divisions,
-                last_exchange_price*0.9,
-                scale / 2.0
-            )
-        } else {
-            vec![]
-        };
-
-
-        // An ask price in the inverse of a bid price, since we want to denominate in RDG
-        // since the volume is in RDG.
-        // Here it is now BTC / RDG
-        let ask_price_expected = 1.0 / last_exchange_price;
-
-        // Apply a max to ask price.
-        let ask_price = f64::max(ask_price_expected, min_ask);
-
-        // An ask is how much BTC is being asked for each RDG
-        // Volume is denominated in RDG because this is what the contract is holding for resale
-        let asks = if available_balance_rdg > 0 {
-            PriceVolume::generate(
-                available_balance_rdg as u64,
-                ask_price,
-                divisions,
-                ask_price*3.0,
-                scale
-            )
-        } else {
-            vec![]
-        };
-        BidAsk {
-            bids,
-            asks,
-            center_price: last_exchange_price,
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct OrderFulfillment {
@@ -399,77 +98,6 @@ pub struct WithdrawalBitcoin {
     used_tx: Vec<Transaction>
 }
 
-
-impl BidAsk {
-
-    pub fn remove_empty(&mut self) {
-        self.bids.retain(|v| v.volume > 0);
-        self.asks.retain(|v| v.volume > 0);
-    }
-    pub fn fulfill_taker_order(
-        &self,
-        order_amount: u64,
-        is_ask: bool,
-        event_time: i64,
-        tx_id: Option<String>,
-        destination: &Address
-    ) -> Option<OrderFulfillment> {
-        let mut remaining_order_amount = order_amount.clone();
-        let mut fulfilled_amount: u64 = 0;
-        let mut updated_curve = if is_ask {
-            // Asks are ordered in increasing amount(USD), denominated in BTC/RDG
-            self.asks.clone()
-        } else {
-            // Bids are ordered in decreasing amount(USD), denominated in RDG/BTC
-            self.bids.clone()
-        };
-
-
-        for pv in updated_curve.iter_mut() {
-
-            let other_amount_requested = if is_ask {
-                // Comments left here for clarity even if code is the same
-                let price = pv.price; // BTC / RDG
-                // BTC / (BTC / RDG) = RDG
-                remaining_order_amount as f64 / price
-            } else {
-                // RDG / RDG/BTC = BTC
-                remaining_order_amount as f64 / pv.price
-            } as u64;
-
-            let this_vol = pv.volume;
-            if other_amount_requested >= this_vol {
-                // We have more Other than this ask can fulfill, so we take it all and move on.
-                fulfilled_amount += this_vol;
-                remaining_order_amount -= (this_vol as f64 * pv.price) as u64;
-                pv.volume = 0;
-            } else {
-                // We have less Other than this ask can fulfill, so we take it and stop
-                pv.volume -= other_amount_requested;
-                remaining_order_amount = 0;
-                fulfilled_amount += other_amount_requested;
-                break
-            }
-        };
-
-        updated_curve.retain(|v| v.volume > 0);
-
-        if fulfilled_amount < DUST_LIMIT {
-            None
-        } else {
-            Some(OrderFulfillment {
-                order_amount,
-                fulfilled_amount,
-                updated_curve,
-                is_ask_fulfillment_from_external_deposit: is_ask,
-                event_time,
-                tx_id_ref: tx_id.map(|id| ExternalTransactionId{ identifier: id }),
-                destination: destination.clone(),
-            })
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositWatcherConfig {
     pub deposit_allocations: Vec<DepositKeyAllocation>,
@@ -477,15 +105,6 @@ pub struct DepositWatcherConfig {
     pub bid_ask: BidAsk,
     pub last_btc_timestamp: u64,
     pub ask_bid_code_reset: Option<bool>,
-}
-
-
-
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PriceVolumeBroken {
-    pub price: Option<f64>, // RDG/BTC (in satoshis for both) for now
-    pub volume: Option<u64>, // Volume of RDG available
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -508,7 +127,7 @@ pub struct DepositWatcherConfigBroken {
 #[derive(Clone)]
 pub struct DepositWatcher {
     relay: Relay,
-    wallet: Vec<Arc<Mutex<SingleKeyBitcoinWallet>>>
+    wallet: Vec<Arc<Mutex<SingleKeyBitcoinWallet<MemoryDatabase>>>>
 }
 
 impl DepositWatcher {
@@ -519,9 +138,9 @@ impl DepositWatcher {
         let u = utxos.get(14).safe_get_msg("Missing utxo")?.clone();
         let a = u.key_pair.address_typed();
         let a_str = a.render_string()?;
-        let res = self.relay.ds.transaction_store.query_utxo_id_valid(
-            &u.utxo_entry.utxo_id()?.transaction_hash.clone().expect("hash"),
-            u.utxo_entry.utxo_id()?.output_index.clone()
+        let utxo_id = &u.utxo_entry.utxo_id()?.clone();
+        let res = self.relay.ds.utxo.utxo_id_valid(
+            utxo_id
         ).await?;
         let uu = u.utxo_entry.clone().json_or();
         if res {
@@ -680,7 +299,7 @@ impl DepositWatcher {
         self.relay.submit_transaction_sync(tx).await
     }
 
-    pub async fn fulfill_btc_bids(&self, w_arc: &Arc<Mutex<SingleKeyBitcoinWallet>>,
+    pub async fn fulfill_btc_bids(&self, w_arc: &Arc<Mutex<SingleKeyBitcoinWallet<MemoryDatabase>>>,
                                   identifier: MultipartyIdentifier, outputs: Vec<(String, u64)>) -> RgResult<String> {
         w_arc.lock()
             .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
@@ -704,100 +323,12 @@ impl DepositWatcher {
         Ok(w.txid()?)
     }
 
-    pub async fn update_withdrawal_datastore(&self, withdrawals: WithdrawalBitcoin, txid: String, key_address: &structs::Address) -> RgResult<()> {
-        for t in withdrawals.used_tx.iter() {
-            let h = t.hash_or();
-            let first_input_addr = t.first_input_address();
-            let source_address = first_input_addr.safe_get_msg("Missing address")?;
-            let input_pk_btc_addr = t.first_input_proof_public_key().as_ref()
-                .and_then(|&pk| pk.to_bitcoin_address(&self.relay.node_config.network).ok());
-            let opt_btc_addr = t.output_bitcoin_address_of(key_address)
-                .cloned()
-                .and_then(|a| a.render_string().ok())
-                .or(input_pk_btc_addr);
-            let destination_address_string_btc = opt_btc_addr.safe_get_msg("Missing destination address")?.clone();
-            let dest = structs::Address::from_bitcoin(&destination_address_string_btc);
-            let amount_rdg = t.output_swap_amount_of(key_address);
-
-            self.relay.ds.multiparty_store.insert_bridge_tx(
-                &h.safe_bytes()?.clone(),
-                &from_hex_ref(&txid)?,
-                // Since the origin of this is on the network through a Redgold transaction,
-                // and we're generating a bitcoin transaction from that, then its outgoing
-                // To an external network
-                true,
-                SupportedCurrency::Bitcoin,
-                source_address,
-                &dest,
-                t.time()?.clone(),
-                amount_rdg
-            ).await?;
-
-        }
-        Ok(())
-    }
-
-
-    pub async fn get_rdg_withdrawals_bids(&self, bid_ask: BidAsk, key_address: &structs::Address, min_ask: f64) -> RgResult<WithdrawalBitcoin> {
-        let mut bid_ask_latest = bid_ask.clone();
-        // These are all transactions that have been sent as RDG to this deposit address,
-        // We need to filter out the ones that have already been paid.
-        let tx: Vec<structs::Transaction> = self.relay.ds.transaction_store
-            .get_filter_tx_for_address(&key_address, 10000, 0, true).await?;
-
-        info!("Found {} incoming potential transactions for withdrawal", tx.len());
-        info!("Found incoming potential transactions for withdrawal json {}", tx.json_or());
-
-        let mut btc_outputs: Vec<(String, u64)> = vec![];
-        let mut tx_res: Vec<Transaction> = vec![];
-
-        for t in tx.iter() {
-            let h = t.hash_or();
-            let used = self.relay.ds.multiparty_store.check_bridge_txid_used(&h.safe_bytes()?.clone()).await?;
-            if !used {
-                let input_pk_btc_addr = t.first_input_proof_public_key().as_ref()
-                    .and_then(|&pk| pk.to_bitcoin_address(&self.relay.node_config.network).ok());
-                let opt_btc_addr = t.output_bitcoin_address_of(&key_address).cloned()
-                    .and_then(|a| a.render_string().ok())
-                    .or(input_pk_btc_addr);
-                let amount_rdg = t.output_swap_amount_of(&key_address);
-                let destination_address_string_btc = opt_btc_addr.safe_get_msg("Missing destination address")?.clone();
-
-                if amount_rdg > 0 && opt_btc_addr.is_some() {
-                    let address = Address::from_bitcoin(&destination_address_string_btc);
-                    if let Some(fulfillment) = bid_ask_latest.fulfill_taker_order(
-                        amount_rdg as u64, false, t.time()?.clone(), None,
-                        &address
-                    ) {
-                        btc_outputs.push((destination_address_string_btc.clone(), fulfillment.fulfilled_amount));
-                        tx_res.push(t.clone());
-                        // In case of failure or error, we need to keep track of the last price that was used so
-                        // we can recover the partial state that was updated instead of the full.
-                        if bid_ask_latest.volume_empty() {
-                            let price = fulfillment.fulfillment_price() * 0.98;
-                            bid_ask_latest = bid_ask_latest.regenerate(price, min_ask);
-                        }
-                    }
-
-                }
-
-            }
-        }
-
-        Ok(WithdrawalBitcoin {
-            outputs: btc_outputs,
-            updated_bidask: bid_ask_latest,
-            used_tx: tx_res,
-        })
-    }
-
-
     pub async fn process_requests_new(
         &mut self,
         alloc: &DepositKeyAllocation,
         _bid_ask_original: BidAsk,
         last_timestamp: u64,
-        w: &Arc<Mutex<SingleKeyBitcoinWallet>>,
+        w: &Arc<Mutex<SingleKeyBitcoinWallet<MemoryDatabase>>>,
     ) -> Result<CurveUpdateResult, ErrorInfo> {
 
         let key = &alloc.key;
@@ -917,131 +448,6 @@ impl DepositWatcher {
 
         Ok(cur)
     }
-
-
-    // pub async fn process_requests(
-    //     &mut self,
-    //     alloc: &DepositKeyAllocation,
-    //     bid_ask_original: BidAsk,
-    //     last_timestamp: u64,
-    //     w: &Arc<Mutex<SingleKeyBitcoinWallet>>,
-    // ) -> Result<CurveUpdateResult, ErrorInfo> {
-    //
-    //     let key = &alloc.key;
-    //     let key_address = key.address()?;
-    //     let identifier = alloc.initiate.identifier.safe_get().cloned()?;
-    //
-    //     let btc_starting_balance = w.lock()
-    //         .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
-    //         .get_wallet_balance()?.confirmed;
-    //
-    //     let environment = self.relay.node_config.network.clone();
-    //     let btc_address = w.lock()
-    //         .map_err(|e| error_info(format!("Failed to lock wallet: {}", e).as_str()))?
-    //         .public_key.to_bitcoin_address(&environment)?;
-    //
-    //     let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
-    //     let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
-    //
-    //     // BTC / RDG
-    //     let min_ask = 1f64 / Self::get_starting_center_price_rdg_btc_fallback().await;
-    //
-    //     let cutoff_time = current_time_millis_i64() - 30_000; //
-    //     // Grab all recent transactions associated with this key address for on-network
-    //     // transactions
-    //     let tx = self.relay.ds.transaction_store
-    //         .get_filter_tx_for_address(&key_address, 10000, 0, true).await?
-    //         .iter().filter(|t| t.time().unwrap_or(&0i64) < &cutoff_time).cloned().collect_vec();
-    //
-    //     let mut staking_deposits = vec![];
-    //     // TODO: Add withdrawal support
-    //     // let mut staking_withdrawals = vec![];
-    //
-    //     for t in &tx {
-    //         if let Some((amount, liquidity_request)) = t.liquidity_of(&key_address) {
-    //             if let Some(d) = &liquidity_request.deposit {
-    //                 let d = StakeDepositInfo {
-    //                     amount: amount.clone(),
-    //                     deposit: d.clone(),
-    //                     tx_hash: t.hash_or(),
-    //                 };
-    //                 staking_deposits.push(d);
-    //             }
-    //         }
-    //     }
-    //
-    //     // Zero or empty check
-    //     let check_zero = bid_ask_original.center_price == 0.0f64;
-    //     let bid_ask = if bid_ask_original.asks.is_empty() && bid_ask_original.bids.is_empty() || check_zero {
-    //         let price = if check_zero {
-    //             info!("BidAsk center price is zero, generating default bid_ask");
-    //             Self::get_starting_center_price_rdg_btc_fallback().await
-    //         } else {
-    //             bid_ask_original.center_price
-    //         };
-    //         BidAsk::generate_default(
-    //             rdg_starting_balance,
-    //             btc_starting_balance,
-    //             price,
-    //             min_ask
-    //         )
-    //     } else {
-    //         bid_ask_original
-    //     };
-    //
-    //
-    //
-    //     let mut bid_ask_latest = bid_ask.clone();
-    //
-    //     // Prepare Fulfill Asks RDG Transaction from BTC deposits to this multiparty address,
-    //     // but don't yet broadcast the transaction.
-    //     let (updated_last_ts, deposit_txs) = self.get_btc_deposits(last_timestamp, w).await?;
-    //
-    //     info!("Found {} new deposits last_updated {} updated_last_ts {} deposit_txs {}",
-    //         deposit_txs.len(), last_timestamp, updated_last_ts, deposit_txs.json_or());
-    //
-    //     let utxos = self.relay.ds.transaction_store.query_utxo_address(&key_address)
-    //         .await?;
-    //
-    //     let (tx, bid_ask_updated_ask_side) = Self::build_rdg_ask_swap_tx(utxos,
-    //         deposit_txs,
-    //         bid_ask_latest, &key_address.clone(), min_ask).await?;
-    //     // info!("Built RDG ask swap tx: {} bid_ask_updated {}", tx.json_or(), bid_ask_updated_ask_side.json_or());
-    //     if let Some(tx) = tx {
-    //         info!("Sending RDG ask swap tx: {}", tx.json_or());
-    //         self.send_ask_fulfillment_transaction(&mut tx.clone(), identifier.clone()).await?;
-    //     }
-    //
-    //     bid_ask_latest = bid_ask_updated_ask_side;
-    //
-    //     let withdrawals = self.get_rdg_withdrawals_bids(bid_ask_latest, &key_address, min_ask).await?;
-    //     bid_ask_latest = withdrawals.updated_bidask.clone();
-    //
-    //     info!("Found {} new withdrawals {}",
-    //         withdrawals.outputs.len(), withdrawals.json_or());
-    //
-    //     if withdrawals.outputs.len() > 0 {
-    //         let txid = self.fulfill_btc_bids(w, identifier, withdrawals.outputs.clone()).await?;
-    //         info!("Fullfilled btc Txid: {}", txid);
-    //         // On failure here really need to handle this somehow?
-    //         self.update_withdrawal_datastore(withdrawals, txid, &key_address).await?;
-    //     }
-    //
-    //     let mut updated_allocation = alloc.clone();
-    //
-    //     // This is okay to use as a delayed balance because we'll recalculate on the next step, only used by UI really
-    //     updated_allocation.balance_btc = btc_starting_balance;
-    //     updated_allocation.balance_rdg = rdg_starting_balance as u64;
-    //     let update = CurveUpdateResult{
-    //         updated_bid_ask: bid_ask_latest,
-    //         updated_btc_timestamp: updated_last_ts,
-    //         updated_allocation,
-    //     };
-    //
-    //     info!("Updated Curve Result {}", update.json_or());
-    //
-    //     Ok(update)
-    // }
 
     // Returns price in RDG/BTC, i.e. ~300 for USD/RDG 100 and BTC 30k
     pub async fn get_starting_center_price_rdg_btc() -> RgResult<f64> {
@@ -1219,7 +625,7 @@ impl IntervalFold for DepositWatcher {
             ).await.log_error();
             // TODO: Get this from local share instead of from a second keysign round.
             if let Ok(r) = res {
-                let test_sign = r.identifier.uuid.clone();
+                let test_sign = r.identifier.room_id.safe_get()?.uuid.safe_get()?.clone();
                 let h = Hash::from_string_calculate(&test_sign);
                 let bd = h.bytes.safe_get_msg("Missing bytes in immediate hash calculation")?;
                 let ksr = initiate_mp::initiate_mp_keysign(
@@ -1267,7 +673,7 @@ async fn debug_local_ds_utxo_balance() {
     arg_translate.translate_args().await.unwrap();
     let nc = arg_translate.node_config;
     let r = Relay::new(nc.clone()).await;
-    let a = Address::parse("cf4989701946ae307efdb902efd73c13d933efda0ef04bcbc3eef2146850534a").expect("");
+    let a = "cf4989701946ae307efdb902efd73c13d933efda0ef04bcbc3eef2146850534a".parse_address().expect("works");
     let utxos = r.ds.transaction_store.query_utxo_address(&a).await.unwrap();
     println!("UTXOS: {}", utxos.json_or());
     println!("{}", nc.mnemonic_words.clone());

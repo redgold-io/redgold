@@ -1,14 +1,17 @@
+use std::hash::Hash;
 use itertools::Itertools;
+use log::info;
 // use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::structs::{Address, AddressType, CurrencyAmount, ErrorInfo, NetworkEnvironment, OutputType, TestContractRequest, UtxoId};
-use redgold_schema::{ErrorInfoContext, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, OutputType, TestContractRequest, UtxoId};
+use redgold_schema::{EasyJson, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::{TransactionBuilderSupport};
+use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::node_config::NodeConfig;
 
 #[derive(Clone, PartialEq)]
@@ -170,8 +173,17 @@ impl TransactionGenerator {
     pub fn generate_simple_tx(&mut self) -> Result<TransactionWithKey, ErrorInfo> {
         // TODO: This can cause a panic
         let prev = self.pop_finished().safe_get()?.clone();
+        let pk = prev.key_pair.public_key();
+        let pk_hex = pk.hex();
+        let pk_json = pk.json_or();
+        let address_prev_utxo = prev.utxo_entry.address().expect("address").render_string().expect("works");
+        let pk_addr = pk.address().expect("address").render_string().expect("works");
+        info!("generate simple tx pk hex {pk_hex}");
+        info!("generate simple tx pk json {pk_json}");
+        info!("generate simple tx address_prev_utxo {address_prev_utxo}");
+        info!("generate simple tx pk_addr {pk_addr}");
         let key = self.all_value_transaction(prev.clone());
-        use redgold_schema::WithMetadataHashable;
+        use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
         // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
         // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
@@ -189,7 +201,7 @@ impl TransactionGenerator {
         let used = self.used_spendable();
         let prev = used.get(0).expect("works").clone();
         let key = self.all_value_transaction(prev.clone());
-        use redgold_schema::WithMetadataHashable;
+        use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
         // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
         // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());

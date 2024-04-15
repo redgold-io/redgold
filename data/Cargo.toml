@@ -33,7 +33,7 @@ chrono = "0.4.35"
 
 
 [build-dependencies]
-sqlx = { version = "0.7.1", features = [ "runtime-tokio-native-tls" , "postgres", "sqlite"] } # Tokio:
+sqlx = { version = "0.7.1", features = [ "runtime-tokio-native-tls" , "sqlite"] } # Tokio:
 tokio = { workspace = true }
 rusqlite = "0.29.0"
 dirs = {workspace = true}

@@ -1,17 +1,12 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 // use async_std::prelude::FutureExt;
 use async_trait::async_trait;
-use dashmap::DashMap;
-use dashmap::mapref::entry::Entry;
 use flume::Sender;
 use futures::future::Either;
-use tokio::task::JoinHandle;
-use redgold_data::add;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
-use redgold_schema::structs::{Address, ContentionKey, ContractStateMarker, ExecutionInput, Output, StateSelector, Transaction};
-use crate::core::internal_message::{Channel, new_bounded_channel, RecvAsyncErrorInfo, SendErrorInfo};
-use crate::core::process_transaction::ProcessTransactionMessage;
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::structs::{ContentionKey, ContractStateMarker, Output, Transaction};
+use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFoldOrReceive;
 use crate::util;
@@ -212,7 +207,7 @@ impl ContractStateManager {
                 let er = redgold_executor::extism_wrapper::invoke_extism_wasm_direct(
                     code,
                     input,
-                    most_recent.state.safe_bytes()?.as_ref(),
+                    most_recent.state.safe_get()?.value.as_ref(),
                 ).await?;
                 let d = er.data.safe_get_msg("data")?;
                 let updated_state = d.state.safe_get_msg("state")?;
@@ -222,7 +217,7 @@ impl ContractStateManager {
                 csm.selector = sel.cloned();
                 csm.time = tx.time()?.clone();
                 csm.transaction_marker = Some(tx.hash_or());
-                csm.nonce = most_recent.nonce + 1;
+                csm.index_counter = most_recent.index_counter + 1;
                 self.relay.ds.state.insert_state(csm.clone()).await?;
                 if let Some(subs) = self.subscribers.remove(k) {
                     for sub in &subs {

@@ -8,6 +8,7 @@ use bdk::bitcoin::hashes::Hash;
 use bdk::bitcoin::hashes::hex::ToHex;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
+use log::info;
 use rand::{Rng, RngCore};
 use rand::rngs::OsRng;
 
@@ -15,7 +16,6 @@ use redgold_keys::util::dhash_str;
 
 use crate::node_config::NodeConfig;
 use crate::observability::trace_setup::init_tracing;
-use crate::schema::SafeBytesAccess;
 
 pub mod auto_update;
 pub mod base26;
@@ -194,6 +194,7 @@ pub fn init_logger() {
     //
     // log4rs::init_config(config)
     init_tracing("DEBUG");
+    info!("Logger initialized");
 }
 
 pub trait Short {

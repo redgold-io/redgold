@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
-use redgold_schema::{ErrorInfoContext, from_hex, ProtoSerde, RgResult, SafeOption};
+use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{InitiateMultipartyKeygenRequest, NetworkEnvironment, PublicKey};
+use redgold_schema::structs::{InitiateMultipartyKeygenRequest, PartyInfo, PublicKey};
 use crate::core::relay::Relay;
 use crate::infra::deploy::DeployMachine;
 use crate::node_config::NodeConfig;
@@ -25,8 +26,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
         std::fs::remove_file(fnm_export).ok();
         let cmd = format!(
             "sqlite3 ~/.rg/{}/data_store.sqlite \"SELECT \
-            room_id, keygen_time, hex(keygen_public_key), hex(host_public_key), self_initiated, \
-            hex(local_share), hex(initiate_keygen) FROM multiparty;\" > ~/.rg/{}/{}",
+            hex(party_info) FROM multiparty;\" > ~/.rg/{}/{}",
             net_str,
             net_str,
             fnm_export
@@ -134,54 +134,21 @@ pub async fn check_updated_multiparty_csv(r: &Relay) -> RgResult<()> {
     let raw = env.multiparty_import_str().await?;
     for row in parse_mp_csv(raw)? {
         r.ds.multiparty_store.add_keygen(
-            row.local_share,
-            row.room_id,
-            row.initiate_keygen,
-            row.self_initiated,
-            Some(row.keygen_time)
+            &row
         ).await?;
     };
     tokio::fs::remove_file(env.multiparty_import()).await.error_info("Failed to remove multiparty import")?;
     Ok(())
 }
 
-pub fn parse_mp_csv(contents: String) -> RgResult<Vec<ParsedMultiparty>> {
-
-    // This was the original command used for making the csv export
-    // let cmd = format!(
-    //     "sqlite3 ~/.rg/{}/data_store.sqlite \"SELECT \
-    //     room_id, keygen_time, hex(keygen_public_key), hex(host_public_key), self_initiated, \
-    //     hex(local_share), hex(initiate_keygen) FROM multiparty;\" > ~/.rg/{}/{}",
-    //     net_str,
-    //     net_str,
-    //     fnm_export
-    // );
+pub fn parse_mp_csv(contents: String) -> RgResult<Vec<PartyInfo>> {
     let mut res = vec![];
 
     for e in contents.split("\n") {
         if e.trim().is_empty() {
             continue;
         }
-        let mut parts = e.split("|");
-        let room_id = parts.next().ok_msg("Missing room_id")?;
-        let keygen_time = parts.next().ok_msg("Missing keygen_time")?.trim();
-        let keygen_public_key = parts.next().ok_msg("Missing keygen_public_key")?;
-        let host_public_key = parts.next().ok_msg("Missing host_public_key")?;
-        let self_initiated = parts.next().ok_msg("Missing self_initiated")?;
-        let self_initiated = self_initiated == "1";
-        let local_share = parts.next().ok_msg("Missing local_share")?;
-        let initiate_keygen = parts.next().ok_msg("Missing initiate_keygen")?;
-        let mp = ParsedMultiparty {
-            room_id: room_id.to_string(),
-            keygen_time: keygen_time.parse::<i64>().error_info("Bad keygen_time")?,
-            keygen_public_key: PublicKey::from_hex(keygen_public_key.to_string())?,
-            host_public_key: PublicKey::from_hex(host_public_key.to_string())?,
-            self_initiated,
-            local_share: String::from_utf8(from_hex(local_share.to_string())?).error_info("Bad local_share")?,
-            initiate_keygen: InitiateMultipartyKeygenRequest::proto_deserialize_hex(initiate_keygen.to_string())?,
-        };
-        res.push(mp);
-
+        res.push(PartyInfo::from_hex(e)?);
     }
     Ok(res)
 }

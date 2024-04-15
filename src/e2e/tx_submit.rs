@@ -10,15 +10,16 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption};
+use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::EasyJson;
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnvironment, SubmitTransactionResponse, UtxoId};
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
 use crate::node_config::NodeConfig;
-use crate::schema::structs::{Error, PublicResponse, ResponseMetadata, Transaction};
-use crate::schema::WithMetadataHashable;
+use crate::schema::structs::{ErrorCode, PublicResponse, ResponseMetadata, Transaction};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
 
 pub struct TransactionSubmitter {
     pub generator: Arc<Mutex<TransactionGenerator>>,
@@ -94,7 +95,7 @@ impl TransactionSubmitter {
                     let err = result.clone().unwrap_err();
                     error!(
                         "Error on transaction {} response: {}",
-                        tx.clone().hash_hex_or_missing(),
+                        tx.clone().hash_hex(),
                         err.clone().json_or()
                     );
                     result
@@ -169,7 +170,6 @@ impl TransactionSubmitter {
         let pc = &self.client;
         let w = WordsPass::from_str_hashed("random").keypair_at_change(0).expect("kp");
         let a = w.address_typed();
-        let _vec_a = a.address.safe_bytes()?;
         let res = //self.runtime.block_on(
             pc.faucet(&a).await?;
         let submit_r = res.submit_transaction_response.safe_get()?;

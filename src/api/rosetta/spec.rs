@@ -1,8 +1,8 @@
-use redgold_schema::{bytes_data, constants, error_message, from_hex, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::structs::{Address, Error as RGError, ErrorInfo, Proof, State};
+use redgold_schema::{bytes_data, constants, error_info, error_message, from_hex, SafeOption, structs};
+use redgold_schema::structs::{Address, ErrorCode as RGError, ErrorInfo, Proof, State};
 use crate::api::rosetta::models::{AccountIdentifier, Amount, Block, BlockIdentifier, CoinAction, CoinChange, CoinIdentifier, Currency, NetworkIdentifier, Operation, OperationIdentifier, PublicKey, Signature, Transaction, TransactionIdentifier};
 use crate::core::relay::Relay;
-use redgold_data::data_store::DataStore;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::schema;
 
 #[derive(Clone)]
@@ -88,25 +88,26 @@ impl Rosetta {
         hash: Option<String>,
         height: Option<i64>,
     ) -> Result<Option<structs::Block>, ErrorInfo> {
-        let mut maybe_hash = None;
-        if let Some(h) = hash {
-            maybe_hash = Some(schema::decode_hex(h)?);
-        };
-        // TODO: Shouldn't this whole thing really check to verify the active height / active chain thing works?
-        // revisit this on block removed events.
-        let maybe_block = self
-            .relay
-            .ds
-            .address_block_store
-            .query_block_hash_height(maybe_hash, height)
-            .await?;
-        Ok(maybe_block)
+        // let mut maybe_hash = None;
+        // if let Some(h) = hash {
+        //     maybe_hash = Some(schema::decode_hex(h)?);
+        // };
+        // // TODO: Shouldn't this whole thing really check to verify the active height / active chain thing works?
+        // // revisit this on block removed events.
+        // let maybe_block = self
+        //     .relay
+        //     .ds
+        //     .address_block_store
+        //     .query_block_hash_height(maybe_hash, height)
+        //     .await?;
+        // Ok(maybe_block)
+        Err(error_info("Not implemented"))
     }
 
     pub fn block_identifier(block: &structs::Block) -> BlockIdentifier {
         BlockIdentifier {
             index: block.height,
-            hash: block.hash_hex().expect("hash"),
+            hash: block.hash_hex(),
         }
     }
 
@@ -123,17 +124,18 @@ impl Rosetta {
     }
 
     pub async fn latest_block(&self) -> Result<crate::schema::structs::Block, ErrorInfo> {
-        self.relay.ds.address_block_store.query_last_block().await?.ok_or(error_message(
-            RGError::DataStoreInternalCorruption,
-            "Missing latest block",
-        ))
+        // self.relay.ds.address_block_store.query_last_block().await?.ok_or(error_message(
+        //     RGError::DataStoreInternalCorruption,
+        //     "Missing latest block",
+        // ))
+        Err(error_info("Not implemented"))
     }
 
     pub fn transaction_identifier(
         transaction: &structs::Transaction,
     ) -> Result<TransactionIdentifier, ErrorInfo> {
         Ok(TransactionIdentifier {
-            hash: transaction.hash_hex()?,
+            hash: transaction.hash_hex(),
         })
     }
 

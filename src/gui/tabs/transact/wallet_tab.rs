@@ -18,8 +18,8 @@ use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::example::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption, WithMetadataHashable};
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::structs::{Hash, Address, AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::EasyJson;
@@ -27,6 +27,7 @@ use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
@@ -34,6 +35,7 @@ use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::gui::components::passphrase_input::PassphraseInput;
 use crate::gui::components::xpub_req;
@@ -153,7 +155,7 @@ impl WalletState {
             .and_then(|kp| KeyPair::from_private_hex(kp.clone()).ok().map(|kp2| (kp.clone(), kp2))) {
             self.public_key = Some(key_pair.public_key());
             let hex = hex::decode(pkhex).unwrap_or(vec![]);
-            let check = Hash::new_checksum(&hex).unwrap_or("".to_string());
+            let check = Hash::new_checksum(&hex);
             self.mnemonic_or_key_checksum = check;
         } else {
             let m = self.hot_mnemonic();
@@ -172,9 +174,7 @@ impl WalletState {
     pub fn checksum_key(&self) -> String {
         if let Some(kp) = self.active_hot_private_key_hex.as_ref() {
             if let Some(b) = hex::decode(kp).ok() {
-                if let Ok(h) = Hash::new_checksum(&b) {
-                    return h
-                }
+                return Hash::new_checksum(&b);
             }
         }
         return self.hot_mnemonic().checksum_words().unwrap_or("".to_string());
@@ -198,7 +198,7 @@ impl WalletState {
 
     pub fn update_signed_tx(&mut self, tx_o: Option<RgResult<Transaction>>) {
         if let Some(tx) = tx_o.as_ref().and_then(|tx| tx.as_ref().ok()) {
-            self.signed_transaction_hash = Some(tx.hash_hex_or_missing());
+            self.signed_transaction_hash = Some(tx.hash_hex());
             self.signed_transaction = tx_o.clone();
         } else {
             self.signed_transaction_hash = None;
@@ -208,7 +208,7 @@ impl WalletState {
 
     pub fn update_unsigned_tx(&mut self, tx_o: Option<RgResult<Transaction>>) {
         if let Some(tx) = tx_o.as_ref().and_then(|tx| tx.as_ref().ok()) {
-            self.unsigned_transaction_hash = Some(tx.hash_hex_or_missing());
+            self.unsigned_transaction_hash = Some(tx.hash_hex());
             self.prepared_transaction = tx_o.clone()
         } else {
             self.signed_transaction_hash = None;
@@ -402,7 +402,7 @@ fn check_assign_hot_key(ls: &mut LocalState, x: &NamedXpub, pk: &PublicKey) -> R
                 info!("Setting public key mismatch error for keyname {} checksum {} {} {} {} {} ",
                     key_name.clone(),
                     w.checksum().expect(""), dp.clone(), dp_xpub.clone(),
-                    pk2.hex_or(), pk.hex_or()
+                    pk2.hex(), pk.hex()
                 );
                 ls.wallet_state.passphrase_input.err_msg = Some("Public key mismatch".to_string());
                 return Err(error_info("Public key mismatch".to_string()));

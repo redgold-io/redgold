@@ -14,10 +14,11 @@ use tokio::task::futures::TaskLocalFuture;
 use tokio::task_local;
 
 use structs::{
-    Address, BytesData, Error, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
+    Address, BytesData, ErrorCode, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
     StructMetadata, Transaction,
 };
 use observability::errors::EnhanceErrorInfo;
+use proto_serde::{ProtoHashable, ProtoSerde};
 
 use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
 
@@ -57,6 +58,9 @@ pub mod pow;
 pub mod tx_schema_validate;
 pub mod fee_validator;
 pub mod observability;
+pub mod proto_serde;
+pub mod helpers;
+pub mod party;
 
 
 impl BytesData {
@@ -78,7 +82,7 @@ pub const VERSION: u32 = 0;
 pub fn i64_from_string(value: String) -> Result<i64, ErrorInfo> {
     value.parse::<i64>().map_err(|_| {
         error_message(
-            Error::ParseFailure,
+            ErrorCode::ParseFailure,
             "unable to parse i64 value from string amount",
         )
     })
@@ -87,7 +91,7 @@ pub fn i64_from_string(value: String) -> Result<i64, ErrorInfo> {
 pub fn from_hex(hex_value: String) -> Result<Vec<u8>, ErrorInfo> {
     hex::decode(hex_value.clone()).map_err(|e| {
         error_message(
-            Error::HexDecodeFailure,
+            ErrorCode::HexDecodeFailure,
             format!("Error decoding hex string value to bytes: {} {}", hex_value, e.to_string()),
         )
     })
@@ -96,7 +100,7 @@ pub fn from_hex(hex_value: String) -> Result<Vec<u8>, ErrorInfo> {
 pub fn from_hex_ref(hex_value: &String) -> Result<Vec<u8>, ErrorInfo> {
     hex::decode(hex_value).map_err(|e| {
         error_message(
-            Error::HexDecodeFailure,
+            ErrorCode::HexDecodeFailure,
             format!("Error decoding hex string value to bytes: {} {}", hex_value, e.to_string()),
         )
     })
@@ -125,89 +129,89 @@ pub fn struct_metadata(time: i64) -> Option<StructMetadata> {
 pub fn struct_metadata_new() -> Option<StructMetadata> {
     struct_metadata(util::current_time_millis())
 }
-
-pub trait SafeBytesAccess {
-    fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo>;
-}
-
-impl SafeBytesAccess for Option<BytesData> {
-    fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self
-            .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "bytes data"))?
-            .value
-            .clone())
-    }
-}
 //
-// impl SafeBytesAccess for Option<Hash> {
+// pub trait SafeBytesAccess {
+//     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo>;
+// }
+//
+// impl SafeBytesAccess for Option<BytesData> {
 //     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
 //         Ok(self
 //             .as_ref() // TODO: parent Field message? necessary or not?
-//             .ok_or(error_message(Error::MissingField, "hash"))?
-//             .bytes
+//             .ok_or(error_message(ErrorCode::MissingField, "bytes data"))?
+//             .value
+//             .clone())
+//     }
+// }
+//
+//
+// //
+// // impl SafeBytesAccess for Option<Hash> {
+// //     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+// //         Ok(self
+// //             .as_ref() // TODO: parent Field message? necessary or not?
+// //             .ok_or(error_message(Error::MissingField, "hash"))?
+// //             .bytes
+// //             .safe_bytes()?)
+// //     }
+// // }
+// //
+// // impl SafeBytesAccess for Hash {
+// //     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+// //         self.proto_serialize()
+// //     }
+// // }
+//
+// impl SafeBytesAccess for Option<Address> {
+//     fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+//         Ok(self
+//             .as_ref() // TODO: parent Field message? necessary or not?
+//             .ok_or(error_message(ErrorCode::MissingField, "address"))?
+//             .address
 //             .safe_bytes()?)
 //     }
 // }
-
-impl SafeBytesAccess for Hash {
-    fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self.bytes.safe_bytes()?)
-    }
-}
-
-impl SafeBytesAccess for Option<Address> {
-    fn safe_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self
-            .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "address"))?
-            .address
-            .safe_bytes()?)
-    }
-}
-
-impl SafeBytesAccess for Option<PublicKey> {
-    fn safe_bytes(&self) -> RgResult<Vec<u8>> {
-        Ok(self
-            .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "Missing public key"))?
-            .bytes
-            .safe_bytes()?
-        )
-    }
-}
-
-impl SafeBytesAccess for Option<PeerId> {
-    fn safe_bytes(&self) -> RgResult<Vec<u8>> {
-        Ok(self
-            .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "Missing peerid"))?
-            .peer_id
-            .safe_bytes()?
-        )
-    }
-}
-
-impl<T> SafeBytesAccess for Option<T>
-where T: SafeBytesAccess + Sized
-{
-    fn safe_bytes(&self) -> RgResult<Vec<u8>> {
-        Ok(self
-            .as_ref() // TODO: parent Field message? necessary or not?
-            .ok_or(error_message(Error::MissingField, "Missing safe bytes field"))?
-            .safe_bytes()?
-        )
-    }
-}
+//
+// impl SafeBytesAccess for Option<PublicKey> {
+//     fn safe_bytes(&self) -> RgResult<Vec<u8>> {
+//         Ok(self
+//             .as_ref() // TODO: parent Field message? necessary or not?
+//             .ok_or(error_message(ErrorCode::MissingField, "Missing public key"))?
+//             .bytes
+//             .safe_bytes()?
+//         )
+//     }
+// }
+//
+// impl SafeBytesAccess for Option<PeerId> {
+//     fn safe_bytes(&self) -> RgResult<Vec<u8>> {
+//         Ok(self
+//             .as_ref() // TODO: parent Field message? necessary or not?
+//             .ok_or(error_message(ErrorCode::MissingField, "Missing peerid"))?
+//             .peer_id
+//             .safe_bytes()?
+//         )
+//     }
+// }
+//
+// impl<T> SafeBytesAccess for Option<T>
+// where T: SafeBytesAccess + Sized
+// {
+//     fn safe_bytes(&self) -> RgResult<Vec<u8>> {
+//         Ok(self
+//             .as_ref() // TODO: parent Field message? necessary or not?
+//             .ok_or(error_message(ErrorCode::MissingField, "Missing safe bytes field"))?
+//             .safe_bytes()?
+//         )
+//     }
+// }
 
 impl std::fmt::Display for Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
-            self.safe_bytes()
-                .map(hex::encode)
-                .unwrap_or("missing hash bytes field".to_string())
+            self.hex()
         )
     }
 }
@@ -233,165 +237,6 @@ fn add_val_ref<T: AddAny>(x: T, y: &T) -> T { x + y }
  */
 //
 
-pub trait ProtoSerde
-    where Self: Message + Default,
-{
-    fn proto_serialize(&self) -> Vec<u8>;
-    fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
-
-    fn proto_deserialize_hex(s: impl Into<String>) -> Result<Self, ErrorInfo>;
-    fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo>;
-}
-
-impl<T> ProtoSerde for T
-where T: Message + Default {
-    fn proto_serialize(&self) -> Vec<u8> {
-        self.encode_to_vec()
-    }
-
-    fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
-        T::decode(&*bytes)
-            .map_err(|e|
-                error_message(Error::ProtoDecoderFailure, e.to_string()))
-    }
-
-    fn proto_deserialize_hex(s: impl Into<String>) -> Result<Self, ErrorInfo> {
-        hex::decode(s.into()).error_info("hex decode").and_then(|v| T::proto_deserialize(v))
-    }
-
-    fn proto_deserialize_ref(bytes: &Vec<u8>) -> Result<Self, ErrorInfo> {
-        T::decode(&**bytes)
-            .map_err(|e|
-                error_message(Error::ProtoDecoderFailure, e.to_string()))
-    }
-
-}
-
-
-pub trait ProtoHashable
-where
-    Self: HashClear + Clone + Message + Default,
-{
-    // fn proto_serialize(&self) -> Vec<u8>;
-    // fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo>;
-    fn calculate_hash(&self) -> Hash;
-    fn from_hex(hex_value: String) -> Result<Self, ErrorInfo>;
-    fn div_mod(&self, bucket: usize) -> i64;
-}
-
-impl<T> ProtoHashable for T
-where
-    T: HashClear + Clone + Message + Default,
-{
-    // fn proto_serialize(&self) -> Vec<u8> {
-    //     self.encode_to_vec()
-    // }
-    //
-    // fn proto_deserialize(bytes: Vec<u8>) -> Result<Self, ErrorInfo> {
-    //     // TODO: Automap this error with a generic _.to_string() trait implicit?
-    //     return T::decode(&*bytes)
-    //         .map_err(|e| error_message(Error::ProtoDecoderFailure, e.to_string()));
-    // }
-
-    fn from_hex(hex_value: String) -> Result<Self, ErrorInfo> {
-        Self::proto_deserialize(from_hex(hex_value)?)
-    }
-
-    fn calculate_hash(&self) -> Hash {
-        let mut clone = self.clone();
-        clone.hash_clear();
-        let input = clone.proto_serialize();
-        Hash::digest(input)
-    }
-
-    fn div_mod(&self, bucket: usize) -> i64 {
-        self.calculate_hash().div_mod(bucket)
-    }
-}
-
-pub trait WithMetadataHashableFields {
-    fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata>;
-    // fn struct_metadata(&self) -> Option<&StructMetadata>;
-    fn struct_metadata_opt_ref(&self) -> Option<&StructMetadata>;
-}
-
-pub trait WithMetadataHashable {
-    fn struct_metadata(&mut self) -> Result<&mut StructMetadata, ErrorInfo>;
-    fn struct_metadata_err(&self) -> Result<&StructMetadata, ErrorInfo>;
-    fn version(&self) -> Result<i32, ErrorInfo>;
-    fn time(&self) -> Result<&i64, ErrorInfo>;
-    fn hash_or(&self) -> Hash;
-    fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo>;
-    fn hash_vec(&self) -> Vec<u8>;
-    fn hash_hex(&self) -> Result<String, ErrorInfo>;
-    fn hash_hex_or_missing(&self) -> String;
-    fn with_hash(&mut self) -> &mut Self;
-    fn set_hash(&mut self, hash: Hash) -> Result<(), ErrorInfo>;
-}
-
-impl<T> WithMetadataHashable for T
-where
-    Self: WithMetadataHashableFields + HashClear + Clone + Message + std::default::Default,
-{
-    fn struct_metadata(&mut self) -> Result<&mut StructMetadata, ErrorInfo> {
-        let option = self.struct_metadata_opt();
-        option.ok_or(error_message(Error::MissingField, "struct_metadata"))
-    }
-
-    fn struct_metadata_err(&self) -> Result<&StructMetadata, ErrorInfo> {
-        self.struct_metadata_opt_ref().ok_or(error_message(Error::MissingField, "struct_metadata"))
-    }
-
-    fn version(&self) -> Result<i32, ErrorInfo> {
-        Ok(self.struct_metadata_err()?.version)
-    }
-
-    fn time(&self) -> Result<&i64, ErrorInfo> {
-        Ok(self.struct_metadata_opt_ref().safe_get()?.time.safe_get()?)
-    }
-
-    fn hash_or(&self) -> Hash {
-        self.struct_metadata_opt_ref()
-            .and_then(|s| s.hash.clone()) // TODO: Change to as_ref() to prevent clone?
-            .unwrap_or(self.calculate_hash())
-    }
-
-    fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        Ok(self.hash_or().bytes.safe_bytes()?)
-    }
-
-    fn hash_vec(&self) -> Vec<u8> {
-        self.hash_bytes().expect("hash bytes missing")
-    }
-
-    fn hash_hex(&self) -> Result<String, ErrorInfo> {
-        Ok(hex::encode(self.hash_or().bytes.safe_bytes()?))
-    }
-
-    fn hash_hex_or_missing(&self) -> String {
-        self.hash_hex().unwrap_or("missing hash".to_string())
-    }
-
-    fn with_hash(&mut self) -> &mut T {
-        let hash = self.calculate_hash();
-        self.set_hash(hash).expect("set");
-        self
-    }
-
-    fn set_hash(&mut self, hash: Hash) -> Result<(), ErrorInfo> {
-        let met = self.struct_metadata()?;
-        met.hash = Some(hash);
-        Ok(())
-    }
-}
-
-/*
-
-
-   pub fn hash_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-
-   }
-*/
 //
 // struct CurrencyTransferTransaction {
 //     transaction: Transaction
@@ -428,7 +273,7 @@ pub trait SafeOption<T> {
 impl<T> SafeOption<T> for Option<T> {
     fn safe_get(&self) -> Result<&T, ErrorInfo> {
         self.as_ref().ok_or(error_message(
-            Error::MissingField,
+            ErrorCode::MissingField,
             "unspecified optional value",
         ))
     }
@@ -436,7 +281,7 @@ impl<T> SafeOption<T> for Option<T> {
         self // TODO: parent Field message? necessary or not?
             .as_ref()
             .ok_or(error_message(
-                Error::MissingField,
+                ErrorCode::MissingField,
                 format!("{} option empty", msg.into()),
             ))
     }
@@ -468,7 +313,7 @@ pub trait ErrorInfoContext<T, E> {
     fn error_info<C: Into<String>>(self, context: C) -> Result<T, ErrorInfo>
         where
             C: Display + Send + Sync + 'static;
-    fn error_msg<C: Into<String>>(self, code: Error, context: C) -> Result<T, ErrorInfo>
+    fn error_msg<C: Into<String>>(self, code: ErrorCode, context: C) -> Result<T, ErrorInfo>
         where
             C: Display + Send + Sync + 'static;
 
@@ -484,20 +329,20 @@ impl<T, E> ErrorInfoContext<T, E> for Result<T, E>
         // Not using map_err to save 2 useless frames off the captured backtrace
         // in ext_context.
         // self.context(context)
-        self.map_err(|e| error_msg(Error::UnknownError, context.into(), e.to_string()))
+        self.map_err(|e| error_msg(ErrorCode::UnknownError, context.into(), e.to_string()))
     }
 
-    fn error_msg<C: Into<String>>(self, code: Error, context: C) -> Result<T, ErrorInfo> where C: Display + Send + Sync + 'static {
+    fn error_msg<C: Into<String>>(self, code: ErrorCode, context: C) -> Result<T, ErrorInfo> where C: Display + Send + Sync + 'static {
         self.map_err(|e| error_msg(code, context.into(), e.to_string()))
     }
 }
 
 
 pub fn error_info<S: Into<String>>(message: S) -> ErrorInfo {
-    error_message(crate::structs::Error::UnknownError, message.into())
+    error_message(crate::structs::ErrorCode::UnknownError, message.into())
 }
 
-pub fn error_code(code: Error) -> ErrorInfo {
+pub fn error_code(code: ErrorCode) -> ErrorInfo {
     error_message(code, "".to_string())
 }
 
@@ -557,7 +402,7 @@ where F : Future{
 }
 
 
-pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_message: P) -> ErrorInfo {
+pub fn error_msg<S: Into<String>, P: Into<String>>(code: ErrorCode, message: S, lib_message: P) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
@@ -586,7 +431,7 @@ pub fn error_msg<S: Into<String>, P: Into<String>>(code: Error, message: S, lib_
     }
 }
 
-pub fn error_message<S: Into<String>>(error_code: structs::Error, message: S) -> ErrorInfo {
+pub fn error_message<S: Into<String>>(error_code: structs::ErrorCode, message: S) -> ErrorInfo {
     error_msg(error_code, message, "".to_string())
 }
 
@@ -868,15 +713,11 @@ pub fn json_from<'a, T: serde::Deserialize<'a>>(t: &'a str) -> Result<T, ErrorIn
 }
 
 impl PeerId {
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes_direct(bytes: Vec<u8>) -> Self {
         Self {
-            peer_id: Some(PublicKey::from_bytes(bytes)),
+            peer_id: Some(PublicKey::from_bytes_direct_ecdsa(bytes)),
             known_proof: vec![],
         }
-    }
-
-    pub fn from_hex(hex: impl Into<String>) -> RgResult<Self> {
-        Ok(Self::from_bytes(from_hex(hex.into())?))
     }
 
     pub fn from_pk(pk: PublicKey) -> Self {
@@ -887,7 +728,7 @@ impl PeerId {
     }
 
     pub fn hex_or(&self) -> String {
-        self.peer_id.as_ref().map(|x| x.hex_or()).unwrap_or("missing peer id".to_string())
+        self.peer_id.as_ref().map(|x| x.hex()).unwrap_or("missing peer id".to_string())
     }
 
 

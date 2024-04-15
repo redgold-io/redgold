@@ -7,6 +7,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{data_item, editable_text_input_copy, valid_label};
@@ -76,7 +77,7 @@ impl KeyInfo {
 
     fn update_public_key_info(&mut self) {
         if let Ok(pk) = self.public_key() {
-            self.public_key = pk.hex_or();
+            self.public_key = pk.hex();
             self.address = pk.address()
                 .and_then(|a| a.render_string())
                 .unwrap_or("Address failure".to_string());

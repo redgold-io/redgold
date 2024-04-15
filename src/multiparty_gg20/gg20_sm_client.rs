@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use round_based::Msg;
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{EasyJson, RgResult};
-use redgold_schema::structs::Request;
+use redgold_schema::structs::{Request, RoomId};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::MultipartyAuthenticationRequest;
@@ -82,7 +82,7 @@ impl SmClient {
         let mut req = Request::empty();
         let mut mpa = MultipartyAuthenticationRequest::default();
         mpa.message = message;
-        mpa.room_id = self.room_id.clone();
+        mpa.room_id = Some(RoomId::from(self.room_id.clone()));
         req.multiparty_authentication_request = Some(mpa);
         req = self.relay.sign_request(req).await.expect("Bad signing request in SM client");
         let result = req.verify_auth();

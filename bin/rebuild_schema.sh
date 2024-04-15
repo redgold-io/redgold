@@ -1,1 +1,3 @@
-cargo build -p redgold-schema
+set -e
+cargo clean;
+cargo build -p redgold-schema;

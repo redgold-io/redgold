@@ -11,7 +11,6 @@ use redgold_schema::error_message;
 use redgold_schema::structs::ErrorInfo;
 
 pub use redgold_schema as schema;
-pub mod address_block;
 pub mod peer;
 pub mod config;
 pub mod servers;
@@ -22,8 +21,11 @@ pub mod data_store;
 pub mod state_store;
 pub mod utxo_store;
 pub mod parquet_export;
-mod parquet_min_index;
-mod parquet_full_index;
+pub mod parquet_min_index;
+pub mod parquet_full_index;
+pub mod transaction_insert;
+pub mod address_transaction;
+pub mod transaction_observability;
 
 #[derive(Clone)]
 pub struct DataStoreContext {
@@ -42,11 +44,11 @@ impl DataStoreContext {
         sqlx::migrate!("./migrations")
             .run(&*self.pool)
             .await
-            .map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
+            .map_err(|e| error_message(schema::structs::ErrorCode::InternalDatabaseError, e.to_string()))
     }
 
     pub fn map_err_sqlx<A>(error: Result<A, sqlx::Error>) -> Result<A, ErrorInfo> {
-        error.map_err(|e| error_message(schema::structs::Error::InternalDatabaseError, e.to_string()))
+        error.map_err(|e| error_message(schema::structs::ErrorCode::InternalDatabaseError, e.to_string()))
     }
 
     // This doesn't seem to work due to the Record type here

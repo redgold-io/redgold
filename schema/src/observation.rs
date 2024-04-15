@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use crate::structs::{Observation, ObservationMetadata, ObservationProof, Proof};
-use crate::{Hash, HashClear, ProtoHashable, struct_metadata_new, StructMetadata, util, WithMetadataHashable, WithMetadataHashableFields};
-
+use crate::{Hash, HashClear, StructMetadata, util};
+use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 //
 // impl HashClear for Observation {
 //     fn hash_clear(&mut self) {
@@ -43,7 +43,7 @@ impl Observation {
     pub fn leafs(&self) -> Vec<Vec<u8>> {
         self.observations
             .iter()
-            .map(| r| r.clone().hash_vec())
+            .map(| r| r.clone().hash_proto_bytes())
             /*
                    old code
             pub fn metadata_hash(&self) -> [u8; 32] {

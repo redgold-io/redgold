@@ -64,7 +64,7 @@ enum PoWProofType {
 // Currently unused, but an optional anti-spam proof included in a transaction for increased mem-pool priority
 message PoWProof {
   PoWProofType proof_type = 1;
-  BytesData nonce = 2;
+  BytesData index_counter = 2;
 }
 
 // Equivalent to a chainId identifier. Used as a marker for contracts or simplicity to indicate information
@@ -272,7 +272,7 @@ enum BytesDecoder {
 message BytesData {
   bytes value = 1;
   BytesDecoder decoder = 2;
-  int64 version = 3;
+  int32 version = 3;
 }
 
 enum HashFormatType {
@@ -317,6 +317,7 @@ message GenericTypedValue {
 
 message ExternalTransactionId {
   string identifier = 1;
+  SupportedCurrency currency = 2;
 }
 
 message InterestRate {
@@ -341,6 +342,11 @@ message CollateralizedLoanRepayment {}
 
 message CollateralizedLoanData {
     CollateralizedLoanInitiation initiation = 1;
+}
+
+message SwapRequest {
+  Address destination = 1;
+  // TODO: Limit parameters here for max price to issue at
 }
 
 // Generic data structure designed to hold arbitrary data in a common format.
@@ -390,6 +396,8 @@ message StandardData {
   ExternalTransactionId external_transaction_id = 25;
   // Used for collateralized loan outputs
   CollateralizedLoanData collateralized_loan_data = 26;
+  // Used for swaps
+  SwapRequest swap_request = 27;
 }
 
 // Native staking range to provide liquidity within. Trades cannot be executed outside of this range
@@ -483,12 +491,13 @@ message OutputContract {
   // hash references, same issue as other thing
   optional StandardContractType standard_contract_type = 1;
   CodeExecutionContract code_execution_contract = 2;
-  optional int64 threshold = 3;
-  repeated int64 weights = 4;
+  Weighting threshold = 3;
+  repeated Weighting weights = 4;
   // What was this for? Are we ever gonna send to an address filter predicate that is different from the output address?
 //  Address filter_predicate_destination = 5;
   bool pay_update_descendents = 6;
   bool consumable = 7;
+  repeated StandardContractType standard_contracts = 8;
 }
 
 enum OutputType {
@@ -527,10 +536,12 @@ message TimeLockWindow {
 
 message CurrencyAmount {
   int64 amount = 1;
-  // Support for BigInts, used for multi-currency support
-  BytesData bytes = 2;
+  optional SupportedCurrency currency = 2;
+  // Support for arbitrary amount, used for multi-currency support
+  optional string string_amount = 3;
+  BytesData bytes = 4;
   // The currency type associated with the amount, used for multi-currency support
-  optional SupportedCurrency currency = 3;
+
 }
 
 message TransactionData {
@@ -605,7 +616,7 @@ message TransactionOptions {
   optional bool is_test = 7;
   // Used only for anti-spam limiting at low limits.
   PoWProof pow_proof = 8;
-  optional TransactionType transaction_type = 9;
+  TransactionType transaction_type = 9;
 }
 
 message Transaction {
@@ -847,14 +858,14 @@ message GetPeersInfoResponse {
   repeated PeerNodeInfo peer_info = 2;
 }
 
-
+// Not used
 message MultipartyBroadcast {
-  string room_id = 1;
+  RoomId room_id = 1;
   string message = 2;
 }
 
 message MultipartyIssueUniqueIndex {
-  string room_id = 1;
+  RoomId room_id = 1;
 }
 
 message MultipartyIssueUniqueIndexResponse {
@@ -862,13 +873,13 @@ message MultipartyIssueUniqueIndexResponse {
 }
 
 message MultipartySubscribe {
-  string room_id = 1;
+  RoomId room_id = 1;
   optional int64 last_event_id = 2;
   bool shutdown = 3;
 }
 
 message MultipartySubscribeEvent {
-  string room_id = 1;
+  RoomId room_id = 1;
   string id = 2;
   string message = 3;
 }
@@ -892,7 +903,7 @@ message QueryObservationProofResponse {
 
 message MultipartyAuthenticationRequest {
   optional string message = 1;
-  string room_id = 2;
+  RoomId room_id = 2;
 }
 
 message HealthRequest {
@@ -954,7 +965,6 @@ message Request {
   Proof proof = 7;
   NodeMetadata node_metadata = 8;
   GetPeersInfoRequest get_peers_info_request = 9;
-  //  optional DownloadMetadataRequest download_metadata_request = 5;
   InitiateMultipartyKeygenRequest initiate_keygen = 10;
   InitiateMultipartySigningRequest initiate_signing = 17;
   SubmitTransactionRequest submit_transaction_request = 11;
@@ -1035,7 +1045,7 @@ message PartyMember {
   Weighting weight = 2;
 }
 
-message PartyInfo {
+message PartyInfoAbridged {
   PartyId party_id = 1;
   Weighting threshold = 2;
   repeated PartyMember members = 3;
@@ -1043,7 +1053,7 @@ message PartyInfo {
 }
 
 message GetPartiesInfoResponse {
-  repeated PartyInfo party_info = 1;
+  repeated PartyInfoAbridged party_info = 1;
 }
 
 message QueryTransactionRequest {
@@ -1206,7 +1216,7 @@ message ErrorDetails {
 }
 
 message ErrorInfo {
-  Error code = 1;
+  ErrorCode code = 1;
   string description = 2;
   string description_extended = 3;
   string message = 4;
@@ -1232,10 +1242,14 @@ message ResponseMetadata {
   optional string trace_id = 5;
 }
 
+message RoomId {
+  optional string uuid = 1;
+}
+
 message MultipartyIdentifier {
   repeated PublicKey party_keys = 1;
-  int64 threshold = 2;
-  string uuid = 3;
+  Weighting threshold = 2;
+  RoomId room_id = 3;
 }
 
 message ControlMultipartyKeygenRequest {
@@ -1259,6 +1273,8 @@ message ControlMultipartySigningResponse {
 
 message InitiateMultipartyKeygenRequest {
   MultipartyIdentifier identifier = 1;
+  int64 time = 2;
+  repeated PublicKey prior_keys = 3;
 }
 
 message InitiateMultipartyKeygenResponse {
@@ -1272,7 +1288,7 @@ message InitiateMultipartySigningResponse{
 
 message InitiateMultipartySigningRequest {
   MultipartyIdentifier identifier = 1;
-  string signing_room_id = 2;
+  RoomId signing_room_id = 2;
   repeated PublicKey signing_party_keys = 3;
   BytesData data_to_sign = 4;
 }
@@ -1294,7 +1310,7 @@ message ControlResponse {
   ControlMultipartySigningResponse control_multiparty_signing_response = 3;
 }
 
-enum Error {
+enum ErrorCode {
   /// Signature failed verification
   IncorrectSignature = 0;
   MissingInputs = 1;
@@ -1418,7 +1434,7 @@ message ContractStateMarker {
   BytesData state = 2;
   StateSelector selector = 3;
   Hash transaction_marker = 4;
-  int64 nonce = 5;
+  int64 index_counter = 5;
   int64 time = 6;
 }
 
@@ -1474,3 +1490,26 @@ import "execution.proto";
 //message TestMessageOuter {
 //  execution.TestMessage inner = 1;
 //}
+
+enum LocalShareType {
+  MultipartyEcdsaCurvKzen = 0;
+}
+
+message LocalKeyShare {
+  optional string local_share = 1;
+  LocalShareType share_type = 2;
+  optional int32 version = 3;
+}
+
+message PartyInfo {
+  InitiateMultipartyKeygenRequest initiate = 1;
+  LocalKeyShare local_key_share = 2;
+  PublicKey party_key = 3;
+  optional bool self_initiated = 4;
+  optional int64 expired_time = 5;
+  PublicKey successor_key = 6;
+}
+
+message PartyData {
+  PublicKey party_key = 1;
+}

@@ -8,22 +8,21 @@ use flume::{Sender, TryRecvError};
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
-use metrics::{histogram, counter};
+use metrics::{counter, histogram};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, UtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
+use redgold_schema::{json_or, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map};
+use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, UtxoId, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
-use crate::core::transaction::{TransactionTestContext};
+use crate::core::transaction::TransactionTestContext;
 use redgold_data::data_store::DataStore;
-use crate::schema::structs::{Error, ResponseMetadata};
+use crate::schema::structs::{ErrorCode, ResponseMetadata};
 use crate::schema::structs::{HashType, ObservationMetadata, State, Transaction};
 use crate::schema::structs::{QueryTransactionResponse, SubmitTransactionResponse};
-use crate::schema::{SafeBytesAccess, WithMetadataHashable};
 use crate::util::runtimes::build_runtime;
 // TODO config
 use crate::schema::structs::ErrorInfo;
@@ -32,6 +31,7 @@ use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
 use redgold_executor::extism_wrapper;
+use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::output::tx_output_data;
@@ -39,11 +39,13 @@ use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_validate::TransactionValidator;
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 
 #[derive(Clone)]
 pub struct Conflict {
@@ -115,7 +117,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     let mut map = HashMap::<Vec<u8>, f64>::new();
     for peer in &an {
         let t = relay.get_security_rating_trust_of_node(peer).await?.unwrap_or(0.0);
-        map.insert(peer.bytes.safe_bytes()?, t);
+        map.insert(peer.vec(), t);
     }
 
     let mut trust_conflicts = vec![];
@@ -133,7 +135,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
                 let ret: Vec<u8> = x
                     .proof
                     .as_ref()
-                    .map(|p| p.public_key_bytes().as_ref().unwrap().clone())
+                    .map(|p| p.public_key_proto_bytes().as_ref().unwrap().clone())
                     .ok_or("")
                     .unwrap();
                 ret
@@ -206,7 +208,7 @@ impl TransactionProcessContext {
         let current_time = util::current_time_millis_i64();
         let input_address = transaction_message.transaction.first_input_address().clone()
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
-        let output_address = transaction_message.transaction.first_output_address()
+        let output_address = transaction_message.transaction.first_output_address_non_input_or_fee()
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
         let node_id = self.relay.node_config.short_id()?;
         let mut hm = HashMap::new();
@@ -491,7 +493,7 @@ impl TransactionProcessContext {
                     // translate error codes for db access / etc. into internal server error.
                     // TODO: This error code just indicates a conflict, not necessarily a deliberate double spend
                     // LiveConflictDetected to distinguish it.
-                    return Err(error_message(Error::TransactionRejectedDoubleSpend, "Double spend detected in live context"));
+                    return Err(error_message(ErrorCode::TransactionRejectedDoubleSpend, "Double spend detected in live context"));
                 }
                 conflicts.push(conflict);
             }
@@ -533,7 +535,7 @@ impl TransactionProcessContext {
                 .await?;
 
             if winner != hash {
-                Err(error_message(Error::TransactionRejectedDoubleSpend,
+                Err(error_message(ErrorCode::TransactionRejectedDoubleSpend,
                                   format!("Lost conflict to other transaction winner: {}", winner.hex())))?;
             } else {
                 for c in &conflicts {
@@ -649,7 +651,7 @@ impl TransactionProcessContext {
                                 .and_then(|d| d.state.clone());
                             csm.address = o.address.clone();
                             csm.time = transaction.time()?.clone();
-                            csm.nonce = 0;
+                            csm.index_counter = 0;
                             csm.transaction_marker = Some(transaction.hash_or());
                             self.relay.ds.state.insert_state(csm).await?;
                             // TODO: ^ save the error above and return it to the user for processing this?
@@ -752,7 +754,7 @@ impl TransactionProcessContext {
             .transaction_channels
             .entry(transaction_hash.clone());
         let res = match entry {
-            Entry::Occupied(_) => Err(error_message(Error::TransactionAlreadyProcessing, "Duplicate TX hash found in processing queue")),
+            Entry::Occupied(_) => Err(error_message(ErrorCode::TransactionAlreadyProcessing, "Duplicate TX hash found in processing queue")),
             Entry::Vacant(entry) => {
                 let req = RequestProcessor::new(&transaction_hash, request_uuid, transaction.clone());
                 entry.insert(req.clone());

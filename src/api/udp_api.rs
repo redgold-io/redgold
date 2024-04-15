@@ -22,16 +22,17 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
 use uuid::Uuid;
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{bytes_data, ErrorInfoContext, json, ProtoHashable, SafeBytesAccess};
+use redgold_schema::{bytes_data, ErrorInfoContext, json};
 use redgold_schema::structs::{ErrorInfo, Request, UdpMessage};
 use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::relay::Relay;
 use crate::util;
 use crate::util::keys::public_key_from_bytes;
 use crate::util::random_port;
-use redgold_schema::ProtoSerde;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::api::udp_api::UdpOperation::Outgoing;
 use redgold_schema::EasyJson;
+use redgold_schema::proto_serde::ProtoHashable;
 
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]

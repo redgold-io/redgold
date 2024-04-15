@@ -12,8 +12,10 @@ use itertools::Itertools;
 
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, structs};
 use redgold_schema::constants::default_node_internal_derivation_path;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
 use redgold_schema::util::cmd::{run_bash_async, run_powershell_async};
@@ -610,7 +612,7 @@ pub async fn derive_mnemonic_and_peer_id(
             result?.peer_id.expect("pid")
         };
         pubkey = Some(pk.clone());
-        pid_hex = pk.hex()?;
+        pid_hex = pk.hex();
     }
     if !peer_id_tx.contains_key(&pid_hex) {
 

@@ -20,9 +20,9 @@ use round_based::Msg;
 use redgold_schema::{bytes_data, error_info, json, json_from, structs};
 use redgold_schema::structs::{ErrorInfo, Proof};
 use redgold_keys::util::verify;
-use crate::multiparty::gg20_keygen::external_address_to_surf_url;
+use crate::multiparty_gg20::gg20_keygen::external_address_to_surf_url;
 
-use crate::multiparty::gg20_sm_client::join_computation;
+use crate::multiparty_gg20::gg20_sm_client::join_computation;
 
 // #[derive(Debug, StructOpt)]
 // struct Cli {
@@ -155,7 +155,7 @@ pub async fn signing(
     let data_bytes = data_to_sign.clone();
     let msg = Message::from_slice(&data_bytes).map_err(|e| error_info(e.to_string()))?;
     let recovered_pk = s.recover(&msg, &rec_sig).map_err(|e| error_info(e.to_string()))?;
-    let public = structs::PublicKey::from_bytes(recovered_pk.serialize().to_vec());
+    let public = structs::PublicKey::from_bytes_direct_ecdsa(recovered_pk.serialize().to_vec());
     let proof = Proof::from(public, sig_struct);
     Ok(proof)
 }

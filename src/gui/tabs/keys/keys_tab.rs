@@ -9,6 +9,7 @@ use tracing::Instrument;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::EasyJson;
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::gui::app_loop::LocalState;
 use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
 use crate::gui::components::account_deriv_sel::AccountDerivationPathInputState;
@@ -174,9 +175,9 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
                     if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
                         let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
                         let check = m.checksum().unwrap_or("".to_string());
-                        let words_public = m.public_at(&dp2).expect("Public at failed").hex_or();
+                        let words_public = m.public_at(&dp2).expect("Public at failed").hex();
                         let xpub_w = XpubWrapper::new(xpub.clone());
-                        let xpub_public = xpub_w.public_at_dp(&dp2).expect("Public at DP failed").hex_or();
+                        let xpub_public = xpub_w.public_at_dp(&dp2).expect("Public at DP failed").hex();
                         let equal = words_public == xpub_public;
                         info!("Adding xpub to local state from keys tab with words pass \
                         checksum: {check} equal {equal} words public: {words_public} xpub public: {xpub_public}");

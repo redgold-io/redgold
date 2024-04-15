@@ -1,4 +1,4 @@
-use crate::ProtoSerde;
+use crate::proto_serde::ProtoSerde;
 use crate::structs::{DebugVersionChange, DebugVersionChange2};
 
 #[test]

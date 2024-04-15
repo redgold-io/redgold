@@ -57,7 +57,7 @@ impl XpubWrapper {
             .map(|i| Self::child_num(i.clone()))
             .collect::<RgResult<Vec<ChildNumber>>>()?;
         let p = x.derive_pub(&Secp256k1::new(), &x1).error_info("Failed to derive public key")?;
-        Ok(structs::PublicKey::from_bytes(p.public_key.serialize().to_vec()))
+        Ok(structs::PublicKey::from_bytes_direct_ecdsa(p.public_key.serialize().to_vec()))
     }
 
     pub fn public_at_dp(&self, dp: &String) -> RgResult<structs::PublicKey> {

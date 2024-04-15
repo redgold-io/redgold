@@ -4,10 +4,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use serde::Serialize;
+use sha3::digest::generic_array::functional::FunctionalSequence;
 use warp::{Filter, Rejection};
 use warp::path::Exact;
 use warp::reply::{Json, Response};
 use redgold_schema::RgResult;
+use redgold_schema::structs::Hash;
 use crate::api::as_warp_json_response;
 use crate::api::explorer::server::{extract_ip, process_origin};
 use crate::core::relay::Relay;
@@ -17,6 +19,7 @@ use crate::core::relay::Relay;
 pub struct ApiData {
     pub relay: Arc<Relay>,
     pub origin_ip: Option<String>,
+    pub param: Option<String>
 }
 
 pub trait ApiHelpers {
@@ -34,6 +37,7 @@ impl<T: Filter<Extract=(), Error=Rejection> + Sized + Send + Clone> ApiHelpers f
                 ApiData{
                     relay: c.clone(),
                     origin_ip: origin,
+                    param: None,
                 }
             })
     }
@@ -141,9 +145,25 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             Ok(api_data.relay.node_config.seeds_now())
         });
 
+    let transaction_get = warp::get()
+        .with_v1()
+        .and(warp::path("transaction"))
+        .with_relay_and_ip(r.clone())
+        .and(warp::path::param())
+        .map(|mut api_data: ApiData, hash: String| {
+            api_data.param = Some(hash);
+            api_data
+        })
+        .and_then_as(move |api_data: ApiData| async move {
+            api_data.relay.lookup_transaction_maybe_error_hex(&api_data.param.unwrap()).await
+        });
+
+
+
     hello
         .or(table_sizes)
         .or(seeds)
+        .or(transaction_get)
 }
 
 

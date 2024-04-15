@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
-use bdk::{Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
+use bdk::{Balance, FeeRate, KeychainKind, SignOptions, sled, SyncOptions, TransactionDetails, Wallet};
 use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash, TxIn, TxOut};
 use bdk::bitcoin::blockdata::opcodes;
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
@@ -12,13 +13,15 @@ use bdk::bitcoin::secp256k1::{All, Secp256k1, Signature};
 use bdk::bitcoin::util::{psbt, sighash};
 use bdk::bitcoin::util::psbt::PartiallySignedTransaction;
 use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetTx};
-use bdk::database::MemoryDatabase;
+use bdk::database::{BatchDatabase, MemoryDatabase};
 use bdk::electrum_client::Client;
 use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
+use bdk::sled::Tree;
 // use crate::util::cli::commands::send;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::{KeyPair, TestConstants};
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
@@ -33,7 +36,7 @@ fn schnorr_test() {
 }
 
 pub fn struct_public_to_address(pk: structs::PublicKey, network: Network) -> Result<Address, ErrorInfo> {
-    let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.bytes.safe_bytes()?)
+    let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.raw_bytes()?)
         .error_info("Unable to convert destination pk to bdk public key")?;
     let addr = Address::p2wpkh(&pk2, network)
         .error_info("Unable to convert destination pk to bdk address")?;
@@ -41,7 +44,7 @@ pub fn struct_public_to_address(pk: structs::PublicKey, network: Network) -> Res
 }
 
 pub fn struct_public_to_bdk_pubkey(pk: &structs::PublicKey) -> Result<bdk::bitcoin::util::key::PublicKey, ErrorInfo> {
-    let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.bytes.safe_bytes()?)
+    let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.raw_bytes()?)
         .error_info("Unable to convert destination pk to bdk public key")?;
     Ok(pk2)
 }
@@ -158,14 +161,14 @@ impl MultipartySigner {
         let guard = arc.read().unwrap();
         let proof = guard.get(&input_index).ok_or(error_info("No proof found"))?;
         let signature = proof.signature.safe_get_msg("Missing signature in proof")?;
-        let sig = Signature::from_compact(&*signature.bytes.safe_bytes()?).error_msg(
-            structs::Error::IncorrectSignature,
+        let sig = Signature::from_compact(&*signature.raw_bytes()?).error_msg(
+            structs::ErrorCode::IncorrectSignature,
             "Decoded signature construction failure",
         )?;
 
         let final_signature = ecdsa::EcdsaSig { sig, hash_ty };
 
-        let public_key = proof.public_key.safe_get_msg("Missing public key")?.bytes.safe_bytes()?;
+        let public_key = proof.public_key.safe_get_msg("Missing public key")?.raw_bytes()?;
         let public_key = bdk::bitcoin::util::key::PublicKey::from_slice(&*public_key)
             .error_info("Public key failure")?;
 
@@ -205,8 +208,8 @@ impl InputSigner for MultipartySigner {
 }
 
 
-pub struct SingleKeyBitcoinWallet {
-    wallet: Wallet<MemoryDatabase>,
+pub struct SingleKeyBitcoinWallet<D: BatchDatabase> {
+    wallet: Wallet<D>,
     pub public_key: structs::PublicKey,
     network: Network,
     pub psbt: Option<PartiallySignedTransaction>,
@@ -249,11 +252,10 @@ impl ExternalTimedTransaction {
 
 }
 
-
-impl SingleKeyBitcoinWallet {
+impl SingleKeyBitcoinWallet<MemoryDatabase> {
 
     pub fn new_wallet(
-        public_key: structs::PublicKey,
+        public_key: PublicKey,
         network: NetworkEnvironment,
         do_sync: bool
     ) -> Result<Self, ErrorInfo> {
@@ -266,7 +268,7 @@ impl SingleKeyBitcoinWallet {
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
         let database = MemoryDatabase::default();
-        let hex = public_key.hex_or();
+        let hex = public_key.to_hex_direct_ecdsa()?;
         let descr = format!("wpkh({})", hex);
         let wallet = Wallet::new(
             &*descr,
@@ -296,6 +298,61 @@ impl SingleKeyBitcoinWallet {
         }
         Ok(bitcoin_wallet)
     }
+}
+impl SingleKeyBitcoinWallet<Tree> {
+    pub fn new_wallet_db_backed(
+        public_key: PublicKey,
+        network: NetworkEnvironment,
+        do_sync: bool,
+        database_path: PathBuf
+    ) -> Result<Self, ErrorInfo> {
+        let network = if network == NetworkEnvironment::Main {
+            Network::Bitcoin
+        } else {
+            Network::Testnet
+        };
+        let client = Client::new("ssl://electrum.blockstream.info:60002")
+            .error_info("Error building bdk client")?;
+        let client = ElectrumBlockchain::from(client);
+        // KeyValueDatabase
+        // Create a database (using default sled type) to store wallet data
+        let database = sled::open(database_path).error_info("Sled database open error")?;
+        let wallet_name = public_key.hex();
+        let database = database.open_tree(wallet_name.clone()).error_info("Database open tree error")?;
+        // let database = MemoryDatabase::default();
+        let hex = public_key.to_hex_direct_ecdsa()?;
+        let descr = format!("wpkh({})", hex);
+        let wallet = Wallet::new(
+            &*descr,
+            Some(&*descr),
+            network,
+            database
+        ).error_info("Error creating BDK wallet")?;
+        let custom_signer = Arc::new(MultipartySigner::new(public_key.clone()));
+        let mut bitcoin_wallet = Self {
+            wallet,
+            public_key,
+            network,
+            psbt: None,
+            transaction_details: None,
+            client,
+            custom_signer: custom_signer.clone(),
+        };
+        // Adding the multiparty signer to the BDK wallet
+        bitcoin_wallet.wallet.add_signer(
+            KeychainKind::External,
+            SignerOrdering(200),
+            custom_signer.clone(),
+        );
+
+        if do_sync {
+            bitcoin_wallet.sync()?;
+        }
+        Ok(bitcoin_wallet)
+    }
+}
+impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
+
     //
     // pub fn new_hardware_wallet(
     //     public_key: structs::PublicKey,
@@ -356,7 +413,7 @@ impl SingleKeyBitcoinWallet {
     }
 
     pub fn address(&self) -> Result<String, ErrorInfo> {
-        let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*self.public_key.bytes.safe_bytes()?)
+        let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*self.public_key.raw_bytes()?)
             .error_info("Unable to convert destination pk to bdk public key")?;
         let addr = bdk::bitcoin::util::address::Address::p2wpkh(&pk2, self.network)
             .error_info("Unable to convert destination pk to bdk address")?;
@@ -523,7 +580,7 @@ impl SingleKeyBitcoinWallet {
     pub fn create_transaction(&mut self, destination: Option<structs::PublicKey>, destination_str: Option<String>, amount: u64) -> Result<(), ErrorInfo> {
 
         let addr = if let Some(destination) = destination {
-            let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*destination.bytes.safe_bytes()?)
+            let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*destination.raw_bytes()?)
                 .error_info("Unable to convert destination pk to bdk public key")?;
             let addr = Address::p2wpkh(&pk2, self.network)
                 .error_info("Unable to convert destination pk to bdk address")?;
@@ -748,7 +805,7 @@ async fn tx_debug() {
 #[tokio::test]
 async fn balance_test2() {
     let w = SingleKeyBitcoinWallet
-    ::new_wallet(PublicKey::from_hex("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
+    ::new_wallet(PublicKey::from_hex_direct("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
     let balance = w.get_wallet_balance().expect("");
 
 

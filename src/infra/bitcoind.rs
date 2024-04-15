@@ -1,4 +1,4 @@
-use crate::schema::structs::Error;
+use crate::schema::structs::ErrorCode;
 use crate::util;
 use itertools::Itertools;
 
@@ -8,7 +8,7 @@ pub struct BitcoindRpcAuth {
     password: String,
 }
 
-pub fn generate_username_rpc_auth<S: Into<String>>(username: S) -> Result<BitcoindRpcAuth, Error> {
+pub fn generate_username_rpc_auth<S: Into<String>>(username: S) -> Result<BitcoindRpcAuth, ErrorCode> {
     // let command = format!("curl -sSL https://raw.githubusercontent.com/bitcoin/bitcoin/master/share/rpcauth/rpcauth.py | python - {}",
     //                       username.into());
     let (stdout, _) = redgold_schema::util::cmd::run_cmd(
@@ -27,7 +27,7 @@ pub fn generate_username_rpc_auth<S: Into<String>>(username: S) -> Result<Bitcoi
         }
     }
     // TODO: Error code for BTC RPC
-    Err(Error::UnknownError)
+    Err(ErrorCode::UnknownError)
 }
 //
 

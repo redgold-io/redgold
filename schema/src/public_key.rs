@@ -1,51 +1,44 @@
 use std::fmt::{Display, Formatter};
-use crate::{bytes_data, from_hex, SafeBytesAccess, ShortString, structs};
+use crate::{bytes_data, RgResult, SafeOption, ShortString, structs};
+use crate::proto_serde::ProtoSerde;
 use crate::structs::{Address, ErrorInfo, PublicKey, PublicKeyType};
 
 
 
 impl Display for PublicKey {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.hex_or())
+        write!(f, "{}", self.hex())
     }
 }
 
-impl structs::PublicKey {
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        structs::PublicKey {
+impl PublicKey {
+    pub fn from_bytes_direct_ecdsa(bytes: Vec<u8>) -> Self {
+        Self {
             bytes: bytes_data(bytes),
             key_type: PublicKeyType::Secp256k1 as i32
         }
     }
 
-    pub fn hex(&self) -> Result<String, ErrorInfo> {
-        let b = self.bytes.safe_bytes()?;
-        Ok(hex::encode(b))
-    }
-
-    pub fn hex_or(&self) -> String {
-        self.hex().unwrap_or("hex error".to_string())
-    }
-
-    pub fn bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
-        self.bytes.safe_bytes()
+    pub fn raw_bytes(&self) -> Result<Vec<u8>, ErrorInfo> {
+        Ok(self.bytes.safe_get().cloned()?.value)
     }
 
     pub fn short_id(&self) -> String {
-        self.hex().expect("hex").short_string().expect("worked")
+        self.hex().short_string().expect("worked")
     }
 
     pub fn address(&self) -> Result<Address, ErrorInfo> {
         Address::from_struct_public(self)
     }
 
-    pub fn from_hex(hex: impl Into<String>) -> Result<Self, ErrorInfo> {
-        let bytes = from_hex(hex.into())?;
-        let key = Self::from_bytes(bytes);
+    pub fn from_hex_direct(hex: impl Into<String>) -> RgResult<Self> {
+        let bytes = crate::from_hex(hex.into())?;
+        let key = Self::from_bytes_direct_ecdsa(bytes);
         Ok(key)
     }
 
-    pub fn vec(&self) -> Vec<u8> {
-        self.bytes().expect("")
+    pub fn to_hex_direct_ecdsa(&self) -> RgResult<String> {
+        self.raw_bytes().map(|b| hex::encode(b))
     }
+
 }

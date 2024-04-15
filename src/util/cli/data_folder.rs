@@ -21,6 +21,10 @@ impl EnvDataFolder {
         self.path.join("data_store.sqlite")
     }
 
+    pub fn bdk_sled_path(&self) -> PathBuf {
+        self.path.join("bdk_sled")
+    }
+
     pub fn mnemonic_path(&self) -> PathBuf {
         self.path.join("mnemonic")
     }

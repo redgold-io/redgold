@@ -1,19 +1,13 @@
-use std::collections::HashSet;
 use itertools::Itertools;
-use crate::core::transaction;
-use crate::schema::output::output_data;
-use crate::schema::structs::{Block, Output, Transaction, UtxoEntry};
-use crate::schema::transaction::amount_data;
+use redgold_keys::address_support::AddressSupport;
+use crate::schema::structs::Transaction;
 use redgold_keys::TestConstants;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use crate::schema::{struct_metadata, WithMetadataHashable};
-use redgold_schema::{constants, ProtoHashable};
-use redgold_schema::constants::{DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY, REDGOLD_PURPOSE, REWARD_AMOUNT};
-use redgold_schema::output::tx_output_data;
-use redgold_schema::structs::{Address, BlockMetadata, CurrencyAmount, NetworkEnvironment, PublicKey, Seed};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::constants::{DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY};
+use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, Seed};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::node::Node;
 use crate::node_config::NodeConfig;
 
 pub struct GenesisDistribution{
@@ -24,7 +18,7 @@ pub struct GenesisDistribution{
 
 fn main_entry(address: impl Into<String>, fraction_pct: impl Into<f64>) -> GenesisDistribution {
     GenesisDistribution {
-        address: Address::parse(&address.into()).expect("works"),
+        address: address.into().parse_address().expect("works"),
         amount: CurrencyAmount::from_fractional((fraction_pct.into() / 100.0) * (MAX_COIN_SUPPLY as f64)).expect("works"),
     }
 }

@@ -27,6 +27,7 @@ use crate::api::RgHttpClient;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 
 pub struct CanaryConfig {}
 
@@ -241,8 +242,8 @@ impl NodeConfig {
         self.seeds_at(util::current_time_millis_i64())
     }
 
-    pub fn seeds_now_pk(&self) -> Vec<Seed> {
-        self.seeds_now().iter().filter(|s| s.public_key.is_some()).cloned().collect()
+    pub fn seeds_now_pk(&self) -> Vec<PublicKey> {
+        self.seeds_now().iter().flat_map(|s| s.public_key.as_ref()).cloned().collect()
     }
 
     pub fn is_seed(&self, pk: &PublicKey) -> bool {
@@ -316,7 +317,7 @@ impl NodeConfig {
     }
 
     pub fn short_id(&self) -> Result<String, ErrorInfo> {
-        self.public_key().hex()?.short_string()
+        self.public_key().hex().short_string()
     }
 
     pub fn gauge_id(&self) -> [(String, String); 1] {
@@ -345,7 +346,6 @@ impl NodeConfig {
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
         let pair = self.words().default_kp().expect("words");
-        let _pk_vec = pair.public_key_vec();
         NodeMetadata{
             transport_info: Some(TransportInfo{
                 external_ipv4: Some(self.external_ip.clone()),

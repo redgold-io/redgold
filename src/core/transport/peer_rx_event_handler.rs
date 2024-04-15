@@ -14,10 +14,10 @@ use metrics::{counter, histogram};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use redgold_schema::{error_info, json_or, RgResult, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{error_info, json_or, RgResult, SafeOption, structs};
 use redgold_schema::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, UtxoId, UtxoValidResponse};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
 
 use crate::api::about;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
@@ -26,8 +26,9 @@ use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::data::download::process_download_request;
-use crate::multiparty::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
+use crate::multiparty_gg20::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::node_config::NodeConfig;
 use crate::schema::json;
 use crate::schema::response_metadata;
@@ -35,7 +36,7 @@ use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use crate::api::faucet::faucet_request;
-use crate::multiparty::watcher::DepositWatcher;
+use crate::multiparty_gg20::watcher::DepositWatcher;
 use redgold_schema::observability::errors::Loggable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveResponse;
@@ -130,17 +131,18 @@ impl PeerRxEventHandler {
         }
 
         if let Some(_) = &request.get_parties_info_request {
-            let mut get_parties_info_response = GetPartiesInfoResponse::default();
-            let mut vec = vec![];
-            if let Some(c) = DepositWatcher::get_deposit_config(&relay.ds).await? {
-                for a in &c.deposit_allocations {
-                    if let Ok(pi) = a.party_info() {
-                        vec.push(pi)
-                    }
-                }
-            }
-            get_parties_info_response.party_info = vec;
-            response.get_parties_info_response = Some(get_parties_info_response);
+            // let mut get_parties_info_response = GetPartiesInfoResponse::default();
+            // let mut vec = vec![];
+            // if let Some(c) = DepositWatcher::get_deposit_config(&relay.ds).await? {
+            //     for a in &c.deposit_allocations {
+            //         if let Ok(pi) = a.party_info() {
+            //             vec.push(pi)
+            //         }
+            //     }
+            // }
+            // get_parties_info_response.party_info = vec;
+            // response.get_parties_info_response = Some(get_parties_info_response);
+            Err(error_info("Not implemented"))?;
         }
 
         if let Some(r) = &request.lookup_transaction_request {
@@ -170,7 +172,7 @@ impl PeerRxEventHandler {
         if let Some(r) = &request.utxo_valid_request {
             // TODO: Check transaction edge for utxo considered invalid.
             let rr: &UtxoId = r;
-            let res = relay.ds.transaction_store.query_utxo_id_valid(r.transaction_hash.safe_get()?, r.output_index).await?;
+            let res = relay.ds.utxo.utxo_id_valid(r).await?;
             let mut u = UtxoValidResponse {
                 valid: None,
                 child_transaction: None,
@@ -179,7 +181,7 @@ impl PeerRxEventHandler {
             if res {
                 u.valid = Some(true);
             } else {
-                let child = relay.ds.transaction_store.utxo_used(rr).await?;
+                let child = relay.ds.utxo.utxo_child(rr).await?;
                 if let Some((child_hash, child_idx)) = child {
                     if let Some((tx, e)) = relay.ds.transaction_store.query_maybe_transaction(&child_hash).await? {
                         if e.is_none() {
@@ -276,9 +278,13 @@ impl PeerRxEventHandler {
                         resp.push(tx)
                     }
                 } else {
-                    let res = relay.ds.transaction_store.accepted_tx_time(hh).await?;
+                    let res = relay.ds.transaction_store.query_accepted_tx(hh).await?;
                     if let Some(tx) = res {
-                        resp.push(tx)
+                        let txe = TransactionEntry {
+                            time: tx.time()?.clone() as u64,
+                            transaction: Some(tx),
+                        };
+                        resp.push(txe)
                     }
                 }
             }

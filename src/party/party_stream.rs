@@ -1,61 +1,27 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::{Add, Sub};
+use std::ops::Sub;
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use bdk::database::{BatchDatabase, MemoryDatabase};
 use itertools::Itertools;
-use log::{error, info};
 use rocket::serde::{Deserialize, Serialize};
-use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
-use redgold_schema::{EasyJson, error_info, RgResult, structs, WithMetadataHashable};
+use redgold_schema::{error_info, RgResult, structs};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
-use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
-use crate::multiparty::watcher::{BidAsk, DepositWatcher, get_btc_per_rdg_starting_min_ask, OrderFulfillment};
-use crate::node_config::NodeConfig;
+use crate::multiparty_gg20::watcher::{get_btc_per_rdg_starting_min_ask, OrderFulfillment};
+use crate::party::bid_ask::BidAsk;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransactionWithObservations {
-    tx: Transaction,
-    observations: Vec<ObservationProof>
+    pub tx: Transaction,
+    pub observations: Vec<ObservationProof>
 }
 
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Balance {
-    value: i64,
-    currency: SupportedCurrency
-}
-
-impl Balance {
-    pub fn new(value: i64, currency: SupportedCurrency) -> Self {
-        Self {
-            value,
-            currency
-        }
-    }
-    pub fn btc(value: u64) -> Self {
-        Self::new(value as i64, SupportedCurrency::Bitcoin)
-    }
-    pub fn rdg(value: i64) -> Self {
-        Self::new(value, SupportedCurrency::Redgold)
-    }
-    pub fn rdga(value: CurrencyAmount) -> Self {
-        Self::new(value.amount, SupportedCurrency::Redgold)
-    }
-
-    pub fn add(&mut self, amount: i64) {
-        self.value += amount;
-    }
-
-    pub fn subtract(&mut self, amount: i64) {
-        self.value -= amount;
-    }
-
-
-}
 
 
 pub struct PartyEvents {
@@ -164,7 +130,7 @@ impl PartyEvents {
             balance_map: Default::default(),
             unfulfilled_deposits: vec![],
             unfulfilled_withdrawals: vec![],
-            price: price,
+            price,
             bid_ask: BidAsk::generate_default(
                 0, 0, price, min_ask
             ),
@@ -329,17 +295,17 @@ impl PartyEvents {
             _ => true
         }
     }
-    pub async fn historical_initialize(
+    pub async fn historical_initialize<B: BatchDatabase>(
         pk_address: &PublicKey,
         relay: &Relay,
-        btc_wallet: &Arc<Mutex<SingleKeyBitcoinWallet>>,
+        btc_wallet: &Arc<Mutex<SingleKeyBitcoinWallet<B>>>,
     ) -> RgResult<Self> {
 
 
         let mut n = Self::new(pk_address, relay);
         // transactions
 
-        // TODO: Seeds at time
+        // TODO: Seeds at time? does it matter?
         let seeds = relay.node_config.seeds_now().iter().flat_map(|s| s.public_key.clone()).collect_vec();
 
         // First get all transactions associated with the address, both incoming or outgoing.

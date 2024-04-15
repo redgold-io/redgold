@@ -17,9 +17,10 @@ use rocket::State;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, RwLock};
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{EasyJsonDeser, structs};
+use redgold_schema::{EasyJson, EasyJsonDeser, structs};
 use crate::core::relay::Relay;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::structs::RoomId;
 
 #[rocket::get("/rooms/<room_id>/subscribe")]
 async fn subscribe(
@@ -57,16 +58,17 @@ async fn subscribe(
 
 fn verify_message(room_id: &str, message: String, db: &State<Db>) -> Option<(usize, Option<String>)> {
     // info!("Attempting to verify message: {}", message.clone());
+    let room_id = RoomId::from(room_id.to_string());
     let decoded = message.json_from::<structs::Request>().log_error();
     let mut ret = None;
     if let Ok(d) = &decoded {
         if let Some(m) = &d.multiparty_authentication_request {
             if let Ok(pk) = &d.verify_auth() {
-                if let Ok(Some(a)) = db.relay.check_mp_authorized(&room_id.to_string(), &pk) {
+                if let Ok(Some(a)) = db.relay.check_mp_authorized(&room_id, &pk) {
                     // db.get_room_or_create_empty(room_id).await;
                     ret = Some((a, m.message.clone()));
                 } else {
-                    info!("Failed to verify internal lock mp authorized on room_id {}", room_id);
+                    info!("Failed to verify internal lock mp authorized on room_id {}", room_id.json_or());
                 }
             } else {
                 info!("Failed to verify auth");

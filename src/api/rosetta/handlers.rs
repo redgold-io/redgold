@@ -1,26 +1,25 @@
 use std::collections::HashMap;
 use warp::Rejection;
+use redgold_keys::address_support::AddressSupport;
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 
-use redgold_schema::{constants, ProtoSerde, SafeOption, struct_metadata_new};
+use redgold_schema::{error_info, SafeOption, struct_metadata_new};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 
-use crate::{schema, util};
-use crate::core::relay::Relay;
-use redgold_data::data_store::DataStore;
-use crate::schema::{bytes_data, error_message};
+use crate::schema;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
+use redgold_schema::structs::UtxoId;
+use crate::schema::error_message;
 use crate::schema::{
-    from_hex, i64_from_string, ProtoHashable, SafeBytesAccess, WithMetadataHashable,
+    from_hex, i64_from_string,
 };
 use crate::schema::structs;
 use crate::schema::structs::{
-    Address, Error as RGError, Input, Output, Proof, State, StructMetadata,
+    Address, ErrorCode as RGError, Output, State,
     SubmitTransactionRequest, UtxoEntry,
 };
 use crate::schema::structs::{ErrorInfo, Hash};
-use crate::schema::transaction::amount_data;
-use redgold_schema::util::lang_util::SameResult;
-
 
 // TODO: What is a better way to handle this?
 pub async fn account_balance_wrap(r: Rosetta, request: AccountBalanceRequest,) -> Result<Result<AccountBalanceResponse, ErrorInfo>, Rejection> {
@@ -30,43 +29,46 @@ pub async fn account_balance_wrap(r: Rosetta, request: AccountBalanceRequest,) -
 pub async fn account_balance(r: Rosetta, request: AccountBalanceRequest,) -> Result<AccountBalanceResponse, ErrorInfo> {
     r.validate_network(request.network_identifier).await?;
     r.validate_currencies(&request.currencies).await?;
-    // TODO: validate currencies
-
-    let mut maybe_block = None;
-    if let Some(partial_block_identifier) = request.block_identifier {
-        maybe_block = r
-            .query_block(
-                partial_block_identifier.hash,
-                partial_block_identifier.index,
-            )
-            .await?;
-    };
-    let address = Address::parse(request.account_identifier.address)?;
-
-    let block: structs::Block = match maybe_block {
-        None => r.latest_block().await?,
-        Some(h) => h,
-    };
-
-    let latest_balance = r
-        .relay
-        .ds
-        .address_block_store
-        .query_address_balance_by_height(address, block.height)
-        .await?;
-    let bal = match latest_balance {
-        None => Err(error_message(
-            RGError::AddressNotFound,
-            "No data found for address",
-        )),
-        Some(b) => Ok(b),
-    }?;
-    // Ok(5 as i64)
-    Ok(AccountBalanceResponse {
-        block_identifier: Rosetta::block_identifier(&block),
-        balances: vec![Rosetta::amount(bal)],
-        metadata: None,
-    })
+    Err(error_info("Not implemented"))
+    //
+    // // TODO: validate currencies
+    //
+    // let mut maybe_block = None;
+    // if let Some(partial_block_identifier) = request.block_identifier {
+    //     maybe_block = r
+    //         .query_block(
+    //             partial_block_identifier.hash,
+    //             partial_block_identifier.index,
+    //         )
+    //         .await?;
+    // };
+    // let address = Address::parse(request.account_identifier.address)?;
+    //
+    // let block: structs::Block = match maybe_block {
+    //     None => r.latest_block().await?,
+    //     Some(h) => h,
+    // };
+    //
+    // let latest_balance = r
+    //     .relay
+    //     .ds
+    //     .address_block_store
+    //     .query_address_balance_by_height(address, block.height)
+    //     .await?;
+    // let bal = match latest_balance {
+    //     None => Err(error_message(
+    //         RGError::AddressNotFound,
+    //         "No data found for address",
+    //     )),
+    //     Some(b) => Ok(b),
+    // }?;
+    //
+    // // Ok(5 as i64)
+    // Ok(AccountBalanceResponse {
+    //     block_identifier: Rosetta::block_identifier(&block),
+    //     balances: vec![Rosetta::amount(bal)],
+    //     metadata: None,
+    // })
 }
 
 pub async fn account_coins_wrap(r: Rosetta, request: AccountCoinsRequest,) -> Result<Result<AccountCoinsResponse, ErrorInfo>, Rejection> {
@@ -79,12 +81,12 @@ pub async fn account_coins(
 ) -> Result<AccountCoinsResponse, ErrorInfo> {
     r.validate_network(request.network_identifier).await?;
     r.validate_currencies(&request.currencies).await?;
-    let address = Address::parse(request.account_identifier.address)?;
+    let address = request.account_identifier.address.parse_address()?;
     let block: structs::Block = r.latest_block().await?;
     let entries = r.relay.ds.transaction_store.query_utxo_address(&address).await?;
-    let mut map: HashMap<Vec<u8>, UtxoEntry> = HashMap::new();
+    let mut map: HashMap<UtxoId, UtxoEntry> = HashMap::new();
     for e in entries {
-        map.insert(e.to_old_utxo_id().coin_id(), e);
+        map.insert(e.utxo_id()?.clone(), e.clone());
     }
     // TODO: Collect all transactions which have been accepted but which are not yet in a block.
     // Then, for those, filter on the address being queried, roll back any changes here
@@ -105,7 +107,7 @@ pub async fn account_coins(
     for (k, entry) in map {
         coins.push(Coin {
             coin_identifier: CoinIdentifier {
-                identifier: hex::encode(k),
+                identifier: k.proto_serialize_hex(),
             },
             amount: Rosetta::amount(entry.output.expect("o").amount() as i64),
         });
@@ -119,27 +121,28 @@ pub async fn account_coins(
 }
 
 pub async fn block(r: Rosetta, request: BlockRequest) -> Result<BlockResponse, ErrorInfo> {
-    r.validate_network(request.network_identifier).await?;
-    let mut maybe_hash = None;
-    let partial_block_identifier = request.block_identifier;
-    if let Some(h) = partial_block_identifier.hash {
-        maybe_hash = Some(schema::decode_hex(h)?);
-    };
-    // TODO: Shouldn't this whole thing really check to verify the active height / active chain thing works?
-    // revisit this on block removed events.
-    let maybe_block = r
-        .relay
-        .ds
-        .address_block_store
-        .query_block_hash_height(maybe_hash, partial_block_identifier.index)
-        .await?;
-    Ok(BlockResponse {
-        block: match maybe_block {
-            Some(b) => r.translate_block(b, State::Accepted).await?.into(),
-            None => None,
-        },
-        other_transactions: None,
-    })
+    // r.validate_network(request.network_identifier).await?;
+    // let mut maybe_hash = None;
+    // let partial_block_identifier = request.block_identifier;
+    // if let Some(h) = partial_block_identifier.hash {
+    //     maybe_hash = Some(schema::decode_hex(h)?);
+    // };
+    // // TODO: Shouldn't this whole thing really check to verify the active height / active chain thing works?
+    // // revisit this on block removed events.
+    // let maybe_block = r
+    //     .relay
+    //     .ds
+    //     .address_block_store
+    //     .query_block_hash_height(maybe_hash, partial_block_identifier.index)
+    //     .await?;
+    // Ok(BlockResponse {
+    //     block: match maybe_block {
+    //         Some(b) => r.translate_block(b, State::Accepted).await?.into(),
+    //         None => None,
+    //     },
+    //     other_transactions: None,
+    // })
+    Err(error_info("Not implemented"))
 }
 
 pub async fn block_transaction(
@@ -147,27 +150,28 @@ pub async fn block_transaction(
     request: BlockTransactionRequest,
 ) -> Result<BlockTransactionResponse, ErrorInfo> {
     r.validate_network(request.network_identifier).await?;
-    let block = r
-        .query_block(
-            Some(request.block_identifier.hash),
-            Some(request.block_identifier.index),
-        )
-        .await?
-        .ok_or(error_message(
-            RGError::UnknownBlock,
-            "Block not found in data store",
-        ))?;
-
-    for t in block.transactions {
-        if t.hash_hex()? == request.transaction_identifier.hash {
-            let transaction = r.translate_transaction(t.clone(), State::Accepted).await?;
-            return Ok(BlockTransactionResponse { transaction });
-        }
-    }
-    Err(error_message(
-        RGError::UnknownTransaction,
-        "Transaction not found in block",
-    ))
+    Err(error_info("Not implemented"))
+    // let block = r
+    //     .query_block(
+    //         Some(request.block_identifier.hash),
+    //         Some(request.block_identifier.index),
+    //     )
+    //     .await?
+    //     .ok_or(error_message(
+    //         RGError::UnknownBlock,
+    //         "Block not found in data store",
+    //     ))?;
+    //
+    // for t in block.transactions {
+    //     if t.hash_hex()? == request.transaction_identifier.hash {
+    //         let transaction = r.translate_transaction(t.clone(), State::Accepted).await?;
+    //         return Ok(BlockTransactionResponse { transaction });
+    //     }
+    // }
+    // Err(error_message(
+    //     RGError::UnknownTransaction,
+    //     "Transaction not found in block",
+    // ))
 }
 
 pub async fn call(r: Rosetta, request: CallRequest) -> Result<CallResponse, ErrorInfo> {
@@ -191,7 +195,7 @@ pub async fn construction_combine(
         let pay = signature.signing_payload;
         let pay_b = from_hex(pay.hex_bytes)?;
         for i in tx.inputs.iter_mut() {
-            if i.utxo_id.safe_get()?.transaction_hash.safe_bytes()? == pay_b {
+            if i.utxo_id.safe_get()?.transaction_hash.safe_get()?.vec() == pay_b {
                 i.proof.push(proof.clone());
             }
         }
@@ -230,7 +234,7 @@ pub async fn construction_hash(
 ) -> Result<TransactionIdentifier, ErrorInfo> {
     r.validate_network(request.network_identifier).await?;
     Ok(TransactionIdentifier {
-        hash: structs::Transaction::from_hex(request.signed_transaction)?.hash_hex()?,
+        hash: structs::Transaction::from_hex(request.signed_transaction)?.hash_hex(),
     })
 }
 
@@ -548,15 +552,15 @@ pub async fn search_transactions(
 
     for ti in request.transaction_identifier {
         let b = from_hex(ti.hash)?;
-        _transaction_hash = Some(Hash::new(b));
+        // _transaction_hash = Some(Hash::new_from_proto(b));
     }
 
     for a in request.address {
-        _addr = Some(Address::parse(a)?);
+        _addr = Some(a.parse_address()?);
     }
     if let Some(s) = request.account_identifier {
         // TODO: Abstract this, validate no subaccount present or throw error.
-        _addr = Some(Address::parse(s.address)?);
+        _addr = Some(s.address.parse_address()?);
     }
 
     if let Some(s) = request.success {

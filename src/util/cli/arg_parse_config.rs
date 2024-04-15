@@ -22,7 +22,7 @@ use tracing::trace;
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess, SafeOption};
+use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::EasyJson;
 use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
@@ -34,6 +34,7 @@ use crate::api::RgHttpClient;
 use crate::node_config::NodeConfig;
 // use crate::gui::image_capture::debug_capture;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::observability::metrics_registry;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
@@ -583,7 +584,7 @@ impl ArgTranslate {
     fn set_public_key(&mut self) {
         let pk = self.node_config.public_key();
         self.node_config.public_key = pk.clone();
-        info!("Public key: {}", pk.hex_or());
+        info!("Public key: {}", pk.hex());
     }
     fn secure_data_folder(&mut self) {
         if let Some(pb) = Self::secure_data_path_buf() {

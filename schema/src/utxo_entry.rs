@@ -25,9 +25,9 @@
 //     }
 // }
 
-use crate::structs::{Address, UtxoId, Hash, Input, Output, CurrencyAmount, UtxoEntry};
-use crate::utxo_id::OldUtxoId;
-use crate::{error_info, RgResult, SafeBytesAccess, SafeOption, Transaction, WithMetadataHashable};
+use crate::structs::{Address, CurrencyAmount, Hash, Input, Output, UtxoEntry, UtxoId};
+use crate::{RgResult, SafeOption, Transaction};
+use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 
 impl UtxoEntry {
 
@@ -37,13 +37,6 @@ impl UtxoEntry {
     }
     pub fn utxo_id(&self) -> RgResult<&UtxoId> {
         self.utxo_id.safe_get_msg("Missing id from utxo entry")
-    }
-    pub fn to_old_utxo_id(&self) -> OldUtxoId {
-        let id = self.utxo_id.clone().expect("");
-        OldUtxoId {
-            transaction_hash: id.transaction_hash.safe_bytes().expect(""),
-            output_index: id.output_index,
-        }
     }
 
     pub fn amount(&self) -> u64 {

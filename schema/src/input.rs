@@ -1,10 +1,10 @@
-use crate::{SafeBytesAccess, SafeOption};
+use crate::{SafeOption};
 use crate::structs::{Address, AddressSelector, ErrorInfo, FloatingUtxoId, Hash, Input, Output, Proof};
 
 impl Input {
 
     pub fn address(&self) -> Result<Address, ErrorInfo> {
-        Proof::proofs_to_address(&self.proof)
+        Proof::multi_proofs_to_address(&self.proof)
     }
 
     pub fn predicate_filter(address: &Address) -> Self {

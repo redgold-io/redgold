@@ -1,13 +1,15 @@
 use std::collections::{HashMap, HashSet};
-use std::iter::FilterMap;
-use std::slice::Iter;
-use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, MAX_INPUTS_OUTPUTS};
-use crate::structs::{Address, BytesData, Error as RGError, ErrorInfo, UtxoId, FloatingUtxoId, Hash, Input, NodeMetadata, ProductId, Proof, StandardData, StructMetadata, Transaction, CurrencyAmount, TypedValue, UtxoEntry, Observation, PublicKey, TransactionOptions, Output, ObservationProof, HashType, LiquidityRequest, NetworkEnvironment, ExternalTransactionId, SupportedCurrency, StandardContractType};
-use crate::utxo_id::OldUtxoId;
-use crate::{bytes_data, error_code, error_info, error_message, ErrorInfoContext, HashClear, PeerMetadata, ProtoHashable, RgResult, SafeBytesAccess, SafeOption, struct_metadata_new, structs, WithMetadataHashable, WithMetadataHashableFields};
+use std::str::FromStr;
+use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StructMetadata, SupportedCurrency, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
+use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
+use num_bigint::BigInt;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
+use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
+use crate::proto_serde::ProtoHashable;
 use crate::structs::TransactionType;
 
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
@@ -24,20 +26,8 @@ impl UtxoId {
     pub fn format_str(&self) -> String {
         format!("UtxoId: {} output: {}", self.transaction_hash.clone().expect("").hex(), self.output_index)
     }
-    pub fn from(id: Vec<u8>) -> UtxoId {
-        let len = id.len();
-        let split = len - 8;
-        let mut output_index_array = [0u8; 8];
-        let output_id_vec = &id[split..len];
-        output_index_array.clone_from_slice(&output_id_vec);
-        let output_index = i64::from_le_bytes(output_index_array);
-        let transaction_hash = id[0..split].to_vec();
-        let transaction_hash = Some(Hash::new(transaction_hash));
-        UtxoId {
-            transaction_hash,
-            output_index,
-        }
-    }
+
+    // This is questionable, should we do this long term for XOR distance?
     pub fn utxo_id_vec(&self) -> Vec<u8> {
         let mut merged: Vec<u8> = vec![];
         merged.extend(self.transaction_hash.clone().expect("hash").vec());
@@ -46,7 +36,7 @@ impl UtxoId {
     }
 
     pub fn as_hash(&self) -> Hash {
-        let mut h = Hash::new(self.utxo_id_vec());
+        let mut h = Hash::new_direct_transaction(&self.utxo_id_vec());
         h.hash_type = HashType::UtxoId as i32;
         h
     }
@@ -109,14 +99,20 @@ pub struct AddressBalance {
 
 impl Transaction {
 
+    pub fn signable_hash_or(&self) -> Hash {
+        self.struct_metadata_opt_ref()
+            .and_then(|s| s.signable_hash.clone()) // TODO: Change to as_ref() to prevent clone?
+            .unwrap_or(self.signable_hash())
+    }
+
     pub fn sponsored_time(&self) -> RgResult<i64> {
         let t = self.options()?.time_sponsor.safe_get_msg("Missing sponsored time")?.time;
         Ok(t)
     }
 
     pub fn transaction_type(&self) -> RgResult<structs::TransactionType> {
-        let t = self.options()?.transaction_type.safe_get_msg("Missing sponsored time")?;
-        TransactionType::from_i32(t.clone()).ok_msg("Invalid transaction type")
+        let t = self.options()?.transaction_type;
+        TransactionType::from_i32(t).ok_msg("Invalid transaction type")
     }
 
     pub fn is_metadata_or_obs(&self) -> bool {
@@ -140,18 +136,33 @@ impl Transaction {
 
         let mut opts = TransactionOptions::default();
         opts.salt = Some(rng.gen::<i64>());
-        opts.transaction_type = Some(TransactionType::Standard as i32);
+        opts.transaction_type = TransactionType::Standard as i32;
         tx.options = Some(opts);
         tx
     }
     pub fn is_test(&self) -> bool {
         self.options.as_ref().and_then(|o| o.is_test).unwrap_or(false)
     }
-
     // TODO: Validator should ensure UtxoId only used once
     // Lets rename all UtxoId just utxoid
     pub fn input_of(&self, f: &UtxoId) -> Option<&Input> {
         self.inputs.iter().find(|i| i.utxo_id.as_ref().filter(|&u| u == f).is_some())
+    }
+
+    pub fn is_swap(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_swap()).count() > 0
+    }
+    pub fn is_liquidity(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_liquidity()).count() > 0
+    }
+    pub fn is_metadata(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_metadata()).count() > 0
+    }
+    pub fn is_request(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_request()).count() > 0
+    }
+    pub fn is_deploy(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_deploy()).count() > 0
     }
 
     pub fn observation_output_index(&self) -> RgResult<i64> {
@@ -226,16 +237,6 @@ impl Transaction {
         self
     }
 
-
-    // TODO: Is this wrong definition here?
-    pub fn iter_utxo_outputs(&self) -> Vec<(Vec<u8>, i64)> {
-        self.outputs
-            .iter()
-            .enumerate()
-            .map(|(x, _)| (self.hash_vec().clone(), x as i64))
-            .collect_vec()
-    }
-
     pub fn utxo_inputs(&self) -> impl Iterator<Item = &UtxoId> {
         self.inputs.iter().filter_map(|i| i.utxo_id.as_ref())
     }
@@ -256,15 +257,18 @@ impl Transaction {
         self.inputs.iter().flat_map(|i| i.utxo_id.as_ref())
     }
 
-    pub fn output_amounts(&self) -> Vec<AddressBalance> {
+    pub fn output_amounts(&self) -> impl Iterator<Item=AddressBalance> + '_ {
         self.outputs
             .iter()
-            .map(|o|
-            // makee hex trait for Vec<u8>
-            AddressBalance{ address: hex::encode(o.address.safe_bytes().expect("bytes")),
-                rounded_balance: o.rounded_amount()
-            })
-            .collect()
+            .flat_map(|o| o.address.as_ref()
+                .and_then(|a| a.render_string().ok())
+                .and_then(|a| o.opt_amount_typed().map(|aa|
+                    AddressBalance {
+                        address: a,
+                        rounded_balance: aa.to_fractional()
+                    })
+                )
+            )
     }
 
     pub fn output_amounts_opt(&self) -> impl Iterator<Item = &CurrencyAmount> {
@@ -305,7 +309,7 @@ impl Transaction {
         ).sum::<i64>()
     }
 
-    // TODO: Return as currency amount with plus operators
+    // TODO: Return as currency amount with plus operators, also maybe make optional?
     pub fn remainder_amount(&self) -> i64 {
         let inputs = self.input_address_set();
         self.outputs.iter().filter_map(|o| {
@@ -614,7 +618,7 @@ impl Transaction {
     }
 
     pub fn first_input_address(&self) -> Option<Address> {
-        self.inputs.first().and_then(|o| o.address().ok())
+        self.inputs.iter().flat_map(|o| o.address.clone()).next()
     }
 
     pub fn first_input_proof_public_key(&self) -> Option<&structs::PublicKey> {
@@ -623,18 +627,29 @@ impl Transaction {
             .and_then(|o| o.public_key.as_ref())
     }
 
-    pub fn first_output_address(&self) -> Option<Address> {
-        self.outputs.first().and_then(|o| o.address.clone())
+    pub fn first_output_non_input_or_fee(&self) -> Option<&Output> {
+        let input_addrs = self.input_addresses();
+        self.outputs.iter()
+            .filter(|o| o.output_type != Some(OutputType::Fee as i32))
+            .filter(|o| o.address.as_ref().map(|a| !input_addrs.contains(a)).unwrap_or(true))
+            .next()
+    }
+
+    pub fn first_output_address_non_input_or_fee(&self) -> Option<Address> {
+        self.first_output_non_input_or_fee()
+            .and_then(|o| o.address.clone())
     }
 
     pub fn first_output_amount(&self) -> Option<f64> {
-        self.outputs.first().as_ref().map(|o| o.rounded_amount())
+        self.first_output_amount_typed().map(|o| o.to_fractional())
     }
 
     pub fn first_output_amount_i64(&self) -> Option<i64> {
-        self.outputs.iter()
-            .flat_map(|o| o.opt_amount_typed_ref()).next()
-            .map(|a| a.amount)
+        self.first_output_non_input_or_fee().and_then(|o| o.opt_amount())
+    }
+
+    pub fn first_output_amount_typed(&self) -> Option<CurrencyAmount> {
+        self.first_output_non_input_or_fee().and_then(|o| o.opt_amount_typed())
     }
 
     pub fn first_contract_type(&self) -> Option<StandardContractType> {
@@ -711,9 +726,22 @@ impl CurrencyAmount {
         a.amount = amount;
         a
     }
+
+    pub fn from_string(amount: String) -> Self {
+        let mut a = Self::default();
+        a.string_amount = Some(amount);
+        a
+    }
+
+
     pub fn from_btc(amount: i64) -> Self {
         let mut a = Self::from(amount);
         a.currency = Some(SupportedCurrency::Bitcoin as i32);
+        a
+    }
+    pub fn from_eth_bigint_string(amount: String) -> Self {
+        let mut a = Self::from_string(amount);
+        a.currency = Some(SupportedCurrency::Ethereum as i32);
         a
     }
     pub fn from_rdg(amount: i64) -> Self {
@@ -765,5 +793,27 @@ impl TypedValue {
         let mut s = Self::default();
         s.bytes_value = bytes_data(bytes.clone());
         s
+    }
+}
+
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TransactionMaybeError {
+    pub transaction: Transaction,
+    pub error: Option<ErrorInfo>,
+}
+
+impl TransactionMaybeError {
+    pub fn new(transaction: Transaction) -> Self {
+        Self {
+            transaction,
+            error: None,
+        }
+    }
+    pub fn new_error(transaction: Transaction, error: ErrorInfo) -> Self {
+        Self {
+            transaction,
+            error: Some(error),
+        }
     }
 }

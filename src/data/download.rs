@@ -16,11 +16,13 @@ use itertools::Itertools;
 use metrics::{counter, gauge};
 use rocket::form::validate::Contains;
 use tokio_stream::Elapsed;
-use redgold_schema::{ProtoHashable, RgResult, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::structs::{ErrorInfo, Hash, PublicKey, Transaction, TransactionEntry, UtxoId};
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::util::xor_distance::XorDistancePartitionInfo;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoHashable;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveRequest;
 use redgold_schema::util::timers::PerfTimer;
@@ -480,9 +482,8 @@ pub async fn process_download_request(
             } else {
                 relay
                     .ds
-                    .transaction_store
-                    .utxo_filter_time(download_request.start_time as i64, download_request.end_time as i64).await
-                    ?
+                    .utxo
+                    .utxo_filter_time(download_request.start_time as i64, download_request.end_time as i64).await?
             }
         },
         transactions: {
@@ -492,7 +493,13 @@ pub async fn process_download_request(
                 relay.ds.transaction_store.query_time_transaction(
                     download_request.start_time as i64,
                     download_request.end_time as i64,
-                ).await?
+                ).await?.into_iter().map(|tx| {
+                    let time = tx.time().unwrap().clone() as u64;
+                    TransactionEntry {
+                        transaction: Some(tx),
+                        time,
+                    }
+                }).collect()
             }
         },
         observations: {

@@ -5,7 +5,7 @@ use itertools::Itertools;
 use log::info;
 use polars::export::chrono::{DateTime, Utc};
 use polars::frame::row::Row;
-use redgold_schema::{error_info, ErrorInfoContext, ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, util};
 use redgold_schema::structs::Transaction;
 use crate::data_store::DataStore;
 
@@ -22,8 +22,7 @@ impl ParquetExporter for DataStore {
 
         info!("Getting time-ordered transactions");
         let txs =
-            self.transaction_store.query_time_transaction_accepted_ordered(0, util::current_time_millis()).await?
-                .into_iter().flat_map(|t| t.transaction).collect_vec();
+            self.transaction_store.query_time_transaction_accepted_ordered(0, util::current_time_millis()).await?;
         //
         // info!("Getting time-ordered observations");
         // let obs = self.observation.query_time_observation(0, util::current_time_millis()).await?
@@ -132,7 +131,9 @@ impl DataStore {
 
 use polars::prelude::*;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::util::current_time_millis;
 use redgold_schema::util::timers::PerfTimer;
 use crate::parquet_min_index::{transaction_simple_parquet_schema, translate_tx_simple};

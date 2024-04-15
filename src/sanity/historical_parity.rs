@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use rocket::form::validate::Contains;
-use redgold_schema::{EasyJson, EasyJsonDeser, ProtoHashable, WithMetadataHashable};
+use redgold_schema::{EasyJson, EasyJsonDeser};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoHashable;
 use redgold_schema::structs::{Hash, Transaction, TransactionEntry, UtxoEntry, UtxoId};
 use redgold_schema::util::ToTimeString;
 use crate::core::relay::Relay;
@@ -14,7 +16,7 @@ async fn historical_parity_debug() {
     let r = Relay::dev_default().await;
     let start = util::current_time_millis_i64();
     let mut all_txs = r.ds.transaction_store.query_time_transaction_accepted_ordered(0, start).await.unwrap();
-    all_txs.sort_by(|a, b| a.time.cmp(&b.time));
+    all_txs.sort_by(|a, b| a.time().expect("t").cmp(&b.time().expect("")));
     let end = util::current_time_millis_i64();
     let delta = (end - start) as f64;
     println!("delta: {}", delta/1000f64);
@@ -153,9 +155,9 @@ async fn historical_parity_debug_cached() {
 }
 
 
-fn validate_utxos(all_txs: &mut Vec<TransactionEntry>, mut valid_utxos: HashMap<UtxoId, UtxoEntry>) {
+fn validate_utxos(all_txs: &mut Vec<Transaction>, mut valid_utxos: HashMap<UtxoId, UtxoEntry>) {
     let gen = all_txs.get(0).unwrap().clone();
-    let gen_tx = gen.transaction.expect("tx");
+    let gen_tx = gen;  // gen.transaction.expect("tx");
     let vec = gen_tx.utxo_outputs().expect("works");
     for utxo_entry in vec {
         let id = utxo_entry.utxo_id.clone().unwrap();
@@ -170,7 +172,6 @@ fn validate_utxos(all_txs: &mut Vec<TransactionEntry>, mut valid_utxos: HashMap<
     let mut bad_txs = vec![];
 
     for (idx, mut t) in all_txs.iter_mut().dropping(1).enumerate() {
-        if let Some(t) = t.transaction.as_mut() {
             t.with_hash();
 
             let has_amount = t.output_amounts_opt().filter(|&a| a.amount > 0).next().is_some();
@@ -210,7 +211,6 @@ fn validate_utxos(all_txs: &mut Vec<TransactionEntry>, mut valid_utxos: HashMap<
                 }
                 valid_utxos.insert(utxo_id.clone(), utxo_entry.clone());
             };
-        }
     }
 
     bad_txs.write_json("bad_txs.json").expect("write_json");
@@ -224,14 +224,14 @@ async fn historical_parity_detect_duplicate_hashes() {
     let r = Relay::dev_default().await;
     let start = util::current_time_millis_i64();
     let mut all_txs = r.ds.transaction_store.query_time_transaction_accepted_ordered(0, start).await.unwrap();
-    all_txs.sort_by(|a, b| a.time.cmp(&b.time));
+    all_txs.sort_by(|a, b| a.time().expect("").cmp(&b.time().expect("")));
     let end = util::current_time_millis_i64();
     let delta = (end - start) as f64;
     println!("delta: {}", delta/1000f64);
     println!("res: {:?}", all_txs.len());
 
     let dedupe = all_txs.iter().unique_by(|tx|
-        tx.transaction.as_ref().map(|t| t.calculate_hash()).expect("tx")
+        tx.hash_or()
     ).count();
     println!("res dedupe: {:?}", dedupe);
     // duplicate_hash_check(&all_txs);
@@ -245,7 +245,7 @@ async fn historical_parity_detect_duplicate_hashes() {
 async fn historical_parity_utxo() {
     let r = Relay::dev_default().await;
     let start = util::current_time_millis_i64();
-    let mut all_utxo = r.ds.transaction_store.utxo_all_debug().await.expect("utxo_all_debug");
+    let mut all_utxo = r.ds.utxo.utxo_all_debug().await.expect("utxo_all_debug");
     all_utxo.sort_by(|a, b| a.time.cmp(&b.time));
     let end = util::current_time_millis_i64();
     let delta = (end - start) as f64;

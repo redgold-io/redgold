@@ -11,7 +11,7 @@ use crate::node_config::NodeConfig;
 
 pub(crate) fn load_icon() -> IconData {
     let (icon_rgba, icon_width, icon_height) = {
-        let icon = include_bytes!("../resources/svg_rg_2_resized_220_2.png");
+        let icon = include_bytes!("../resources/images/historical/design_one/logo_orig_crop256.png");
         let image = image::load_from_memory(icon)
             .expect("Failed to open icon path")
             .into_rgba8();
@@ -44,7 +44,7 @@ pub async fn attempt_start(nc: NodeConfig
             .with_min_inner_size([x,y])
             .with_icon(
                 // NOE: Adding an icon is optional
-                eframe::icon_data::from_png_bytes(&include_bytes!("../resources/svg_rg_2_crop.png")[..])
+                eframe::icon_data::from_png_bytes(&include_bytes!("../resources/images/historical/design_one/logo_orig_crop.png")[..])
                     .unwrap(),
             ),
         ..Default::default()

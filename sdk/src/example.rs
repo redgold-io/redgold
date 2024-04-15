@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use extism_pdk::{FnResult, plugin_fn};
 
-use redgold_schema::{bytes_data, ProtoSerde, RgResult};
+use redgold_schema::{bytes_data, RgResult};
 use redgold_schema::structs::{ExecutionInput, ExecutionResult, StandardData, TestContractInternalState, TestContractRequest};
 
 use crate::entry::with_entry_decoder;
@@ -60,6 +59,8 @@ pub fn example_contract_main(input: ExecutionInput) -> RgResult<ExecutionResult>
 
 
 use extism_pdk::*;
+use redgold_schema::proto_serde::ProtoSerde;
+
 #[plugin_fn]
 pub fn extism_entrypoint(input: Vec<u8>) -> FnResult<Vec<u8>> {
     with_entry_decoder(input, example_contract_main)

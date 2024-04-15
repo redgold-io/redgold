@@ -8,12 +8,16 @@ use rocket::form::FromForm;
 use tokio::task::JoinHandle;
 
 use redgold_data::data_store::DataStore;
+use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
+use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, json, json_from, json_pretty, RgResult, SafeOption};
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
 use redgold_schema::transaction::rounded_balance_i64;
@@ -118,19 +122,18 @@ pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfi
 
 
 pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
-    let destination = Address::parse(p0.to.clone())?;
+    let destination = p0.to.clone().parse_address()?;
     let mut query_addresses = vec![];
     let mut hm: HashMap<Vec<u8>, KeyPair> = HashMap::new();
     // for x in p0.from {
     //     let address = Address::parse(x)?;
     //     query_addresses.push(address);
     // }
-    use redgold_schema::SafeBytesAccess;
 
     for i in 0..10 {
         let kp = p1.words().keypair_at_change(i as i64).expect("works");
         let x1 = kp.address_typed();
-        let x: Vec<u8> = x1.address.safe_bytes()?;
+        let x: Vec<u8> = x1.vec();
         query_addresses.push(x1);
         hm.insert(x, kp.clone());
     }
@@ -146,7 +149,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let option1 = utxos.get(0);
     let first_uto = option1.safe_get_msg("first")?;
     let first_addr = first_uto.address()?;
-    let option = hm.get(&first_addr.address.safe_bytes()?);
+    let option = hm.get(&first_addr.vec());
     let kp = option.safe_get_msg("keypair")?.clone().clone();
 
     let utxo = utxos.get(0).expect("first").clone();
@@ -163,10 +166,10 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
 }
 
 pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
-    let address = Address::parse(p0.to.clone())?;
+    let address = p0.to.clone().parse_address()?;
     let response = p1.api_client().faucet(&address).await?;
     let tx = response.submit_transaction_response.safe_get()?.transaction.safe_get()?;
-    let tx_hex = tx.hash_hex()?;
+    let tx_hex = tx.hash_hex();
     println!("{}", tx_hex);
     Ok(())
 }
@@ -423,7 +426,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
     let faucet_tx = tx_submit.with_faucet().await?;
     // info!("Faucet response: {}", faucet_tx.json_or());
     let faucet_tx = faucet_tx.submit_transaction_response.safe_get()?.transaction.safe_get()?;
-    let address = faucet_tx.first_output_address().expect("a");
+    let address = faucet_tx.first_output_address_non_input_or_fee().expect("a");
     let response = client.query_hash(address.render_string().expect("")).await?;
     let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
     assert!(rounded > 0.);
@@ -432,7 +435,7 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
         tx_submit.generator.lock().expect("");
         assert!(gen.finished_pool.len() > 0);
     };
-    let source = Proof::proofs_to_address(&faucet_tx.inputs.get(0).expect("").proof)?;
+    let source = Proof::proofs_to_addresses(&faucet_tx.inputs.get(0).expect("").proof)?.get(0).expect("source").clone();
     let repeat = tx_submit.drain(source).await?;
     // assert!(repeat.accepted());
     // assert proofs here
@@ -491,7 +494,7 @@ async fn test_new_deploy() {
 
 pub async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) {
     let hex = p0.clone().clone();
-    let pk = PublicKey::from_hex(&hex).expect("hex");
+    let pk = PublicKey::from_hex_direct(&hex).expect("hex");
     let w = SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("works");
     let b = w.get_wallet_balance().expect("balance");
     println!("Balance: {:?}", b);

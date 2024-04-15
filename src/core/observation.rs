@@ -17,8 +17,8 @@ use tokio_util::either::Either;
 
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{SafeBytesAccess, WithMetadataHashable};
 use redgold_schema::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Hash, ObservationProof, Transaction};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
@@ -192,9 +192,7 @@ impl ObservationBuffer {
             .iter()
             .map(|r| r.hash_or())
             .collect_vec();
-        let root = redgold_schema::util::merkle::build_root(hashes)?.root;
-        let _vec = root.safe_bytes()?;
-        let _parent_hash = self.latest.hash_or();
+        let root = build_root(hashes)?.root;
         let height = self.latest.height().expect("Missing height on internal observation") + 1;
         let utxo_id = self.latest.observation_as_utxo_id()?;
 

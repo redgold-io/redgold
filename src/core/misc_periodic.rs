@@ -18,6 +18,7 @@ impl MiscPeriodic {
 #[async_trait]
 impl IntervalFold for MiscPeriodic {
     async fn interval_fold(&mut self) -> RgResult<()> {
+        self.relay.ds.transaction_store.delete_old_rejected_transaction(None, None).await?;
         self.relay.ds.count_gauges().await?;
         Ok(())
     }

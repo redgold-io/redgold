@@ -1,10 +1,8 @@
-use std::collections::HashSet;
 use itertools::Itertools;
-use log::info;
-use redgold_schema::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
-use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
+use redgold_schema::{error_message, RgResult, SafeOption, structs};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{Address, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry};
 use crate::KeyPair;
 use crate::proof_support::{ProofSupport, PublicKeySupport};
 
@@ -18,7 +16,6 @@ pub trait TransactionSupport {
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
-    fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo>;
     fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool;
     fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
     fn output_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
@@ -80,23 +77,6 @@ impl TransactionSupport for Transaction {
         let x = self.with_hash();
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())
-    }
-
-    fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
-        let id = utxo_entry.utxo_id.safe_get_msg("Missing utxo id during verify_utxo_entry_proof")?;
-        let input = self
-            .inputs
-            .get(id.output_index as usize)
-            .ok_or(error_message(
-                structs::Error::MissingInputs,
-                format!("missing input index: {}", id.output_index),
-            ))?;
-        let address = utxo_entry.address()?;
-        Ok(Proof::verify_proofs(
-            &input.proof,
-            &self.signable_hash(),
-            address,
-        )?)
     }
 
     fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool {

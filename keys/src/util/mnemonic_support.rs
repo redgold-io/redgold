@@ -11,9 +11,11 @@ use bdk::miniscript::miniscript;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
@@ -82,7 +84,7 @@ impl WordsPass {
                 rdg_btc_main_address: pk.to_bitcoin_address(&NetworkEnvironment::Main)?,
                 rdg_btc_test_address: pk.to_bitcoin_address(&NetworkEnvironment::Test)?,
                 xpub: self.xpub(xpub_path)?.to_string(),
-                public_hex: pk.hex_or(),
+                public_hex: pk.hex(),
             });
         }
         Ok(WordsPassMetadata {
@@ -135,14 +137,14 @@ impl WordsPass {
     }
 
     pub fn checksum(&self) -> RgResult<String> {
-        Hash::new_checksum(&self.seed()?.to_vec())
+        Ok(Hash::new_checksum(&self.seed()?.to_vec()))
     }
 
     pub fn checksum_words(&self) -> RgResult<String> {
         let mut s2 = self.clone();
         s2.passphrase = None;
         let s = s2.seed()?.to_vec();
-        Hash::new_checksum(&s)
+        Ok(Hash::new_checksum(&s))
     }
 
     pub fn seed(&self) -> RgResult<[u8; 64]> {
@@ -152,7 +154,7 @@ impl WordsPass {
     pub fn hash_derive_words(&self, concat_nonce: impl Into<String>) -> RgResult<Self> {
         let mut vec = self.seed()?.to_vec();
         vec.extend(concat_nonce.into().as_bytes());
-        let entropy = structs::Hash::digest(vec).safe_bytes()?;
+        let entropy = structs::Hash::digest(vec).raw_bytes()?;
         let m = Mnemonic::from_entropy(&*entropy).error_info("Failed to derive mnemonic from entropy")?;
         Ok(Self {
             words: m.to_string(),
@@ -201,7 +203,11 @@ impl WordsPass {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> RgResult<Self> {
-        let m = Mnemonic::from_entropy(bytes).error_info("Failed to derive mnemonic from entropy")?;
+        let m = Mnemonic::from_entropy(bytes)
+            .error_info("Failed to derive mnemonic from entropy")
+            .with_detail("bytes", hex::encode(bytes))
+            .with_detail("bytes_len", bytes.len().to_string())
+            ?;
         Ok(Self {
             words: m.to_string(),
             passphrase: None
@@ -209,7 +215,7 @@ impl WordsPass {
     }
 
     pub fn from_str_hashed(str: impl Into<String>) -> Self {
-        let b: Vec<u8> = structs::Hash::from_string_calculate(&str.into()).vec();
+        let b: Vec<u8> = structs::Hash::from_string_calculate(&str.into()).raw_bytes().expect("hash");
         Self::from_bytes(&b).unwrap()
     }
 
@@ -270,7 +276,7 @@ impl WordsPass {
     pub fn public_at(&self, path: impl Into<String>) -> RgResult<structs::PublicKey> {
         let key = self.key_from_path_str(path.into())?;
         let vec = key.private_key.public_key(&Secp256k1::new()).serialize().to_vec();
-        Ok(structs::PublicKey::from_bytes(vec))
+        Ok(structs::PublicKey::from_bytes_direct_ecdsa(vec))
     }
 
     pub fn keypair_at_change(&self, change: impl Into<i64>) -> RgResult<KeyPair> {

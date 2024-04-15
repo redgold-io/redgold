@@ -21,7 +21,7 @@ use crate::api::rosetta::models::Error;
 // use crate::util::to_libp2p_peer_id;
 
 use crate::core::relay::Relay;
-use crate::multiparty::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
+use crate::multiparty_gg20::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
 use crate::schema::structs::{
     ControlRequest, ControlResponse, ResponseMetadata,
 };
@@ -120,7 +120,7 @@ impl ControlServer {
                     req.identifier.safe_get_msg("Missing identifier")?.clone(),
                     req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
                     req.signing_party_keys.clone(),
-                    Some(req.signing_room_id.clone())
+                    req.signing_room_id.clone()
                 ).await?;
                 let mut res = ControlMultipartySigningResponse::default();
                 res.identifier = req.identifier.clone();

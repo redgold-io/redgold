@@ -1,3 +1,5 @@
+pub mod external_networks;
+
 use std::time::Duration;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};

@@ -1,16 +1,12 @@
-use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use itertools::Itertools;
-use log::info;
 use redgold_data::data_store::DataStore;
-use redgold_keys::KeyPair;
-use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use redgold_schema::{bytes_data, EasyJson, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, EasyJson, error_info, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::tx_schema_validate::SchemaValidationSupport;
 use crate::node_config::NodeConfig;
 
@@ -76,7 +72,7 @@ impl TransactionBuilder {
     }
     pub fn with_type(&mut self, transaction_type: structs::TransactionType) -> &mut Self {
         let opts = self.transaction.options.as_mut().expect("");
-        opts.transaction_type = Some(transaction_type as i32);
+        opts.transaction_type = transaction_type as i32;
         self
     }
     pub fn with_ds(&mut self, ds: DataStore) -> &mut Self {
@@ -287,10 +283,25 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn last_output(&mut self) -> Option<&mut Output> {
+        self.transaction.outputs.last_mut()
+    }
+
+    pub fn last_output_data(&mut self) -> Option<&mut StandardData> {
+        self.transaction.outputs.last_mut().and_then(|o| o.data.as_mut())
+    }
+
     pub fn with_last_output_swap_type(&mut self) -> &mut Self {
         let contract_type = structs::StandardContractType::Swap;
         self.with_last_output_contract_type(contract_type);
         self
+    }
+
+    pub fn with_last_output_swap_destination(&mut self, destination: &Address) -> RgResult<&mut Self> {
+        let swap_request = structs::SwapRequest::default();
+        swap_request.destination = Some(destination.clone());
+        self.last_output_data().ok_msg("Missing output")?.swap_request = swap_request
+        Ok(self)
     }
 
     pub fn with_last_output_stake(&mut self) -> &mut Self {

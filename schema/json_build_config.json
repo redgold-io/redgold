@@ -9,6 +9,10 @@
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
         "structs.CollateralizedLoanData",
+        "structs.SwapRequest",
+        "structs.PartyData",
+        "structs.LocalKeyShare",
+        "structs.RoomId",
         "structs.CollateralizedLoanInitiation",
         "structs.CollateralizedLoanFulfillment",
         "structs.CollateralizedLoanCall",
@@ -19,6 +23,7 @@
         "structs.GenesisRequest",
         "structs.PartyMember",
         "structs.PartyInfo",
+        "structs.PartyInfoAbridged",
         "structs.GetPartiesInfoRequest",
         "structs.GetPartiesInfoResponse",
         "structs.RecentTransactionAndObservationRequest",
@@ -169,7 +174,7 @@
         "structs.ValidationType",
         "structs.State",
         "structs.HashType",
-        "structs.Error",
+        "structs.ErrorCode",
         "structs.StandardContractType",
         "structs.DownloadDataType",
         "structs.NetworkEnvironment",
@@ -182,6 +187,7 @@
         "structs.OutputType",
         "structs.TransactionType",
         "structs.AddressType",
+        "structs.LocalShareType",
         "structs.SupportedCurrency"
       ]
     },
@@ -213,6 +219,8 @@
       "attr": "#[serde(skip_serializing_if = \"Option::is_none\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
       "paths": [
         "structs.Input.product_id",
+        "structs.CurrencyAmount.bytes",
+        "structs.CurrencyAmount.currency",
         "structs.Request.batch_transaction_resolve_request",
         "structs.Input.floating_utxo_id",
         "structs.TransportInfo.external_ipv6",
@@ -227,6 +235,7 @@
         "structs.TypedValue.double_value",
         "structs.TypedValue.bool_value",
         "structs.StandardData.amount",
+        "structs.StandardData.collateralized_loan_data",
         "structs.StandardData.observation",
         "structs.StandardData.bitcoin_address",
         "structs.StandardData.bitcoin_txid",
@@ -312,6 +321,8 @@
         "structs.TransactionOptions.time_sponsor",
         "structs.TransactionOptions.network_type",
         "structs.TransactionOptions.is_test",
+        "structs.TransactionOptions.salt",
+        "structs.TransactionOptions.pow_proof",
         "structs.Response.response_metadata",
         "structs.Response.submit_transaction_response",
         "structs.Response.query_transaction_response",
@@ -372,7 +383,8 @@
         "structs.PublicKey.key_type",
         "structs.ObservationMetadata.observation_type",
         "structs.ObservationMetadata.state",
-        "structs.ObservationMetadata.validation_liveness"
+        "structs.ObservationMetadata.validation_liveness",
+        "structs.TransactionOptions.transaction_type"
       ]
     },
     {

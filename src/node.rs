@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, EasyJson, EasyJsonDeser, error_info, ErrorInfoContext, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, structs};
+use redgold_schema::{bytes_data, EasyJson, EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
@@ -25,7 +25,6 @@ use crate::api::public_api::PublicClient;
 use crate::api::{control_api, rosetta};
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::core::{block_formation, stream_handlers};
-use crate::core::block_formation::BlockFormationProcess;
 use crate::core::observation::ObservationBuffer;
 use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
@@ -36,13 +35,13 @@ use crate::data::download;
 use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{ControlRequest, ErrorInfo, NodeState};
-use crate::schema::{ProtoHashable, WithMetadataHashable};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 // use crate::trust::rewards::Rewards;
 use crate::{api, e2e, util};
 // use crate::mparty::mp_server::{Db, MultipartyHandler};
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::process_observation::ObservationHandler;
-use crate::multiparty::gg20_sm_manager;
+use crate::multiparty_gg20::gg20_sm_manager;
 use crate::util::runtimes::build_runtime;
 use crate::util::{auto_update, keys};
 use crate::schema::constants::EARLIEST_TIME;
@@ -61,11 +60,12 @@ use crate::core::recent_download::RecentDownload;
 use crate::core::stream_handlers::{IntervalFold, run_recv_single};
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::infra::multiparty_backup::check_updated_multiparty_csv;
-use crate::multiparty::initiate_mp::default_room_id_signing;
-use crate::multiparty::watcher::DepositWatcher;
+use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
+use crate::multiparty_gg20::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
 use crate::sanity::{historical_parity, migrations};
@@ -139,7 +139,7 @@ impl Node {
 
         // Components for download now initialized.
         // relay.clone().node_state.store(NodeState::Downloading);
-
+        info!("Starting obs buffer");
 
         let ojh = ObservationBuffer::new(relay.clone()).await;
         join_handles.push(NamedHandle::new("ObservationBuffer", ojh));
@@ -363,7 +363,6 @@ impl Node {
                 vec![relay.node_config.seeds_now().get(0).unwrap().clone()]
             };
 
-
             let seeds = relay.node_config.non_self_seeds();
 
             let seed_results = stream::iter(seeds)
@@ -373,7 +372,7 @@ impl Node {
                 .filter_map(|x| async {
                     let res = x.ok();
                     if res.is_none() {
-                        counter!("redgold.node.seed_startup_query_failure").increment(1);
+                        counter!("redgold_node_seed_startup_query_failure").increment(1);
                     }
                     res
                 })
@@ -434,6 +433,7 @@ impl Node {
             counter!("redgold.node.genesis_created").increment(1);
             info!("No genesis transaction found, generating new one");
             let tx = genesis_transaction(&node_config, &node_config.words(), &node_config.seeds_now());
+            info!("Genesis transaction generated {}", tx.json_or());
             // let tx = Node::genesis_from(node_config.clone()).0;
             // runtimes.auxiliary.block_on(
             relay.ds.config_store.store_proto("genesis", tx.clone()).await?;

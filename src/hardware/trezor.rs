@@ -7,8 +7,10 @@ use itertools::{all, Itertools};
 use redgold_keys::proof_support::{ProofSupport, PublicKeySupport};
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::InputSupport;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, SafeBytesAccess, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{EasyJson, error_info, ErrorInfoContext, SafeOption, structs};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -333,7 +335,7 @@ async fn debug_sign_tx () {
     let _tc = TestConstants::new();
     let pk = default_pubkey().expect("pk");
     let address = pk.address().expect("a");
-    let _addr = address.clone().address.safe_bytes().expect("");
+    let _addr = address.clone().hex();
     let hash = Hash::from_string_calculate("test");
     let utxo = UtxoEntry{
         utxo_id: Some(UtxoId::new(&hash, 0)),

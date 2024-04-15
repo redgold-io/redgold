@@ -1,4 +1,4 @@
-use crate::bytes_data;
+use crate::{bytes_data, RgResult, SafeOption};
 use crate::structs::{Signature, SignatureType};
 
 impl Signature {
@@ -15,5 +15,8 @@ impl Signature {
             signature_type: SignatureType::EcdsaBitcoinSignMessageHardware as i32,
             rsv: None
         }
+    }
+    pub fn raw_bytes(&self) -> RgResult<Vec<u8>> {
+        Ok(self.bytes.safe_get()?.value.clone())
     }
 }

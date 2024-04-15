@@ -1,4 +1,5 @@
 use crate::{error_info, HashClear, RgResult, SafeOption};
+use crate::proto_serde::ProtoSerde;
 use crate::structs::{ErrorInfo, Hash, NetworkEnvironment, NodeMetadata, PartitionInfo, PeerNodeInfo, PublicKey, TransportInfo};
 use crate::util::xor_distance::xorfc_hash;
 
@@ -19,7 +20,7 @@ impl NodeMetadata {
     }
 
     pub fn long_identifier(&self) -> String {
-        let pk = self.public_key.clone().and_then(|p| p.hex().ok()).unwrap_or("".to_string());
+        let pk = self.public_key.clone().map(|p| p.hex()).unwrap_or("".to_string());
         let info = self.transport_info.clone().expect("ti");
         let ip = info.external_host.or(info.external_ipv4).expect("ip");
         format!("node_name {} public key {} ip {}",

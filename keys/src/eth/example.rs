@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 use bdk::bitcoin::hashes::hex::ToHex;
 use ethers::{core::{types::TransactionRequest},
@@ -17,10 +18,11 @@ use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::utils::Anvil;
 use foundry_block_explorers::account::GenesisOption;
 use foundry_block_explorers::Client;
+use itertools::Itertools;
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use redgold_schema::{EasyJson, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
-use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::address_external::ToEthereumAddress;
 use crate::util::btc_wallet::ExternalTimedTransaction;
@@ -81,6 +83,40 @@ impl EthHistoricalClient {
         let bal = metadata.balance;
         Ok(bal)
     }
+
+    pub async fn get_balance_typed(&self, address: &structs::Address) -> RgResult<CurrencyAmount> {
+        let address = address.render_string()?;
+        let addr = address.parse().error_info("address parse failure")?;
+        let metadata = self.client
+            .get_ether_balance_single(&addr, None).await.error_info("balance fetch failure")?;
+        let bal = metadata.balance;
+        Ok(CurrencyAmount::from_eth_bigint_string(bal))
+    }
+    //
+    // pub async fn get_balance_multi(&self, addresses: Vec<structs::Address>) -> RgResult<HashMap<structs::Address, CurrencyAmount>> {
+    //     let mut addrs = vec![];
+    //     let mut mapping = HashMap::new();
+    //     for addr in addresses {
+    //         let s = addr.render_string()?;
+    //         let aa = s.parse().error_info("address parse failure")?;
+    //         mapping.insert(aa.clone(), addr);
+    //         addrs.push(aa)
+    //     }
+    //     let metadata = self.client
+    //         .get_ether_balance_multi(&*addrs, None).await.error_info("balance fetch failure")?;
+    //     let mut res = HashMap::new();
+    //     for m in metadata {
+    //         let addr = mapping.get(&m.account).expect("address mapping");
+    //         let amt = CurrencyAmount::from_eth_bigint_string(m.balance);
+    //         res.insert(addr.clone(), amt);
+    //     }
+    //     Ok(res)
+    // }
+
+    pub fn translate_response_string_bigint(value: &String) -> RgResult<BigInt> {
+        BigInt::from_str(value).error_info("value parse failure")
+    }
+
     pub fn translate_value(value: &String) -> RgResult<i64> {
         BigInt::from_str(value).error_info("value parse failure")
             .map(|v| v / Self::bigint_offset())

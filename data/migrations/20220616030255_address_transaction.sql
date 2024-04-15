@@ -10,8 +10,11 @@ CREATE TABLE IF NOT EXISTS address_transaction (
 CREATE INDEX IF NOT EXISTS address_transaction_address
     ON address_transaction (address DESC);
 
+CREATE INDEX IF NOT EXISTS address_transaction_address_incoming
+    ON address_transaction (address DESC, incoming DESC);
+
 CREATE INDEX IF NOT EXISTS address_transaction_tx_hash
-    ON address_transaction (tx_hash DESC);
+    ON address_transaction (tx_hash ASC);
 
 CREATE INDEX IF NOT EXISTS address_transaction_time
     ON address_transaction (time DESC);

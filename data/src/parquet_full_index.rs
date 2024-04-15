@@ -1,7 +1,9 @@
 use polars::datatypes::{AnyValue, DataType, Field, TimeUnit};
 use polars::frame::row::Row;
 use polars::prelude::Schema;
-use redgold_schema::{ProtoSerde, RgResult, SafeBytesAccess, WithMetadataHashable};
+use redgold_schema::{RgResult};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::Transaction;
 
 pub fn parquet_schema(time: Option<i64>) -> Schema {
@@ -30,14 +32,14 @@ fn translate_tx<'a>(tx: &Transaction) -> RgResult<Row<'a>> {
     let time = tx.time()?.clone();
     let sponsored_time = tx.sponsored_time().ok();
     let transaction_proto = tx.proto_serialize();
-    let hash = tx.hash_bytes()?;
-    let signable_hash = tx.signable_hash().safe_bytes()?;
-    let signed_hash = tx.signed_hash().safe_bytes()?;
+    let hash = tx.hash_proto_bytes();
+    let signable_hash = tx.signable_hash().vec();
+    let signed_hash = tx.signed_hash().vec();
     // TODO: Distinguish these cases
     let counterparty_hash: Option<Vec<u8>> = None;
     let confirmation_hash: Option<Vec<u8>> = None;
     let first_input_address = tx.first_input_address().map(|a| a.proto_serialize());
-    let first_output_address = tx.first_output_address().map(|a| a.proto_serialize());
+    let first_output_address = tx.first_output_address_non_input_or_fee().map(|a| a.proto_serialize());
     let transaction_type = tx.transaction_type().ok().map(|t| t as i32);
     let is_test = tx.is_test();
     let total_amount = tx.total_output_amount();

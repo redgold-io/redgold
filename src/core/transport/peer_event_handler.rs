@@ -27,6 +27,7 @@ use crate::util;
 use redgold_schema::EasyJson;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {
@@ -47,7 +48,7 @@ impl PeerOutgoingEventHandler {
             if let Some(nmd) = res {
                 Self::send_message_rest(message.clone(), nmd, &relay).await?;
             } else {
-                error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex_or(), ser_msgp);
+                error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);
             }
         } else if let Some(nmd) = &message.node_metadata {
             debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",
