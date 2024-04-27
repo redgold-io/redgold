@@ -32,7 +32,7 @@ csv = "1.1"
 num-traits = "0.2.15"
 tokio = { version = "1.36.0", features = ["rt", "process"]}
 rand = { workspace = true }
-num-bigint = "0.4"
+num-bigint = { workspace = true }
 async-trait = "0.1.78"
 chrono = "0.4.33"
 log = "0.4.21"

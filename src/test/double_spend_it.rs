@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{EasyJson, ErrorInfoContext, SafeOption};
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SubmitTransactionResponse};
-use redgold_schema::util::lang_util::AnyPrinter;
+use redgold_schema::{ErrorInfoContext, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
 use crate::api::public_api::PublicClient;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::node_config::NodeConfig;
-use crate::test::external_amm_integration::{amm_public_key, dev_ci_kp};
+use crate::test::external_amm_integration::dev_ci_kp;
 
 // Use this for manual testing
 #[ignore]

@@ -1,9 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::pin::pin;
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use async_trait::async_trait;
+use bdk::sled::Tree;
 
 use crate::core::internal_message;
 use crate::core::internal_message::{Channel, new_channel};
@@ -18,11 +20,13 @@ use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::{error, info};
 use metrics::counter;
+use rocket::form::FromForm;
 use tokio::runtime::Runtime;
+use tokio::sync::MutexGuard;
 use tracing::trace;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
@@ -32,8 +36,11 @@ use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
+use redgold_keys::eth::example::EthWalletWrapper;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::transaction::{amount_to_raw_amount, TransactionMaybeError};
@@ -44,6 +51,7 @@ use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::SafeOption;
+use crate::scrape::external_networks::ExternalNetworkData;
 use crate::util;
 use crate::util::keys::ToPublicKey;
 
@@ -93,15 +101,34 @@ pub struct ObservationMetadataInternalSigning {
     pub sender: flume::Sender<ObservationProof>
 }
 
+
+// TODO: There's a better pattern here than mutex, but wrapping this here for clarity
+// for a future change.
 #[derive(Clone, Default)]
-pub struct ReadManyWriteOne<T> {
-    pub inner: Arc<AtomicCell<T>>
+pub struct ReadManyWriteOne<T> where T: Clone {
+    pub inner: Arc<tokio::sync::Mutex<T>>
 }
 
-impl<T> ReadManyWriteOne<T> {
-    pub fn write(&self, t: T) {
-        self.inner.store(t);
+impl<T> ReadManyWriteOne<T> where T: Clone  {
+    pub async fn write(&self, t: T) -> () {
+        let mut guard = self.lock().await;
+        *guard = t;
+        ()
     }
+
+    async fn lock(&self) -> MutexGuard<'_, T> {
+        self.inner.lock().await
+    }
+
+    pub async fn clone_read(&self) -> T {
+        let guard = self.lock().await;
+        (*guard).clone()
+    }
+
+    pub async fn read(&self) -> MutexGuard<'_, T> {
+        self.lock().await
+    }
+
 }
 
 #[derive(Clone)]
@@ -176,6 +203,17 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 }
 
 impl Relay {
+
+    pub fn btc_wallet(&self, pk: &PublicKey) -> RgResult<SingleKeyBitcoinWallet<Tree>> {
+        SingleKeyBitcoinWallet::new_wallet_db_backed(
+            pk.clone(), self.node_config.network.clone(), true,
+            self.node_config.env_data_folder().bdk_sled_path()
+        )
+    }
+
+    pub fn eth_wallet(&self) -> RgResult<EthWalletWrapper> {
+        EthWalletWrapper::new(&self.node_config.keypair().to_private_hex(), &self.node_config.network)
+    }
 
     pub fn default_fee_addrs(&self) -> Vec<Address> {
         self.node_config.seed_peer_addresses()
@@ -321,8 +359,7 @@ use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::e2e::tx_gen::SpendableUTXO;
-use crate::party::party_watcher::PartyInternalData;
-use crate::scrape::external_networks::ExternalNetworkData;
+use crate::party::data_enrichment::PartyInternalData;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -834,6 +871,19 @@ impl Relay {
         }
     }
 
+    pub async fn health_request(&self, nodes: &Vec<PublicKey>) -> RgResult<Vec<RgResult<Response>>> {
+        let mut req = Request::default();
+        req.health_request = Some(HealthRequest::default());
+        self.broadcast_async(nodes.clone(), req, None).await
+    }
+
+    pub async fn health_request_all(&self, nodes: &Vec<PublicKey>) -> RgResult<()> {
+        for r in self.health_request(nodes).await? {
+            r?;
+        }
+        Ok(())
+    }
+
     // the new function everything should use
     pub async fn broadcast_async(
         &self,
@@ -844,7 +894,7 @@ impl Relay {
         let mut results = vec![];
         for p in nodes {
             let req = request.clone();
-            let timeout = Some(timeout.unwrap_or(Duration::from_secs(20)));
+            let timeout = Some(timeout.unwrap_or(Duration::from_secs(30)));
             let res = self.send_message_async(&req, &p, timeout).await?;
             results.push((p, res));
         }

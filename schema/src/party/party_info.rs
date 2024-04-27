@@ -1,4 +1,4 @@
-use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PartyInfo, PublicKey};
+use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartyState, PublicKey};
 
 impl PartyInfo {
 
@@ -32,7 +32,8 @@ impl PartyInfo {
             party_key: None,
             self_initiated: Some(self_initiated),
             expired_time: None,
-            successor_key: None
+            successor_key: None,
+            state: PartyState::Active as i32,
         }
     }
 

@@ -22,7 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
 use uuid::Uuid;
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{bytes_data, ErrorInfoContext, json};
+use redgold_schema::{bytes_data, ErrorInfoContext};
 use redgold_schema::structs::{ErrorInfo, Request, UdpMessage};
 use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::relay::Relay;
@@ -31,7 +31,8 @@ use crate::util::keys::public_key_from_bytes;
 use crate::util::random_port;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::api::udp_api::UdpOperation::Outgoing;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::json;
 use redgold_schema::proto_serde::ProtoHashable;
 
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
@@ -267,7 +268,7 @@ impl UdpServer {
 
     async fn send_rx_incoming_log(&mut self, data: Vec<u8>, addr: SocketAddr) -> Result<(), ErrorInfo> {
         self.send_rx_incoming(data, addr.clone()).await.map_err(|e| {
-            log::error!("Failed to send UDP message to relay: {}", crate::schema::json_or(&e));
+            log::error!("Failed to send UDP message to relay: {}", e.json_or());
             e
         })
 }

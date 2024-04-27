@@ -2,10 +2,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use log::{error, info};
 
-use redgold_schema::{error_info, ErrorInfoContext, json_pretty, RgResult, SafeOption, structs};
-use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, Proof, PublicKey, Request, Response, RoomId, Weighting};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
 use crate::core::internal_message::SendErrorInfo;
-use crate::core::relay::{ Relay};
+use crate::core::relay::Relay;
 use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
 // use ssh2::init;
@@ -17,7 +17,8 @@ use crate::multiparty_gg20::{gg20_keygen, gg20_signing};
 fn debug() {
 
 }
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::json_pretty;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::node_config::NodeConfig;
 
@@ -77,7 +78,8 @@ pub async fn initiate_mp_keygen(
     relay: Relay,
     ident: Option<MultipartyIdentifier>,
     store_local_share: bool,
-    node_ids: Option<Vec<PublicKey>>
+    node_ids: Option<Vec<PublicKey>>,
+    debug_purpose: bool
 ) -> Result<SelfInitiateKeygenResult, ErrorInfo> {
 
     // Better pattern for unwrap or else async error?
@@ -102,6 +104,13 @@ pub async fn initiate_mp_keygen(
     };
 
     let mut base_request = InitiateMultipartyKeygenRequest::default();
+    base_request.purpose = {
+        if debug_purpose {
+            structs::PartyPurpose::StandardPurpose
+        } else {
+            structs::PartyPurpose::StandardPurpose
+        }
+    } as i32;
     let identifier = ident.clone();
     base_request.identifier = Some(identifier.clone());
 
@@ -157,7 +166,7 @@ pub async fn initiate_mp_keygen_authed(
         .collect_vec();
     info!("Sending initiate keygen request to peers: {} message: {}", peers.json_or(), req.json_or());
 
-    let results = relay.broadcast_async(peers, req, Some(Duration::from_secs(100))).await?;
+    let results = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(100))).await?;
 
     let mut successful = 0;
 
@@ -171,7 +180,7 @@ pub async fn initiate_mp_keygen_authed(
                 successful += 1
             }
             Err(e) => {
-                use crate::schema::json_or;
+                use redgold_schema::helpers::easy_json::json_or;
                 // TODO: add peer short public key identifier.
                 info!("Error sending initiate keygen request to peer {}", json_or(&e));
             }
@@ -180,7 +189,7 @@ pub async fn initiate_mp_keygen_authed(
 
     info!("Num successful peers participating in keygen: {}", successful);
 
-    if successful < threshold {
+    if successful < peers.len() {
         res.abort();
         return Err(error_info("Not enough successful peers"));
     }
@@ -214,6 +223,12 @@ pub async fn initiate_mp_keygen_follower(
 
     // TODO: Verify score of initiating pk
 
+    let score = relay.get_security_rating_trust_of_node(initiating_pk).await?.ok_msg("Initiating public key trust not found")?;
+    // TODO: use a function on a score class rather than this explicit check
+    if score < 0.1 {
+        return Err(error_info("Initiating public key trust score too low"));
+    }
+
     let ident = mp_req.identifier.safe_get()?;
     let index = ident.party_keys.iter().enumerate().find(|(_idx, x)| x == &&relay.node_config.public_key())
         .map(|(idx, _x)| (idx as u16) + 1)
@@ -226,6 +241,9 @@ pub async fn initiate_mp_keygen_follower(
 
     let host_key = ident.party_keys.get(0).cloned();
     let host_key = host_key.safe_get_msg("No host key")?;
+    if initiating_pk != host_key {
+        return Err(error_info("Initiating public key does not match host key"));
+    }
     let metadata = relay.ds.peer_store.query_public_key_metadata(host_key).await?;
     let metadata = metadata.safe_get_msg("No host key metadata")?;
     let address = metadata.external_address()?;
@@ -344,7 +362,8 @@ pub async fn initiate_mp_keysign(
     // Change to &Vec<u8>?
     data_to_sign: BytesData,
     mut parties: Vec<PublicKey>,
-    signing_room_id: Option<RoomId>
+    signing_room_id: Option<RoomId>,
+    validation: Option<PartySigningValidation>
 ) -> RgResult<SelfInitiateKeysignResult> {
 
 
@@ -364,6 +383,7 @@ pub async fn initiate_mp_keysign(
     mp_req.data_to_sign = Some(data_to_sign.clone());
     mp_req.signing_room_id = Some(signing_room_id.clone());
     mp_req.signing_party_keys = parties.clone();
+    mp_req.party_signing_validation = validation;
 
     relay.authorize_signing(mp_req.clone())?;
 
@@ -432,7 +452,7 @@ pub async fn initiate_mp_keysign_authed(
     info!("Sending initiate keysign request to peers: {} message: {} self_port: {} signing_room_id: {} index: {}",
         peers.json_or(), req.json_or(), port, signing_room_id.clone().and_then(|x| x.uuid).unwrap_or("".to_string()), index.json_or());
 
-    let results = relay.broadcast_async(peers, req, Some(Duration::from_secs(100))).await?;
+    let results = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(100))).await?;
 
     let mut successful = 0;
 
@@ -448,7 +468,7 @@ pub async fn initiate_mp_keysign_authed(
             }
         }
     }
-    if successful < ident.threshold.safe_get()?.value as usize {
+    if successful < peers.clone().len() {
         jh.abort();
         return Err(error_info("Not enough successful peers"));
     }
@@ -473,7 +493,14 @@ pub async fn initiate_mp_keysign_follower(
 )
     -> Result<InitiateMultipartySigningResponse, ErrorInfo> {
 
+    let t = relay.get_security_rating_trust_of_node(initiating_pk).await?.ok_msg("Initiating public key trust not found")?;
+    if t < 0.1 {
+        return Err(error_info("Initiating keysign public key trust score too low"));
+    }
+
+
     let ident = mp_req.identifier.safe_get_msg("Missing room id for keygen on signing follower")?;
+
     let kg_rid_typed = ident.room_id.safe_get()?;
     let keygen_room_id = kg_rid_typed.uuid.safe_get()?.clone();
 
@@ -504,6 +531,16 @@ pub async fn initiate_mp_keysign_follower(
     let party_info = relay.ds.multiparty_store
         .party_info(&kg_rid_typed).await?
         .ok_or(error_info("Local share not found"))?;
+
+    let signing_bytes = mp_req.data_to_sign.clone().safe_get()?.clone().value;
+
+    let validate = mp_req.party_signing_validation.safe_get_msg("No party signing validation")?.clone();
+    if let Some(pk) = &party_info.party_key {
+        let value = relay.external_network_shared_data.read().await;
+        let data = value.get(pk).ok_or(error_info("No party key data found"))?;
+        data.party_events.safe_get_msg("No party events found")?.validate_event(validate, signing_bytes.clone(), &relay)?;
+    }
+
     // TODO: Check initiate keygen matches
     let local_share = party_info.local_key_share.safe_get()?.local_share.safe_get()?.clone();
     let init = party_info.initiate.safe_get_msg("No initiate keygen")?.clone();
@@ -517,7 +554,6 @@ pub async fn initiate_mp_keysign_follower(
     room {} with parties {} address: {} port: {} host_key: {}",
         signing_room_id.safe_get()?.uuid.safe_get()?.clone(), index.clone().json_or(), address, port, host_key.json_or()
     );
-    let signing_bytes = mp_req.data_to_sign.clone().safe_get()?.clone().value;
     let nc = relay.clone();
     let res = tokio::time::timeout(
         timeout,

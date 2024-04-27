@@ -18,7 +18,7 @@ use rocket::form::validate::Contains;
 use tokio_stream::Elapsed;
 use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::structs::{ErrorInfo, Hash, PublicKey, Transaction, TransactionEntry, UtxoId};
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::util::xor_distance::XorDistancePartitionInfo;
 use redgold_schema::observability::errors::Loggable;

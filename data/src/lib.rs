@@ -26,6 +26,7 @@ pub mod parquet_full_index;
 pub mod transaction_insert;
 pub mod address_transaction;
 pub mod transaction_observability;
+mod price_time;
 
 #[derive(Clone)]
 pub struct DataStoreContext {

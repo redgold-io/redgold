@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
@@ -17,12 +17,18 @@ use bdk::database::{BatchDatabase, MemoryDatabase};
 use bdk::electrum_client::Client;
 use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
 use bdk::sled::Tree;
+use itertools::Itertools;
 // use crate::util::cli::commands::send;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
+// use crate::util::cli::commands::send;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::{KeyPair, TestConstants};
+use crate::address_external::ToBitcoinAddress;
+use crate::address_support::AddressSupport;
+use crate::eth::example::dev_ci_kp;
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
 use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
@@ -231,23 +237,30 @@ pub struct ExternalTimedTransaction {
     pub other_address: String,
     pub other_output_addresses: Vec<String>,
     pub amount: u64,
+    pub bigint_amount: Option<String>,
     pub incoming: bool,
     pub currency: SupportedCurrency,
+    pub block_number: Option<u64>,
+    pub price_usd: Option<f64>,
 }
 
 impl ExternalTimedTransaction {
-    pub fn confirmed(&self) -> bool {
-        self.timestamp.is_some()
-    }
 
     pub fn other_address_typed(&self) -> RgResult<structs::Address> {
-        // TODO: Move to keys util to validate the address
-        if self.currency == SupportedCurrency::Bitcoin {
-            let destination_address = structs::Address::from_bitcoin(&self.other_address);
-            Ok(destination_address)
+        self.other_address.parse_address()
+    }
+
+    pub fn currency_amount(&self) -> CurrencyAmount {
+        let mut ca = if let Some(ba) = self.bigint_amount.as_ref() {
+            CurrencyAmount::from_eth_bigint_string(ba.clone())
         } else {
-            Err(error_info("Unsupported currency".to_string()))
-        }
+            CurrencyAmount::from(self.amount as i64)
+        };
+        ca.currency = Some(self.currency as i32);
+        ca
+    }
+    pub fn confirmed(&self) -> bool {
+        self.timestamp.is_some()
     }
 
 }
@@ -478,8 +491,11 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                     other_address: a,
                     other_output_addresses: non_self_addrs_output,
                     amount: value,
+                    bigint_amount: None,
                     incoming: true,
                     currency: SupportedCurrency::Bitcoin,
+                    block_number: None,
+                    price_usd: None,
                 };
                 res.push(ett)
             }
@@ -561,8 +577,11 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                     other_address: a,
                     other_output_addresses,
                     amount: value,
+                    bigint_amount: None,
                     incoming,
                     currency: SupportedCurrency::Bitcoin,
+                    block_number: None,
+                    price_usd: None,
                 };
                 res.push(ett)
             }
@@ -634,6 +653,13 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         self.psbt = Some(psbt);
         Ok(())
     }
+
+    // pub fn psbt_outputs(&self) -> RgResult<Vec<(structs::Address, i64)>> {
+    //     let psbt = self.psbt.safe_get_msg("No psbt found")?;
+    //     for o in psbt.outputs.iter() {
+    //         o.redeem_script
+    //     }
+    // }
 
     pub fn txid(&self) -> Result<String, ErrorInfo> {
         let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid;
@@ -767,6 +793,12 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(txid)
     }
 
+    pub fn convert_psbt_outputs(&self) -> Vec<(String, u64)> {
+        let tx = self.psbt.clone().expect("psbt").extract_tx();
+        let outputs = self.outputs_convert(&tx.output);
+        outputs
+    }
+
 }
 
 /*
@@ -801,12 +833,13 @@ async fn tx_debug() {
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn balance_test2() {
-    let w = SingleKeyBitcoinWallet
+    let mut w = SingleKeyBitcoinWallet
     ::new_wallet(PublicKey::from_hex_direct("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
     let balance = w.get_wallet_balance().expect("");
+
 
 
     println!("balance: {:?}", balance);
@@ -815,9 +848,21 @@ async fn balance_test2() {
     for t in txs {
         println!("tx: {}", t.json_or());
     }
+    let (_, kp) = dev_ci_kp().expect("");
+    let dest = kp.public_key().to_bitcoin_address(&NetworkEnvironment::Dev).expect("");
+    let tx = w.create_transaction(Some(kp.public_key()), None, 2200).expect("");
+    let psbt = w.psbt.expect("psbt");
+    let txb = psbt.clone().extract_tx();
+    println!("txb: {:?}", txb);
+    for o in txb.output {
+        println!("o: {:?}", o);
+
+    }
+
+
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn balance_test() {
     let tc = TestConstants::new();

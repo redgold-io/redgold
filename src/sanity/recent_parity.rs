@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use async_trait::async_trait;
 use log::info;
-use redgold_schema::{EasyJson, error_info, RgResult};
+use redgold_schema::{error_info, RgResult};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Hash, Transaction, TransactionEntry, UtxoId};

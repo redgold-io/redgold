@@ -7,7 +7,7 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use tracing::Instrument;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::gui::app_loop::LocalState;

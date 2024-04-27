@@ -1,8 +1,8 @@
 use std::collections::hash_map::{Entry, HashMap};
 use std::net::IpAddr;
 use std::sync::{
-    atomic::{AtomicU16, Ordering},
     Arc,
+    atomic::{AtomicU16, Ordering},
 };
 use config::Environment;
 
@@ -11,13 +11,14 @@ use log::info;
 use rocket::data::ToByteUnit;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Request};
-use rocket::response::stream::{stream, Event, EventStream};
+use rocket::response::stream::{Event, EventStream, stream};
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, RwLock};
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{EasyJson, EasyJsonDeser, structs};
+use redgold_schema::structs;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use crate::core::relay::Relay;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::RoomId;

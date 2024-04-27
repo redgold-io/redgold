@@ -1,8 +1,9 @@
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
-use redgold_schema::{EasyJson, error_info, RgResult};
+use redgold_schema::{error_info, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Address, NetworkEnvironment, Transaction};
 use redgold_schema::fee_validator::TransactionFeeValidator;
+use redgold_schema::helpers::easy_json::EasyJson;
 
 pub trait TransactionValidator {
     fn validate(&self, fee_addrs: Option<&Vec<Address>>, network: Option<&NetworkEnvironment>) -> RgResult<()>;

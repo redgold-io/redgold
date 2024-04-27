@@ -9,7 +9,8 @@ use redgold_keys::eth::example::{dev_ci_kp, EthHistoricalClient, EthWalletWrappe
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{bytes_data, EasyJson, ErrorInfoContext, SafeOption, structs};
+use redgold_schema::{bytes_data, ErrorInfoContext, SafeOption, structs};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, TestContractInternalState, Transaction};
 use crate::api::control_api::ControlClient;
@@ -18,15 +19,16 @@ use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
-use crate::multiparty_gg20::watcher::DepositWatcherConfig;
+// use crate::multiparty_gg20::watcher::DepositWatcherConfig;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
+use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::observability::metrics_registry;
 
-#[allow(dead_code)]
+#[derive(Clone)]
 pub struct LocalTestNodeContext {
     id: u16,
     port_offset: u16,
@@ -39,9 +41,12 @@ pub struct LocalTestNodeContext {
 impl LocalTestNodeContext {
     async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
+        node_config.watcher_interval = Duration::from_secs(5);
+        node_config.config_data.party_config_data.order_cutoff_delay_time = 5;
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;
+            node_config.config_data.party_config_data.enable_party_mode = true;
         }
 
         node_config.seeds = seed.clone();
@@ -374,7 +379,9 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let seed_json = local_nodes.seeds.json_or();
     info!("Seeds: {}", seed_json);
-    let start_node = local_nodes.start();
+    let start_node = local_nodes.start().clone();
+    let config = start_node.node.relay.node_config.clone();
+    let relay_start = start_node.node.relay.clone();
     // info!("Started initial node");
     let client1 = start_node.control_client.clone();
     let _client2 = start_node.control_client.clone();
@@ -549,6 +556,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let environment = NetworkEnvironment::Dev;
 
+    // Manual test uses up funds.
 
     let do_mp_eth_test = false;
 
@@ -556,7 +564,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         // Ignore this part for now
         let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
         let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
-        let txs = h.get_all_tx(&string_addr).await.expect("works");
+        let txs = h.get_all_tx(&string_addr, None).await.expect("works");
         println!("txs: {}", txs.json_or());
         let tx_head = txs.get(0).expect("tx");
         let _other_address = tx_head.other_address.clone();
@@ -598,6 +606,16 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // }
     // assert!(loaded);
 
+    // Eth staking tests.
+    if let Some((secret, kp)) = dev_ci_kp() {
+        // First send some funds to pay for fees.
+        let config = start_node.node.relay.node_config.clone();
+        let txb = TransactionBuilder::new(&config);
+        // txb.with_utxo()
+
+        let eth = EthWalletWrapper::new(&secret, &environment).expect("works");
+
+    }
 
 
     std::mem::forget(local_nodes);

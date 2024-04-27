@@ -146,6 +146,10 @@ impl Address {
             currency: None,
         }
     }
+
+    pub fn currency_or(&self) -> SupportedCurrency {
+        self.currency.and_then(|s| SupportedCurrency::from_i32(s)).unwrap_or(SupportedCurrency::Redgold)
+    }
 }
 
 

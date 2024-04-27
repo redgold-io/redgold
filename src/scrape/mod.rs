@@ -3,7 +3,8 @@ pub mod external_networks;
 use std::time::Duration;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use redgold_schema::{EasyJson, EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::SupportedCurrency;
 use crate::util;
@@ -420,12 +421,12 @@ struct OkxHistoricalResponse {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OkxParsedRow {
-    time: i64,
-    open: f64,
-    high: f64,
-    low: f64,
-    close: f64,
-    confirmed: bool
+    pub time: i64,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub confirmed: bool
 }
 
 

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
-use crate::{EasyJson, error_code, error_info, error_message, RgResult, SafeOption, structs, util};
+use crate::{error_code, error_info, error_message, RgResult, SafeOption, structs, util};
 use crate::constants::MAX_INPUTS_OUTPUTS;
+use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::pow::TransactionPowValidate;

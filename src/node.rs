@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, EasyJson, EasyJsonDeser, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{bytes_data, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
@@ -49,6 +49,7 @@ use redgold_keys::TestConstants;
 use tokio::task::spawn_blocking;
 use tracing::{Span, trace};
 use redgold_keys::proof_support::ProofSupport;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::TransactionState::Mempool;
 use crate::api::rosetta::models::Peer;
@@ -61,13 +62,14 @@ use crate::core::stream_handlers::{IntervalFold, run_recv_single};
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::infra::multiparty_backup::check_updated_multiparty_csv;
 use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
-use crate::multiparty_gg20::watcher::DepositWatcher;
+// use crate::multiparty_gg20::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::shuffle::shuffle_interval::Shuffle;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
+use crate::party::party_watcher::PartyWatcher;
 use crate::sanity::{historical_parity, migrations};
 use crate::sanity::recent_parity::RecentParityCheck;
 
@@ -206,8 +208,9 @@ impl Node {
             discovery, relay.discovery.receiver.clone(), 100
         ).await));
 
-        join_handles.push(NamedHandle::new("DepositWatcher", stream_handlers::run_interval_fold(
-            DepositWatcher::new(relay.clone()), relay.node_config.watcher_interval, false
+        // TODO: Use anon func to push to named handles
+        join_handles.push(NamedHandle::new("PartyWatcher", stream_handlers::run_interval_fold(
+            PartyWatcher::new(&relay), relay.node_config.watcher_interval, false
         ).await));
 
 

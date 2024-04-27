@@ -1,7 +1,5 @@
-use std::collections::HashMap;
 use std::str::FromStr;
-use bdk::bitcoin::hashes::hex::ToHex;
-use ethers::{core::{types::TransactionRequest},
+use ethers::{core::types::TransactionRequest,
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, providers, signers::{LocalWallet, Signer}};
 
 
@@ -16,12 +14,13 @@ use ethers::prelude::{maybe, to_eip155_v, U256};
 use ethers::types::{Address, Bytes, Signature};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::utils::Anvil;
-use foundry_block_explorers::account::GenesisOption;
+use foundry_block_explorers::account::{GenesisOption, Sort, TxListParams};
 use foundry_block_explorers::Client;
 use itertools::Itertools;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use num_traits::{FromPrimitive, ToPrimitive};
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
+use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::address_external::ToEthereumAddress;
@@ -63,7 +62,20 @@ impl EthHistoricalClient {
         })
     }
 
-    // pub fn query_contract(&self) {
+    // This doesn't appear to be working rn
+    pub async fn recommended_fee(&self) -> RgResult<BigInt> {
+        let fee = self.client.gas_oracle().await.error_info("gas oracle")?;
+        let fee = fee.safe_gas_price;
+        let vec = fee.to_be_bytes_vec();
+        let bi = BigInt::from_bytes_be(Sign::Plus, &*vec);
+        Ok(bi)
+    }
+    pub async fn recommended_fee_typed(&self) -> RgResult<CurrencyAmount> {
+        Ok(CurrencyAmount::from_eth_bigint(self.recommended_fee().await?))
+    }
+
+
+        // pub fn query_contract(&self) {
     //     self.client.
     // }
 
@@ -92,6 +104,7 @@ impl EthHistoricalClient {
         let bal = metadata.balance;
         Ok(CurrencyAmount::from_eth_bigint_string(bal))
     }
+
     //
     // pub async fn get_balance_multi(&self, addresses: Vec<structs::Address>) -> RgResult<HashMap<structs::Address, CurrencyAmount>> {
     //     let mut addrs = vec![];
@@ -158,6 +171,13 @@ impl EthHistoricalClient {
         u256
     }
 
+    pub fn translate_ruint_u256_big_int(value: U256) -> BigInt {
+        let mut vec = vec![];
+        value.to_big_endian(&mut *vec);
+        let bi = BigInt::from_bytes_be(Sign::Plus, &*vec);
+        bi
+    }
+
     pub fn translate_float_value_u256(value: &String) -> RgResult<U256> {
         let bi = Self::translate_float_value_bigint(&value)?;
         let u256 = Self::translate_big_int_u256(bi);
@@ -172,10 +192,17 @@ impl EthHistoricalClient {
 
     pub async fn get_all_tx(
         &self,
-        address: &String
+        address: &String,
+        start_block: Option<u64>
     ) -> RgResult<Vec<ExternalTimedTransaction>> {
         let addr = address.parse().error_info("address parse failure")?;
-        let txs = self.client.get_transactions(&addr, None).await.error_info("txs fetch failure")?;
+
+        let tx_params = if let Some(s) = start_block {
+            Some(TxListParams::new(s, 1e16 as u64, 0, 0, Sort::Asc))
+        } else {
+            None
+        };
+        let txs = self.client.get_transactions(&addr, tx_params).await.error_info("txs fetch failure")?;
         let mut res = vec![];
         for t in txs {
             let tx_id = match t.hash {
@@ -188,6 +215,7 @@ impl EthHistoricalClient {
             };
             let to_opt = t.to.map(|h| h.to_string());
             let timestamp = t.time_stamp.parse::<u64>().ok();
+            let block_num = t.block_number.as_number().map(|b| b.as_limbs()[0].clone());
 
             let value_str = t.value.to_string();
             let amount = Self::translate_value(&value_str)?;
@@ -205,8 +233,11 @@ impl EthHistoricalClient {
                     other_address,
                     other_output_addresses: vec![],
                     amount: amount as u64,
+                    bigint_amount: Some(value_str),
                     incoming,
                     currency: SupportedCurrency::Ethereum,
+                    block_number: block_num,
+                    price_usd: None,
                 });
             }
         }
@@ -214,6 +245,21 @@ impl EthHistoricalClient {
     }
 
 }
+
+
+// #[ignore]
+#[tokio::test]
+async fn show_balances() {
+    let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
+    let addr = dev_kp.public_key().to_ethereum_address_typed().expect("works");
+    let environment = NetworkEnvironment::Dev;
+    let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
+    let b = h.get_balance_typed(&addr).await.expect("works");
+    println!("balance: {}", b.json_or());
+    // let fee = h.recommended_fee_typed().await.expect("works");
+    // println!("fee: {}", fee.json_or());
+}
+
 
 
 async fn foo() -> Result<(), Box<dyn std::error::Error>> {
@@ -234,7 +280,7 @@ async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
 
     let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
-    let txs = h.get_all_tx(&string_addr).await.expect("works");
+    let txs = h.get_all_tx(&string_addr, None).await.expect("works");
 
     println!("txs: {}", txs.json_or());
 
@@ -261,6 +307,36 @@ pub struct EthWalletWrapper {
 
 impl EthWalletWrapper {
 
+    pub fn validate_eth_fulfillment(
+        fulfills: Vec<(structs::Address, CurrencyAmount)>, typed_tx_payload: &String, signing_data: &Vec<u8>
+    ) -> RgResult<()> {
+        let tx = typed_tx_payload.json_from::<TypedTransaction>()?;
+        let to = tx.to_addr().ok_msg("to address missing")?;
+        let amount = tx.value().ok_msg("value missing")?;
+        let amount_bigint = EthHistoricalClient::translate_ruint_u256_big_int(amount.clone());
+        let has_match = fulfills.iter()
+            .map(|(f_addr, f_amt)|
+                f_addr.render_string()
+                    .and_then(|a| Self::parse_address(&a))
+                    .map(|a| &a == to)
+                    .and_then(|b| f_amt.bigint_amount().clone().ok_msg("Missing bigint amount").map(|a| a == amount_bigint && b))
+            ).collect::<RgResult<Vec<bool>>>()?.iter().any(|b| *b);
+        if !has_match {
+            return Err(error_info("fulfillment does not match transaction"));
+        }
+        let signing = Self::signing_data(&tx)?;
+        if signing != *signing_data {
+            return Err(error_info("signing data does not match transaction"));
+        }
+
+        Ok(())
+    }
+
+    pub fn fee(&self) {
+        // self.provider.estimate_gas()
+
+    }
+
     pub fn new(secret_key: &String, network: &NetworkEnvironment) -> RgResult<EthWalletWrapper> {
 
         let bytes = from_hex(secret_key.clone())?;
@@ -285,6 +361,11 @@ impl EthWalletWrapper {
             provider,
         })
 
+    }
+
+    pub fn parse_address(a: &String) -> RgResult<Address> {
+        let addr: Address = a.parse().error_info("address parse failure")?;
+        Ok(addr)
     }
 
     pub async fn send_tx(&self, to: &String, value: u64) -> RgResult<()> {
@@ -323,6 +404,7 @@ impl EthWalletWrapper {
 
         self.provider.fill_transaction(&mut tx, None).await
             .error_info("tx fill failure")?;
+
 
         Ok(tx)
     }
@@ -415,7 +497,7 @@ impl EthWalletWrapper {
 }
 
 // 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn main() {
     foo().await.expect("works");

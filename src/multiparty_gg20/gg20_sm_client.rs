@@ -8,7 +8,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use round_based::Msg;
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{EasyJson, RgResult};
+use redgold_schema::RgResult;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Request, RoomId};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;

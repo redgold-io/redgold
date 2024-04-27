@@ -5,7 +5,7 @@ use redgold_schema::structs::NetworkEnvironment;
 use crate::core::relay::Relay;
 use crate::infra::deploy::derive_mnemonic_and_peer_id;
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn dump_seed_info_string() {
     let r = Relay::dev_default().await;
@@ -15,7 +15,7 @@ async fn dump_seed_info_string() {
 
     let mut hm = HashMap::new();
 
-    for i in 0..20 {
+    for i in 0..10 {
         let (words, pid) = derive_mnemonic_and_peer_id(&
             r.node_config,
             salt_m.clone(),

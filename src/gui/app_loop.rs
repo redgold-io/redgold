@@ -8,7 +8,7 @@ use eframe::egui::{Align, ScrollArea, TextStyle};
 use eframe::egui;
 use itertools::Itertools;
 use log::{error, info};
-use redgold_schema::{EasyJson, error_info, RgResult};
+use redgold_schema::{error_info, RgResult};
 
 use crate::util::sym_crypt;
 // 0.8
@@ -421,13 +421,14 @@ use redgold_data::data_store::DataStore;
 use redgold_keys::util::dhash_vec;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
-use crate::gui::tabs::{server_tab};
+use crate::gui::tabs::server_tab;
 use crate::gui::tabs::keys::keygen_subtab::KeygenState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
 use crate::gui::tabs::server_tab::{ServersState, ServerStatus};

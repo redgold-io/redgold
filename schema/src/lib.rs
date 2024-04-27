@@ -20,7 +20,7 @@ use structs::{
 use observability::errors::EnhanceErrorInfo;
 use proto_serde::{ProtoHashable, ProtoSerde};
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector, VersionInfo};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -53,7 +53,7 @@ pub mod transaction_info;
 pub mod exec;
 pub mod contract;
 pub mod local_stored_state;
-mod weighting;
+pub mod weighting;
 pub mod pow;
 pub mod tx_schema_validate;
 pub mod fee_validator;
@@ -61,6 +61,8 @@ pub mod observability;
 pub mod proto_serde;
 pub mod helpers;
 pub mod party;
+pub mod tx;
+pub mod config_data;
 
 
 impl BytesData {
@@ -638,92 +640,16 @@ impl PublicResponse {
     }
 }
 
-// #[async_trait]
-pub trait EasyJson {
-    fn json(&self) -> Result<String, ErrorInfo>;
-    fn json_or(&self) -> String;
-    fn json_pretty(&self) -> Result<String, ErrorInfo>;
-    fn json_pretty_or(&self) -> String;
-    fn write_json(&self, path: &str) -> RgResult<()>;
-}
-
-pub trait EasyJsonDeser {
-    fn json_from<'a, T: serde::Deserialize<'a>>(&'a self) -> Result<T, ErrorInfo>;
-}
-
-impl EasyJsonDeser for String {
-    fn json_from<'a, T: serde::Deserialize<'a>>(&'a self) -> Result<T, ErrorInfo> {
-        json_from(self)
-    }
-}
-
-// #[async_trait]
-impl<T> EasyJson for T
-where T: Serialize {
-    fn json(&self) -> Result<String, ErrorInfo> {
-        json(&self)
-    }
-
-    fn json_or(&self) -> String {
-        json_or(&self)
-    }
-
-    fn json_pretty(&self) -> Result<String, ErrorInfo> {
-        json_pretty(&self)
-    }
-    fn json_pretty_or(&self) -> String {
-        json_pretty(&self).unwrap_or("json pretty failure".to_string())
-    }
-
-    fn write_json(&self, path: &str) -> RgResult<()> {
-        let string = self.json_or();
-        std::fs::write(path, string.clone()).error_info("error write json to path ").add(path.to_string()).add(" ").add(string)
-    }
-
-}
-
-#[test]
-pub fn json_trait_ser_test() {
-    let mut vers = VersionInfo::default();
-    vers.executable_checksum = "asdf".to_string();
-    println!("{}", vers.json_or());
-}
-
-pub fn json<T: Serialize>(t: &T) -> Result<String, ErrorInfo> {
-    serde_json::to_string(&t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
-}
-
-pub fn json_result<T: Serialize, E: Serialize>(t: &Result<T, E>) -> String {
-    match t {
-        Ok(t) => json_or(t),
-        Err(e) => json_or(e),
-    }
-}
-
-pub fn json_or<T: Serialize>(t: &T) -> String {
-    json(t).unwrap_or("json ser failure of error".to_string())
-}
-
-pub fn json_pretty<T: Serialize>(t: &T) -> Result<String, ErrorInfo> {
-    serde_json::to_string_pretty(&t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
-}
-
-pub fn json_from<'a, T: serde::Deserialize<'a>>(t: &'a str) -> Result<T, ErrorInfo> {
-    serde_json::from_str(t).map_err(|e| ErrorInfo::error_info(format!("serde json ser error: {:?}", e)))
-}
-
 impl PeerId {
     pub fn from_bytes_direct(bytes: Vec<u8>) -> Self {
         Self {
             peer_id: Some(PublicKey::from_bytes_direct_ecdsa(bytes)),
-            known_proof: vec![],
         }
     }
 
     pub fn from_pk(pk: PublicKey) -> Self {
         Self {
             peer_id: Some(pk),
-            known_proof: vec![],
         }
     }
 

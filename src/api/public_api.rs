@@ -18,13 +18,14 @@ use tracing::trace;
 use warp::reply::Json;
 use warp::{Filter, Server};
 use warp::http::Response;
-use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, RgResult, SafeOption, structs};
+use redgold_schema::{empty_public_request, empty_public_response, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse, Seed};
 use redgold_schema::transaction::rounded_balance_i64;
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
+use redgold_schema::helpers::easy_json::json;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 // use crate::genesis::create_test_genesis_transaction;
@@ -37,7 +38,7 @@ use crate::schema::structs::{
 };
 use crate::schema::structs::{QueryAddressesResponse, Transaction};
 use crate::schema::{bytes_data, error_info};
-use crate::schema::{response_metadata};
+use crate::schema::response_metadata;
 use crate::{api, schema, util};
 use crate::api::{about, as_warp_json_response, explorer};
 use crate::api::faucet::faucet_request;

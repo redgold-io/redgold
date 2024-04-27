@@ -1,7 +1,8 @@
-use redgold_schema::{EasyJson, error_info};
+use redgold_schema::error_info;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, PublicKey, Transaction};
 use tracing::info;
 use redgold_keys::address_support::AddressSupport;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::gui::tabs::transact::wallet_tab::WalletState;

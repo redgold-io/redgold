@@ -22,9 +22,10 @@ use tracing::trace;
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJsonDeser, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption};
+use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, Transaction, TrustData};

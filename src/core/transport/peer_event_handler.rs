@@ -11,7 +11,7 @@ use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
-use redgold_schema::{error_info, ErrorInfoContext, json_or, SafeOption, structs};
+use redgold_schema::{error_info, ErrorInfoContext, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request};
 
@@ -19,12 +19,13 @@ use crate::api::RgHttpClient;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
-use crate::schema::json;
+use redgold_schema::helpers::easy_json::json;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util;
 // use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::json_or;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;

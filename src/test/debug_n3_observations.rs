@@ -1,4 +1,4 @@
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::relay::Relay;
 
 #[ignore]

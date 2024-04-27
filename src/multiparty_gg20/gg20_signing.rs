@@ -17,7 +17,7 @@ use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::sig
 };
 use round_based::async_runtime::AsyncProtocol;
 use round_based::Msg;
-use redgold_schema::{bytes_data, error_info, json, json_from, structs};
+use redgold_schema::{bytes_data, error_info, structs};
 use redgold_schema::structs::{ErrorInfo, Proof};
 use redgold_keys::util::verify;
 use crate::multiparty_gg20::gg20_keygen::external_address_to_surf_url;
@@ -114,6 +114,7 @@ async fn signing_original(
 }
 use curv::elliptic::curves::ECScalar;
 use log::info;
+use redgold_schema::helpers::easy_json::{json, json_from};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::RsvSignature;

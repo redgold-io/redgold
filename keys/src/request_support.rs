@@ -1,5 +1,6 @@
 
-use redgold_schema::{EasyJson, error_info, RgResult, SafeOption};
+use redgold_schema::{error_info, RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{AboutNodeResponse, NodeMetadata, Proof, PublicKey, Request, Response};

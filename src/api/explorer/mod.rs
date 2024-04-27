@@ -12,29 +12,33 @@ use futures::TryFutureExt;
 use itertools::Itertools;
 use log::info;
 use rocket::form::FromForm;
-use redgold_schema::{EasyJson, error_info, RgResult, SafeOption};
+use redgold_schema::{error_info, RgResult, SafeOption};
 use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
 use serde::{Deserialize, Serialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use tokio::time::Instant;
 use tracing::trace;
 use warp::get;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::{Pagination, TokenParam};
-use crate::multiparty_gg20::watcher::{DepositWatcher, DepositWatcherConfig};
+// use crate::multiparty_gg20::watcher::{DepositWatcher, DepositWatcherConfig};
 use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::address_support::AddressSupport;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::api::faucet::faucet_request;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
 use redgold_schema::structs::PartyInfoAbridged;
-use crate::party::bid_ask::BidAsk;
+use crate::party::central_price::CentralPricePair;
+use crate::party::price_volume::PriceVolume;
+// use crate::party::bid_ask::BidAsk;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {
@@ -133,12 +137,13 @@ pub struct DetailedTransaction {
 #[derive(Serialize, Deserialize)]
 pub struct AddressPoolInfo {
     public_key: String,
-    // rdg_pk_address: String,
-    rdg_address: String,
-    rdg_balance: f64,
-    btc_address: String,
-    btc_balance: f64,
-    bid_ask: BidAsk,
+    addresses: Vec<String>,
+    balances: HashMap<String, String>,
+    bids: HashMap<String, Vec<PriceVolume>>,
+    asks: HashMap<String, Vec<PriceVolume>>,
+    bids_usd: HashMap<String, Vec<PriceVolume>>,
+    asks_usd: HashMap<String, Vec<PriceVolume>>,
+    central_prices: HashMap<String, CentralPricePair>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -270,27 +275,53 @@ pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
 
 pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>> {
 
-    let res: Option<DepositWatcherConfig> = r.ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
-    let res = match res {
-        None => {
-            None
-        }
-        Some(d) => {
-            let a = d.deposit_allocations.get(0).safe_get_msg("Missing deposit alloc")?.clone();
-            let btc_swap_address = a.key.to_bitcoin_address(&r.node_config.network.clone())?;
-            let btc_amount = (a.balance_btc as f64) / 1e8;
-            let rdg_amount = (a.balance_rdg as f64) / 1e8;
-            Some(AddressPoolInfo {
-                public_key: a.key.hex(),
-                rdg_address: a.key.address()?.render_string()?,
-                rdg_balance: rdg_amount,
-                btc_address: btc_swap_address,
-                btc_balance: btc_amount,
-                bid_ask: d.bid_ask.clone(),
-            })
-        }
-    };
-    Ok(res)
+    let data = r.external_network_shared_data.clone_read().await;
+    let pid = data
+        .iter()
+        .filter(|(k, v)| v.party_info.self_initiated())
+        .next()
+        .map(|x| x.1);
+    if let Some(d) = pid {
+        let pk = d.party_info.party_key.safe_get_msg("Missing party key")?;
+        let public_key =
+            pk.hex();
+        if let Some(pe) = d.party_events.as_ref() {
+            let balances = pe.balance_map.iter().map(|(k, v)| {
+                (format!("{:?}", k), v.to_fractional().to_string())
+            }).collect::<HashMap<String, String>>();
+            let addresses = pk.to_all_addresses_for_network(&r.node_config.network)?
+                .iter().flat_map(|a| a.render_string().ok()).collect_vec();
+            let central_prices = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.clone())
+            }).collect::<HashMap<String, CentralPricePair>>();
+            let bids = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.bids().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+            let asks = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.asks().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+            let bids_usd = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.bids_usd().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+            let asks_usd = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.asks_usd().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+
+            return Ok(Some(AddressPoolInfo {
+                public_key,
+                addresses,
+                balances,
+                bids,
+                asks,
+                bids_usd,
+                asks_usd,
+                central_prices,
+            }))
+        };
+
+
+    }
+    Ok(None)
 }
 
 pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>, offset: Option<i64>) -> RgResult<DetailedAddress> {
@@ -310,7 +341,7 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
 
     let address_str = a.render_string()?;
     let address_pool_info = get_address_pool_info(r.clone()).await?
-        .filter(|p| p.btc_address == address_str || p.rdg_address == address_str);
+        .filter(|p| p.addresses.contains(&address_str));
 
     let detailed = DetailedAddress {
         address: address_str,

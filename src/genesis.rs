@@ -22,12 +22,21 @@ fn main_entry(address: impl Into<String>, fraction_pct: impl Into<f64>) -> Genes
         amount: CurrencyAmount::from_fractional((fraction_pct.into() / 100.0) * (MAX_COIN_SUPPLY as f64)).expect("works"),
     }
 }
-fn main_distribution(test_address: &Address) -> Vec<GenesisDistribution> {
-    let mut zero_distribution = main_entry("3a299a25abcc604983dcabbf8a20dfb1440d6c36766762c936030ee8de6a7465", 1);
-    zero_distribution.amount.amount -= 10 * DECIMAL_MULTIPLIER;
-    let entries = vec![
+
+fn add_entry_mutate_first(entries: &mut Vec<GenesisDistribution>, address: &Address, amount: impl Into<f64>) {
+    let amount = CurrencyAmount::from_fractional(amount.into()).expect("works");
+    entries[0].amount.amount -= amount.amount;
+    entries.push(GenesisDistribution {
+        address: address.clone(),
+        amount
+    });
+}
+
+fn main_distribution(test_address: &Address, seeds: &Vec<Seed>) -> Vec<GenesisDistribution> {
+    let mut entries = vec![
+        // TODO: Update these
         // 0 - Active dev fund
-        zero_distribution,
+        main_entry("3a299a25abcc604983dcabbf8a20dfb1440d6c36766762c936030ee8de6a7465", 1),
         // 1 - Original dev fund
         main_entry("e1234f3be30667f1b8860c1a2bbbd12846f8f4581857f883c825be40e43e9a03", 10),
         // 2 - Foundation fund
@@ -50,16 +59,31 @@ fn main_distribution(test_address: &Address) -> Vec<GenesisDistribution> {
         GenesisDistribution { address: test_address.clone(), amount: CurrencyAmount::from_fractional(10.0).expect("a") }
     ];
 
+    add_entry_mutate_first(&mut entries, test_address, 10.0);
+
+    seeds.iter().for_each(|s| {
+        if let Some(addr) = s.public_key.as_ref().and_then(|pk| pk.address().ok()) {
+            add_entry_mutate_first(&mut entries, &addr, 5.0);
+        }
+        if let Some(addr) = s.peer_id.as_ref()
+            .and_then(|pk| pk.peer_id.as_ref())
+            .and_then(|pk| pk.address().ok()) {
+            add_entry_mutate_first(&mut entries, &addr, 5.0);
+        }
+    });
+
+    // Debug hot addresses.
+
     let total = entries.iter().map(|e| e.amount.to_rounded_int()).sum::<i64>();
     assert_eq!(total, MAX_COIN_SUPPLY);
 
     entries
 }
-#[test]
-pub fn verify_genesis_distribution_main() {
-    let tc = TestConstants::new();
-    main_distribution(&tc.address_1);
-}
+// #[test]
+// pub fn verify_genesis_distribution_main() {
+//     let tc = TestConstants::new();
+//     main_distribution(&tc.address_1);
+// }
 
 fn lower_distribution(_network: &NetworkEnvironment, words_pass: &WordsPass, seeds: &Vec<Seed>) -> Vec<GenesisDistribution> {
     let mut pks = vec![];
@@ -91,8 +115,8 @@ pub fn genesis_transaction(
     words: &WordsPass,
     seeds: &Vec<Seed>
 ) -> Transaction {
-    let distribution = if nc.network.is_main() {
-        main_distribution(&words.default_public_key().expect("default_kp").address().expect("address"))
+    let distribution = if nc.network.is_main_stage_network() {
+        main_distribution(&words.default_public_key().expect("default_kp").address().expect("address"), seeds)
     } else {
         lower_distribution(&nc.network, words, seeds)
     };

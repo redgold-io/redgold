@@ -6,7 +6,7 @@ use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transactio
 use redgold_schema::util;
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::relay::Relay;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::process_transaction::{ProcessTransactionMessage, RequestProcessor};
 use redgold_schema::observability::errors::Loggable;

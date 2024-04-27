@@ -17,6 +17,7 @@ use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::config_data::ConfigData;
 use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
 use crate::api::public_api::PublicClient;
 use crate::util::cli::args::RgArgs;
@@ -145,6 +146,7 @@ impl Default for NodeInfoConfig {
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
+    pub config_data: ConfigData,
     // User supplied params
     // TODO: Should this be a class Peer_ID with a multihash of the top level?
     // TODO: Review all schemas to see if we can switch to multiformats types.
@@ -297,6 +299,10 @@ impl NodeConfig {
             peer_id: Some(self.peer_id.clone()),
             public_key: Some(self.public_key()),
         }
+    }
+
+    pub fn is_self_seed(&self) -> bool {
+        self.seeds_now_pk().iter().any(|pk| pk == &self.public_key())
     }
 
     pub fn peer_id(&self) -> PeerId {
@@ -513,6 +519,7 @@ impl NodeConfig {
 
     pub fn default() -> Self {
         Self {
+            config_data: Default::default(),
             peer_id: Default::default(),
             public_key: structs::PublicKey::default(),
             mnemonic_words: "".to_string(),

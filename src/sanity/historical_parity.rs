@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use rocket::form::validate::Contains;
-use redgold_schema::{EasyJson, EasyJsonDeser};
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::proto_serde::ProtoHashable;
-use redgold_schema::structs::{Hash, Transaction, TransactionEntry, UtxoEntry, UtxoId};
+use redgold_schema::structs::{Hash, Transaction, UtxoEntry, UtxoId};
 use redgold_schema::util::ToTimeString;
 use crate::core::relay::Relay;
 use crate::util;
@@ -91,7 +90,8 @@ async fn historical_parity_debug_cached() {
             let is_swap = o.is_swap();
             let is_liquidity = o.is_liquidity();
             let data = o.data.clone().expect("");
-            let ext = data.external_transaction_id.json_or();
+            let ext = o.response().and_then(|r| r.swap_fulfillment.as_ref())
+                .and_then(|r| r.external_transaction_id.as_ref()).json_or();
 
             println!("{valid_utxo} valid {output_addr} amount {:?} is_swap {is_swap} is_liquidity {is_liquidity} external_id {ext} child {child}", amt);
         }

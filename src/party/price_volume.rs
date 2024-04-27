@@ -1,6 +1,7 @@
 use rocket::serde::{Deserialize, Serialize};
 use log::error;
-use crate::multiparty_gg20::watcher::DUST_LIMIT;
+use crate::party::central_price::DUST_LIMIT;
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PriceVolume {
@@ -18,7 +19,7 @@ impl PriceVolume {
         scale: f64
     ) -> Vec<PriceVolume> {
 
-        if available_volume < DUST_LIMIT {
+        if available_volume < DUST_LIMIT as u64 {
             return vec![];
         }
 
@@ -124,19 +125,19 @@ impl PriceVolume {
         let mut dust_trigger = false;
 
         for pv in price_volumes.iter_mut() {
-            if pv.volume < DUST_LIMIT {
+            if pv.volume < DUST_LIMIT as u64 {
                 dust_trigger = true;
             }
         }
 
         if dust_trigger {
             let mut new_price_volumes = vec![];
-            let divs = (available_volume / DUST_LIMIT) as usize;
+            let divs = (available_volume / DUST_LIMIT as u64) as usize;
             for (i,pv) in price_volumes.iter_mut().enumerate() {
                 if i < divs {
                     new_price_volumes.push(PriceVolume {
                         price: pv.price,
-                        volume: DUST_LIMIT
+                        volume: DUST_LIMIT as u64
                     });
                 }
             }

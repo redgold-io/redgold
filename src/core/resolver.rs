@@ -14,7 +14,7 @@ use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
 // use crate::genesis::create_test_genesis_transaction;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoHashable;

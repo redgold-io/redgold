@@ -1,13 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StructMetadata, SupportedCurrency, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, LiquidityDeposit, LiquidityRequest, LiquidityWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
 use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
-use num_bigint::BigInt;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use crate::fee_validator::MIN_RDG_SATS_FEE;
 use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 use crate::proto_serde::ProtoHashable;
 use crate::structs::TransactionType;
@@ -152,6 +150,65 @@ impl Transaction {
     pub fn is_swap(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_swap()).count() > 0
     }
+
+    pub fn output_data(&self) -> impl Iterator<Item=&StandardData> {
+        self.outputs.iter().filter_map(|o| o.data.as_ref())
+    }
+
+    pub fn output_request(&self) -> impl Iterator<Item=&StandardRequest> {
+        self.output_data().map(|d| d.standard_request.as_ref()).flatten()
+    }
+
+    pub fn output_response(&self) -> impl Iterator<Item=&StandardResponse> {
+        self.output_data().map(|d| d.standard_response.as_ref()).flatten()
+    }
+
+    pub fn swap_request(&self) -> Option<&SwapRequest> {
+        self.output_request().filter_map(|d| d.swap_request.as_ref()).next()
+    }
+
+    pub fn swap_destination(&self) -> Option<&Address> {
+        self.swap_request().and_then(|r| r.destination.as_ref())
+    }
+
+    pub fn stake_request(&self) -> Option<&LiquidityRequest> {
+        self.output_request().filter_map(|d| d.liquidity_request.as_ref()).next()
+    }
+
+    pub fn stake_deposit_request(&self) -> Option<&LiquidityDeposit> {
+        self.stake_request().and_then(|d| d.deposit.as_ref())
+    }
+
+    pub fn stake_withdrawal_request(&self) -> Option<&LiquidityWithdrawal> {
+        self.stake_request().and_then(|d| d.withdrawal.as_ref())
+    }
+
+    pub fn stake_deposit_destination(&self) -> Option<&Address> {
+        self.stake_deposit_request()
+            .and_then(|d| d.deposit.as_ref())
+            .and_then(|d| d.address.as_ref())
+    }
+
+    pub fn stake_destination(&self) -> Option<&Address> {
+        self.stake_deposit_destination().or(self.stake_withdrawal_destination())
+    }
+
+    pub fn stake_withdrawal_destination(&self) -> Option<&Address> {
+        self.stake_withdrawal_request()
+            .and_then(|d| d.destination.as_ref())
+    }
+
+    pub fn swap_destination_currency(&self) -> Option<SupportedCurrency> {
+        self.swap_destination().and_then(|a| a.currency.as_ref())
+            .and_then(|c| SupportedCurrency::from_i32(c.clone()))
+    }
+
+    pub fn external_destination_currency(&self) -> Option<SupportedCurrency> {
+        self.swap_destination().or(self.stake_destination())
+            .and_then(|a| a.currency.as_ref())
+            .and_then(|c| SupportedCurrency::from_i32(c.clone()))
+    }
+
     pub fn is_liquidity(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_liquidity()).count() > 0
     }
@@ -300,7 +357,8 @@ impl Transaction {
             })
     }
 
-    pub fn non_remainder_amount(&self) -> i64 {
+    // TODO: Fix this, it's wrong
+    pub fn non_remainder_amount_rdg(&self) -> i64 {
         let inputs = self.input_address_set();
         self.outputs.iter().filter_map(|o| {
             o.address.as_ref()
@@ -326,23 +384,21 @@ impl Transaction {
     }
 
     pub fn first_output_external_txid(&self) -> Option<&ExternalTransactionId> {
-        self.outputs
-            .iter()
-            .filter_map(|o| o.data.as_ref())
-            .filter_map(|d| d.external_transaction_id.as_ref())
-            .next()
+        self.output_external_txids().next()
     }
     pub fn output_external_txids(&self) -> impl Iterator<Item = &ExternalTransactionId> {
-        self.outputs
-            .iter()
-            .filter_map(|o| o.data.as_ref())
+        self.output_response()
+            .filter_map(|r| r.swap_fulfillment.as_ref())
             .filter_map(|d| d.external_transaction_id.as_ref())
     }
 
-    pub fn output_amount_of(&self, address: &Address) -> i64 {
+    pub fn output_rdg_amount_of(&self, address: &Address) -> i64 {
         self.outputs
             .iter()
-            .filter_map(|o| o.address.as_ref().filter(|&a| a == address).and_then(|_| o.opt_amount()))
+            .filter_map(|o| o.address.as_ref().filter(|&a| a == address)
+                .and_then(|_| o.opt_amount_typed()))
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .map(|a| a.amount)
             .sum::<i64>()
     }
 
@@ -350,6 +406,14 @@ impl Transaction {
         self.outputs
             .iter()
             .filter_map(|o| o.address.as_ref().filter(|&a| a == address).map(|_| o))
+            .collect_vec()
+    }
+
+    pub fn output_of_with_index(&self, address: &Address) -> Vec<(usize, &structs::Output)> {
+        self.outputs
+            .iter()
+            .enumerate()
+            .filter_map(|(index, o)| o.address.as_ref().filter(|&a| a == address).map(|_| (index, o)))
             .collect_vec()
     }
 
@@ -399,17 +463,30 @@ impl Transaction {
         })
     }
 
-    pub fn liquidity_of(&self, a: &Address) -> Option<(CurrencyAmount, &LiquidityRequest)> {
-        let output_contract = self.output_of(a).iter().next().cloned();
-        let amount = output_contract
-            .and_then(|o| o.data.as_ref().and_then(|d| d.amount.clone()));
-        self.outputs.iter().filter(|o| o.is_liquidity()).next()
-            .and_then(|o| o.data.as_ref().and_then(|d| d.liquidity_request.as_ref()))
-            .and_then(|o| {
-            amount.map(|a| {
-                (a, o)
-            })
-        })
+    pub fn output_index(&self, output: &Output) -> RgResult<i64> {
+        let index = self.outputs.iter().position(|o| o == output);
+        index.safe_get_msg("Missing output index").map(|i| i.clone() as i64)
+    }
+
+    pub fn utxo_id_at(&self, index: usize) -> RgResult<UtxoId> {
+        let hash = self.hash_or();
+        let output = self.outputs.get(index);
+        output.safe_get_msg("Missing output")?;
+        let utxo_id = UtxoId::new(&hash, index as i64);
+        Ok(utxo_id)
+    }
+
+    pub fn liquidity_of(&self, a: &Address) -> Vec<(UtxoId, &LiquidityRequest)> {
+        self.output_of_with_index(a)
+            .iter()
+            .flat_map(|(u, o)|
+                self.utxo_id_at(*u).ok().and_then(|utxo_id|
+                    o.data.as_ref()
+                        .and_then(|d| d.standard_request.as_ref())
+                        .and_then(|d| d.liquidity_request.as_ref())
+                        .map(|l| (utxo_id, l))
+            ))
+            .collect_vec()
     }
 
     pub fn total_output_amount(&self) -> i64 {
@@ -664,98 +741,6 @@ impl Transaction {
 
 // #[derive(Clone)]
 // pub struct LiquidityInfo
-
-impl CurrencyAmount {
-
-    pub fn amount_i64(&self) -> i64 {
-        self.amount
-    }
-    pub fn from_fractional(a: impl Into<f64>) -> Result<Self, ErrorInfo> {
-        let a = a.into();
-        if a <= 0f64 {
-            Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
-        }
-        if a > MAX_COIN_SUPPLY as f64 {
-            Err(ErrorInfo::error_info("Invalid transaction amount"))?
-        }
-        let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
-        let mut a = CurrencyAmount::default();
-        a.amount = amount;
-        Ok(a)
-    }
-
-    pub fn currency_or(&self) -> SupportedCurrency {
-        self.currency
-            .and_then(|c| SupportedCurrency::from_i32(c))
-            .unwrap_or(SupportedCurrency::Redgold)
-    }
-
-    pub fn min_fee() -> Self {
-        Self::from(MIN_RDG_SATS_FEE)
-    }
-
-    pub fn bigint_amount(&self)  {
-        todo!()
-    }
-    pub fn to_fractional(&self) -> f64 {
-        let currency = self.currency
-            .and_then(|c| SupportedCurrency::from_i32(c))
-            .unwrap_or(SupportedCurrency::Redgold);
-        // match currency {
-        //     SupportedCurrency::Usdc => {}
-        //     SupportedCurrency::Bitcoin => {}
-        //     SupportedCurrency::Ethereum => {
-        //
-        //     }
-        //     SupportedCurrency::Redgold => {
-        //         self.to_fractional_std()
-        //     }
-        // }
-        self.to_fractional_std()
-    }
-
-    fn to_fractional_std(&self) -> f64 {
-        (self.amount as f64) / (DECIMAL_MULTIPLIER as f64)
-    }
-
-    pub fn to_rounded_int(&self) -> i64 {
-        self.to_fractional() as i64
-    }
-    pub fn from(amount: i64) -> Self {
-        let mut a = Self::default();
-        a.amount = amount;
-        a
-    }
-
-    pub fn from_string(amount: String) -> Self {
-        let mut a = Self::default();
-        a.string_amount = Some(amount);
-        a
-    }
-
-
-    pub fn from_btc(amount: i64) -> Self {
-        let mut a = Self::from(amount);
-        a.currency = Some(SupportedCurrency::Bitcoin as i32);
-        a
-    }
-    pub fn from_eth_bigint_string(amount: String) -> Self {
-        let mut a = Self::from_string(amount);
-        a.currency = Some(SupportedCurrency::Ethereum as i32);
-        a
-    }
-    pub fn from_rdg(amount: i64) -> Self {
-        let mut a = Self::from(amount);
-        a.currency = Some(SupportedCurrency::Redgold as i32);
-        a
-    }
-
-    pub fn from_float_string(str: &String) -> Result<Self, ErrorInfo> {
-        let amount = str.parse::<f64>()
-            .error_info("Invalid transaction amount")?;
-        Self::from_fractional(amount)
-    }
-}
 
 
 // TODO: ove into standard data

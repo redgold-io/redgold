@@ -1,10 +1,11 @@
 use sqlx::Row;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, Transaction};
-use redgold_schema::{EasyJsonDeser, ErrorInfoContext, RgResult};
+use redgold_schema::{ErrorInfoContext, RgResult};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
-use crate::schema::json;
+use redgold_schema::helpers::easy_json::json;
 use serde::{Deserialize, Serialize};
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::local_stored_state::LocalStoredState;
 use redgold_schema::proto_serde::ProtoSerde;
 

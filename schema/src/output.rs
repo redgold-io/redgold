@@ -1,5 +1,5 @@
 
-use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData};
+use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData, StandardRequest, StandardResponse, SwapFulfillment};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, RgResult, SafeOption};
 
@@ -109,8 +109,20 @@ impl Output {
         self.is_node_metadata() || self.is_peer_data()
     }
 
+    pub fn request(&self) -> Option<&StandardRequest> {
+        self.data.as_ref().and_then(|d| d.standard_request.as_ref())
+    }
+
+    pub fn response(&self) -> Option<&StandardResponse> {
+        self.data.as_ref().and_then(|d| d.standard_response.as_ref())
+    }
+
+    pub fn swap_fulfillment(&self) -> Option<&SwapFulfillment> {
+        self.response().and_then(|r| r.swap_fulfillment.as_ref())
+    }
+
     pub fn is_liquidity(&self) -> bool {
-        self.data.as_ref().and_then(|c| c.liquidity_request.as_ref()).is_some()
+        self.request().and_then(|c| c.liquidity_request.as_ref()).is_some()
     }
 
     pub fn is_fee(&self) -> bool {

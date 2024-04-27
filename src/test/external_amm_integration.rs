@@ -3,7 +3,8 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJson, SafeOption};
+use redgold_schema::SafeOption;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
@@ -98,7 +99,7 @@ pub async fn send_test_rdg_btc_tx_withdrawal() {
         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
             .utxo_entries.clone();
 
-        let btc_addr = pk.to_bitcoin_address_typed(&network)?;
+        let btc_addr = pk.to_bitcoin_address_typed(&network).expect("btc address");
 
         let amount = CurrencyAmount::from_fractional(amount).expect("");
         let tb = TransactionBuilder::new(&nc)
@@ -106,7 +107,7 @@ pub async fn send_test_rdg_btc_tx_withdrawal() {
             .with_utxos(&utxos).expect("utxos")
             .with_output(&amm_addr, &amount)
             .with_last_output_swap_type()
-            .with_last_output_swap_destination(&btc_addr)
+            .with_last_output_swap_destination(&btc_addr).expect("swap")
             .build().expect("build")
             .sign(&keypair).expect("sign");
 

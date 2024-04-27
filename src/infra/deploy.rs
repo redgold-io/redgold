@@ -12,13 +12,15 @@ use itertools::Itertools;
 
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{EasyJson, EasyJsonDeser, ErrorInfoContext, RgResult, structs};
+use redgold_schema::{ErrorInfoContext, RgResult, structs};
 use redgold_schema::constants::default_node_internal_derivation_path;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::Server;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
 use redgold_schema::util::cmd::{run_bash_async, run_powershell_async};
+use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
@@ -612,7 +614,7 @@ pub async fn derive_mnemonic_and_peer_id(
             result?.peer_id.expect("pid")
         };
         pubkey = Some(pk.clone());
-        pid_hex = pk.hex();
+        pid_hex = PeerId::from_pk(pk).hex();
     }
     if !peer_id_tx.contains_key(&pid_hex) {
 
@@ -843,6 +845,9 @@ pub async fn default_deploy(
             let mut this_hm = hm.clone();
             // TODO: Change to _main
             if ss.index == 0 && node_config.opts.development_mode {
+                if node_config.opts.development_mode_main {
+                    this_hm.insert("REDGOLD_ENABLE_PARTY_MODE".to_string(), "true".to_string());
+                };
                 this_hm.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
             }
             if node_config.opts.development_mode_main {

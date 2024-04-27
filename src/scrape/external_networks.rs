@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use bdk::bitcoin::PublicKey;
+use serde::{Deserialize, Serialize};
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::{RgResult, structs};
@@ -13,14 +14,17 @@ pub struct ExternalNetworkScraper {
     relay: Relay
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ExternalNetworkData {
     pub pk: structs::PublicKey,
     pub transactions: Vec<ExternalTimedTransaction>,
     pub balance: CurrencyAmount,
-    pub currency: SupportedCurrency
+    pub currency: SupportedCurrency,
+    pub max_ts: Option<u64>,
+    pub max_block: Option<u64>
 }
 
+// Fut streaming impl here, unused now.
 impl ExternalNetworkScraper {
 
     pub fn new(relay: &Relay) -> Self {

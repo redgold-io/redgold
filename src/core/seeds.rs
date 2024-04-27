@@ -1,6 +1,6 @@
 use bdk::bitcoin::secp256k1::PublicKey;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::seeds::get_seeds;
+use redgold_schema::seeds::get_all_hardcoded_seeds;
 use redgold_schema::structs::{NetworkEnvironment, TrustData};
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
@@ -9,7 +9,7 @@ use crate::node_config::NodeConfig;
 #[ignore]
 #[tokio::test]
 pub async fn debug_get_seeds_info() {
-    let s = get_seeds();
+    let s = get_all_hardcoded_seeds();
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
     for si in s {

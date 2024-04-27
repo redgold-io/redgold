@@ -20,12 +20,14 @@ use crate::mp_store::MultipartyStore;
 use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeOption, structs, util};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs, util};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
 use redgold_schema::util::machine_info::{available_bytes, cores_total, file_size_bytes, memory_total_kb};
+use crate::price_time::PriceTimeStore;
 
 use crate::schema::structs::{
     Address, ErrorInfo,
@@ -46,6 +48,7 @@ pub struct DataStore {
     pub ctx: DataStoreContext,
     pub state: StateStore,
     pub utxo: UtxoStore,
+    pub price_time: PriceTimeStore
 }
 
 impl DataStore {
@@ -432,6 +435,7 @@ WHERE
             multiparty_store: MultipartyStore { ctx: ctx.clone() },
             observation: ObservationStore { ctx: ctx.clone() },
             state: StateStore { ctx: ctx.clone() },
+            price_time: PriceTimeStore { ctx },
         }
     }
 

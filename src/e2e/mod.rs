@@ -21,7 +21,7 @@ use redgold_keys::transaction_support::TransactionSupport;
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::transaction::amount_to_raw_amount;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;

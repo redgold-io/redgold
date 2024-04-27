@@ -1,7 +1,8 @@
 use log::{error, Level};
 use tracing::{event, Event, Metadata};
 use tracing::field::FieldSet;
-use crate::{EasyJson, HashClear, RgResult, structs};
+use crate::{HashClear, RgResult, structs};
+use crate::helpers::easy_json::EasyJson;
 use crate::structs::{ErrorDetails, ErrorInfo, ResponseMetadata};
 
 pub fn convert_log_level(level: String) -> log::Level {

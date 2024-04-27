@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use crate::structs::{PartyInfo, PublicKey};
-use crate::util;
+use crate::{structs, util};
 
 #[derive(Clone)]
 pub struct AllParties {
@@ -15,6 +15,13 @@ impl AllParties {
     pub fn new(parties: Vec<PartyInfo>) -> Self {
         let mut grouped = HashMap::new();
         for p in &parties {
+            let usable = p.initiate.as_ref()
+                .map(|p| p.purpose())
+                .filter(|p| p != &structs::PartyPurpose::DebugPurpose)
+                .is_some();
+            if !usable {
+                continue
+            }
             if let Some(host_key) = p.host_public_key() {
                 grouped.entry(host_key.clone()).or_insert_with(Vec::new).push(p.clone());
             }

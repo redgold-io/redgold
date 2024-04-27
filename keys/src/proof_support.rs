@@ -1,8 +1,7 @@
-use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use itertools::Itertools;
-use log::info;
-use redgold_schema::{EasyJson, error_info, error_message, from_hex, RgResult, SafeOption, signature_data, structs};
+use redgold_schema::{error_info, error_message, from_hex, RgResult, SafeOption, signature_data, structs};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof};
@@ -127,24 +126,25 @@ impl ProofSupport for Proof {
 #[test]
 fn verify_single_signature_proof() {
     let tc = TestConstants::new();
-    let proof = Proof::new(&tc.hash_vec.clone().into(), &tc.secret, &tc.public);
-    assert!(proof.verify(&Hash::new_from_proto(tc.hash_vec)).is_ok());
+
+    let proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
+    assert!(proof.verify(&tc.rhash_1).is_ok());
 }
 
 #[test]
 fn verify_invalid_single_signature_proof() {
     let tc = TestConstants::new();
-    let mut proof = Proof::new(&tc.hash_vec.clone().into(), &tc.secret, &tc.public);
+    let mut proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
     proof.signature = signature_data(tc.hash_vec.clone());
-    assert!(proof.verify( &Hash::new_from_proto(tc.hash_vec)).is_err());
+    assert!(proof.verify( &tc.rhash_1).is_err());
 }
 
 #[test]
 fn verify_invalid_key_single_signature_proof() {
     let tc = TestConstants::new();
-    let mut proof = Proof::new(&tc.hash_vec.clone().into(), &tc.secret, &tc.public);
+    let mut proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
     proof.public_key = public_key_ser(&tc.public2);
-    assert!(proof.verify(&Hash::new_from_proto(tc.hash_vec)).is_err());
+    assert!(proof.verify(&tc.rhash_1).is_err());
 }
 
 
@@ -152,6 +152,7 @@ pub trait PublicKeySupport {
     fn validate(&self) -> Result<&Self, ErrorInfo>;
     fn from_direct_ecdsa_hex<S: Into<String>>(hex: S) -> Result<structs::PublicKey, ErrorInfo>;
     fn to_all_addresses(&self) -> RgResult<Vec<Address>>;
+    fn to_all_addresses_for_network(&self, network: &NetworkEnvironment) -> RgResult<Vec<Address>>;
 }
 
 impl PublicKeySupport for structs::PublicKey {
@@ -175,5 +176,13 @@ impl PublicKeySupport for structs::PublicKey {
         let btc_main = self.to_bitcoin_address_typed(&NetworkEnvironment::Main)?;
         Ok(vec![default, eth, btc_test, btc_main])
     }
+
+    fn to_all_addresses_for_network(&self, network: &NetworkEnvironment) -> RgResult<Vec<Address>> {
+        let default = self.address()?;
+        let eth = self.to_ethereum_address_typed()?;
+        let btc = self.to_bitcoin_address_typed(&network)?;
+        Ok(vec![default, eth, btc])
+    }
+
 }
 

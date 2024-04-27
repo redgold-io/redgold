@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use log::info;
 use metrics::counter;
-use redgold_schema::{EasyJson, RgResult, SafeOption};
+use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, Transaction};

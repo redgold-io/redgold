@@ -1,6 +1,6 @@
 use dirs::home_dir;
 use redgold_data::data_store::DataStore;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::api::explorer::handle_explorer_recent;
 use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;

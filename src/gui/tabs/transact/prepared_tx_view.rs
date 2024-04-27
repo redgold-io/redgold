@@ -2,7 +2,7 @@ use eframe::egui;
 use eframe::egui::Ui;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::EasyJsonDeser;
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::util::lang_util::JsonCombineResult;

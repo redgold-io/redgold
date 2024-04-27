@@ -1,11 +1,12 @@
 use itertools::Itertools;
 use redgold_data::data_store::DataStore;
-use redgold_schema::{bytes_data, EasyJson, error_info, RgResult, SafeOption, structs};
+use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::tx_schema_validate::SchemaValidationSupport;
 use crate::node_config::NodeConfig;
@@ -266,14 +267,16 @@ impl TransactionBuilder {
     }
 
     // Should this be hex or bytes data?
-    pub fn with_last_output_deposit_swap_fulfillment(&mut self, btc_txid: String) -> &mut Self {
-        if let Some(o) = self.transaction.outputs.last_mut() {
-            if let Some(d) = o.data.as_mut() {
-                d.external_transaction_id = Some(structs::ExternalTransactionId {identifier: btc_txid.clone()});
-            }
-        }
-        self.with_last_output_swap_type();
-        self
+    pub fn with_last_output_deposit_swap_fulfillment(&mut self, txid: ExternalTransactionId) -> RgResult<&mut Self> {
+        let d = self.last_output_data().ok_or(error_info("Missing output"))?;
+
+        let mut res = StandardResponse::default();
+        let mut sw = structs::SwapFulfillment::default();
+        let mut ext = ExternalTransactionId::default();
+        sw.external_transaction_id = Some(txid);
+        res.swap_fulfillment = Some(sw);
+        d.standard_response = Some(res);
+        Ok(self)
     }
 
     pub fn with_last_output_type(&mut self, output_type: OutputType) -> &mut Self {
@@ -291,16 +294,29 @@ impl TransactionBuilder {
         self.transaction.outputs.last_mut().and_then(|o| o.data.as_mut())
     }
 
+    pub fn last_output_request(&mut self) -> Option<&mut StandardRequest> {
+        self.last_output_data().and_then(|d| d.standard_request.as_mut())
+    }
+
     pub fn with_last_output_swap_type(&mut self) -> &mut Self {
         let contract_type = structs::StandardContractType::Swap;
         self.with_last_output_contract_type(contract_type);
         self
     }
 
+    pub fn with_last_output_request(&mut self, req: StandardRequest) -> &mut Self {
+        if let Some(o) = self.transaction.outputs.last_mut() {
+            if let Some(d) = o.data.as_mut() {
+                d.standard_request = Some(req);
+            }
+        }
+        self
+    }
+
     pub fn with_last_output_swap_destination(&mut self, destination: &Address) -> RgResult<&mut Self> {
-        let swap_request = structs::SwapRequest::default();
+        let mut swap_request = structs::SwapRequest::default();
         swap_request.destination = Some(destination.clone());
-        self.last_output_data().ok_msg("Missing output")?.swap_request = swap_request
+        self.last_output_request().ok_msg("Missing output")?.swap_request = Some(swap_request);
         Ok(self)
     }
 
@@ -328,7 +344,9 @@ impl TransactionBuilder {
         lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_fractional(upper).expect("works"));
         deposit.liquidity_ranges = vec![lr];
         lq.deposit = Some(deposit);
-        d.liquidity_request = Some(lq);
+        let mut sr = StandardRequest::default();
+        sr.liquidity_request = Some(lq);
+        d.standard_request = Some(sr);
         o.data = Some(d);
         self.transaction.outputs.push(o);
         self

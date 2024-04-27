@@ -224,7 +224,6 @@ message VersionInfo {
 
 message PeerId {
   PublicKey peer_id = 1;
-  repeated Proof known_proof = 3;
 }
 
 // All of this is optional, used for external verifications
@@ -297,9 +296,22 @@ message AbridgedNodeMetadata {
   PartitionInfo partition_info = 2;
 }
 
+message PortfolioRequest {
+  PortfolioInfo portfolio_info = 1;
+}
+
 
 message StandardRequest {
   StateSelector selector = 1;
+  // Staking request, designed for use with the native AMM/Portfolio functions.
+  LiquidityRequest liquidity_request = 2;
+  // Portfolio information, used for updating the current 'target' state of a portfolio
+  PortfolioRequest portfolio_request = 3;
+  // Used for collateralized loan outputs
+  CollateralizedLoanRequest collateralized_loan = 4;
+  // Used for swaps
+  SwapRequest swap_request = 5;
+  DepositRequest deposit_request = 6;
 }
 
 message SchemaDef {
@@ -340,7 +352,7 @@ message CollateralizedLoanCall {
 message CollateralizedLoanRepayment {}
 
 
-message CollateralizedLoanData {
+message CollateralizedLoanRequest {
     CollateralizedLoanInitiation initiation = 1;
 }
 
@@ -349,6 +361,26 @@ message SwapRequest {
   // TODO: Limit parameters here for max price to issue at
 }
 
+message SwapFulfillment {
+  // A bitcoin txid for example
+  ExternalTransactionId external_transaction_id = 25;
+}
+
+message DepositRequest {
+  // The address to watch for deposits
+  Address address = 1;
+  // Proof that you own this external address
+  Proof proof = 2;
+  // The amount expected to be deposited
+  CurrencyAmount amount = 3;
+  // The desired spend address for the deposit
+  Address spend_address = 4;
+}
+
+message StandardResponse {
+  SwapFulfillment swap_fulfillment = 1;
+  CollateralizedLoanFulfillment collateralized_loan_fulfillment = 2;
+}
 // Generic data structure designed to hold arbitrary data in a common format.
 // This should be considered supplementary to using a regular schema, not a
 // complete substitute.
@@ -381,10 +413,7 @@ message StandardData {
   // Contract style response, similar to above, but specifically typed to correspond to a 'default' schema driven
   // request common to all contracts and available automatically in the SDK.
   StandardRequest standard_request = 19;
-  // Staking request, designed for use with the native AMM/Portfolio functions.
-  LiquidityRequest liquidity_request = 20;
-  // Portfolio information, used for updating the current 'target' state of a portfolio
-  PortfolioInfo portfolio_info = 21;
+  StandardResponse standard_response = 20;
   // Schema definition for the data, used for parsing and validation
   SchemaDef schema_def = 22;
   // Generic bytes data, used for storing arbitrary data
@@ -392,12 +421,7 @@ message StandardData {
   // For eUTXO style contracts, the hash of all state information aggregated from initial state origin.
   // Can be re-calculated.
   Hash aggregate_state_hash = 24;
-  // A bitcoin txid for example
-  ExternalTransactionId external_transaction_id = 25;
-  // Used for collateralized loan outputs
-  CollateralizedLoanData collateralized_loan_data = 26;
-  // Used for swaps
-  SwapRequest swap_request = 27;
+
 }
 
 // Native staking range to provide liquidity within. Trades cannot be executed outside of this range
@@ -425,6 +449,7 @@ message LiquidityWithdrawal {
 message LiquidityDeposit {
   // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within
   repeated LiquidityRange liquidity_ranges = 1;
+  DepositRequest deposit = 2;
 }
 
 // Request to update external liquidity to a native pool
@@ -1110,13 +1135,20 @@ message AboutNodeResponse {
 }
 
 enum AddressType {
+  // Original default address type, SHA3-224 checksum of the public key, along with a checksum suffix
+  // 28 bytes + 4 byte checksum = 32 bytes for the direct information, proto ser form is used to add version info
+  // with another 4 bytes
   Sha3_224_Checksum_Public = 0;
-  MULTIHASH_KEYHASH = 1;
+  // Direct Bitcoin address string embedded as UTF bytes
   Bitcoin_External_String = 2;
+  // This is intended to be used with RSV signature verification.
   ETHEREUM_COMPAT_ADDRESS = 3;
+  // Not used anywhere, but could be used for direct public key addresses
   PUBLIC_KEY_DIRECT_ADDRESS = 4;
+  // Unclear if needed except for debugging
   UNKNOWN_ADDRESS_TYPE = 5;
   SCRIPT_HASH = 6;
+  // Direct Ethereum string hash reference with embedded string upper/lower checksum.
   Ethereum_External_String = 7;
 }
 
@@ -1271,10 +1303,16 @@ message ControlMultipartySigningResponse {
   MultipartyIdentifier identifier = 2;
 }
 
+enum PartyPurpose {
+  StandardPurpose = 0;
+  DebugPurpose = 1;
+}
+
 message InitiateMultipartyKeygenRequest {
   MultipartyIdentifier identifier = 1;
   int64 time = 2;
   repeated PublicKey prior_keys = 3;
+  PartyPurpose purpose = 4;
 }
 
 message InitiateMultipartyKeygenResponse {
@@ -1286,11 +1324,18 @@ message InitiateMultipartySigningResponse{
   InitiateMultipartySigningRequest initial_request = 2;
 }
 
+message PartySigningValidation {
+  optional string json_payload = 1;
+  SupportedCurrency currency = 2;
+  Transaction transaction = 3;
+}
+
 message InitiateMultipartySigningRequest {
   MultipartyIdentifier identifier = 1;
   RoomId signing_room_id = 2;
   repeated PublicKey signing_party_keys = 3;
   BytesData data_to_sign = 4;
+  PartySigningValidation party_signing_validation = 5;
 }
 
 
@@ -1406,10 +1451,12 @@ enum TransactionState {
 }
 
 enum SupportedCurrency {
-  Usdc = 0;
+  Redgold = 0;
   Bitcoin = 1;
   Ethereum = 2;
-  Redgold = 3;
+  Usd = 3;
+  Usdc = 4;
+  Usdt = 5;
 }
 
 
@@ -1501,6 +1548,14 @@ message LocalKeyShare {
   optional int32 version = 3;
 }
 
+enum PartyState {
+  Debug = 0;
+  Active = 1;
+  PendingRemoval = 2;
+  Inactive = 3;
+  Starting = 4;
+}
+
 message PartyInfo {
   InitiateMultipartyKeygenRequest initiate = 1;
   LocalKeyShare local_key_share = 2;
@@ -1508,8 +1563,22 @@ message PartyInfo {
   optional bool self_initiated = 4;
   optional int64 expired_time = 5;
   PublicKey successor_key = 6;
+  PartyState state = 7;
 }
 
 message PartyData {
-  PublicKey party_key = 1;
+  // Used for db storage for internal types.
+  optional string json_party_internal_data = 1;
+}
+
+enum PriceSource {
+  OkxMinute = 0;
+}
+
+message PriceTime {
+  Weighting price = 1;
+  int64 time = 2;
+  SupportedCurrency currency = 3;
+  PriceSource source = 4;
+  SupportedCurrency denomination = 5;
 }

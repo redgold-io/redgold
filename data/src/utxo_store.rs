@@ -15,7 +15,7 @@ pub struct UtxoStore {
     pub ctx: DataStoreContext
 }
 
-use crate::schema::json_or;
+use redgold_schema::helpers::easy_json::json_or;
 
 impl UtxoStore {
 

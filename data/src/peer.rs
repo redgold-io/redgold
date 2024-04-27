@@ -7,7 +7,7 @@ use itertools::Itertools;
 use metrics::{counter, gauge};
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::TestConstants;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PeerIdInfo;

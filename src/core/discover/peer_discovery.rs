@@ -16,7 +16,7 @@ use crate::core::relay::{Relay, SafeLock};
 use crate::core::stream_handlers::{IntervalFold, TryRecvForEach};
 use crate::e2e::run;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::util::lang_util::WithMaxLengthString;
