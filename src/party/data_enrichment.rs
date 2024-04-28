@@ -32,10 +32,7 @@ impl PartyInternalData {
     }
 
     pub fn not_debug(&self) -> bool {
-        self.party_info.initiate.as_ref()
-            .map(|p| p.purpose())
-            .filter(|p| p != &structs::PartyPurpose::DebugPurpose)
-            .is_some()
+        self.party_info.not_debug()
     }
 }
 

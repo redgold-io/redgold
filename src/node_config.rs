@@ -209,6 +209,10 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
+    pub fn tx_builder(&self) -> TransactionBuilder {
+        TransactionBuilder::new(self)
+    }
+
     pub fn seed_peer_addresses(&self) -> Vec<Address> {
         self.seeds_now().iter()
             .flat_map(|s| s.peer_id.as_ref())

@@ -6,7 +6,7 @@
 // use log::{error, info};
 //
 // use redgold_schema::{error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeOption, structs};
-// use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, LiquidityDeposit, MultipartyIdentifier, NetworkEnvironment, PartyId, PartyInfo, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, Weighting};
+// use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, StakeDeposit, MultipartyIdentifier, NetworkEnvironment, PartyId, PartyInfo, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, Weighting};
 // use crate::core::relay::Relay;
 // use crate::core::stream_handlers::IntervalFold;
 // use crate::multiparty_gg20::initiate_mp;
@@ -131,7 +131,7 @@
 // #[derive(Clone, Serialize, Deserialize)]
 // pub struct StakeDepositInfo {
 //     amount: CurrencyAmount,
-//     deposit: LiquidityDeposit,
+//     deposit: StakeDeposit,
 //     tx_hash: Hash
 // }
 //

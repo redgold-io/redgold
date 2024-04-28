@@ -46,7 +46,7 @@ impl LocalTestNodeContext {
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;
-            node_config.config_data.party_config_data.enable_party_mode = true;
+            node_config.opts.enable_party_mode = true;
         }
 
         node_config.seeds = seed.clone();
@@ -365,6 +365,7 @@ async fn e2e() {
     tokio::time::sleep(Duration::from_secs(2)).await;
     // let runtime = build_runtime(8, "e2e");
     // runtime.block_on(e2e_async()).expect("e2e");
+    result.expect("e2e");
 }
 
 
@@ -609,11 +610,45 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // Eth staking tests.
     if let Some((secret, kp)) = dev_ci_kp() {
         // First send some funds to pay for fees.
-        let config = start_node.node.relay.node_config.clone();
-        let txb = TransactionBuilder::new(&config);
-        // txb.with_utxo()
+        let rdg_address = kp.address_typed();
+        let response = submit.send_to(&rdg_address).await.expect("works");
+        let tx = response.transaction.expect("works");
+        let utxo = tx.to_utxo_address(&rdg_address);
+        assert!(!utxo.is_empty());
+
+        config.tx_builder()
+
+        let eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
+
+        let mut txb = TransactionBuilder::new(&config);
+        let exact_amount = EthWalletWrapper::test_amount_typed();
+        let tx_stake = txb.with_utxos(&utxo)?
+            .with_external_stake_usd_bounds(
+                None,
+                None,
+                &rdg_address,
+                &eth_addr,
+                &exact_amount
+            ).build().expect("works");
+
+
+
+        submit.send_tx(&tx_stake).await.expect("works");
+
 
         let eth = EthWalletWrapper::new(&secret, &environment).expect("works");
+        eth.send_tx()
+
+        let config = start_node.node.relay.node_config.clone();
+
+        let count = relay_start.external_network_shared_data.clone_read().await.iter().filter(|(k, v)| {
+            v.party_info.not_debug() && v.party_info.self_initiated()
+        }).count();
+        assert!(count > 0);
+
+
+        // txb.with_utxo()
+
 
     }
 
@@ -672,7 +707,7 @@ async fn data_store_test() {
 
 async fn do_signing(party: ControlMultipartyKeygenResponse, signing_data: Hash, client: ControlClient) -> Proof {
 
-        let vec1 = signing_data.vec();
+        let vec1 = signing_data.raw_bytes().expect("works");
         let vec = bytes_data(vec1.clone()).expect("");
         let mut signing_request = ControlMultipartySigningRequest::default();
         let mut init_signing = InitiateMultipartySigningRequest::default();

@@ -1,4 +1,4 @@
-use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, LiquidityDeposit, LiquidityWithdrawal, SupportedCurrency, Transaction, UtxoId};
+use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
 use redgold_schema::RgResult;
 use num_bigint::BigInt;
 use itertools::Itertools;
@@ -51,7 +51,7 @@ impl PartyEvents {
     }
 
     fn handle_external_liquidity_deposit(
-        &mut self, event: &AddressEvent, tx: &Transaction, deposit_inner: &DepositRequest, liquidity_deposit: &LiquidityDeposit,
+        &mut self, event: &AddressEvent, tx: &Transaction, deposit_inner: &DepositRequest, liquidity_deposit: &StakeDeposit,
         utxo_id: UtxoId) {
         if let Some(amt) = deposit_inner.amount.as_ref() {
             let pk_first = tx.first_input_proof_public_key();
@@ -80,7 +80,7 @@ impl PartyEvents {
         }
     }
 
-    pub(crate) fn handle_liquidity_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
+    pub(crate) fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
         let addrs = self.party_public_key.to_all_addresses()?;
         let amt = Some(addrs.iter().map(|a| tx.output_rdg_amount_of(a)).sum::<i64>())
             .filter(|a| *a > 0)
@@ -102,7 +102,7 @@ impl PartyEvents {
         Ok(())
     }
 
-    fn process_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &LiquidityWithdrawal) {
+    fn process_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal) {
         let input_utxo_ids = tx.input_utxo_ids().collect_vec();
         // Find inputs corresponding to staking events.
         // This represents a withdrawal, either external or internal
@@ -145,7 +145,7 @@ impl PartyEvents {
         }
     }
 
-    fn internal_liquidity_stake(&mut self, event: &AddressEvent, tx: &Transaction, amt: Option<CurrencyAmount>, deposit: &LiquidityDeposit, utxo_id: UtxoId) {
+    fn internal_liquidity_stake(&mut self, event: &AddressEvent, tx: &Transaction, amt: Option<CurrencyAmount>, deposit: &StakeDeposit, utxo_id: UtxoId) {
         if let Some(amt) = amt.clone() {
             if amt.currency() == SupportedCurrency::Redgold && Self::minimum_stake_amount(&amt) {
                 if let Some(withdrawal_address) = tx.first_input_proof_public_key()
@@ -170,7 +170,7 @@ pub struct InternalStakeEvent {
     pub tx: Transaction,
     pub amount: CurrencyAmount,
     pub withdrawal_address: Address,
-    pub liquidity_deposit: LiquidityDeposit,
+    pub liquidity_deposit: StakeDeposit,
     pub utxo_id: UtxoId,
 }
 
@@ -181,7 +181,7 @@ pub struct PendingExternalStakeEvent {
     pub amount: CurrencyAmount,
     pub external_address: Address,
     pub external_currency: SupportedCurrency,
-    pub liquidity_deposit: LiquidityDeposit,
+    pub liquidity_deposit: StakeDeposit,
     pub deposit_inner: DepositRequest,
     pub utxo_id: UtxoId,
 }

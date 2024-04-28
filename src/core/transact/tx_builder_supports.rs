@@ -2,7 +2,7 @@ use itertools::Itertools;
 use redgold_data::data_store::DataStore;
 use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, StakeDeposit, LiquidityRange, StakeRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, DepositRequest};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
@@ -333,19 +333,61 @@ impl TransactionBuilder {
     }
 
 
-    pub fn with_stake_usd_bounds(&mut self, lower: Option<f64>, upper: Option<f64>, address: &Address) -> &mut Self {
+    pub fn with_external_stake_usd_bounds(
+        &mut self,
+        lower: Option<f64>,
+        upper: Option<f64>,
+        stake_control_address: &Address,
+        external_address: &Address,
+        external_amount: &CurrencyAmount,
+    ) -> &mut Self {
         let mut o = Output::default();
-        o.address = Some(address.clone());
+        o.address = Some(stake_control_address.clone());
         let mut d = StandardData::default();
-        let mut lq = LiquidityRequest::default();
-        let mut deposit = LiquidityDeposit::default();
+        let mut lq = StakeRequest::default();
+        let mut deposit = StakeDeposit::default();
         let mut lr = LiquidityRange::default();
-        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_fractional(lower).expect("works"));
-        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_fractional(upper).expect("works"));
+        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
+        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
         deposit.liquidity_ranges = vec![lr];
+        let mut dr = DepositRequest::default();
+        dr.address = Some(external_address.clone());
+        dr.amount = Some(external_amount.clone());
+        deposit.deposit =
         lq.deposit = Some(deposit);
+
         let mut sr = StandardRequest::default();
-        sr.liquidity_request = Some(lq);
+        sr.stake_request = Some(lq);
+        d.standard_request = Some(sr);
+        o.data = Some(d);
+        self.transaction.outputs.push(o);
+        self
+    }
+
+    pub fn with_internal_stake_usd_bounds(
+        &mut self,
+        lower: Option<f64>,
+        upper: Option<f64>,
+        stake_control_address: &Address,
+        amount: &CurrencyAmount,
+    ) -> &mut Self {
+        let mut o = Output::default();
+        o.address = Some(stake_control_address.clone());
+        let mut d = StandardData::default();
+        let mut lq = StakeRequest::default();
+        let mut deposit = StakeDeposit::default();
+        let mut lr = LiquidityRange::default();
+        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
+        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
+        deposit.liquidity_ranges = vec![lr];
+        let mut dr = DepositRequest::default();
+        dr.address = Some(external_address.clone());
+        dr.amount = Some(external_amount.clone());
+        deposit.deposit =
+        lq.deposit = Some(deposit);
+
+        let mut sr = StandardRequest::default();
+        sr.stake_request = Some(lq);
         d.standard_request = Some(sr);
         o.data = Some(d);
         self.transaction.outputs.push(o);

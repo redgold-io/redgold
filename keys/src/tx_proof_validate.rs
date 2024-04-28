@@ -37,7 +37,7 @@ fn validate_inner(tx: &Transaction) -> RgResult<()> {
 fn validate_deposit_addresses(tx: &Transaction) -> RgResult<()> {
 
     let res = tx.output_request()
-        .flat_map(|r| r.liquidity_request.as_ref())
+        .flat_map(|r| r.stake_request.as_ref())
         .flat_map(|r| r.deposit.as_ref())
         .flat_map(|r| r.deposit.as_ref())
         .collect_vec();

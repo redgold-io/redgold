@@ -1,6 +1,15 @@
+use crate::structs;
 use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartyState, PublicKey};
 
 impl PartyInfo {
+
+
+    pub fn not_debug(&self) -> bool {
+        self.initiate.as_ref()
+            .map(|p| p.purpose())
+            .filter(|p| p != &structs::PartyPurpose::DebugPurpose)
+            .is_some()
+    }
 
     pub fn identifier(&self) -> Option<&MultipartyIdentifier> {
         self.initiate.as_ref().and_then(|i| i.identifier.as_ref())

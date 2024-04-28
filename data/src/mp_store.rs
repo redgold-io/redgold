@@ -61,7 +61,7 @@ impl MultipartyStore {
         let time = initiate_keygen.time;
         let pi = party_info.proto_serialize();
         let self_initiated = party_info.self_initiated.safe_get()?.clone();
-        let host_public_key = party_info.party_key.safe_get_msg("host missing in keygen sql add")?.vec();
+        let host_public_key = ident.party_keys.get(0).safe_get_msg("missing host pk")?.vec();
 
         let party_data: Vec<u8> = vec![];
 

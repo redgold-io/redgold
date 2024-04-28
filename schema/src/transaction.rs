@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, LiquidityDeposit, LiquidityRequest, LiquidityWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
 use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
 use rand::Rng;
@@ -171,15 +171,15 @@ impl Transaction {
         self.swap_request().and_then(|r| r.destination.as_ref())
     }
 
-    pub fn stake_request(&self) -> Option<&LiquidityRequest> {
-        self.output_request().filter_map(|d| d.liquidity_request.as_ref()).next()
+    pub fn stake_request(&self) -> Option<&StakeRequest> {
+        self.output_request().filter_map(|d| d.stake_request.as_ref()).next()
     }
 
-    pub fn stake_deposit_request(&self) -> Option<&LiquidityDeposit> {
+    pub fn stake_deposit_request(&self) -> Option<&StakeDeposit> {
         self.stake_request().and_then(|d| d.deposit.as_ref())
     }
 
-    pub fn stake_withdrawal_request(&self) -> Option<&LiquidityWithdrawal> {
+    pub fn stake_withdrawal_request(&self) -> Option<&StakeWithdrawal> {
         self.stake_request().and_then(|d| d.withdrawal.as_ref())
     }
 
@@ -476,14 +476,14 @@ impl Transaction {
         Ok(utxo_id)
     }
 
-    pub fn liquidity_of(&self, a: &Address) -> Vec<(UtxoId, &LiquidityRequest)> {
+    pub fn liquidity_of(&self, a: &Address) -> Vec<(UtxoId, &StakeRequest)> {
         self.output_of_with_index(a)
             .iter()
             .flat_map(|(u, o)|
                 self.utxo_id_at(*u).ok().and_then(|utxo_id|
                     o.data.as_ref()
                         .and_then(|d| d.standard_request.as_ref())
-                        .and_then(|d| d.liquidity_request.as_ref())
+                        .and_then(|d| d.stake_request.as_ref())
                         .map(|l| (utxo_id, l))
             ))
             .collect_vec()
@@ -586,6 +586,19 @@ impl Transaction {
 
     pub fn to_utxo_entries(&self, time: u64) -> Vec<UtxoEntry> {
         return UtxoEntry::from_transaction(self, time as i64);
+    }
+
+    pub fn to_utxo_address(&self, address: &Address) -> Vec<UtxoEntry> {
+        let mut res = vec![];
+        let time = self.time();
+        if let Some(time) = time {
+            for u in UtxoEntry::from_transaction(self, time as i64) {
+                if u.address() == Ok(address) {
+                    res.push(u);
+                }
+            }
+        }
+        res
     }
 
     pub fn utxo_outputs(&self) -> RgResult<Vec<UtxoEntry>> {

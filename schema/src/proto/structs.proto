@@ -304,13 +304,14 @@ message PortfolioRequest {
 message StandardRequest {
   StateSelector selector = 1;
   // Staking request, designed for use with the native AMM/Portfolio functions.
-  LiquidityRequest liquidity_request = 2;
+  StakeRequest stake_request = 2;
   // Portfolio information, used for updating the current 'target' state of a portfolio
   PortfolioRequest portfolio_request = 3;
   // Used for collateralized loan outputs
   CollateralizedLoanRequest collateralized_loan = 4;
   // Used for swaps
   SwapRequest swap_request = 5;
+  // Used for arbitrary deposits which have no specific use yet.
   DepositRequest deposit_request = 6;
 }
 
@@ -367,14 +368,12 @@ message SwapFulfillment {
 }
 
 message DepositRequest {
-  // The address to watch for deposits
+  // The (external) address to watch for deposits
   Address address = 1;
-  // Proof that you own this external address
+  // Proof that you own this external address, if missing, defaults to first input proof
   Proof proof = 2;
   // The amount expected to be deposited
   CurrencyAmount amount = 3;
-  // The desired spend address for the deposit
-  Address spend_address = 4;
 }
 
 message StandardResponse {
@@ -436,28 +435,29 @@ message LiquidityRange {
   Weighting desired_fee_fraction = 4;
   // How much of the total input staking quantity to allocate to this range, defaults to equal division among fractions
   Weighting allocation_fraction = 5;
+  optional bool ask_filter = 6;
 }
 
 // Request to withdraw liquidity from a pool
-message LiquidityWithdrawal {
+message StakeWithdrawal {
   Address destination = 1;
 }
 
 // Pre-claim deposit operation designating native multiparty groups to watch address for native deposits
 // Requires that the address on this network match the address of the external network, so that the private
 // key used for both is the same.
-message LiquidityDeposit {
+message StakeDeposit {
   // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within
   repeated LiquidityRange liquidity_ranges = 1;
   DepositRequest deposit = 2;
 }
 
 // Request to update external liquidity to a native pool
-message LiquidityRequest {
+message StakeRequest {
   // A marker for a future external (native to the external currency,) deposit to a multiparty AMM-like pool
-  LiquidityDeposit deposit = 1;
+  StakeDeposit deposit = 1;
   // A withdrawl request, indicating to the pool to send funds to the specified external chain address
-  LiquidityWithdrawal withdrawal = 2;
+  StakeWithdrawal withdrawal = 2;
 }
 
 // Generically typed value, used for storing arbitrary data in a common format.

@@ -4,7 +4,7 @@ use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::ErrorInfoContext;
+use crate::{ErrorInfoContext, RgResult};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
 use crate::structs::{CurrencyAmount, ErrorInfo, SupportedCurrency};
 
@@ -24,6 +24,18 @@ impl CurrencyAmount {
         let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
         let mut a = CurrencyAmount::default();
         a.amount = amount;
+        Ok(a)
+    }
+
+    pub fn from_usd(a: impl Into<f64>) -> RgResult<Self> {
+        let a = a.into();
+        if a <= 0f64 {
+            Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
+        }
+        let amount = (a * (DECIMAL_MULTIPLIER as f64)) as i64;
+        let mut a = CurrencyAmount::default();
+        a.amount = amount;
+        a.currency = Some(SupportedCurrency::Usd as i32);
         Ok(a)
     }
 

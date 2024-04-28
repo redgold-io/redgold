@@ -122,7 +122,7 @@ impl Output {
     }
 
     pub fn is_liquidity(&self) -> bool {
-        self.request().and_then(|c| c.liquidity_request.as_ref()).is_some()
+        self.request().and_then(|c| c.stake_request.as_ref()).is_some()
     }
 
     pub fn is_fee(&self) -> bool {

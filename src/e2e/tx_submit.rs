@@ -140,6 +140,25 @@ impl TransactionSubmitter {
         res.at_least_1()?;
         Ok(res)
     }
+
+    pub async fn send_to(&self, a: &Address) -> Result<SubmitTransactionResponse, ErrorInfo> {
+        let transaction = self.generator.lock().unwrap().generate_simple_tx_to(a)?.clone();
+        let res = self.client.clone().send_transaction(&transaction, true).await?;
+        // let res = self.block(self.spawn(transaction.clone().transaction)).await?;
+        // if res.clone().accepted() {
+        // self.generator.lock().unwrap().completed(transaction);
+        // }
+        // info!("Submit response: {}", res.json_or());
+        res.at_least_1()?;
+        Ok(res)
+    }
+
+    pub async fn send_tx(&self, tx: &Transaction) -> RgResult<SubmitTransactionResponse> {
+        let res = self.client.clone().send_transaction(tx, true).await?;
+        res.at_least_1()?;
+        Ok(res)
+    }
+
     pub async fn submit_test_contract(&self) -> RgResult<SubmitTransactionResponse> {
         let tk = self.generator.lock().unwrap().generate_deploy_test_contract().await?;
         let res = self.client.clone().send_transaction(&tk.transaction, true).await?;

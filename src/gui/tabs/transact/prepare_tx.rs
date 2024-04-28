@@ -25,7 +25,7 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
     }
     if x.mark_output_as_stake {
         tb.with_last_output_stake();
-        tb.with_stake_usd_bounds(None, None, a);
+        tb.with_external_stake_usd_bounds(None, None, a);
     }
     if x.mark_output_as_swap && x.mark_output_as_stake {
         return Err(error_info("Cannot mark as both swap and stake"));

@@ -23,7 +23,7 @@ impl PartyWatcher {
         }
     }
     pub async fn tick(&self) -> RgResult<()> {
-        info!("Party watcher tick");
+        // info!("Party watcher tick");
         let parties = self.relay.ds.multiparty_store.all_party_info_with_key().await?;
         let all_parties = AllParties::new(parties);
         let active = all_parties.active;

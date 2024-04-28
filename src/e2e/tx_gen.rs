@@ -44,6 +44,10 @@ pub struct TransactionGenerator {
 
 impl TransactionGenerator {
 
+    pub fn tx_builder(&self) -> TransactionBuilder {
+        TransactionBuilder::new(&self.node_config)
+    }
+
     pub fn used_spendable(&self) -> Vec<SpendableUTXO> {
         self.pop_finished.iter()
             .filter(|x| !self.finished_pool.contains(x))
@@ -100,6 +104,16 @@ impl TransactionGenerator {
             transaction: tx,
             key_pairs: vec![kp2],
         }
+    }
+
+    pub fn all_value_transaction_to(&mut self, prev: SpendableUTXO, to: &Address) -> Transaction {
+
+        let tx = TransactionBuilder::new(&self.node_config)
+            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
+            .with_output(to, &CurrencyAmount::from(prev.utxo_entry.amount() as i64))
+            .build().expect("Failed to build transaction")
+            .sign(&prev.key_pair).expect("signed");
+        tx
     }
 
 
@@ -184,6 +198,26 @@ impl TransactionGenerator {
         info!("generate simple tx address_prev_utxo {address_prev_utxo}");
         info!("generate simple tx pk_addr {pk_addr}");
         let key = self.all_value_transaction(prev.clone());
+        use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+        // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
+        // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());
+        // info!("Generate simple TX hash: {}", key.transaction.hash_hex_or_missing());
+        Ok(key)
+    }
+
+    pub fn generate_simple_tx_to(&mut self, address: &Address) -> Result<Transaction, ErrorInfo> {
+        // TODO: This can cause a panic
+        let prev = self.pop_finished().safe_get()?.clone();
+        let pk = prev.key_pair.public_key();
+        let pk_hex = pk.hex();
+        let pk_json = pk.json_or();
+        let address_prev_utxo = prev.utxo_entry.address().expect("address").render_string().expect("works");
+        let pk_addr = pk.address().expect("address").render_string().expect("works");
+        info!("generate simple tx pk hex {pk_hex}");
+        info!("generate simple tx pk json {pk_json}");
+        info!("generate simple tx address_prev_utxo {address_prev_utxo}");
+        info!("generate simple tx pk_addr {pk_addr}");
+        let key = self.all_value_transaction_to(prev.clone(), &address);
         use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));
         // info!("Generate simple TX from utxo output_id: {}", prev.clone().utxo_entry.output_index.clone().to_string());

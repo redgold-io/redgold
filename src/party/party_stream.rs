@@ -338,7 +338,7 @@ impl PartyEvents {
                 }
             };
             } else if t.tx.is_liquidity() {
-                self.handle_liquidity_requests(e, time, &t.tx)?;
+                self.handle_stake_requests(e, time, &t.tx)?;
                 // Represents a stake deposit initiation event OR just a regular transaction sending here
                 // TODO: Don't match this an else, but rather allow both swaps and stakes as part of the same TX.
             }
@@ -514,8 +514,8 @@ impl PartyEvents {
         // // let mut staking_withdrawals = vec![];
         //
         // for t in &tx {
-        //     if let Some((amount, liquidity_request)) = t.liquidity_of(&key_address) {
-        //         if let Some(d) = &liquidity_request.deposit {
+        //     if let Some((amount, stake_request)) = t.liquidity_of(&key_address) {
+        //         if let Some(d) = &stake_request.deposit {
         //             let d = StakeDepositInfo {
         //                 amount: amount.clone(),
         //                 deposit: d.clone(),

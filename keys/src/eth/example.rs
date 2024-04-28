@@ -8,6 +8,7 @@ use crate::{KeyPair, TestConstants};
 use crate::util::mnemonic_support::WordsPass;
 
 use alloy_chains::Chain;
+use bdk::bitcoin::hashes::hex::ToHex;
 
 
 use ethers::prelude::{maybe, to_eip155_v, U256};
@@ -337,6 +338,19 @@ impl EthWalletWrapper {
 
     }
 
+    pub fn test_amount(&self) -> u64 {
+        let fee = "0.000108594791676".to_string();
+        let fee_value = EthHistoricalClient::translate_float_value(&fee.to_string()).expect("works") as u64;
+        let amount = fee_value * 5;
+        amount
+    }
+
+    pub fn test_amount_typed(&self) -> CurrencyAmount {
+        // 0.000108594791676 originally as a fee from a testnet transaction
+        let fee = "0.000508594791676".to_string();
+        CurrencyAmount::from_eth_bigint_string(fee)
+    }
+
     pub fn new(secret_key: &String, network: &NetworkEnvironment) -> RgResult<EthWalletWrapper> {
 
         let bytes = from_hex(secret_key.clone())?;
@@ -384,6 +398,25 @@ impl EthWalletWrapper {
         println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
         println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
         Ok(())
+
+    }
+
+    pub async fn send_tx_typed(&self, to: &structs::Address, value: CurrencyAmount) -> RgResult<String> {
+        let to_str_address = to.render_string()?;
+        let to_address: Address = to_str_address.parse().error_info("to address parse failure")?;
+        let value = value.bigint_amount().ok_msg("value missing")?;
+        let value = EthHistoricalClient::translate_big_int_u256(value);
+        let tx = TransactionRequest::new().to(to_address).value(value);
+
+        // send it!
+        let pending_tx = self.client.send_transaction(tx, None).await.expect("works");
+
+        // get the mined tx
+        let receipt = pending_tx.await.expect("mined").expect("no error");
+        let tx = self.client.get_transaction(receipt.transaction_hash).await.expect("works");
+        // println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
+        // println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
+        Ok(receipt.transaction_hash.0.to_hex())
 
     }
 

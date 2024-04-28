@@ -208,10 +208,8 @@ impl PeerStore {
     pub async fn insert_peer(&self, tx: &Transaction) -> Result<i64, ErrorInfo> {
         let pd = tx.peer_data()?;
         let tx_blob = tx.proto_serialize();
-        let _pd_blob = pd.proto_serialize();
-        let _tx_hash = tx.hash_or().vec();
         let mut pool = self.ctx.pool().await?;
-        let pid = pd.peer_id.safe_get()?.clone().peer_id.safe_get()?.clone().vec();
+        let pid = pd.peer_id.safe_get()?.vec();
 
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO peers (id, tx) VALUES (?1, ?2)"#,
@@ -483,7 +481,7 @@ impl PeerStore {
         let public_key = nmd.public_key.safe_get()?;
         public_key.validate()?;
         let pk_bytes = public_key.vec();
-        let pid = nmd.peer_id.safe_get()?.peer_id.safe_get()?.vec();;
+        let pid = nmd.peer_id.safe_get()?.vec();
         let _ser_nmd = nmd.proto_serialize();
         let tx_ser = tx.proto_serialize();
         let rows = sqlx::query!(
