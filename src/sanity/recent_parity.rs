@@ -28,7 +28,7 @@ impl RecentParityCheck {
         // since we expect not all within distance.
         let ct = util::current_time_millis_i64();
         // Last day of TX
-        info!("Started recent sanity check for parity");
+        // info!("Started recent sanity check for parity");
         let begin = ct - 1000 * 60 * 60 * 24;
         let recent_tx = self.relay.ds.transaction_store
             .query_time_transaction_accepted_ordered(begin, ct).await.mark_abort()?;

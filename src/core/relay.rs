@@ -21,6 +21,7 @@ use itertools::Itertools;
 use log::{error, info};
 use metrics::counter;
 use rocket::form::FromForm;
+use rocket::http::ext::IntoCollection;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
@@ -179,36 +180,31 @@ pub struct Relay {
     pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>,
     pub tx_writer: Channel<TxWriterMessage>,
     pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
-    pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>
-}
+    pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
+    pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
 
-impl Relay {
-    pub(crate) async fn dev_default() -> Self {
-        Self::new(NodeConfig::dev_default().await).await
-    }
-}
-
-
-
-#[async_trait]
-pub trait SafeLock<T> where T: ?Sized + std::marker::Send {
-    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>>;
-}
-#[async_trait]
-impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Send {
-    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>> {
-        // May need a timeout here in the future, hence wrapping it
-        Ok(self.lock().await)
-    }
 }
 
 impl Relay {
 
-    pub fn btc_wallet(&self, pk: &PublicKey) -> RgResult<SingleKeyBitcoinWallet<Tree>> {
-        SingleKeyBitcoinWallet::new_wallet_db_backed(
-            pk.clone(), self.node_config.network.clone(), true,
-            self.node_config.env_data_folder().bdk_sled_path()
-        )
+    pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
+        let mut guard = self.btc_wallets.lock().await;
+        let result = guard.get(pk);
+        let mutex = match result {
+            Some(w) => {
+                w.clone()
+            }
+            None => {
+                let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
+                    pk.clone(), self.node_config.network.clone(), true,
+                    self.node_config.env_data_folder().bdk_sled_path()
+                )?;
+                let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
+                guard.insert(pk.clone(), w.clone());
+                w
+            }
+        };
+        Ok(mutex)
     }
 
     pub fn eth_wallet(&self) -> RgResult<EthWalletWrapper> {
@@ -742,7 +738,7 @@ impl Relay {
         };
         self.observation_metadata.sender.send_rg_err(omi)?;
         let res = tokio::time::timeout(
-            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 10),
+            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 60),
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
@@ -809,7 +805,7 @@ impl Relay {
     pub async fn gossip(&self, tx: &Transaction) -> Result<(), ErrorInfo> {
         counter!("redgold_gossip_outgoing").increment(1);
         let all = self.ds.peer_store.select_gossip_peers(tx).await?;
-        info!("Gossiping transaction to {} peers {}", all.len(), all.json_or());
+        trace!("Gossiping transaction to {} peers {}", all.len(), all.json_or());
         for p in all {
             let mut req = Request::default();
             let mut gtr = GossipTransactionRequest::default();
@@ -1111,7 +1107,29 @@ impl Relay {
             tx_writer: new_channel(),
             peer_send_failures: Arc::new(Default::default()),
             external_network_shared_data: Default::default(),
+            btc_wallets: Arc::new(Default::default()),
         }
+    }
+}
+
+
+impl Relay {
+    pub(crate) async fn dev_default() -> Self {
+        Self::new(NodeConfig::dev_default().await).await
+    }
+}
+
+
+
+#[async_trait]
+pub trait SafeLock<T> where T: ?Sized + std::marker::Send {
+    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>>;
+}
+#[async_trait]
+impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Send {
+    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>> {
+        // May need a timeout here in the future, hence wrapping it
+        Ok(self.lock().await)
     }
 }
 

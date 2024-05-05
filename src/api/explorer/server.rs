@@ -72,7 +72,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     let cert = if let (Ok(cert), Ok(key)) = (folder.cert().await, folder.key().await) {
         Some((cert, key))
     } else {
-        info!("Unable to find explorer TLS / SSL cert in: {}", folder.path.to_str().unwrap().to_string());
+        // info!("Unable to find explorer TLS / SSL cert in: {}", folder.path.to_str().unwrap().to_string());
         None
     };
     // Create a warp Service using the filter

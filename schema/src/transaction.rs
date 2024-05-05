@@ -209,8 +209,8 @@ impl Transaction {
             .and_then(|c| SupportedCurrency::from_i32(c.clone()))
     }
 
-    pub fn is_liquidity(&self) -> bool {
-        self.outputs.iter().filter(|o| o.is_liquidity()).count() > 0
+    pub fn is_stake(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_stake()).count() > 0
     }
     pub fn is_metadata(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_metadata()).count() > 0
@@ -488,6 +488,17 @@ impl Transaction {
             ))
             .collect_vec()
     }
+    pub fn stake_requests(&self) -> Vec<(UtxoId, &StakeRequest)> {
+        self.outputs
+            .iter()
+            .enumerate()
+            .flat_map(|(u, o)|
+                self.utxo_id_at(u).ok().and_then(|utxo_id|
+                    o.stake_request()
+                        .map(|l| (utxo_id, l))
+            ))
+            .collect_vec()
+    }
 
     pub fn total_output_amount(&self) -> i64 {
         let mut total = 0;
@@ -591,8 +602,8 @@ impl Transaction {
     pub fn to_utxo_address(&self, address: &Address) -> Vec<UtxoEntry> {
         let mut res = vec![];
         let time = self.time();
-        if let Some(time) = time {
-            for u in UtxoEntry::from_transaction(self, time as i64) {
+        if let Ok(time) = time {
+            for u in UtxoEntry::from_transaction(self, time.clone()) {
                 if u.address() == Ok(address) {
                     res.push(u);
                 }

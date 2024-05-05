@@ -40,7 +40,7 @@ pub async fn join_computation<M>(
 
     // Obtain party index
     let index = client.issue_index().await.context("issue an index")?;
-    info!("Multiparty join computation issued index: {}", index);
+    // info!("Multiparty join computation issued index: {}", index);
     // Ignore incoming messages addressed to someone else
     let incoming = incoming.try_filter(move |msg| {
         futures::future::ready(

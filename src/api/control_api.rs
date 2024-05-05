@@ -105,7 +105,8 @@ impl ControlServer {
                     mps.multiparty_identifier.clone(),
                     true,
                     None,
-                    true
+                    true,
+                    vec![],
                 ).await?;
                 let mut resp = ControlMultipartyKeygenResponse::default();
                 if mps.return_local_share {

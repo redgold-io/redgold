@@ -358,6 +358,7 @@ message CollateralizedLoanRequest {
 }
 
 message SwapRequest {
+  // This can be an internal or external destination.
   Address destination = 1;
   // TODO: Limit parameters here for max price to issue at
 }

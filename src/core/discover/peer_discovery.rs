@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::TryFutureExt;
 use itertools::Itertools;
 // use libp2p::request_response::RequestResponseMessage::Request;
-use log::info;
+use log::{info, trace};
 use metrics::counter;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
@@ -159,7 +159,7 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
                     .with_detail("long_identifier", message.node_metadata.long_identifier())
                     .with_detail("response", r.json_or().with_max_length(3000))
                     .with_detail("node_metadata", message.node_metadata.json_or());
-                debug!("Got discovery response for peer: {} {}", message.node_metadata.long_identifier(), r.json_or().with_max_length(3000));
+                trace!("Got discovery response for peer: {} {}", message.node_metadata.long_identifier(), r.json_or().with_max_length(3000));
                 res
             }
             Err(e) => {

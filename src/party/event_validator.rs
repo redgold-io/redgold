@@ -5,7 +5,7 @@ use crate::party::party_stream::PartyEvents;
 
 impl PartyEvents {
 
-    pub fn validate_event(&self, validator: PartySigningValidation, hash_to_sign: Vec<u8>, r: &Relay) -> RgResult<()> {
+    pub async fn validate_event(&self, validator: PartySigningValidation, hash_to_sign: Vec<u8>, r: &Relay) -> RgResult<()> {
         let c = validator.currency();
         if c == SupportedCurrency::Redgold {
             let tx = validator.transaction.safe_get_msg("Missing transaction")?;
@@ -14,7 +14,8 @@ impl PartyEvents {
         let payload = validator.json_payload.safe_get_msg("Missing PSBT")?.clone();
         match c {
             SupportedCurrency::Bitcoin => {
-                let mut w = r.btc_wallet(&self.party_public_key)?;
+                let arc = r.btc_wallet(&self.party_public_key).await?;
+                let mut w = arc.lock().await;
                 self.validate_btc_fulfillment(payload, hash_to_sign, &mut w)?;
             }
             SupportedCurrency::Ethereum => {

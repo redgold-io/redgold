@@ -193,7 +193,6 @@ pub struct NodeConfig {
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
     pub discovery_interval: Duration,
-    pub watcher_interval: Duration,
     pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
@@ -563,7 +562,6 @@ impl NodeConfig {
             secure_data_folder: None,
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
-            watcher_interval: Duration::from_secs(200),
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
@@ -574,7 +572,7 @@ impl NodeConfig {
             node_info: NodeInfoConfig::default(),
             contract: Default::default(),
             contention: Default::default(),
-            default_timeout: Duration::from_secs(60),
+            default_timeout: Duration::from_secs(120),
         }
     }
 
@@ -600,7 +598,6 @@ impl NodeConfig {
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
         node_config.e2e_enabled = false;
-        node_config.watcher_interval = Duration::from_secs(5);
         node_config
     }
     pub async fn data_store(&self) -> DataStore {

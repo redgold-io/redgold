@@ -9,6 +9,7 @@ use num_bigint::BigInt;
 use rocket::serde::{Deserialize, Serialize};
 use serde::__private::de::IdentifierDeserializer;
 use redgold_keys::eth::example::EthWalletWrapper;
+use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
@@ -26,6 +27,7 @@ use crate::party::address_event::AddressEvent;
 use crate::party::address_event::AddressEvent::External;
 use crate::party::central_price::CentralPricePair;
 use crate::party::order_fulfillment::OrderFulfillment;
+use crate::party::price_query::PriceDataPointUsdQuery;
 use crate::party::stake_event_stream::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent, WithdrawalStakingEvent};
 use crate::util::current_time_millis_i64;
 
@@ -255,6 +257,7 @@ impl PartyEvents {
     }
 
     pub async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()> {
+        self.events.push(e.clone());
         let time = e.time(&self.seeds_pk(0));
         if let Some(t) = time {
             self.process_confirmed_event(e, t).await?;
@@ -337,7 +340,7 @@ impl PartyEvents {
                     // info!("Withdrawal fulfillment request for incoming RDG tx_hash: {} fulfillment {}", t.tx.hash_or(), fulfillment.json_or());
                 }
             };
-            } else if t.tx.is_liquidity() {
+            } else if t.tx.is_stake() {
                 self.handle_stake_requests(e, time, &t.tx)?;
                 // Represents a stake deposit initiation event OR just a regular transaction sending here
                 // TODO: Don't match this an else, but rather allow both swaps and stakes as part of the same TX.
@@ -647,5 +650,46 @@ async fn debug_events() -> RgResult<()> {
     Ok(())
 
     // DepositWatcher::get_starting_center_price_rdg_btc_fallback()
+
+}
+
+
+#[tokio::test]
+async fn debug_event_stream2() {
+    crate::party::party_stream::debug_events2().await.unwrap();
+}
+async fn debug_events2() -> RgResult<()> {
+
+
+    let relay = Relay::dev_default().await;
+    relay.ds.run_migrations().await?;
+    // not this
+    let pk_hex = "024cfc97a479af32fcb9d7b59c0e1273832817bf0bb264227e56e449d1a6b30e8e";
+    let pk_address = PublicKey::from_hex_direct(pk_hex).expect("pk");
+
+    let eth_addr = "0x7D464545F9E9E667bbb1A907121bccb49Dc39160".to_string();
+    let eth = EthHistoricalClient::new(&NetworkEnvironment::Dev).expect("").expect("");
+    let tx = eth.get_all_tx(&eth_addr, None).await.expect("");
+
+    let mut events = vec![];
+    for e in &tx {
+        events.push(External(e.clone()));
+    };
+
+    let mut pq = PriceDataPointUsdQuery::new();
+    pq.enrich_address_events(&mut events, &relay.ds).await.expect("works");
+
+    let mut pe = PartyEvents::new(&pk_address, &NetworkEnvironment::Dev);
+
+
+    for e in &events {
+
+        pe.process_event(e).await?;
+    }
+
+
+    println!("{}", pe.json_or());
+
+    Ok(())
 
 }

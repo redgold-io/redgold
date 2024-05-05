@@ -1,8 +1,9 @@
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PartyData, PartyInfo, PublicKey, SupportedCurrency, Transaction};
 use rocket::serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::info;
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::example::EthHistoricalClient;
+use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
@@ -34,6 +35,12 @@ impl PartyInternalData {
     pub fn not_debug(&self) -> bool {
         self.party_info.not_debug()
     }
+
+    pub fn self_initiated_not_debug(&self) -> bool {
+        self.party_info.not_debug() && self.party_info.self_initiated.unwrap_or(false)
+    }
+
+
 }
 
 impl PartyWatcher {
@@ -42,7 +49,7 @@ impl PartyWatcher {
         let seeds = self.relay.node_config.seeds_now_pk();
         let mut shared_data = HashMap::new();
         for party in active {
-            let pk = party.host_public_key().expect("pk missing");
+            let pk = party.party_key.safe_get_msg("party key missing")?;
             let prior_data = self.relay.ds.multiparty_store.party_data(&pk).await?
                 .and_then(|pd| pd.json_party_internal_data)
                 .and_then(|pid| pid.json_from::<PartyInternalData>().ok());
@@ -58,8 +65,8 @@ impl PartyWatcher {
             ).flatten().cloned();
             let eth = self.get_public_key_eth_data(&pk, max_eth_block).await?;
             let mut hm = HashMap::new();
-            hm.insert(SupportedCurrency::Bitcoin, btc);
-            hm.insert(SupportedCurrency::Ethereum, eth);
+            hm.insert(SupportedCurrency::Bitcoin, btc.clone());
+            hm.insert(SupportedCurrency::Ethereum, eth.clone());
             // Change to time filter query to get prior data.
             let mut txs = self.relay.ds.transaction_store.get_all_tx_for_address(&pk.address()?, 1e9 as i64, 0).await?;
             txs.sort_by_key(|t| t.time().expect("time missing").clone());
@@ -75,12 +82,33 @@ impl PartyWatcher {
                 let ae = AddressEvent::Internal(txo);
                 address_events.push(ae);
             }
+            for t in btc.transactions.iter() {
+                address_events.push(AddressEvent::External(t.clone()));
+            }
+            for t in eth.transactions.iter() {
+                address_events.push(AddressEvent::External(t.clone()));
+            }
 
             address_events.sort_by(|a, b| {
                 a.time(&seeds).cmp(&b.time(&seeds))
             });
 
+
+
+            // Filter out all orders before initiation period (testing mostly.)
+
+            let party_start = party.initiate.safe_get_msg("initiate")?.time.clone();
+            // info!("enrich data Address events len: {} party start {}", address_events.len(), party_start);
+            address_events.retain(|ae| {
+                ae.time(&seeds).unwrap_or(0) >= party_start
+            });
+            // info!("enrich data Address events len after filter: {}", address_events.len());
+
+            // info!("enrich data eth: {}", eth.json_or());
+
             price_data.enrich_address_events(&mut address_events, &self.relay.ds).await?;
+
+            // info!("events with prices: {}", address_events.json_or());
 
             let pid = PartyInternalData {
                 party_info: party.clone(),
@@ -98,7 +126,8 @@ impl PartyWatcher {
 
     // This is backed by a database, so the query parameter isn't really necessary here
     pub async fn get_public_key_btc_data(&self, pk: &PublicKey) -> RgResult<ExternalNetworkData> {
-        let btc = self.relay.btc_wallet(pk)?;
+        let arc = self.relay.btc_wallet(pk).await?;
+        let btc = arc.lock().await;
         let all_tx = btc.get_all_tx()?;
         let raw_balance = btc.get_wallet_balance()?.confirmed;
         let amount = CurrencyAmount::from_btc(raw_balance as i64);
@@ -118,7 +147,7 @@ impl PartyWatcher {
         let eth_addr = pk.to_ethereum_address_typed()?;
         let amount = eth.get_balance_typed(&eth_addr).await?;
         let eth_addr_str = eth_addr.render_string()?;
-        let all_tx= eth.get_all_tx(&eth_addr_str, start_block).await?;
+        let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block, None, None).await?;
         let end = ExternalNetworkData {
             pk: pk.clone(),
             transactions: all_tx.clone(),

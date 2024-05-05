@@ -404,7 +404,10 @@ going back at least a year, and is likely to be stable for the foreseeable futur
 This is the only function tested in here that works properly over long time series.
  */
 pub async fn okx_point(time: i64, supported_currency: SupportedCurrency) -> RgResult<OkxParsedRow> {
-    let res = okx_historical_test(None, time, supported_currency).await?;
+    let res = okx_historical_test(None, time, supported_currency).await
+        .with_detail("time", time.to_string())
+        .with_detail("currency", format!("{:?}", supported_currency))
+        ?;
     res.iter()
         .map(|r| ((time - r.time).abs(), r))
         .min_by(|a, b| a.0.cmp(&b.0))
@@ -453,7 +456,7 @@ impl OkxHistoricalResponse {
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn okx_debug_routes() {
     // let c = coinbase_btc_spot_latest().await.unwrap();
@@ -469,7 +472,7 @@ async fn okx_debug_routes() {
     let start = current_time_millis_i64() - 1000*60*5;
     for i in 500..510 {
         let t = start - i*1000*60*60*24;
-        let c = okx_point(t, SupportedCurrency::Bitcoin).await.unwrap();
+        let c = okx_point(t, SupportedCurrency::Ethereum).await.unwrap();
         let delta = (t- c.time).abs();
         let price = c.open.clone();
         println!("{} {} {}", t, delta, price);

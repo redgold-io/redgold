@@ -132,8 +132,8 @@ impl CurrencyAmount {
         a.currency = Some(SupportedCurrency::Bitcoin as i32);
         a
     }
-    pub fn from_eth_bigint_string(amount: String) -> Self {
-        let mut a = Self::from_string(amount);
+    pub fn from_eth_bigint_string(amount: impl Into<String>) -> Self {
+        let mut a = Self::from_string(amount.into());
         a.currency = Some(SupportedCurrency::Ethereum as i32);
         a
     }
@@ -144,6 +144,10 @@ impl CurrencyAmount {
     }
     pub fn from_eth_i64(amount: i64) -> Self {
         let bi = BigInt::from_i64(amount).expect("from_i64") * Self::bigint_offset_denomination();
+        Self::from_eth_bigint(bi)
+    }
+    pub fn from_eth_fractional(amount: f64) -> Self {
+        let bi = BigInt::from_f64(amount * 1e18).expect("from_f64");
         Self::from_eth_bigint(bi)
     }
 

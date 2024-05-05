@@ -444,7 +444,7 @@ impl TransactionProcessContext {
         let mut self_signed_pending = false;
 
         if !conflict_detected {
-            tracing::info!("Signing pending transaction");
+            // tracing::info!("Signing pending transaction");
             let prf = self.observe(validation_type, State::Pending).await?;
             self_signed_pending = true;
             observation_proofs.insert(prf);
@@ -519,7 +519,7 @@ impl TransactionProcessContext {
 
         // Completion stage
 
-        tracing::info!("Conflict resolution stage started with {:?} conflicts", conflicts.len());
+        // tracing::info!("Conflict resolution stage started with {:?} conflicts", conflicts.len());
 
         if !conflicts.is_empty() {
 
@@ -573,20 +573,31 @@ impl TransactionProcessContext {
         // tx time
         self.relay.write_transaction(&transaction, transaction.time()?.clone(), None, true).await?;
         counter!("redgold.transaction.accepted").increment(1);
-        tracing::info!("Accepted transaction");
+        // tracing::info!("Accepted transaction");
 
         // tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());
 
         // Await until it has appeared in an observation and other nodes observations.
 
 
-        tokio::time::sleep(Duration::from_secs(6)).await;
+        let mut retries = 0;
+        loop {
+            retries += 1;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let stored_proofs = self.relay.ds.observation.select_observation_edge(&hash).await?;
+            // tracing::info!("Found {:?} stored proofs in ds", stored_proofs.len());
+            observation_proofs.extend(stored_proofs);
+            let pks = self.relay.node_config.seeds_now_pk();
+            let done = pks.iter().all(|pk| {
+                observation_proofs.iter().any(|o| {
+                    o.proof.as_ref().and_then(|p| p.public_key.as_ref()).map(|p| p == pk).unwrap_or(false)
+                })
+            });
+            if done || retries > 20 {
+                break;
+            }
+        };
 
-        let stored_proofs = self.relay.ds.observation.select_observation_edge(&hash).await?;
-
-        tracing::info!("Found {:?} stored proofs in ds", stored_proofs.len());
-
-        observation_proofs.extend(stored_proofs);
         // TODO: Query our internal datastore for all obs proofs, and extend based on that
 
         // TODO: periodic process to clean mempool in event of thread processing crash?
@@ -597,17 +608,17 @@ impl TransactionProcessContext {
         });
 
         if !peers.is_empty() {
-            tracing::info!("Collecting observation proofs from {} peers", peers.len());
+            // tracing::info!("Collecting observation proofs from {} peers", peers.len());
             let results = Relay::broadcast(self.relay.clone(),
                                            peers, obs_proof_req,
                                            // self.tx_process.clone(),
                                            Some(
-                                               Duration::from_secs(5))).await;
+                                               Duration::from_secs(10))).await;
             for (pk, r) in results {
                 match r {
                     Ok(r) => {
                         let num_proofs = r.clone().query_observation_proof_response.map(|o| o.observation_proof.len()).unwrap_or(0);
-                        tracing::info!("Received {:?} observation proofs from peer: {}", num_proofs,  pk.short_id());
+                        // tracing::info!("Received {:?} observation proofs from peer: {}", num_proofs,  pk.short_id());
                         if let Some(obs_proof) = r.query_observation_proof_response {
                             observation_proofs.extend(obs_proof.observation_proof);
                         }

@@ -43,7 +43,7 @@ impl TxWriter {
     pub async fn write_transaction(&self, message: &TransactionWithSender) -> RgResult<()> {
 
         let transaction = &message.transaction;
-        info!("Writing transaction: {}", transaction.hash_or());
+        // info!("Writing transaction: {}", transaction.hash_or());
         counter!("redgold.transaction.tx_writer.write_transaction").increment(1);
         // Validate again immediately
         // for utxo_id in transaction.utxo_inputs() {
@@ -63,7 +63,7 @@ impl TxWriter {
         // with a message? Or should we just delete it here?
         // Commit transaction internally to database.
 
-        info!("Accepting transaction: {}", transaction.hash_or());
+        // info!("Accepting transaction: {}", transaction.hash_or());
         let time = if message.rejection_reason.is_none() {
             transaction.time()?.clone()
         } else {
@@ -75,7 +75,7 @@ impl TxWriter {
                 &transaction, time, message.rejection_reason.clone(), message.update_utxo
             ).await.log_error().add("Transaction writer internal failure").mark_abort()?;
 
-        info!("Sanity check on transaction: {}", transaction.hash_or());
+        // info!("Sanity check on transaction: {}", transaction.hash_or());
         // Additional sanity check here
         for fixed in transaction.utxo_inputs() {
             if message.rejection_reason.is_none() && message.update_utxo {
@@ -89,7 +89,7 @@ impl TxWriter {
 
         }
 
-        info!("Wrote transaction: {}", transaction.hash_or());
+        // info!("Wrote transaction: {}", transaction.hash_or());
 
 
 

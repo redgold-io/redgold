@@ -44,7 +44,7 @@ impl AddressEvent {
     pub fn time(&self, seeds: &Vec<PublicKey>) -> Option<i64> {
         match self {
             // Convert from unix time to time ms
-            AddressEvent::External(e) => e.timestamp.map(|t| (t * 1000) as i64),
+            AddressEvent::External(e) => e.timestamp.map(|t| t as i64),
             AddressEvent::Internal(t) => {
                 let seed_obs = t.observations.iter().filter_map(|o|
                     {
@@ -58,12 +58,16 @@ impl AddressEvent {
                             .filter(|_| metadata.filter(|m| m.state == State::Accepted as i32).is_some())
                     }
                 ).map(|t| t.clone()).collect_vec();
-                let times = seed_obs.iter().sum::<i64>();
-                let avg = times / seed_obs.len() as i64;
-                if avg == 0 {
-                    None
+                if seeds.len() == 0 {
+                    t.tx.time().cloned().ok()
                 } else {
-                    Some(avg)
+                    let times = seed_obs.iter().sum::<i64>();
+                    let avg = times / seed_obs.len() as i64;
+                    if avg == 0 {
+                        None
+                    } else {
+                        Some(avg)
+                    }
                 }
             }
         }

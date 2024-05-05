@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::MemoryDatabase;
 use itertools::Itertools;
 use log::{error, info};
@@ -10,7 +11,7 @@ use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry};
+use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use crate::party::data_enrichment::PartyInternalData;
@@ -41,7 +42,7 @@ impl PartyWatcher {
                 let btc_address = key.to_bitcoin_address(&environment)?;
 
                 let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
-                let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance")?.clone();
+                let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance").cloned().unwrap_or(0);
 
 
                 let num_events = ps.events.len();
@@ -50,17 +51,34 @@ impl PartyWatcher {
                 let num_unfulfilled_withdrawals = ps.unfulfilled_withdrawals.len();
                 let utxos = self.relay.ds.transaction_store.query_utxo_address(&key_address).await?;
 
-                info!("watcher balances: RDG:{}, BTC:{} \
-         BTC_address: {} environment: {} orders {} cutoff_orders {} num_events: {} num_unconfirmed {} num_un_deposit {} \
-         num_un_withdrawls {} num_utxos: {}  \
-         central_prices: {} orders_json {}",
-            rdg_starting_balance, btc_starting_balance, btc_address, environment.to_std_string(),
+                let eth_balance = ps.balance_map.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or("");
+                let eth_address = key.to_ethereum_address().log_error().ok().unwrap_or("".to_string());
+
+                let num_pending_stake_withdrawals = ps.pending_stake_withdrawals.len();
+                let num_pending_stake_deposits = ps.external_unfulfilled_staking_txs.len();
+                let fulfilled =  ps.fulfillment_history.len();
+                let internal_staking_events = ps.internal_staking_events.len();
+                let external_staking_events = ps.external_staking_events.len();
+
+                info!("watcher balances: RDG:{}, BTC:{}, ETH:{} ETH_address={} \
+         BTC_address: {} environment: {} orders {} cutoff_orders {} num_events: {} num_unconfirmed {} num_unfulfilled_deposits {} \
+         num_unfulfilled_withdrawals {} num_utxos: {} num_pending_stake_withdrawals {} num_pending_stake_deposits {} \
+         fulfilled {} \
+         internal_staking_events {} \
+         external_staking_events {} \
+         central_prices: {} orders_len {}",
+            rdg_starting_balance, btc_starting_balance, eth_balance, eth_address, btc_address, environment.to_std_string(),
             orders.len(),
             cutoff_orders.len(),
             num_events, num_unconfirmed, num_unfulfilled_deposits, num_unfulfilled_withdrawals,
             utxos.len(),
+                    num_pending_stake_withdrawals,
+                    num_pending_stake_deposits,
+                    fulfilled,
+                    internal_staking_events,
+                    external_staking_events,
             ps.central_prices.json_or(),
-            orders.json_or(),
+            orders.len(),
         );
 
                 self.fulfill_btc_orders(key, &identifier, ps, cutoff_time).await?;
@@ -149,8 +167,10 @@ impl PartyWatcher {
         Ok(())
     }
 
-    pub async fn mp_send_btc(&self, public_key: &PublicKey, identifier: &MultipartyIdentifier, outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<String> {
-        let mut w = self.relay.btc_wallet(public_key)?;
+    pub async fn payloads_and_validation(&self, outputs: Vec<(String, u64)>, public_key: &PublicKey, ps: &PartyEvents)
+        -> RgResult<(Vec<(Vec<u8>, EcdsaSighashType)>, PartySigningValidation)> {
+        let arc = self.relay.btc_wallet(public_key).await?;
+        let mut w = arc.lock().await;
         w.create_transaction_output_batch(outputs)?;
 
         let pbst_payload = w.psbt.safe_get_msg("Missing PSBT")?.clone().json_or();
@@ -160,13 +180,33 @@ impl PartyWatcher {
 
         let hashes = w.signable_hashes()?.clone();
         for (i, (hash, hash_type)) in hashes.iter().enumerate() {
-
             ps.validate_btc_fulfillment(pbst_payload.clone(), hash.clone(), &mut w)?;
+        }
+        Ok((hashes, validation))
+    }
+
+    pub async fn mp_send_btc(&self, public_key: &PublicKey, identifier: &MultipartyIdentifier, outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<String> {
+        // TODO: Split this lock into a separate function?
+
+        let (hashes, validation) = self.payloads_and_validation(outputs, public_key, ps).await?;
+
+        let mut results = vec![];
+
+        for (hash, _) in hashes.iter() {
+
             let result = initiate_mp_keysign(self.relay.clone(), identifier.clone(),
                                              BytesData::from(hash.clone()),
                                              identifier.party_keys.clone(), None,
                 Some(validation.clone())
             ).await?;
+
+            results.push(result);
+        }
+
+        let arc = self.relay.btc_wallet(public_key).await?;
+        let mut w = arc.lock().await;
+        for (i, ((_, hash_type), result)) in
+        hashes.iter().zip(results.iter()).enumerate() {
             w.affix_input_signature(i, &result.proof, hash_type);
         }
         w.sign()?;

@@ -1,4 +1,4 @@
-use redgold_keys::eth::example::EthHistoricalClient;
+use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::structs::PublicKey;
 use tracing::{error, info};

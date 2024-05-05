@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct PartyConfigData {
     // Enable multiparty support, requires API keys and additional setup for oracle pricing info.
     pub enable_party_mode: bool,
-    pub order_cutoff_delay_time: i64
+    pub order_cutoff_delay_time: i64,
+    pub poll_interval: i64,
 }
 
 // Migrate node_config stuff here
@@ -16,7 +17,11 @@ pub struct ConfigData {
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
-            party_config_data: PartyConfigData { enable_party_mode: false, order_cutoff_delay_time: 300_000 },
+            party_config_data: PartyConfigData {
+                enable_party_mode: false,
+                order_cutoff_delay_time: 300_000,
+                poll_interval: 300_000,
+            },
         }
     }
 }

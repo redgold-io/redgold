@@ -20,12 +20,13 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
     //     info!("Address info UTXO in prepare transaction: {}", u.json_or());
     // }
     tb.with_output(&destination, &amount);
+    // TODO: Fix me
     if x.mark_output_as_swap {
-        tb.with_last_output_swap_type();
+        // tb.with_last_output_swap_type();
     }
     if x.mark_output_as_stake {
-        tb.with_last_output_stake();
-        tb.with_external_stake_usd_bounds(None, None, a);
+        // tb.with_last_output_stake();
+        // tb.with_external_stake_usd_bounds(None, None, a, );
     }
     if x.mark_output_as_swap && x.mark_output_as_stake {
         return Err(error_info("Cannot mark as both swap and stake"));

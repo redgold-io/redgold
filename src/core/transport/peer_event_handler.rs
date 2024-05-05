@@ -49,7 +49,7 @@ impl PeerOutgoingEventHandler {
             if let Some(nmd) = res {
                 Self::send_message_rest(message.clone(), nmd, &relay).await?;
             } else {
-                error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);
+                // error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);
             }
         } else if let Some(nmd) = &message.node_metadata {
             debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",

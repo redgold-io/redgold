@@ -35,16 +35,16 @@ impl PartyEvents {
         false
     }
 
-    fn minimum_stake_amount(amt: &CurrencyAmount) -> bool {
+    pub fn minimum_stake_amount(amt: &CurrencyAmount) -> bool {
         match amt.currency_or() {
             SupportedCurrency::Redgold => {
                 amt.to_fractional() >= 1.0
             }
             SupportedCurrency::Bitcoin => {
-                amt.amount >= 20000
+                amt.amount >= 10000
             }
             SupportedCurrency::Ethereum => {
-                amt.bigint_amount().map(|b| b >= BigInt::from(1e12 as i64)).unwrap_or(false)
+                amt.bigint_amount().map(|b| b >= BigInt::from(1e11 as i64)).unwrap_or(false)
             }
             _ => false
         }
@@ -85,7 +85,9 @@ impl PartyEvents {
         let amt = Some(addrs.iter().map(|a| tx.output_rdg_amount_of(a)).sum::<i64>())
             .filter(|a| *a > 0)
             .map(|a| CurrencyAmount::from(a));
-        for ((utxo_id, req)) in addrs.iter().flat_map(|a| tx.liquidity_of(a)).next() {
+        let opt_stake_request_utxo_id = tx.stake_requests();
+        // let opt_stake_request_utxo_id = addrs.iter().flat_map(|a| tx.liquidity_of(a)).next();
+        for ((utxo_id, req)) in opt_stake_request_utxo_id {
             if let Some(deposit) = req.deposit.as_ref() {
                 // This represents an external deposit.
                 if let Some(deposit_inner) = deposit.deposit.as_ref() {

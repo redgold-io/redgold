@@ -760,7 +760,7 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
             amount: o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0),
             children,
             is_swap: o.is_swap(),
-            is_liquidity: o.is_liquidity(),
+            is_liquidity: o.is_stake(),
         };
         outputs.push(output);
     }

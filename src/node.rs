@@ -210,7 +210,7 @@ impl Node {
 
         // TODO: Use anon func to push to named handles
         join_handles.push(NamedHandle::new("PartyWatcher", stream_handlers::run_interval_fold(
-            PartyWatcher::new(&relay), relay.node_config.watcher_interval, false
+            PartyWatcher::new(&relay), Duration::from_millis(relay.node_config.config_data.party_config_data.poll_interval as u64), false
         ).await));
 
 
@@ -429,14 +429,14 @@ impl Node {
     }
 
     async fn genesis_start(relay: &Relay, node_config: &NodeConfig) -> Result<(), ErrorInfo> {
-        info!("Starting from genesis");
+        // info!("Starting from genesis");
         let existing = relay.ds.config_store.get_maybe_proto::<Transaction>("genesis").await?;
 
         if existing.is_none() {
             counter!("redgold.node.genesis_created").increment(1);
-            info!("No genesis transaction found, generating new one");
+            // info!("No genesis transaction found, generating new one");
             let tx = genesis_transaction(&node_config, &node_config.words(), &node_config.seeds_now());
-            info!("Genesis transaction generated {}", tx.json_or());
+            // info!("Genesis transaction generated {}", tx.json_or());
             // let tx = Node::genesis_from(node_config.clone()).0;
             // runtimes.auxiliary.block_on(
             relay.ds.config_store.store_proto("genesis", tx.clone()).await?;
@@ -447,7 +447,7 @@ impl Node {
                     .await.expect("insert failed");
             // }
             let genesis_hash = tx.hash_or();
-            info!("Genesis hash {}", genesis_hash.hex());
+            // info!("Genesis hash {}", genesis_hash.hex());
             let _obs = relay.observe_tx(&genesis_hash, State::Pending, ValidationType::Full, structs::ValidationLiveness::Live).await?;
             let _obs = relay.observe_tx(&genesis_hash, State::Accepted, ValidationType::Full, structs::ValidationLiveness::Live).await?;
             assert_eq!(relay.ds.observation.select_observation_edge(&genesis_hash).await?.len(), 2);

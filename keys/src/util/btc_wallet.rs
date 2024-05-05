@@ -567,7 +567,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                 output_amounts.iter().filter(|(x,_y)| x != &self_addr).next().map(|(_x,y)| y.clone())
             };
 
-            let block_timestamp = x.confirmation_time.clone().map(|x| x.timestamp);
+            let block_timestamp = x.confirmation_time.clone().map(|x| x.timestamp).map(|t| t * 1000);
 
             if let (Some(a), Some(value)) = (other_address, amount) {
 

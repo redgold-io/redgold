@@ -148,14 +148,15 @@ impl PublicClient {
         sync: bool,
     ) -> Result<SubmitTransactionResponse, ErrorInfo> {
 
-        let c = self.client_wrapper();
+        let mut c = self.client_wrapper();
+        c.timeout = Duration::from_secs(180);
 
         let mut request = Request::default();
         request.submit_transaction_request = Some(SubmitTransactionRequest {
                 transaction: Some(t.clone()),
                 sync_query_response: sync,
         });
-        // debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
+        debug!("Sending transaction: {}", t.clone().hash_hex());
         let response = c.proto_post_request(request, None, None).await?;
         response.as_error_info()?;
         Ok(response.submit_transaction_response.safe_get()?.clone())

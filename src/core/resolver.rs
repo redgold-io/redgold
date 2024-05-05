@@ -232,7 +232,8 @@ pub async fn resolve_input(
         }
 
         if observation_proofs.len() == 0 {
-            return Err(ErrorInfo::error_info("Missing observation proofs"));
+            return Err(ErrorInfo::error_info("Missing observation proofs"))
+                .with_detail("utxo_id", u.json_or());
         }
         // TODO: Use trust score here
         let invalid_majority = peer_invalid_index.len() > peer_valid_index.len();

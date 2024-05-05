@@ -137,7 +137,7 @@ impl CentralPricePair {
 
         updated_curve.retain(|v| v.volume > 0);
 
-        if fulfilled_amount < DUST_LIMIT as u64 {
+        if fulfilled_amount < DUST_LIMIT as u64 || fulfilled_amount <= 0 {
             None
         } else {
             Some(OrderFulfillment {
@@ -163,8 +163,13 @@ impl CentralPricePair {
         let enforced_base_min_usd = enforced_base_min_usd.unwrap_or(100.0);
         let bid_scale_factor = bid_scale_factor.unwrap_or(1.1);
 
-        let core_vol = reserve_volumes.get(&SupportedCurrency::Redgold).ok_msg("No core volume")?;
+
         let mut ret = HashMap::new();
+        let core_vol = reserve_volumes.get(&SupportedCurrency::Redgold);
+        if core_vol.is_none() {
+            return Ok(ret);
+        }
+        let core_vol = core_vol.unwrap().clone();
 
         for (currency, vol) in reserve_volumes.iter() {
             if currency != &SupportedCurrency::Redgold {
@@ -235,9 +240,9 @@ fn debug_calculate_sample_prices() {
             (SupportedCurrency::Ethereum, 3000.0),
         ].iter().cloned().collect(),
         [
-            (SupportedCurrency::Redgold, CurrencyAmount::from(1000)),
-            (SupportedCurrency::Bitcoin, CurrencyAmount::from(10)),
-            (SupportedCurrency::Ethereum, CurrencyAmount::from(100)),
+            (SupportedCurrency::Redgold, CurrencyAmount::from_fractional(10.0).expect("")),
+            (SupportedCurrency::Bitcoin, CurrencyAmount::from_btc(100_000)),
+            (SupportedCurrency::Ethereum, CurrencyAmount::from_eth_bigint_string("055551508594791676")),
         ].iter().cloned().collect(),
         1000,
         None,
@@ -250,5 +255,9 @@ fn debug_calculate_sample_prices() {
             a.1.volume.partial_cmp(&b.1.volume).unwrap()).map(|(i, v)| {
             println!("Max bid: {:?} at index {:?}", v, i);
         });
+        println!("Asks: {:?}", v.asks());
+        println!("Asks_usd: {:?}", v.asks_usd());
+        println!("bids: {:?}", v.bids());
+        println!("bids_usd: {:?}", v.bids_usd());
     }
 }

@@ -1,6 +1,6 @@
 use dashmap::mapref::one::Ref;
 use futures::{StreamExt, TryStreamExt};
-use log::{debug, info};
+use log::{debug, info, trace};
 use metrics::counter;
 use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
 use redgold_schema::util;
@@ -43,7 +43,7 @@ impl ObservationHandler {
 
     async fn process_message(&self, o: Transaction) -> Result<(), ErrorInfo> {
         counter!("redgold.observation.received").increment(1);
-        debug!("Received peer observation {}", o.json_or());
+        trace!("Received peer observation {}", o.json_or());
         // TODO: Verify merkle root
         // TODO: Verify time and/or avoid updating time if row already present.
         // TODO: Verify there is no conflicting data to our knowledge in the observation,

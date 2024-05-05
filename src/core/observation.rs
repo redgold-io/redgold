@@ -5,7 +5,7 @@
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, info, trace};
 use metrics::{counter, gauge};
 use tokio::task::JoinHandle;
 // use futures::stream::StreamExt;
@@ -27,6 +27,7 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::helpers::easy_json::json;
+use redgold_schema::observability::errors::Loggable;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;
@@ -161,7 +162,7 @@ impl ObservationBuffer {
             if let Some(oh) = o.metadata.clone().and_then(|m| m.observed_hash) {
                 if let Some(s) = self.subscribers.get(&oh) {
                     // info!("Responding to sender with observation proof");
-                    s.send_rg_err(o.clone())?;
+                    s.send_rg_err(o.clone()).log_error().ok();
                 }
             }
         }
@@ -252,7 +253,7 @@ impl ObservationBuffer {
             counter!("redgold.observation.metadata.total").increment(1);
         }
         let node_id = self.relay.node_config.short_id()?;
-        info!("node_id={} Formed observation {}", node_id, json(&o.clone())?);
+        trace!("node_id={} Formed observation {}", node_id, json(&o.clone())?);
         Ok(proofs)
     }
 }

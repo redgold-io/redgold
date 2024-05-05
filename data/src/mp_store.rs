@@ -1,5 +1,7 @@
+use log::info;
 use redgold_schema::structs::{ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, LocalKeyShare, PartyData, PartyInfo, Proof, PublicKey, RoomId};
 use redgold_schema::{RgResult};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
@@ -14,8 +16,7 @@ impl MultipartyStore {
 
     pub async fn all_party_info_with_key(&self) -> RgResult<Vec<PartyInfo>> {
         DataStoreContext::map_err_sqlx(sqlx::query!(
-            r#"SELECT party_info FROM multiparty WHERE keygen_public_key != null"#,
-
+            r#"SELECT party_info FROM multiparty WHERE keygen_public_key IS NOT NULL"#,
         )
             .fetch_all(&mut *self.ctx.pool().await?)
             .await)?.into_iter().map(|r| PartyInfo::proto_deserialize(r.party_info)).collect()
@@ -117,6 +118,22 @@ impl MultipartyStore {
             .await)?.count as i64)
     }
 
+    pub async fn update_room_id_party_key(&self, keygen_room_id: &RoomId, party_pk: &PublicKey) -> RgResult<i64> {
+        let mut pool = self.ctx.pool().await?;
+
+        let pi = party_pk.vec();
+        let room_id = keygen_room_id.vec();
+        let rows = sqlx::query!(
+            r#"UPDATE multiparty SET keygen_public_key = ?1 WHERE room_id = ?2"#,
+            pi,
+            room_id,
+        )
+            .execute(&mut *pool)
+            .await;
+        let _rows_m = DataStoreContext::map_err_sqlx(rows)?.rows_affected();
+        Ok(_rows_m as i64)
+    }
+
     pub async fn update_room_id_party_info(&self, room_id: &RoomId, party_info: PartyInfo) -> RgResult<i64> {
         let mut pool = self.ctx.pool().await?;
 
@@ -155,9 +172,16 @@ impl MultipartyStore {
 
         let mut pi = self.party_info(keygen_room_id).await?.ok_or(ErrorInfo::new("No party info for keygen room"))?;
         if pi.party_key.is_none() {
+            // info!("Adding party key to party info and table signing proof with existing party info {}", pi.json_or());
             let key = proof.public_key.safe_get_msg("Missing pk")?.clone();
-            pi.party_key = Some(key);
+            pi.party_key = Some(key.clone());
             self.update_room_id_party_info(keygen_room_id, pi).await?;
+            self.update_room_id_party_key(keygen_room_id, &key).await?;
+            let all_pi = self.all_party_info_with_key().await?;
+            // info!("All party info with key after update {}", all_pi.json_or());
+            if !all_pi.iter().any(|p| p.party_key == Some(key.clone())) {
+                return Err(ErrorInfo::new("Party key not found in all party info after update"));
+            }
         }
         self.add_signing_proof_signatures(keygen_room_id, room_id, proof, initiate_signing).await
     }

@@ -15,11 +15,7 @@ impl AllParties {
     pub fn new(parties: Vec<PartyInfo>) -> Self {
         let mut grouped = HashMap::new();
         for p in &parties {
-            let usable = p.initiate.as_ref()
-                .map(|p| p.purpose())
-                .filter(|p| p != &structs::PartyPurpose::DebugPurpose)
-                .is_some();
-            if !usable {
+            if !p.not_debug() {
                 continue
             }
             if let Some(host_key) = p.host_public_key() {

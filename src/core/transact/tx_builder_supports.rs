@@ -2,7 +2,7 @@ use itertools::Itertools;
 use redgold_data::data_store::DataStore;
 use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, StakeDeposit, LiquidityRange, StakeRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, DepositRequest};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, StakeDeposit, LiquidityRange, StakeRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, DepositRequest, StakeWithdrawal};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
@@ -294,8 +294,13 @@ impl TransactionBuilder {
         self.transaction.outputs.last_mut().and_then(|o| o.data.as_mut())
     }
 
-    pub fn last_output_request(&mut self) -> Option<&mut StandardRequest> {
-        self.last_output_data().and_then(|d| d.standard_request.as_mut())
+    pub fn last_output_request_or(&mut self) -> Option<&mut StandardRequest> {
+        self.last_output_data().and_then(|d| {
+            let mut default = StandardRequest::default();
+            let mut r = d.standard_request.as_mut().unwrap_or(&mut default);
+            d.standard_request = Some(r.clone());
+            d.standard_request.as_mut()
+        })
     }
 
     pub fn with_last_output_swap_type(&mut self) -> &mut Self {
@@ -316,7 +321,14 @@ impl TransactionBuilder {
     pub fn with_last_output_swap_destination(&mut self, destination: &Address) -> RgResult<&mut Self> {
         let mut swap_request = structs::SwapRequest::default();
         swap_request.destination = Some(destination.clone());
-        self.last_output_request().ok_msg("Missing output")?.swap_request = Some(swap_request);
+        self.last_output_request_or().ok_msg("Missing output")?.swap_request = Some(swap_request);
+        Ok(self)
+    }
+
+    pub fn with_swap(&mut self, destination: &Address, party_fee_or_rdg_amount: &CurrencyAmount, party_address: &Address) -> RgResult<&mut Self> {
+        self.with_output(party_address, party_fee_or_rdg_amount);
+        self.with_last_output_swap_destination(destination)?;
+        self.with_last_output_swap_type();
         Ok(self)
     }
 
@@ -340,20 +352,26 @@ impl TransactionBuilder {
         stake_control_address: &Address,
         external_address: &Address,
         external_amount: &CurrencyAmount,
+        pool_address: &Address,
+        pool_fee: &CurrencyAmount,
     ) -> &mut Self {
+        self.with_output(pool_address, pool_fee);
+        self.with_last_output_stake();
         let mut o = Output::default();
         o.address = Some(stake_control_address.clone());
         let mut d = StandardData::default();
         let mut lq = StakeRequest::default();
         let mut deposit = StakeDeposit::default();
-        let mut lr = LiquidityRange::default();
-        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
-        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
-        deposit.liquidity_ranges = vec![lr];
+        if lower.is_some() || upper.is_some() {
+            let mut lr = LiquidityRange::default();
+            lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
+            lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
+            deposit.liquidity_ranges = vec![lr];
+        }
         let mut dr = DepositRequest::default();
         dr.address = Some(external_address.clone());
         dr.amount = Some(external_amount.clone());
-        deposit.deposit =
+        deposit.deposit = Some(dr);
         lq.deposit = Some(deposit);
 
         let mut sr = StandardRequest::default();
@@ -369,23 +387,46 @@ impl TransactionBuilder {
         lower: Option<f64>,
         upper: Option<f64>,
         stake_control_address: &Address,
-        amount: &CurrencyAmount,
+        party_address: &Address,
+        party_send_amount: &CurrencyAmount,
     ) -> &mut Self {
+        self.with_output(party_address, party_send_amount);
+        self.with_last_output_stake();
         let mut o = Output::default();
         o.address = Some(stake_control_address.clone());
         let mut d = StandardData::default();
         let mut lq = StakeRequest::default();
         let mut deposit = StakeDeposit::default();
-        let mut lr = LiquidityRange::default();
-        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
-        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
-        deposit.liquidity_ranges = vec![lr];
-        let mut dr = DepositRequest::default();
-        dr.address = Some(external_address.clone());
-        dr.amount = Some(external_amount.clone());
-        deposit.deposit =
+        if lower.is_some() || upper.is_some() {
+            let mut lr = LiquidityRange::default();
+            lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
+            lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
+            deposit.liquidity_ranges = vec![lr];
+        }
         lq.deposit = Some(deposit);
+        let mut sr = StandardRequest::default();
+        sr.stake_request = Some(lq);
+        d.standard_request = Some(sr);
+        o.data = Some(d);
+        self.transaction.outputs.push(o);
+        self
+    }
 
+    pub fn with_stake_withdrawal(&mut self,
+                                 destination: &Address,
+                                 party_address: &Address,
+                                 party_fee: &CurrencyAmount,
+        original_utxo: UtxoEntry
+    ) -> &mut Self {
+        self.with_unsigned_input(original_utxo).expect("works");
+        let mut o = Output::default();
+        o.address = Some(party_address.clone());
+        let mut d = StandardData::default();
+        d.amount = Some(party_fee.clone());
+        let mut lq = StakeRequest::default();
+        let mut withdrawal = StakeWithdrawal::default();
+        withdrawal.destination = Some(destination.clone());
+        lq.withdrawal = Some(withdrawal);
         let mut sr = StandardRequest::default();
         sr.stake_request = Some(lq);
         d.standard_request = Some(sr);
@@ -422,7 +463,9 @@ impl TransactionBuilder {
             if self.balance() > 0 {
                 break
             }
-            self.with_unsigned_input(u.clone())?;
+            if u.opt_amount().is_some() {
+                self.with_unsigned_input(u.clone())?;
+            }
         }
 
         if self.balance() < 0 {

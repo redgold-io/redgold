@@ -12,7 +12,7 @@ use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnvironment, SubmitTransactionResponse, UtxoId};
+use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnvironment, SubmitTransactionResponse, UtxoEntry, UtxoId};
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
@@ -151,6 +151,13 @@ impl TransactionSubmitter {
         // info!("Submit response: {}", res.json_or());
         res.at_least_1()?;
         Ok(res)
+    }
+
+    pub async fn send_to_return_utxos(&self, a: &Address) -> RgResult<Vec<UtxoEntry>> {
+        let transaction = self.generator.lock().unwrap().generate_simple_tx_to(a)?.clone();
+        let res = self.client.clone().send_transaction(&transaction, true).await?;
+        res.at_least_1()?;
+        Ok(res.transaction.unwrap().to_utxo_address(a))
     }
 
     pub async fn send_tx(&self, tx: &Transaction) -> RgResult<SubmitTransactionResponse> {

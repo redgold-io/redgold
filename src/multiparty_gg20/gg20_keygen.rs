@@ -39,13 +39,13 @@ async fn keygen_original(
     relay: &Relay
 ) -> Result<String> {
 
-    info!("Starting join computation for room {} on node {} index: {}", room, relay.node_config.short_id().expect(""), index);
+    // info!("Starting join computation for room {} on node {} index: {}", room, relay.node_config.short_id().expect(""), index);
     let (_i, incoming, outgoing) =
         join_computation(address, room, relay)
         .await
         .context("join computation")?;
 
-    println!("Finished join computation");
+    // println!("Finished join computation");
 
     let incoming = incoming.fuse();
     tokio::pin!(incoming);

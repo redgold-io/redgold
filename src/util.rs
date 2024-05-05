@@ -194,7 +194,7 @@ pub fn init_logger() {
     //
     // log4rs::init_config(config)
     init_tracing("DEBUG");
-    info!("Logger initialized");
+    // info!("Logger initialized");
 }
 
 pub trait Short {

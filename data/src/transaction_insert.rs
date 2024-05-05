@@ -54,7 +54,7 @@ impl TransactionStore {
         let is_metadata = tx.is_metadata();
         let is_request = tx.is_request();
         let is_deploy = tx.is_deploy();
-        let is_liquidity = tx.is_liquidity();
+        let is_liquidity = tx.is_stake();
         /*
 
           is_test INTEGER NOT NULL,

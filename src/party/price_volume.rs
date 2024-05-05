@@ -1,3 +1,4 @@
+use curv::arithmetic::Zero;
 use rocket::serde::{Deserialize, Serialize};
 use log::error;
 use crate::party::central_price::DUST_LIMIT;
@@ -36,9 +37,9 @@ impl PriceVolume {
         for i in 0..divisions {
             let price_offset = (i+1) as f64;
             let price = center_price + (price_offset * (price_width/divisions_f64));
-            if price.is_nan() || price.is_infinite()  || price.is_sign_negative() {
-                error!("Price is invalid: {} center_price: {} price_offset: {} price_width: {} divisions_f64: {}",
-                       price, center_price, price_offset, price_width, divisions_f64);
+            if price.is_nan() || price.is_infinite()  || price.is_sign_negative() || price.is_zero() {
+                // error!("Price is invalid: {} center_price: {} price_offset: {} price_width: {} divisions_f64: {}",
+                //        price, center_price, price_offset, price_width, divisions_f64);
             } else {
                 let volume = (first_term * ratio.powi(divisions - i)) as u64;
                 price_volumes.push(PriceVolume { price, volume });

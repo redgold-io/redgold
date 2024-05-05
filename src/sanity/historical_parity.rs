@@ -88,7 +88,7 @@ async fn historical_parity_debug_cached() {
             let output_addr = o.address.as_ref().expect("").render_string().unwrap_or("MISSING ADDRESS OUTPUT".to_string());
             let amt = o.opt_amount();
             let is_swap = o.is_swap();
-            let is_liquidity = o.is_liquidity();
+            let is_liquidity = o.is_stake();
             let data = o.data.clone().expect("");
             let ext = o.response().and_then(|r| r.swap_fulfillment.as_ref())
                 .and_then(|r| r.external_transaction_id.as_ref()).json_or();

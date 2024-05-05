@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use async_trait::async_trait;
 use log::info;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::RgResult;
 use redgold_schema::party::all_parties::AllParties;
 use redgold_schema::structs::PublicKey;
@@ -23,11 +23,12 @@ impl PartyWatcher {
         }
     }
     pub async fn tick(&self) -> RgResult<()> {
-        // info!("Party watcher tick");
         let parties = self.relay.ds.multiparty_store.all_party_info_with_key().await?;
-        let all_parties = AllParties::new(parties);
+
+        let all_parties = AllParties::new(parties.clone());
         let active = all_parties.active;
-        let mut shared_data = self.enrich_prepare_data(active).await?;
+
+        let mut shared_data = self.enrich_prepare_data(active.clone()).await?;
         // TODO: self.merge_child_events
         self.calculate_party_stream_events(&mut shared_data).await?;
         if self.relay.node_config.opts.enable_party_mode {
@@ -39,9 +40,10 @@ impl PartyWatcher {
         for (pk, pid) in shared_data.iter() {
             self.relay.ds.multiparty_store.update_party_data(&pk, pid.to_party_data()).await?;
         }
-        self.relay.external_network_shared_data.write(shared_data.clone());
+        self.relay.external_network_shared_data.write(shared_data.clone()).await;
         if self.relay.node_config.opts.enable_party_mode {
-            self.tick_formations(shared_data).await?;
+            // info!("Party watcher tick num parties total {} active {}", parties.len(), active.len());
+            self.tick_formations(&shared_data).await?;
         }
         Ok(())
     }
@@ -62,6 +64,7 @@ impl PartyWatcher {
 #[async_trait]
 impl IntervalFold for PartyWatcher {
     async fn interval_fold(&mut self) -> RgResult<()> {
-        self.tick().await.bubble_abort()?
+        self.tick().await.log_error().bubble_abort()?.ok();
+        Ok(())
     }
 }
