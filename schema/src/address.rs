@@ -39,7 +39,8 @@ impl Address {
             currency: Some(SupportedCurrency::Bitcoin as i32),
         }
     }
-    pub fn from_eth(address: &String) -> Address {
+    pub fn from_eth(address: impl Into<String>) -> Address {
+        let address = address.into();
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::EthereumExternalString as i32,

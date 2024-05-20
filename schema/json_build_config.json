@@ -9,6 +9,7 @@
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
         "structs.CollateralizedLoanRequest",
+        "structs.StakeWithdrawalFulfillment",
         "structs.PartySigningValidation",
         "structs.PortfolioRequest",
         "structs.DepositRequest",

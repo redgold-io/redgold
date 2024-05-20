@@ -37,7 +37,7 @@ use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_keys::eth::example::EthWalletWrapper;
+use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;

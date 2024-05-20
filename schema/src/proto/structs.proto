@@ -377,9 +377,14 @@ message DepositRequest {
   CurrencyAmount amount = 3;
 }
 
+message StakeWithdrawalFulfillment {
+  UtxoId stake_withdrawal_request = 1;
+}
+
 message StandardResponse {
   SwapFulfillment swap_fulfillment = 1;
   CollateralizedLoanFulfillment collateralized_loan_fulfillment = 2;
+  StakeWithdrawalFulfillment stake_withdrawal_fulfillment = 3;
 }
 // Generic data structure designed to hold arbitrary data in a common format.
 // This should be considered supplementary to using a regular schema, not a

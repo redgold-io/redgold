@@ -2,7 +2,7 @@ use itertools::Itertools;
 use redgold_data::data_store::DataStore;
 use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, StakeDeposit, LiquidityRange, StakeRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, DepositRequest, StakeWithdrawal};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, StakeDeposit, LiquidityRange, StakeRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, DepositRequest, StakeWithdrawal, UtxoId};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
@@ -272,9 +272,17 @@ impl TransactionBuilder {
 
         let mut res = StandardResponse::default();
         let mut sw = structs::SwapFulfillment::default();
-        let mut ext = ExternalTransactionId::default();
         sw.external_transaction_id = Some(txid);
         res.swap_fulfillment = Some(sw);
+        d.standard_response = Some(res);
+        Ok(self)
+    }
+    pub fn with_last_output_stake_withdrawal_fulfillment(&mut self, initiating_utxo_id: &UtxoId) -> RgResult<&mut Self> {
+        let d = self.last_output_data().ok_or(error_info("Missing output"))?;
+        let mut res = StandardResponse::default();
+        let mut sw = structs::StakeWithdrawalFulfillment::default();
+        sw.stake_withdrawal_request = Some(initiating_utxo_id.clone());
+        res.stake_withdrawal_fulfillment = Some(sw);
         d.standard_response = Some(res);
         Ok(self)
     }

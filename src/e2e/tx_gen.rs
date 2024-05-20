@@ -213,10 +213,10 @@ impl TransactionGenerator {
         let pk_json = pk.json_or();
         let address_prev_utxo = prev.utxo_entry.address().expect("address").render_string().expect("works");
         let pk_addr = pk.address().expect("address").render_string().expect("works");
-        info!("generate simple tx pk hex {pk_hex}");
-        info!("generate simple tx pk json {pk_json}");
-        info!("generate simple tx address_prev_utxo {address_prev_utxo}");
-        info!("generate simple tx pk_addr {pk_addr}");
+        // info!("generate simple tx pk hex {pk_hex}");
+        // info!("generate simple tx pk json {pk_json}");
+        // info!("generate simple tx address_prev_utxo {address_prev_utxo}");
+        // info!("generate simple tx pk_addr {pk_addr}");
         let key = self.all_value_transaction_to(prev.clone(), &address);
         use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
         // info!("Generate simple TX from utxo hash: {}", hex::encode(prev.clone().utxo_entry.transaction_hash.clone()));

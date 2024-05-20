@@ -183,6 +183,10 @@ impl Transaction {
         self.stake_request().and_then(|d| d.withdrawal.as_ref())
     }
 
+    pub fn stake_withdrawal_fulfillments(&self) -> impl Iterator<Item =&structs::StakeWithdrawalFulfillment> {
+        self.output_response().flat_map(|r| r.stake_withdrawal_fulfillment.as_ref())
+    }
+
     pub fn stake_deposit_destination(&self) -> Option<&Address> {
         self.stake_deposit_request()
             .and_then(|d| d.deposit.as_ref())

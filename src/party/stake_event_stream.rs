@@ -2,10 +2,12 @@ use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, StakeDepo
 use redgold_schema::RgResult;
 use num_bigint::BigInt;
 use itertools::Itertools;
-use rocket::form::validate::Contains;
+use rocket::form::validate::{Contains, with};
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::proof_support::PublicKeySupport;
 use rocket::serde::{Deserialize, Serialize};
+use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_stream::PartyEvents;
@@ -18,11 +20,12 @@ impl PartyEvents {
             let amt = event.currency_amount();
             let oa = event.other_address_typed();
             if let Ok(addr) = oa {
-                let matching = self.external_unfulfilled_staking_txs.iter()
+                let matching = self.pending_external_staking_txs.iter()
                     .filter(|s| s.amount == amt && s.external_address == addr)
                     .next()
                     .cloned();
                 if let Some(m) = matching {
+                    self.pending_external_staking_txs.retain(|s| s.utxo_id != m.utxo_id);
                     let ev = ConfirmedExternalStakeEvent {
                         pending_event: m,
                         event: event_o.clone(),
@@ -35,18 +38,39 @@ impl PartyEvents {
         false
     }
 
-    pub fn minimum_stake_amount(amt: &CurrencyAmount) -> bool {
-        match amt.currency_or() {
+    pub fn meets_minimum_stake_amount(amt: &CurrencyAmount) -> bool {
+        Self::minimum_stake_amount_total(amt.currency_or())
+            .map(|min| amt.clone() >= min)
+            .unwrap_or(false)
+    }
+
+    pub fn minimum_stake_amount_total(currency: SupportedCurrency) -> Option<CurrencyAmount> {
+        match currency {
             SupportedCurrency::Redgold => {
-                amt.to_fractional() >= 1.0
+                Some(CurrencyAmount::from_fractional(1.0).unwrap())
             }
             SupportedCurrency::Bitcoin => {
-                amt.amount >= 10000
+                Some(CurrencyAmount::from_btc(10_000))
             }
             SupportedCurrency::Ethereum => {
-                amt.bigint_amount().map(|b| b >= BigInt::from(1e11 as i64)).unwrap_or(false)
+                Some(CurrencyAmount::from_eth_fractional(0.005))
             }
-            _ => false
+            _ => None
+        }
+    }
+
+    pub fn expected_fee_amount(currency: SupportedCurrency) -> Option<CurrencyAmount> {
+        match currency {
+            SupportedCurrency::Redgold => {
+                Some(CurrencyAmount::from_fractional(0.0001).unwrap())
+            }
+            SupportedCurrency::Bitcoin => {
+                Some(CurrencyAmount::from_btc(2_000))
+            }
+            SupportedCurrency::Ethereum => {
+                Some(EthWalletWrapper::fee_fixed_normal())
+            }
+            _ => None
         }
     }
 
@@ -65,7 +89,7 @@ impl PartyEvents {
                     }
                     _ => None
                 } {
-                    self.external_unfulfilled_staking_txs.push(PendingExternalStakeEvent {
+                    self.pending_external_staking_txs.push(PendingExternalStakeEvent {
                         event: event.clone(),
                         tx: tx.clone(),
                         amount: amt.clone(),
@@ -80,7 +104,7 @@ impl PartyEvents {
         }
     }
 
-    pub(crate) fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
+    pub fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
         let addrs = self.party_public_key.to_all_addresses()?;
         let amt = Some(addrs.iter().map(|a| tx.output_rdg_amount_of(a)).sum::<i64>())
             .filter(|a| *a > 0)
@@ -98,13 +122,13 @@ impl PartyEvents {
                     self.internal_liquidity_stake(event, tx, amt.clone(), deposit, utxo_id.clone());
                 }
             } else if let Some(withdrawal) = req.withdrawal.as_ref() {
-                self.process_withdrawal(event, tx, withdrawal);
+                self.process_stake_withdrawal(event, tx, withdrawal, time, utxo_id.clone())?;
             }
         }
         Ok(())
     }
 
-    fn process_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal) {
+    pub fn process_stake_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal, time: i64, id: UtxoId) -> RgResult<()> {
         let input_utxo_ids = tx.input_utxo_ids().collect_vec();
         // Find inputs corresponding to staking events.
         // This represents a withdrawal, either external or internal
@@ -126,13 +150,55 @@ impl PartyEvents {
                 }
             };
             if let Some(amt) = amount {
-                self.pending_stake_withdrawals.push(WithdrawalStakingEvent {
-                    address: d.clone(),
-                    amount: amt,
-                    initiating_event: event.clone(),
-                });
+                if let Some(existing) = self.balance_map.get(&amt.currency_or()) {
+                    let minimum_amt = Self::minimum_stake_amount_total(
+                        amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
+                    );
+                    if let Some(fee) = Self::expected_fee_amount(amt.currency_or()) {
+                        let expected_fee = fee.clone();
+                        let delta = existing.clone() - amt.clone() - minimum_amt.clone() - (expected_fee.clone() * 2);
+                        let order_amt = if delta > minimum_amt.clone() {
+                            let candidates = vec![delta, amt];
+                            let min = candidates.iter().min().expect("min").clone();
+                            Some(min)
+                        } else if !self.network.is_main() {
+                            let reduced = existing.clone() - (fee.clone() * 2);
+                            if reduced > fee {
+                                Some(reduced)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                        if let Some(order_amt) = order_amt {
+                            self.fulfill_order(order_amt.clone(), false, time, None, &d, true, event, Some(id.clone()))?;
+                        }
+                    }
+                }
             }
         }
+        if self.event_fulfillment.is_none() {
+            self.rejected_stake_withdrawals.push(event.clone());
+        }
+        if let Some(of) = self.event_fulfillment.clone() {
+            let is_external = of.is_stake_withdrawal && of.destination.currency_or() != SupportedCurrency::Redgold;
+            // Is this even being used anymore?
+            let w = PendingWithdrawalStakeEvent {
+                address: withdrawal.destination.clone().expect("destination"),
+                amount: of.fulfilled_currency_amount(),
+                initiating_event: event.clone(),
+                is_external,
+                utxo_id: id
+            };
+            self.pending_stake_withdrawals.push(w);
+            if is_external {
+                self.unfulfilled_external_withdrawals.push((of, event.clone()));
+            } else {
+                self.unfulfilled_rdg_orders.push((of, event.clone()));
+            }
+        }
+        Ok(())
     }
 
     fn retain_external_stake(&mut self, utxo_ids: &Vec<&UtxoId>, w_currency: SupportedCurrency) -> Option<CurrencyAmount> {
@@ -149,7 +215,7 @@ impl PartyEvents {
 
     fn internal_liquidity_stake(&mut self, event: &AddressEvent, tx: &Transaction, amt: Option<CurrencyAmount>, deposit: &StakeDeposit, utxo_id: UtxoId) {
         if let Some(amt) = amt.clone() {
-            if amt.currency() == SupportedCurrency::Redgold && Self::minimum_stake_amount(&amt) {
+            if amt.currency() == SupportedCurrency::Redgold && Self::meets_minimum_stake_amount(&amt) {
                 if let Some(withdrawal_address) = tx.first_input_proof_public_key()
                     .and_then(|pk| pk.address().ok()) {
                     self.internal_staking_events.push(InternalStakeEvent {
@@ -176,7 +242,7 @@ pub struct InternalStakeEvent {
     pub utxo_id: UtxoId,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PendingExternalStakeEvent {
     pub event: AddressEvent,
     pub tx: Transaction,
@@ -196,8 +262,10 @@ pub struct ConfirmedExternalStakeEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WithdrawalStakingEvent {
+pub struct PendingWithdrawalStakeEvent {
     pub address: Address,
     pub amount: CurrencyAmount,
     pub initiating_event: AddressEvent,
+    pub is_external: bool,
+    pub utxo_id: UtxoId,
 }

@@ -206,6 +206,7 @@ impl EthHistoricalClient {
                     tokio::time::sleep(Duration::from_secs(retry_interval_seconds as u64)).await;
                     max_retries -= 1;
                     if max_retries == 0 {
+                        info!("Max retries exceeded for get_all_tx_with_retries");
                         return Err(e);
                     }
                 }
@@ -245,6 +246,14 @@ impl EthHistoricalClient {
             let value_str = t.value.to_string();
             let amount = Self::translate_value(&value_str)?;
 
+            let string = t.gas_used.to_string();
+            let gas_used = BigInt::from_str(&*string).error_info("BigInt parse failure on gas used")?;
+            let fee = t.gas_price.map(|p| p.to_string())
+                .map(|gas_price| BigInt::from_str(&*gas_price).error_info("BigInt parse failure on gas price"))
+                .transpose()?
+                .map(|gp| gp * gas_used)
+                .map(|ca| CurrencyAmount::from_eth_bigint(ca));
+
             if let (Some(tx_id), Some(from), Some(to)) = (tx_id, from_opt, to_opt) {
                 let incoming = &to == address;
                 let other_address = if incoming {
@@ -263,6 +272,7 @@ impl EthHistoricalClient {
                     currency: SupportedCurrency::Ethereum,
                     block_number: block_num,
                     price_usd: None,
+                    fee
                 });
             }
         }

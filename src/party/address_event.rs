@@ -5,7 +5,7 @@ use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::party_stream::TransactionWithObservationsAndPrice;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum AddressEvent {
     External(ExternalTimedTransaction),
     Internal(TransactionWithObservationsAndPrice)

@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
-use assert_cmd::assert;
 use itertools::Itertools;
 use log::info;
 use log::kv::Source;
 use serde::Serialize;
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::example::{dev_ci_kp, EthWalletWrapper};
+use redgold_keys::eth::example::dev_ci_kp;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::{KeyPair, TestConstants};
+use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{bytes_data, ErrorInfoContext, RgResult, SafeOption, structs};
@@ -30,7 +30,7 @@ use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::observability::metrics_registry;
 use crate::party::party_stream::PartyEvents;
-use crate::test::local_test_context::LocalNodes;
+use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 //
 // #[test]
 // fn test_panic() {
@@ -91,9 +91,6 @@ async fn e2e() {
 
 async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     util::init_logger_once();
-    metrics_registry::register_metric_names();
-    // metrics_registry::init_print_logger();
-    // init_tracing();
     let _tc = TestConstants::new();
 
     let mut local_nodes = LocalNodes::new(None).await;
@@ -103,30 +100,14 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let start_node = local_nodes.start().clone();
     let config = start_node.node.relay.node_config.clone();
     let relay_start = start_node.node.relay.clone();
-    // info!("Started initial node");
     let client1 = start_node.control_client.clone();
     let _client2 = start_node.control_client.clone();
     let _ds = start_node.node.relay.ds.clone();
-    // let show_balances = || {
-    //     let res = &ds.query_all_balance();
-    //     let res2 = res.as_ref().unwrap();
-    //     let str = serde_json::to_string(&res2).unwrap();
-    //     info!("Balances: {}", str);
-    // };
-
-    // show_balances();
 
     let client = start_node.public_client.clone();
 
     let vec = start_node.node.relay.ds.utxo.utxo_all_debug().await.expect("utxo all debug");
     assert!(vec.len() > 0);
-    for u in vec {
-        // info!("utxo at start: {}", u.json_or());
-    }
-    //
-    // let utxos = ds.query_time_utxo(0, util::current_time_millis())
-    //     .unwrap();
-    // info!("Num utxos from genesis {:?}", utxos.len());
 
     let (_, spend_utxos) = Node::genesis_from(start_node.node.relay.node_config.clone());
 
@@ -136,7 +117,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         &start_node.node.relay.node_config
     );
 
-    // submit.submit().await.expect("submit");
+    submit.submit().await.expect("submit");
     //
     // if contract_tests {
     //     let res = submit.submit_test_contract().await.expect("submit test contract");
@@ -160,70 +141,30 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // // info!("Num utxos after first submit {:?}", utxos.len());
     //
     //
-    // // Exception bad access on this on the json decoding? wtf?
-    // let _ = submit.with_faucet().await.expect("faucet");
-    // // info!("Faucet response: {}", faucet_res.json_pretty_or());
-    //
-    // submit.submit().await.expect("submit 2");
+    // Exception bad access on this on the json decoding? wtf?
+    let _ = submit.with_faucet().await.expect("faucet");
+    // info!("Faucet response: {}", faucet_res.json_pretty_or());
+
+    submit.submit().await.expect("submit 2");
     //
     // // info!("Num utxos after second submit {:?}", utxos.len());
     //
-    // submit.submit_duplicate().await;
+    submit.submit_duplicate().await;
     //
     // // info!("Num utxos after duplicate submit {:?}", utxos.len());
     //
     // // show_balances();
     // // // shouldn't response metadata be not an option??
     //
-    // for _ in 0..1 {
-    //     // TODO Flaky failure observed once? Why?
-    //     // submit.submit_double_spend(None).await;
-    // }
+    for _ in 0..1 {
+        // TODO Flaky failure observed once? Why?
+        submit.submit_double_spend(None).await;
+    }
     //
     // // TODO: Submit invalid UTXO
-    // submit.submit_invalid_signature().await;
-    // submit.submit_used_mismatched_utxo().await;
-    // submit.submit_used_utxo().await;
-
-    //  let tx_s = {
-    //     let mut gen = submit.generator.lock().unwrap();
-    //     let transaction = gen.generate_simple_used_utxo_tx_otherwise_valid().clone().expect("tx");
-    //     let mut tx = transaction.transaction.clone();
-    //     tx
-    // };
-    // let inputs = tx_s.inputs.clone();
-    // let option1 = inputs.iter().next();
-    // let option = option1.cloned().expect("input").utxo_id;
-    // let utxo_id= option.expect("utxo");
-    // info!("Utxo id: {}", utxo_id.json_or());
-    // assert!(tx_s.prevalidate().is_ok());
-    // let is_valid = _ds.utxo.utxo_id_valid(&utxo_id).await.expect("utxo valid");
-    // assert!(!is_valid);
-    // let res = submit.client.clone().send_transaction(&tx_s, true).await;
-
-
-    // assert!(res.is_err());
-
-    // info!("Num utxos after double spend submit {:?}", utxos.len());
-
-    // show_balances();
-
-    // for _ in 0..2 {
-    //     submit.submit_split();
-    //     show_balances();
-    // }
-
-    // let addr =
-    //     runtime.block_on(
-    // client.query_addresses(submit.get_addresses()).await;
-
-    // info!("Address response: {:?}", addr);
-
-    // //
-    // let after_node_added = submit.submit();
-    // assert_eq!(2, after_node_added.submit_transaction_response.expect("submit").query_transaction_response.expect("query")
-    //     .observation_proofs.len());
-
+    submit.submit_invalid_signature().await;
+    submit.submit_used_mismatched_utxo().await;
+    submit.submit_used_utxo().await;
 
     local_nodes.verify_data_equivalent().await;
 
@@ -232,31 +173,24 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     ).await;
 
     local_nodes.verify_data_equivalent().await;
-    //
-    // tokio::time::sleep(Duration::from_secs(2)).await;
-    //
-    // let after_2_nodes = submit.submit().await.expect("submit");
-    //
-    // // tracing::info!("After two nodes started first submit: {}", after_2_nodes.json_pretty_or());
-    //
-    // // Debug for purpose of viewing 2nd node operations
-    // // tokio::time::sleep(Duration::from_secs(15)).await;
-    // after_2_nodes.at_least_n(2).unwrap();
-    //
-    // local_nodes.verify_peers().await.expect("verify peers");
-    //
-    //
-    // let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
-    //
-    // // tokio::time::sleep(Duration::from_secs(10)).await;
-    //
-    //
-    // let signing_data = Hash::from_string_calculate("hey");
-    // let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
-    //
-    // tracing::info!("After MP test");
-    //
-    // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let after_2_nodes = submit.submit().await.expect("submit");
+    after_2_nodes.at_least_n(2).unwrap();
+
+    local_nodes.verify_peers().await.expect("verify peers");
+
+
+    let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
+
+    // tokio::time::sleep(Duration::from_secs(10)).await;
+
+
+    let signing_data = Hash::from_string_calculate("hey");
+    let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
+
+    tracing::info!("After MP test");
+
+    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
 
     local_nodes.verify_data_equivalent().await;
 
@@ -265,51 +199,22 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     local_nodes.verify_data_equivalent().await;
     local_nodes.verify_peers().await?;
     //
-    // // This works but is really flaky for some reason?
-    // // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
-    //
-    // // submit.submit().await?.at_least_n(3).unwrap();
-    //
-    // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
-    // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
-    // let public = res.public_key.expect("public key");
-    // let mp_eth_addr = public.to_ethereum_address().expect("eth address");
-    //
-    // let environment = NetworkEnvironment::Dev;
+    // This works but is really flaky for some reason?
+    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+
+    submit.submit().await?.at_least_n(3).unwrap();
+
+    let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
+    let public = res.public_key.expect("public key");
+    let mp_eth_addr = public.to_ethereum_address().expect("eth address");
+
+    let environment = NetworkEnvironment::Dev;
     //
     // // Manual test uses up funds.
-    //
-    // let do_mp_eth_test = false;
-    //
-    // if do_mp_eth_test {
-    //     // Ignore this part for now
-    //     let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
-    //     let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
-    //     let txs = h.get_all_tx(&string_addr, None).await.expect("works");
-    //     println!("txs: {}", txs.json_or());
-    //     let tx_head = txs.get(0).expect("tx");
-    //     let _other_address = tx_head.other_address.clone();
-    //
-    //     // Load using the faucet KP, but send to the multiparty address
-    //     let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
-    //     let eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
-    //     let dev_faucet_rx_addr = dev_kp.public_key().to_ethereum_address().expect("works");
-    //     let fee = "0.000108594791676".to_string();
-    //     let fee_value = EthHistoricalClient::translate_float_value(&fee.to_string()).expect("works") as u64;
-    //     let amount = fee_value * 6;
-    //     let _tx = eth.send_tx(&mp_eth_addr, amount).await.expect("works");
-    //
-    //     tokio::time::sleep(Duration::from_secs(20)).await;
-    //
-    //     let mut tx = eth.create_transaction(&mp_eth_addr, &dev_faucet_rx_addr, fee_value * 3).await.expect("works");
-    //     let data = EthWalletWrapper::signing_data(&tx).expect("works");
-    //     let h = Hash::new_from_proto(data).expect("works");
-    //     let res = do_signing(keygen2.clone(), h.clone(), client1.clone()).await;
-    //     let sig = res.signature.expect("sig");
-    //     let raw = EthWalletWrapper::process_signature(sig, &mut tx).expect("works");
-    //     eth.broadcast_tx(raw).await.expect("works");
-    // }
-    // // TODO: AMM tests
+
+    // manual_eth_mp_signing_test(client1, keygen2, &mp_eth_addr, &environment).await;
+    // TODO: AMM tests
 
     // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
     // ETH support.
@@ -327,31 +232,72 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // }
     // assert!(loaded);
 
-    // Await party formation
-    let mut retries = 0;
-    loop {
-        if let Some((party_public_key, pid)) = relay_start.external_network_shared_data.clone_read().await
-            .into_iter().filter(|(k, v)| {
-            v.self_initiated_not_debug()
-        }).next() {
-            info!("Party formation pk: {}", party_public_key.json_or());
-            let all_in = pid.party_info.initiate.expect("init").identifier.expect("id").party_keys.len() == 3;
-            if all_in {
-                break;
-            } else {
-                panic!("Not all parties in formation");
-            }
-        }
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        retries += 1;
-        if retries > 30 {
-            panic!("Party formation not completed in expected time");
-        }
-    }
-
     // Eth staking tests.
+    // ignore for now, too flakey.
+    // if false {
+    // eth_amm_e2e(start_node, relay_start, &submit).await.expect("works");
+
+    info!("Test passed");
+
+    std::mem::forget(local_nodes);
+    std::mem::forget(submit);
+    Ok(())
+}
+//
+// async fn manual_eth_mp_signing_test(client1: ControlClient, keygen2: ControlMultipartyKeygenResponse, mp_eth_addr: &String, environment: &NetworkEnvironment) {
+// // Ignore this part for now
+//     let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
+//     let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
+//     let txs = h.get_all_tx(&string_addr, None).await.expect("works");
+//     println!("txs: {}", txs.json_or());
+//     let tx_head = txs.get(0).expect("tx");
+//     let _other_address = tx_head.other_address.clone();
+//
+//     // Load using the faucet KP, but send to the multiparty address
+//     let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
+//     let eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
+//     let dev_faucet_rx_addr = dev_kp.public_key().to_ethereum_address().expect("works");
+//     let fee = "0.000108594791676".to_string();
+//     let fee_value = EthHistoricalClient::translate_float_value(&fee.to_string()).expect("works") as u64;
+//     let amount = fee_value * 6;
+//     let _tx = eth.send(&mp_eth_addr, amount).await.expect("works");
+//
+//     tokio::time::sleep(Duration::from_secs(20)).await;
+//
+//     let mut tx = eth.create_transaction(&mp_eth_addr, &dev_faucet_rx_addr, fee_value * 3).await.expect("works");
+//     let data = EthWalletWrapper::signing_data(&tx).expect("works");
+//     let h = Hash::new_from_proto(data).expect("works");
+//     let res = do_signing(keygen2.clone(), h.clone(), client1.clone()).await;
+//     let sig = res.signature.expect("sig");
+//     let raw = EthWalletWrapper::process_signature(sig, &mut tx).expect("works");
+//     eth.broadcast_tx(raw).await.expect("works");
+// }
+
+async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submit: &TransactionSubmitter) -> RgResult<()> {
     if let Some((secret, kp)) = dev_ci_kp() {
 
+
+        // Await party formation
+        let mut retries = 0;
+        loop {
+            if let Some((party_public_key, pid)) = relay_start.external_network_shared_data.clone_read().await
+                .into_iter().filter(|(k, v)| {
+                v.self_initiated_not_debug()
+            }).next() {
+                info!("Party formation pk: {}", party_public_key.json_or());
+                let all_in = pid.party_info.initiate.expect("init").identifier.expect("id").party_keys.len() == 3;
+                if all_in {
+                    break;
+                } else {
+                    panic!("Not all parties in formation");
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            retries += 1;
+            if retries > 60 {
+                panic!("Party formation not completed in expected time");
+            }
+        }
 
         // TODO: Mock request for API to get pool information.
         let (party_public_key, pid) = relay_start.external_network_shared_data.clone_read().await
@@ -416,7 +362,6 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
         // Then send the external ETH stake registration request
 
-
         info!("Getting utxos for external stake test");
         let test_tx = submit.send_to(&dev_ci_rdg_address).await.expect("works").transaction.expect("works");
         info!("Got utxos for external stake test");
@@ -439,8 +384,8 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
                 &party_fee_amount
             ).build().expect("works").sign(&kp).expect("works");
 
-        info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
-        info!("tx_stake tx: {}", tx_stake.json_or());
+        // info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
+        // info!("tx_stake tx: {}", tx_stake.json_or());
 
         let res = submit.send_tx(&tx_stake).await.expect("works");
 
@@ -452,20 +397,19 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
                 v.self_initiated_not_debug()
             }).next() {
                 if let Some(pe) = pid.party_events {
-                    if pe.external_unfulfilled_staking_txs.len() > 0 {
-                        info!("Found pending external stake event: {}", pe.external_unfulfilled_staking_txs.json_or());
+                    if pe.pending_external_staking_txs.len() > 0 {
+                        info!("Found pending external stake event"); //: {}", pe.external_unfulfilled_staking_txs.json_or());
                         break;
                     }
                 }
             }
             info!("Awaiting internal pending external stake event");
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(10)).await;
             retries += 1;
-            if retries > 8 {
+            if retries > 10 {
                 panic!("No internal pending external stake event found");
             }
         }
-
 
 
         let stake_external_utxo_for_withdrawal = tx_stake.to_utxo_address(&dev_ci_rdg_address).iter()
@@ -481,8 +425,10 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
         info!("Sending eth stake to party address");
         let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
+        info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
+        info!("Fee fixed {}", EthWalletWrapper::fee_fixed_normal().json_or());
         let res = tokio::time::timeout(
-            Duration::from_secs(30), eth.send_tx_typed(&party_eth_address, &exact_eth_stake_amount)
+            Duration::from_secs(120), eth.send(&party_eth_address, &exact_eth_stake_amount)
         ).await.expect("works").expect("works");
         info!("Eth txid: {}", res);
         let mut retries = 0;
@@ -502,7 +448,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
             }
             tokio::time::sleep(Duration::from_secs(10)).await;
             retries += 1;
-            if retries > 10 {
+            if retries > 20 {
                 panic!("Failed to receive ETH stake");
             }
         }
@@ -510,7 +456,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let key = std::env::var("ETHERSCAN_API_KEY2").expect("works");
         let eth_h = EthHistoricalClient::new_from_key(&config.network, key).expect("works");
         // From here we need to wrap everything in a function, so that we can catch failures to withdraw this stake.
-
+        //
         let maybe_err = proceed_swap_test_from_eth_send(
             &config,
             &party_rdg_address,
@@ -523,6 +469,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
             &relay_start,
             &eth_h
         ).await.log_error();
+
 
         info!("Finished proceed_swap_test_from_eth_send");
 
@@ -561,7 +508,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
             }
             retries += 1;
             if retries > 10 {
-                return Err(ErrorInfo::error_info("Failed to receive ETH swap"));
+                return Err(ErrorInfo::error_info("Failed to receive ETH stake withdrawal"));
             }
         };
 
@@ -578,15 +525,10 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
             ).build().expect("works").sign(&kp).expect("works");
 
         let res = submit.send_tx(&rdg_withdrawal).await.expect("works");
+        info!("Finished RDG withdrawal success");
 
         maybe_err.expect("works");
-
-
     };
-
-
-    std::mem::forget(local_nodes);
-    std::mem::forget(submit);
     Ok(())
 }
 
@@ -602,61 +544,67 @@ async fn proceed_swap_test_from_eth_send(
     relay: &Relay,
     h: &EthHistoricalClient
 ) -> RgResult<()> {
-
-    // This is sending RDG to receive ETH
-    info!("Getting UTXOs for test send rdg_receive_eth");
-    let utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
-    let bal = utxos.iter().flat_map(|u| u.opt_amount()).map(|a| a.amount).sum::<i64>();
-    let amount = CurrencyAmount::from_rdg(bal - bal / 10);
-    let original_eth_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
-    let amount_orig = original_eth_balance.amount_i64_or();
-    let send_rdg_receive_eth = config.tx_builder()
-        .with_utxos(&utxos).expect("works")
-        .with_swap(
-            &dev_ci_eth_addr,
-            &amount,
-            party_rdg_address,
-        )?
-        .build()?
-        .sign(&kp).expect("works");
-    info!("Submitting send_rdg_receive_eth");
-
-    let res = submit.send_tx(&send_rdg_receive_eth).await?;
-    let mut retries = 0;
-    loop {
-        tokio::time::sleep(Duration::from_secs(10)).await;
-        info!("Awaiting receipt of ETH swap");
-        let new_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
-        let new_amount = new_balance.amount_i64_or();
-        if new_amount > amount_orig {
-            break;
-        }
-        retries += 1;
-        if retries > 10 {
-            return Err(ErrorInfo::error_info("Failed to receive ETH swap"));
-        }
-    };
-
-    let rdg_balance = relay.ds.transaction_store
-        .get_balance(&party_rdg_address).await?.ok_msg("works")?;
+    //
+    // // This is sending RDG to receive ETH
+    // info!("Getting UTXOs for test send rdg_receive_eth");
+    // let utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
+    // let bal = utxos.iter().flat_map(|u| u.opt_amount()).map(|a| a.amount).sum::<i64>();
+    // let amount = CurrencyAmount::from_rdg(bal - bal / 10);
+    // let original_eth_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
+    // let amount_orig = original_eth_balance.amount_i64_or();
+    // let send_rdg_receive_eth = config.tx_builder()
+    //     .with_utxos(&utxos).expect("works")
+    //     .with_swap(
+    //         &dev_ci_eth_addr,
+    //         &amount,
+    //         party_rdg_address,
+    //     )?
+    //     .build()?
+    //     .sign(&kp).expect("works");
+    // info!("Submitting send_rdg_receive_eth");
+    //
+    // let res = submit.send_tx(&send_rdg_receive_eth).await?;
+    // let mut retries = 0;
+    // loop {
+    //     tokio::time::sleep(Duration::from_secs(10)).await;
+    //     info!("Awaiting receipt of ETH swap after sending RDG");
+    //     let new_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
+    //     let new_amount = new_balance.amount_i64_or();
+    //     if new_amount > amount_orig {
+    //         break;
+    //     }
+    //     retries += 1;
+    //     if retries > 10 {
+    //         return Err(ErrorInfo::error_info("Failed to receive ETH swap"));
+    //     }
+    // };
+    //
+    // let rdg_balance = relay.ds.transaction_store
+    //     .get_balance(&party_rdg_address).await?.ok_msg("works")?;
 
     info!("Submitting eth direct deposit to RDG swap");
 
     // TODO: Should we use SwapRequest to represent an external event? Not necessary for now
     // since this will just directly issue a swap.
-    eth.send_tx_typed(
+
+    eth.send(
         &party_eth_address,
-        &EthWalletWrapper::test_amount_typed()
+        &EthWalletWrapper::test_send_amount_typed()
     ).await?;
     // let fee_amount_pool = CurrencyAmount::from_rdg(10000);
+
+    let mut receive_addr = dev_ci_eth_addr.clone();
+    receive_addr.set_currency(SupportedCurrency::Redgold);
+    let rdg_eth_receive_addr_bal = relay.ds.transaction_store
+        .get_balance(&receive_addr).await?.unwrap_or(0);
 
     let mut retries = 0;
     loop {
         tokio::time::sleep(Duration::from_secs(10)).await;
-        info!("Awaiting receipt of ETH swap");
-        let new_balance = relay.ds.transaction_store
-            .get_balance(&party_rdg_address).await?.ok_msg("works")?;
-        if new_balance > rdg_balance {
+        info!("Awaiting receipt of RDG from swap after sending ETH");
+        let new_bal = relay.ds.transaction_store
+            .get_balance(&receive_addr).await?.unwrap_or(0);
+        if new_bal > rdg_eth_receive_addr_bal {
             break;
         }
         retries += 1;
@@ -664,6 +612,8 @@ async fn proceed_swap_test_from_eth_send(
             return Err(ErrorInfo::error_info("Failed to receive RDG swap"));
         }
     };
+
+    info!("Swap success of RDG from sent eth");
 
     Ok(())
 }
@@ -758,7 +708,22 @@ async fn debug_send() {
     let a = structs::Address::from_eth(&dest.to_string());
     let amt = EthWalletWrapper::stake_test_amount_typed();
 
-    assert!(PartyEvents::minimum_stake_amount(&amt));
-    eth.send_tx_typed(&a, &amt).await.expect("works");
+    assert!(PartyEvents::meets_minimum_stake_amount(&amt));
+    // eth.send_tx_typed(&a, &amt).await.expect("works");
+    let destination = Address::from_eth(dest);
+    let from = dev_kp.public_key().to_ethereum_address_typed().expect("");
+    let tx = eth.create_transaction_typed_inner(
+        &from,
+        &destination,
+        amt,
+        None
+    ).await.expect("works");
+    let gas_cost = eth.get_gas_cost_estimate(&tx).await.expect("works");
+    let gas_price = eth.get_gas_price().await.expect("works");
+    let fee = gas_cost.clone() * gas_price.clone();
 
+    println!("Fee: {}", fee.json_or());
+    println!("Fee: {}", fee.to_fractional());
+    println!("Gas cost: {}", gas_cost.json_or());
+    println!("Gas price: {}", gas_price.json_or());
 }

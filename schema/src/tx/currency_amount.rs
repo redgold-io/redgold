@@ -1,5 +1,5 @@
 use std::iter::Sum;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::str::FromStr;
@@ -198,8 +198,83 @@ impl Sub for CurrencyAmount {
         a
     }
 }
+
+impl Mul for CurrencyAmount {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut a = self.clone();
+        assert_eq!(a.currency_or(), rhs.currency_or());
+        if let (Some(ba), Some(rhs_ba)) = (self.bigint_amount(), rhs.bigint_amount()) {
+            let added = ba * rhs_ba;
+            a.string_amount = Some(added.to_string());
+        } else {
+            a.amount *= rhs.amount;
+        }
+        a
+    }
+
+}
+impl Mul<i64> for CurrencyAmount {
+    type Output = Self;
+
+    fn mul(self, rhs: i64) -> Self::Output {
+        let mut a = self.clone();
+        if let Some(ba) = self.bigint_amount() {
+            let added = ba * rhs;
+            a.string_amount = Some(added.to_string());
+        } else {
+            a.amount *= rhs;
+        }
+        a
+    }
+
+}
+
+impl Div for CurrencyAmount {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        let mut a = self.clone();
+        assert_eq!(a.currency_or(), rhs.currency_or());
+        if let Some(ba) = self.bigint_amount() {
+            let rhs_ba = rhs.bigint_amount().expect("rhs_bigint_amount");
+            let added = ba / rhs_ba;
+            a.string_amount = Some(added.to_string());
+        } else {
+            a.amount /= rhs.amount;
+        }
+        a
+    }
+
+}
+
+
 impl Sum for CurrencyAmount {
     fn sum<I: Iterator<Item = CurrencyAmount>>(iter: I) -> Self {
         iter.reduce(|a, b| a + b).unwrap_or(CurrencyAmount::default())
+    }
+}
+
+
+use std::cmp::Ordering;
+
+impl PartialOrd for CurrencyAmount {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if let (Some(ba), Some(ob)) = (self.bigint_amount(), other.bigint_amount()) {
+            ba.partial_cmp(&ob)
+        } else {
+            self.amount.partial_cmp(&other.amount)
+        }
+    }
+}
+
+impl Ord for CurrencyAmount {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if let (Some(ba), Some(ob)) = (self.bigint_amount(), other.bigint_amount()) {
+            ba.cmp(&ob)
+        } else {
+            self.amount.cmp(&other.amount)
+        }
     }
 }

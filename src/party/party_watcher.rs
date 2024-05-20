@@ -45,13 +45,14 @@ impl PartyWatcher {
             // info!("Party watcher tick num parties total {} active {}", parties.len(), active.len());
             self.tick_formations(&shared_data).await?;
         }
+        // info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
         Ok(())
     }
 
 
     async fn calculate_party_stream_events(&self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
         for (k,v ) in data.iter_mut() {
-            let mut pe = PartyEvents::new(k, &self.relay.node_config.network);
+            let mut pe = PartyEvents::new(k, &self.relay.node_config.network, &self.relay);
             for e in v.address_events.iter() {
                 pe.process_event(e).await?;
             }

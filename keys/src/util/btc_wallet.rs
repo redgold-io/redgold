@@ -230,7 +230,7 @@ pub struct RawTransaction {
     pub transaction_details: Option<TransactionDetails>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ExternalTimedTransaction {
     pub tx_id: String,
     pub timestamp: Option<u64>,
@@ -242,9 +242,19 @@ pub struct ExternalTimedTransaction {
     pub currency: SupportedCurrency,
     pub block_number: Option<u64>,
     pub price_usd: Option<f64>,
+    pub fee: Option<CurrencyAmount>,
 }
 
 impl ExternalTimedTransaction {
+
+    pub fn balance_change(&self) -> CurrencyAmount {
+        let fee = self.fee.clone().unwrap_or(CurrencyAmount::zero(self.currency));
+        if self.incoming {
+            self.currency_amount()
+        } else {
+            self.currency_amount() - fee
+        }
+    }
 
     pub fn other_address_typed(&self) -> RgResult<structs::Address> {
         self.other_address.parse_address()
@@ -437,6 +447,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Address::from_str(&addr).error_info("Unable to convert destination pk to bdk address")
     }
 
+    #[deprecated]
     pub fn get_sourced_tx(&self) -> Result<Vec<ExternalTimedTransaction>, ErrorInfo> {
         let self_addr = self.address()?;
         let mut res = vec![];
@@ -496,6 +507,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                     currency: SupportedCurrency::Bitcoin,
                     block_number: None,
                     price_usd: None,
+                    fee: None,
                 };
                 res.push(ett)
             }
@@ -568,9 +580,8 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
             };
 
             let block_timestamp = x.confirmation_time.clone().map(|x| x.timestamp).map(|t| t * 1000);
-
+            let fee = x.fee.map(|f| CurrencyAmount::from_btc(f as i64));
             if let (Some(a), Some(value)) = (other_address, amount) {
-
                 let ett = ExternalTimedTransaction {
                     tx_id: x.txid.to_string(),
                     timestamp: block_timestamp,
@@ -582,6 +593,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                     currency: SupportedCurrency::Bitcoin,
                     block_number: None,
                     price_usd: None,
+                    fee,
                 };
                 res.push(ett)
             }

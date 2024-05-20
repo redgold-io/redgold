@@ -589,7 +589,10 @@ impl TransactionProcessContext {
             observation_proofs.extend(stored_proofs);
             let pks = self.relay.node_config.seeds_now_pk();
             let done = pks.iter().all(|pk| {
-                observation_proofs.iter().any(|o| {
+                observation_proofs.iter()
+                    .filter(|op| op.metadata.as_ref()
+                        .map(|m| m.state() == State::Accepted).unwrap_or(false)
+                    ).any(|o| {
                     o.proof.as_ref().and_then(|p| p.public_key.as_ref()).map(|p| p == pk).unwrap_or(false)
                 })
             });

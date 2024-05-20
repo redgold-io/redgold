@@ -147,7 +147,11 @@ impl PartyWatcher {
         let eth_addr = pk.to_ethereum_address_typed()?;
         let amount = eth.get_balance_typed(&eth_addr).await?;
         let eth_addr_str = eth_addr.render_string()?;
-        let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block, None, None).await?;
+
+        // Ignoring for now to debug
+        let start_block_arg = None;
+        // let start_block_arg = start_block;
+        let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
         let end = ExternalNetworkData {
             pk: pk.clone(),
             transactions: all_tx.clone(),

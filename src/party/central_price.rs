@@ -4,6 +4,7 @@ use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, SupportedCurrency};
 use crate::party::order_fulfillment::OrderFulfillment;
+use crate::party::party_stream::PartyEvents;
 use crate::party::price_volume::PriceVolume;
 
 pub const DUST_LIMIT: i64 = 2500;
@@ -135,21 +136,41 @@ impl CentralPricePair {
             }
         };
 
-        updated_curve.retain(|v| v.volume > 0);
+        // updated_curve.retain(|v| v.volume > 0);
+        let cur = destination.currency_or();
+        let fee = PartyEvents::expected_fee_amount(cur).ok_msg("fee").expect("invalid currency in fulfill order").amount_i64_or();
 
-        if fulfilled_amount < DUST_LIMIT as u64 || fulfilled_amount <= 0 {
+        if fulfilled_amount < fee as u64 || fulfilled_amount <= 0 {
             None
         } else {
             Some(OrderFulfillment {
                 order_amount,
                 fulfilled_amount,
-                updated_curve,
                 is_ask_fulfillment_from_external_deposit: is_ask,
                 event_time,
                 tx_id_ref: tx_id.clone(),
                 destination: destination.clone(),
+                is_stake_withdrawal: false,
+                stake_withdrawal_fulfilment_utxo_id: None,
             })
         }
+    }
+
+    pub fn recalculate_no_quote_price_change(
+        existing: HashMap<SupportedCurrency, CentralPricePair>,
+        reserve_volumes: HashMap<SupportedCurrency, CurrencyAmount>,
+        time: i64,
+    ) -> RgResult<HashMap<SupportedCurrency, CentralPricePair>> {
+        let hm = existing.iter()
+            .map(|(k, v)| (k.clone(), v.pair_quote_price_estimate))
+            .collect();
+        Self::calculate_central_prices_bid_ask(
+            hm,
+            reserve_volumes,
+            time,
+            None,
+            None
+        )
     }
 
     pub fn calculate_central_prices_bid_ask(

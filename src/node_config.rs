@@ -242,6 +242,10 @@ impl NodeConfig {
         all_seeds.iter().unique().cloned().collect_vec()
     }
 
+    pub fn seeds_at_pk(&self, time: i64) -> Vec<PublicKey> {
+        self.seeds_at(time).iter().flat_map(|s| s.public_key.clone()).collect()
+    }
+
     // This may cause a problem with manually configured seeds
     pub fn seeds_now(&self) -> Vec<Seed> {
         self.seeds_at(util::current_time_millis_i64())
