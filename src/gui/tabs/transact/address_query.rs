@@ -1,9 +1,9 @@
-use redgold_keys::eth::example::EthHistoricalClient;
+use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::structs::PublicKey;
 use tracing::{error, info};
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::SendErrorInfo;
 use crate::gui::app_loop::LocalState;

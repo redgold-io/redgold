@@ -14,7 +14,8 @@ use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, R
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
 use std::sync::Arc;
 use tracing_subscriber::Registry;
-use redgold_schema::{EasyJson, ErrorInfoContext, RgResult};
+use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::helpers::easy_json::EasyJson;
 
 
 pub struct WrappedMetrics {

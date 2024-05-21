@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS observation (
-                                           hash    BLOB PRIMARY KEY,
-                                           raw    BLOB NOT NULL,
+                                           hash    BLOB PRIMARY KEY NOT NULL,
+                                           observation_proto    BLOB NOT NULL,
                                            public_key    BLOB NOT NULL,
                                            time INTEGER NOT NULL,
                                            height INTEGER NOT NULL

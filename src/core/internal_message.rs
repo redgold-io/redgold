@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
-use crate::schema::structs::{Error, ErrorInfo, PublicResponse, Request, Response, Transaction};
+use crate::schema::structs::{ErrorCode, ErrorInfo, PublicResponse, Request, Response, Transaction};
 use crate::schema::error_message;
 use bdk::bitcoin::secp256k1::PublicKey;
 use tokio::task::JoinError;
@@ -101,7 +101,7 @@ where
     async fn recv_async_err(&self) -> Result<T, ErrorInfo> {
         self.recv_async()
             .await
-            .map_err(|e| error_message(Error::InternalChannelReceiveError, e.to_string()))
+            .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
     }
     async fn recv_async_err_timeout(&self, duration: Duration) -> Result<T, ErrorInfo> {
         tokio::time::timeout(duration, self.recv_async_err())
@@ -123,7 +123,7 @@ where
 {
     fn send_rg_err(&self, t: T) -> Result<(), ErrorInfo> {
         self.send(t)
-            .map_err(|e| error_message(Error::InternalChannelReceiveError, e.to_string()))
+            .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
     }
 }
 
@@ -137,7 +137,7 @@ impl<T> Channel<T> {
     pub async fn send(&self, t: T) -> Result<(), ErrorInfo> {
         self.sender
             .send(t)
-            .map_err(|e| error_message(Error::InternalChannelSendError, e.to_string()))
+            .map_err(|e| error_message(ErrorCode::InternalChannelSendError, e.to_string()))
     }
     pub fn new() -> Channel<T> {
         new_channel()

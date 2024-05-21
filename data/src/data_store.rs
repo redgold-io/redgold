@@ -10,20 +10,24 @@ use log::info;
 use metrics::{counter, gauge};
 use serde_json::de::Read;
 use sqlx::{Acquire, Sqlite, SqlitePool};
-use sqlx::{Row};
+use sqlx::Row;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
+use redgold_keys::address_support::AddressSupport;
 
-use crate::address_block::AddressBlockStore;
 use crate::config::ConfigStore;
 use crate::DataStoreContext;
 use crate::mp_store::MultipartyStore;
 use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, SafeBytesAccess, SafeOption, structs, util, WithMetadataHashable};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs, util};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
 use redgold_schema::util::machine_info::{available_bytes, cores_total, file_size_bytes, memory_total_kb};
+use crate::price_time::PriceTimeStore;
 
 use crate::schema::structs::{
     Address, ErrorInfo,
@@ -35,7 +39,6 @@ use crate::utxo_store::UtxoStore;
 pub struct DataStore {
     pub connection_path: String,
     pub pool: Arc<SqlitePool>,
-    pub address_block_store: AddressBlockStore,
     pub peer_store: PeerStore,
     pub config_store: ConfigStore,
     pub transaction_store: TransactionStore,
@@ -45,6 +48,7 @@ pub struct DataStore {
     pub ctx: DataStoreContext,
     pub state: StateStore,
     pub utxo: UtxoStore,
+    pub price_time: PriceTimeStore
 }
 
 impl DataStore {
@@ -124,15 +128,19 @@ impl DataStore {
             .with_detail("time", time.to_string())
             .with_detail("update_utxo", update_utxo.to_string());
         // result
-        match result {
+        let final_result = match result {
             Ok(_) => {
                 sqlite_tx.commit().await.error_info("Sqlite commit failure")?;
                 Ok(())
             }
             Err(e) => {
-                sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or())
+                match sqlite_tx.rollback().await.error_info("Rollback failure").with_detail("original_error", e.json_or()) {
+                    Ok(_) => { Err(e)}
+                    Err(e) => {Err(e)}
+                }
             }
-        }
+        };
+        final_result
     }
 
     async fn accept_transaction_inner(
@@ -140,9 +148,11 @@ impl DataStore {
         tx: &Transaction, time: i64, rejection_reason: Option<ErrorInfo>, update_utxo: bool,
         sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
     ) -> RgResult<()> {
-        self.insert_transaction(
+        let insert_result = self.insert_transaction(
             tx, time, rejection_reason.clone(), update_utxo, sqlite_tx
-        ).await?;
+        ).await;
+
+        insert_result?;
 
         if rejection_reason.is_none() {
             for utxo_id in tx.input_utxo_ids() {
@@ -169,7 +179,9 @@ impl DataStore {
             for entry in UtxoEntry::from_transaction(tx, time.clone()) {
                 let id = entry.utxo_id.safe_get_msg("malformed utxo_id on formation in insert transaction")?;
                 if self.utxo.utxo_children_pool_opt(id, Some(sqlite_tx)).await?.len() == 0 {
-                    self.transaction_store.insert_utxo(&entry, sqlite_tx).await?;
+                    self.utxo.insert_utxo(&entry, sqlite_tx).await?;
+                } else {
+                    counter!("redgold_utxo_insertion_duplicate").increment(1);
                 }
             }
         }
@@ -227,9 +239,9 @@ impl DataStore {
     ) -> Result<i64, ErrorInfo> {
 
         let hash = utxo_id.transaction_hash.safe_get_msg("No transaction hash on utxo_id")?.vec();
-        let child_hash = child_transaction_hash.safe_bytes()?;
+        let child_hash = child_transaction_hash.vec();
         let output_index = utxo_id.output_index;
-        let address = address.address.safe_bytes()?;
+        let address = address.proto_serialize();
         let rows = DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"
         INSERT OR REPLACE INTO transaction_edge
@@ -312,7 +324,7 @@ impl DataStore {
             transaction = Some(t);
             rejection_reason = e;
             // Query UTXO by hash only for all valid outputs.
-            let valid_utxo_output_ids = self.transaction_store
+            let valid_utxo_output_ids = self.utxo
                 .query_utxo_output_index(&hash)
                 .await?;
 
@@ -366,7 +378,7 @@ impl DataStore {
         gauge!("redgold_utxo_distinct_addresses").set(self.utxo.count_distinct_address_utxo().await? as f64);
         gauge!("redgold_disk_available_gigabytes").set(available_bytes(self.ctx.file_path.clone(), false).log_error().unwrap_or(0) as f64 / (1024f64*1024f64*1024f64));
         gauge!("redgold_data_store_size_gigabytes").set(file_size_bytes(self.ctx.file_path.clone()).log_error().unwrap_or(0) as f64  / (1024f64*1024f64*1024f64));
-        gauge!("redgold_memory_total").set(memory_total_kb().log_error().unwrap_or(0) as f64  / (1024f64*1024f64));
+        gauge!("redgold_memory_total").set(memory_total_kb().unwrap_or(0) as f64  / (1024f64*1024f64));
         gauge!("redgold_cores_total").set(cores_total().log_error().unwrap_or(0) as f64);
         gauge!("redgold_multiparty_total").set(self.multiparty_store.count_multiparty_total().await? as f64);
         gauge!("redgold_multiparty_self").set(self.multiparty_store.count_self_multiparty().await? as f64);
@@ -376,7 +388,7 @@ impl DataStore {
 
     // TODO: Move to utxoStore
     pub async fn get_address_string_info(&self, address: String) -> Result<AddressInfo, ErrorInfo> {
-        let addr = Address::parse(address)?;
+        let addr = address.parse_address()?;
         let res = self.transaction_store.query_utxo_address(&addr).await?;
         Ok(AddressInfo::from_utxo_entries(addr.clone(), res))
     }
@@ -415,7 +427,6 @@ WHERE
             ctx: ctx.clone(),
             connection_path: path.clone(),
             pool: pl.clone(),
-            address_block_store: AddressBlockStore{ ctx: ctx.clone() },
             peer_store: PeerStore{ ctx: ctx.clone() },
             config_store: ConfigStore{ ctx: ctx.clone() },
             // server_store: ServerStore{ ctx: ctx.clone() },
@@ -424,6 +435,7 @@ WHERE
             multiparty_store: MultipartyStore { ctx: ctx.clone() },
             observation: ObservationStore { ctx: ctx.clone() },
             state: StateStore { ctx: ctx.clone() },
+            price_time: PriceTimeStore { ctx },
         }
     }
 

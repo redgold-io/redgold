@@ -1,0 +1,86 @@
+use std::collections::HashMap;
+use itertools::Itertools;
+use log::{error, info};
+use redgold_schema::{error_info, RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::structs::{ErrorInfo, Hash, HealthRequest, PublicKey, Request};
+use crate::multiparty_gg20::initiate_mp;
+use crate::party::data_enrichment::PartyInternalData;
+use crate::party::deposit_key_allocation::DepositKeyAllocation;
+use crate::party::party_watcher::PartyWatcher;
+
+impl PartyWatcher {
+
+    pub async fn initial_formation(&self) -> RgResult<()> {
+        // info!("Initial party key formation");
+        // Initiate MP keysign etc. gather public key and original proof and params
+        // TODO: Add deposit trust scored peers.
+        let seeds = self.relay.node_config.non_self_seeds_pk().clone();
+        let party_peers = seeds.clone();
+        self.form_keygen_group(party_peers).await?;
+        // info!("Initial party key formation success");
+        Ok(())
+    }
+
+    async fn form_keygen_group(&self, party_peers: Vec<PublicKey>) -> RgResult<()> {
+        let results = self.relay.health_request(&party_peers).await?;
+        let errs = results.iter().filter_map(|r| r.as_ref().err()).collect_vec();
+        if errs.len() > 0 {
+
+            info!("Not enough peers in party formation");
+            // error!("Error in initial party key formation {}", errs.json_or());
+            // return Err(error_info("Error in initial party key formation {}"))
+            //     .with_detail("party_peers", party_peers.json_or())
+            //     .with_detail("errors", errs.json_or())
+            return Ok(())
+        }
+        let r = initiate_mp::initiate_mp_keygen(
+            self.relay.clone(),
+            None,
+            true,
+            Some(party_peers.clone()),
+            false,
+            vec![]
+        ).await?;
+
+        // info!("Keygen group formed with {}", r.json_or());
+        // TODO: Get this from local share instead of from a second keysign round.
+        let test_sign = r.identifier.room_id.safe_get()?.uuid.safe_get()?.clone();
+        let h = Hash::from_string_calculate(&test_sign);
+        let bd = h.bytes.safe_get_msg("Missing bytes in immediate hash calculation")?;
+        let ksr = initiate_mp::initiate_mp_keysign(
+            self.relay.clone(), r.identifier.clone(),
+            bd.clone(),
+            r.identifier.party_keys.clone(),
+            None,
+            None
+        ).await?;
+        // info!("Keygen signing group formed with {} peers {}", party_peers.len(), ksr.json_or());
+        let party_pk = ksr.proof.public_key.safe_get_msg("proof in ksr")?.clone();
+        // info!("Party public key: {}", party_pk);
+        let api = self.relay.ds.multiparty_store.all_party_info_with_key().await?;
+        // info!("All party info with key: {}", api.json_or());
+        let pd = self.relay.ds.multiparty_store.party_data(&party_pk).await?;
+        let pd = pd.safe_get_msg("party data missing")?;
+        // info!("Party data: {}", pd.json_party_internal_data.clone().unwrap_or("".to_string()));
+
+
+        Ok(())
+    }
+
+    pub async fn tick_formations(&self, shared_data: &HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
+        let self_host = shared_data.iter()
+            .filter(|(k,v)| v.self_initiated_not_debug())
+            .collect_vec();
+
+        // info!("Party formation tick self_host_len: {}", self_host.len());
+
+        if self_host.len() == 0 {
+            self.initial_formation().await.log_error().ok();
+        }
+
+        Ok(())
+    }
+
+}

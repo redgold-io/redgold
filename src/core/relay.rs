@@ -1,14 +1,16 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::pin::pin;
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use async_trait::async_trait;
+use bdk::sled::Tree;
 
 use crate::core::internal_message;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::schema::structs::{
-    Error, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
+    ErrorCode, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
 use flume::{Receiver, Sender};
@@ -18,11 +20,14 @@ use futures::task::SpawnExt;
 use itertools::Itertools;
 use log::{error, info};
 use metrics::counter;
+use rocket::form::FromForm;
+use rocket::http::ext::IntoCollection;
 use tokio::runtime::Runtime;
+use tokio::sync::MutexGuard;
 use tracing::trace;
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, DynamicNodeMetadata, UtxoId, GossipTransactionRequest, Hash, HashType, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, Response, State, Transaction, TrustData, ValidationType, PartitionInfo, ResolveHashRequest, PartyId, UtxoEntry, CurrencyAmount};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
@@ -32,23 +37,29 @@ use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
+use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::transaction::amount_to_raw_amount;
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
+use redgold_schema::transaction::{amount_to_raw_amount, TransactionMaybeError};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::NodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
-use crate::schema::{ProtoHashable, SafeOption, WithMetadataHashable};
+use crate::schema::SafeOption;
+use crate::scrape::external_networks::ExternalNetworkData;
 use crate::util;
 use crate::util::keys::ToPublicKey;
 
 #[derive(Clone)]
 pub struct TransactionErrorCache {
     pub process_time: u64,
-    pub error: Error,
+    pub error: ErrorCode,
 }
 
 #[derive(Clone)]
@@ -91,9 +102,34 @@ pub struct ObservationMetadataInternalSigning {
     pub sender: flume::Sender<ObservationProof>
 }
 
-#[derive(Clone)]
-pub struct ReadManyWriteOne<T> {
-    pub inner: Arc<AtomicCell<T>>
+
+// TODO: There's a better pattern here than mutex, but wrapping this here for clarity
+// for a future change.
+#[derive(Clone, Default)]
+pub struct ReadManyWriteOne<T> where T: Clone {
+    pub inner: Arc<tokio::sync::Mutex<T>>
+}
+
+impl<T> ReadManyWriteOne<T> where T: Clone  {
+    pub async fn write(&self, t: T) -> () {
+        let mut guard = self.lock().await;
+        *guard = t;
+        ()
+    }
+
+    async fn lock(&self) -> MutexGuard<'_, T> {
+        self.inner.lock().await
+    }
+
+    pub async fn clone_read(&self) -> T {
+        let guard = self.lock().await;
+        (*guard).clone()
+    }
+
+    pub async fn read(&self) -> MutexGuard<'_, T> {
+        self.lock().await
+    }
+
 }
 
 #[derive(Clone)]
@@ -134,8 +170,8 @@ pub struct Relay {
     /// Used for immediate discovery messages for unknown or unrecognized message
     pub discovery: Channel<DiscoveryMessage>,
     /// Authorization channel for multiparty keygen to determine room_id and participating keys
-    pub mp_keygen_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartyKeygenRequest>>>,
-    pub mp_signing_authorizations: Arc<Mutex<HashMap<String, InitiateMultipartySigningRequest>>>,
+    pub mp_keygen_authorizations: Arc<Mutex<HashMap<RoomId, InitiateMultipartyKeygenRequest>>>,
+    pub mp_signing_authorizations: Arc<Mutex<HashMap<RoomId, InitiateMultipartySigningRequest>>>,
     pub contract_state_manager_channels: Vec<Channel<ContractStateMessage>>,
     pub contention: Vec<Channel<ContentionMessage>>,
     pub predicted_trust_overall_rating_score: Arc<Mutex<HashMap<PeerId, f64>>>,
@@ -143,30 +179,37 @@ pub struct Relay {
     pub mempool_entries: Arc<DashMap<Hash, Transaction>>,
     pub faucet_rate_limiter: Arc<Mutex<HashMap<String, (Instant, i32)>>>,
     pub tx_writer: Channel<TxWriterMessage>,
-    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>
+    pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
+    pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
+    pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
+
 }
 
 impl Relay {
-    pub(crate) async fn dev_default() -> Self {
-        Self::new(NodeConfig::dev_default().await).await
+
+    pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
+        let mut guard = self.btc_wallets.lock().await;
+        let result = guard.get(pk);
+        let mutex = match result {
+            Some(w) => {
+                w.clone()
+            }
+            None => {
+                let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
+                    pk.clone(), self.node_config.network.clone(), true,
+                    self.node_config.env_data_folder().bdk_sled_path()
+                )?;
+                let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
+                guard.insert(pk.clone(), w.clone());
+                w
+            }
+        };
+        Ok(mutex)
     }
-}
 
-
-
-#[async_trait]
-pub trait SafeLock<T> where T: ?Sized + std::marker::Send {
-    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>>;
-}
-#[async_trait]
-impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Send {
-    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>> {
-        // May need a timeout here in the future, hence wrapping it
-        Ok(self.lock().await)
+    pub fn eth_wallet(&self) -> RgResult<EthWalletWrapper> {
+        EthWalletWrapper::new(&self.node_config.keypair().to_private_hex(), &self.node_config.network)
     }
-}
-
-impl Relay {
 
     pub fn default_fee_addrs(&self) -> Vec<Address> {
         self.node_config.seed_peer_addresses()
@@ -257,6 +300,24 @@ impl Relay {
         Ok(false)
     }
 
+    pub async fn lookup_transaction_maybe_error_hex(&self, hash: impl Into<String>) -> RgResult<Option<TransactionMaybeError>> {
+        let hash = Hash::from_hex(hash)?;
+        self.lookup_transaction_maybe_error(&hash).await
+    }
+    pub async fn lookup_transaction_maybe_error(&self, hash: &Hash) -> RgResult<Option<TransactionMaybeError>> {
+        let res = match self.lookup_transaction(hash).await? {
+            None => {
+                self.ds.transaction_store.query_rejected_transaction(hash).await?.map(
+                    |(t, e)| TransactionMaybeError::new_error(t, e)
+                )
+            }
+            Some(t) => {
+                Some(TransactionMaybeError::new(t))
+            }
+        };
+        Ok(res)
+    }
+
     pub async fn lookup_transaction(&self, hash: &Hash) -> RgResult<Option<Transaction>> {
         let res = match self.mempool_entries.get(hash)
             .map(|t| t.clone())
@@ -265,8 +326,7 @@ impl Relay {
             )
         {
             None => {
-                self.ds.transaction_store.query_maybe_transaction(hash).await?
-                    .map(|t| t.0)
+                self.ds.transaction_store.query_accepted_transaction(hash).await?
             }
             Some(t) => {
                 Some(t)
@@ -292,9 +352,10 @@ are instantiated by the node
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
-use crate::core::transact::contention_conflicts::{ContentionResult, ContentionMessage, ContentionMessageInner};
+use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::e2e::tx_gen::SpendableUTXO;
+use crate::party::data_enrichment::PartyInternalData;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -460,7 +521,7 @@ impl Relay {
     pub async fn last_6_peer_id(&self) -> RgResult<String> {
         Ok(self.peer_tx().await?.peer_data()?
             .peer_id.ok_msg("Peer ID not found")?.peer_id.ok_msg("Peer ID not found")?
-            .hex_or().last_n(6))
+            .hex().last_n(6))
     }
 
     pub async fn gauge_labels(&self) -> RgResult<[(String, String); 2]> {
@@ -628,15 +689,15 @@ impl Relay {
 
     pub fn authorize_signing(&self, p0: InitiateMultipartySigningRequest) -> RgResult<()> {
         let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
-        l.insert(p0.signing_room_id.clone(), p0);
+        l.insert(p0.signing_room_id.safe_get_msg("room id signing missing")?.clone(), p0);
         Ok(())
     }
-    pub fn remove_signing_authorization(&self, room_id: &String) -> RgResult<()> {
+    pub fn remove_signing_authorization(&self, room_id: &RoomId) -> RgResult<()> {
         let mut l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         l.remove(room_id);
         Ok(())
     }
-    pub fn check_signing_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+    pub fn check_signing_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         Ok(l.get(room_id).safe_get_msg("missing room_id")
             .and_then(|x| x.identifier.safe_get_msg("missing identifier")
@@ -645,23 +706,25 @@ impl Relay {
 
     pub fn authorize_keygen(&self, p0: InitiateMultipartyKeygenRequest) -> RgResult<()> {
         let mut l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
-        l.insert(p0.identifier.safe_get_msg("missing identifier")?.uuid.clone(), p0);
+        l.insert(p0.identifier.safe_get_msg("missing identifier")?.room_id.safe_get_msg("rid")?.clone(), p0);
         Ok(())
     }
-    pub fn remove_keygen_authorization(&self, room_id: &String) -> RgResult<()> {
+    pub fn remove_keygen_authorization(&self, room_id: &RoomId) -> RgResult<()> {
         let mut l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         l.remove(room_id);
         Ok(())
     }
-    pub fn check_keygen_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+    pub fn check_keygen_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         Ok(l.get(room_id).safe_get_msg("missing room_id")
             .and_then(|x| x.identifier.safe_get_msg("missing identifier")
             ).map(|p| p.party_index(public_key)).unwrap_or(None))
     }
-    pub fn check_mp_authorized(&self, room_id: &String, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+    pub fn check_mp_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
+        let room_id = room_id.uuid.safe_get()?.clone();
         let stripped_one = room_id.strip_suffix("-online").unwrap_or(room_id.as_str());
         let room_id = stripped_one.strip_suffix("-offline").unwrap_or(stripped_one).to_string();
+        let room_id = RoomId::from(room_id);
         Ok(self.check_keygen_authorized(&room_id, public_key)?.or(self.check_signing_authorized(&room_id, public_key)?))
     }
 
@@ -675,7 +738,7 @@ impl Relay {
         };
         self.observation_metadata.sender.send_rg_err(omi)?;
         let res = tokio::time::timeout(
-            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 10),
+            Duration::from_secs(self.node_config.observation_formation_millis.as_secs() + 60),
             r.recv_async_err()
         ).await.error_info("Timeout waiting for internal observation formation")??;
         Ok(res)
@@ -742,7 +805,7 @@ impl Relay {
     pub async fn gossip(&self, tx: &Transaction) -> Result<(), ErrorInfo> {
         counter!("redgold_gossip_outgoing").increment(1);
         let all = self.ds.peer_store.select_gossip_peers(tx).await?;
-        info!("Gossiping transaction to {} peers {}", all.len(), all.json_or());
+        trace!("Gossiping transaction to {} peers {}", all.len(), all.json_or());
         for p in all {
             let mut req = Request::default();
             let mut gtr = GossipTransactionRequest::default();
@@ -804,6 +867,19 @@ impl Relay {
         }
     }
 
+    pub async fn health_request(&self, nodes: &Vec<PublicKey>) -> RgResult<Vec<RgResult<Response>>> {
+        let mut req = Request::default();
+        req.health_request = Some(HealthRequest::default());
+        self.broadcast_async(nodes.clone(), req, None).await
+    }
+
+    pub async fn health_request_all(&self, nodes: &Vec<PublicKey>) -> RgResult<()> {
+        for r in self.health_request(nodes).await? {
+            r?;
+        }
+        Ok(())
+    }
+
     // the new function everything should use
     pub async fn broadcast_async(
         &self,
@@ -814,7 +890,7 @@ impl Relay {
         let mut results = vec![];
         for p in nodes {
             let req = request.clone();
-            let timeout = Some(timeout.unwrap_or(Duration::from_secs(20)));
+            let timeout = Some(timeout.unwrap_or(Duration::from_secs(30)));
             let res = self.send_message_async(&req, &p, timeout).await?;
             results.push((p, res));
         }
@@ -1030,7 +1106,30 @@ impl Relay {
             faucet_rate_limiter: Arc::new(Mutex::new(Default::default())),
             tx_writer: new_channel(),
             peer_send_failures: Arc::new(Default::default()),
+            external_network_shared_data: Default::default(),
+            btc_wallets: Arc::new(Default::default()),
         }
+    }
+}
+
+
+impl Relay {
+    pub(crate) async fn dev_default() -> Self {
+        Self::new(NodeConfig::dev_default().await).await
+    }
+}
+
+
+
+#[async_trait]
+pub trait SafeLock<T> where T: ?Sized + std::marker::Send {
+    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>>;
+}
+#[async_trait]
+impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Send {
+    async fn safe_lock(&self) -> RgResult<tokio::sync::MutexGuard<T>> {
+        // May need a timeout here in the future, hence wrapping it
+        Ok(self.lock().await)
     }
 }
 

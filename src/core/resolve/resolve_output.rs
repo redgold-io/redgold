@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use std::time::Duration;
 use itertools::Itertools;
-use redgold_schema::{error_info, RgResult, SafeBytesAccess, SafeOption};
+use redgold_schema::{error_info, RgResult, SafeOption};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NodeMetadata, ObservationProof, Output, PublicKey, Request, ResolveCodeResponse, Response, Transaction};
 use redgold_schema::util::xor_distance::XorfConvDistanceSubset;
 use crate::core::relay::Relay;
@@ -48,7 +49,7 @@ pub async fn resolve_output(
     if internal_resolve.transaction.is_none() {
 
         let peer_subset: Vec<&NodeMetadata> = peers.xorf_conv_distance_subset(
-            &addr.address.safe_bytes()?, |i| i.contract_address
+            &addr.vec(), |i| i.contract_address
         );
         let peer_keys = peer_subset.iter().filter_map(|n| n.public_key.clone()).collect_vec();
 

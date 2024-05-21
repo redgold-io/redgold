@@ -19,7 +19,7 @@ pub const DEBUG_FINALIZATION_INTERVAL_MILLIS: u64 = 4000;
 pub const OBSERVATION_FORMATION_TIME_MILLIS: u64 = 3_000;
 pub const REWARD_POLL_INTERVAL: u64 = 60_000;
 
-pub const EARLIEST_TIME: i64 = 1650866635183;
+pub const EARLIEST_TIME: i64 = 1712949364925;
 //
 // pub const HASHER: Code = multihash::Code::Sha3_256;
 // pub const ADDRESS_HASHER: Code = multihash::Code::Sha3_224;
@@ -30,7 +30,7 @@ pub const REDGOLD: &str = "redgold";
 
 pub const RDG_SYMBOL: &str = "RDG";
 
-pub const STANDARD_VERSION: i64 = 0;
+pub const STANDARD_VERSION: i32 = 0;
 
 pub fn default_node_internal_derivation_path(account: i64) -> String {
     format!("m/{REDGOLD_PURPOSE}'/{REDGOLD_KEY_DERIVATION_PATH}'/{account}'/0/0")

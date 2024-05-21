@@ -1,13 +1,16 @@
-use redgold_schema::{EasyJson, error_info};
+use redgold_schema::error_info;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, PublicKey, Transaction};
 use tracing::info;
+use redgold_keys::address_support::AddressSupport;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::gui::tabs::transact::wallet_tab::WalletState;
 use crate::node_config::NodeConfig;
 
 pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String, x: &WalletState, nc: &NodeConfig)
                            -> Result<Transaction, ErrorInfo> {
-    let destination = Address::parse(destination.clone())?;
+    let destination = destination.parse_address()?;
     let amount = CurrencyAmount::from_float_string(amount)?;
     let mut tb = TransactionBuilder::new(&nc);
     let a = ai.address.as_ref().expect("a");
@@ -17,12 +20,13 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
     //     info!("Address info UTXO in prepare transaction: {}", u.json_or());
     // }
     tb.with_output(&destination, &amount);
+    // TODO: Fix me
     if x.mark_output_as_swap {
-        tb.with_last_output_swap_type();
+        // tb.with_last_output_swap_type();
     }
     if x.mark_output_as_stake {
-        tb.with_last_output_stake();
-        tb.with_stake_usd_bounds(None, None, a);
+        // tb.with_last_output_stake();
+        // tb.with_external_stake_usd_bounds(None, None, a, );
     }
     if x.mark_output_as_swap && x.mark_output_as_stake {
         return Err(error_info("Cannot mark as both swap and stake"));

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
-use redgold_schema::{ProtoSerde, structs};
+use redgold_schema::structs;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::InitiateMultipartyKeygenRequest;
 
 #[ignore]

@@ -2,7 +2,8 @@ use std::str::FromStr;
 use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use serde::Serialize;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeBytesAccess, structs};
+use redgold_schema::{ErrorInfoContext, RgResult, structs};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, Hash};
 use crate::util::dhash_vec;
 use crate::util::keys::ToPublicKeyFromLib;
@@ -27,8 +28,6 @@ pub struct TestConstants {
     pub secret2: bdk::bitcoin::secp256k1::SecretKey,
     pub public2: bdk::bitcoin::secp256k1::PublicKey,
     pub hash_vec: Vec<u8>,
-    pub addr: Vec<u8>,
-    pub addr2: Vec<u8>,
     pub address_1: Address,
     pub rhash_1: Hash,
     pub rhash_2: Hash,
@@ -51,21 +50,15 @@ impl TestConstants {
         let kp2 = result.keypair_at_change(1).expect("");
         let (secret2, public2) = (kp2.secret_key, kp2.public_key);
         let hash_vec = Hash::from_string_calculate("asdf1").vec();
-        let addr = Address::from_struct_public(&public.to_struct_public_key()).expect("").address.safe_bytes().expect("");
-        let addr2 = Address::from_struct_public(&public2.to_struct_public_key()).expect("").address.safe_bytes().expect("");
-        let mut peer_trusts: Vec<f64> = Vec::new();
-
-        let public_peer_id = dhash_vec(&dhash_vec(&public.serialize().to_vec()).to_vec()).to_vec();
-
+        let addr = Address::from_struct_public(&public.to_struct_public_key()).expect("");
+        // let addr2 = Address::from_struct_public(&public2.to_struct_public_key()).expect("")
         return TestConstants {
             secret,
             public,
             secret2,
             public2,
             hash_vec,
-            addr: addr.clone(),
-            addr2,
-            address_1: addr.into(),
+            address_1: addr,
             rhash_1: Hash::from_string_calculate("asdf"),
             rhash_2: Hash::from_string_calculate("asdf2"),
             words: "abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string(),
@@ -91,17 +84,8 @@ impl KeyPair {
         };
     }
 
-    pub fn address(&self) -> Vec<u8> {
-        Address::from_struct_public(&self.public_key.to_struct_public_key())
-            .expect("").address.safe_bytes().expect("")
-    }
-
     pub fn address_typed(&self) -> Address {
-        self.public_key.to_struct_public_key().address().expect("")
-    }
-
-    pub fn public_key_vec(&self) -> Vec<u8> {
-        self.public_key.serialize().to_vec()
+        self.public_key().address().expect("")
     }
 
     pub fn public_key(&self) -> structs::PublicKey {

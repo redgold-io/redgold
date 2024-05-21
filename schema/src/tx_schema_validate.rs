@@ -1,9 +1,11 @@
-use std::cmp::max;
 use std::collections::HashSet;
-use crate::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, util, WithMetadataHashable};
+use crate::{error_code, error_info, error_message, RgResult, SafeOption, structs, util};
 use crate::constants::MAX_INPUTS_OUTPUTS;
+use crate::helpers::easy_json::EasyJson;
+use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::pow::TransactionPowValidate;
+use crate::proto_serde::ProtoSerde;
 use crate::structs::{NetworkEnvironment, Transaction, UtxoId};
 use crate::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 
@@ -62,11 +64,11 @@ impl SchemaValidationSupport for Transaction  {
         if self.inputs.is_empty() {
             // if all nmd or
             if !self.is_metadata_or_obs() {
-                Err(error_code(structs::Error::MissingInputs))?;
+                Err(error_code(structs::ErrorCode::MissingInputs))?;
             }
         }
         if self.outputs.is_empty() {
-            Err(error_code(structs::Error::MissingOutputs))?;
+            Err(error_code(structs::ErrorCode::MissingOutputs))?;
         }
 
         if let Some(o) = &self.options {
@@ -88,14 +90,14 @@ impl SchemaValidationSupport for Transaction  {
         for input in self.inputs.iter() {
             if let Some(utxo) = input.utxo_id.as_ref() {
                 if utxo.output_index > (MAX_INPUTS_OUTPUTS as i64) {
-                    Err(error_code(structs::Error::InvalidAddressInputIndex))?;
+                    Err(error_code(structs::ErrorCode::InvalidAddressInputIndex))?;
                 }
             }
             if expect_signed {
                 if input.proof.is_empty() {
                     let floating_non_consume_input = input.utxo_id.is_none() && input.floating_utxo_id.is_some();
                     if !floating_non_consume_input {
-                        Err(error_message(structs::Error::MissingProof,
+                        Err(error_message(structs::ErrorCode::MissingProof,
                                           format!("Input proof is missing on input {}", input.json_or()
                                           )))?;
                     }

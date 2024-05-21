@@ -16,7 +16,6 @@ pub mod  node_config;
 pub mod resources;
 pub mod trust;
 pub mod util;
-pub mod multiparty;
 pub mod hardware;
 pub mod wallet;
 pub mod observability;
@@ -26,6 +25,8 @@ pub mod test;
 pub mod qr_window;
 pub mod scrape;
 pub mod sanity;
+pub mod party;
+pub mod multiparty_gg20;
 
 pub use redgold_schema as schema;
 pub use redgold_data as datas;

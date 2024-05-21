@@ -1,13 +1,9 @@
-use std::time::Duration;
-use redgold_schema::structs::{Address, ContractStateMarker, ErrorInfo, UtxoId, Hash, NodeMetadata, PeerMetadata, PeerId, PeerNodeInfo, PublicKey, StateSelector, Transaction};
-use redgold_schema::{ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, util, WithMetadataHashable};
+use redgold_schema::structs::{Address, ContractStateMarker, ErrorInfo, StateSelector};
+use redgold_schema::{RgResult};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use itertools::Itertools;
-use redgold_keys::proof_support::PublicKeySupport;
-use redgold_keys::TestConstants;
-use redgold_schema::EasyJson;
-use redgold_schema::structs::PeerIdInfo;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 
 #[derive(Clone)]
 pub struct StateStore {
@@ -20,15 +16,15 @@ impl StateStore {
     ) -> Result<i64, ErrorInfo> {
 
         let mut pool = self.ctx.pool().await?;
-        let address = state.address.safe_bytes()?;
+        let address = state.address.safe_get()?.vec();
         let selector_hash = if let Some(s) = &state.selector {
-            Some(s.calculate_hash().safe_bytes()?)
+            Some(s.calculate_hash().vec())
         } else {
             None
         };
-        let state_hash = state.state.safe_get()?.calculate_hash().safe_bytes()?;
-        let marker = state.transaction_marker.safe_get()?.bytes.safe_bytes()?;
-        let nonce = state.nonce.clone();
+        let state_hash = state.state.safe_get()?.calculate_hash().vec();
+        let marker = state.transaction_marker.safe_get()?.vec();
+        let nonce = state.index_counter.clone();
 
         let ser = state.proto_serialize();
 
@@ -37,7 +33,7 @@ impl StateStore {
             r#"INSERT OR REPLACE INTO state (
             address, selector_hash,
             state_hash, transaction_marker,
-            time, nonce, state
+            time, index_counter, state
             ) VALUES (
             ?1, ?2, ?3, ?4, ?5,
             ?6, ?7
@@ -58,12 +54,12 @@ impl StateStore {
     ) -> Result<Vec<ContractStateMarker>, ErrorInfo> {
 
         let mut pool = self.ctx.pool().await?;
-        let addr = address.address.safe_bytes()?;
+        let addr = address.vec();
         let limit = limit.unwrap_or(20);
         let x = if let Some(sel) = selector {
-            let h = sel.calculate_hash().safe_bytes()?;
+            let h = sel.calculate_hash().vec();
             let rows = sqlx::query!(
-            r#"SELECT state FROM state WHERE address = ?1 AND selector_hash = ?3 ORDER BY nonce DESC LIMIT ?2"#,
+            r#"SELECT state FROM state WHERE address = ?1 AND selector_hash = ?3 ORDER BY index_counter DESC LIMIT ?2"#,
             addr,
             limit,
             h
@@ -73,7 +69,7 @@ impl StateStore {
             rows_m.iter().map(|i| i.state.clone()).collect_vec()
         } else {
             let rows = sqlx::query!(
-            r#"SELECT state FROM state WHERE address = ?1 ORDER BY nonce DESC LIMIT ?2"#,
+            r#"SELECT state FROM state WHERE address = ?1 ORDER BY index_counter DESC LIMIT ?2"#,
             addr,
             limit
             ).fetch_all(&mut *pool)
@@ -90,10 +86,10 @@ impl StateStore {
     ) -> Result<u64, ErrorInfo> {
 
         let mut pool = self.ctx.pool().await?;
-        let addr = address.address.safe_bytes()?;
-        let sel = state_sel.calculate_hash().safe_bytes()?;
+        let addr = address.vec();
+        let sel = state_sel.calculate_hash().vec();
         let rows = sqlx::query!(
-            r#"DELETE FROM state WHERE address = ?1 AND selector_hash = ?2 AND nonce < ?3"#,
+            r#"DELETE FROM state WHERE address = ?1 AND selector_hash = ?2 AND index_counter < ?3"#,
             addr,
             sel,
             nonce

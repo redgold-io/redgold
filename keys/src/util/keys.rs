@@ -8,6 +8,6 @@ pub trait ToPublicKeyFromLib {
 
 impl ToPublicKeyFromLib for PublicKey {
     fn to_struct_public_key(&self) -> structs::PublicKey {
-        structs::PublicKey::from_bytes(self.serialize().to_vec())
+        structs::PublicKey::from_bytes_direct_ecdsa(self.serialize().to_vec())
     }
 }

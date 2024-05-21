@@ -6,6 +6,7 @@ use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
+use redgold_schema::proto_serde::ProtoSerde;
 
 pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, offset: Option<i64>) -> Result<HashSearchResponse, ErrorInfo> {
     let mut response = HashSearchResponse {
@@ -28,11 +29,13 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
         return Ok(response);
     } else {
         let h = from_hex(hash_input.clone())?;
-        let hash = Hash::new(h.clone());
-        let maybe_tx_info = relay.ds.resolve_transaction_hash(&hash).await?;
-        if let Some(tx_info) = maybe_tx_info {
-            response.transaction_info = Some(tx_info);
-            return Ok(response)
+        let hash = Hash::new_from_proto(h.clone());
+        if let Ok(hash) = hash {
+            let maybe_tx_info = relay.ds.resolve_transaction_hash(&hash).await?;
+            if let Some(tx_info) = maybe_tx_info {
+                response.transaction_info = Some(tx_info);
+                return Ok(response)
+            }
         }
     }
 
@@ -46,21 +49,20 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
                 response.peer_node_info = Some(pni);
                 return Ok(response);
             }
+            let id = PeerId::from_pk(pk);
+            if relay.node_config.peer_id == id {
+                response.peer_id_info = Some(relay.peer_id_info().await?);
+                return Ok(response);
+            }
+
+            if let Some(pid_info) = relay.ds.peer_store
+                .query_peer_id_info(&id)
+                .await? {
+                response.peer_id_info = Some(pid_info);
+                return Ok(response);
+            }
+
         }
-    }
-
-    let result = from_hex(hash_input.clone())?;
-    let id = PeerId::from_bytes(result.clone());
-    if relay.node_config.peer_id == id {
-        response.peer_id_info = Some(relay.peer_id_info().await?);
-        return Ok(response);
-    }
-
-    if let Some(pid_info) = relay.ds.peer_store
-        .query_peer_id_info(&id)
-        .await? {
-        response.peer_id_info = Some(pid_info);
-        return Ok(response);
     }
 
     if let Some(h) = Hash::from_hex(hash_input.clone()).ok() {
@@ -71,7 +73,6 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
         }
     }
 
-    // Err(error_info("Hash not found"))
     Ok(response)
 }
 

@@ -18,13 +18,16 @@ use tracing::trace;
 use warp::reply::Json;
 use warp::{Filter, Server};
 use warp::http::Response;
-use redgold_schema::{empty_public_request, empty_public_response, from_hex, json, ProtoHashable, ProtoSerde, RgResult, SafeOption, structs};
+use redgold_schema::{empty_public_request, empty_public_response, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse, Seed};
 use redgold_schema::transaction::rounded_balance_i64;
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
+use redgold_schema::helpers::easy_json::json;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 // use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{
     Address, AddressType, ErrorInfo, QueryAddressesRequest, QueryTransactionResponse,
@@ -35,7 +38,7 @@ use crate::schema::structs::{
 };
 use crate::schema::structs::{QueryAddressesResponse, Transaction};
 use crate::schema::{bytes_data, error_info};
-use crate::schema::{response_metadata, SafeBytesAccess, WithMetadataHashable};
+use crate::schema::response_metadata;
 use crate::{api, schema, util};
 use crate::api::{about, as_warp_json_response, explorer};
 use crate::api::faucet::faucet_request;
@@ -145,14 +148,15 @@ impl PublicClient {
         sync: bool,
     ) -> Result<SubmitTransactionResponse, ErrorInfo> {
 
-        let c = self.client_wrapper();
+        let mut c = self.client_wrapper();
+        c.timeout = Duration::from_secs(180);
 
         let mut request = Request::default();
         request.submit_transaction_request = Some(SubmitTransactionRequest {
                 transaction: Some(t.clone()),
                 sync_query_response: sync,
         });
-        // debug!("Sending transaction: {}", t.clone().hash_hex_or_missing());
+        debug!("Sending transaction: {}", t.clone().hash_hex());
         let response = c.proto_post_request(request, None, None).await?;
         response.as_error_info()?;
         Ok(response.submit_transaction_response.safe_get()?.clone())
@@ -476,23 +480,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             }
         });
 
-    let p2_relay = relay.clone();
-    let transaction_lookup = warp::get()
-        .and(warp::path("transaction"))
-        .and(warp::path::param())
-        .and_then(move |hash: String| {
-            let relay3 = p2_relay.clone();
-            async move {
-                let ps = relay3.ds.transaction_store
-                    .query_transaction_hex(hash).await;
-                let res: Result<Json, warp::reject::Rejection> = Ok(ps
-                       .map_err(|e| warp::reply::json(&e))
-                       .map(|r| warp::reply::json(&r))
-                       .combine());
-                res
-            }
-        });
-
     let address_relay = relay.clone();
     let address_lookup = warp::get()
         .and(warp::path("address"))
@@ -625,7 +612,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .or(request_normal)
         .or(request_bin)
         .or(peers)
-        .or(transaction_lookup)
         .or(address_lookup)
         // .or(explorer_hash)
         // .or(explorer_recent)

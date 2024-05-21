@@ -4,7 +4,8 @@ use bdk::bitcoin::util::bip32::{ChildNumber, ExtendedPubKey};
 use itertools::Itertools;
 
 use serde::{Deserialize, Serialize};
-use redgold_schema::{ErrorInfoContext, json_or, RgResult, SafeOption, structs};
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::TestConstants;
 use crate::util::mnemonic_support::WordsPass;
 
@@ -57,7 +58,7 @@ impl XpubWrapper {
             .map(|i| Self::child_num(i.clone()))
             .collect::<RgResult<Vec<ChildNumber>>>()?;
         let p = x.derive_pub(&Secp256k1::new(), &x1).error_info("Failed to derive public key")?;
-        Ok(structs::PublicKey::from_bytes(p.public_key.serialize().to_vec()))
+        Ok(structs::PublicKey::from_bytes_direct_ecdsa(p.public_key.serialize().to_vec()))
     }
 
     pub fn public_at_dp(&self, dp: &String) -> RgResult<structs::PublicKey> {
@@ -79,7 +80,7 @@ pub fn test_xpub_wrapper() {
     let account_path = test_dp.as_account_path().expect("works");
     let string = words.xpub_str(account_path).expect("works");
     let w = XpubWrapper::new(string);
-    let public = words.public_at(test_dp.clone()).expect("works").hex_or();
-    let public2 = w.public_at_dp(&test_dp).expect("works").hex_or();
+    let public = words.public_at(test_dp.clone()).expect("works").hex();
+    let public2 = w.public_at_dp(&test_dp).expect("works").hex();
     assert_eq!(public, public2);
 }

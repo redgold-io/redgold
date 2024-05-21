@@ -8,22 +8,21 @@ use flume::{Sender, TryRecvError};
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, info};
-use metrics::{histogram, counter};
+use metrics::{counter, histogram};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::{json_or, ProtoHashable, ProtoSerde, RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map, WithMetadataHashableFields};
-use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, UtxoId, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, ValidationType};
+use redgold_schema::{RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map};
+use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, UtxoId, ValidationType};
 
 use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
-use crate::core::transaction::{TransactionTestContext};
+use crate::core::transaction::TransactionTestContext;
 use redgold_data::data_store::DataStore;
-use crate::schema::structs::{Error, ResponseMetadata};
+use crate::schema::structs::{ErrorCode, ResponseMetadata};
 use crate::schema::structs::{HashType, ObservationMetadata, State, Transaction};
 use crate::schema::structs::{QueryTransactionResponse, SubmitTransactionResponse};
-use crate::schema::{SafeBytesAccess, WithMetadataHashable};
 use crate::util::runtimes::build_runtime;
 // TODO config
 use crate::schema::structs::ErrorInfo;
@@ -32,18 +31,22 @@ use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
 use redgold_executor::extism_wrapper;
+use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::output::tx_output_data;
 use crate::core::resolver::resolve_transaction;
 use crate::core::transact::utxo_conflict_resolver::check_utxo_conflicts;
 use crate::util::current_time_millis_i64;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::json_or;
+use redgold_schema::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::core::transact::contention_conflicts::{ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_validate::TransactionValidator;
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 
 #[derive(Clone)]
 pub struct Conflict {
@@ -115,7 +118,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
     let mut map = HashMap::<Vec<u8>, f64>::new();
     for peer in &an {
         let t = relay.get_security_rating_trust_of_node(peer).await?.unwrap_or(0.0);
-        map.insert(peer.bytes.safe_bytes()?, t);
+        map.insert(peer.vec(), t);
     }
 
     let mut trust_conflicts = vec![];
@@ -133,7 +136,7 @@ async fn resolve_conflict(relay: Relay, conflicts: Vec<Conflict>) -> Result<Hash
                 let ret: Vec<u8> = x
                     .proof
                     .as_ref()
-                    .map(|p| p.public_key_bytes().as_ref().unwrap().clone())
+                    .map(|p| p.public_key_proto_bytes().as_ref().unwrap().clone())
                     .ok_or("")
                     .unwrap();
                 ret
@@ -206,7 +209,7 @@ impl TransactionProcessContext {
         let current_time = util::current_time_millis_i64();
         let input_address = transaction_message.transaction.first_input_address().clone()
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
-        let output_address = transaction_message.transaction.first_output_address()
+        let output_address = transaction_message.transaction.first_output_address_non_input_or_fee()
             .and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
         let node_id = self.relay.node_config.short_id()?;
         let mut hm = HashMap::new();
@@ -441,7 +444,7 @@ impl TransactionProcessContext {
         let mut self_signed_pending = false;
 
         if !conflict_detected {
-            tracing::info!("Signing pending transaction");
+            // tracing::info!("Signing pending transaction");
             let prf = self.observe(validation_type, State::Pending).await?;
             self_signed_pending = true;
             observation_proofs.insert(prf);
@@ -491,7 +494,7 @@ impl TransactionProcessContext {
                     // translate error codes for db access / etc. into internal server error.
                     // TODO: This error code just indicates a conflict, not necessarily a deliberate double spend
                     // LiveConflictDetected to distinguish it.
-                    return Err(error_message(Error::TransactionRejectedDoubleSpend, "Double spend detected in live context"));
+                    return Err(error_message(ErrorCode::TransactionRejectedDoubleSpend, "Double spend detected in live context"));
                 }
                 conflicts.push(conflict);
             }
@@ -516,7 +519,7 @@ impl TransactionProcessContext {
 
         // Completion stage
 
-        tracing::info!("Conflict resolution stage started with {:?} conflicts", conflicts.len());
+        // tracing::info!("Conflict resolution stage started with {:?} conflicts", conflicts.len());
 
         if !conflicts.is_empty() {
 
@@ -533,7 +536,7 @@ impl TransactionProcessContext {
                 .await?;
 
             if winner != hash {
-                Err(error_message(Error::TransactionRejectedDoubleSpend,
+                Err(error_message(ErrorCode::TransactionRejectedDoubleSpend,
                                   format!("Lost conflict to other transaction winner: {}", winner.hex())))?;
             } else {
                 for c in &conflicts {
@@ -570,20 +573,34 @@ impl TransactionProcessContext {
         // tx time
         self.relay.write_transaction(&transaction, transaction.time()?.clone(), None, true).await?;
         counter!("redgold.transaction.accepted").increment(1);
-        tracing::info!("Accepted transaction");
+        // tracing::info!("Accepted transaction");
 
         // tracing::info!("Finalize end on current {} with num conflicts {:?}", hash.hex(), conflicts.len());
 
         // Await until it has appeared in an observation and other nodes observations.
 
 
-        tokio::time::sleep(Duration::from_secs(6)).await;
+        let mut retries = 0;
+        loop {
+            retries += 1;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let stored_proofs = self.relay.ds.observation.select_observation_edge(&hash).await?;
+            // tracing::info!("Found {:?} stored proofs in ds", stored_proofs.len());
+            observation_proofs.extend(stored_proofs);
+            let pks = self.relay.node_config.seeds_now_pk();
+            let done = pks.iter().all(|pk| {
+                observation_proofs.iter()
+                    .filter(|op| op.metadata.as_ref()
+                        .map(|m| m.state() == State::Accepted).unwrap_or(false)
+                    ).any(|o| {
+                    o.proof.as_ref().and_then(|p| p.public_key.as_ref()).map(|p| p == pk).unwrap_or(false)
+                })
+            });
+            if done || retries > 20 {
+                break;
+            }
+        };
 
-        let stored_proofs = self.relay.ds.observation.select_observation_edge(&hash).await?;
-
-        tracing::info!("Found {:?} stored proofs in ds", stored_proofs.len());
-
-        observation_proofs.extend(stored_proofs);
         // TODO: Query our internal datastore for all obs proofs, and extend based on that
 
         // TODO: periodic process to clean mempool in event of thread processing crash?
@@ -594,17 +611,17 @@ impl TransactionProcessContext {
         });
 
         if !peers.is_empty() {
-            tracing::info!("Collecting observation proofs from {} peers", peers.len());
+            // tracing::info!("Collecting observation proofs from {} peers", peers.len());
             let results = Relay::broadcast(self.relay.clone(),
                                            peers, obs_proof_req,
                                            // self.tx_process.clone(),
                                            Some(
-                                               Duration::from_secs(5))).await;
+                                               Duration::from_secs(10))).await;
             for (pk, r) in results {
                 match r {
                     Ok(r) => {
                         let num_proofs = r.clone().query_observation_proof_response.map(|o| o.observation_proof.len()).unwrap_or(0);
-                        tracing::info!("Received {:?} observation proofs from peer: {}", num_proofs,  pk.short_id());
+                        // tracing::info!("Received {:?} observation proofs from peer: {}", num_proofs,  pk.short_id());
                         if let Some(obs_proof) = r.query_observation_proof_response {
                             observation_proofs.extend(obs_proof.observation_proof);
                         }
@@ -649,7 +666,7 @@ impl TransactionProcessContext {
                                 .and_then(|d| d.state.clone());
                             csm.address = o.address.clone();
                             csm.time = transaction.time()?.clone();
-                            csm.nonce = 0;
+                            csm.index_counter = 0;
                             csm.transaction_marker = Some(transaction.hash_or());
                             self.relay.ds.state.insert_state(csm).await?;
                             // TODO: ^ save the error above and return it to the user for processing this?
@@ -752,7 +769,7 @@ impl TransactionProcessContext {
             .transaction_channels
             .entry(transaction_hash.clone());
         let res = match entry {
-            Entry::Occupied(_) => Err(error_message(Error::TransactionAlreadyProcessing, "Duplicate TX hash found in processing queue")),
+            Entry::Occupied(_) => Err(error_message(ErrorCode::TransactionAlreadyProcessing, "Duplicate TX hash found in processing queue")),
             Entry::Vacant(entry) => {
                 let req = RequestProcessor::new(&transaction_hash, request_uuid, transaction.clone());
                 entry.insert(req.clone());

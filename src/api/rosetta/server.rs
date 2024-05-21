@@ -64,7 +64,7 @@ fn format_response<T>(
 
 async fn deser<'a, T : Deserialize<'a>>(s: &'a str) -> Result<T, ErrorInfo> {
     serde_json::from_str::<T>(s)
-        .error_msg(structs::Error::DeserializationFailure, "error deserializing string input as type")
+        .error_msg(structs::ErrorCode::DeserializationFailure, "error deserializing string input as type")
 }
 
 fn ser<T>(t: Result<T, ErrorInfo>, e: String) -> WithStatus<Json>
@@ -84,7 +84,7 @@ pub async fn handle_warp_request(path: String, r: Rosetta, b: Bytes) -> Result<W
         Err(er) => {
             return Ok(
                 ser(Err::<AccountBalanceResponse, ErrorInfo>(
-                    error_msg(structs::Error::UnknownError, "Error deserializing bytes to utf8 string", er.to_string())
+                    error_msg(structs::ErrorCode::UnknownError, "Error deserializing bytes to utf8 string", er.to_string())
                 ), e.clone())
             );
         },
@@ -177,7 +177,7 @@ pub async fn handle_warp_request(path: String, r: Rosetta, b: Bytes) -> Result<W
         x => {
             log::error!("Invalid or unsupported endpoint for rosetta {}", x.to_string());
             ser(Err::<Error, ErrorInfo>(error_message(
-                structs::Error::UnknownError, format!("unknown endpoint {}", e))
+                structs::ErrorCode::UnknownError, format!("unknown endpoint {}", e))
             ), e)
         }
     };

@@ -1,10 +1,8 @@
-use std::collections::HashSet;
 use itertools::Itertools;
-use log::info;
-use redgold_schema::{EasyJson, error_code, error_info, error_message, ProtoSerde, RgResult, SafeOption, structs, WithMetadataHashable};
-use redgold_schema::constants::{MAX_INPUTS_OUTPUTS};
-use redgold_schema::structs::{Address, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Proof, TimeSponsor, Transaction, TransactionOptions, UtxoEntry, UtxoId};
-use redgold_schema::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
+use redgold_schema::{error_message, RgResult, SafeOption, structs};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions, UtxoEntry};
 use crate::KeyPair;
 use crate::proof_support::{ProofSupport, PublicKeySupport};
 
@@ -18,12 +16,12 @@ pub trait TransactionSupport {
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
-    fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo>;
-    fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool;
-    fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
-    fn output_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64>;
-    fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool;
+    fn inputs_match_pk_address(&self, other_address: &Address) -> bool;
     fn first_input_address_to_btc_address(&self, network: &NetworkEnvironment) -> Option<String>;
+    fn outputs_of_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>>;
+    fn output_rdg_amount_of_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount>;
+    fn outputs_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>>;
+    fn output_rdg_amount_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount>;
 }
 
 #[test]
@@ -82,63 +80,40 @@ impl TransactionSupport for Transaction {
         Ok(x.clone())
     }
 
-    fn verify_utxo_entry_proof(&self, utxo_entry: &UtxoEntry) -> Result<(), ErrorInfo> {
-        let id = utxo_entry.utxo_id.safe_get_msg("Missing utxo id during verify_utxo_entry_proof")?;
-        let input = self
-            .inputs
-            .get(id.output_index as usize)
-            .ok_or(error_message(
-                structs::Error::MissingInputs,
-                format!("missing input index: {}", id.output_index),
-            ))?;
-        let address = utxo_entry.address()?;
-        Ok(Proof::verify_proofs(
-            &input.proof,
-            &self.signable_hash(),
-            address,
-        )?)
-    }
-
-    fn input_bitcoin_address(&self, network: &NetworkEnvironment, other_address: &String) -> bool {
+    fn inputs_match_pk_address(&self, other_address: &Address) -> bool {
         self.inputs.iter()
             .flat_map(|i| -> &Vec<Proof> { i.proof.as_ref()})
             .filter_map(|p: &structs::Proof| p.public_key.as_ref())
-            .filter_map(|pk| pk.to_bitcoin_address(network).ok())
+            .filter_map(|pk| pk.to_all_addresses().ok())
+            .flatten()
             .filter(|a| a == other_address)
             .count() > 0
     }
 
-    fn output_swap_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64> {
-        let btc_address = pk_address.to_bitcoin_address(network_environment)?;
-        let address = pk_address.address()?;
-        let amt = self.outputs
-            .iter()
-            .filter_map(|o| {
-                if o.is_swap() {
-                    o.address.as_ref()
-                        .filter(|&a| a == &address || a.render_string().ok().as_ref() == Some(&btc_address))
-                        .and_then(|_| o.opt_amount())
-                } else {
-                    None
-                }
-            }).sum::<i64>();
-        Ok(amt)
-    }
-    fn output_amount_of_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> RgResult<i64> {
-        let btc_address = pk_address.to_bitcoin_address(network_environment)?;
-        let address = pk_address.address()?;
-        let amt = self.outputs
-            .iter()
-            .filter_map(|o| {
-                    o.address.as_ref()
-                        .filter(|&a| a == &address || a.render_string().ok().as_ref() == Some(&btc_address))
-                        .and_then(|_| o.opt_amount())
-            }).sum::<i64>();
-        Ok(amt)
+    fn outputs_of_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>> {
+        let all = pk.to_all_addresses()?;
+        Ok(self.outputs.iter()
+            .filter(move |o| o.address.as_ref().filter(|a| all.contains(a)).is_some()))
     }
 
-    fn has_swap_to_multi(&self, pk_address: &structs::PublicKey, network_environment: &NetworkEnvironment) -> bool {
-        self.output_swap_amount_of_multi(pk_address, network_environment).map(|b| b > 0).unwrap_or(false)
+    fn outputs_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>> {
+        let all = pk.to_all_addresses()?;
+        Ok(self.outputs.iter()
+            .filter(move |o| o.address.as_ref().filter(|a| !all.contains(a)).is_some()))
+    }
+
+    fn output_rdg_amount_of_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
+        Ok(self.outputs_of_pk(pk)?
+            .filter_map(|a| a.opt_amount_typed())
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .sum::<CurrencyAmount>())
+    }
+
+    fn output_rdg_amount_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
+        Ok(self.outputs_of_exclude_pk(pk)?
+            .filter_map(|a| a.opt_amount_typed())
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .sum::<CurrencyAmount>())
     }
 
     fn first_input_address_to_btc_address(&self, network: &NetworkEnvironment) -> Option<String> {

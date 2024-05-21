@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use log::info;
 use metrics::counter;
-use redgold_schema::{EasyJson, RgResult, SafeOption, WithMetadataHashable};
+use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{ErrorInfo, Transaction};
 use crate::core::internal_message::SendErrorInfo;
@@ -41,7 +43,7 @@ impl TxWriter {
     pub async fn write_transaction(&self, message: &TransactionWithSender) -> RgResult<()> {
 
         let transaction = &message.transaction;
-        info!("Writing transaction: {}", transaction.hash_or());
+        // info!("Writing transaction: {}", transaction.hash_or());
         counter!("redgold.transaction.tx_writer.write_transaction").increment(1);
         // Validate again immediately
         // for utxo_id in transaction.utxo_inputs() {
@@ -61,25 +63,23 @@ impl TxWriter {
         // with a message? Or should we just delete it here?
         // Commit transaction internally to database.
 
-        info!("Accepting transaction: {}", transaction.hash_or());
+        // info!("Accepting transaction: {}", transaction.hash_or());
         let time = if message.rejection_reason.is_none() {
             transaction.time()?.clone()
         } else {
             message.time
         };
         self.relay
-                .ds
-                .accept_transaction(
-                    &transaction, time, message.rejection_reason.clone(), message.update_utxo
-                ).await.mark_abort()?;
+            .ds
+            .accept_transaction(
+                &transaction, time, message.rejection_reason.clone(), message.update_utxo
+            ).await.log_error().add("Transaction writer internal failure").mark_abort()?;
 
-        info!("Sanity check on transaction: {}", transaction.hash_or());
+        // info!("Sanity check on transaction: {}", transaction.hash_or());
         // Additional sanity check here
         for fixed in transaction.utxo_inputs() {
             if message.rejection_reason.is_none() && message.update_utxo {
-                let utxo_valid = self.relay.ds.transaction_store.query_utxo_id_valid(
-                    &fixed.transaction_hash.safe_get()?.clone(), fixed.output_index
-                ).await.mark_abort()?;
+                let utxo_valid = self.relay.ds.utxo.utxo_id_valid(fixed).await.mark_abort()?;
                 let deleted = !utxo_valid;
                 if !deleted {
                     return Err(ErrorInfo::new("UTXO not deleted")).add(fixed.json_or())
@@ -89,7 +89,7 @@ impl TxWriter {
 
         }
 
-        info!("Wrote transaction: {}", transaction.hash_or());
+        // info!("Wrote transaction: {}", transaction.hash_or());
 
 
 

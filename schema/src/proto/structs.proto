@@ -64,7 +64,7 @@ enum PoWProofType {
 // Currently unused, but an optional anti-spam proof included in a transaction for increased mem-pool priority
 message PoWProof {
   PoWProofType proof_type = 1;
-  BytesData nonce = 2;
+  BytesData index_counter = 2;
 }
 
 // Equivalent to a chainId identifier. Used as a marker for contracts or simplicity to indicate information
@@ -224,7 +224,6 @@ message VersionInfo {
 
 message PeerId {
   PublicKey peer_id = 1;
-  repeated Proof known_proof = 3;
 }
 
 // All of this is optional, used for external verifications
@@ -272,7 +271,7 @@ enum BytesDecoder {
 message BytesData {
   bytes value = 1;
   BytesDecoder decoder = 2;
-  int64 version = 3;
+  int32 version = 3;
 }
 
 enum HashFormatType {
@@ -297,9 +296,23 @@ message AbridgedNodeMetadata {
   PartitionInfo partition_info = 2;
 }
 
+message PortfolioRequest {
+  PortfolioInfo portfolio_info = 1;
+}
+
 
 message StandardRequest {
   StateSelector selector = 1;
+  // Staking request, designed for use with the native AMM/Portfolio functions.
+  StakeRequest stake_request = 2;
+  // Portfolio information, used for updating the current 'target' state of a portfolio
+  PortfolioRequest portfolio_request = 3;
+  // Used for collateralized loan outputs
+  CollateralizedLoanRequest collateralized_loan = 4;
+  // Used for swaps
+  SwapRequest swap_request = 5;
+  // Used for arbitrary deposits which have no specific use yet.
+  DepositRequest deposit_request = 6;
 }
 
 message SchemaDef {
@@ -317,6 +330,7 @@ message GenericTypedValue {
 
 message ExternalTransactionId {
   string identifier = 1;
+  SupportedCurrency currency = 2;
 }
 
 message InterestRate {
@@ -339,10 +353,39 @@ message CollateralizedLoanCall {
 message CollateralizedLoanRepayment {}
 
 
-message CollateralizedLoanData {
+message CollateralizedLoanRequest {
     CollateralizedLoanInitiation initiation = 1;
 }
 
+message SwapRequest {
+  // This can be an internal or external destination.
+  Address destination = 1;
+  // TODO: Limit parameters here for max price to issue at
+}
+
+message SwapFulfillment {
+  // A bitcoin txid for example
+  ExternalTransactionId external_transaction_id = 25;
+}
+
+message DepositRequest {
+  // The (external) address to watch for deposits
+  Address address = 1;
+  // Proof that you own this external address, if missing, defaults to first input proof
+  Proof proof = 2;
+  // The amount expected to be deposited
+  CurrencyAmount amount = 3;
+}
+
+message StakeWithdrawalFulfillment {
+  UtxoId stake_withdrawal_request = 1;
+}
+
+message StandardResponse {
+  SwapFulfillment swap_fulfillment = 1;
+  CollateralizedLoanFulfillment collateralized_loan_fulfillment = 2;
+  StakeWithdrawalFulfillment stake_withdrawal_fulfillment = 3;
+}
 // Generic data structure designed to hold arbitrary data in a common format.
 // This should be considered supplementary to using a regular schema, not a
 // complete substitute.
@@ -375,10 +418,7 @@ message StandardData {
   // Contract style response, similar to above, but specifically typed to correspond to a 'default' schema driven
   // request common to all contracts and available automatically in the SDK.
   StandardRequest standard_request = 19;
-  // Staking request, designed for use with the native AMM/Portfolio functions.
-  LiquidityRequest liquidity_request = 20;
-  // Portfolio information, used for updating the current 'target' state of a portfolio
-  PortfolioInfo portfolio_info = 21;
+  StandardResponse standard_response = 20;
   // Schema definition for the data, used for parsing and validation
   SchemaDef schema_def = 22;
   // Generic bytes data, used for storing arbitrary data
@@ -386,10 +426,7 @@ message StandardData {
   // For eUTXO style contracts, the hash of all state information aggregated from initial state origin.
   // Can be re-calculated.
   Hash aggregate_state_hash = 24;
-  // A bitcoin txid for example
-  ExternalTransactionId external_transaction_id = 25;
-  // Used for collateralized loan outputs
-  CollateralizedLoanData collateralized_loan_data = 26;
+
 }
 
 // Native staking range to provide liquidity within. Trades cannot be executed outside of this range
@@ -404,27 +441,29 @@ message LiquidityRange {
   Weighting desired_fee_fraction = 4;
   // How much of the total input staking quantity to allocate to this range, defaults to equal division among fractions
   Weighting allocation_fraction = 5;
+  optional bool ask_filter = 6;
 }
 
 // Request to withdraw liquidity from a pool
-message LiquidityWithdrawal {
+message StakeWithdrawal {
   Address destination = 1;
 }
 
 // Pre-claim deposit operation designating native multiparty groups to watch address for native deposits
 // Requires that the address on this network match the address of the external network, so that the private
 // key used for both is the same.
-message LiquidityDeposit {
+message StakeDeposit {
   // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within
   repeated LiquidityRange liquidity_ranges = 1;
+  DepositRequest deposit = 2;
 }
 
 // Request to update external liquidity to a native pool
-message LiquidityRequest {
+message StakeRequest {
   // A marker for a future external (native to the external currency,) deposit to a multiparty AMM-like pool
-  LiquidityDeposit deposit = 1;
+  StakeDeposit deposit = 1;
   // A withdrawl request, indicating to the pool to send funds to the specified external chain address
-  LiquidityWithdrawal withdrawal = 2;
+  StakeWithdrawal withdrawal = 2;
 }
 
 // Generically typed value, used for storing arbitrary data in a common format.
@@ -483,12 +522,13 @@ message OutputContract {
   // hash references, same issue as other thing
   optional StandardContractType standard_contract_type = 1;
   CodeExecutionContract code_execution_contract = 2;
-  optional int64 threshold = 3;
-  repeated int64 weights = 4;
+  Weighting threshold = 3;
+  repeated Weighting weights = 4;
   // What was this for? Are we ever gonna send to an address filter predicate that is different from the output address?
 //  Address filter_predicate_destination = 5;
   bool pay_update_descendents = 6;
   bool consumable = 7;
+  repeated StandardContractType standard_contracts = 8;
 }
 
 enum OutputType {
@@ -527,10 +567,12 @@ message TimeLockWindow {
 
 message CurrencyAmount {
   int64 amount = 1;
-  // Support for BigInts, used for multi-currency support
-  BytesData bytes = 2;
+  optional SupportedCurrency currency = 2;
+  // Support for arbitrary amount, used for multi-currency support
+  optional string string_amount = 3;
+  BytesData bytes = 4;
   // The currency type associated with the amount, used for multi-currency support
-  optional SupportedCurrency currency = 3;
+
 }
 
 message TransactionData {
@@ -605,7 +647,7 @@ message TransactionOptions {
   optional bool is_test = 7;
   // Used only for anti-spam limiting at low limits.
   PoWProof pow_proof = 8;
-  optional TransactionType transaction_type = 9;
+  TransactionType transaction_type = 9;
 }
 
 message Transaction {
@@ -847,14 +889,14 @@ message GetPeersInfoResponse {
   repeated PeerNodeInfo peer_info = 2;
 }
 
-
+// Not used
 message MultipartyBroadcast {
-  string room_id = 1;
+  RoomId room_id = 1;
   string message = 2;
 }
 
 message MultipartyIssueUniqueIndex {
-  string room_id = 1;
+  RoomId room_id = 1;
 }
 
 message MultipartyIssueUniqueIndexResponse {
@@ -862,13 +904,13 @@ message MultipartyIssueUniqueIndexResponse {
 }
 
 message MultipartySubscribe {
-  string room_id = 1;
+  RoomId room_id = 1;
   optional int64 last_event_id = 2;
   bool shutdown = 3;
 }
 
 message MultipartySubscribeEvent {
-  string room_id = 1;
+  RoomId room_id = 1;
   string id = 2;
   string message = 3;
 }
@@ -892,7 +934,7 @@ message QueryObservationProofResponse {
 
 message MultipartyAuthenticationRequest {
   optional string message = 1;
-  string room_id = 2;
+  RoomId room_id = 2;
 }
 
 message HealthRequest {
@@ -954,7 +996,6 @@ message Request {
   Proof proof = 7;
   NodeMetadata node_metadata = 8;
   GetPeersInfoRequest get_peers_info_request = 9;
-  //  optional DownloadMetadataRequest download_metadata_request = 5;
   InitiateMultipartyKeygenRequest initiate_keygen = 10;
   InitiateMultipartySigningRequest initiate_signing = 17;
   SubmitTransactionRequest submit_transaction_request = 11;
@@ -1035,7 +1076,7 @@ message PartyMember {
   Weighting weight = 2;
 }
 
-message PartyInfo {
+message PartyInfoAbridged {
   PartyId party_id = 1;
   Weighting threshold = 2;
   repeated PartyMember members = 3;
@@ -1043,7 +1084,7 @@ message PartyInfo {
 }
 
 message GetPartiesInfoResponse {
-  repeated PartyInfo party_info = 1;
+  repeated PartyInfoAbridged party_info = 1;
 }
 
 message QueryTransactionRequest {
@@ -1100,13 +1141,20 @@ message AboutNodeResponse {
 }
 
 enum AddressType {
+  // Original default address type, SHA3-224 checksum of the public key, along with a checksum suffix
+  // 28 bytes + 4 byte checksum = 32 bytes for the direct information, proto ser form is used to add version info
+  // with another 4 bytes
   Sha3_224_Checksum_Public = 0;
-  MULTIHASH_KEYHASH = 1;
+  // Direct Bitcoin address string embedded as UTF bytes
   Bitcoin_External_String = 2;
+  // This is intended to be used with RSV signature verification.
   ETHEREUM_COMPAT_ADDRESS = 3;
+  // Not used anywhere, but could be used for direct public key addresses
   PUBLIC_KEY_DIRECT_ADDRESS = 4;
+  // Unclear if needed except for debugging
   UNKNOWN_ADDRESS_TYPE = 5;
   SCRIPT_HASH = 6;
+  // Direct Ethereum string hash reference with embedded string upper/lower checksum.
   Ethereum_External_String = 7;
 }
 
@@ -1206,7 +1254,7 @@ message ErrorDetails {
 }
 
 message ErrorInfo {
-  Error code = 1;
+  ErrorCode code = 1;
   string description = 2;
   string description_extended = 3;
   string message = 4;
@@ -1232,10 +1280,14 @@ message ResponseMetadata {
   optional string trace_id = 5;
 }
 
+message RoomId {
+  optional string uuid = 1;
+}
+
 message MultipartyIdentifier {
   repeated PublicKey party_keys = 1;
-  int64 threshold = 2;
-  string uuid = 3;
+  Weighting threshold = 2;
+  RoomId room_id = 3;
 }
 
 message ControlMultipartyKeygenRequest {
@@ -1257,8 +1309,16 @@ message ControlMultipartySigningResponse {
   MultipartyIdentifier identifier = 2;
 }
 
+enum PartyPurpose {
+  StandardPurpose = 0;
+  DebugPurpose = 1;
+}
+
 message InitiateMultipartyKeygenRequest {
   MultipartyIdentifier identifier = 1;
+  int64 time = 2;
+  repeated PublicKey prior_keys = 3;
+  PartyPurpose purpose = 4;
 }
 
 message InitiateMultipartyKeygenResponse {
@@ -1270,11 +1330,18 @@ message InitiateMultipartySigningResponse{
   InitiateMultipartySigningRequest initial_request = 2;
 }
 
+message PartySigningValidation {
+  optional string json_payload = 1;
+  SupportedCurrency currency = 2;
+  Transaction transaction = 3;
+}
+
 message InitiateMultipartySigningRequest {
   MultipartyIdentifier identifier = 1;
-  string signing_room_id = 2;
+  RoomId signing_room_id = 2;
   repeated PublicKey signing_party_keys = 3;
   BytesData data_to_sign = 4;
+  PartySigningValidation party_signing_validation = 5;
 }
 
 
@@ -1294,7 +1361,7 @@ message ControlResponse {
   ControlMultipartySigningResponse control_multiparty_signing_response = 3;
 }
 
-enum Error {
+enum ErrorCode {
   /// Signature failed verification
   IncorrectSignature = 0;
   MissingInputs = 1;
@@ -1390,10 +1457,12 @@ enum TransactionState {
 }
 
 enum SupportedCurrency {
-  Usdc = 0;
+  Redgold = 0;
   Bitcoin = 1;
   Ethereum = 2;
-  Redgold = 3;
+  Usd = 3;
+  Usdc = 4;
+  Usdt = 5;
 }
 
 
@@ -1418,7 +1487,7 @@ message ContractStateMarker {
   BytesData state = 2;
   StateSelector selector = 3;
   Hash transaction_marker = 4;
-  int64 nonce = 5;
+  int64 index_counter = 5;
   int64 time = 6;
 }
 
@@ -1474,3 +1543,48 @@ import "execution.proto";
 //message TestMessageOuter {
 //  execution.TestMessage inner = 1;
 //}
+
+enum LocalShareType {
+  MultipartyEcdsaCurvKzen = 0;
+}
+
+message LocalKeyShare {
+  optional string local_share = 1;
+  LocalShareType share_type = 2;
+  optional int32 version = 3;
+}
+
+enum PartyState {
+  Debug = 0;
+  Active = 1;
+  PendingRemoval = 2;
+  Inactive = 3;
+  Starting = 4;
+}
+
+message PartyInfo {
+  InitiateMultipartyKeygenRequest initiate = 1;
+  LocalKeyShare local_key_share = 2;
+  PublicKey party_key = 3;
+  optional bool self_initiated = 4;
+  optional int64 expired_time = 5;
+  PublicKey successor_key = 6;
+  PartyState state = 7;
+}
+
+message PartyData {
+  // Used for db storage for internal types.
+  optional string json_party_internal_data = 1;
+}
+
+enum PriceSource {
+  OkxMinute = 0;
+}
+
+message PriceTime {
+  Weighting price = 1;
+  int64 time = 2;
+  SupportedCurrency currency = 3;
+  PriceSource source = 4;
+  SupportedCurrency denomination = 5;
+}

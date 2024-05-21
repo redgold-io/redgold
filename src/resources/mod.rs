@@ -20,7 +20,7 @@ impl Default for Resources {
             )
             .to_string(),
             full_moon_csv: include_str!("full_moon.csv").into(),
-            logo_bytes: include_bytes!("svg_rg_2_crop.png").to_vec(),
+            logo_bytes: include_bytes!("images/historical/design_one/logo_orig_crop.png").to_vec(),
             // logo_bytes: include_bytes!("logo.jpg").to_vec(),
             filebeat_docker_config: include_str!("infra/ops_services/filebeat.docker.yml").into(),
             btc_rpc_auth_py: include_str!("infra/experimental/rpcauth.py").into(),

@@ -3,8 +3,10 @@ use itertools::Itertools;
 use metrics::gauge;
 use sqlx::Sqlite;
 use redgold_keys::TestConstants;
-use redgold_schema::structs::{Address, ErrorInfo, UtxoId, Hash, Output, Transaction, TransactionEntry, UtxoEntry};
-use redgold_schema::{from_hex, ProtoHashable, ProtoSerde, RgResult, SafeBytesAccess, structs, WithMetadataHashable};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Output, Transaction, TransactionEntry, UtxoEntry, UtxoId};
+use redgold_schema::{from_hex, RgResult, structs};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -13,7 +15,7 @@ pub struct UtxoStore {
     pub ctx: DataStoreContext
 }
 
-use crate::schema::json_or;
+use redgold_schema::helpers::easy_json::json_or;
 
 impl UtxoStore {
 
@@ -56,7 +58,7 @@ impl UtxoStore {
         utxo: &UtxoId,
         tx_opt: Option<&mut sqlx::Transaction<'_, Sqlite>>
     ) -> Result<bool, ErrorInfo> {
-        let b = utxo.transaction_hash.safe_bytes()?;
+        let b = utxo.transaction_hash.safe_get()?.vec();
         // TODO: Select present
         let rows = sqlx::query!(
             r#"SELECT output_index FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
@@ -89,7 +91,7 @@ impl UtxoStore {
         utxo_id: &UtxoId,
         tx_opt: Option<&mut sqlx::Transaction<'_, Sqlite>>
     ) -> RgResult<Vec<(Hash, i64)>> {
-        let bytes = utxo_id.transaction_hash.safe_bytes()?;
+        let bytes = utxo_id.transaction_hash.safe_get()?.vec();
         let output_index = utxo_id.output_index;
 
         let rows = sqlx::query!(
@@ -110,10 +112,10 @@ impl UtxoStore {
                 rows.fetch_all(&mut *pool).await
             }
         })?;
-        Ok(fetched_rows
-            .iter()
-            .map(|o| (Hash::new(o.child_transaction_hash.clone()), o.child_input_index))
-            .collect_vec())
+        fetched_rows
+            .into_iter()
+            .map(|o| Hash::new_from_proto(o.child_transaction_hash.clone()).map(|h| (h, o.child_input_index)))
+            .collect()
     }
 
 
@@ -121,9 +123,9 @@ impl UtxoStore {
         &self,
         utxo_id: &UtxoId,
     ) -> RgResult<Option<(Hash, i64)>> {
-        let bytes = utxo_id.transaction_hash.safe_bytes()?;
+        let bytes = utxo_id.transaction_hash.safe_get()?.vec();
         let output_index = utxo_id.output_index;
-        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+        DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT child_transaction_hash, child_input_index FROM transaction_edge
             WHERE transaction_hash = ?1 AND output_index = ?2"#,
             bytes,
@@ -131,7 +133,8 @@ impl UtxoStore {
         )
             .fetch_optional(&mut *self.ctx.pool().await?)
             .await)?
-            .map(|o| (Hash::new(o.child_transaction_hash), o.child_input_index)))
+            .map(|o| Hash::new_from_proto(o.child_transaction_hash).map(|h| (h, o.child_input_index)))
+            .transpose()
     }
 
     pub async fn delete_utxo(
@@ -142,7 +145,7 @@ impl UtxoStore {
 
         let transaction_hash = fixed_utxo_id.transaction_hash.safe_get()?;
         let output_index = fixed_utxo_id.output_index.clone();
-        let bytes = transaction_hash.safe_bytes()?;
+        let bytes = transaction_hash.vec();
         let rows = sqlx::query!(
             r#"DELETE FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
             bytes,
@@ -171,7 +174,7 @@ impl UtxoStore {
         address: &Address
     ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
 
-        let bytes = address.address.safe_bytes()?;
+        let bytes = address.vec();
         DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT raw FROM utxo WHERE address = ?1"#,
             bytes
@@ -188,7 +191,7 @@ impl UtxoStore {
     ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
         let transaction_hash = fixed_utxo_id.transaction_hash.safe_get()?;
         let output_index = fixed_utxo_id.output_index.clone();
-        let bytes = transaction_hash.safe_bytes()?;
+        let bytes = transaction_hash.vec();
         DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT raw FROM utxo WHERE transaction_hash = ?1 AND output_index = ?2"#,
             bytes,
@@ -205,13 +208,114 @@ impl UtxoStore {
         start: i64,
         end: i64
     ) -> RgResult<Vec<Hash>> {
-        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+        DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT DISTINCT transaction_hash FROM utxo WHERE time >= ?1 AND time < ?2"#,
             start,
             end
         ).fetch_all(&mut *self.ctx.pool().await?).await)?
             .into_iter()
-            .map(|row| Hash::new(row.transaction_hash)).collect_vec())
+            .map(|row| Hash::new_from_proto(row.transaction_hash)).collect()
+    }
+
+    pub async fn insert_utxo(
+        &self,
+        utxo_entry: &UtxoEntry,
+        sqlite_tx: &mut sqlx::Transaction<'_, Sqlite>
+    ) -> Result<i64, ErrorInfo> {
+        // let mut pool = self.ctx.pool().await?;
+        let id = utxo_entry.utxo_id.safe_get_msg("missing utxo id")?;
+        let hash = id.transaction_hash.safe_get()?.vec();
+        let output_index = id.output_index;
+        let output = utxo_entry.output.safe_get_msg("UTxo entry insert missing output")?;
+        let amount = output.opt_amount().clone();
+        let output_ser = output.proto_serialize();
+        let raw = utxo_entry.proto_serialize();
+        let addr = utxo_entry.address()?;
+        let address = addr.vec();
+
+        let has_code = output.validate_deploy_code().is_ok();
+        let qry = sqlx::query!(
+            r#"
+        INSERT OR REPLACE INTO utxo (transaction_hash, output_index,
+        address, output, time, amount, raw, has_code) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+            hash,
+            output_index,
+            address,
+            output_ser,
+            utxo_entry.time,
+            amount,
+            raw,
+            has_code
+        );
+        let rows = qry
+            .execute(&mut **sqlite_tx)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        gauge!("redgold.utxo.total").increment(1.0);
+        Ok(rows_m.last_insert_rowid())
+    }
+
+    pub async fn query_utxo_output_index(
+        &self,
+        transaction_hash: &Hash,
+    ) -> Result<Vec<i32>, ErrorInfo> {
+        let bytes = transaction_hash.vec();
+        Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT output_index FROM utxo WHERE transaction_hash = ?1"#,
+            bytes
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?.into_iter().map(|row| row.output_index as i32).collect_vec())
+    }
+
+
+
+}
+
+
+
+// Debug stuff below
+impl UtxoStore {
+
+    pub async fn utxo_all_debug(
+        &self
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT raw FROM utxo"#,
+        )
+            .fetch_all(&mut *pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(UtxoEntry::proto_deserialize(row.raw)?)
+        }
+        Ok(res)
+    }
+
+
+    pub async fn utxo_filter_time(
+        &self,
+        start: i64,
+        end: i64
+    ) -> Result<Vec<UtxoEntry>, ErrorInfo> {
+
+        let mut pool = self.ctx.pool().await?;
+        let rows = sqlx::query!(
+            r#"SELECT raw FROM utxo WHERE time >= ?1 AND time < ?2"#,
+            start,
+            end
+        )
+            .fetch_all(&mut *pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mut res = vec![];
+        for row in rows_m {
+            res.push(UtxoEntry::proto_deserialize(row.raw)?)
+        }
+        Ok(res)
     }
 
 }

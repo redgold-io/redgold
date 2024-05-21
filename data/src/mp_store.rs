@@ -1,6 +1,8 @@
-use redgold_keys::TestConstants;
-use redgold_schema::structs::{Address, ErrorInfo, SupportedCurrency, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, Proof, PublicKey};
-use redgold_schema::{ProtoHashable, ProtoSerde, SafeBytesAccess};
+use log::info;
+use redgold_schema::structs::{ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, LocalKeyShare, PartyData, PartyInfo, Proof, PublicKey, RoomId};
+use redgold_schema::{RgResult};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use redgold_schema::util;
@@ -11,56 +13,69 @@ pub struct MultipartyStore {
 }
 
 impl MultipartyStore {
-    pub async fn local_share_and_initiate(&self, room_id: String) -> Result<Option<(String, InitiateMultipartyKeygenRequest)>, ErrorInfo> {
+
+    pub async fn all_party_info_with_key(&self) -> RgResult<Vec<PartyInfo>> {
+        DataStoreContext::map_err_sqlx(sqlx::query!(
+            r#"SELECT party_info FROM multiparty WHERE keygen_public_key IS NOT NULL"#,
+        )
+            .fetch_all(&mut *self.ctx.pool().await?)
+            .await)?.into_iter().map(|r| PartyInfo::proto_deserialize(r.party_info)).collect()
+    }
+
+    pub async fn party_info(&self, room_id: &RoomId) -> RgResult<Option<PartyInfo>> {
         let mut pool = self.ctx.pool().await?;
+        let room_id = room_id.vec();
 
         let rows = sqlx::query!(
-            r#"SELECT local_share, initiate_keygen FROM multiparty WHERE room_id = ?1"#,
+            r#"SELECT party_info FROM multiparty WHERE room_id = ?1"#,
             room_id
         )
-            .fetch_all(&mut *pool)
+            .fetch_optional(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        // TODO: Check for collissions
-        let mut res = None;
-
-        for row in rows_m {
-            let s: String = row.local_share;
-            let k = row.initiate_keygen;
-            let r = InitiateMultipartyKeygenRequest::proto_deserialize(k)?;
-            res = Some((s, r));
-        }
-        Ok(res)
+        rows_m.map(|r| PartyInfo::proto_deserialize(r.party_info)).transpose()
     }
-    /*
-    room_id TEXT PRIMARY KEY,
-                                    local_share TEXT,
-                                    proof BLOB,
-                                    keygen_time INTEGER,
-                                    proof_time INTEGER
-     */
-    pub async fn add_keygen(&self, local_share: String, room_id: String,
-                            initiate_keygen: InitiateMultipartyKeygenRequest,
-                            self_initiated: bool,
-        time: Option<i64>
-    ) -> Result<i64, ErrorInfo> {
+
+    pub async fn party_data(&self, keygen_public_key: &PublicKey) -> RgResult<Option<PartyData>> {
+        let mut pool = self.ctx.pool().await?;
+        let qry = keygen_public_key.vec();
+
+        let rows = sqlx::query!(
+            r#"SELECT party_data FROM multiparty WHERE keygen_public_key = ?1"#,
+            qry
+        )
+            .fetch_optional(&mut *pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        let mapped = rows_m.and_then(|r| r.party_data);
+        let deser = mapped.map(|r| PartyData::proto_deserialize(r)).transpose()?;
+        Ok(deser)
+    }
+    pub async fn add_keygen(&self, party_info: &PartyInfo) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
-        let time = time.unwrap_or(util::current_time_millis());
-        let init = initiate_keygen.proto_serialize();
-        let id = initiate_keygen.identifier.safe_get_msg("ident missing in keygen sql add")?;
-        let option = id.party_keys.get(0);
-        let pk =
-            option.safe_get_msg("Missing public key head in identifier multiparty keygen")?;
-        let pkb = pk.bytes.safe_bytes()?;
+
+        let initiate_keygen = party_info.initiate.safe_get_msg("init missing in keygen sql add")?;
+        let ident = initiate_keygen.identifier.safe_get_msg("ident missing in keygen sql add")?;
+
+        let room_id = ident.room_id.safe_get_msg("missing room id")?.vec();
+        let time = initiate_keygen.time;
+        let pi = party_info.proto_serialize();
+        let self_initiated = party_info.self_initiated.safe_get()?.clone();
+        let host_public_key = ident.party_keys.get(0).safe_get_msg("missing host pk")?.vec();
+
+        let party_data: Vec<u8> = vec![];
+
         let rows = sqlx::query!(
-            r#"INSERT OR REPLACE INTO multiparty (room_id, local_share, keygen_time, initiate_keygen, self_initiated, host_public_key) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+            r#"INSERT OR REPLACE INTO multiparty
+            (room_id, keygen_time, party_info, self_initiated, host_public_key, party_data)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
             room_id,
-            local_share,
             time,
-            init,
+            pi,
             self_initiated,
-            pkb
+            host_public_key,
+            party_data
         )
             .execute(&mut *pool)
             .await;
@@ -84,7 +99,7 @@ impl MultipartyStore {
         &self, initiator: &PublicKey
     ) -> Result<i64, ErrorInfo> {
 
-        let pk = initiator.bytes()?;
+        let pk = initiator.vec();
         Ok(DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT COUNT(*) as count FROM multiparty WHERE host_public_key = ?1"#,
             pk
@@ -103,34 +118,85 @@ impl MultipartyStore {
             .await)?.count as i64)
     }
 
-    pub async fn update_room_id_key(&self, room_id: String, key: PublicKey,
-    ) -> Result<(), ErrorInfo> {
+    pub async fn update_room_id_party_key(&self, keygen_room_id: &RoomId, party_pk: &PublicKey) -> RgResult<i64> {
         let mut pool = self.ctx.pool().await?;
 
-        let _time = util::current_time_millis();
-        let pkb = key.bytes.safe_bytes()?;
+        let pi = party_pk.vec();
+        let room_id = keygen_room_id.vec();
         let rows = sqlx::query!(
             r#"UPDATE multiparty SET keygen_public_key = ?1 WHERE room_id = ?2"#,
-            pkb,
+            pi,
             room_id,
         )
             .execute(&mut *pool)
             .await;
-        let _rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        Ok(())
+        let _rows_m = DataStoreContext::map_err_sqlx(rows)?.rows_affected();
+        Ok(_rows_m as i64)
+    }
+
+    pub async fn update_room_id_party_info(&self, room_id: &RoomId, party_info: PartyInfo) -> RgResult<i64> {
+        let mut pool = self.ctx.pool().await?;
+
+        let pi = party_info.proto_serialize();
+        let room_id = room_id.vec();
+        let rows = sqlx::query!(
+            r#"UPDATE multiparty SET party_info = ?1 WHERE room_id = ?2"#,
+            pi,
+            room_id,
+        )
+            .execute(&mut *pool)
+            .await;
+        let _rows_m = DataStoreContext::map_err_sqlx(rows)?.rows_affected();
+        Ok(_rows_m as i64)
+    }
+
+    pub async fn update_party_data(&self, keygen_public_key: &PublicKey, party_data: PartyData) -> RgResult<i64> {
+        let mut pool = self.ctx.pool().await?;
+
+        let pi = party_data.proto_serialize();
+        let qry = keygen_public_key.vec();
+        let rows = sqlx::query!(
+            r#"UPDATE multiparty SET party_data = ?1 WHERE keygen_public_key = ?2"#,
+            pi,
+            qry,
+        )
+            .execute(&mut *pool)
+            .await;
+        let _rows_m = DataStoreContext::map_err_sqlx(rows)?.rows_affected();
+        Ok(_rows_m as i64)
     }
 
     pub async fn add_signing_proof(
-        &self, keygen_room_id: String, room_id: String, proof: Proof, initiate_signing: InitiateMultipartySigningRequest
+        &self, keygen_room_id: &RoomId, room_id: &RoomId, proof: Proof, initiate_signing: InitiateMultipartySigningRequest
     ) -> Result<(), ErrorInfo> {
 
-        self.update_room_id_key(keygen_room_id.clone(), proof.public_key.safe_get_msg("Missing pk")?.clone()).await?;
-
+        let mut pi = self.party_info(keygen_room_id).await?.ok_or(ErrorInfo::new("No party info for keygen room"))?;
+        if pi.party_key.is_none() {
+            // info!("Adding party key to party info and table signing proof with existing party info {}", pi.json_or());
+            let key = proof.public_key.safe_get_msg("Missing pk")?.clone();
+            pi.party_key = Some(key.clone());
+            self.update_room_id_party_info(keygen_room_id, pi).await?;
+            self.update_room_id_party_key(keygen_room_id, &key).await?;
+            let all_pi = self.all_party_info_with_key().await?;
+            // info!("All party info with key after update {}", all_pi.json_or());
+            if !all_pi.iter().any(|p| p.party_key == Some(key.clone())) {
+                return Err(ErrorInfo::new("Party key not found in all party info after update"));
+            }
+        }
         self.add_signing_proof_signatures(keygen_room_id, room_id, proof, initiate_signing).await
     }
 
-    pub async fn add_signing_proof_signatures(&self, keygen_room_id: String, room_id: String, proof: Proof, initiate_signing: InitiateMultipartySigningRequest) -> Result<(), ErrorInfo> {
+    pub async fn add_signing_proof_signatures(
+        &self,
+        keygen_room_id: &RoomId,
+        room_id: &RoomId,
+        proof: Proof,
+        initiate_signing: InitiateMultipartySigningRequest
+    ) -> Result<(), ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
+
+        let keygen_room_id = keygen_room_id.vec();
+        let room_id = room_id.vec();
 
         let time = util::current_time_millis();
         let proof_vec = proof.proto_serialize();
@@ -148,54 +214,6 @@ impl MultipartyStore {
         let _ = DataStoreContext::map_err_sqlx(rows)?;
         Ok(())
     }
-
-    pub async fn check_bridge_txid_used(&self, txid: &Vec<u8>) -> Result<bool, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let rows = sqlx::query!(
-            r#"SELECT COUNT(txid) as count FROM multiparty_bridge WHERE txid = ?1"#,
-            txid
-        )
-            .fetch_one(&mut *pool)
-            .await;
-        let r = DataStoreContext::map_err_sqlx(rows)?;
-        Ok(r.count > 0)
-    }
-
-    // TODO: Remove this
-    pub async fn insert_bridge_tx(
-        &self,
-        txid: &Vec<u8>,
-        secondary_txid: &Vec<u8>,
-        outgoing: bool,
-        network: SupportedCurrency,
-        source_address: &Address,
-        destination_address: &Address,
-        timestamp: i64,
-        amount: i64
-    ) -> Result<i64, ErrorInfo> {
-        let mut pool = self.ctx.pool().await?;
-        let network = network as i32;
-        let source_address = source_address.address.safe_bytes()?;
-        let destination_address = destination_address.address.safe_bytes()?;
-        let rows = sqlx::query!(
-            r#"INSERT INTO multiparty_bridge (txid, secondary_txid, outgoing,
-            network, source_address, destination_address, timestamp, amount)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
-            txid,
-            secondary_txid,
-            outgoing,
-            network,
-            source_address,
-            destination_address,
-            timestamp,
-            amount
-        )
-            .execute(&mut *pool)
-            .await;
-        let r = DataStoreContext::map_err_sqlx(rows)?;
-        Ok(r.last_insert_rowid())
-    }
-
 
 }
 

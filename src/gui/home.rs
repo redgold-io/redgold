@@ -8,6 +8,7 @@ use egui_extras::{Column, TableBuilder};
 use itertools::Itertools;
 use std::time::Duration;
 use log::{error, info};
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::gui::app_loop;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
@@ -173,7 +174,7 @@ pub async fn query_network_status(
                 true
             }
             Err(e) => {
-                error!("Network status query failed: {}", crate::schema::json_or(&e));
+                error!("Network status query failed: {}", e.json_or());
                 false
             }
         };

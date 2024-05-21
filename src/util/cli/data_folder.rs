@@ -1,7 +1,8 @@
-use std::path::{Path, PathBuf};
-use redgold_schema::{ErrorInfoContext, json_from, RgResult, structs};
+use std::path::PathBuf;
+use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Transaction};
 use redgold_data::data_store::DataStore;
+use redgold_schema::helpers::easy_json::json_from;
 use redgold_schema::servers::Server;
 
 // TODO: Move everything to use this
@@ -19,6 +20,10 @@ impl EnvDataFolder {
 
     pub fn data_store_path(&self) -> PathBuf {
         self.path.join("data_store.sqlite")
+    }
+
+    pub fn bdk_sled_path(&self) -> PathBuf {
+        self.path.join("bdk_sled")
     }
 
     pub fn mnemonic_path(&self) -> PathBuf {

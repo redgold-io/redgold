@@ -12,7 +12,7 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetRequest,
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::relay::Relay;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 //

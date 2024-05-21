@@ -1,7 +1,9 @@
 use extism::{Context, Plugin};
 
-use redgold_schema::{bytes_data, EasyJson, error_info, ErrorInfoContext, ProtoSerde, RgResult};
+use redgold_schema::{bytes_data, error_info, ErrorInfoContext, RgResult};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ExecutionInput, ExecutionResult, TestContractInternalState, TestContractRequest, TestContractUpdate2};
 
 pub async fn invoke_wasm(

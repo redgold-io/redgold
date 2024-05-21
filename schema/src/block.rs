@@ -1,7 +1,8 @@
-use crate::structs::{Block, Error, ErrorInfo, Hash, StructMetadata};
-use crate::{error_message, SafeOption, WithMetadataHashable};
-use crate::{HashClear, SafeBytesAccess};
-use crate::{ProtoHashable, WithMetadataHashableFields};
+use crate::structs::{Block, ErrorInfo, StructMetadata};
+use crate::SafeOption;
+use crate::HashClear;
+use crate::helpers::with_metadata_hashable::WithMetadataHashable;
+use crate::helpers::with_metadata_hashable::WithMetadataHashableFields;
 
 impl HashClear for Block {
     fn hash_clear(&mut self) {

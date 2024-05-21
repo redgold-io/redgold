@@ -13,7 +13,8 @@ use tracing::trace;
 use uuid::Uuid;
 use warp::{Filter, Rejection};
 use warp::reply::Json;
-use redgold_schema::{json_or, response_metadata, RgResult, SafeOption, structs};
+use redgold_schema::{response_metadata, RgResult, SafeOption, structs};
+use redgold_schema::helpers::easy_json::json_or;
 use redgold_schema::structs::{BytesData, ControlMultipartyKeygenRequest, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ControlMultipartySigningResponse, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, Request};
 use crate::api::{as_warp_json_response, RgHttpClient};
 use crate::api::rosetta::models::Error;
@@ -21,7 +22,7 @@ use crate::api::rosetta::models::Error;
 // use crate::util::to_libp2p_peer_id;
 
 use crate::core::relay::Relay;
-use crate::multiparty::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
+use crate::multiparty_gg20::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
 use crate::schema::structs::{
     ControlRequest, ControlResponse, ResponseMetadata,
 };
@@ -103,7 +104,9 @@ impl ControlServer {
                     relay.clone(),
                     mps.multiparty_identifier.clone(),
                     true,
-                    None
+                    None,
+                    true,
+                    vec![],
                 ).await?;
                 let mut resp = ControlMultipartyKeygenResponse::default();
                 if mps.return_local_share {
@@ -120,7 +123,8 @@ impl ControlServer {
                     req.identifier.safe_get_msg("Missing identifier")?.clone(),
                     req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
                     req.signing_party_keys.clone(),
-                    Some(req.signing_room_id.clone())
+                    req.signing_room_id.clone(),
+                    None
                 ).await?;
                 let mut res = ControlMultipartySigningResponse::default();
                 res.identifier = req.identifier.clone();

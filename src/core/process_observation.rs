@@ -1,12 +1,13 @@
 use dashmap::mapref::one::Ref;
 use futures::{StreamExt, TryStreamExt};
-use log::{debug, info};
+use log::{debug, info, trace};
 use metrics::counter;
 use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
-use redgold_schema::{util, WithMetadataHashable};
+use redgold_schema::util;
 use crate::core::internal_message::RecvAsyncErrorInfo;
 use crate::core::relay::Relay;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::process_transaction::{ProcessTransactionMessage, RequestProcessor};
 use redgold_schema::observability::errors::Loggable;
 
@@ -42,7 +43,7 @@ impl ObservationHandler {
 
     async fn process_message(&self, o: Transaction) -> Result<(), ErrorInfo> {
         counter!("redgold.observation.received").increment(1);
-        debug!("Received peer observation {}", o.json_or());
+        trace!("Received peer observation {}", o.json_or());
         // TODO: Verify merkle root
         // TODO: Verify time and/or avoid updating time if row already present.
         // TODO: Verify there is no conflicting data to our knowledge in the observation,

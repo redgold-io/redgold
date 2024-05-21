@@ -3,7 +3,8 @@ pub mod entry;
 
 use extism_pdk::*;
 use serde::Serialize;
-use redgold_schema::{ProtoSerde, RgResult};
+use redgold_schema::RgResult;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ExecutionInput, ExecutionResult};
 use redgold_schema::transaction::amount_data;
 use redgold_schema::util::lang_util::SameResult;

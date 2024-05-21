@@ -3,7 +3,8 @@ use eframe::egui::{ScrollArea, Ui, Widget};
 use tracing::info;
 use itertools::Itertools;
 use redgold_schema::local_stored_state::NamedXpub;
-use redgold_schema::{EasyJson, ErrorInfoContext, RgResult};
+use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tabs::transact::wallet_tab;
 

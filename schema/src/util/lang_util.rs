@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use serde::Serialize;
-use crate::json_or;
+use crate::helpers::easy_json::json_or;
 use crate::structs::ErrorInfo;
 
 pub trait SameResult<T> {

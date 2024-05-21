@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use crate::RgResult;
+use crate::proto_serde::ProtoSerde;
 use crate::structs::{Hash, NodeMetadata, PartitionInfo, PublicKey};
 
 pub fn xor_distance(v1: &Vec<u8>, v2: &Vec<u8>) -> i64 {
@@ -37,7 +37,7 @@ pub fn xorf_conv_distance(query_hash: &Vec<u8>, peer_marker: &Vec<u8>) -> i64 {
 
 pub fn xorfc_hash(query_hash: &Hash, pk: &PublicKey) -> i64 {
     let query_hash = query_hash.vec();
-    let pk_bytes = pk.bytes().expect("bytes");
+    let pk_bytes = pk.vec();
     xorf_conv_distance(&query_hash, &pk_bytes)
 }
 

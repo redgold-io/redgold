@@ -1,16 +1,13 @@
-use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use itertools::Itertools;
-use log::info;
 use redgold_data::data_store::DataStore;
-use redgold_keys::KeyPair;
-use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use redgold_schema::{bytes_data, EasyJson, error_info, RgResult, SafeOption, structs, WithMetadataHashable};
+use redgold_schema::{bytes_data, error_info, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, Input, LiquidityDeposit, LiquidityRange, LiquidityRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry};
+use redgold_schema::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, StakeDeposit, LiquidityRange, StakeRequest, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, DepositRequest, StakeWithdrawal, UtxoId};
 use redgold_schema::transaction::amount_data;
 use crate::api::public_api::PublicClient;
 use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::tx_schema_validate::SchemaValidationSupport;
 use crate::node_config::NodeConfig;
 
@@ -76,7 +73,7 @@ impl TransactionBuilder {
     }
     pub fn with_type(&mut self, transaction_type: structs::TransactionType) -> &mut Self {
         let opts = self.transaction.options.as_mut().expect("");
-        opts.transaction_type = Some(transaction_type as i32);
+        opts.transaction_type = transaction_type as i32;
         self
     }
     pub fn with_ds(&mut self, ds: DataStore) -> &mut Self {
@@ -270,14 +267,24 @@ impl TransactionBuilder {
     }
 
     // Should this be hex or bytes data?
-    pub fn with_last_output_deposit_swap_fulfillment(&mut self, btc_txid: String) -> &mut Self {
-        if let Some(o) = self.transaction.outputs.last_mut() {
-            if let Some(d) = o.data.as_mut() {
-                d.external_transaction_id = Some(structs::ExternalTransactionId {identifier: btc_txid.clone()});
-            }
-        }
-        self.with_last_output_swap_type();
-        self
+    pub fn with_last_output_deposit_swap_fulfillment(&mut self, txid: ExternalTransactionId) -> RgResult<&mut Self> {
+        let d = self.last_output_data().ok_or(error_info("Missing output"))?;
+
+        let mut res = StandardResponse::default();
+        let mut sw = structs::SwapFulfillment::default();
+        sw.external_transaction_id = Some(txid);
+        res.swap_fulfillment = Some(sw);
+        d.standard_response = Some(res);
+        Ok(self)
+    }
+    pub fn with_last_output_stake_withdrawal_fulfillment(&mut self, initiating_utxo_id: &UtxoId) -> RgResult<&mut Self> {
+        let d = self.last_output_data().ok_or(error_info("Missing output"))?;
+        let mut res = StandardResponse::default();
+        let mut sw = structs::StakeWithdrawalFulfillment::default();
+        sw.stake_withdrawal_request = Some(initiating_utxo_id.clone());
+        res.stake_withdrawal_fulfillment = Some(sw);
+        d.standard_response = Some(res);
+        Ok(self)
     }
 
     pub fn with_last_output_type(&mut self, output_type: OutputType) -> &mut Self {
@@ -287,10 +294,50 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn last_output(&mut self) -> Option<&mut Output> {
+        self.transaction.outputs.last_mut()
+    }
+
+    pub fn last_output_data(&mut self) -> Option<&mut StandardData> {
+        self.transaction.outputs.last_mut().and_then(|o| o.data.as_mut())
+    }
+
+    pub fn last_output_request_or(&mut self) -> Option<&mut StandardRequest> {
+        self.last_output_data().and_then(|d| {
+            let mut default = StandardRequest::default();
+            let mut r = d.standard_request.as_mut().unwrap_or(&mut default);
+            d.standard_request = Some(r.clone());
+            d.standard_request.as_mut()
+        })
+    }
+
     pub fn with_last_output_swap_type(&mut self) -> &mut Self {
         let contract_type = structs::StandardContractType::Swap;
         self.with_last_output_contract_type(contract_type);
         self
+    }
+
+    pub fn with_last_output_request(&mut self, req: StandardRequest) -> &mut Self {
+        if let Some(o) = self.transaction.outputs.last_mut() {
+            if let Some(d) = o.data.as_mut() {
+                d.standard_request = Some(req);
+            }
+        }
+        self
+    }
+
+    pub fn with_last_output_swap_destination(&mut self, destination: &Address) -> RgResult<&mut Self> {
+        let mut swap_request = structs::SwapRequest::default();
+        swap_request.destination = Some(destination.clone());
+        self.last_output_request_or().ok_msg("Missing output")?.swap_request = Some(swap_request);
+        Ok(self)
+    }
+
+    pub fn with_swap(&mut self, destination: &Address, party_fee_or_rdg_amount: &CurrencyAmount, party_address: &Address) -> RgResult<&mut Self> {
+        self.with_output(party_address, party_fee_or_rdg_amount);
+        self.with_last_output_swap_destination(destination)?;
+        self.with_last_output_swap_type();
+        Ok(self)
     }
 
     pub fn with_last_output_stake(&mut self) -> &mut Self {
@@ -306,18 +353,91 @@ impl TransactionBuilder {
     }
 
 
-    pub fn with_stake_usd_bounds(&mut self, lower: Option<f64>, upper: Option<f64>, address: &Address) -> &mut Self {
+    pub fn with_external_stake_usd_bounds(
+        &mut self,
+        lower: Option<f64>,
+        upper: Option<f64>,
+        stake_control_address: &Address,
+        external_address: &Address,
+        external_amount: &CurrencyAmount,
+        pool_address: &Address,
+        pool_fee: &CurrencyAmount,
+    ) -> &mut Self {
+        self.with_output(pool_address, pool_fee);
+        self.with_last_output_stake();
         let mut o = Output::default();
-        o.address = Some(address.clone());
+        o.address = Some(stake_control_address.clone());
         let mut d = StandardData::default();
-        let mut lq = LiquidityRequest::default();
-        let mut deposit = LiquidityDeposit::default();
-        let mut lr = LiquidityRange::default();
-        lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_fractional(lower).expect("works"));
-        lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_fractional(upper).expect("works"));
-        deposit.liquidity_ranges = vec![lr];
+        let mut lq = StakeRequest::default();
+        let mut deposit = StakeDeposit::default();
+        if lower.is_some() || upper.is_some() {
+            let mut lr = LiquidityRange::default();
+            lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
+            lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
+            deposit.liquidity_ranges = vec![lr];
+        }
+        let mut dr = DepositRequest::default();
+        dr.address = Some(external_address.clone());
+        dr.amount = Some(external_amount.clone());
+        deposit.deposit = Some(dr);
         lq.deposit = Some(deposit);
-        d.liquidity_request = Some(lq);
+
+        let mut sr = StandardRequest::default();
+        sr.stake_request = Some(lq);
+        d.standard_request = Some(sr);
+        o.data = Some(d);
+        self.transaction.outputs.push(o);
+        self
+    }
+
+    pub fn with_internal_stake_usd_bounds(
+        &mut self,
+        lower: Option<f64>,
+        upper: Option<f64>,
+        stake_control_address: &Address,
+        party_address: &Address,
+        party_send_amount: &CurrencyAmount,
+    ) -> &mut Self {
+        self.with_output(party_address, party_send_amount);
+        self.with_last_output_stake();
+        let mut o = Output::default();
+        o.address = Some(stake_control_address.clone());
+        let mut d = StandardData::default();
+        let mut lq = StakeRequest::default();
+        let mut deposit = StakeDeposit::default();
+        if lower.is_some() || upper.is_some() {
+            let mut lr = LiquidityRange::default();
+            lr.min_inclusive = lower.map(|lower| CurrencyAmount::from_usd(lower).expect("works"));
+            lr.max_exclusive = upper.map(|upper| CurrencyAmount::from_usd(upper).expect("works"));
+            deposit.liquidity_ranges = vec![lr];
+        }
+        lq.deposit = Some(deposit);
+        let mut sr = StandardRequest::default();
+        sr.stake_request = Some(lq);
+        d.standard_request = Some(sr);
+        o.data = Some(d);
+        self.transaction.outputs.push(o);
+        self
+    }
+
+    pub fn with_stake_withdrawal(&mut self,
+                                 destination: &Address,
+                                 party_address: &Address,
+                                 party_fee: &CurrencyAmount,
+        original_utxo: UtxoEntry
+    ) -> &mut Self {
+        self.with_unsigned_input(original_utxo).expect("works");
+        let mut o = Output::default();
+        o.address = Some(party_address.clone());
+        let mut d = StandardData::default();
+        d.amount = Some(party_fee.clone());
+        let mut lq = StakeRequest::default();
+        let mut withdrawal = StakeWithdrawal::default();
+        withdrawal.destination = Some(destination.clone());
+        lq.withdrawal = Some(withdrawal);
+        let mut sr = StandardRequest::default();
+        sr.stake_request = Some(lq);
+        d.standard_request = Some(sr);
         o.data = Some(d);
         self.transaction.outputs.push(o);
         self
@@ -351,7 +471,9 @@ impl TransactionBuilder {
             if self.balance() > 0 {
                 break
             }
-            self.with_unsigned_input(u.clone())?;
+            if u.opt_amount().is_some() {
+                self.with_unsigned_input(u.clone())?;
+            }
         }
 
         if self.balance() < 0 {

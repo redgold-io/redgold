@@ -20,7 +20,7 @@ pub trait ToEthereumAddress {
 impl ToBitcoinAddress for PublicKey {
     fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo> {
 
-        let pk = &key::PublicKey::from_slice(&self.bytes()?).error_info("public key conversion")?;
+        let pk = &key::PublicKey::from_slice(&self.raw_bytes()?).error_info("public key conversion")?;
         let network1 = if network == &NetworkEnvironment::Main {
             Network::Bitcoin
         } else {
@@ -57,7 +57,7 @@ impl ToBitcoinAddress for structs::Address {
 impl ToEthereumAddress for PublicKey {
     fn to_ethereum_address(&self) -> Result<String, ErrorInfo> {
         // ETH address requires uncompressed public key
-        let data = self.to_lib_public_key()?.serialize_uncompressed().to_vec()[1..].to_vec();
+        let data = self.to_lib_ecdsa_public_key()?.serialize_uncompressed().to_vec()[1..].to_vec();
         // Verify if this is correct.
 
         let mut hasher = Keccak256::new();

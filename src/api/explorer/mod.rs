@@ -12,25 +12,33 @@ use futures::TryFutureExt;
 use itertools::Itertools;
 use log::info;
 use rocket::form::FromForm;
-use redgold_schema::{EasyJson, error_info, ProtoSerde, RgResult, SafeBytesAccess, SafeOption, WithMetadataHashable};
+use redgold_schema::{error_info, RgResult, SafeOption};
 use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
 use strum_macros::EnumString;
 use tokio::time::Instant;
 use tracing::trace;
 use warp::get;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::{Pagination, TokenParam};
-use crate::multiparty::watcher::{BidAsk, DepositWatcher, DepositWatcherConfig};
+// use crate::multiparty_gg20::watcher::{DepositWatcher, DepositWatcherConfig};
 use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::address_support::AddressSupport;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::api::faucet::faucet_request;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
+use redgold_schema::structs::PartyInfoAbridged;
+use crate::party::central_price::CentralPricePair;
+use crate::party::price_volume::PriceVolume;
+// use crate::party::bid_ask::BidAsk;
 
 #[derive(Serialize, Deserialize)]
 pub struct HashResponse {
@@ -129,12 +137,13 @@ pub struct DetailedTransaction {
 #[derive(Serialize, Deserialize)]
 pub struct AddressPoolInfo {
     public_key: String,
-    // rdg_pk_address: String,
-    rdg_address: String,
-    rdg_balance: f64,
-    btc_address: String,
-    btc_balance: f64,
-    bid_ask: BidAsk,
+    addresses: Vec<String>,
+    balances: HashMap<String, String>,
+    bids: HashMap<String, Vec<PriceVolume>>,
+    asks: HashMap<String, Vec<PriceVolume>>,
+    bids_usd: HashMap<String, Vec<PriceVolume>>,
+    asks_usd: HashMap<String, Vec<PriceVolume>>,
+    central_prices: HashMap<String, CentralPricePair>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -266,27 +275,53 @@ pub fn convert_utxo(u: &UtxoEntry) -> RgResult<BriefUtxoEntry> {
 
 pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>> {
 
-    let res: Option<DepositWatcherConfig> = r.ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await?;
-    let res = match res {
-        None => {
-            None
-        }
-        Some(d) => {
-            let a = d.deposit_allocations.get(0).safe_get_msg("Missing deposit alloc")?.clone();
-            let btc_swap_address = a.key.to_bitcoin_address(&r.node_config.network.clone())?;
-            let btc_amount = (a.balance_btc as f64) / 1e8;
-            let rdg_amount = (a.balance_rdg as f64) / 1e8;
-            Some(AddressPoolInfo {
-                public_key: a.key.hex_or(),
-                rdg_address: a.key.address()?.render_string()?,
-                rdg_balance: rdg_amount,
-                btc_address: btc_swap_address,
-                btc_balance: btc_amount,
-                bid_ask: d.bid_ask.clone(),
-            })
-        }
-    };
-    Ok(res)
+    let data = r.external_network_shared_data.clone_read().await;
+    let pid = data
+        .iter()
+        .filter(|(k, v)| v.party_info.self_initiated())
+        .next()
+        .map(|x| x.1);
+    if let Some(d) = pid {
+        let pk = d.party_info.party_key.safe_get_msg("Missing party key")?;
+        let public_key =
+            pk.hex();
+        if let Some(pe) = d.party_events.as_ref() {
+            let balances = pe.balance_map.iter().map(|(k, v)| {
+                (format!("{:?}", k), v.to_fractional().to_string())
+            }).collect::<HashMap<String, String>>();
+            let addresses = pk.to_all_addresses_for_network(&r.node_config.network)?
+                .iter().flat_map(|a| a.render_string().ok()).collect_vec();
+            let central_prices = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.clone())
+            }).collect::<HashMap<String, CentralPricePair>>();
+            let bids = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.bids().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+            let asks = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.asks().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+            let bids_usd = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.bids_usd().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+            let asks_usd = pe.central_prices.iter().map(|(k,v)| {
+                (format!("{:?}", k), v.asks_usd().clone())
+            }).collect::<HashMap<String, Vec<PriceVolume>>>();
+
+            return Ok(Some(AddressPoolInfo {
+                public_key,
+                addresses,
+                balances,
+                bids,
+                asks,
+                bids_usd,
+                asks_usd,
+                central_prices,
+            }))
+        };
+
+
+    }
+    Ok(None)
 }
 
 pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>, offset: Option<i64>) -> RgResult<DetailedAddress> {
@@ -306,7 +341,7 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
 
     let address_str = a.render_string()?;
     let address_pool_info = get_address_pool_info(r.clone()).await?
-        .filter(|p| p.btc_address == address_str || p.rdg_address == address_str);
+        .filter(|p| p.addresses.contains(&address_str));
 
     let detailed = DetailedAddress {
         address: address_str,
@@ -352,7 +387,7 @@ pub async fn handle_observation(otx: &Transaction, _r: &Relay) -> RgResult<Detai
         observations: o.observations.iter()
             .map(|om| convert_observation_metadata(om))
             .collect::<RgResult<Vec<DetailedObservationMetadata>>>()?,
-        public_key: pbs_pk.hex_or(),
+        public_key: pbs_pk.hex(),
         signature: otx.observation_proof()?.signature_hex()?,
         time: otx.time()?.clone(),
         hash: otx.hash_or().hex(),
@@ -367,7 +402,7 @@ pub async fn handle_observation(otx: &Transaction, _r: &Relay) -> RgResult<Detai
 
 pub fn convert_trust(trust: &TrustRatingLabel) -> RgResult<DetailedTrust> {
     let pid: Option<PeerId> = trust.peer_id.clone();
-    let h = pid.and_then(|p| p.peer_id).and_then(|h| h.hex().ok()).unwrap_or("".to_string());
+    let h = pid.and_then(|p| p.peer_id).map(|h| h.hex()).unwrap_or("".to_string());
     Ok(DetailedTrust{
         peer_id: h,
         trust: trust.trust_data.get(0).safe_get()?.label(),
@@ -385,8 +420,8 @@ pub async fn handle_peer(p: &PeerIdInfo, r: &Relay, skip_recent_observations: bo
         }
     }
     Ok(DetailedPeer {
-        peer_id: hex::encode(pd.peer_id.safe_get_msg("Missing peer id")?.peer_id
-            .safe_get_msg("Missing peer id public key info")?.bytes.safe_bytes()?),
+        peer_id: pd.peer_id.safe_get_msg("Missing peer id")?.peer_id
+            .safe_get_msg("Missing peer id public key info")?.hex(),
         nodes,
         trust: pd.labels.iter().map(|l| convert_trust(l))
             .collect::<RgResult<Vec<DetailedTrust>>>()?
@@ -408,7 +443,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay, skip_recent_observat
 
     Ok(DetailedPeerNode{
         external_address: nmd.external_address()?,
-        public_key: pk.hex()?,
+        public_key: pk.hex(),
         node_type:  format!("{:?}", NodeType::from_i32(nmd.node_type.unwrap_or(0)).unwrap_or(NodeType::Static)),
         executable_checksum: vi.executable_checksum.clone(),
         commit_hash: vi.commit_hash.unwrap_or("".to_string()),
@@ -421,9 +456,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay, skip_recent_observat
         port_offset: nmd.port_or(_r.node_config.network) as i64,
         node_name: nmd.node_name.unwrap_or("".to_string()),
         peer_id: nmd.peer_id.as_ref()
-            .and_then(|p| p.peer_id.safe_get().ok())
-            .and_then(|p| p.bytes.safe_bytes().ok())
-            .map(|p| hex::encode(p)).unwrap_or("".to_string()),
+            .map(|p| p.hex()).unwrap_or("".to_string()),
         nat_restricted: nmd.transport_info.as_ref().and_then(|t| t.nat_restricted).unwrap_or(false),
         recent_observations: obs,
     })
@@ -482,7 +515,7 @@ pub struct ExplorerPoolInfoResponse {
 async fn render_pool_member(relay: &Relay, member: &PublicKey, party_len: usize) -> RgResult<PoolMember> {
     Ok(PoolMember {
         peer_id: relay.ds.peer_store.peer_id_for_node_pk(member).await?.map(|p| p.hex_or()).unwrap_or("".to_string()),
-        public_key: member.hex_or(),
+        public_key: member.hex(),
         share_fraction: 1f64/(party_len as f64),
         deposit_rating: 10.0,
         security_rating: 10.0,
@@ -493,7 +526,7 @@ async fn render_pool_member(relay: &Relay, member: &PublicKey, party_len: usize)
 }
 
 
-async fn convert_party_info(relay: &Relay, pi: &PartyInfo) -> RgResult<ExplorerPoolInfoResponse> {
+async fn convert_party_info(relay: &Relay, pi: &PartyInfoAbridged) -> RgResult<ExplorerPoolInfoResponse> {
     if let Some(pid) = pi.party_id.as_ref() {
         if let Some(pk) = pid.public_key.as_ref() {
             if let Some(owner) = pid.owner.as_ref() {
@@ -516,8 +549,8 @@ async fn convert_party_info(relay: &Relay, pi: &PartyInfo) -> RgResult<ExplorerP
                         .map(|b| b.amount).unwrap_or(0);
 
                     return Ok(ExplorerPoolInfoResponse {
-                        public_key: pk.hex_or(),
-                        owner: owner.hex_or(),
+                        public_key: pk.hex(),
+                        owner: owner.hex(),
                         balance_btc: (balance_btc as f64) / 1e8,
                         balance_rdg: (balance_rdg as f64) / 1e8,
                         balance_eth: 0.0,
@@ -533,30 +566,30 @@ async fn convert_party_info(relay: &Relay, pi: &PartyInfo) -> RgResult<ExplorerP
 }
 async fn handle_explorer_pool(relay: Relay) -> RgResult<ExplorerPoolsResponse> {
     let mut pools = vec![];
-    if let Some(dw) = DepositWatcher::get_deposit_config(&relay.ds).await? {
-        let opt = dw.deposit_allocations.get(0);
-        if let Some(dk) = opt {
-           if let Ok(pi) = dk.party_info() {
-               let res = convert_party_info(&relay, &pi).await?;
-                pools.push(res);
-           }
-        }
-    };
-    let mut req = Request::default();
-    req.get_parties_info_request = Some(Default::default());
-    let nodes = relay.ds.peer_store.active_nodes(None).await?;
-    let res = relay.broadcast_async(nodes, req, Some(Duration::from_secs(5))).await?;
-    for r in res {
-        if let Ok(res) = r {
-            if let Some(pi) = res.get_parties_info_response {
-                for pi in pi.party_info {
-                    if let Ok(res) = convert_party_info(&relay, &pi).await {
-                        pools.push(res);
-                    }
-                }
-            }
-        }
-    }
+    // if let Some(dw) = DepositWatcher::get_deposit_config(&relay.ds).await? {
+    //     let opt = dw.deposit_allocations.get(0);
+    //     if let Some(dk) = opt {
+    //        if let Ok(pi) = dk.party_info() {
+    //            let res = convert_party_info(&relay, &pi).await?;
+    //             pools.push(res);
+    //        }
+    //     }
+    // };
+    // let mut req = Request::default();
+    // req.get_parties_info_request = Some(Default::default());
+    // let nodes = relay.ds.peer_store.active_nodes(None).await?;
+    // let res = relay.broadcast_async(nodes, req, Some(Duration::from_secs(5))).await?;
+    // for r in res {
+    //     if let Ok(res) = r {
+    //         if let Some(pi) = res.get_parties_info_response {
+    //             for pi in pi.party_info {
+    //                 if let Ok(res) = convert_party_info(&relay, &pi).await {
+    //                     pools.push(res);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     Ok(ExplorerPoolsResponse{
         pools,
@@ -631,8 +664,8 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
                             .safe_get_msg("validationtype")?.clone();
 
                         let ns = NodeSignerDetailed {
-                            signature: hex::encode(sig.bytes.safe_bytes()?),
-                            node_id: pk.hex_or(),
+                            signature: sig.hex(),
+                            node_id: pk.hex(),
                             signed_pending_time: None,
                             observation_hash: observed.hex(),
                             observation_type: format!("{:?}", obs_type),
@@ -671,7 +704,7 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
         } else {
             let peer_signer = PeerSignerDetailed {
                 // TODO: query peer ID from peer store
-                peer_id: hex::encode(pt.peer_id.peer_id.safe_get()?.bytes.safe_bytes()?),
+                peer_id: pt.peer_id.hex(),
                 trust: pt.trust.clone() * 10.0,
                 nodes: vec![ns.clone()],
             };
@@ -727,7 +760,7 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
             amount: o.opt_amount_typed().map(|a| a.to_fractional()).unwrap_or(0.0),
             children,
             is_swap: o.is_swap(),
-            is_liquidity: o.is_liquidity(),
+            is_liquidity: o.is_stake(),
         };
         outputs.push(output);
     }
@@ -769,7 +802,7 @@ fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
         from: tx.first_input_address()
             .and_then(|a| a.render_string().ok())
             .unwrap_or("".to_string()),
-        to: tx.first_output_address().safe_get_msg("Missing output address")?.render_string()?,
+        to: tx.first_output_address_non_input_or_fee().safe_get_msg("Missing output address")?.render_string()?,
         amount: tx.total_output_amount_float(),
         fee: tx.fee_amount(),
         bytes: tx.proto_serialize().len() as i64,

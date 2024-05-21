@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 use prost::{DecodeError, Message};
-use crate::{EasyJson, error_info, HashClear, ProtoHashable, Response, response_metadata, ResponseMetadata, SafeOption};
-use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, NodeMetadata, Proof, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse};
+use crate::{error_info, HashClear, Response, response_metadata, ResponseMetadata, SafeOption};
+use crate::helpers::easy_json::EasyJson;
+use crate::structs::{AboutNodeResponse, ControlResponse, ErrorInfo, NodeMetadata, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse};
 
 impl AboutNodeResponse {
     pub fn empty() -> Self {

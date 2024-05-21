@@ -1,7 +1,5 @@
-use std::str::FromStr;
-use bdk::bitcoin::hashes::hex::ToHex;
-use ethers::{core::{types::TransactionRequest},
-             middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, providers, signers::{LocalWallet, Signer}};
+use ethers::{core::types::TransactionRequest,
+             middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, signers::{LocalWallet, Signer}};
 
 
 use crate::{KeyPair, TestConstants};
@@ -9,22 +7,17 @@ use crate::{KeyPair, TestConstants};
 use crate::util::mnemonic_support::WordsPass;
 
 use alloy_chains::Chain;
-
-
-use ethers::prelude::{maybe, to_eip155_v, U256};
-use ethers::types::{Address, Bytes, Signature};
+use ethers::prelude::U256;
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::utils::Anvil;
-use foundry_block_explorers::account::GenesisOption;
 use foundry_block_explorers::Client;
-use num_bigint::BigInt;
-use num_traits::{FromPrimitive, ToPrimitive};
-use redgold_schema::{EasyJson, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
-use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
+use redgold_schema::ErrorInfoContext;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::address_external::ToEthereumAddress;
-use crate::util::btc_wallet::ExternalTimedTransaction;
-
+use crate::eth::eth_wallet::EthWalletWrapper;
+use crate::eth::historical_client::EthHistoricalClient;
 
 //  Has faucet bitcoin test funds
 pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
@@ -46,140 +39,6 @@ fn eth_addr() -> String {
 }
 
 
-pub struct EthHistoricalClient {
-    client: Client,
-}
-
-impl EthHistoricalClient {
-    pub fn new(network_environment: &NetworkEnvironment) -> Option<RgResult<EthHistoricalClient>> {
-        let key = std::env::var("ETHERSCAN_API_KEY").ok();
-        let chain = Self::chain_id(network_environment);
-        key.map(|k| {
-            Client::new(chain, k)
-                .error_info("Client initialization failure")
-                .map(|c| EthHistoricalClient { client: c })
-        })
-    }
-
-    // pub fn query_contract(&self) {
-    //     self.client.
-    // }
-
-    fn chain_id(network_environment: &NetworkEnvironment) -> Chain {
-        let chain = if network_environment.is_main() {
-            Chain::mainnet()
-        } else {
-            Chain::sepolia()
-        };
-        chain
-    }
-
-    pub async fn get_balance(&self, address: &String) -> RgResult<String> {
-        let addr = address.parse().error_info("address parse failure")?;
-        let metadata = self.client
-            .get_ether_balance_single(&addr, None).await.error_info("balance fetch failure")?;
-        let bal = metadata.balance;
-        Ok(bal)
-    }
-    pub fn translate_value(value: &String) -> RgResult<i64> {
-        BigInt::from_str(value).error_info("value parse failure")
-            .map(|v| v / Self::bigint_offset())
-            .and_then(|v| v.to_i64().ok_or(error_info("BigInt translation to i64 failure")))
-    }
-    pub fn translate_value_to_float(value: &String) -> RgResult<f64> {
-        let bi = BigInt::from_str(value).error_info("bigint value parse failure")?;
-        let f64 = bi.to_f64().ok_or(error_info("BigInt translation to f64 failure"))?;
-        Ok(f64 / 10_f64.powi(18))
-    }
-
-    pub fn parse_address(value: &String) -> RgResult<structs::Address> {
-        let addr: Address = value.parse().error_info("address parse failure")?;
-        Ok(structs::Address::from_eth(value))
-    }
-
-    // Workaround for dealing with u64's etc, drop from e18 precision to e8 precision
-    pub fn bigint_offset() -> BigInt {
-        BigInt::from(10_u64.pow(10))
-    }
-
-    pub fn translate_float_value(value: &String) -> RgResult<i64> {
-        let f64_val = value.parse::<f64>().error_info(format!("failed to parse string value {} as f64", value))?;
-        let f64_offset = f64_val * 10_f64.powi(18);
-        let bi = BigInt::from_f64(f64_offset).ok_msg("f64 to BigInt failure")?;
-        let offset_bi = bi / BigInt::from(10_u64.pow(10));
-        offset_bi.to_i64().ok_or(error_info("BigInt translation to i64 failure"))
-    }
-
-    pub fn translate_float_value_bigint(value: &String) -> RgResult<BigInt> {
-        let f64_val = value.parse::<f64>().error_info(format!("failed to parse string value {} as f64", value))?;
-        let f64_offset = f64_val * 10_f64.powi(18);
-        let bi = BigInt::from_f64(f64_offset).ok_msg("f64 to BigInt failure")?;
-        Ok(bi)
-    }
-
-    pub fn translate_big_int_u256(value: BigInt) -> U256 {
-        let u256 = U256::from_big_endian(&*value.to_bytes_be().1);
-        u256
-    }
-
-    pub fn translate_float_value_u256(value: &String) -> RgResult<U256> {
-        let bi = Self::translate_float_value_bigint(&value)?;
-        let u256 = Self::translate_big_int_u256(bi);
-        Ok(u256)
-    }
-
-
-    pub fn translate_value_bigint(value: i64) -> RgResult<BigInt> {
-        BigInt::from_i64(value).ok_or(error_info("BigInt int64 value parse failure"))
-            .map(|v| v * BigInt::from(10_u64.pow(10)))
-    }
-
-    pub async fn get_all_tx(
-        &self,
-        address: &String
-    ) -> RgResult<Vec<ExternalTimedTransaction>> {
-        let addr = address.parse().error_info("address parse failure")?;
-        let txs = self.client.get_transactions(&addr, None).await.error_info("txs fetch failure")?;
-        let mut res = vec![];
-        for t in txs {
-            let tx_id = match t.hash {
-                GenesisOption::Some(h) => {Some(hex::encode(h.0))}
-                _ => {None}
-            };
-            let from_opt = match t.from {
-                GenesisOption::Some(h) => {Some(h.to_string())}
-                _ => {None}
-            };
-            let to_opt = t.to.map(|h| h.to_string());
-            let timestamp = t.time_stamp.parse::<u64>().ok();
-
-            let value_str = t.value.to_string();
-            let amount = Self::translate_value(&value_str)?;
-
-            if let (Some(tx_id), Some(from), Some(to)) = (tx_id, from_opt, to_opt) {
-                let incoming = &to == address;
-                let other_address = if incoming {
-                    from
-                } else {
-                    to
-                };
-                res.push(ExternalTimedTransaction {
-                    tx_id,
-                    timestamp,
-                    other_address,
-                    other_output_addresses: vec![],
-                    amount: amount as u64,
-                    incoming,
-                    currency: SupportedCurrency::Ethereum,
-                });
-            }
-        }
-        Ok(res)
-    }
-
-}
-
-
 async fn foo() -> Result<(), Box<dyn std::error::Error>> {
 
     let key = std::env::var("ETHERSCAN_API_KEY").expect("api key");
@@ -198,7 +57,7 @@ async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
 
     let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
-    let txs = h.get_all_tx(&string_addr).await.expect("works");
+    let txs = h.get_all_tx(&string_addr, None).await.expect("works");
 
     println!("txs: {}", txs.json_or());
 
@@ -217,169 +76,8 @@ async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub struct EthWalletWrapper {
-    pub wallet: LocalWallet,
-    pub client: SignerMiddleware<Provider<Http>, LocalWallet>,
-    pub provider: Provider<Http>,
-}
-
-impl EthWalletWrapper {
-
-    pub fn new(secret_key: &String, network: &NetworkEnvironment) -> RgResult<EthWalletWrapper> {
-
-        let bytes = from_hex(secret_key.clone())?;
-        let w = LocalWallet::from_bytes(&bytes).error_info("wallet creation failure")?;
-
-        let provider = if network.is_main() {
-            &providers::MAINNET
-        } else {
-            &providers::SEPOLIA
-        }.provider();
-        let chain = EthHistoricalClient::chain_id(network).id();
-
-        let wallet1 = w.with_chain_id(chain);
-
-        let client = SignerMiddleware::new(
-            provider.clone(), wallet1.clone()
-        );
-
-        Ok(Self {
-            wallet: wallet1,
-            client,
-            provider,
-        })
-
-    }
-
-    pub async fn send_tx(&self, to: &String, value: u64) -> RgResult<()> {
-        let to_address: Address = to.parse().error_info("to address parse failure")?;
-        let value = EthHistoricalClient::translate_value_bigint(value as i64)?;
-        let value = EthHistoricalClient::translate_big_int_u256(value);
-        let tx = TransactionRequest::new().to(to_address).value(value);
-
-        // send it!
-        let pending_tx = self.client.send_transaction(tx, None).await.expect("works");
-
-        // get the mined tx
-        let receipt = pending_tx.await.expect("mined").expect("no error");
-        let tx = self.client.get_transaction(receipt.transaction_hash).await.expect("works");
-
-        println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
-        println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
-        Ok(())
-
-    }
-
-    pub async fn create_transaction(&self, from: &String, to: &String, value: u64) -> RgResult<TypedTransaction> {
-        let big_value = EthHistoricalClient::translate_value_bigint(value as i64)?;
-        let u256 = U256::from_big_endian(&*big_value.to_bytes_be().1);
-        let to_address: Address = to.parse().error_info("to address parse failure")?;
-        let from_address: Address = from.parse().error_info("from address parse failure")?;
-        let tr = TransactionRequest::new().to(to_address).value(u256);
-        let mut tx: TypedTransaction = tr.into();
-
-        tx.set_chain_id(self.wallet.chain_id());
-        tx.set_from(from_address);
-
-        let nonce = maybe(tx.nonce().cloned(), self.client.get_transaction_count(from_address, None)).await
-            .error_info("nonce get failure")?;
-        tx.set_nonce(nonce);
-
-        self.provider.fill_transaction(&mut tx, None).await
-            .error_info("tx fill failure")?;
-
-        Ok(tx)
-    }
-    pub fn signing_data(tx: &TypedTransaction) -> RgResult<Vec<u8>> {
-        let sig_hash = tx.sighash().0.to_vec();
-        Ok(sig_hash)
-    }
-
-    pub fn process_signature(signature: structs::Signature, tx: &mut TypedTransaction) -> RgResult<Bytes> {
-        let rsv = signature.rsv.ok_msg("rsv missing")?;
-        let r = rsv.r.ok_msg("r missing")?.value;
-        let s = rsv.s.ok_msg("s missing")?.value;
-        let v = rsv.v.ok_msg("v missing")?;
-        // let r_bytes = FieldBytes::from_slice(&*r);
-        // let r_bytes: FieldBytes = r.into();
-        // let s_bytes = FieldBytes::from_slice(&*s);
-        // let s_bytes: FieldBytes = s.into();
-        // let r = U256::from_big_endian(r_bytes.as_slice());
-        // let r = U256::from_big_endian(r_bytes.as_slice());
-        let r = U256::from_big_endian(&*r);
-        let s = U256::from_big_endian(&*s);
-        let v_offset = (v as u64) + 27;
-
-        let mut sig = Signature {
-            r,
-            s,
-            v: v_offset,
-        };
-
-        let chain_id = tx.chain_id().ok_msg("chain id missing")?.as_u64();
-
-        // sign_hash sets `v` to recid + 27, so we need to subtract 27 before normalizing
-        sig.v = to_eip155_v(sig.v as u8 - 27, chain_id);
-
-        // ensure correct v given the chain - first extract recid
-        let recid = (sig.v - 35) % 2;
-        // eip155 check
-        assert_eq!(sig.v, chain_id * 2 + 35 + recid);
-
-        // since we initialize with None we need to re-set the chain_id for the sighash to be
-        // correct
-        let tx = tx;
-        tx.set_chain_id(chain_id);
-        let sighash = tx.sighash();
-
-        let origin = tx.from().ok_msg("origin missing")?;
-        sig.verify(sighash, *origin).error_info("signature verification failure")?;
-
-        Ok(tx.rlp_signed(&sig))
-
-    }
-
-    pub async fn broadcast_tx(&self, tx: Bytes) -> RgResult<()> {
-        let result = self.client.send_raw_transaction(tx).await;
-        match result {
-            Ok(_o) => {
-                Ok(())
-            }
-            Err(_e) => {
-                Err(error_info(format!("tx send failure {}", "error")))
-            }
-        }
-    }
-
-        /*
-
-        let sighash = tx.sighash();
-        let mut sig = self.sign_hash(sighash)?;
-
-        // sign_hash sets `v` to recid + 27, so we need to subtract 27 before normalizing
-        sig.v = to_eip155_v(sig.v as u8 - 27, chain_id);
-        Ok(sig)
-
-    /// Signs the provided hash.
-    pub fn sign_hash(&self, hash: H256) -> Result<Signature, WalletError> {
-        let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
-
-        let v = u8::from(recovery_id) as u64 + 27;
-
-        let r_bytes: FieldBytes<Secp256k1> = recoverable_sig.r().into();
-        let s_bytes: FieldBytes<Secp256k1> = recoverable_sig.s().into();
-        let r = U256::from_big_endian(r_bytes.as_slice());
-        let s = U256::from_big_endian(s_bytes.as_slice());
-
-        Ok(Signature { r, s, v })
-    }
-
-         */
-
-}
-
 // 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn main() {
     foo().await.expect("works");
@@ -435,5 +133,43 @@ async fn main() {
     println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
     println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
 
+
+}
+// 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
+// #[ignore]
+
+
+#[tokio::test]
+async fn debug_u256() {
+
+    let tc = TestConstants::new();
+    let (dev_secret, _dev_kp) = dev_ci_kp().expect("works");
+
+    let eth = EthWalletWrapper::new(&dev_secret, &NetworkEnvironment::Dev).expect("works");
+    let eth_addr = _dev_kp.public_key().to_ethereum_address_typed().expect("works");
+    let eth_addr2 = tc.key_pair().public_key().to_ethereum_address_typed().expect("works");
+    let tx = eth.create_transaction_typed(&eth_addr, &eth_addr2, CurrencyAmount::from_eth_fractional(0.001), None).await.expect("works");
+    let val = tx.value().expect("works");
+    let str = val.to_string();
+    println!("tx: {}", str);
+    let u25 = U256::from_dec_str(&str).expect("works");
+    assert_eq!(val, &u25);
+
+    println!("tx: {}", tx.json_or());
+
+    let tx_js = tx.json_or();
+
+    println!("tx: {:?}", tx);
+    let tx2 = tx_js.json_from::<TypedTransaction>().expect("works");
+    println!("tx2: {:?}", tx2);
+
+    let signing = EthWalletWrapper::signing_data(&tx).expect("works");
+
+    EthWalletWrapper::validate_eth_fulfillment(
+        vec![(eth_addr2.clone(), CurrencyAmount::from_eth_fractional(0.001))],
+        &tx_js,
+        &signing,
+        &NetworkEnvironment::Dev
+    ).expect("works");
 
 }

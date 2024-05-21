@@ -161,7 +161,7 @@ pub async fn poll_update(
                 }
             }
             Err(e) => {
-                use crate::schema::json_or;
+                use redgold_schema::helpers::easy_json::json_or;
                 error!("Error querying s3 for updated checksum check, {}", json_or(&e))
             }
         }

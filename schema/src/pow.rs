@@ -1,6 +1,7 @@
 use std::time::Instant;
-use sha3::{Digest, Sha3_256};
-use crate::{bytes_data, RgResult, SafeBytesAccess, SafeOption};
+use sha3::Digest;
+use crate::{bytes_data, RgResult, SafeOption};
+use crate::proto_serde::ProtoSerde;
 use crate::structs::{Hash, PoWProof, PoWProofType, Transaction};
 
 
@@ -32,7 +33,7 @@ impl PoWProof {
         proof.proof_type = PoWProofType::Sha3256Nonce as i32;
         let mut nonce: i64 = 0;
         loop {
-            proof.nonce = bytes_data(nonce.to_be_bytes().to_vec());
+            proof.index_counter = bytes_data(nonce.to_be_bytes().to_vec());
             if proof.verify(hash, difficulty)? {
                 break
             }
@@ -44,8 +45,8 @@ impl PoWProof {
     }
 
     pub fn merged_bytes(&self, hash: &Hash) -> RgResult<Vec<u8>> {
-        let hash_bytes = hash.safe_bytes()?;
-        let nonce = self.nonce.safe_bytes()?;
+        let hash_bytes = hash.proto_serialize();
+        let nonce = self.index_counter.safe_get()?.value.clone();
         let mut merged = hash_bytes.clone();
         merged.extend_from_slice(&*nonce);
         Ok(merged)
@@ -57,15 +58,15 @@ impl PoWProof {
     }
 
     pub fn verify(&self, hash: &Hash, difficulty: usize) -> RgResult<bool> {
-        Ok(check_difficulty_bytes(&self.merged_digest_hash(&hash)?.safe_bytes()?, difficulty))
+        Ok(check_difficulty_bytes(&self.merged_digest_hash(&hash)?.raw_bytes()?, difficulty))
     }
 
     pub fn merged_hex(&self, hash: &Hash) -> RgResult<String> {
-        Ok(hex::encode(self.merged_digest_hash(hash)?.safe_bytes()?))
+        Ok(hex::encode(self.merged_digest_hash(hash)?.raw_bytes()?))
     }
 
     pub fn nonce_int(&self) -> RgResult<i64> {
-        Ok(i64::from_be_bytes(self.nonce.safe_bytes()?.as_slice().try_into().expect("nonce")))
+        Ok(i64::from_be_bytes(self.index_counter.safe_get()?.value.clone().as_slice().try_into().expect("nonce")))
     }
 }
 
@@ -86,7 +87,7 @@ fn test_pow() {
         println!("hash: {:?}", hash.hex());
         println!("merged hex bytes: {:?}", hex::encode(proof.merged_bytes(&hash).expect("")));
         println!("Proof merged hash: {:?}", proof.merged_hex(&hash).expect("merged_hex"));
-        println!("Proof merged bytes: {:?}", proof.merged_digest_hash(&hash).expect("merged_hex").safe_bytes().expect("safe_bytes"));
+        println!("Proof merged bytes: {:?}", proof.merged_digest_hash(&hash).expect("merged_hex").vec());
         println!("Proof nonce: {:?}", proof.nonce_int().expect("nonce_int"));
         let elapsed = now.elapsed();
         elapsed_all.push(elapsed.as_millis());

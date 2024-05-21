@@ -1,10 +1,11 @@
-use crate::structs::{Address, AddressInfo, AddressType, Error, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
-use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, RgResult, SafeBytesAccess};
+use crate::structs::{Address, AddressInfo, AddressType, ErrorCode, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
+use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption};
 use crate::{error_message, structs};
 use std::io::Write;
 use sha3::Sha3_224;
 
 use sha3::Digest;
+use crate::proto_serde::ProtoSerde;
 
 // impl fromstr for address etc. impl tostring
 impl Into<Address> for structs::PublicKey {
@@ -21,28 +22,6 @@ impl Into<Address> for Vec<u8> {
 
 
 impl Address {
-    pub fn parse<S: Into<String>>(addr: S) -> Result<Address, ErrorInfo> {
-
-        let s = addr.into();
-
-        Self::from_hex(s)
-        // // TODO: Address validation function here honestly
-        // if s.len() < 5 {
-        //     return Err(error_message(
-        //         Error::AddressDecodeFailure,
-        //         format!("Address minimum string length failure on address: {}", s.clone()),
-        //     ));
-        // }
-        // // this slice 3 is unsafe.
-        // let address_vec = base58::from_check(&s.clone()[3..]).map_err(|e| {
-        //     error_message(
-        //         Error::AddressDecodeFailure,
-        //         format!("Base58 checked address decoding failure on {} {}", s.clone(), e.to_string()),
-        //     )
-        // })?;
-        // Ok(address_vec.into())
-    }
-
 
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
         let mut new = Self::from_bytes(Self::hash(input.as_ref()))?;
@@ -60,7 +39,8 @@ impl Address {
             currency: Some(SupportedCurrency::Bitcoin as i32),
         }
     }
-    pub fn from_eth(address: &String) -> Address {
+    pub fn from_eth(address: impl Into<String>) -> Address {
+        let address = address.into();
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::EthereumExternalString as i32,
@@ -72,22 +52,46 @@ impl Address {
         self.address_type == AddressType::BitcoinExternalString as i32
     }
 
+    pub fn address_typed(&self) -> RgResult<AddressType> {
+        AddressType::from_i32(self.address_type).ok_msg("Invalid address type")
+    }
+
+    pub fn raw_bytes(&self) -> RgResult<Vec<u8>> {
+        Ok(self.address.safe_get()?.value.clone())
+    }
+
+    pub fn external_string_address(&self) -> RgResult<String> {
+        String::from_utf8(self.raw_bytes()?)
+            .error_info("Unable to convert bitcoin address bytes to utf8 string")
+    }
+
     pub fn render_string(&self) -> Result<String, ErrorInfo> {
-        let result = self.address.safe_bytes()?;
-        if self.address_type == AddressType::BitcoinExternalString as i32 {
-            return Ok(String::from_utf8(result).error_info("Unable to convert bitcoin address bytes to utf8 string")?);
-        }
-        Ok(Self::address_to_str(&result))
+
+        let address_string = match self.address_typed()? {
+            AddressType::BitcoinExternalString => {
+                self.external_string_address()?
+            }
+            AddressType::EthereumExternalString => {
+                self.external_string_address()?
+            }
+            _ => {
+                self.hex()
+            }
+        };
+        Ok(address_string)
     }
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Address, ErrorInfo> {
         let addr = Self::new_raw(bytes);
         addr.verify_checksum()?;
-
         Ok(addr)
     }
 
     pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
-        Self::from_bytes(Self::hash(&pk.bytes.safe_bytes()?))
+        Self::from_byte_calculate(&pk.vec())
+    }
+
+    pub fn from_byte_calculate(vec: &Vec<u8>) -> Result<Address, ErrorInfo> {
+        Self::from_bytes(Self::hash(&vec))
     }
 
     pub fn with_checksum(bytes: Vec<u8>) -> Vec<u8> {
@@ -98,22 +102,22 @@ impl Address {
         res
     }
 
-    pub fn hash(buf: &[u8]) -> Vec<u8> {
+    fn hash(buf: &[u8]) -> Vec<u8> {
         let bytes = Sha3_224::digest(buf).to_vec();
         Self::with_checksum(bytes)
     }
 
     pub fn verify_length(&self) -> Result<(), ErrorInfo> {
-        let i = self.address.safe_bytes()?.len();
-        if i != 32 {
-            Err(error_info(format!("Invalid address length: {:?}", i)))?;
-        }
+        // let i = self.address.safe_bytes()?.len();
+        // if i != 32 {
+        //     Err(error_info(format!("Invalid address length: {:?}", i)))?;
+        // }
         Ok(())
     }
 
     pub fn verify_checksum(&self) -> Result<(), ErrorInfo> {
         self.verify_length()?;
-        let bytes = self.address.safe_bytes()?;
+        let bytes = self.raw_bytes()?;
         if Self::with_checksum(bytes[0..28].to_vec()) != bytes {
             Err(error_info("Invalid address checksum bytes"))?;
         }
@@ -144,10 +148,8 @@ impl Address {
         }
     }
 
-
-    fn from_hex(p0: String) -> Result<Address, ErrorInfo> {
-        let bytes = from_hex(p0)?;
-        Address::from_bytes(bytes)
+    pub fn currency_or(&self) -> SupportedCurrency {
+        self.currency.and_then(|s| SupportedCurrency::from_i32(s)).unwrap_or(SupportedCurrency::Redgold)
     }
 }
 

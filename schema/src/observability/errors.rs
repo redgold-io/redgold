@@ -1,7 +1,8 @@
 use log::{error, Level};
 use tracing::{event, Event, Metadata};
 use tracing::field::FieldSet;
-use crate::{EasyJson, HashClear, RgResult};
+use crate::{HashClear, RgResult, structs};
+use crate::helpers::easy_json::EasyJson;
 use crate::structs::{ErrorDetails, ErrorInfo, ResponseMetadata};
 
 pub fn convert_log_level(level: String) -> log::Level {
@@ -84,6 +85,10 @@ impl ErrorInfo {
         ed.detail_name = k.into();
         self.details.push(ed);
     }
+    pub fn with_code(&mut self, v: structs::ErrorCode) {
+        self.code = v as i32;
+    }
+
 }
 
 impl HashClear for ErrorInfo {
@@ -96,6 +101,7 @@ pub trait EnhanceErrorInfo<T> {
     fn add(self, message: impl Into<String>) -> RgResult<T>;
     fn mark_abort(self) -> RgResult<T>;
     fn bubble_abort(self) -> RgResult<RgResult<T>>;
+    fn with_code(self, v: structs::ErrorCode) -> RgResult<T>;
     fn with_detail(self, k: impl Into<String>, v: impl Into<String>) -> RgResult<T>;
     fn with_detail_fn<F>(self, k: impl Into<String>, v: impl Fn() -> F) -> RgResult<T>
     where F: Into<String> + Sized;
@@ -125,12 +131,19 @@ impl<T> EnhanceErrorInfo<T> for RgResult<T> {
             }
         }
     }
+    fn with_code(self, v: structs::ErrorCode) -> RgResult<T> {
+        self.map_err(|mut e| {
+            e.with_code(v);
+            e
+        })
+    }
     fn with_detail(self, k: impl Into<String>, v: impl Into<String>) -> RgResult<T> {
         self.map_err(|mut e| {
             e.with_detail(k, v);
             e
         })
     }
+
 
     fn with_detail_fn<F>(self, k: impl Into<String>, v: impl Fn() -> F) -> RgResult<T>
     where F: Into<String> + Sized{

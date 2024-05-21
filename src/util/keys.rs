@@ -1,7 +1,8 @@
 use bdk::bitcoin::secp256k1::{Error, PublicKey};
 use bdk::bitcoin::hashes::hex::ToHex;
 use redgold_keys::TestConstants;
-use redgold_schema::{error_info, SafeBytesAccess, structs};
+use redgold_schema::{error_info, structs};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::ErrorInfo;
 
 pub trait ToPublicKey {
@@ -15,13 +16,13 @@ pub trait ToPublicKeyFromLib {
 
 impl ToPublicKeyFromLib for PublicKey {
     fn to_struct_public_key(&self) -> structs::PublicKey {
-        structs::PublicKey::from_bytes(self.serialize().to_vec())
+        structs::PublicKey::from_bytes_direct_ecdsa(self.serialize().to_vec())
     }
 }
 
 impl ToPublicKey for structs::PublicKey {
     fn to_public_key(&self) -> Result<PublicKey, ErrorInfo> {
-        let b = self.bytes.safe_bytes()?;
+        let b = self.raw_bytes()?;
         return PublicKey::from_slice(&b).map_err(|e| error_info(e.to_string()));
     }
 }

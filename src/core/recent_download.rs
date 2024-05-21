@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use itertools::Itertools;
 use metrics::counter;
-use redgold_schema::{RgResult, WithMetadataHashable};
+use redgold_schema::RgResult;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::Relay;

@@ -1,6 +1,8 @@
 
-use redgold_schema::{EasyJson, error_info, ProtoHashable, RgResult, SafeOption};
+use redgold_schema::{error_info, RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{AboutNodeResponse, NodeMetadata, Proof, PublicKey, Request, Response};
 use crate::{KeyPair, TestConstants};
 use crate::proof_support::ProofSupport;
@@ -96,7 +98,7 @@ impl ResponseSupport for Response {
             if proof_pk != intended {
                 return
                     Err(error_info("Intended public key and proof public key mismatch on response authentication verification"
-                    )).with_detail("intended_pk", intended.hex_or()).with_detail("proof_pk", proof_pk.hex_or());
+                    )).with_detail("intended_pk", intended.hex()).with_detail("proof_pk", proof_pk.hex());
             }
         }
         Ok(self)

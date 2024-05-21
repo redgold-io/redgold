@@ -7,7 +7,8 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use log::{error, info};
 use metrics::{counter, gauge};
-use redgold_schema::{EasyJson, json_or, SafeOption};
+use redgold_schema::SafeOption;
+use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
 use redgold_schema::structs::ErrorInfo;
 

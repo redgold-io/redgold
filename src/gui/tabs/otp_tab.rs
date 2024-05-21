@@ -1,14 +1,9 @@
 use std::env::current_dir;
-use eframe::egui;
 use eframe::egui::{Context, Ui};
-use egui_extras::{Column, TableBuilder};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
-use redgold_schema::structs::SupportedCurrency;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size, bounded_text_area_size_id, editable_text_input_copy};
-use crate::gui::tables::text_table;
-
+use crate::gui::common::{bounded_text_area_size_id, editable_text_input_copy};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtpMetadata {
@@ -87,7 +82,8 @@ use std::io;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use redgold_schema::{EasyJson, EasyJsonDeser, error_info, RgResult};
+use redgold_schema::{error_info, RgResult};
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 
 fn get_random_from_device(device_path: impl Into<String>) -> io::Result<Vec<u8>> {
     let mut file = File::open(device_path.into())?;

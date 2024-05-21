@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::NetworkEnvironment;
 use crate::core::relay::Relay;
 use crate::infra::deploy::derive_mnemonic_and_peer_id;
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn dump_seed_info_string() {
     let r = Relay::dev_default().await;
@@ -14,7 +15,7 @@ async fn dump_seed_info_string() {
 
     let mut hm = HashMap::new();
 
-    for i in 0..20 {
+    for i in 0..10 {
         let (words, pid) = derive_mnemonic_and_peer_id(&
             r.node_config,
             salt_m.clone(),
@@ -30,7 +31,7 @@ async fn dump_seed_info_string() {
         ).await.expect("derive");
         let w = WordsPass::words(words);
         let pk = w.default_kp().expect("kp").public_key();
-        let pk_hex = pk.hex_or();
+        let pk_hex = pk.hex();
         println!("simple_seed(\n\"n{i}.redgold.io\",\n\"{pid}\",\n\"{pk_hex}\",\nfalse),");
     }
 

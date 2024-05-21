@@ -17,6 +17,7 @@ use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle;
 use redgold_schema::util::merkle::MerkleTree;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::config_data::ConfigData;
 use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
 use crate::api::public_api::PublicClient;
 use crate::util::cli::args::RgArgs;
@@ -27,6 +28,7 @@ use crate::api::RgHttpClient;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 
 pub struct CanaryConfig {}
 
@@ -144,6 +146,7 @@ impl Default for NodeInfoConfig {
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
+    pub config_data: ConfigData,
     // User supplied params
     // TODO: Should this be a class Peer_ID with a multihash of the top level?
     // TODO: Review all schemas to see if we can switch to multiformats types.
@@ -190,7 +193,6 @@ pub struct NodeConfig {
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
     pub discovery_interval: Duration,
-    pub watcher_interval: Duration,
     pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
@@ -205,6 +207,10 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn tx_builder(&self) -> TransactionBuilder {
+        TransactionBuilder::new(self)
+    }
 
     pub fn seed_peer_addresses(&self) -> Vec<Address> {
         self.seeds_now().iter()
@@ -236,13 +242,17 @@ impl NodeConfig {
         all_seeds.iter().unique().cloned().collect_vec()
     }
 
+    pub fn seeds_at_pk(&self, time: i64) -> Vec<PublicKey> {
+        self.seeds_at(time).iter().flat_map(|s| s.public_key.clone()).collect()
+    }
+
     // This may cause a problem with manually configured seeds
     pub fn seeds_now(&self) -> Vec<Seed> {
         self.seeds_at(util::current_time_millis_i64())
     }
 
-    pub fn seeds_now_pk(&self) -> Vec<Seed> {
-        self.seeds_now().iter().filter(|s| s.public_key.is_some()).cloned().collect()
+    pub fn seeds_now_pk(&self) -> Vec<PublicKey> {
+        self.seeds_now().iter().flat_map(|s| s.public_key.as_ref()).cloned().collect()
     }
 
     pub fn is_seed(&self, pk: &PublicKey) -> bool {
@@ -298,6 +308,10 @@ impl NodeConfig {
         }
     }
 
+    pub fn is_self_seed(&self) -> bool {
+        self.seeds_now_pk().iter().any(|pk| pk == &self.public_key())
+    }
+
     pub fn peer_id(&self) -> PeerId {
         self.peer_id.clone()
     }
@@ -316,7 +330,7 @@ impl NodeConfig {
     }
 
     pub fn short_id(&self) -> Result<String, ErrorInfo> {
-        self.public_key().hex()?.short_string()
+        self.public_key().hex().short_string()
     }
 
     pub fn gauge_id(&self) -> [(String, String); 1] {
@@ -345,7 +359,6 @@ impl NodeConfig {
 
     pub fn node_metadata_fixed(&self) -> NodeMetadata {
         let pair = self.words().default_kp().expect("words");
-        let _pk_vec = pair.public_key_vec();
         NodeMetadata{
             transport_info: Some(TransportInfo{
                 external_ipv4: Some(self.external_ip.clone()),
@@ -513,6 +526,7 @@ impl NodeConfig {
 
     pub fn default() -> Self {
         Self {
+            config_data: Default::default(),
             peer_id: Default::default(),
             public_key: structs::PublicKey::default(),
             mnemonic_words: "".to_string(),
@@ -552,7 +566,6 @@ impl NodeConfig {
             secure_data_folder: None,
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
-            watcher_interval: Duration::from_secs(200),
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
@@ -563,7 +576,7 @@ impl NodeConfig {
             node_info: NodeInfoConfig::default(),
             contract: Default::default(),
             contention: Default::default(),
-            default_timeout: Duration::from_secs(60),
+            default_timeout: Duration::from_secs(120),
         }
     }
 
@@ -589,7 +602,6 @@ impl NodeConfig {
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
         node_config.e2e_enabled = false;
-        node_config.watcher_interval = Duration::from_secs(5);
         node_config
     }
     pub async fn data_store(&self) -> DataStore {

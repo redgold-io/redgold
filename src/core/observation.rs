@@ -5,7 +5,7 @@
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, info, trace};
 use metrics::{counter, gauge};
 use tokio::task::JoinHandle;
 // use futures::stream::StreamExt;
@@ -17,8 +17,8 @@ use tokio_util::either::Either;
 
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{SafeBytesAccess, WithMetadataHashable};
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Hash, ObservationProof, Transaction};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
@@ -26,7 +26,8 @@ use redgold_schema::util::merkle::build_root;
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::schema::json;
+use redgold_schema::helpers::easy_json::json;
+use redgold_schema::observability::errors::Loggable;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;
@@ -161,7 +162,7 @@ impl ObservationBuffer {
             if let Some(oh) = o.metadata.clone().and_then(|m| m.observed_hash) {
                 if let Some(s) = self.subscribers.get(&oh) {
                     // info!("Responding to sender with observation proof");
-                    s.send_rg_err(o.clone())?;
+                    s.send_rg_err(o.clone()).log_error().ok();
                 }
             }
         }
@@ -192,9 +193,7 @@ impl ObservationBuffer {
             .iter()
             .map(|r| r.hash_or())
             .collect_vec();
-        let root = redgold_schema::util::merkle::build_root(hashes)?.root;
-        let _vec = root.safe_bytes()?;
-        let _parent_hash = self.latest.hash_or();
+        let root = build_root(hashes)?.root;
         let height = self.latest.height().expect("Missing height on internal observation") + 1;
         let utxo_id = self.latest.observation_as_utxo_id()?;
 
@@ -254,7 +253,7 @@ impl ObservationBuffer {
             counter!("redgold.observation.metadata.total").increment(1);
         }
         let node_id = self.relay.node_config.short_id()?;
-        info!("node_id={} Formed observation {}", node_id, json(&o.clone())?);
+        trace!("node_id={} Formed observation {}", node_id, json(&o.clone())?);
         Ok(proofs)
     }
 }

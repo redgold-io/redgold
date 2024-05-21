@@ -7,7 +7,7 @@ use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 
 use redgold_schema::{bytes_data, error_info, error_message,
-                     ErrorInfoContext, SafeBytesAccess, structs};
+                     ErrorInfoContext, structs};
 use redgold_schema::structs::ErrorInfo;
 
 use crate::{TestConstants, util};
@@ -24,7 +24,7 @@ pub fn sign(hash: &Vec<u8>, key: &SecretKey) -> Result<Vec<u8>, ErrorInfo> {
     ret[..].copy_from_slice(&hash[0..32]);
     let message = Message::from_slice(&ret).map_err(|e| {
         error_message(
-            structs::Error::IncorrectSignature,
+            structs::ErrorCode::IncorrectSignature,
             format!("Signature message construction failure {}", e.to_string()),
         )
     })?;
@@ -35,7 +35,7 @@ pub fn sign(hash: &Vec<u8>, key: &SecretKey) -> Result<Vec<u8>, ErrorInfo> {
 
 // TODO: Change to our own signature type
 pub fn sign_hash(hash: &structs::Hash, key: &SecretKey) -> Result<Vec<u8>, ErrorInfo> {
-    sign(&hash.safe_bytes().expect("bytes"), &key)
+    sign(&hash.raw_bytes()?, &key)
 }
 
 #[test]
@@ -54,21 +54,21 @@ pub fn verify(hash: &Vec<u8>, signature: &Vec<u8>, public_key: &Vec<u8>) -> Resu
 
     ret[..].copy_from_slice(&hash[0..32]);
     let message = Message::from_slice(&ret).error_msg(
-            structs::Error::IncorrectSignature,
+            structs::ErrorCode::IncorrectSignature,
             "Signature message construction failure",
     )?;
     let decoded_signature = Signature::from_compact(signature).error_msg(
-            structs::Error::IncorrectSignature,
+            structs::ErrorCode::IncorrectSignature,
             "Decoded signature construction failure",
         )?;
     let result = PublicKey::from_slice(public_key).error_msg(
-            structs::Error::IncorrectSignature,
+            structs::ErrorCode::IncorrectSignature,
             "Public key construction failure",
     )?;
     Secp256k1::new()
         .verify(&message, &decoded_signature, &result)
         .error_msg(
-                structs::Error::IncorrectSignature,
+                structs::ErrorCode::IncorrectSignature,
                 "Signature verification failure"
         )?;
     return Ok(());
@@ -98,10 +98,10 @@ fn sign_and_verify() {
     .is_ok());
 }
 
-pub fn public_key_ser(public_key: &PublicKey) -> Option<redgold_schema::structs::PublicKey> {
+pub fn public_key_ser(public_key: &PublicKey) -> Option<structs::PublicKey> {
     Some(structs::PublicKey {
         bytes: bytes_data(public_key.serialize().to_vec()),
-        key_type: redgold_schema::structs::PublicKeyType::Secp256k1 as i32,
+        key_type: structs::PublicKeyType::Secp256k1 as i32,
     })
 }
 
@@ -179,12 +179,12 @@ pub fn merge_hash(left: [u8; 32], r: [u8; 32]) -> [u8; 32] {
 
 
 pub trait ToPublicKey {
-    fn to_lib_public_key(&self) -> Result<PublicKey, ErrorInfo>;
+    fn to_lib_ecdsa_public_key(&self) -> Result<PublicKey, ErrorInfo>;
 }
 
 impl ToPublicKey for structs::PublicKey {
-    fn to_lib_public_key(&self) -> Result<PublicKey, ErrorInfo> {
-        let b = self.bytes.safe_bytes()?;
+    fn to_lib_ecdsa_public_key(&self) -> Result<PublicKey, ErrorInfo> {
+        let b = self.raw_bytes()?;
         return PublicKey::from_slice(&b).map_err(|e| error_info(e.to_string()));
     }
 }

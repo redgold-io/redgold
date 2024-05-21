@@ -5,7 +5,7 @@ use itertools::Itertools;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_builder;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::EasyJson;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::NetworkEnvironment;
 
 use crate::gui::app_loop::LocalState;

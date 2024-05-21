@@ -1,5 +1,6 @@
-use extism_pdk::{FnResult, plugin_fn};
-use redgold_schema::{ProtoSerde, RgResult};
+use extism_pdk::FnResult;
+use redgold_schema::RgResult;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ExecutionInput, ExecutionResult};
 use redgold_schema::util::lang_util::SameResult;
 

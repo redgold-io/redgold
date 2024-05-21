@@ -29,6 +29,7 @@ pub fn empty_args() -> RgArgs {
         etherscan_api_key: None,
         from_email: None,
         to_email: None,
+        enable_party_mode: false,
     }
 }
 
@@ -116,6 +117,9 @@ pub struct RgArgs {
     /// Alerts / watched data emails
     #[clap(long, env = "REDGOLD_TO_EMAIL")]
     pub to_email: Option<String>,
+    /// Alerts / watched data emails
+    #[clap(long, env = "REDGOLD_ENABLE_PARTY_MODE")]
+    pub enable_party_mode: bool
 
 }
 
