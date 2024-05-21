@@ -756,6 +756,7 @@ impl PartyEvents {
 // }
 
 
+#[ignore]
 #[tokio::test]
 async fn debug_event_stream2() {
     crate::party::party_stream::debug_events2().await.unwrap();

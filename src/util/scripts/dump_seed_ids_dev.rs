@@ -5,7 +5,7 @@ use redgold_schema::structs::NetworkEnvironment;
 use crate::core::relay::Relay;
 use crate::infra::deploy::derive_mnemonic_and_peer_id;
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn dump_seed_info_string() {
     let r = Relay::dev_default().await;

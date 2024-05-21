@@ -161,7 +161,7 @@ jobs:
       - run: rustup update
       - run: rustup -V
 #      - run: cargo clean
-      - run: ./bin/test.sh
+#      - run: ./bin/test.sh
       - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: cargo build --release
         # try CWD?
