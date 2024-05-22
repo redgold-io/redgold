@@ -68,11 +68,12 @@ impl WordsPassMetadata {
 impl WordsPass {
 
     pub fn metadata(&self) -> RgResult<WordsPassMetadata> {
+        let default_calc = 20;
         let mut res = vec![];
         // Default spending keys
-        let mut sequence = (0..10).collect_vec().iter().map(|i| 50 + i).collect_vec();
+        let mut sequence = (0..default_calc).collect_vec().iter().map(|i| 50 + i).collect_vec();
         // Default peer ids
-        sequence.extend((0..10).collect_vec().iter().map(|i| 99 - i).collect_vec());
+        sequence.extend((0..default_calc).collect_vec().iter().map(|i| 99 - i).collect_vec());
         for account in sequence {
             let path = format!("m/44'/0'/{}'/0/0", account);
             let xpub_path = format!("m/44'/0'/{}'", account);
