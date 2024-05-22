@@ -547,7 +547,7 @@ impl PartyEvents {
                 // Since this is an ask fulfillment, we are receiving some external event currency
                 // And using the address from that deposit as the fulfillment address denominated in
                 // Redgold.
-                other_addr.currency = Some(SupportedCurrency::Redgold as i32);
+                other_addr.currency = SupportedCurrency::Redgold as i32;
 
                 let mut extid = ExternalTransactionId::default();
                 extid.identifier = t.tx_id.clone();

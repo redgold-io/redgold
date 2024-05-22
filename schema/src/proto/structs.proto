@@ -1161,7 +1161,7 @@ enum AddressType {
 message Address {
   BytesData address = 1;
   AddressType address_type = 2;
-  optional SupportedCurrency currency = 3;
+  SupportedCurrency currency = 3;
 }
 
 message QueryAddressesRequest {

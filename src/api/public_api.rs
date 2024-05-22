@@ -19,7 +19,7 @@ use warp::reply::Json;
 use warp::{Filter, Server};
 use warp::http::Response;
 use redgold_schema::{empty_public_request, empty_public_response, from_hex, RgResult, SafeOption, structs};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse, Seed};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse, Seed, SupportedCurrency};
 use redgold_schema::transaction::rounded_balance_i64;
 
 use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
@@ -192,7 +192,7 @@ impl PublicClient {
                     .map(|a| Address {
                         address: bytes_data(a.clone()),
                         address_type: AddressType::Sha3224ChecksumPublic as i32,
-                        currency: None,
+                        currency: SupportedCurrency::Redgold as i32,
                     })
                     .collect_vec(),
             });
