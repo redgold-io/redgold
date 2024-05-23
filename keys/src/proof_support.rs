@@ -76,7 +76,6 @@ impl ProofSupport for Proof {
     ) -> Result<(), ErrorInfo> {
         let all_addresses = Self::proofs_to_addresses(proofs)?;
         let proof_1 = proofs.get(0).expect("exists").clone();
-        let pk = proof_1.public_key.safe_get_msg("Missing public key")?.clone();
         if !all_addresses.contains(address) {
             return Err(error_message(
                 structs::ErrorCode::AddressPublicKeyProofMismatch,

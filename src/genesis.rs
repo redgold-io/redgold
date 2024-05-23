@@ -36,25 +36,25 @@ fn main_distribution(test_address: &Address, seeds: &Vec<Seed>) -> Vec<GenesisDi
     let mut entries = vec![
         // TODO: Update these
         // 0 - Active dev fund
-        main_entry("3a299a25abcc604983dcabbf8a20dfb1440d6c36766762c936030ee8de6a7465", 1),
+        main_entry("0a220a209dd9790a8d75eb17555d091ffe7ff5e77a6a5b7ca7a0993abb0d80476aa7fe18", 1),
         // 1 - Original dev fund
-        main_entry("e1234f3be30667f1b8860c1a2bbbd12846f8f4581857f883c825be40e43e9a03", 10),
+        main_entry("0a220a2033150611bcbaf033e7ccb2cd90a05432ddc8c3a9cf1ebd8744f3fa93849aa055", 10),
         // 2 - Foundation fund
-        main_entry("04f25fb391f7c59bcc1370115787c49fd0762ca44ca54078dd48e67cd56abe55", 10),
+        main_entry("0a220a201cb5cee74fcbaf6c381e146b9677640801f26b20fee8b78307af3a09915dc3dd", 10),
         // 3 - Future dev fund
-        main_entry("2d064069d1a012698b6791e783f3b9e1c2c65146bb4408ba8b209e3d61e20924", 10),
+        main_entry("0a220a20304c0a4e52fc4c4425b8edb7fdeb016fbd74e65dabdeb2b2d472ebb311638d88", 10),
         // 4 - Anon-N
-        main_entry("282111c64b7da428f75ec3b8fcfda186e164e18c597c246f9ffb1e16cbc42729", 2),
+        main_entry("0a220a20dc60094db8f18f7e408af71d7d1c574397b3d04e05bf7dc6b1c171193cda1c67", 2),
         // 5 - Anon-T
-        main_entry("0b3ab3c3ed000de6d39db543aff29c885bafe50010111c9f7713001a974e9961", 0.5),
+        main_entry("0a220a206765bf4a6a35845f89d489b9c06226a9f1e1a69a16a3d00ebe6402cd834cb6da", 0.5),
         // 6 - Anon-X
-        main_entry("7d220dea6f6854572d7d82d9923fb6e677bd1968f0df7fe4c70b743e9445984e", 0.5),
+        main_entry("0a220a2061fce745ec2041557d210834a8a23d754b182842ea41d1c53e95bd07a23b693f", 0.5),
         // 7 - Anon-J
-        main_entry("0bc3af2b862e75e69eb59bd5d4354544f76da9269c5354821afb9c450079d9a4", 0.5),
+        main_entry("0a220a20337f2398775b729d5178ff2ed7ce163736e0f343a66d11987b397fae456b8f8e", 0.5),
         // 8 - Anon-R
-        main_entry("91f7158f3b6aee0697288ed8b4c7b3ba782d70dede85a7b9322aed42e16e814d", 0.5),
+        main_entry("0a220a2003935fad58b99aa2d2678806e2d0f36df188419e73859ec50d9a0e0c00b87cdb", 0.5),
         // 9 - Origin DAO
-        main_entry("8965cf0387275d2ac5100b9a3d0e46d9d5cf6e6066db9d5779b1f1649f159068", 65),
+        main_entry("0a220a2015559790fd1235640c80421e55422cd91f16c3bd70bcf6e05faab5afe4114aea", 65),
         // Node testing address
         GenesisDistribution { address: test_address.clone(), amount: CurrencyAmount::from_fractional(10.0).expect("a") }
     ];

@@ -440,7 +440,8 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
     });
 
     if ui.button("Generate Password Mnemonic").clicked() {
-        let string = key.generate_mnemonic_state.password_input.clone();
+        let string = get_displayed_password(key);
+        // let string = key.generate_mnemonic_state.password_input.clone();
         // TODO validate on password length
         // TODO: Hover text on valid button showing reason?
         if !string.is_empty() {
@@ -485,6 +486,17 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
         // This is the original function used, need a switch around this to different ones.
     };
 
+}
+
+fn get_displayed_password(key: &mut KeygenState) -> String {
+    let mut fixed_concat = key.generate_mnemonic_state.concat_password.clone();
+    let text = if key.generate_mnemonic_state.toggle_concat_password {
+        &mut fixed_concat
+    } else {
+        &mut key.generate_mnemonic_state
+            .password_input
+    };
+    text.clone()
 }
 
 pub(crate) fn mnemonic_window(
