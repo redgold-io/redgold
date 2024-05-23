@@ -55,8 +55,6 @@ fn main_distribution(test_address: &Address, seeds: &Vec<Seed>) -> Vec<GenesisDi
         main_entry("0a220a2003935fad58b99aa2d2678806e2d0f36df188419e73859ec50d9a0e0c00b87cdb", 0.5),
         // 9 - Origin DAO
         main_entry("0a220a2015559790fd1235640c80421e55422cd91f16c3bd70bcf6e05faab5afe4114aea", 65),
-        // Node testing address
-        GenesisDistribution { address: test_address.clone(), amount: CurrencyAmount::from_fractional(10.0).expect("a") }
     ];
 
     add_entry_mutate_first(&mut entries, test_address, 10.0);
@@ -79,11 +77,12 @@ fn main_distribution(test_address: &Address, seeds: &Vec<Seed>) -> Vec<GenesisDi
 
     entries
 }
-// #[test]
-// pub fn verify_genesis_distribution_main() {
-//     let tc = TestConstants::new();
-//     main_distribution(&tc.address_1);
-// }
+#[tokio::test]
+pub async fn verify_genesis_distribution_main() {
+    let nc = NodeConfig::dev_default().await;
+    let tc = TestConstants::new();
+    main_distribution(&tc.address_1, nc.seeds.as_ref());
+}
 
 fn lower_distribution(_network: &NetworkEnvironment, words_pass: &WordsPass, seeds: &Vec<Seed>) -> Vec<GenesisDistribution> {
     let mut pks = vec![];
