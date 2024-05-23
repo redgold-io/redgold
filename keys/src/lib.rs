@@ -105,3 +105,13 @@ impl KeyPair {
         self.secret_key.secret_bytes().to_hex()
     }
 }
+
+#[test]
+fn debug_addr() {
+    let tc = TestConstants::new();
+    let kp = tc.key_pair();
+    let addr = kp.address_typed();
+    println!("addr: {:?}", addr);
+    println!("addr: {}", addr.render_string().expect(""));
+    println!("addr: {}", addr.raw_bytes().expect("").to_hex());
+}

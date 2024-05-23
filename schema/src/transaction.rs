@@ -203,14 +203,12 @@ impl Transaction {
     }
 
     pub fn swap_destination_currency(&self) -> Option<SupportedCurrency> {
-        self.swap_destination().and_then(|a| a.currency.as_ref())
-            .and_then(|c| SupportedCurrency::from_i32(c.clone()))
+        self.swap_destination().map(|a| a.currency_or())
     }
 
     pub fn external_destination_currency(&self) -> Option<SupportedCurrency> {
         self.swap_destination().or(self.stake_destination())
-            .and_then(|a| a.currency.as_ref())
-            .and_then(|c| SupportedCurrency::from_i32(c.clone()))
+            .map(|a| a.currency_or())
     }
 
     pub fn is_stake(&self) -> bool {

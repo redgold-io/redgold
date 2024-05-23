@@ -36,7 +36,7 @@ impl Address {
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::BitcoinExternalString as i32,
-            currency: Some(SupportedCurrency::Bitcoin as i32),
+            currency: SupportedCurrency::Bitcoin as i32,
         }
     }
     pub fn from_eth(address: impl Into<String>) -> Address {
@@ -44,7 +44,7 @@ impl Address {
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::EthereumExternalString as i32,
-            currency: Some(SupportedCurrency::Ethereum as i32),
+            currency: SupportedCurrency::Ethereum as i32,
         }
     }
 
@@ -95,7 +95,7 @@ impl Address {
     }
 
     pub fn with_checksum(bytes: Vec<u8>) -> Vec<u8> {
-        let checksum_bytes = Hash::digest(bytes.clone()).vec();
+        let checksum_bytes = Hash::digest(bytes.clone()).raw_bytes().unwrap();
         let mut res: Vec<u8> = Vec::new();
         res.extend_from_slice(&bytes);
         res.extend_from_slice(&checksum_bytes[0..4]);
@@ -144,12 +144,12 @@ impl Address {
         Address {
             address: bytes_data(address),
             address_type: AddressType::Sha3224ChecksumPublic as i32,
-            currency: None,
+            currency: SupportedCurrency::Redgold as i32,
         }
     }
 
     pub fn currency_or(&self) -> SupportedCurrency {
-        self.currency.and_then(|s| SupportedCurrency::from_i32(s)).unwrap_or(SupportedCurrency::Redgold)
+        self.currency()
     }
 }
 

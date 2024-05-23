@@ -69,7 +69,7 @@ impl Hash {
     }
 
     pub fn checksum_no_calc(&self) -> Vec<u8> {
-        self.vec()[0..4].to_vec()
+        self.raw_bytes().expect("b")[0..4].to_vec()
     }
 
     pub fn checksum_hex(&self) -> String {

@@ -235,7 +235,6 @@
         "structs.Input.floating_utxo_id",
         "structs.TransportInfo.external_ipv6",
         "structs.Input.input_type",
-        "structs.Address.currency",
         "structs.ResolveCodeResponse",
         "structs.ExecutionResult.result_metadata",
         "structs.TypedValue.string_value",
