@@ -91,7 +91,7 @@ async fn update_tick(relay: &Relay) -> Result<(), ErrorInfo> {
     if std::env::var("REDGOLD_GRAFANA_PUBLIC_WRITER").is_ok() {
 
         let targets_path = folder.targets().to_str().expect("str").to_string();
-        info!("Updating grafana public targets {}", targets_path.clone());
+        // info!("Updating grafana public targets {}", targets_path.clone());
         SSHProcessInvoke::new("grafana-public-node.redgold.io", None)
             .scp(targets_path.clone(), targets_path.clone(), true, None).await
             .add("Failed to update grafana public targets at")

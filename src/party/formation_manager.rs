@@ -28,7 +28,7 @@ impl PartyWatcher {
         let errs = results.iter().filter_map(|r| r.as_ref().err()).collect_vec();
         if errs.len() > 0 {
 
-            info!("Not enough peers in party formation");
+            // info!("Not enough peers in party formation");
             // error!("Error in initial party key formation {}", errs.json_or());
             // return Err(error_info("Error in initial party key formation {}"))
             //     .with_detail("party_peers", party_peers.json_or())

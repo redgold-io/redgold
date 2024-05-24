@@ -168,6 +168,8 @@ impl LiveE2E {
             return Ok(None);
         }
 
+        gauge!("redgold_e2e_spendable_utxos").set(spendable_utxos.len() as f64);
+
         let tx = Self::build_live_tx(&self.relay.node_config, destination_choice, spendable_utxos)?;
 
         return Ok(Some(tx.clone()));
