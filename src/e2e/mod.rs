@@ -237,7 +237,7 @@ impl LiveE2E {
     pub fn live_e2e_address_kps(wp: &WordsPass, network: &NetworkEnvironment) -> Result<HashMap<Address, KeyPair>, ErrorInfo> {
         let mut map: HashMap<Address, KeyPair> = HashMap::new();
 
-        if !network.is_main() {
+        if !network.is_main_stage_network() {
             let min_offset = 20;
             let max_offset = 30;
             for i in min_offset..max_offset {
