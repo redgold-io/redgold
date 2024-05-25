@@ -222,3 +222,10 @@ impl IntervalFold for AwsBackup {
         Ok(())
     }
 }
+
+#[ignore]
+#[tokio::test]
+async fn test_aws_backup() {
+    let res = AwsBackup::s3_ls(&"redgold-backups".to_string(), "".to_string()).await.unwrap();
+    println!("{:?}", res);
+}

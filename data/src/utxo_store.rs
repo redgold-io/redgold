@@ -165,7 +165,7 @@ impl UtxoStore {
         })?;
         let rows = fetched_rows.rows_affected();
 
-        gauge!("redgold.utxo.total").decrement(rows as f64);
+        // gauge!("redgold.utxo.total").decrement(rows as f64);
         Ok(rows)
     }
 
@@ -251,7 +251,7 @@ impl UtxoStore {
             .execute(&mut **sqlite_tx)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        gauge!("redgold.utxo.total").increment(1.0);
+        // gauge!("redgold.utxo.total").increment(1.0);
         Ok(rows_m.last_insert_rowid())
     }
 
