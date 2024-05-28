@@ -163,13 +163,13 @@ impl LiveE2E {
             &self.relay.node_config.words(), &self.relay.node_config.network
         )?;
 
-        let spendable_utxos = Self::get_spendable_utxos(&self.relay.ds, map).await?;
+        let spendable_utxos = Self::get_spendable_utxos(&self.relay.ds, map.clone()).await?;
         if spendable_utxos.is_empty() {
             return Ok(None);
         }
 
         let existing_addrs = spendable_utxos
-            .iter().flat_map(|s| s.utxo_entry.address().ok()).collect::<HashSet<Address>>();
+            .iter().flat_map(|s| s.utxo_entry.address().ok().cloned()).collect::<HashSet<Address>>();
 
         let unused_self_key = map.keys().filter(|k| !existing_addrs.contains(k))
             .map(|k| k.clone()).collect_vec();

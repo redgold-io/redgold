@@ -63,6 +63,7 @@ pub mod helpers;
 pub mod party;
 pub mod tx;
 pub mod config_data;
+mod server_config;
 
 
 impl BytesData {

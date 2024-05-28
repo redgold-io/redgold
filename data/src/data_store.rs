@@ -382,6 +382,8 @@ impl DataStore {
         gauge!("redgold_cores_total").set(cores_total().log_error().unwrap_or(0) as f64);
         gauge!("redgold_multiparty_total").set(self.multiparty_store.count_multiparty_total().await? as f64);
         gauge!("redgold_multiparty_self").set(self.multiparty_store.count_self_multiparty().await? as f64);
+        gauge!("redgold_active_nodes_len").set(self.peer_store.active_nodes(None).await?.len() as f64);
+        gauge!("redgold_all_peers_len").set(self.peer_store.all_peers().await?.len() as f64);
         // self.multiparty_store
         Ok(())
     }
