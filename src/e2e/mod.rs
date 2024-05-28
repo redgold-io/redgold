@@ -2,7 +2,7 @@ use crate::e2e::tx_gen::SpendableUTXO;
 use crate::util::{self};
 use itertools::Itertools;
 use log::{error, info};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use metrics::{counter, gauge};
@@ -168,9 +168,20 @@ impl LiveE2E {
             return Ok(None);
         }
 
+        let existing_addrs = spendable_utxos
+            .iter().flat_map(|s| s.utxo_entry.address().ok()).collect::<HashSet<Address>>();
+
+        let unused_self_key = map.keys().filter(|k| !existing_addrs.contains(k))
+            .map(|k| k.clone()).collect_vec();
+        let opt_dest_choice = {
+            let mut rng = thread_rng(); // Get a random number generator
+            unused_self_key.choose(&mut rng).cloned()
+        }.unwrap_or(destination_choice);
+
+
         gauge!("redgold_e2e_spendable_utxos").set(spendable_utxos.len() as f64);
 
-        let tx = Self::build_live_tx(&self.relay.node_config, destination_choice, spendable_utxos)?;
+        let tx = Self::build_live_tx(&self.relay.node_config, opt_dest_choice, spendable_utxos)?;
 
         return Ok(Some(tx.clone()));
     }
@@ -249,6 +260,14 @@ impl LiveE2E {
             let key = wp.default_kp()?;
             let address = key.address_typed();
             map.insert(address, key);
+
+            let min_offset = 1;
+            let max_offset = 5;
+            for i in min_offset..max_offset {
+                let key = wp.keypair_at_change(i).expect("");
+                let address = key.address_typed();
+                map.insert(address, key);
+            }
         }
         Ok(map)
     }
