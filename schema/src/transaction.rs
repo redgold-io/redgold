@@ -721,7 +721,7 @@ impl Transaction {
     }
 
     pub fn first_input_address(&self) -> Option<Address> {
-        self.inputs.iter().flat_map(|o| o.address.clone()).next()
+        self.inputs.iter().flat_map(|o| o.address().ok()).next()
     }
 
     pub fn first_input_proof_public_key(&self) -> Option<&structs::PublicKey> {

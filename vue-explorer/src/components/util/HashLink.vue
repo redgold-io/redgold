@@ -15,15 +15,34 @@ export default {
     shorten: {
       type: Boolean,
       default: true
+    },
+    trimPrefix: {
+      type: Boolean,
+      default: true
     }
   },
   computed: {
-    displayedHash() {
-      if (this.shorten) {
-        return this.data.substring(0, 4) + '...' + this.data.substring(this.data.length - 4);
-      } else {
-        return this.data;
+    postTrim() {
+      let excludePrefixes = ['0a220a20']
+      if (this.trimPrefix) {
+        for (let pfx of excludePrefixes) {
+          if (this.data.startsWith(pfx)) {
+            return this.data.substring(pfx.length);
+          }
+        }
       }
+      return this.data;
+    },
+    shortened() {
+      let d = this.postTrim;
+      if (this.shorten) {
+        return d.substring(0, 4) + '...' + d.substring(d.length - 4);
+      } else {
+        return d;
+      }
+    },
+    displayedHash() {
+      return this.shortened;
     }
   },
   methods: {
