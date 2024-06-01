@@ -832,30 +832,7 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     //     r.ds.transaction_store.count_total_transactions().await?;
     // trace!("count_total_transactions time elapsed: {:?}", current_time_millis_i64() - start);
 
-    let peers = r.ds.peer_store.active_nodes(None).await?;
-    trace!("active nodes ds query elapsed: {:?}", current_time_millis_i64() - start);
-
-    let num_active_peers = (peers.len() as i64) + 1;
-
-    let pks = peers[0..9.min(peers.len())].to_vec();
-    let mut active_peers_abridged = vec![];
-    active_peers_abridged.push(
-        handle_peer(&r.peer_id_info().await?, &r, true).await?
-    );
-
-    trace!("active nodes first handle peer elapsed: {:?}", current_time_millis_i64() - start);
-
-    for pk in &pks {
-        if let Some(pid) = r.ds.peer_store.peer_id_for_node_pk(pk).await? {
-            if let Some(pid_info) = r.ds.peer_store.query_peer_id_info(&pid).await? {
-                if let Some(p) = handle_peer(&pid_info, &r, true).await.ok() {
-                    active_peers_abridged.push(p);
-                }
-            }
-        }
-    }
-
-    active_peers_abridged = active_peers_abridged.iter().filter(|p| !p.nodes.is_empty()).cloned().collect_vec();
+    let (num_active_peers, active_peers_abridged) = load_active_peers_info(&r, start).await?;
     trace!("active nodes and peers done time elapsed: {:?}", current_time_millis_i64() - start);
 
 
@@ -899,6 +876,43 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     })
 }
 
+async fn load_active_peers_info(r: &Relay, start: i64) -> Result<(i64, Vec<DetailedPeer>), ErrorInfo> {
+    let peers = r.ds.peer_store.active_nodes(None).await?;
+    trace!("active nodes ds query elapsed: {:?}", current_time_millis_i64() - start);
+
+    let num_active_peers = (peers.len() as i64) + 1;
+
+    let pks = peers[0..9.min(peers.len())].to_vec();
+    let mut active_peers_abridged = vec![];
+    active_peers_abridged.push(
+        handle_peer(&r.peer_id_info().await?, &r, true).await?
+    );
+
+    trace!("active nodes first handle peer elapsed: {:?}", current_time_millis_i64() - start);
+
+    for pk in &pks {
+        if let Some(pid) = r.ds.peer_store.peer_id_for_node_pk(pk).await? {
+            if let Some(pid_info) = r.ds.peer_store.query_peer_id_info(&pid).await? {
+                if let Some(p) = handle_peer(&pid_info, &r, true).await.ok() {
+                    active_peers_abridged.push(p);
+                }
+            }
+        }
+    }
+
+    active_peers_abridged = active_peers_abridged.iter().filter(|p| !p.nodes.is_empty()).cloned().collect_vec();
+    Ok((num_active_peers, active_peers_abridged))
+}
+
 pub async fn handle_explorer_swap(relay: Relay) -> RgResult<Option<AddressPoolInfo>> {
     get_address_pool_info(relay).await
+}
+
+#[tokio::test]
+async fn debug_peers_load() {
+    let r = Relay::dev_default().await;
+    let start = current_time_millis_i64();
+    let res = load_active_peers_info(&r, start).await.expect("failed to load peers");
+    println!("Peers: {}", res.1.json_or());
+
 }

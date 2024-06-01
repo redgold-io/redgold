@@ -155,9 +155,11 @@ impl PeerStore {
             time,
             bytes
         ) // Execute instead of fetch
-            .fetch_all(&mut *pool)
+            .execute(&mut *pool)
             .await;
-        let _ = DataStoreContext::map_err_sqlx(rows)?;
+        let rows_affected = DataStoreContext::map_err_sqlx(rows)?;
+        let rows_affected = rows_affected.rows_affected();
+        counter!("redgold_peer_store_update_last_seen").increment(rows_affected);
         Ok(())
     }
 
@@ -271,6 +273,7 @@ impl PeerStore {
         let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
         let delay = delay.as_millis() as i64;
         let cutoff = util::current_time_millis() - delay;
+        let cutoff = 0i64;
 
         let rows = sqlx::query!(
             r#"SELECT public_key FROM nodes WHERE last_seen > ?1"#,
@@ -297,6 +300,7 @@ impl PeerStore {
         let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
         let delay = delay.as_millis() as i64;
         let cutoff = util::current_time_millis() - delay;
+        let cutoff = 0i64;
 
         DataStoreContext::map_err_sqlx(sqlx::query!(
             r#"SELECT public_key, peer_id FROM nodes WHERE last_seen > ?1"#,
@@ -355,7 +359,9 @@ impl PeerStore {
         let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
         let delay = delay.as_millis() as i64;
         let cutoff = util::current_time_millis() - delay;
+        let cutoff = 0i64;
 
+        // TODO: Fix root cause of last_seen not being update
         let rows = sqlx::query!(
             r#"SELECT tx FROM nodes WHERE last_seen > ?1"#,
             cutoff

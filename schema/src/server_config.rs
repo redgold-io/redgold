@@ -10,6 +10,13 @@ pub struct VPNConfig {
     server: String
 }
 
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct HAProxyConfig {
+    proxy_external_ip: String,
+    proxy_host: String,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NodeInstance {
     // Enable multiparty support, requires API keys and additional setup for oracle pricing info.
@@ -19,7 +26,8 @@ pub struct NodeInstance {
     pub network_environment: NetworkEnvironment,
     pub external_host: Option<String>,
     pub host_port_offset: Option<i64>,
-    pub vpn_config: Option<VPNConfig>
+    pub vpn_config: Option<VPNConfig>,
+    pub ha_proxy_config: Option<HAProxyConfig>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
