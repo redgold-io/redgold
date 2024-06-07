@@ -124,6 +124,12 @@ impl Address {
         Ok(())
     }
 
+    pub fn validated(self) -> RgResult<Self> {
+        self.verify_length()?;
+        self.verify_checksum()?;
+        Ok(self)
+    }
+
     pub fn str_to_address(s: String) -> Vec<u8> {
         hex::decode(s).expect("hex")
         // return base58::from_check(&s[3..]).unwrap();

@@ -19,7 +19,7 @@ impl<T : Into<String> + Clone> AddressSupport for T {
             Address::from_bitcoin(&str_rep)
         } else if let Ok(a) = EthHistoricalClient::parse_address(&str_rep) {
             a
-        } else if let Ok(a) = Address::from_hex(&str_rep) {
+        } else if let Ok(a) = Address::from_hex(&str_rep).and_then(|a| a.validated()) {
             a
         } else {
             return Err(error_info("Unable to parse address: ".to_string())).add(str_rep.clone());
