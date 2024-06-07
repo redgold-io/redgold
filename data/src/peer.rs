@@ -122,8 +122,9 @@ impl PeerStore {
     ) -> Result<Option<Transaction>, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;
 
-        let x = peer_id.peer_id.safe_get()?;
+        let x = peer_id;
         let vec = x.vec();
+        let hx = hex::encode(vec.clone());
 
         let rows = sqlx::query!(
             r#"SELECT tx FROM peers WHERE id = ?1"#,

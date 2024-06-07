@@ -891,8 +891,10 @@ async fn load_active_peers_info(r: &Relay, start: i64) -> Result<(i64, Vec<Detai
     trace!("active nodes first handle peer elapsed: {:?}", current_time_millis_i64() - start);
 
     for pk in &pks {
-        if let Some(pid) = r.ds.peer_store.peer_id_for_node_pk(pk).await? {
-            if let Some(pid_info) = r.ds.peer_store.query_peer_id_info(&pid).await? {
+        let option = r.ds.peer_store.peer_id_for_node_pk(pk).await?;
+        if let Some(pid) = option {
+            let option1 = r.ds.peer_store.query_peer_id_info(&pid).await?;
+            if let Some(pid_info) = option1 {
                 if let Some(p) = handle_peer(&pid_info, &r, true).await.ok() {
                     active_peers_abridged.push(p);
                 }
