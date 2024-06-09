@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use log::{error, info};
+use metrics::{counter, gauge};
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
@@ -13,10 +14,14 @@ use crate::party::party_watcher::PartyWatcher;
 impl PartyWatcher {
 
     pub async fn initial_formation(&self) -> RgResult<()> {
+        counter!("redgold_party_initial_formation").increment(1);
+
         // info!("Initial party key formation");
         // Initiate MP keysign etc. gather public key and original proof and params
         // TODO: Add deposit trust scored peers.
         let seeds = self.relay.node_config.non_self_seeds_pk().clone();
+        gauge!("redgold_party_initial_formation_non_self_seeds").set(seeds.len() as f64);
+
         let party_peers = seeds.clone();
         self.form_keygen_group(party_peers).await?;
         // info!("Initial party key formation success");
@@ -26,6 +31,7 @@ impl PartyWatcher {
     async fn form_keygen_group(&self, party_peers: Vec<PublicKey>) -> RgResult<()> {
         let results = self.relay.health_request(&party_peers).await?;
         let errs = results.iter().filter_map(|r| r.as_ref().err()).collect_vec();
+        gauge!("redgold_party_form_keygen_group_peer_errs").set(errs.len() as f64);
         if errs.len() > 0 {
 
             // info!("Not enough peers in party formation");
@@ -70,6 +76,8 @@ impl PartyWatcher {
     }
 
     pub async fn tick_formations(&self, shared_data: &HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
+
+        counter!("redgold_party_formation_tick").increment(1);
         let self_host = shared_data.iter()
             .filter(|(k,v)| v.self_initiated_not_debug())
             .collect_vec();

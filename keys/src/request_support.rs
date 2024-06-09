@@ -65,6 +65,7 @@ pub trait ResponseSupport {
      where Self: Sized;
     fn verify_auth_inner(self, intended_pk: Option<&PublicKey>) -> RgResult<Self>
         where Self: Sized;
+    fn proceed_from_proof_pk(&self, intended_pk: Option<&PublicKey>, nmd_pk: &PublicKey, proof: &Proof, proof_pk: &PublicKey) -> RgResult<()>;
 }
 
 impl ResponseSupport for Response {
@@ -77,12 +78,10 @@ impl ResponseSupport for Response {
     }
 
     fn verify_auth(self, intended_pk: Option<&PublicKey>) -> RgResult<Self> {
-        let json = self.json_or();
         let pk_json = intended_pk.json_or();
         self.verify_auth_inner(intended_pk)
             .add("Response authorization failure")
-            .add(json)
-            .add(pk_json)
+            .with_detail("intended_pk_json", pk_json)
     }
 
     fn verify_auth_inner(self, intended_pk: Option<&PublicKey>) -> RgResult<Self> {
@@ -90,6 +89,13 @@ impl ResponseSupport for Response {
         let nmd_pk = nmd.public_key.safe_get_msg("Missing public key on node metadata response authentication verification")?;
         let proof = self.proof.safe_get_msg("Missing proof on response authentication verification")?;
         let proof_pk = proof.public_key.safe_get_msg("Missing public key on proof on response authentication verification")?;
+        self.proceed_from_proof_pk(intended_pk, nmd_pk, proof, proof_pk)
+            .with_detail("nmd_pk", nmd_pk.hex())
+            .with_detail("proof_pk", proof_pk.hex())
+            ?;
+        Ok(self)
+    }
+    fn proceed_from_proof_pk(&self, intended_pk: Option<&PublicKey>, nmd_pk: &PublicKey, proof: &Proof, proof_pk: &PublicKey) -> RgResult<()> {
         proof.verify(&self.calculate_hash()).add("proof verification failure on response")?;
         if nmd_pk != proof_pk {
             return Err(error_info("Node metadata public key and proof public key mismatch on response authentication verification"));
@@ -101,7 +107,7 @@ impl ResponseSupport for Response {
                     )).with_detail("intended_pk", intended.hex()).with_detail("proof_pk", proof_pk.hex());
             }
         }
-        Ok(self)
+        Ok(())
     }
 
 }

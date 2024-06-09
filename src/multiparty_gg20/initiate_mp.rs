@@ -8,6 +8,7 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::Relay;
 use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
+use metrics::{counter, gauge};
 use serde::{Deserialize, Serialize};
 // use ssh2::init;
 use tokio::runtime::Runtime;
@@ -90,6 +91,8 @@ pub async fn initiate_mp_keygen(
     debug_purpose: bool,
     prior_keys: Vec<PublicKey>
 ) -> Result<SelfInitiateKeygenResult, ErrorInfo> {
+
+    counter!("redgold_initiate_mp_keygen").increment(1);
 
     // Better pattern for unwrap or else async error?
     let ident = match ident {
