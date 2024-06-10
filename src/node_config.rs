@@ -556,7 +556,7 @@ impl NodeConfig {
             genesis_config: GenesisConfig{
             },
             faucet_enabled: true,
-            e2e_enabled: true,
+            e2e_enabled: false,
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string(),
             external_host: "localhost".to_string(),
