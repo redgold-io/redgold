@@ -112,11 +112,11 @@ pub fn get_all_hardcoded_seeds() -> Vec<Seed> {
         //     "0a250a230a21035c74e389a5677085ecf56e6678e4d704be6030cf74e02f01d59f58ede1fdfbec",
         //     "0a230a210364612f26001ff2c17fae5d889af58f5263b5a823fcd261dc525c0279710eb300",
         //     false),
-        simple_seed(
-            "n9.redgold.io",
-            "0a250a230a210365c5b87014fed14b80a812e649a2be594d713fedb25e216f4426264b032b8ca1",
-            "0a230a2102be2bde0f08f8430fb593edbc7de749f3c56d16891089e563adddde26b3524aa6",
-            false),
+        // simple_seed(
+        //     "n9.redgold.io",
+        //     "0a250a230a210365c5b87014fed14b80a812e649a2be594d713fedb25e216f4426264b032b8ca1",
+        //     "0a230a2102be2bde0f08f8430fb593edbc7de749f3c56d16891089e563adddde26b3524aa6",
+        //     false),
     ]
 }
 
