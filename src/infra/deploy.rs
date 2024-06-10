@@ -847,6 +847,7 @@ pub async fn default_deploy(
             if ss.index == 0 && node_config.opts.development_mode {
                 if node_config.opts.development_mode_main {
                     this_hm.insert("REDGOLD_ENABLE_PARTY_MODE".to_string(), "true".to_string());
+                    this_hm.insert("REDGOLD_LIVE_E2E_ENABLED".to_string(), "true".to_string());
                 };
                 this_hm.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
             }

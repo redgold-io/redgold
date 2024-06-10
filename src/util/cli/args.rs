@@ -17,8 +17,7 @@ pub fn empty_args() -> RgArgs {
         genesis: false,
         seed_address: None,
         seed_port_offset: None,
-        enable_e2e: true,
-        disable_e2e: false,
+        enable_live_e2e: false,
         log_level: None,
         development_mode: false,
         development_mode_main: false,
@@ -79,12 +78,9 @@ pub struct RgArgs {
     /// Seed network port offset, only used for local testing and manually connecting to a specific
     /// network
     pub seed_port_offset: Option<i32>,
-    #[clap(long)]
+    #[clap(long, env = "REDGOLD_LIVE_E2E_ENABLED")]
     /// Debug only option to enable an internal continuous E2E test sending transactions
-    pub enable_e2e: bool,
-    #[clap(long)]
-    /// Debug only option to enable an internal continuous E2E test sending transactions
-    pub disable_e2e: bool,
+    pub enable_live_e2e: bool,
     #[clap(long)]
     /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
     pub log_level: Option<String>,
@@ -117,10 +113,9 @@ pub struct RgArgs {
     /// Alerts / watched data emails
     #[clap(long, env = "REDGOLD_TO_EMAIL")]
     pub to_email: Option<String>,
-    /// Alerts / watched data emails
+    /// Multiparty mode enabled
     #[clap(long, env = "REDGOLD_ENABLE_PARTY_MODE")]
-    pub enable_party_mode: bool
-
+    pub enable_party_mode: bool,
 }
 
 impl Default for RgArgs {

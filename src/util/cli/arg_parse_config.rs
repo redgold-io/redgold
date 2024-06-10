@@ -470,9 +470,6 @@ impl ArgTranslate {
 
     fn e2e_enable(&mut self) {
 
-        if self.opts.disable_e2e {
-            self.node_config.e2e_enabled = false;
-        }
         // std::env::var("REDGOLD_ENABLE_E2E").ok().map(|b| {
         //     self.node_config.e2e_enable = true;
         // }
