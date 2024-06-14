@@ -365,6 +365,7 @@ pub async fn resolve_transaction(tx: &Transaction, relay: Relay
                                         // runtime.clone(),
                                          peers.clone(), tx.signable_hash().clone(), true, time))
             .await.map_err(|e| error_info(e.to_string()))}
+            .map_err(|mut e| e.with_detail("invocation", "resolve_transaction_async_input"))
     ).collect_vec()).await {
         let result = result??;
         if !result.internal_accepted {

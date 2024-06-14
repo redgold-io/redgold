@@ -154,6 +154,10 @@ impl Address {
         }
     }
 
+    pub fn raw_from_hex(hex: impl Into<String>) -> RgResult<Address> {
+        Ok(Self::new_raw(from_hex(hex.into())?))
+    }
+
     pub fn currency_or(&self) -> SupportedCurrency {
         self.currency()
     }

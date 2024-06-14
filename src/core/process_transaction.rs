@@ -259,7 +259,8 @@ impl TransactionProcessContext {
         let result_or_error = {
             let result = match self.immediate_validation(&transaction_message.transaction).await {
                 Ok(_) => {
-                    let res = self.process(transaction_message.transaction.clone(), current_time, request_uuid).await;
+                    let res = self.process(transaction_message.transaction.clone(), current_time, request_uuid).await
+                        .with_detail("transaction", transaction_message.transaction.json_or());
                     res
                 }
                 Err(e) => {

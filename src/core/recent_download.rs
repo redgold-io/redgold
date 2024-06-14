@@ -3,6 +3,7 @@ use itertools::Itertools;
 use metrics::counter;
 use redgold_schema::RgResult;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::Relay;
@@ -77,7 +78,8 @@ impl RecentDownload {
                                 update.parent_transaction.signable_hash(),
                                 false,
                                 update.parent_transaction.time()?.clone(),
-                            ).await;
+                            ).await
+                                .with_detail("resolve_invocation", "recent_download");
                             if let Ok(resolved_input) = resolved_input {
                                 self.relay.unknown_resolved_inputs.sender.send_rg_err(resolved_input)?;
                             } else {
