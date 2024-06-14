@@ -20,7 +20,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
     let mut addr = None;
 
     // TODO: Move to unified parser function.
-    if let Ok(a) = hash_input.parse_address().or(Address::from_bytes()) {
+    if let Ok(a) = hash_input.parse_address().or(Address::raw_from_hex(hash_input.clone())) {
         addr = Some(a);
     }
     if let Some(a) = addr {
