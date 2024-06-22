@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use itertools::Itertools;
 use redgold_schema::{error_info, error_message, from_hex, RgResult, SafeOption, signature_data, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, SupportedCurrency};
 use crate::{KeyPair, TestConstants, util};
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::{public_key_ser, ToPublicKey};
@@ -152,6 +153,7 @@ pub trait PublicKeySupport {
     fn from_direct_ecdsa_hex<S: Into<String>>(hex: S) -> Result<structs::PublicKey, ErrorInfo>;
     fn to_all_addresses(&self) -> RgResult<Vec<Address>>;
     fn to_all_addresses_for_network(&self, network: &NetworkEnvironment) -> RgResult<Vec<Address>>;
+    fn to_all_addresses_for_network_by_currency(&self, network: &NetworkEnvironment) -> RgResult<HashMap<SupportedCurrency, Address>>;
 }
 
 impl PublicKeySupport for structs::PublicKey {
@@ -181,6 +183,17 @@ impl PublicKeySupport for structs::PublicKey {
         let eth = self.to_ethereum_address_typed()?;
         let btc = self.to_bitcoin_address_typed(&network)?;
         Ok(vec![default, eth, btc])
+    }
+
+    fn to_all_addresses_for_network_by_currency(&self, network: &NetworkEnvironment) -> RgResult<HashMap<SupportedCurrency, Address>> {
+        let default = self.address()?;
+        let eth = self.to_ethereum_address_typed()?;
+        let btc = self.to_bitcoin_address_typed(&network)?;
+        let mut hm = HashMap::new();
+        hm.insert(SupportedCurrency::Redgold, default);
+        hm.insert(SupportedCurrency::Ethereum, eth);
+        hm.insert(SupportedCurrency::Bitcoin, btc);
+        Ok(hm)
     }
 
 }

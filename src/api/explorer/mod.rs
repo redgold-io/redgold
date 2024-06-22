@@ -137,7 +137,8 @@ pub struct DetailedTransaction {
 #[derive(Serialize, Deserialize)]
 pub struct AddressPoolInfo {
     public_key: String,
-    addresses: Vec<String>,
+    // currency to address
+    addresses: HashMap<String, String>,
     balances: HashMap<String, String>,
     bids: HashMap<String, Vec<PriceVolume>>,
     asks: HashMap<String, Vec<PriceVolume>>,
@@ -289,8 +290,8 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
             let balances = pe.balance_map.iter().map(|(k, v)| {
                 (format!("{:?}", k), v.to_fractional().to_string())
             }).collect::<HashMap<String, String>>();
-            let addresses = pk.to_all_addresses_for_network(&r.node_config.network)?
-                .iter().flat_map(|a| a.render_string().ok()).collect_vec();
+            let addresses = pk.to_all_addresses_for_network_by_currency(&r.node_config.network)?
+                .iter().flat_map(|(c,a)| a.render_string().ok().map(|aa| (c.json_or(), aa))).collect::<HashMap<String, String>>();
             let central_prices = pe.central_prices.iter().map(|(k,v)| {
                 (format!("{:?}", k), v.clone())
             }).collect::<HashMap<String, CentralPricePair>>();
@@ -341,7 +342,7 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
 
     let address_str = a.render_string()?;
     let address_pool_info = get_address_pool_info(r.clone()).await?
-        .filter(|p| p.addresses.contains(&address_str));
+        .filter(|p| p.addresses.values().collect_vec().contains(&&address_str));
 
     let detailed = DetailedAddress {
         address: address_str,
