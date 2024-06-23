@@ -291,7 +291,8 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 (format!("{:?}", k), v.to_fractional().to_string())
             }).collect::<HashMap<String, String>>();
             let addresses = pk.to_all_addresses_for_network_by_currency(&r.node_config.network)?
-                .iter().flat_map(|(c,a)| a.render_string().ok().map(|aa| (c.json_or(), aa))).collect::<HashMap<String, String>>();
+                .iter().flat_map(|(c,a)| a.render_string().ok()
+                .map(|aa| (format!("{:?}", c), aa))).collect::<HashMap<String, String>>();
             let central_prices = pe.central_prices.iter().map(|(k,v)| {
                 (format!("{:?}", k), v.clone())
             }).collect::<HashMap<String, CentralPricePair>>();

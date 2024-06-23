@@ -116,7 +116,7 @@ export default {
     this.usdBtcStr = this.usdBtc.toFixed(2);
     let swapInfo = await this.fetchSwapInfo();
     if (swapInfo != null) {
-      this.btcSwapAddress = swapInfo.btc_address;
+      this.btcSwapAddress = swapInfo.addresses['Bitcoin'];
       this.rgdBtc = swapInfo.bid_ask.center_price;
       this.rgdBtcStr = this.rgdBtc.toFixed(2);
       this.usdRdg = (1 / this.rgdBtc) * this.usdBtc;
