@@ -117,12 +117,13 @@ export default {
     let swapInfo = await this.fetchSwapInfo();
     if (swapInfo != null) {
       this.btcSwapAddress = swapInfo.addresses['Bitcoin'];
-      this.rgdBtc = swapInfo.bid_ask.center_price;
-      this.rgdBtcStr = this.rgdBtc.toFixed(2);
-      this.usdRdg = (1 / this.rgdBtc) * this.usdBtc;
-      this.usdRdgStr = this.usdRdg.toFixed(2);
+      if ('Bitcoin' in swapInfo.central_prices) {
+        this.usdRdg = swapInfo['Bitcoin'].min_ask_estimated
+        this.rgdBtc = swapInfo['Bitcoin'].min_ask
+        this.rgdBtcStr = this.rgdBtc.toFixed(2);
+        this.usdRdgStr = this.usdRdg.toFixed(2);
+      }
     }
-
   }
 }
 </script>
