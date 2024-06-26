@@ -95,7 +95,7 @@ export default {
       btcSwapAddress: '',
       rgdBtc: 100.012312,
       rgdBtcStr: '100.012312',
-      usdRdg: 1.012312,
+      usdRdg: 100.012312,
       usdRdgStr: '1.012',
       usdBtc: 30000.3210,
       usdBtcStr: '30000.32'

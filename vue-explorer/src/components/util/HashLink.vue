@@ -23,7 +23,7 @@ export default {
   },
   computed: {
     postTrim() {
-      let excludePrefixes = ['0a220a20']
+      let excludePrefixes = ['0a220a20', '0a230a2103', '0a230a2102']
       if (this.trimPrefix) {
         for (let pfx of excludePrefixes) {
           if (this.data.startsWith(pfx)) {

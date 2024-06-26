@@ -42,31 +42,37 @@
 
           <div v-if="hashData.address_pool_info" >
             <h3 class="detail-group">AMM Swap Info</h3>
-
-
             <div class="grid-container">
+
+              <div><strong>RDG Address</strong></div>
+              <div><HashLink :shorten="false" :data="hashData.address_pool_info.addresses['Redgold']" /></div>
+              <div><strong>RDG Address Balance</strong></div>
+              <div>{{ (hashData.address_pool_info.balances['Redgold'] || 0).toFixed(8)}} RDG</div>
 
               <div><strong>BTC Explorer Link</strong></div>
               <a :href="btcExplorerLink">{{btcExplorerLink}}</a>
               <div><strong>BTC Address</strong></div>
-              <div><HashLink :shorten="false" :data="hashData.address_pool_info.btc_address" /></div>
+              <div><HashLink :shorten="false" :data="hashData.address_pool_info.addresses['Bitcoin']" /></div>
               <div><strong>BTC Balance</strong></div>
-              <div>{{ (hashData.address_pool_info.btc_balance).toFixed(8) }} BTC</div>
-              <div><strong>RDG Address Balance</strong></div>
-              <div>{{ hashData.address_pool_info.rdg_balance.toFixed(8)}} RDG</div>
-              <div><strong>RDG Address</strong></div>
-              <div><HashLink :shorten="false" :data="hashData.address_pool_info.rdg_address" /></div>
+              <div>{{ (hashData.address_pool_info.balances['Bitcoin'] || 0).toFixed(8) }} BTC</div>
+
+              <div><strong>ETH Explorer Link</strong></div>
+              <a :href="ethExplorerLink">{{ethExplorerLink}}</a>
+              <div><strong>ETH Address</strong></div>
+              <div><HashLink :shorten="false" :data="hashData.address_pool_info.addresses['Ethereum']" /></div>
+              <div><strong>ETH Balance</strong></div>
+              <div>{{ (hashData.address_pool_info.balances['Ethereum'] || 0).toFixed(18) }} ETH</div>
+
               <div><strong>Public Key</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
-              <div><strong>Price Ask USD/RDG</strong></div>
+              <div><strong>Price Ask USD/RDG BTC Quote</strong></div>
               <div><TextCopy :data="askPriceUsdRdg" /></div>
-              <div><strong>Price Center USD/RDG</strong></div>
-              <div><TextCopy :data="centerPriceUsdRdg" /></div>
-              <div><strong>Price Center RDG/BTC</strong></div>
-              <div><TextCopy :data="hashData.address_pool_info.bid_ask.center_price" /></div>
-              <div><strong>Spread USD</strong></div>
-              <div>
-                ${{ spreadUsd }} USD</div>
+              <div><strong>Price Bid USD/RDG BTC Quote</strong></div>
+              <div><TextCopy :data="bidPriceUsdRdg" /></div>
+<!--              <div><strong>Price Center RDG/BTC </strong></div>-->
+<!--              <div><TextCopy :data="centerPriceRdgBtc" /></div>-->
+<!--              <div><strong>Spread USD</strong></div>-->
+<!--              <div>${{ spreadUsd }} USD</div>-->
             </div>
 
             <h3 class="detail-group">Bid Ask AMM Curve RDG/BTC</h3>
@@ -324,7 +330,7 @@ export default {
     btcExplorerLink() {
 
       var net = "testnet/";
-      let btcAddress = this.hashData.address_pool_info.btc_address;
+      let btcAddress = this.hashData.address_pool_info.addresses['Bitcoin'];
 
       if (!btcAddress.startsWith("tb")) {
         net = "";
@@ -332,23 +338,40 @@ export default {
 
       return "https://blockstream.info/" + net + "address/" + btcAddress;
     },
-    centerPriceUsdRdg() {
+    ethExplorerLink() {
+      let btcAddress = this.hashData.address_pool_info.addresses['Bitcoin'];
+      let ethAddress = this.hashData.address_pool_info.addresses['Ethereum'];
+      var retUrl = "https://sepolia.etherscan.io/address/" + ethAddress;
+      if (!btcAddress.startsWith("tb")) {
+        retUrl = "https://etherscan.io/address/" + ethAddress;
+      }
+      return retUrl;
+    },
+
+    bidPriceUsdRdg() {
       if (this.hashData.address_pool_info != null) {
-        let centerPrice = this.hashData.address_pool_info.bid_ask.center_price;
-        let usdPrice = (1/centerPrice) * this.usdBtcRate;
-        return usdPrice.toFixed(2);
+        let centerPrice = this.hashData.address_pool_info.central_prices['Bitcoin'];
+        if (centerPrice != null) {
+          return centerPrice.min_bid_estimated.toFixed(2);
+        }
       }
       return 0;
     },
+    //
+    // centerPriceRdgBtc() {
+    //   if (this.hashData.address_pool_info != null) {
+    //     let centerPrice = this.hashData.address_pool_info.bid_ask.center_price;
+    //     let usdPrice = (1/centerPrice) * this.usdBtcRate;
+    //     return usdPrice.toFixed(2);
+    //   }
+    //   return 0;
+    // },
+
     askPriceUsdRdg() {
       if (this.hashData.address_pool_info != null) {
-        let asks = this.hashData.address_pool_info.bid_ask.asks;
-        if (asks.length > 0) {
-          let centerPrice = asks[0].price; // Now in RDG / BTC
-          let usdPrice =  centerPrice * this.usdBtcRate ;
-          return usdPrice.toFixed(2);
-        } else {
-          return 0
+        let centerPrice = this.hashData.address_pool_info.central_prices['Bitcoin'];
+        if (centerPrice != null) {
+          return centerPrice.min_ask_estimated.toFixed(2);
         }
       }
       return 0;
