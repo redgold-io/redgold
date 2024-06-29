@@ -74,6 +74,7 @@ pub struct PeerSignerDetailed {
 pub struct NodeSignerDetailed {
     pub signature: String,
     pub node_id: String,
+    pub node_name: String,
     pub signed_pending_time: Option<i64>,
     pub signed_finalized_time: Option<i64>,
     pub observation_hash: String,
@@ -665,9 +666,13 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
                         let obs_type: ValidationType = i33
                             .safe_get_msg("validationtype")?.clone();
 
+                        let node_name = r.ds.peer_store.query_public_key_metadata(pk)
+                            .await?.and_then(|m| m.node_name).unwrap_or("".to_string());
+
                         let ns = NodeSignerDetailed {
                             signature: sig.hex(),
                             node_id: pk.hex(),
+                            node_name,
                             signed_pending_time: None,
                             observation_hash: observed.hex(),
                             observation_type: format!("{:?}", obs_type),

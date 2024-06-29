@@ -23,8 +23,8 @@ pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
     let pk_hex = match network_environment {
         // NetworkEnvironment::Main => {}
         // NetworkEnvironment::Test => {}
-        NetworkEnvironment::Dev => {"03879516077881c5be714024099c16974910d48b691c94c1824fad9635c17f3c37"}
-        NetworkEnvironment::Staging => {"02efbe0b97d823da74ef2d88b2321d4e52ce2f62b137b0b5c5b415be9e40a9ca15"}
+        NetworkEnvironment::Dev => {"0a230a2102747b692f95b12029a48326136d0378fee5ddd29c7a25228722842fbc51c33fd4"}
+        // NetworkEnvironment::Staging => {"02efbe0b97d823da74ef2d88b2321d4e52ce2f62b137b0b5c5b415be9e40a9ca15"}
         _ => { panic!("not implemented"); }
     };
     PublicKey::from_hex(pk_hex.to_string()).expect("pk")
@@ -133,10 +133,10 @@ pub fn dev_balance_check() {
         SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("w");
 
     //
-    // let a = w.address().expect("a");
-    // println!("wallet address: {a}");
-    // let b = w.get_wallet_balance().expect("balance");
-    // println!("wallet balance: {b}");
+    let a = w.address().expect("a");
+    println!("wallet address: {a}");
+    let b = w.get_wallet_balance().expect("balance");
+    println!("wallet balance: {b}");
     //
     // let mut tx = w.get_sourced_tx().expect("sourced tx");
     // tx.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
@@ -155,4 +155,78 @@ pub fn dev_balance_check() {
     }
 
 
+}
+
+
+
+
+
+
+
+
+
+
+// #[ignore]
+#[tokio::test]
+pub async fn send_test_btc_staking_tx() {
+    let network = NetworkEnvironment::Dev;
+    // let amount_sats = 40000;
+
+    let nc = NodeConfig::default_env(network).await;
+    // let amm_addr = amm_public_key(&network).address().expect("address");
+    // let amount = 1.0;
+
+    if let Some((privk, kp)) = dev_ci_kp() {
+        let pk = kp.public_key();
+        let rdg_address = pk.address().expect("address");
+        println!("pk rdg address: {}", rdg_address.render_string().expect(""));
+
+        let mut w =
+            SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true)
+                .expect("w");
+        let a = w.address().expect("a");
+        println!("wallet address: {a}");
+        let b = w.get_wallet_balance().expect("balance");
+        println!("wallet balance: {b}");
+        //
+        // let stake_tx = TransactionBuilder::new(&nc)
+        //     .with_external_stake_usd_bounds(None, None, )
+        //     .build().expect("build")
+        //     .sign(&kp).expect("sign");
+
+    }
+//     }
+// }
+//
+//
+//     let addr = amm_addr.render_string().expect("");
+//
+//     println!("sending to rdg amm address: {addr}");
+//
+//     if let Some((_privk, keypair)) = dev_ci_kp() {
+//         let pk = keypair.public_key();
+//         let rdg_address = pk.address().expect("");
+//         println!("pk: {}", rdg_address.render_string().expect(""));
+//
+//         let client = nc.api_client();
+//         client.faucet(&rdg_address).await.expect("faucet");
+//         let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
+//         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
+//             .utxo_entries.clone();
+//
+//         let btc_addr = pk.to_bitcoin_address_typed(&network).expect("btc address");
+//
+//         let amount = CurrencyAmount::from_fractional(amount).expect("");
+//         let tb = TransactionBuilder::new(&nc)
+//             .with_network(&network)
+//             .with_utxos(&utxos).expect("utxos")
+//             .with_output(&amm_addr, &amount)
+//             .with_last_output_swap_type()
+//             .with_last_output_swap_destination(&btc_addr).expect("swap")
+//             .build().expect("build")
+//             .sign(&keypair).expect("sign");
+//
+//         let res = client.send_transaction(&tb, true).await.expect("send").json_or();
+//
+//         println!("send: {}", res);
 }
