@@ -42,6 +42,7 @@ impl TransactionBuilderSupport for TransactionBuilder {
             nc: Some(config.clone()),
             fee_addrs,
             allow_bypass_fee: false,
+            input_addresses: vec![],
         };
         s.with_network(&network);
         s
@@ -58,7 +59,27 @@ pub struct TransactionBuilder {
     pub network: Option<NetworkEnvironment>,
     pub nc: Option<NodeConfig>,
     pub fee_addrs: Vec<Address>,
-    pub allow_bypass_fee: bool
+    pub allow_bypass_fee: bool,
+    pub input_addresses: Vec<Address>
+}
+
+impl TransactionBuilder {
+    pub fn with_input_address(&mut self, p0: &Address) -> &mut TransactionBuilder {
+        self.input_addresses.push(p0.clone());
+        self
+    }
+
+    pub async fn with_auto_utxos(&mut self) -> RgResult<&mut TransactionBuilder> {
+        if let Some(nc) = self.nc.as_ref() {
+            if self.input_addresses.len() > 0 {
+                let response = nc.api_client().query_address(self.input_addresses.clone()).await?;
+                if let Some(qar) = response.query_addresses_response {
+                    self.with_utxos(&qar.utxo_entries)?;
+                }
+            }
+        }
+        Ok(self)
+    }
 }
 
 

@@ -126,6 +126,13 @@ impl Transaction {
         }
         Ok(())
     }
+    pub fn network(&self) -> RgResult<NetworkEnvironment> {
+        let opts = self.options()?;
+        let net = opts.network_type.safe_get_msg("Missing network type")?;
+        let net = NetworkEnvironment::from_i32(net.clone());
+        let net = net.safe_get_msg("Invalid network type")?;
+        Ok(net.clone())
+    }
 
     pub fn new_blank() -> Self {
         let mut rng = rand::thread_rng();

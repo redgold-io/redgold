@@ -204,6 +204,7 @@ pub struct NodeConfig {
     pub contention: ContentionConfig,
     pub node_info: NodeInfoConfig,
     pub(crate) default_timeout: Duration,
+    pub disable_metrics: bool,
 }
 
 impl NodeConfig {
@@ -517,7 +518,8 @@ impl NodeConfig {
     pub async fn default_env(network_environment: NetworkEnvironment) -> Self {
         let mut opts = RgArgs::default();
         opts.network = Some(network_environment.to_std_string());
-        let node_config = NodeConfig::default();
+        let mut node_config = NodeConfig::default();
+        node_config.disable_metrics = true;
         let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
         arg_translate.translate_args().await.unwrap();
         let nc = arg_translate.node_config;
@@ -577,6 +579,7 @@ impl NodeConfig {
             contract: Default::default(),
             contention: Default::default(),
             default_timeout: Duration::from_secs(120),
+            disable_metrics: false
         }
     }
 

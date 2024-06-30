@@ -16,6 +16,8 @@ use std::sync::Arc;
 use tracing_subscriber::Registry;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use crate::observability::metrics_help::WithMetrics;
 
 
 pub struct WrappedMetrics {
@@ -227,6 +229,7 @@ fn install_prometheus(socket: SocketAddrV4) -> RgResult<()> {
     result
         .with_http_listener(socket).install()
         .error_info("Failed to install Prometheus exporter")
+        .with_detail("port", socket.port().to_string())
 }
 
 fn with_buckets(builder: PrometheusBuilder) -> Result<PrometheusBuilder, BuildError> {

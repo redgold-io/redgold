@@ -47,21 +47,21 @@
               <div><strong>RDG Address</strong></div>
               <div><HashLink :shorten="false" :data="hashData.address_pool_info.addresses['Redgold']" /></div>
               <div><strong>RDG Address Balance</strong></div>
-              <div>{{ (hashData.address_pool_info.balances['Redgold'] || 0).toFixed(8)}} RDG</div>
+              <div>{{ parseFloat(hashData.address_pool_info.balances['Redgold'] || 0).toFixed(8)}} RDG</div>
 
               <div><strong>BTC Explorer Link</strong></div>
               <a :href="btcExplorerLink">{{btcExplorerLink}}</a>
               <div><strong>BTC Address</strong></div>
               <div><HashLink :shorten="false" :data="hashData.address_pool_info.addresses['Bitcoin']" /></div>
               <div><strong>BTC Balance</strong></div>
-              <div>{{ (hashData.address_pool_info.balances['Bitcoin'] || 0).toFixed(8) }} BTC</div>
+              <div>{{ parseFloat(hashData.address_pool_info.balances['Bitcoin'] || 0).toFixed(8) }} BTC</div>
 
               <div><strong>ETH Explorer Link</strong></div>
               <a :href="ethExplorerLink">{{ethExplorerLink}}</a>
               <div><strong>ETH Address</strong></div>
               <div><HashLink :shorten="false" :data="hashData.address_pool_info.addresses['Ethereum']" /></div>
               <div><strong>ETH Balance</strong></div>
-              <div>{{ (hashData.address_pool_info.balances['Ethereum'] || 0).toFixed(18) }} ETH</div>
+              <div>{{ parseFloat(hashData.address_pool_info.balances['Ethereum'] || 0).toFixed(18) }} ETH</div>
 
               <div><strong>Public Key</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>

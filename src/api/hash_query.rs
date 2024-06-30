@@ -1,3 +1,4 @@
+use rocket::yansi::Paint;
 use redgold_schema::{error_info, from_hex};
 use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, PeerId, PublicKey, Transaction, TransactionInfo, TransactionState};
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
@@ -9,37 +10,37 @@ use redgold_keys::proof_support::PublicKeySupport;
 use redgold_schema::proto_serde::ProtoSerde;
 
 pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, offset: Option<i64>) -> Result<HashSearchResponse, ErrorInfo> {
-    let mut response = HashSearchResponse {
-        transaction_info: None,
-        address_info: None,
-        observation: None,
-        peer_node_info: None,
-        peer_id_info: None
-    };
+    let mut response = HashSearchResponse::default();
 
-    let mut addr = None;
 
+    // First check address
     // TODO: Move to unified parser function.
     if let Ok(a) = hash_input.parse_address().or(Address::raw_from_hex(hash_input.clone())) {
-        addr = Some(a);
-    }
-    if let Some(a) = addr {
         let info = get_address_info(&relay, limit, offset, &a).await?;
         response.address_info = Some(info);
         return Ok(response);
-    } else {
-        let h = from_hex(hash_input.clone())?;
-        let hash = Hash::new_from_proto(h.clone());
-        if let Ok(hash) = hash {
-            let maybe_tx_info = relay.ds.resolve_transaction_hash(&hash).await?;
-            if let Some(tx_info) = maybe_tx_info {
-                response.transaction_info = Some(tx_info);
-                return Ok(response)
-            }
+    }
+
+    // Then check transaction
+    let fallback = Hash::from_raw_hex_transaction(hash_input.clone()).ok();
+    let normal_proto_hex_hash = Hash::from_hex(hash_input.clone()).ok();
+    if let Some(hash) = normal_proto_hex_hash.or(fallback) {
+        let maybe_tx_info = relay.ds.resolve_transaction_hash(&hash).await?;
+        if let Some(tx_info) = maybe_tx_info {
+            response.transaction_info = Some(tx_info);
+            return Ok(response)
+        }
+        let r = relay.ds.observation.query_observation(&hash).await?;
+        if let Some(r) = r {
+            response.observation = Some(r.clone());
+            return Ok(response);
         }
     }
 
-    if let Some(pk) = PublicKey::from_hex(hash_input.clone()).ok() {
+
+    if let Some(pk) = PublicKey::from_hex(hash_input.clone()).ok().or(
+        PublicKey::from_hex_direct(hash_input.clone()).and_then(|a| a.validate().map(|_| a.clone())).ok()
+    ) {
         if pk.validate().is_ok() {
             if relay.node_config.public_key() == pk {
                 response.peer_node_info = Some(relay.peer_node_info().await?);
@@ -62,14 +63,6 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
                 return Ok(response);
             }
 
-        }
-    }
-
-    if let Some(h) = Hash::from_hex(hash_input.clone()).ok() {
-        let r = relay.ds.observation.query_observation(&h).await?;
-        if let Some(r) = r {
-            response.observation = Some(r.clone());
-            return Ok(response);
         }
     }
 

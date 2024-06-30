@@ -31,6 +31,14 @@ impl Hash {
         }
     }
 
+    // Don't use this unless you know what you're doing.
+    pub fn from_raw_hex_transaction(h: impl Into<String>) -> RgResult<Self> {
+        let bytes = from_hex(h.into())?;
+        let hash = Self::new_direct_transaction(&bytes);
+        hash.validate_size()?;
+        Ok(hash)
+    }
+
     pub fn validate_size(&self) -> Result<&Self, ErrorInfo> {
         let i = self.raw_bytes()?.len();
         // If switching to .vec() use 36

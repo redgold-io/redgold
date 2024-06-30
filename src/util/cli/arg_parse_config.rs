@@ -145,7 +145,9 @@ impl ArgTranslate {
         self.check_load_logger()?;
         self.determine_network()?;
         self.ports();
-        metrics_registry::register_metrics(self.node_config.port_offset);
+        if !self.node_config.disable_metrics {
+            metrics_registry::register_metrics(self.node_config.port_offset);
+        }
         self.data_folder()?;
         self.secure_data_folder();
         self.load_mnemonic().await?;

@@ -9,7 +9,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::node_config::NodeConfig;
-
+use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 // Use this for testing AMM transactions.
 
 pub fn amm_btc_address(network_environment: NetworkEnvironment) -> String {
@@ -166,14 +166,14 @@ pub fn dev_balance_check() {
 
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn send_test_btc_staking_tx() {
     let network = NetworkEnvironment::Dev;
     // let amount_sats = 40000;
 
     let nc = NodeConfig::default_env(network).await;
-    // let amm_addr = amm_public_key(&network).address().expect("address");
+    let amm_addr = amm_public_key(&network).address().expect("address");
     // let amount = 1.0;
 
     if let Some((privk, kp)) = dev_ci_kp() {
@@ -182,18 +182,29 @@ pub async fn send_test_btc_staking_tx() {
         println!("pk rdg address: {}", rdg_address.render_string().expect(""));
 
         let mut w =
-            SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true)
+            SingleKeyBitcoinWallet::new_wallet(pk.clone(), NetworkEnvironment::Dev, true)
                 .expect("w");
         let a = w.address().expect("a");
         println!("wallet address: {a}");
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
-        //
-        // let stake_tx = TransactionBuilder::new(&nc)
-        //     .with_external_stake_usd_bounds(None, None, )
-        //     .build().expect("build")
-        //     .sign(&kp).expect("sign");
+        // wallet balance: { immature: 0, trusted_pending: 0, untrusted_pending: 0, confirmed: 3818590 }
 
+        let btc_amt = CurrencyAmount::from_btc(50_000);
+
+        let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
+        let party_fee_amount = CurrencyAmount::from_rdg(100000);
+        let stake_tx = TransactionBuilder::new(&nc)
+            .with_input_address(&rdg_address)
+            .with_auto_utxos().await.expect("utxos")
+            .with_external_stake_usd_bounds(None, None, &rdg_address, &btc_address, &btc_amt, &amm_addr, &party_fee_amount)
+            .build()
+            .expect("build")
+            .sign(&kp)
+            .expect("sign");
+
+        let response = stake_tx.broadcast().await.expect("broadcast").json_or();
+        println!("response: {response}");
     }
 //     }
 // }
