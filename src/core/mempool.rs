@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use async_trait::async_trait;
 use flume::{SendError, TrySendError};
+use futures::FutureExt;
 use itertools::Itertools;
 use log::Level;
 use metrics::{counter, gauge};
@@ -99,11 +100,22 @@ pub struct MempoolEntry {
 #[async_trait]
 impl IntervalFold for Mempool {
     async fn interval_fold(&mut self) -> RgResult<()> {
+
+        // TODO: Construct mempool instance with this information already known
+        // dynamic query here is unnecessary overhead.
+        let genesis_hash = self.relay.ds.config_store.get_genesis().await?.map(|g| g.hash_or());
+
         let messages = self.relay.mempool.recv_while()?;
         gauge!("redgold_mempool_messages_recv").set(self.heap.len() as f64);
 
         let addrs = self.relay.node_config.seed_peer_addresses();
         for message in messages {
+            let m_hash = message.transaction.hash_or();
+            if let Some(h) = genesis_hash.as_ref() {
+                if h.eq(&m_hash) {
+                    continue;
+                }
+            }
             match self.verify_and_form_entry(&addrs, &message)
                 .await
                 .with_detail("transaction", message.transaction.json_or())
