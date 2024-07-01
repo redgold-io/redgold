@@ -308,7 +308,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
             let res = c.relay.submit_transaction(SubmitTransactionRequest {
                 transaction: Some(transaction.clone()),
                 sync_query_response: true
-            }).await;
+            }, None, None).await;
 
             match res {
                 Ok(response) => {

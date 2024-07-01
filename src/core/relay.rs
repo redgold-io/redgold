@@ -1005,23 +1005,14 @@ impl Relay {
         self.submit_transaction(SubmitTransactionRequest{
             transaction: Some(tx.clone()),
             sync_query_response: true,
-        }).await
-    }
-
-    pub async fn submit_transaction_with(
-        &self,
-        tx: &Transaction,
-        sync: bool,
-    ) -> Result<SubmitTransactionResponse, ErrorInfo> {
-        self.submit_transaction(SubmitTransactionRequest{
-            transaction: Some(tx.clone()),
-            sync_query_response: sync,
-        }).await
+        }, None, None).await
     }
 
     pub async fn submit_transaction(
         &self,
         tx_req: SubmitTransactionRequest,
+        origin: Option<PublicKey>,
+        origin_ip: Option<String>,
     ) -> Result<SubmitTransactionResponse, ErrorInfo> {
         let (s, r) = flume::bounded(1);
         let response_channel = if tx_req.sync_query_response {
@@ -1039,6 +1030,8 @@ impl Relay {
             .send(TransactionMessage {
                 transaction: tx.clone(),
                 response_channel,
+                origin,
+                origin_ip,
             })
             .await?;
 

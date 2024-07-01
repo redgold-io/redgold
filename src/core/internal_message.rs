@@ -76,6 +76,8 @@ impl PeerMessage {
 pub struct TransactionMessage {
     pub transaction: Transaction,
     pub response_channel: Option<flume::Sender<Response>>,
+    pub origin: Option<structs::PublicKey>,
+    pub origin_ip: Option<String>
 }
 use async_trait::async_trait;
 use flume::TryRecvError;

@@ -77,9 +77,10 @@ impl PeerRxEventHandler {
             }
         }
 
+
         // Handle the request
         // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone()).await
+        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone(), pm.socket_addr).await
             .map_err(|e| Response::from_error_info(e)).combine()
             .with_metadata(relay.node_metadata().await?)
             .with_auth(&relay.node_config.keypair())
@@ -108,8 +109,11 @@ impl PeerRxEventHandler {
     }
 
 
-    pub async fn request_response(relay: Relay, request: Request, verified: RgResult<PublicKey>
-                                  // , arc: Arc<Runtime>
+    pub async fn request_response(
+        relay: Relay,
+        request: Request,
+        verified: RgResult<PublicKey>,
+        origin_ip: Option<SocketAddr>
     ) -> RgResult<Response> {
 
 
@@ -230,7 +234,8 @@ impl PeerRxEventHandler {
 
         if let Some(s) = request.submit_transaction_request {
             // debug!("Received submit transaction request, sending to relay");
-            response.submit_transaction_response = Some(relay.submit_transaction(s).await?);
+            response.submit_transaction_response = Some(
+                relay.submit_transaction(s, verified.clone().ok(), origin_ip.map(|s| s.to_string())).await?);
         } // else
         // if let some(f) = request.fau
         if let Some(_) = request.get_peers_info_request {
@@ -250,7 +255,7 @@ impl PeerRxEventHandler {
                 relay.submit_transaction(SubmitTransactionRequest {
                     transaction: Some(t),
                     sync_query_response: false,
-                }).await?;
+                },verified.clone().ok(), origin_ip.map(|s| s.to_string())).await?;
             }
         }
         // TODO: Merge this into gossip transaction when process tx handles obs.

@@ -33,6 +33,8 @@ impl IntervalFold for DataDiscovery {
                                      TransactionMessage{
                                          transaction: tx,
                                          response_channel: None,
+                                         origin: Some(node.clone()),
+                                         origin_ip: None,
                                      }
                                 )?;
                             }

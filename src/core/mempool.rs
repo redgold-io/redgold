@@ -12,12 +12,14 @@ use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::pow::TransactionPowValidate;
 use redgold_schema::structs::{Address, QueryTransactionResponse, Response, SubmitTransactionResponse, Transaction};
 use redgold_schema::fee_validator::TransactionFeeValidator;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::util;
 
 pub struct Mempool {
@@ -102,9 +104,12 @@ impl IntervalFold for Mempool {
 
         let addrs = self.relay.node_config.seed_peer_addresses();
         for message in messages {
-
             match self.verify_and_form_entry(&addrs, &message)
                 .await
+                .with_detail("transaction", message.transaction.json_or())
+                .with_detail("public_key_origin", message.origin.json_or())
+                .with_detail("origin_ip", message.origin_ip.json_or())
+                .with_detail("transaction_hash", message.transaction.hash_hex())
                 .log_error()
                 .bubble_abort()? {
                 Err(e) => {
