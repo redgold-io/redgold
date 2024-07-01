@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof};
 use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
 use rand::Rng;
@@ -96,6 +96,14 @@ pub struct AddressBalance {
 }
 
 impl Transaction {
+
+    pub fn with_pow(mut self) -> RgResult<Self> {
+        let hash = self.signable_hash();
+        let proof = PoWProof::from_hash_sha3_256(&hash, 1)?;
+        let opts = self.options.as_mut().expect("");
+        opts.pow_proof = Some(proof);
+        Ok(self)
+    }
 
     pub fn signable_hash_or(&self) -> Hash {
         self.struct_metadata_opt_ref()

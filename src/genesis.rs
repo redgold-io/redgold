@@ -128,8 +128,10 @@ pub fn genesis_tx_from(distribution: Vec<GenesisDistribution>, network: &NodeCon
     for d in distribution {
         txb.with_output(&d.address, &d.amount);
     }
-    let x = txb.with_no_salt().with_time(Some(EARLIEST_TIME))
-        .transaction.with_hashes();
+    let x = txb
+        .with_no_salt()
+        .with_time(Some(EARLIEST_TIME))
+        .with_pow().expect("pow").transaction.clone();
     x.clone()
 }
 

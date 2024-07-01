@@ -122,6 +122,7 @@ impl IntervalFold for Mempool {
                 .with_detail("public_key_origin", message.origin.json_or())
                 .with_detail("origin_ip", message.origin_ip.json_or())
                 .with_detail("transaction_hash", message.transaction.hash_hex())
+                .with_detail("genesis?", genesis_hash.json_or())
                 .log_error()
                 .bubble_abort()? {
                 Err(e) => {

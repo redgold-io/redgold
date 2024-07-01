@@ -145,6 +145,14 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             Ok(api_data.relay.node_config.seeds_now())
         });
 
+    let genesis = warp::get()
+        .with_v1()
+        .and(warp::path("genesis"))
+        .with_relay_and_ip(r.clone())
+        .and_then_as(move |api_data: ApiData| async move {
+            api_data.relay.ds.config_store.get_genesis().await
+        });
+
     let transaction_get = warp::get()
         .with_v1()
         .and(warp::path("transaction"))
@@ -163,7 +171,9 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
     hello
         .or(table_sizes)
         .or(seeds)
+        .or(genesis)
         .or(transaction_get)
+
 }
 
 
