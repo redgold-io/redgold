@@ -138,6 +138,10 @@
               </div>
               <div v-for="(signer, index) in signer.nodes" :key="index">
                 <div class="grid-container">
+
+                  <div><strong>Node Name</strong></div>
+                  <div>{{ signer.node_name }}</div>
+
                   <div><strong>Node Public Key</strong></div>
                   <div><HashLink :data="signer.node_id" :shorten="false" /></div>
                   <div><strong>Signature</strong></div>
