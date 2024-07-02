@@ -231,6 +231,7 @@
         "structs.Input.product_id",
         "structs.CurrencyAmount.bytes",
         "structs.CurrencyAmount.currency",
+        "structs.CurrencyAmount.string_amount",
         "structs.Request.batch_transaction_resolve_request",
         "structs.Input.floating_utxo_id",
         "structs.TransportInfo.external_ipv6",
@@ -244,6 +245,7 @@
         "structs.TypedValue.double_value",
         "structs.TypedValue.bool_value",
         "structs.StandardData.amount",
+        "structs.StandardData.standard_response",
         "structs.StandardRequest.collateralized_loan",
         "structs.StandardData.observation",
         "structs.StandardData.bitcoin_address",
@@ -383,6 +385,7 @@
       "attr": "#[serde(skip_serializing_if = \"num_traits::identities::Zero::is_zero\", default)]",
       "paths": [
         "structs.Hash.hash_type",
+        "structs.Address.currency",
         "structs.BytesData.decoder",
         "structs.BytesData.version",
         "structs.StructMetadata.version",

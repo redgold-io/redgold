@@ -9,6 +9,7 @@ mod parquet_testing;
 mod debug_n3_observations;
 mod connection_refused_test;
 pub mod local_test_context;
+mod debug_genesis_issue;
 
 fn asdf() {
 
