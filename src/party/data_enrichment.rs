@@ -26,6 +26,11 @@ pub struct PartyInternalData {
 }
 
 impl PartyInternalData {
+
+    pub fn clear_sensitive(&mut self) -> &mut Self {
+        self.party_info.clear_sensitive();
+        self
+    }
     pub fn to_party_data(&self) -> PartyData {
         PartyData {
             json_party_internal_data: Some(self.json_or())

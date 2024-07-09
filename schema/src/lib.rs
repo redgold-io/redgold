@@ -677,12 +677,17 @@ impl StructMetadata {
 
 pub trait ShortString {
     fn short_string(&self) -> Result<String, ErrorInfo>;
+    fn last_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo>;
 }
 
 impl ShortString for String {
     fn short_string(&self) -> Result<String, ErrorInfo> {
+        self.last_n(6)
+    }
+
+    fn last_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo> {
         let len = self.len();
-        let start = (len as i32) - 6;
+        let start = (len as i32) - n.into();
         if start < 0 {
             return Err(error_info("string too short to short_string"));
         }

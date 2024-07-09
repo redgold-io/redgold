@@ -111,3 +111,9 @@ pub async fn send_message(
 
     Ok(())
 }
+
+#[ignore]
+#[tokio::test]
+async fn debug_send() {
+    email_default("test", "test").await.expect("Failed to send email");
+}

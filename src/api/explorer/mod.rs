@@ -37,6 +37,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
 use redgold_schema::structs::PartyInfoAbridged;
 use crate::party::central_price::CentralPricePair;
+use crate::party::data_enrichment::PartyInternalData;
 use crate::party::price_volume::PriceVolume;
 // use crate::party::bid_ask::BidAsk;
 
@@ -146,6 +147,7 @@ pub struct AddressPoolInfo {
     bids_usd: HashMap<String, Vec<PriceVolume>>,
     asks_usd: HashMap<String, Vec<PriceVolume>>,
     central_prices: HashMap<String, CentralPricePair>,
+    events: PartyInternalData
 }
 
 #[derive(Serialize, Deserialize)]
@@ -310,6 +312,9 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 (format!("{:?}", k), v.asks_usd().clone())
             }).collect::<HashMap<String, Vec<PriceVolume>>>();
 
+            let mut d = d.clone();
+            let events = d.clear_sensitive().clone();
+
             return Ok(Some(AddressPoolInfo {
                 public_key,
                 addresses,
@@ -319,6 +324,7 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 bids_usd,
                 asks_usd,
                 central_prices,
+                events
             }))
         };
 

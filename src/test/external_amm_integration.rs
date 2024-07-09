@@ -23,7 +23,7 @@ pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
     let pk_hex = match network_environment {
         // NetworkEnvironment::Main => {}
         // NetworkEnvironment::Test => {}
-        NetworkEnvironment::Dev => {"0a230a2102747b692f95b12029a48326136d0378fee5ddd29c7a25228722842fbc51c33fd4"}
+        NetworkEnvironment::Dev => {"0a230a210266f48bc55acec1647168d40fe827359f9b1f8ca457a0c6b111a1881f84aaea46"}
         // NetworkEnvironment::Staging => {"02efbe0b97d823da74ef2d88b2321d4e52ce2f62b137b0b5c5b415be9e40a9ca15"}
         _ => { panic!("not implemented"); }
     };
@@ -189,7 +189,7 @@ pub async fn send_test_btc_staking_tx() {
         let b = w.get_wallet_balance().expect("balance");
         println!("wallet balance: {b}");
         // wallet balance: { immature: 0, trusted_pending: 0, untrusted_pending: 0, confirmed: 3818590 }
-
+        //
         let btc_amt = CurrencyAmount::from_btc(50_000);
 
         let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");

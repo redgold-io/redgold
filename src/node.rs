@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{bytes_data, error_info, ErrorInfoContext, RgResult, SafeOption, ShortString, structs};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
@@ -416,6 +416,15 @@ impl Node {
         trace!("Node ready");
         counter!("redgold.node.node_started").increment(1);
 
+        // gauge!("redgold.node.node_started").set(1.0);
+        let gen_tx = relay.ds.config_store.get_genesis()
+            .await.expect("Genesis query fail").expect("genesis hash missing")
+            .hash_hex()
+            .short_string()
+            .expect("genesis hash short string");
+        let id = relay.node_config.gauge_id().to_vec();
+        let labels = [("genesis_hash".to_string(), gen_tx), id.get(0).cloned().expect("id")];
+        gauge!("redgold.node.genesis_hash", &labels).set(1.0);
         return Ok(node);
     }
 
