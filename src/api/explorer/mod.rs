@@ -395,8 +395,7 @@ fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
                 }.to_string();
                 let party_key = p0.party_info.party_key.clone().expect("k");
                 let party_address = party_key.address().expect("address");
-                let inc = i.tx.inputs_match_pk_address(
-                    &party_address);
+                let inc = !i.tx.inputs_match_pk_address(&party_address);
                 de.incoming = format!("{}", inc);
                 de.amount = {
                     if inc {
