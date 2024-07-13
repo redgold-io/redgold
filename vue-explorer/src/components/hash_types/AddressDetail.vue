@@ -119,6 +119,10 @@
               <span v-if="calculatorTransactionType === 'SELL'">BTC</span>
             </div>
 
+
+<!--            show events-->
+
+
           </div>
 
 
@@ -155,6 +159,12 @@
 
             </ul>
           </nav>
+
+
+          <div v-if="hashData.address_pool_info" >
+            <h3 class="detail-group">AMM Events</h3>
+          </div>
+
 
         </div>
       </div>

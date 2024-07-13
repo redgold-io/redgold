@@ -29,6 +29,7 @@ use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
+use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::api::faucet::faucet_request;
@@ -36,6 +37,7 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
 use redgold_schema::structs::PartyInfoAbridged;
+use crate::party::address_event::AddressEvent;
 use crate::party::central_price::CentralPricePair;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::price_volume::PriceVolume;
@@ -136,6 +138,31 @@ pub struct DetailedTransaction {
 }
 
 
+
+
+#[derive(Serialize, Deserialize, EnumString)]
+enum AddressEventType {
+    Internal, External
+}
+
+
+#[derive(Serialize, Deserialize, EnumString)]
+enum AddressEventExtendedType {
+    StakeDeposit, StakeWithdrawal, Swap
+}
+
+
+#[derive(Serialize, Deserialize)]
+pub struct DetailedEvents {
+    event_type: String,
+    extended_type: String,
+    other_address: String,
+    network: String,
+    amount: f64,
+    tx_hash: String,
+    incoming: String
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct AddressPoolInfo {
     public_key: String,
@@ -147,7 +174,8 @@ pub struct AddressPoolInfo {
     bids_usd: HashMap<String, Vec<PriceVolume>>,
     asks_usd: HashMap<String, Vec<PriceVolume>>,
     central_prices: HashMap<String, CentralPricePair>,
-    events: PartyInternalData
+    events: PartyInternalData,
+    detailed_events: Vec<DetailedEvents>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -324,13 +352,75 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 bids_usd,
                 asks_usd,
                 central_prices,
-                events
+                events: events.clone(),
+                detailed_events: convert_events(events)?,
             }))
         };
 
 
     }
     Ok(None)
+}
+
+fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
+    let mut res = vec![];
+    for x in p0.address_events {
+        let mut de = DetailedEvents {
+            event_type: "".to_string(),
+            extended_type: "".to_string(),
+            network: "".to_string(),
+            amount: 0.0,
+            tx_hash: "".to_string(),
+            other_address: "".to_string(),
+            incoming: "".to_string(),
+        };
+        match x {
+            AddressEvent::External(ett) => {
+                de.event_type = "External".to_string();
+                de.network = format!("{:?}", ett.currency);
+                de.amount = ett.currency_amount().to_fractional();
+                de.tx_hash = ett.tx_id;
+                de.other_address = ett.other_address;
+            }
+            AddressEvent::Internal(i) => {
+                de.event_type = "Internal".to_string();
+                de.extended_type = {
+                    if i.tx.is_swap() {
+                        "Swap"
+                    } else if i.tx.is_stake() {
+                        "Stake"
+                    } else {
+                        "Unknown"
+                    }
+                }.to_string();
+                let party_key = p0.party_info.party_key.clone().expect("k");
+                let party_address = party_key.address().expect("address");
+                let inc = i.tx.inputs_match_pk_address(
+                    &party_address);
+                de.incoming = format!("{}", inc);
+                de.amount = {
+                    if inc {
+                        i.tx.output_rdg_amount_of_pk(&party_key).map(|a| a.to_fractional())
+                            .unwrap_or(0f64)
+                    } else {
+                        i.tx.output_rdg_amount_of_exclude_pk(&party_key).map(|a| a.to_fractional())
+                            .unwrap_or(0f64)
+                    }
+                };
+                de.other_address = {
+                    if inc {
+                        i.tx.first_input_address()
+                    } else {
+                        i.tx.first_output_address_non_input_or_fee()
+                    }
+                }.and_then(|a| a.render_string().ok()).unwrap_or("".to_string());
+                de.tx_hash = i.tx.hash_or().hex();
+                de.network = "Redgold".to_string();
+            }
+        };
+        res.push(de);
+    };
+    Ok(res)
 }
 
 pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>, offset: Option<i64>) -> RgResult<DetailedAddress> {
