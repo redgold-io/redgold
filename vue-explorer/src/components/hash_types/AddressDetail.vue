@@ -163,6 +163,10 @@
 
           <div v-if="hashData.address_pool_info" >
             <h3 class="detail-group">AMM Events</h3>
+            <div v-if="hashData.address_pool_info.detailed_events">
+              <div><DetailedEvent :events="hashData.address_pool_info.detailed_events" /></div>
+
+            </div>
           </div>
 
 
@@ -196,6 +200,7 @@ import {   Title,
 import { Bar } from 'vue-chartjs';
 import TextCopy from "@/components/util/TextCopy.vue";
 import HashLink from "@/components/util/HashLink.vue";
+import DetailedEvent from "@/components/DetailedEvent.vue";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 // ChartJS.defaults.global.defaultFontColor = '#FFFFFF';
@@ -204,6 +209,7 @@ export default {
   name: 'TransactionDetail',
   props: ['hashDataInitial'],
   components: {
+    DetailedEvent,
     HashLink,
     TextCopy,
     BriefTransaction,

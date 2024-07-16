@@ -104,7 +104,7 @@ export default {
           let data = response.data;
           this.data.data = data;
           console.log(data); // log the response data
-          this.transactions = data['recent_transactions'];
+          this.events = data['recent_transactions'];
           this.peers = data['active_peers_abridged'];
           this.observations = data['recent_observations'];
         })
