@@ -194,17 +194,21 @@ pub async fn send_test_btc_staking_tx() {
 
         let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
-        let stake_tx = TransactionBuilder::new(&nc)
-            .with_input_address(&rdg_address)
-            .with_auto_utxos().await.expect("utxos")
-            .with_external_stake_usd_bounds(None, None, &rdg_address, &btc_address, &btc_amt, &amm_addr, &party_fee_amount)
-            .build()
-            .expect("build")
-            .sign(&kp)
-            .expect("sign");
-
-        let response = stake_tx.broadcast().await.expect("broadcast").json_or();
-        println!("response: {response}");
+        // let stake_tx = TransactionBuilder::new(&nc)
+        //     .with_input_address(&rdg_address)
+        //     .with_auto_utxos().await.expect("utxos")
+        //     .with_external_stake_usd_bounds(None, None, &rdg_address, &btc_address, &btc_amt, &amm_addr, &party_fee_amount)
+        //     .build()
+        //     .expect("build")
+        //     .sign(&kp)
+        //     .expect("sign");
+        // let response = stake_tx.broadcast().await.expect("broadcast").json_or();
+        // println!("response: {response}");
+        //
+        //
+        w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
+        
+        
     }
 //     }
 // }
