@@ -34,3 +34,9 @@ async-process = "2.1.0"
 flume = "0.11.0"
 serde = { version = "1.0.197", features = ["derive"] }
 octocrab = "0.34.3"
+
+# LLMs
+# this out appears out of date, but it exists?
+allms = "0.7.5"
+# this one appears recent.
+llmclient = "0.3.0"

@@ -14,7 +14,7 @@ use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 
 pub fn amm_btc_address(network_environment: NetworkEnvironment) -> String {
     match network_environment {
-        NetworkEnvironment::Dev => { "tb1qyxzxhpdkfdd9f2tpaxehq7hc4522f343tzgvt2" }
+        NetworkEnvironment::Dev => { "tb1q4zkz4qlkdkwhwry88a4pk82plcp5fnzmh2y53w" }
         NetworkEnvironment::Staging => { "tb1qftm7w70xmr7xplzp6w6ntxs4dygxtd2evc7x2e" }
         _ => { panic!("not implemented"); }
     }.to_string()
@@ -191,7 +191,6 @@ pub async fn send_test_btc_staking_tx() {
         // wallet balance: { immature: 0, trusted_pending: 0, untrusted_pending: 0, confirmed: 3818590 }
         //
         let btc_amt = CurrencyAmount::from_btc(50_000);
-
         let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
         // let stake_tx = TransactionBuilder::new(&nc)
@@ -206,8 +205,8 @@ pub async fn send_test_btc_staking_tx() {
         // println!("response: {response}");
         //
         //
-        w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
-        
+        let res = w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
+        println!("txid: {res}");
         
     }
 //     }

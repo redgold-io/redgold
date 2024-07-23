@@ -21,10 +21,13 @@ export default {
       type: Boolean,
       default: true
     },
-
     useLink: {
       type: Boolean,
       default: true
+    },
+    useExternalLink: {
+      type: Boolean,
+      default: false
     },
     link: {
       type: String,
@@ -44,16 +47,17 @@ export default {
         let url = "explorer.redgold.io"
         const hostname = window.location.hostname;
         let main = hostname === url
-
-        if (hashValue.startsWith('0x')) {
-          let urlType = this.isAddress ? "address" : "tx"
-          let prefix = main ? "" : "sepolia."
-          return `https://${prefix}etherscan.io/${urlType}/${hashValue}`;
-        }
-        if (hashValue.startsWith('tb') || hashValue.startsWith('bc')) {
-          let urlType = this.isAddress ? "address" : "tx"
-          let prefix = main ? "" : "testnet/"
-          return `https://blockstream.info/${prefix}${urlType}/${hashValue}`;
+        if (this.useExternalLink) {
+          if (hashValue.startsWith('0x')) {
+            let urlType = this.isAddress ? "address" : "tx"
+            let prefix = main ? "" : "sepolia."
+            return `https://${prefix}etherscan.io/${urlType}/${hashValue}`;
+          }
+          if (hashValue.startsWith('tb') || hashValue.startsWith('bc')) {
+            let urlType = this.isAddress ? "address" : "tx"
+            let prefix = main ? "" : "testnet/"
+            return `https://blockstream.info/${prefix}${urlType}/${hashValue}`;
+          }
         }
         return `/hash/${hashValue}`;
       }
@@ -82,15 +86,6 @@ export default {
     }
   },
   methods: {
-    copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        // Success feedback here
-        console.log('Copying to clipboard was successful!');
-      }, (err) => {
-        // Error feedback here
-        console.error('Could not copy text: ', err);
-      });
-    }
   }
 }
 </script>
