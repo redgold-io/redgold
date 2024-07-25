@@ -174,7 +174,7 @@ impl ArgTranslate {
 
         tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
         tracing::info!("Parsed args successfully with args: {:?}", self.args);
-        tracing::info!("RgArgs options parsed: {:?}", self.opts);
+        tracing::info!("RgArgs options parsed: {:?}", self.opts.clear_sensitive());
         // info!("Development mode: {}", self.opts.development_mode);
 
         Ok(())

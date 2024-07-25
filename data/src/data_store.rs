@@ -421,6 +421,9 @@ WHERE
          */
         let pool = SqlitePool::connect_with(options)
             .await
+            .error_info("Connection failure")
+            .with_detail("path", path.clone())
+            .with_detail("original_path", original_path.clone())
             .expect("Connection failure");
         // info!("Opened pool");
         let pl = Arc::new(pool);

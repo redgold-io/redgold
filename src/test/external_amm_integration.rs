@@ -205,8 +205,21 @@ pub async fn send_test_btc_staking_tx() {
         // println!("response: {response}");
         //
         //
-        let res = w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
-        println!("txid: {res}");
+        // let res = w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
+        // println!("txid: {res}");
+        let internal_stake_amount = CurrencyAmount::from_rdg(10);
+
+        let internal_stake_tx = TransactionBuilder::new(&nc)
+            .with_input_address(&rdg_address)
+            .with_auto_utxos().await.expect("utxos")
+            .with_internal_stake_usd_bounds(
+                None, None, &rdg_address, &amm_addr, &internal_stake_amount,
+            )
+            .build()
+            .expect("build")
+            .sign(&kp)
+            .expect("sign");
+
         
     }
 //     }

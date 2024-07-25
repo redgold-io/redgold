@@ -118,6 +118,16 @@ pub struct RgArgs {
     pub enable_party_mode: bool,
 }
 
+impl RgArgs {
+    pub(crate) fn clear_sensitive(&self) -> Self {
+        let mut c = self.clone();
+        c.words = None;
+        c.aws_access_key_id = None;
+        c.aws_secret_access_key = None;
+        c
+    }
+}
+
 impl Default for RgArgs {
     fn default() -> RgArgs {
         empty_args()

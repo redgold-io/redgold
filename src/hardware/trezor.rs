@@ -16,7 +16,7 @@ use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Inpu
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::node_config::NodeConfig;
-use redgold_schema::util::cmd::run_cmd;
+use redgold_schema::util::cmd::{run_cmd, run_cmd_safe};
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use crate::util::init_logger_once;
 
@@ -25,7 +25,7 @@ const TREZORCTL: &str = "trezorctl";
 
 pub fn trezor_cmd(args: Vec<&str>) -> Result<String, ErrorInfo> {
     // tracing::debug!("Running trezor cmd with args {:?}", args.clone());
-    let res = run_cmd(TREZORCTL, args);
+    let res = run_cmd_safe(TREZORCTL, args)?;
     // tracing::debug!("Trezor command raw output: {:?}", res.clone());
     if res.0.contains(MISSING_DEVICE) {
         Err(error_info("Failed to find a Trezor device".to_string()))?;
