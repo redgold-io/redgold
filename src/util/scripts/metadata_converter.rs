@@ -12,12 +12,26 @@ use crate::infra::deploy::derive_mnemonic_and_peer_id;
 async fn metadata_converter() {
     let r = Relay::dev_default().await;
     let df = r.node_config.secure_data_folder.clone().expect("secure");
+    println!("{}", df.path.to_str().expect("path"));
     let all = df.all();
-    let dat = tokio::fs::read_to_string(all.path.join("metadata.json")).await.expect("metadata");
+    let all_p = all.path.join("metadata.json");
+    println!("{}", all_p.to_str().expect("path"));
+    let dat = tokio::fs::read_to_string(all_p).await.expect("metadata");
     let m = dat.json_from::<WordsPassMetadata>().expect("metadata");
 
-    for w in m.rdg_btc_message_account_metadata {
-        println!("{}", w.account);
-        println!("{}", w.rdg_address);
+    println!("name,derivation_path,xpub");
+
+    for w in m.rdg_btc_message_account_metadata.clone() {
+        if w.account >= 50 && w.account < 60 {
+            println!("gen_{},{},{}", w.account, w.derivation_path, w.xpub);
+        }
     }
+
+    for w in m.rdg_btc_message_account_metadata.iter().rev() {
+        if w.account >= 90 && w.account < 100 {
+            let inv = 100 - w.account;
+            println!("peer_{}_{},{},{}", w.account, inv, w.derivation_path, w.xpub);
+        }
+    }
+
 }
