@@ -22,27 +22,15 @@ pub trait ProofSupport {
     ) -> Result<(), ErrorInfo>;
     fn public_key(&self) -> RgResult<structs::PublicKey>;
     fn proofs_to_addresses(proofs: &Vec<Proof>) -> RgResult<Vec<Address>>;
+    fn verify_inner(&self, hash: &Hash) -> RgResult<()>;
 }
 
 impl ProofSupport for Proof {
     fn verify(&self, hash: &Hash) -> RgResult<()> {
-        let sig = self.signature.safe_get()?;
-        let verify_hash = match sig.signature_type {
-            // SignatureType::Ecdsa
-            0 => {
-                hash.raw_bytes()?
-            }
-            // SignatureType::EcdsaBitcoinSignMessageHardware
-            1 => {
-                util::bitcoin_message_signer::prepare_message_sign(hex::encode(hash.raw_bytes()?))
-            }
-            _ => {
-                return Err(error_info(
-                    "Invalid signature type",
-                ));
-            }
-        };
-        return util::verify(&verify_hash, &self.signature_bytes()?, &self.public_key_direct_bytes()?);
+        self.verify_inner(&hash)
+            .with_detail("hash", &hash.json_or())
+            .with_detail("public_key", &self.public_key.json_or())
+            .with_detail("signature", &self.signature.json_or())
     }
     fn new(hash: &Hash, secret: &SecretKey, public: &PublicKey) -> Proof {
         let signature = util::sign_hash(&hash, &secret).expect("signature works");
@@ -51,7 +39,6 @@ impl ProofSupport for Proof {
             public_key: public_key_ser(public),
         };
     }
-
     fn from_keypair(hash: &Vec<u8>, keypair: KeyPair) -> Proof {
         let secret = &keypair.secret_key;
         let public = &keypair.public_key;
@@ -120,7 +107,28 @@ impl ProofSupport for Proof {
         }
     }
 
+    fn verify_inner(&self, hash: &Hash) -> RgResult<()> {
+        let sig = self.signature.safe_get()?;
+        let verify_hash = match sig.signature_type {
+            // SignatureType::Ecdsa
+            0 => {
+                hash.raw_bytes()?
+            }
+            // SignatureType::EcdsaBitcoinSignMessageHardware
+            1 => {
+                util::bitcoin_message_signer::prepare_message_sign_hash(&hash)
+            }
+            _ => {
+                return Err(error_info(
+                    "Invalid signature type",
+                ));
+            }
+        };
+        return util::verify(&verify_hash, &self.signature_bytes()?, &self.public_key_direct_bytes()?);
+    }
+
 }
+
 
 
 #[test]

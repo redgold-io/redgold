@@ -157,6 +157,7 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: b
                                 t.clone(),
                                 ls.wallet_state.updates.sender.clone(),
                                 pk.clone().clone(),
+                                ls.keytab_state.derivation_path_xpub_input_account.derivation_path()
                             );
                             ls.wallet_state.signing_flow_status = Some("Awaiting hardware response...".to_string());
                         } else {
