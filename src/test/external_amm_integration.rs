@@ -1,4 +1,5 @@
-use redgold_keys::address_external::ToBitcoinAddress;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
@@ -173,7 +174,9 @@ pub async fn send_test_btc_staking_tx() {
     // let amount_sats = 40000;
 
     let nc = NodeConfig::default_env(network).await;
-    let amm_addr = amm_public_key(&network).address().expect("address");
+    let amm_rdg_address = amm_public_key(&network).address().expect("address");
+    let amm_eth_address = amm_public_key(&network).to_ethereum_address_typed().expect("address");
+    let amm_btc_pk_address = amm_public_key(&network).to_bitcoin_address_typed(&network).expect("address");
     // let amount = 1.0;
 
     if let Some((privk, kp)) = dev_ci_kp() {
@@ -207,20 +210,53 @@ pub async fn send_test_btc_staking_tx() {
         //
         // let res = w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
         // println!("txid: {res}");
-        let internal_stake_amount = CurrencyAmount::from_rdg(10);
+        // let internal_stake_amount = CurrencyAmount::from_fractional(100).expect("works");
+        //
+        // let internal_stake_tx = TransactionBuilder::new(&nc)
+        //     .with_input_address(&rdg_address)
+        //     .with_auto_utxos().await.expect("utxos")
+        //     .with_internal_stake_usd_bounds(
+        //         None, None, &rdg_address, &amm_addr, &internal_stake_amount,
+        //     )
+        //     .build()
+        //     .expect("build")
+        //     .sign(&kp)
+        //     .expect("sign");
+        // let response = internal_stake_tx.broadcast().await.expect("broadcast").json_or();
+        // println!("response: {response}");
+        //
 
-        let internal_stake_tx = TransactionBuilder::new(&nc)
-            .with_input_address(&rdg_address)
-            .with_auto_utxos().await.expect("utxos")
-            .with_internal_stake_usd_bounds(
-                None, None, &rdg_address, &amm_addr, &internal_stake_amount,
-            )
-            .build()
-            .expect("build")
-            .sign(&kp)
-            .expect("sign");
 
-        
+        let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
+        let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
+        let party_fee_amount = CurrencyAmount::from_rdg(100000);
+        //
+        // let stake_tx = TransactionBuilder::new(&nc)
+        //     .with_input_address(&rdg_address)
+        //     .with_auto_utxos().await.expect("utxos")
+        //     .with_external_stake_usd_bounds(
+        //         None, None, &rdg_address, &dev_ci_eth_addr, &exact_eth_stake_amount, &amm_rdg_address, &party_fee_amount
+        //     )
+        //     .build()
+        //     .expect("build")
+        //     .sign(&kp)
+        //     .expect("sign");
+        // let response = stake_tx.broadcast().await.expect("broadcast").json_or();
+        // println!("response: {response}");
+        // info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
+        // info!("tx_stake tx: {}", tx_stake.json_or());
+        //
+        // let eth_submit = EthWalletWrapper::new(&privk, &network).expect("works");
+        // let res = eth_submit.send(&amm_eth_address, &exact_eth_stake_amount).await.expect("works");
+        // println!("eth tx: {res}");
+
+        // test btc swap
+
+        let btc_swap_amt = CurrencyAmount::from_btc(10_000);
+        let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 10_000, privk).expect("send");
+        println!("txid: {res}");
+
+
     }
 //     }
 // }

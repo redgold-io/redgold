@@ -29,6 +29,14 @@ export default {
       type: Boolean,
       default: false
     },
+    bitcoinExternalLink: {
+      type: Boolean,
+      default: false
+    },
+    ethereumExternalLink: {
+      type: Boolean,
+      default: false
+    },
     link: {
       type: String,
       default: ''
@@ -48,12 +56,12 @@ export default {
         const hostname = window.location.hostname;
         let main = hostname === url
         if (this.useExternalLink) {
-          if (hashValue.startsWith('0x')) {
-            let urlType = this.isAddress ? "address" : "tx"
+          if (hashValue.startsWith('0x') || this.ethereumExternalLink) {
+            let urlType = this.isAddress ? "address/" : "tx/0x"
             let prefix = main ? "" : "sepolia."
-            return `https://${prefix}etherscan.io/${urlType}/${hashValue}`;
+            return `https://${prefix}etherscan.io/${urlType}${hashValue}`;
           }
-          if (hashValue.startsWith('tb') || hashValue.startsWith('bc')) {
+          if (hashValue.startsWith('tb') || hashValue.startsWith('bc') || this.bitcoinExternalLink) {
             let urlType = this.isAddress ? "address" : "tx"
             let prefix = main ? "" : "testnet/"
             return `https://blockstream.info/${prefix}${urlType}/${hashValue}`;

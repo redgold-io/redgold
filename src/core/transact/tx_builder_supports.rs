@@ -529,7 +529,8 @@ impl TransactionBuilder {
 
         self.with_pow()?;
 
-        self.transaction.validate_schema(self.network.as_ref(), false)?;
+        self.transaction.validate_schema(self.network.as_ref(), false)
+            .with_detail("tx", self.transaction.json_or())?;
         let transaction = self.transaction.clone();
         Ok(transaction)
         // self.balance
