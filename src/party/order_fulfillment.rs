@@ -126,9 +126,12 @@ impl PartyWatcher {
         let mut tb = TransactionBuilder::new(&self.relay.node_config);
         tb.with_utxos(&utxos)?;
 
-        for o in ps.orders().iter()
+        let orig_orders = ps.orders();
+        let orders = orig_orders.iter()
             .filter(|e| e.event_time < cutoff_time)
-            .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold) {
+            .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold)
+            .collect_vec();
+        for o in orders.clone() {
             tb.with_output(&o.destination, &o.fulfilled_currency_amount());
             if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
                 tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
@@ -140,7 +143,7 @@ impl PartyWatcher {
         if tb.transaction.outputs.len() > 0 {
             let tx = tb.build()?;
             ps.validate_rdg_swap_fulfillment_transaction(&tx)?;
-            info!("Sending RDG fulfillment transaction: {}", tx.json_or());
+            info!("Sending RDG fulfillment transaction: {} with party_events: {} and orders {}", tx.json_or(), ps.json_or(), orders.json_or());
             self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
             info!("Sent RDG fulfillment transaction: {}", tx.json_or());
         }
