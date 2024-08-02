@@ -167,7 +167,7 @@ pub fn dev_balance_check() {
 
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn send_test_btc_staking_tx() {
     let network = NetworkEnvironment::Dev;
@@ -252,8 +252,8 @@ pub async fn send_test_btc_staking_tx() {
 
         // test btc swap
 
-        let btc_swap_amt = CurrencyAmount::from_btc(10_000);
-        let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 10_000, privk).expect("send");
+        let btc_swap_amt = CurrencyAmount::from_btc(10_001);
+        let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 10_001, privk).expect("send");
         println!("txid: {res}");
 
 

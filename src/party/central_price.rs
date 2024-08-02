@@ -99,37 +99,53 @@ impl CentralPricePair {
     ) -> Option<OrderFulfillment> {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
-        let mut updated_curve = if is_ask {
-            // Asks are ordered in increasing amount(USD), denominated in BTC/RDG
-            // now changed to RDG/BTC
+        let mut pv_curve = if is_ask {
+            // Asks are ordered in increasing amount(USD), denominated in RDG/PAIR
             self.asks()
         } else {
-            // Bids are ordered in decreasing amount(USD), denominated in RDG/BTC
+            // Bids are ordered in decreasing amount(USD), denominated in RDG/PAIR
             self.bids()
         };
 
-        for pv in updated_curve.iter_mut() {
+        for pv in pv_curve.iter_mut() {
+            // This price is always in RDG/PAIR
+            let price_rdg_pair = pv.price;
+            // This volume is RDG if ask, PAIR if bid
+            let this_volume = pv.volume;
 
+            // This is the total amount of the other currency we're swapping for that remains
+            // to fulfill
             let other_amount_requested = if is_ask {
-                // Comments left here for clarity even if code is the same
-                let price = pv.price;
-                // RDG / BTC now
-                // BTC * (RDG / BTC) = RDG
-                remaining_order_amount as f64 * price
+                // If we're fulfilling an ask, we're giving RDG in exchange for receiving PAIR
+                // RDG / PAIR now
+                // PAIR * (RDG / PAIR) = RDG
+                remaining_order_amount as f64 * price_rdg_pair
             } else {
-                // RDG / RDG/BTC = BTC
-                remaining_order_amount as f64 / pv.price
+                // If we're fulfilling an bid, we're giving PAIR in exchange for receiving RDG
+                // RDG / RDG/PAIR = PAIR
+                remaining_order_amount as f64 / price_rdg_pair
             } as u64;
 
-            let this_vol = pv.volume;
-            if other_amount_requested >= this_vol {
+            // We need to use multiple price volume buckets to fulfill this order.
+            if other_amount_requested >= this_volume {
                 // We have more Other than this ask can fulfill, so we take it all and move on.
-                fulfilled_amount += this_vol;
-                remaining_order_amount -= (this_vol as f64 * pv.price) as u64;
-                pv.volume = 0;
+                fulfilled_amount += this_volume;
+                let this_remove_from_order = if is_ask {
+                    // If ask, this_volume is of unit RDG / (RDG/PAIR) = PAIR
+                    this_volume as f64 / price_rdg_pair
+                } else {
+                    // RDG / RDG/PAIR = PAIR
+                    this_volume as f64 * pv.price
+                } as u64;
+                // This is to catch float rounding issues
+                if this_remove_from_order > remaining_order_amount {
+                    break
+                } else {
+                    remaining_order_amount -= this_remove_from_order;
+                    // Continue iterating to more price volume buckets.
+                }
             } else {
                 // We have less Other than this ask can fulfill, so we take it and stop
-                pv.volume -= other_amount_requested;
                 remaining_order_amount = 0;
                 fulfilled_amount += other_amount_requested;
                 break
@@ -261,8 +277,8 @@ fn debug_calculate_sample_prices() {
             (SupportedCurrency::Ethereum, 3000.0),
         ].iter().cloned().collect(),
         [
-            (SupportedCurrency::Redgold, CurrencyAmount::from_fractional(10.0).expect("")),
-            (SupportedCurrency::Bitcoin, CurrencyAmount::from_btc(100_000)),
+            (SupportedCurrency::Redgold, CurrencyAmount::from_fractional(100.0).expect("")),
+            (SupportedCurrency::Bitcoin, CurrencyAmount::from_btc(50_000)),
             (SupportedCurrency::Ethereum, CurrencyAmount::from_eth_bigint_string("055551508594791676")),
         ].iter().cloned().collect(),
         1000,
@@ -281,4 +297,12 @@ fn debug_calculate_sample_prices() {
         println!("bids: {:?}", v.bids());
         println!("bids_usd: {:?}", v.bids_usd());
     }
+
+    let bpp = cpp.get(&SupportedCurrency::Bitcoin).unwrap();
+    let f = bpp.fulfill_taker_order(
+        10_000, false, 1000, None, &Address::default()
+    ).unwrap();
+    let fra = f.fulfilled_currency_amount().to_fractional();
+    println!("Fulfillment: {}", f.json_pretty_or());
+    println!("Fulfillment amount: {}", fra);
 }

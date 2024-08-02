@@ -23,11 +23,13 @@ use redgold_schema::output::output_data;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::seeds::get_seeds_by_env_time;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, ObservationProof, PublicKey, SupportedCurrency, Transaction, UtxoId};
+use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
 // use crate::multiparty_gg20::watcher::{get_btc_per_rdg_starting_min_ask, OrderFulfillment};
 use crate::party::address_event::AddressEvent;
 use crate::party::address_event::AddressEvent::External;
 use crate::party::central_price::CentralPricePair;
+use crate::party::data_enrichment::PartyInternalData;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::price_query::PriceDataPointUsdQuery;
 use crate::party::stake_event_stream::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
@@ -766,33 +768,51 @@ async fn debug_events2() -> RgResult<()> {
 
     let relay = Relay::dev_default().await;
     relay.ds.run_migrations().await?;
+
+    let res = relay.ds.multiparty_store.all_party_info_with_key().await?;
+    let pi = res.get(0).expect("head");
+
+    let key = pi.party_key.clone().expect("key");
+    let data = relay.ds.multiparty_store.party_data(&key).await.expect("data")
+        .and_then(|pd| pd.json_party_internal_data)
+        .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
+
+    let pev = data.party_events.clone().expect("v");
+
+    // pev.json_pretty_or().print();
     // not this
-    let pk_hex = "024cfc97a479af32fcb9d7b59c0e1273832817bf0bb264227e56e449d1a6b30e8e";
-    let pk_address = PublicKey::from_hex_direct(pk_hex).expect("pk");
 
-    let eth_addr = "0x7D464545F9E9E667bbb1A907121bccb49Dc39160".to_string();
-    let eth = EthHistoricalClient::new(&NetworkEnvironment::Dev).expect("").expect("");
-    let tx = eth.get_all_tx(&eth_addr, None).await.expect("");
+    let cent = pev.central_prices.get(&SupportedCurrency::Bitcoin).expect("redgold");
 
-    let mut events = vec![];
-    for e in &tx {
-        events.push(External(e.clone()));
-    };
-
-    let mut pq = PriceDataPointUsdQuery::new();
-    pq.enrich_address_events(&mut events, &relay.ds).await.expect("works");
-
-    let mut pe = PartyEvents::new(&pk_address, &NetworkEnvironment::Dev, &relay);
-
-
-    for e in &events {
-
-        pe.process_event(e).await?;
-    }
-
-
-    println!("{}", pe.json_or());
-
+        cent.json_pretty_or().print();
+    cent.fulfill_taker_order(10_000, true, 1722524343044, None, &Address::default()).json_pretty_or().print();
     Ok(())
+    // let pk_hex = "024cfc97a479af32fcb9d7b59c0e1273832817bf0bb264227e56e449d1a6b30e8e";
+    // let pk_address = PublicKey::from_hex_direct(pk_hex).expect("pk");
+    //
+    // let eth_addr = "0x7D464545F9E9E667bbb1A907121bccb49Dc39160".to_string();
+    // let eth = EthHistoricalClient::new(&NetworkEnvironment::Dev).expect("").expect("");
+    // let tx = eth.get_all_tx(&eth_addr, None).await.expect("");
+    //
+    // let mut events = vec![];
+    // for e in &tx {
+    //     events.push(External(e.clone()));
+    // };
+    //
+    // let mut pq = PriceDataPointUsdQuery::new();
+    // pq.enrich_address_events(&mut events, &relay.ds).await.expect("works");
+    //
+    // let mut pe = PartyEvents::new(&pk_address, &NetworkEnvironment::Dev, &relay);
+    //
+    //
+    // for e in &events {
+    //
+    //     pe.process_event(e).await?;
+    // }
+    //
+    //
+    // println!("{}", pe.json_or());
+    //
+    // Ok(())
 
 }
