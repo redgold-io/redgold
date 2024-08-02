@@ -25,6 +25,7 @@ use redgold_schema::seeds::get_seeds_by_env_time;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, ObservationProof, PublicKey, SupportedCurrency, Transaction, UtxoId};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
+use crate::core::transact::tx_builder_supports::TransactionBuilder;
 // use crate::multiparty_gg20::watcher::{get_btc_per_rdg_starting_min_ask, OrderFulfillment};
 use crate::party::address_event::AddressEvent;
 use crate::party::address_event::AddressEvent::External;
@@ -779,13 +780,51 @@ async fn debug_events2() -> RgResult<()> {
 
     let pev = data.party_events.clone().expect("v");
 
+    let ev = pev.events.clone();
+
+    let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
+
+    // this matches
+    for e in &ev {
+        duplicate.process_event(e).await.expect("works");
+    }
+    let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
+
+    past_orders.clone().json_pretty_or().print();
+
+    //
+    let mut tb = relay.node_config.tx_builder();
+    tb.with_input_address(&key.address().expect("works"))
+        .with_auto_utxos().await.expect("works");
+
+    for o in past_orders.iter()
+        // .filter(|e| e.event_time < cutoff_time)
+        .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold) {
+        tb.with_output(&o.destination, &o.fulfilled_currency_amount());
+        if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
+            tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
+        } else {
+            tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
+        };
+    }
+
+    if tb.transaction.outputs.len() > 0 {
+        let tx = tb.build()?;
+        // pev.validate_rdg_swap_fulfillment_transaction(&tx)?;
+        // info!("Sending RDG fulfillment transaction: {}", tx.json_or());
+        // self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
+        // info!("Sent RDG fulfillment transaction: {}", tx.json_or());
+    }
+    tb.transaction.json_pretty_or().print();
+    // Ok(())
+
     // pev.json_pretty_or().print();
     // not this
-
-    let cent = pev.central_prices.get(&SupportedCurrency::Bitcoin).expect("redgold");
-
-        cent.json_pretty_or().print();
-    cent.fulfill_taker_order(10_000, true, 1722524343044, None, &Address::default()).json_pretty_or().print();
+    //
+    // let cent = pev.central_prices.get(&SupportedCurrency::Bitcoin).expect("redgold");
+    //
+    //     cent.json_pretty_or().print();
+    // cent.fulfill_taker_order(10_000, true, 1722524343044, None, &Address::default()).json_pretty_or().print();
     Ok(())
     // let pk_hex = "024cfc97a479af32fcb9d7b59c0e1273832817bf0bb264227e56e449d1a6b30e8e";
     // let pk_address = PublicKey::from_hex_direct(pk_hex).expect("pk");

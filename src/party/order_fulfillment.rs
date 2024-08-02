@@ -276,9 +276,6 @@ pub struct OrderFulfillment {
 }
 
 impl OrderFulfillment {
-    pub fn fulfillment_price(&self) -> f64 {
-        self.fulfilled_amount as f64 / self.order_amount as f64
-    }
 
     pub fn fulfilled_currency_amount(&self) -> CurrencyAmount {
         let c = self.destination.currency_or();
