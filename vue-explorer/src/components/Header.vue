@@ -118,8 +118,8 @@ export default {
     if (swapInfo != null) {
       this.btcSwapAddress = swapInfo.addresses['Bitcoin'];
       if ('Bitcoin' in swapInfo.central_prices) {
-        this.usdRdg = swapInfo['Bitcoin'].min_ask_estimated
-        this.rgdBtc = swapInfo['Bitcoin'].min_ask
+        this.usdRdg = swapInfo.central_prices['Bitcoin'].min_ask_estimated
+        this.rgdBtc = swapInfo.central_prices['Bitcoin'].min_ask
         this.rgdBtcStr = this.rgdBtc.toFixed(2);
         this.usdRdgStr = this.usdRdg.toFixed(2);
       }
