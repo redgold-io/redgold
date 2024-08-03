@@ -40,3 +40,4 @@ octocrab = "0.34.3"
 allms = "0.7.5"
 # this one appears recent.
 llmclient = "0.3.0"
+ollama-rs = "0.2.0"
