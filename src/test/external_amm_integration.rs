@@ -167,7 +167,7 @@ pub fn dev_balance_check() {
 
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn send_test_btc_staking_tx() {
     let network = NetworkEnvironment::Dev;
@@ -216,7 +216,7 @@ pub async fn send_test_btc_staking_tx() {
         //     .with_input_address(&rdg_address)
         //     .with_auto_utxos().await.expect("utxos")
         //     .with_internal_stake_usd_bounds(
-        //         None, None, &rdg_address, &amm_addr, &internal_stake_amount,
+        //         None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
         //     )
         //     .build()
         //     .expect("build")
@@ -224,7 +224,7 @@ pub async fn send_test_btc_staking_tx() {
         //     .expect("sign");
         // let response = internal_stake_tx.broadcast().await.expect("broadcast").json_or();
         // println!("response: {response}");
-        //
+
 
 
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
@@ -246,15 +246,14 @@ pub async fn send_test_btc_staking_tx() {
         // info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
         // info!("tx_stake tx: {}", tx_stake.json_or());
         //
-        // let eth_submit = EthWalletWrapper::new(&privk, &network).expect("works");
-        // let res = eth_submit.send(&amm_eth_address, &exact_eth_stake_amount).await.expect("works");
+        let eth_submit = EthWalletWrapper::new(&privk, &network).expect("works");
+        let res = eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works");
         // println!("eth tx: {res}");
 
         // test btc swap
-
-        let btc_swap_amt = CurrencyAmount::from_btc(10_001);
-        let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 10_001, privk).expect("send");
-        println!("txid: {res}");
+        //
+        // let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 6_001, privk).expect("send");
+        // println!("txid: {res}");
 
 
     }

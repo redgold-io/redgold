@@ -17,6 +17,7 @@ message = client.messages.create(
                 }
             ]
         }
-    ]
+    ],
+    tool_choice=
 )
 print(message.content)

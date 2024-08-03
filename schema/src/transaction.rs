@@ -166,6 +166,10 @@ impl Transaction {
         self.outputs.iter().filter(|o| o.is_swap()).count() > 0
     }
 
+    pub fn is_swap_fulfillment(&self) -> bool {
+        self.outputs.iter().filter(|o| o.is_swap_fulfillment()).count() > 0
+    }
+
     pub fn output_data(&self) -> impl Iterator<Item=&StandardData> {
         self.outputs.iter().filter_map(|o| o.data.as_ref())
     }

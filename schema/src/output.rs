@@ -97,6 +97,10 @@ impl Output {
             .filter(|&c| c == StandardContractType::Swap as i32).is_some()
     }
 
+    pub fn is_swap_fulfillment(&self) -> bool {
+        self.swap_fulfillment().is_some()
+    }
+
     pub fn stake_request(&self) -> Option<&StakeRequest> {
         self.request().and_then(|c| c.stake_request.as_ref())
     }

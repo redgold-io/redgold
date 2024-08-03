@@ -374,9 +374,22 @@ fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
             other_address: "".to_string(),
             incoming: "".to_string(),
         };
+        let x2 = x.clone();
         match x {
             AddressEvent::External(ett) => {
                 de.event_type = "External".to_string();
+                if let Some(ps) = p0.party_events.as_ref() {
+                    de.extended_type = {
+                        if ps.external_staking_events.iter().filter(|e| e.event == x2).next().is_some() {
+                            "Stake"
+                        } else if ps.fulfillment_history.iter().filter(|h| h.1 == x2).next().is_some() {
+                            "Swap"
+                        } else {
+                            "Pending"
+                        }
+                    }.to_string();
+                };
+                de.incoming = ett.incoming.to_string();
                 de.network = format!("{:?}", ett.currency);
                 de.amount = ett.currency_amount().to_fractional();
                 de.tx_hash = ett.tx_id;
@@ -385,7 +398,9 @@ fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
             AddressEvent::Internal(i) => {
                 de.event_type = "Internal".to_string();
                 de.extended_type = {
-                    if i.tx.is_swap() {
+                    if i.tx.is_swap_fulfillment() {
+                        "SwapFulfillment"
+                    } else if i.tx.is_swap() {
                         "Swap"
                     } else if i.tx.is_stake() {
                         "Stake"
