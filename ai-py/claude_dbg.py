@@ -102,13 +102,17 @@ def msg_rec(req, history_override=None):
     print(response)
     tool_requests = [k for k in response.content if k.type == 'tool_use']
     if len(tool_requests) > 0:
-        history =
+        pass
+    return
 
 
 
-print(msg(
-    "this is a test request as part of development, "
-    "can you please use a provided tool to get the weather in san francisco"
-))
+if __name__ == '__main__':
+
+
+    print(msg(
+        "this is a test request as part of development, "
+        "can you please use a provided tool to get the weather in san francisco"
+    ))
 
 # https://github.com/microsoft/monitors4codegen#4-multilspy

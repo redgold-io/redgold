@@ -63,12 +63,16 @@
               <div><strong>ETH Balance</strong></div>
               <div>{{ parseFloat(hashData.address_pool_info.balances['Ethereum'] || 0).toFixed(18) }} ETH</div>
 
-              <div><strong>Public Key</strong></div>
+              <div><strong>Public Key (Proto)</strong></div>
               <div><TextCopy :data="hashData.address_pool_info.public_key" /></div>
+
+              <div><strong>Public Key (Compact)</strong></div>
+              <div><TextCopy :data="publicKeyCompact" /></div>
+
               <div><strong>Price Ask USD/RDG BTC Quote</strong></div>
-              <div><TextCopy :data="askPriceUsdRdg" /></div>
+              <div><TextCopy :data="'$' + askPriceUsdRdg" /></div>
               <div><strong>Price Bid USD/RDG BTC Quote</strong></div>
-              <div><TextCopy :data="bidPriceUsdRdg" /></div>
+              <div><TextCopy :data="'$' + bidPriceUsdRdg" /></div>
 <!--              <div><strong>Price Center RDG/BTC </strong></div>-->
 <!--              <div><TextCopy :data="centerPriceRdgBtc" /></div>-->
 <!--              <div><strong>Spread USD</strong></div>-->
@@ -77,8 +81,14 @@
 
             <h3 class="detail-group">Bid Ask AMM Curve RDG/BTC</h3>
             <div class="grid-container">
-              <Bar :data="computedBidData" :options="exampleOptions" class="chart-container" />
-              <Bar :data="computedAskData" :options="exampleOptions" class="chart-container" />
+              <Bar :data="this.computeData('Bitcoin', false)" :options="exampleOptions" class="chart-container" />
+              <Bar :data="this.computeData('Bitcoin', true)" :options="exampleOptions" class="chart-container" />
+            </div>
+
+            <h3 class="detail-group">Bid Ask AMM Curve RDG/ETH</h3>
+            <div class="grid-container">
+              <Bar :data="this.computeData('Ethereum', false)" :options="exampleOptions" class="chart-container" />
+              <Bar :data="this.computeData('Ethereum', true)" :options="exampleOptions" class="chart-container" />
             </div>
 
             <h6 class="detail-group">Trade Calculator</h6>
@@ -276,7 +286,7 @@ export default {
       // console.log("New RDG value " + newRDGValue)
       if (this.hashData.address_pool_info != null && !(isNaN(floatRDGValue))) {
 
-        let bids = this.hashData.address_pool_info.bid_ask.bids;
+        let bids = this.hashData.address_pool_info.bids['Bitcoin'];
         let total_rdg = floatRDGValue;
         let total_fulfilled = 0;
         // console.log("Total RDG: " + total_rdg)
@@ -307,15 +317,15 @@ export default {
       let floatBtcValue = parseFloat(newBTCValue);
 
       if (this.hashData.address_pool_info != null && !(isNaN(floatBtcValue))) {
-        let asks = this.hashData.address_pool_info.bid_ask.asks;
+        let asks = this.hashData.address_pool_info.asks['Bitcoin'];
         let total_btc = floatBtcValue;
         let total_fulfilled = 0;
         for (let i = 0; i < asks.length;  i++) {
           let ask = asks[i];
-          let p = ask.price // BTC / RDG now
+          let p = ask.price // RDG / BTC now
           let v = ask.volume / 1e8 // amount RDG available for sale via ask
-          let requested_vol = total_btc / p // BTC / (BTC/RDG) = vol RDG unit;
-          let thisBtc = v * p; // RDG * BTC / RDG = BTC
+          let requested_vol = total_btc * p // BTC * (RDG/BTC) = vol RDG unit;
+          let thisBtc = v / p; // RDG / RDG / BTC = BTC
           console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
           thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
           if (requested_vol > v) {
@@ -343,6 +353,18 @@ export default {
   },
   mixins: [fetchHashInfo],
   computed: {
+
+    publicKeyCompact() {
+      let excludePrefixes = ['0a220a20', '0a230a2103', '0a230a2102']
+      let dat = this.hashData.address_pool_info.public_key;
+
+        for (let pfx of excludePrefixes) {
+          if (dat.startsWith(pfx)) {
+            return dat.substring(pfx.length);
+          }
+        }
+      return dat
+    },
     btcExplorerLink() {
 
       var net = "testnet/";
@@ -392,20 +414,20 @@ export default {
       }
       return 0;
     },
-    spreadUsd() {
-      if (this.hashData.address_pool_info != null) {
-        let ba = this.hashData.address_pool_info.bid_ask;
-        if (ba.asks.length > 0 && ba.bids.length > 0) {
-          let ask_first = ba.asks[0].price; // BTC / RDG
-          let bid_first = ba.bids[0].price; // RDG / BTC
-          let adjusted_bid = 1/bid_first; // BTC / RDG
-          let usd_ask = ask_first * this.usdBtcRate
-          let usd_bid = adjusted_bid * this.usdBtcRate
-          return (usd_ask - usd_bid).toFixed(2);
-        }
-      }
-      return "na";
-    },
+    // spreadUsd() {
+    //   if (this.hashData.address_pool_info != null) {
+    //     let ba = this.hashData.address_pool_info.bid_ask;
+    //     if (ba.asks.length > 0 && ba.bids.length > 0) {
+    //       let ask_first = ba.asks[0].price; // BTC / RDG
+    //       let bid_first = ba.bids[0].price; // RDG / BTC
+    //       let adjusted_bid = 1/bid_first; // BTC / RDG
+    //       let usd_ask = ask_first * this.usdBtcRate
+    //       let usd_bid = adjusted_bid * this.usdBtcRate
+    //       return (usd_ask - usd_bid).toFixed(2);
+    //     }
+    //   }
+    //   return "na";
+    // },
     usdBtcRate() {
       return this.$store.state.btcExchangeRate;
     },
@@ -457,112 +479,66 @@ export default {
       },
     }},
     computedBidData() {
-      let labels = [];
-      let data = [];
-      let api = this.hashData.address_pool_info;
-      if (api != null) {
-        let ba = api.bid_ask;
-        // console.log("Bid ask: " + ba);
-        if (ba != null) {
-          let bids = ba.bids;
-          if (bids != null) {
-            for (let i = 0; i < bids.length; i++) {
-              let bid = bids[i];
-              // console.log("Bid " + bid);
-              if (bid.price != null) {
-                // Price is originally in RDG / BTC -- i.e. 400 RDG / 1 BTC
-                // We want to convert it to USD / RDG
-                let rdg_btc = bid.price; // RDG / BTC
-                let btc_rdg = (1 / rdg_btc); // BTC / RDG
-                let usd_btc = this.usdBtcRate; // USD / BTC
-                let price = btc_rdg * usd_btc; // USD / RDG
-                labels.push(price);
-              }
-              if (bid.volume != null) {
-                data.push(bid.volume);
-              }
-            }
-          }
-        }
-      }
-      while (labels.length < 25) {
-        labels.push(0);
-      }
-      while (data.length < 25) {
-        data.push(0);
-      }
-
-      let slice_len = 25;
-      let resultLabels = labels.map(value => {
-        return value.toFixed(2);
-      }).slice(0, slice_len).reverse();
-      let resultData = data.map(value => {
-        return value.toFixed(2);
-      }).slice(0, slice_len).reverse();
-      // console.log("Result labels: " + resultLabels);
-      // console.log("Result data: " + resultData);
-      return {
-        labels: resultLabels,
-        datasets: [
-          {
-            label: 'BTC Bid USD/Volume(Sats)',
-            backgroundColor: '#79f87f',
-            data: resultData
-          }
-        ]
-      }
+      return this.computeData("Bitcoin", false)
+      // let labels = [];
+      // let data = [];
+      // let api = this.hashData.address_pool_info;
+      // if (api != null) {
+      //   let ba = api.bid_ask;
+      //   // console.log("Bid ask: " + ba);
+      //   if (ba != null) {
+      //     let bids = ba.bids;
+      //     if (bids != null) {
+      //       for (let i = 0; i < bids.length; i++) {
+      //         let bid = bids[i];
+      //         // console.log("Bid " + bid);
+      //         if (bid.price != null) {
+      //           // Price is originally in RDG / BTC -- i.e. 400 RDG / 1 BTC
+      //           // We want to convert it to USD / RDG
+      //           let rdg_btc = bid.price; // RDG / BTC
+      //           let btc_rdg = (1 / rdg_btc); // BTC / RDG
+      //           let usd_btc = this.usdBtcRate; // USD / BTC
+      //           let price = btc_rdg * usd_btc; // USD / RDG
+      //           labels.push(price);
+      //         }
+      //         if (bid.volume != null) {
+      //           data.push(bid.volume);
+      //         }
+      //       }
+      //     }
+      //   }
+      // }
+      // while (labels.length < 25) {
+      //   labels.push(0);
+      // }
+      // while (data.length < 25) {
+      //   data.push(0);
+      // }
+      //
+      // let slice_len = 25;
+      // let resultLabels = labels.map(value => {
+      //   return value.toFixed(2);
+      // }).slice(0, slice_len).reverse();
+      // let resultData = data.map(value => {
+      //   return value.toFixed(2);
+      // }).slice(0, slice_len).reverse();
+      // // console.log("Result labels: " + resultLabels);
+      // // console.log("Result data: " + resultData);
+      // return {
+      //   labels: resultLabels,
+      //   datasets: [
+      //     {
+      //       label: 'BTC Bid USD/Volume(Sats)',
+      //       backgroundColor: '#79f87f',
+      //       data: resultData
+      //     }
+      //   ]
+      // }
     },
 
     computedAskData() {
-      let labels = [];
-      let data = [];
-      let api = this.hashData.address_pool_info;
-      if (api != null) {
-        let ba = api.bid_ask;
-        // console.log("Bid ask: " + ba);
-        if (ba != null) {
-          let asks = ba.asks;
-          if (asks != null) {
-            for (let i = 0; i < asks.length; i++) {
-              let ask = asks[i];
-              // console.log("Bid " + ask);
-              if (ask.price != null) {
-                let price = ask.price; // BTC / RDG
-                let usdPrice = price * this.usdBtcRate; // USD / RDG
-                labels.push(usdPrice);
-              }
-              if (ask.volume != null) {
-                data.push(ask.volume / 1e8);
-              }
-            }
-          }
-        }
-      }
-
-      let slice_len = 25;
-      let resultLabels = labels.map(value => {
-          return value.toFixed(2);
-      }).slice(0, slice_len);
-      let resultData = data.map(value => {
-          return value.toFixed(2);
-      }).slice(0, slice_len);
-      // console.log("Result asks labels: " + resultLabels);
-      // console.log("Result asks data: " + resultData);
-      return {
-        labels: resultLabels,
-        datasets: [
-          {
-            label: 'RDG Ask USD/Volume(RDG)',
-            backgroundColor: '#f87979',
-            data: resultData
-          }
-        ]
-      }
+      return this.computeData("Bitcoin", true)
     },
-
-    // processedData() {
-    //   return this.preprocessData(this.bids, this.asks);
-    // },
     filteredTransactions() {
       if (this.transactionType === 'incoming') {
         return this.hashData.incoming_transactions;
@@ -594,6 +570,65 @@ export default {
     },
   },
   methods: {
+    computeData(pair, isAsk) {
+      let labels = [];
+      let data = [];
+      let api = this.hashData.address_pool_info;
+      if (api != null) {
+        let ba = isAsk ? api.asks_usd : api.bids_usd;
+        if (ba != null) {
+          let asks = ba[pair];
+          if (asks != null) {
+            for (let i = 0; i < asks.length; i++) {
+              let ask = asks[i];
+              // console.log("Bid " + ask);
+              if (ask.price != null) {
+                let usdPrice = ask.price; // USD / RDG
+                labels.push(usdPrice);
+              }
+              if (ask.volume != null) {
+                let vol = isAsk ? (ask.volume / 1e8) : ask.volume;
+                data.push(vol);
+              }
+            }
+          }
+        }
+      }
+      let slice_len = 25;
+
+      if (!isAsk) {
+        while (labels.length < slice_len) {
+          labels.push(0);
+        }
+        while (data.length < slice_len) {
+          data.push(0);
+        }
+      }
+
+      let resultLabels = labels.map(value => {
+        return value.toFixed(2);
+      }).slice(0, slice_len);
+      let resultData = data.map(value => {
+        return value.toFixed(2);
+      }).slice(0, slice_len);
+      if (!isAsk) {
+        resultLabels = resultLabels.reverse();
+        resultData = resultData.reverse();
+        console.log("Result asks labels: " + resultLabels);
+        console.log("Result asks data: " + resultData);
+      }
+
+      return {
+        labels: resultLabels,
+        datasets: [
+          {
+            label: isAsk ? 'Ask USD/Volume(RDG)' : 'Bid USD/Volume(Sats)',
+            backgroundColor: isAsk? '#f87979' : '#79f87f',
+            data: resultData
+          }
+        ]
+      }
+    },
     // preprocessData(bids, asks) {
     //   // Sort bids and asks
     //   bids = bids.sort((a, b) => b[0] - a[0]);

@@ -23,10 +23,10 @@
           {{ transaction.network }}
         </td>
         <td>
-          <HashLink :data="transaction.other_address" :use-external-link="true" />
+          <HashLink :data="transaction.other_address" :use-external-link="transaction.event_type === 'External'"/>
         </td>
         <td>
-          <HashLink :data="transaction.tx_hash" :use-external-link="true"
+          <HashLink :data="transaction.tx_hash" :use-external-link="transaction.event_type === 'External'"
                     :is-address="false"
                     :bitcoin-external-link="transaction.other_address.startsWith('bc') || transaction.other_address.startsWith('tb')"
                     :ethereum-external-link="transaction.other_address.startsWith('0x')"
