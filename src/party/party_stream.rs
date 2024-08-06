@@ -415,12 +415,13 @@ impl PartyEvents {
         is_stake: bool,
         event: &AddressEvent,
         stake_utxo_id: Option<UtxoId>,
+        event_currency: SupportedCurrency,
     ) -> RgResult<()> {
         let fulfillment = if !is_stake {
             let currency = if is_ask {
                 amount.currency_or()
             } else {
-                destination.currency_or()
+                event_currency
             };
             if let Some(cp) = self.central_prices.get(&currency) {
                 let of = cp.fulfill_taker_order(
@@ -470,7 +471,7 @@ impl PartyEvents {
             if let Some(swap_destination) = t.tx.swap_destination() {
                 // Represents a withdrawal from network / swap initiation event
                 self.fulfill_order(
-                    amount.clone(), false, time, None, &swap_destination, false, e, None
+                    amount.clone(), false, time, None, &swap_destination, false, e, None, swap_destination.currency_or()
                 )?;
             } else if t.tx.is_stake() {
                 self.handle_stake_requests(e, time, &t.tx)?;
@@ -556,7 +557,7 @@ impl PartyEvents {
                 extid.identifier = t.tx_id.clone();
                 extid.currency = t.currency as i32;
                 self.fulfill_order(
-                    t.currency_amount(), true, time, Some(extid), &other_addr, false, &e, None
+                    t.currency_amount(), true, time, Some(extid), &other_addr, false, &e, None, t.currency
                 )?;
             // Represents a deposit / swap external event.
             // This should be a fulfillment of an ASK, corresponding to a TAKER BUY

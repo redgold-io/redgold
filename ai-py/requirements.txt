@@ -1,2 +1,3 @@
 anthropic
 simplematrixbotlib
+google-generativeai

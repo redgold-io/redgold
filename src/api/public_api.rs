@@ -181,25 +181,6 @@ impl PublicClient {
     }
 
     #[allow(dead_code)]
-    pub async fn query_addresses(
-        &self,
-        addresses: Vec<Vec<u8>>,
-    ) -> Result<PublicResponse, ErrorInfo> {
-        let mut request = empty_public_request();
-        request.query_addresses_request = Some(QueryAddressesRequest {
-                addresses: addresses
-                    .iter()
-                    .map(|a| Address {
-                        address: bytes_data(a.clone()),
-                        address_type: AddressType::Sha3224ChecksumPublic as i32,
-                        currency: SupportedCurrency::Redgold as i32,
-                    })
-                    .collect_vec(),
-            });
-        self.request(&request).await
-    }
-
-    #[allow(dead_code)]
     pub async fn query_address(
         &self,
         addresses: Vec<Address>,

@@ -257,7 +257,8 @@ impl ExternalTimedTransaction {
     }
 
     pub fn other_address_typed(&self) -> RgResult<structs::Address> {
-        self.other_address.parse_address()
+        let mut addr = self.other_address.parse_address()?;
+        Ok(addr)
     }
 
     pub fn currency_amount(&self) -> CurrencyAmount {

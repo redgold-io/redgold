@@ -10,6 +10,7 @@ mod debug_n3_observations;
 mod connection_refused_test;
 pub mod local_test_context;
 mod debug_genesis_issue;
+mod debug_balance_issue;
 
 fn asdf() {
 

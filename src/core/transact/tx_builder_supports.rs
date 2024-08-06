@@ -348,8 +348,10 @@ impl TransactionBuilder {
     }
 
     pub fn with_last_output_swap_destination(&mut self, destination: &Address) -> RgResult<&mut Self> {
+        let mut addr = destination.clone();
+        addr.mark_external();
         let mut swap_request = structs::SwapRequest::default();
-        swap_request.destination = Some(destination.clone());
+        swap_request.destination = Some(addr);
         self.last_output_request_or().ok_msg("Missing output")?.swap_request = Some(swap_request);
         Ok(self)
     }
@@ -398,7 +400,9 @@ impl TransactionBuilder {
             deposit.liquidity_ranges = vec![lr];
         }
         let mut dr = DepositRequest::default();
-        dr.address = Some(external_address.clone());
+        let mut external = external_address.clone();
+        external.mark_external();
+        dr.address = Some(external);
         dr.amount = Some(external_amount.clone());
         deposit.deposit = Some(dr);
         lq.deposit = Some(deposit);
@@ -454,6 +458,8 @@ impl TransactionBuilder {
         d.amount = Some(party_fee.clone());
         let mut lq = StakeRequest::default();
         let mut withdrawal = StakeWithdrawal::default();
+        let mut destination = destination.clone();
+        destination.mark_external();
         withdrawal.destination = Some(destination.clone());
         lq.withdrawal = Some(withdrawal);
         let mut sr = StandardRequest::default();

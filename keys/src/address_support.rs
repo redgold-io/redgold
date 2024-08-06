@@ -8,6 +8,7 @@ use crate::util::btc_wallet::SingleKeyBitcoinWallet;
 
 pub trait AddressSupport {
     fn parse_address(&self) -> RgResult<Address>;
+    fn parse_address_incl_raw(&self) -> RgResult<Address>;
 }
 
 impl<T : Into<String> + Clone> AddressSupport for T {
@@ -25,6 +26,11 @@ impl<T : Into<String> + Clone> AddressSupport for T {
             return Err(error_info("Unable to parse address: ".to_string())).add(str_rep.clone());
         };
         Ok(result)
+    }
+
+    fn parse_address_incl_raw(&self) -> RgResult<Address> {
+        let hex = self.clone().into();
+        self.parse_address().or(Address::raw_from_hex(hex))
     }
 }
 

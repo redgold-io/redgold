@@ -8,8 +8,11 @@ use sha3::digest::generic_array::functional::FunctionalSequence;
 use warp::{Filter, Rejection};
 use warp::path::Exact;
 use warp::reply::{Json, Response};
+use redgold_keys::address_support::AddressSupport;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_keys::public_key_parse_support::PublicKeyParseSupport;
 use redgold_schema::RgResult;
-use redgold_schema::structs::Hash;
+use redgold_schema::structs::{CurrencyAmount, Hash, SupportedCurrency};
 use crate::api::as_warp_json_response;
 use crate::api::explorer::server::{extract_ip, process_origin};
 use crate::core::relay::Relay;
@@ -167,6 +170,21 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         });
 
 
+    // TODO: Waterfall function, from address / raw address / public key proto / compact public key /
+    let balance_get = warp::get()
+        .with_v1()
+        .and(warp::path("balance"))
+        .with_relay_and_ip(r.clone())
+        .and(warp::path::param())
+        .map(|mut api_data: ApiData, hash: String| {
+            api_data.param = Some(hash);
+            api_data
+        })
+        .and_then_as(move |api_data: ApiData| async move {
+            balance_lookup(api_data.relay, api_data.param.unwrap().clone()).await
+        });
+
+
 
     hello
         .or(table_sizes)
@@ -174,6 +192,23 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(genesis)
         .or(transaction_get)
 
+}
+
+async fn balance_lookup(relay: Arc<Relay>, hash: String) -> RgResult<CurrencyAmount> {
+    let net = relay.node_config.network.clone();
+    let pk_parse = hash.clone().parse_public_key().and_then(|pk| pk.to_all_addresses_for_network(&net));
+    let addrs = hash.clone().parse_address_incl_raw().map(|a| vec![a])
+        .or(pk_parse)?;
+
+    let mut total = CurrencyAmount::zero(SupportedCurrency::Redgold);
+
+    for addr in addrs {
+        let b = relay.ds.transaction_store.get_balance(&addr).await?;
+        if let Some(b) = b {
+            total = total + CurrencyAmount::from_rdg(b)
+        }
+    }
+    Ok(total)
 }
 
 

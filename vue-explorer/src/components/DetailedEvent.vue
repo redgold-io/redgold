@@ -9,7 +9,7 @@
       </tr>
       </thead>
       <tbody>
-      <tr v-for="transaction in events" :key="transaction.tx_hash">
+      <tr v-for="transaction in reverseEvents" :key="transaction.tx_hash">
         <td>
           {{ transaction.event_type }}
         </td>
@@ -63,6 +63,12 @@ export default {
           'Amount'
       ],
     };
+  },
+  computed: {
+    reverseEvents() {
+      let events = this.events;
+      return events.reverse();
+    }
   }
 }
 

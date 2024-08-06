@@ -172,7 +172,8 @@ impl PartyEvents {
                             None
                         };
                         if let Some(order_amt) = order_amt {
-                            self.fulfill_order(order_amt.clone(), false, time, None, &d, true, event, Some(id.clone()))?;
+                            self.fulfill_order(order_amt.clone(),
+                                               false, time, None, &d, true, event, Some(id.clone()), w_currency)?;
                         }
                     }
                 }

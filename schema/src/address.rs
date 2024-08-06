@@ -6,6 +6,7 @@ use sha3::Sha3_224;
 
 use sha3::Digest;
 use crate::proto_serde::ProtoSerde;
+use crate::structs::SupportedCurrency::Redgold;
 
 // impl fromstr for address etc. impl tostring
 impl Into<Address> for structs::PublicKey {
@@ -23,20 +24,45 @@ impl Into<Address> for Vec<u8> {
 
 impl Address {
 
+    pub fn mark_bitcoin_external(&mut self) -> &mut Self {
+        self.currency = SupportedCurrency::Bitcoin as i32;
+        self
+    }
+
+    pub fn mark_ethereum_external(&mut self) -> &mut Self {
+        self.currency = SupportedCurrency::Ethereum as i32;
+        self
+    }
+
+    pub fn mark_external(&mut self) -> &mut Self {
+        match self.address_type() {
+            AddressType::BitcoinExternalString => self.mark_bitcoin_external(),
+            AddressType::EthereumExternalString => self.mark_ethereum_external(),
+            _ => self
+        }
+    }
+
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
         let mut new = Self::from_bytes(Self::hash(input.as_ref()))?;
         new.address_type = AddressType::ScriptHash as i32;
         Ok(new)
     }
 
-    // Maybe consider checking here to see if the address is valid?
+    pub fn from_bitcoin_external(address: &String) -> Address {
+        let mut ret = Self::from_bitcoin(address);
+        ret.currency = SupportedCurrency::Bitcoin as i32;
+        ret
+    }
+
+        // Maybe consider checking here to see if the address is valid?
     // Or before this actually, we should potentially not do 'into bytes'
     // but instead change this to a vec and decode it.
     pub fn from_bitcoin(address: &String) -> Address {
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::BitcoinExternalString as i32,
-            currency: SupportedCurrency::Bitcoin as i32,
+            // currency: SupportedCurrency::Bitcoin as i32,
+            currency: Redgold as i32,
         }
     }
     pub fn from_eth(address: impl Into<String>) -> Address {
@@ -44,8 +70,14 @@ impl Address {
         Self {
             address: bytes_data(address.clone().into_bytes()),
             address_type: AddressType::EthereumExternalString as i32,
-            currency: SupportedCurrency::Ethereum as i32,
+            currency: Redgold as i32,
         }
+    }
+
+    pub fn from_eth_external(address: &String) -> Address {
+        let mut ret = Self::from_eth(address);
+        ret.currency = SupportedCurrency::Ethereum as i32;
+        ret
     }
 
     pub fn is_bitcoin(&self) -> bool {

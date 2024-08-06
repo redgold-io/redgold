@@ -74,50 +74,50 @@ pub async fn send_test_btc_transaction_deposit() {
     }
 }
 
-
-// Use this for testing AMM transactions.
-#[ignore]
-#[tokio::test]
-pub async fn send_test_rdg_btc_tx_withdrawal() {
-
-    let network = NetworkEnvironment::Staging;
-    let nc = NodeConfig::default_env(network).await;
-    let amm_addr = amm_public_key(&network).address().expect("address");
-    let amount = 1.0;
-
-    let addr = amm_addr.render_string().expect("");
-
-    println!("sending to rdg amm address: {addr}");
-
-    if let Some((_privk, keypair)) = dev_ci_kp() {
-        let pk = keypair.public_key();
-        let rdg_address = pk.address().expect("");
-        println!("pk: {}", rdg_address.render_string().expect(""));
-
-        let client = nc.api_client();
-        client.faucet(&rdg_address).await.expect("faucet");
-        let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
-        let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
-            .utxo_entries.clone();
-
-        let btc_addr = pk.to_bitcoin_address_typed(&network).expect("btc address");
-
-        let amount = CurrencyAmount::from_fractional(amount).expect("");
-        let tb = TransactionBuilder::new(&nc)
-            .with_network(&network)
-            .with_utxos(&utxos).expect("utxos")
-            .with_output(&amm_addr, &amount)
-            .with_last_output_swap_type()
-            .with_last_output_swap_destination(&btc_addr).expect("swap")
-            .build().expect("build")
-            .sign(&keypair).expect("sign");
-
-        let res = client.send_transaction(&tb, true).await.expect("send").json_or();
-
-        println!("send: {}", res);
-
-    }
-}
+//
+// // Use this for testing AMM transactions.
+// #[ignore]
+// #[tokio::test]
+// pub async fn send_test_rdg_btc_tx_withdrawal() {
+//
+//     let network = NetworkEnvironment::Staging;
+//     let nc = NodeConfig::default_env(network).await;
+//     let amm_addr = amm_public_key(&network).address().expect("address");
+//     let amount = 1.0;
+//
+//     let addr = amm_addr.render_string().expect("");
+//
+//     println!("sending to rdg amm address: {addr}");
+//
+//     if let Some((_privk, keypair)) = dev_ci_kp() {
+//         let pk = keypair.public_key();
+//         let rdg_address = pk.address().expect("");
+//         println!("pk: {}", rdg_address.render_string().expect(""));
+//
+//         let client = nc.api_client();
+//         client.faucet(&rdg_address).await.expect("faucet");
+//         let result = client.query_address(vec![rdg_address.clone()]).await.expect("").as_error().expect("");
+//         let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response").expect("")
+//             .utxo_entries.clone();
+//
+//         let btc_addr = pk.to_bitcoin_address_typed(&network).expect("btc address");
+//
+//         let amount = CurrencyAmount::from_fractional(amount).expect("");
+//         let tb = TransactionBuilder::new(&nc)
+//             .with_network(&network)
+//             .with_utxos(&utxos).expect("utxos")
+//             .with_output(&amm_addr, &amount)
+//             .with_last_output_swap_type()
+//             .with_last_output_swap_destination(&btc_addr).expect("swap")
+//             .build().expect("build")
+//             .sign(&keypair).expect("sign");
+//
+//         let res = client.send_transaction(&tb, true).await.expect("send").json_or();
+//
+//         println!("send: {}", res);
+//
+//     }
+// }
 
 #[ignore]
 #[test]
