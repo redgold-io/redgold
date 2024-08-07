@@ -8,6 +8,7 @@ use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey};
+use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::node_config::NodeConfig;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
@@ -167,7 +168,7 @@ pub fn dev_balance_check() {
 
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn send_test_btc_staking_tx() {
     let network = NetworkEnvironment::Dev;
@@ -247,13 +248,23 @@ pub async fn send_test_btc_staking_tx() {
         // info!("tx_stake tx: {}", tx_stake.json_or());
         //
         let eth_submit = EthWalletWrapper::new(&privk, &network).expect("works");
-        let res = eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works");
+        // let res = eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works");
         // println!("eth tx: {res}");
 
         // test btc swap
         //
         // let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 6_001, privk).expect("send");
         // println!("txid: {res}");
+
+        nc.tx_builder().with_input_address(&rdg_address)
+            .with_auto_utxos().await.expect("utxos")
+            .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.05).unwrap(), &amm_rdg_address)
+            .unwrap()
+            .build()
+            .unwrap()
+            .sign(&kp)
+            .unwrap()
+            .broadcast().await.expect("broadcast").json_pretty_or().print();
 
 
     }

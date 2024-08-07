@@ -434,7 +434,7 @@ impl NodeConfig {
                 (self.load_balancer_url.clone(), self.network.default_port_offset() + 1)
             }
         };
-        info!("Load balancer host: {} port: {:?}", host, port);
+        // info!("Load balancer host: {} port: {:?}", host, port);
         PublicClient::from(host, port, None)
     }
 

@@ -18,7 +18,7 @@ use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinW
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::output::output_data;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::seeds::get_seeds_by_env_time;
@@ -70,6 +70,7 @@ pub struct PartyEvents {
     // This needs to be populated if deserializing.
     #[serde(skip)]
     pub relay: Option<Relay>,
+    pub locally_fulfilled_orders: Vec<OrderFulfillment>
 }
 
 impl PartyEvents {
@@ -275,6 +276,8 @@ impl PartyEvents {
         }
 
         for (of, ae) in &self.unfulfilled_external_withdrawals {
+            let mpc_claims_fulfillment = self.locally_fulfilled_orders.iter().filter(|f| &f.primary_event == ae)
+                .next().is_some();
             match ae {
                 AddressEvent::Internal(t) => {
                     // Since this is a RDG incoming transaction, which we'll fulfill with BTC,
@@ -282,7 +285,15 @@ impl PartyEvents {
                     // (i.e. it's already been unconfirmed fulfilled.)
                     t.tx.first_input_address_to_btc_address(&self.network).map(|addr| {
                         if !self.unconfirmed_btc_output_other_addresses().contains(&addr) {
-                            orders.push(of.clone());
+                            if mpc_claims_fulfillment {
+                                Err::<(), ErrorInfo>(error_info("MPC claims event fulfillment but external TXID not yet recognized as unconfirmed"))
+                                    .with_detail("txid", t.tx.hash_hex())
+                                    .with_detail("event", ae.json_or())
+                                    .log_error()
+                                    .ok();
+                            } else {
+                                orders.push(of.clone());
+                            }
                         }
                     });
                 }
@@ -328,10 +339,15 @@ impl PartyEvents {
             // pending_stake_withdrawals: vec![],
             rejected_stake_withdrawals: vec![],
             central_prices: Default::default(),
-            relay: Some(relay.clone())
+            relay: Some(relay.clone()),
+            locally_fulfilled_orders: vec![],
         }
     }
 
+    pub async fn process_locally_fulfilled_orders(&mut self, orders: Vec<OrderFulfillment>) -> RgResult<()> {
+        self.locally_fulfilled_orders.extend(orders);
+        Ok(())
+    }
     pub async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()> {
         self.events.push(e.clone());
         let seeds = self.relay.safe_get_msg("Missing relay in process event")?.node_config.seeds_now_pk();
@@ -416,6 +432,8 @@ impl PartyEvents {
         event: &AddressEvent,
         stake_utxo_id: Option<UtxoId>,
         event_currency: SupportedCurrency,
+        primary_event: AddressEvent,
+        prior_related_event: Option<AddressEvent>
     ) -> RgResult<()> {
         let fulfillment = if !is_stake {
             let currency = if is_ask {
@@ -425,7 +443,7 @@ impl PartyEvents {
             };
             if let Some(cp) = self.central_prices.get(&currency) {
                 let of = cp.fulfill_taker_order(
-                    amount.amount_i64_or() as u64, is_ask, event_time, tx_id, &destination
+                    amount.amount_i64_or() as u64, is_ask, event_time, tx_id, &destination, primary_event
                 );
                 if let Some(of) = of.as_ref() {
                     if is_ask {
@@ -448,6 +466,10 @@ impl PartyEvents {
                 destination: destination.clone(),
                 is_stake_withdrawal: true,
                 stake_withdrawal_fulfilment_utxo_id: stake_utxo_id,
+                primary_event,
+                prior_related_event,
+                successive_related_event: None,
+                fulfillment_txid_external: None,
             };
 
             Some(of)
@@ -471,7 +493,9 @@ impl PartyEvents {
             if let Some(swap_destination) = t.tx.swap_destination() {
                 // Represents a withdrawal from network / swap initiation event
                 self.fulfill_order(
-                    amount.clone(), false, time, None, &swap_destination, false, e, None, swap_destination.currency_or()
+                    amount.clone(), false, time, None, &swap_destination, false, e, None, swap_destination.currency_or(),
+                    e.clone(),
+                    None
                 )?;
             } else if t.tx.is_stake() {
                 self.handle_stake_requests(e, time, &t.tx)?;
@@ -557,7 +581,9 @@ impl PartyEvents {
                 extid.identifier = t.tx_id.clone();
                 extid.currency = t.currency as i32;
                 self.fulfill_order(
-                    t.currency_amount(), true, time, Some(extid), &other_addr, false, &e, None, t.currency
+                    t.currency_amount(), true, time, Some(extid), &other_addr, false, &e, None, t.currency,
+                    ec.clone(),
+                    None
                 )?;
             // Represents a deposit / swap external event.
             // This should be a fulfillment of an ASK, corresponding to a TAKER BUY
@@ -763,7 +789,7 @@ impl PartyEvents {
 #[ignore]
 #[tokio::test]
 async fn debug_event_stream2() {
-    crate::party::party_stream::debug_events2().await.unwrap();
+    debug_events2().await.unwrap();
 }
 async fn debug_events2() -> RgResult<()> {
 
@@ -788,6 +814,7 @@ async fn debug_events2() -> RgResult<()> {
     // this matches
     for e in &ev {
         duplicate.process_event(e).await.expect("works");
+
     }
     let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
 
@@ -797,26 +824,26 @@ async fn debug_events2() -> RgResult<()> {
     let mut tb = relay.node_config.tx_builder();
     tb.with_input_address(&key.address().expect("works"))
         .with_auto_utxos().await.expect("works");
-
-    for o in past_orders.iter()
-        // .filter(|e| e.event_time < cutoff_time)
-        .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold) {
-        tb.with_output(&o.destination, &o.fulfilled_currency_amount());
-        if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
-            tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
-        } else {
-            tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
-        };
-    }
-
-    if tb.transaction.outputs.len() > 0 {
-        let tx = tb.build()?;
-        // pev.validate_rdg_swap_fulfillment_transaction(&tx)?;
-        // info!("Sending RDG fulfillment transaction: {}", tx.json_or());
-        // self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
-        // info!("Sent RDG fulfillment transaction: {}", tx.json_or());
-    }
-    tb.transaction.json_pretty_or().print();
+    //
+    // for o in past_orders.iter()
+    //     // .filter(|e| e.event_time < cutoff_time)
+    //     .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold) {
+    //     tb.with_output(&o.destination, &o.fulfilled_currency_amount());
+    //     if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
+    //         tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
+    //     } else {
+    //         tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
+    //     };
+    // }
+    //
+    // if tb.transaction.outputs.len() > 0 {
+    //     let tx = tb.build()?;
+    //     // pev.validate_rdg_swap_fulfillment_transaction(&tx)?;
+    //     // info!("Sending RDG fulfillment transaction: {}", tx.json_or());
+    //     // self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
+    //     // info!("Sent RDG fulfillment transaction: {}", tx.json_or());
+    // }
+    // tb.transaction.json_pretty_or().print();
     // Ok(())
 
     // pev.json_pretty_or().print();

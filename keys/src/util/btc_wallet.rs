@@ -230,7 +230,7 @@ pub struct RawTransaction {
     pub transaction_details: Option<TransactionDetails>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct ExternalTimedTransaction {
     pub tx_id: String,
     pub timestamp: Option<u64>,

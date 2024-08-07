@@ -14,6 +14,7 @@ use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
+use crate::party::address_event::AddressEvent;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
 use crate::party::party_watcher::PartyWatcher;
@@ -92,9 +93,16 @@ impl PartyWatcher {
             orders.len(),
         );
 
-                self.fulfill_btc_orders(key, &identifier, ps, cutoff_time).await.log_error().ok();
-
-                self.fulfill_eth(ps, &identifier, v2).await.log_error().ok();
+                let mut done_orders = vec![];
+                let btc = self.fulfill_btc_orders(key, &identifier, ps, cutoff_time).await.log_error().ok();
+                if let Some(b) = btc {
+                    done_orders.extend(b);
+                }
+                let eth = self.fulfill_eth(ps, &identifier, v2).await.log_error().ok();
+                if let Some(e) = eth {
+                    done_orders.extend(e);
+                }
+                ps.process_locally_fulfilled_orders(done_orders);
 
                 self.fulfill_rdg_orders(&identifier, &utxos, ps, cutoff_time).await?;
 
@@ -104,10 +112,15 @@ impl PartyWatcher {
         Ok(())
     }
 
-    async fn fulfill_btc_orders(&self, key: &PublicKey, identifier: &MultipartyIdentifier, ps: &PartyEvents, cutoff_time: i64) -> RgResult<()> {
-        let btc_outputs = ps.orders().iter()
+    async fn fulfill_btc_orders(&self, key: &PublicKey, identifier: &MultipartyIdentifier, ps: &PartyEvents, cutoff_time: i64) -> RgResult<Vec<OrderFulfillment>> {
+        let orders_to_fulfill = ps.orders().iter()
             .filter(|e| e.event_time < cutoff_time)
             .filter(|e| e.destination.currency_or() == SupportedCurrency::Bitcoin)
+            .map(|e| e.clone())
+            .collect_vec();
+        let btc_outputs = orders_to_fulfill
+            .clone()
+            .into_iter()
             .map(|o| {
                 let btc = o.destination.render_string().expect("works");
                 let amount = o.fulfilled_amount;
@@ -119,7 +132,7 @@ impl PartyWatcher {
             let txid = self.mp_send_btc(key, &identifier, btc_outputs.clone(), ps).await.log_error().ok();
             info!("Sending BTC fulfillment transaction id {}: {:?}", txid.json_or(), btc_outputs);
         }
-        Ok(())
+        Ok(orders_to_fulfill)
     }
 
     async fn fulfill_rdg_orders(&self, identifier: &MultipartyIdentifier, utxos: &Vec<UtxoEntry>, ps: &PartyEvents, cutoff_time: i64) -> Result<(), ErrorInfo> {
@@ -151,17 +164,23 @@ impl PartyWatcher {
     }
 
 
-    pub async fn fulfill_eth(&self, pes: &PartyEvents, ident: &MultipartyIdentifier, v: PartyInternalData) -> RgResult<()> {
+    pub async fn fulfill_eth(&self, pes: &PartyEvents, ident: &MultipartyIdentifier, v: PartyInternalData)
+        -> RgResult<Vec<OrderFulfillment>> {
         let orders = pes.orders();
         let eth_orders = orders.iter()
             .filter(|o| o.destination.currency_or() == SupportedCurrency::Ethereum)
             .collect_vec();
         let mp_eth_addr = pes.party_public_key.to_ethereum_address_typed()?;
 
+        let mut fulfilled = vec![];
+
         for order in eth_orders {
-            self.fulfill_individual_eth_order(pes, ident, v.clone(), &mp_eth_addr, order).await.log_error().ok();
+            let res = self.fulfill_individual_eth_order(pes, ident, v.clone(), &mp_eth_addr, order).await.log_error().ok();
+            if res.is_some() {
+                fulfilled.push(order.clone());
+            }
         }
-        Ok(())
+        Ok(fulfilled)
     }
 
     async fn fulfill_individual_eth_order(
@@ -222,7 +241,8 @@ impl PartyWatcher {
         Ok((hashes, validation))
     }
 
-    pub async fn mp_send_btc(&self, public_key: &PublicKey, identifier: &MultipartyIdentifier, outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<String> {
+    pub async fn mp_send_btc(&self, public_key: &PublicKey, identifier: &MultipartyIdentifier,
+                             outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<ExternalTransactionId> {
         // TODO: Split this lock into a separate function?
 
         let (hashes, validation) = self.payloads_and_validation(outputs, public_key, ps).await?;
@@ -248,7 +268,11 @@ impl PartyWatcher {
         }
         w.sign()?;
         w.broadcast_tx()?;
-        Ok(w.txid()?)
+        let string = w.txid()?;
+        let mut txid = ExternalTransactionId::default();
+        txid.identifier = string.clone();
+        txid.currency = SupportedCurrency::Bitcoin as i32;
+        Ok(txid)
     }
     pub async fn mp_send_rdg_tx(&self, tx: &mut Transaction, identifier: MultipartyIdentifier) -> RgResult<SubmitTransactionResponse> {
         let mut validation = structs::PartySigningValidation::default();
@@ -275,7 +299,11 @@ pub struct OrderFulfillment {
     pub tx_id_ref: Option<ExternalTransactionId>,
     pub destination: Address,
     pub is_stake_withdrawal: bool,
-    pub stake_withdrawal_fulfilment_utxo_id: Option<UtxoId>
+    pub stake_withdrawal_fulfilment_utxo_id: Option<UtxoId>,
+    pub primary_event: AddressEvent,
+    pub prior_related_event: Option<AddressEvent>,
+    pub successive_related_event: Option<AddressEvent>,
+    pub fulfillment_txid_external: Option<ExternalTransactionId>
 }
 
 impl OrderFulfillment {

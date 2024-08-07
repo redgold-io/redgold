@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, SupportedCurrency};
+use crate::party::address_event::AddressEvent;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::party_stream::PartyEvents;
 use crate::party::price_volume::PriceVolume;
@@ -95,7 +97,8 @@ impl CentralPricePair {
         is_ask: bool,
         event_time: i64,
         tx_id: Option<ExternalTransactionId>,
-        destination: &Address
+        destination: &Address,
+        primary_event: AddressEvent
     ) -> Option<OrderFulfillment> {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
@@ -168,6 +171,10 @@ impl CentralPricePair {
                 destination: destination.clone(),
                 is_stake_withdrawal: false,
                 stake_withdrawal_fulfilment_utxo_id: None,
+                primary_event,
+                prior_related_event: None,
+                successive_related_event: None,
+                fulfillment_txid_external: None     ,
             })
         }
     }
@@ -300,7 +307,7 @@ fn debug_calculate_sample_prices() {
 
     let bpp = cpp.get(&SupportedCurrency::Bitcoin).unwrap();
     let f = bpp.fulfill_taker_order(
-        10_000, false, 1000, None, &Address::default()
+        10_000, false, 1000, None, &Address::default(), AddressEvent::External(ExternalTimedTransaction::default())
     ).unwrap();
     let fra = f.fulfilled_currency_amount().to_fractional();
     println!("Fulfillment: {}", f.json_pretty_or());
