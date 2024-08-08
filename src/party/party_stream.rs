@@ -344,9 +344,8 @@ impl PartyEvents {
         }
     }
 
-    pub async fn process_locally_fulfilled_orders(&mut self, orders: Vec<OrderFulfillment>) -> RgResult<()> {
+    pub fn process_locally_fulfilled_orders(&mut self, orders: Vec<OrderFulfillment>){
         self.locally_fulfilled_orders.extend(orders);
-        Ok(())
     }
     pub async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()> {
         self.events.push(e.clone());

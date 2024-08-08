@@ -168,7 +168,7 @@ pub fn dev_balance_check() {
 
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn send_test_btc_staking_tx() {
     let network = NetworkEnvironment::Dev;
@@ -258,7 +258,7 @@ pub async fn send_test_btc_staking_tx() {
 
         nc.tx_builder().with_input_address(&rdg_address)
             .with_auto_utxos().await.expect("utxos")
-            .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.05).unwrap(), &amm_rdg_address)
+            .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.0456).unwrap(), &amm_rdg_address)
             .unwrap()
             .build()
             .unwrap()

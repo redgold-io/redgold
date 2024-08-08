@@ -129,6 +129,12 @@ def count_tokens(text):
     return len(encoding.encode(text, disallowed_special=()))
 
 
+def all_repo_contents():
+    config = ScanConfig()
+    ac = AccumFileData.from_config(config)
+    return ac.contents_all()
+
+
 # Test function
 def test_scan_tld():
     config = ScanConfig()
