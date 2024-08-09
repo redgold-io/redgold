@@ -361,6 +361,12 @@ jobs:
       - run: echo steps.check-branch.outputs.match
       - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
+      - name: Install GMP
+        run: brew install gmp
+      - name: Set GMP environment variables
+        run: |
+          echo "LIBRARY_PATH=$(brew --prefix gmp)/lib" >> $GITHUB_ENV
+          echo "CPATH=$(brew --prefix gmp)/include" >> $GITHUB_ENV
       - if:
           contains('
           refs/heads/staging
