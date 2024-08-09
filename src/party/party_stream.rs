@@ -276,6 +276,10 @@ impl PartyEvents {
         }
 
         for (of, ae) in &self.unfulfilled_external_withdrawals {
+            // Disable stake withdrawals temporarily on mainnet
+            if of.is_stake_withdrawal && self.network.is_main() {
+                continue;
+            }
             let mpc_claims_fulfillment = self.locally_fulfilled_orders.iter().filter(|f| &f.primary_event == ae)
                 .next().is_some();
             match ae {
