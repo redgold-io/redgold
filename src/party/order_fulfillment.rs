@@ -4,6 +4,7 @@ use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::MemoryDatabase;
 use itertools::Itertools;
 use log::{error, info};
+use metrics::gauge;
 use serde::{Deserialize, Serialize};
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
@@ -11,6 +12,7 @@ use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
@@ -66,6 +68,29 @@ impl PartyWatcher {
                 let num_external_incoming = ps.num_external_incoming_events();
                 let num_eth_tx = v.network_data.get(&SupportedCurrency::Ethereum).map(|d| d.transactions.len())
                     .unwrap_or(0);
+
+                let party_pk_hex = key.hex();
+
+                let pk_label = ["party_key", party_pk_hex.as_str()];
+
+                gauge!("redgold_party_rdg_balance", &pk_label).set(rdg_starting_balance as f64);
+                gauge!("redgold_party_btc_balance", &pk_label).set(btc_starting_balance as f64);
+                gauge!("redgold_party_eth_balance", &pk_label).set(eth_balance.parse::<f64>().unwrap_or(0.0));
+                gauge!("redgold_party_num_events", &pk_label).set(num_events as f64);
+                gauge!("redgold_party_num_unconfirmed", &pk_label).set(num_unconfirmed as f64);
+                gauge!("redgold_party_num_unfulfilled_deposits", &pk_label).set(num_unfulfilled_deposits as f64);
+                gauge!("redgold_party_num_unfulfilled_withdrawals", &pk_label).set(num_unfulfilled_withdrawals as f64);
+                gauge!("redgold_party_num_utxos", &pk_label).set(utxos.len() as f64);
+                gauge!("redgold_party_num_pending_stake_deposits", &pk_label).set(num_pending_stake_deposits as f64);
+                gauge!("redgold_party_fulfilled", &pk_label).set(fulfilled as f64);
+                gauge!("redgold_party_internal_staking_events", &pk_label).set(internal_staking_events as f64);
+                gauge!("redgold_party_external_staking_events", &pk_label).set(external_staking_events as f64);
+                gauge!("redgold_party_rejected_stake_withdrawals", &pk_label).set(rejected_stake_withdrawals as f64);
+                gauge!("redgold_party_num_internal_events", &pk_label).set(num_internal_events as f64);
+                gauge!("redgold_party_num_external_events", &pk_label).set(num_external_events as f64);
+                gauge!("redgold_party_num_external_incoming", &pk_label).set(num_external_incoming as f64);
+                gauge!("redgold_party_num_eth_tx", &pk_label).set(num_eth_tx as f64);
+
 
                 info!("\
                 watcher balances: RDG:{}, BTC:{}, ETH:{} ETH_address={} \

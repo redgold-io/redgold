@@ -14,7 +14,6 @@ use std::time::Duration;
 use futures::StreamExt;
 use itertools::Itertools;
 use metrics::{counter, gauge};
-use rocket::form::validate::Contains;
 use tokio_stream::Elapsed;
 use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::structs::{ErrorInfo, Hash, PublicKey, Transaction, TransactionEntry, UtxoId};

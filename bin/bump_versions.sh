@@ -1,16 +1,14 @@
 #!/bin/bash
 
-
-script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # https://stackoverflow.com/a/246128/1826109
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 echo "Script dir: $script_dir"
-
 
 bump_patch_version() {
   # Parse version
   local version=$("$script_dir/get_version.sh")
-  local major=$(echo $version | cut -d. -f1)
-  local minor=$(echo $version | cut -d. -f2)
-  local patch=$(echo $version | cut -d. -f3)
+  local major=$(echo $version | awk -F. '{print $1}')
+  local minor=$(echo $version | awk -F. '{print $2}')
+  local patch=$(echo $version | awk -F. '{print $3}')
 
   # Bump patch version
   patch=$((patch + 1))
@@ -21,38 +19,16 @@ bump_patch_version() {
   echo "$new_version $(pwd)"
 
   # Replace the version in the top level 3rd line of file
-  sed -i '' "3s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
+  sed -i.bak "3s/version = \".*\"/version = \"$new_version\"/" Cargo.toml && rm Cargo.toml.bak
 
   # Replace the redgold module versions
-  sed -i '' "/^redgold-/s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
-
+  sed -i.bak "/^redgold-/s/version = \".*\"/version = \"$new_version\"/" Cargo.toml && rm Cargo.toml.bak
 }
-
 
 set -e
 
 bump_patch_version
 
-cd schema
-bump_patch_version
-cd ..
-
-cd data
-bump_patch_version
-cd ..
-
-cd executor
-bump_patch_version
-cd ..
-
-cd keys
-bump_patch_version
-cd ..
-
-cd sdk
-bump_patch_version
-cd ..
-
-cd sdk-client
-bump_patch_version
-cd ..
+for dir in schema data executor keys sdk sdk-client; do
+  (cd "$dir" && bump_patch_version)
+done

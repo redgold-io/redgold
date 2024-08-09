@@ -313,7 +313,7 @@ async fn e2e_tick(c: &mut LiveE2E) -> Result<(), ErrorInfo> {
             match res {
                 Ok(response) => {
                     c.num_success += 1;
-                    info!("Live E2E request success");
+                    // info!("Live E2E request success");
                     counter!("redgold.e2e.success").increment(1);
                     if let Some(q) = response.query_transaction_response {
                         gauge!("redgold.e2e.num_peers").set(q.observation_proofs.len() as f64);
