@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-// use crossbeam_channel::{unbounded, Receiver, Sender};
 use dashmap::mapref::entry::Entry;
 use flume::{Sender, TryRecvError};
 use futures::{TryFutureExt, TryStreamExt};
@@ -605,7 +604,8 @@ impl TransactionProcessContext {
         // TODO: Query our internal datastore for all obs proofs, and extend based on that
 
         // TODO: periodic process to clean mempool in event of thread processing crash?
-        let peers = self.relay.ds.peer_store.active_nodes(None).await?;
+        let peers = self.relay.trusted_nodes().await?;
+        // let peers = self.relay.ds.peer_store.active_nodes(None).await?;
         let mut obs_proof_req = Request::default();
         obs_proof_req.query_observation_proof_request = Some(QueryObservationProofRequest {
             hash: Some(hash.clone())

@@ -361,6 +361,18 @@ pub struct StrictRelay {}
 // as the other 'half' here.
 impl Relay {
 
+    // TODO: More granular function than this. Also memory efficiency.
+    pub async fn trusted_nodes(&self) -> RgResult<Vec<PublicKey>> {
+        let mut res = vec![];
+        for pk in self.ds.peer_store.active_nodes(None).await? {
+            let t = self.get_security_rating_trust_of_node(&pk).await?;
+            if t.unwrap_or(0.0) > 0.1 {
+                res.push(pk);
+            }
+        }
+        Ok(res)
+    }
+
     pub async fn get_trust(&self) -> RgResult<HashMap<PeerId, f64>> {
 
         let peer_tx = self.peer_tx().await?;
