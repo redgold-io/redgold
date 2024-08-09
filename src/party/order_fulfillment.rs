@@ -71,7 +71,7 @@ impl PartyWatcher {
 
                 let party_pk_hex = key.hex();
 
-                let pk_label = ["party_key", party_pk_hex.as_str()];
+                let pk_label = [("party_key".to_string(), party_pk_hex)];
 
                 gauge!("redgold_party_rdg_balance", &pk_label).set(rdg_starting_balance as f64);
                 gauge!("redgold_party_btc_balance", &pk_label).set(btc_starting_balance as f64);
