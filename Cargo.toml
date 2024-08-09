@@ -64,10 +64,12 @@ futures = "0.3.1"
 async-trait = "0.1.56"
 num-bigint = "0.4"
 toml = "0.8.12"
+arc-swap = "1.7.1"
+
 
 [dependencies]
 redgold-schema = {workspace = true}
-
+arc-swap = {workspace = true}
 sha3 = {workspace = true}
 #redgold-sdk-client = {workspace = true}
 tempfile = "3.3.0"

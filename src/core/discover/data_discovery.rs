@@ -14,7 +14,8 @@ pub struct DataDiscovery {
 #[async_trait]
 impl IntervalFold for DataDiscovery {
     async fn interval_fold(&mut self) -> RgResult<()> {
-        let n = self.relay.ds.peer_store.active_nodes(None).await?;
+        let n = self.relay.trusted_nodes().await?;
+        // let n = self.relay.ds.peer_store.active_nodes(None).await?;
         for node in n {
             let mut r = Request::default();
             r.recent_transactions_request = Some(RecentDiscoveryTransactionsRequest{

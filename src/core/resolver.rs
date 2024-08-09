@@ -352,7 +352,8 @@ impl ResolvedTransaction {
 pub async fn resolve_transaction(tx: &Transaction, relay: Relay
                                  // , runtime: Arc<Runtime>
 ) -> Result<ResolvedTransaction, ErrorInfo> {
-    let peers = relay.ds.peer_store.active_nodes(None).await?;
+    // let peers = relay.ds.peer_store.active_nodes(None).await?;
+    let peers = relay.trusted_nodes().await?;
     let mut resolved_internally = true;
     let mut vec = vec![];
     let time = tx.time()?.clone();
