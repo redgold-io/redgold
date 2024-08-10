@@ -436,9 +436,6 @@ jobs:
         id: check-branch
         run: ./bin/release_branches.sh
         shell: bash
-#      - run: ./bin/install_build_deps.sh
-#      - run: ./bin/sqlx_prepare.sh
-#      - run: ls -lA .sqlx
       - name: Cargo Publish
         if:
           contains('
@@ -448,7 +445,6 @@ jobs:
           echo "Branch is release branch, doing cargo publish"
           cargo login ${{ secrets.CARGO_TOKEN }} &&
           ./bin/install_build_deps.sh &&
-#          ./bin/sqlx_prepare.sh &&
           ./bin/cargo_publish.sh
 
 
