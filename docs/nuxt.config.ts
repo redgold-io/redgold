@@ -8,9 +8,15 @@ export default defineNuxtConfig({
     // https://github.com/nuxt/devtools
     '@nuxt/devtools'
   ],
-  target: 'static', // default is 'server'
+
+  // default is 'server'
+  target: 'static',
+
   ssr: true,
+
   head: { // this doesn't seem to work
     link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.png' }]
-  }
+  },
+
+  compatibilityDate: '2024-08-09'
 })
