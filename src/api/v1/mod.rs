@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use async_trait::async_trait;
 use futures::TryFutureExt;
+use itertools::Itertools;
 use serde::Serialize;
 use sha3::digest::generic_array::functional::FunctionalSequence;
 use warp::{Filter, Rejection};
@@ -156,6 +157,20 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             api_data.relay.ds.config_store.get_genesis().await
         });
 
+    let party_data = warp::get()
+        .with_v1()
+        .and(warp::path("party"))
+        .and(warp::path("data"))
+        .with_relay_and_ip(r.clone())
+        .and_then_as(move |api_data: ApiData| async move {
+            let data = api_data.relay.external_network_shared_data.clone_read().await;
+            data.iter().map(|(k, v)| {
+                let mut v = v.clone();
+                v.clear_sensitive();
+                v
+            }).collect_vec()
+        });
+
     let transaction_get = warp::get()
         .with_v1()
         .and(warp::path("transaction"))
@@ -190,6 +205,7 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(table_sizes)
         .or(seeds)
         .or(genesis)
+        .or(party_data)
         .or(transaction_get)
 
 }
