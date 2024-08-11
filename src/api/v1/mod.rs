@@ -164,11 +164,12 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .with_relay_and_ip(r.clone())
         .and_then_as(move |api_data: ApiData| async move {
             let data = api_data.relay.external_network_shared_data.clone_read().await;
-            data.iter().map(|(k, v)| {
+            let cleared = data.iter().map(|(k, v)| {
                 let mut v = v.clone();
                 v.clear_sensitive();
                 v
-            }).collect_vec()
+            }).collect_vec();
+            Ok(cleared)
         });
 
     let transaction_get = warp::get()

@@ -5,7 +5,8 @@ import tiktoken
 def directory_exclusions():
     return [
         ".git", "target", "node_modules", ".idea", "experiments", "venv", ".nuxt", ".output", "dist",
-        ".sqlx"
+        ".sqlx",
+        "ignore-data"
     ]
 
 def endings_exclusions():
