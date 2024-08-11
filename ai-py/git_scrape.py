@@ -29,9 +29,9 @@ def format_issues(issues):
         labels = " ".join([f"#{label['name']}" for label in issue['labels']])
         created_at = datetime.strptime(issue['created_at'], "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M:%S")
         updated_at = datetime.strptime(issue['updated_at'], "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%d %H:%M:%S")
-
+        created_by = issue['user']['login']
         formatted_issue = (
-            f"{issue['state']} {issue['number']} - {issue['title']} - {labels}\n"
+            f"{issue['state']} - {created_by} - {issue['number']} - {issue['title']} - {labels}\n"
             f"{issue['body']}\n"
             f"created_at: {created_at}, updated_at: {updated_at}\n"
         )

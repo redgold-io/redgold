@@ -27,7 +27,7 @@ use tokio::sync::MutexGuard;
 use tracing::trace;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
@@ -1120,6 +1120,9 @@ impl Relay {
 impl Relay {
     pub(crate) async fn dev_default() -> Self {
         Self::new(NodeConfig::dev_default().await).await
+    }
+    pub(crate) async fn env_default(env: NetworkEnvironment) -> Self {
+        Self::new(NodeConfig::default_env(env).await).await
     }
 }
 

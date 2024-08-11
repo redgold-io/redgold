@@ -287,7 +287,9 @@ pub async fn deploy_redgold(
     let _host = ssh.server.host.clone();
 
     ssh.exes("sudo apt update", p).await?;
-    ssh.exes("sudo apt upgrade -y", p).await?;
+    // Issue here with command hanging.
+    // E: dpkg was interrupted, you must manually run 'sudo dpkg --configure -a' to correct the problem.
+    // ssh.exes("sudo apt upgrade -y", p).await?;
     ssh.exes("docker system prune -a -f", p).await?;
     ssh.exes("apt install -y ufw", p).await?;
     ssh.exes("sudo ufw allow ssh", p).await?;
