@@ -443,9 +443,9 @@ jobs:
           ', github.ref)
         run: |
           echo "Branch is release branch, doing cargo publish"
-          cargo login ${{ secrets.CARGO_TOKEN }} &&
-          ./bin/install_build_deps.sh &&
-          ./bin/cargo_publish.sh
+#          cargo login ${{ secrets.CARGO_TOKEN }} &&
+#          ./bin/install_build_deps.sh &&
+#          ./bin/cargo_publish.sh
 
 
 
