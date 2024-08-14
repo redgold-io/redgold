@@ -11,6 +11,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PeerIdInfo;
+use redgold_schema::util::times;
 use redgold_schema::util::xor_distance::xorfc_hash;
 
 #[derive(Clone)]
@@ -150,7 +151,7 @@ impl PeerStore {
         let mut pool = self.ctx.pool().await?;
 
         let bytes = node.vec();
-        let time = util::current_time_millis();
+        let time = times::current_time_millis();
         let rows = sqlx::query!(
             r#"UPDATE nodes SET last_seen = ?1 WHERE public_key = ?2"#,
             time,
@@ -273,7 +274,7 @@ impl PeerStore {
         let mut pool = self.ctx.pool().await?;
         let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
         let delay = delay.as_millis() as i64;
-        let cutoff = util::current_time_millis() - delay;
+        let cutoff = times::current_time_millis() - delay;
         let cutoff = 0i64;
 
         let rows = sqlx::query!(
@@ -300,7 +301,7 @@ impl PeerStore {
     ) -> Result<Vec<PeerIdNode>, ErrorInfo> {
         let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
         let delay = delay.as_millis() as i64;
-        let cutoff = util::current_time_millis() - delay;
+        let cutoff = times::current_time_millis() - delay;
         let cutoff = 0i64;
 
         DataStoreContext::map_err_sqlx(sqlx::query!(
@@ -359,7 +360,7 @@ impl PeerStore {
         let mut pool = self.ctx.pool().await?;
         let delay = delay.unwrap_or(Duration::from_secs(60*60*24));
         let delay = delay.as_millis() as i64;
-        let cutoff = util::current_time_millis() - delay;
+        let cutoff = times::current_time_millis() - delay;
         let cutoff = 0i64;
 
         // TODO: Fix root cause of last_seen not being update
@@ -482,7 +483,7 @@ impl PeerStore {
     }
 
     pub async fn insert_node(&self, tx: &Transaction) -> Result<i64, ErrorInfo> {
-        let time = util::current_time_millis();
+        let time = times::current_time_millis();
         let mut pool = self.ctx.pool().await?;
         let nmd = tx.node_metadata()?;
         let public_key = nmd.public_key.safe_get()?;

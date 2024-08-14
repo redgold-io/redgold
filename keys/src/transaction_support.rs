@@ -9,7 +9,7 @@ use crate::proof_support::{ProofSupport, PublicKeySupport};
 
 
 
-use redgold_schema::util::current_time_millis;
+use redgold_schema::util::times::current_time_millis;
 use crate::address_external::ToBitcoinAddress;
 
 pub trait TransactionSupport {

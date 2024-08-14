@@ -22,7 +22,7 @@ impl ParquetExporter for DataStore {
 
         info!("Getting time-ordered transactions");
         let txs =
-            self.transaction_store.query_time_transaction_accepted_ordered(0, util::current_time_millis()).await?;
+            self.transaction_store.query_time_transaction_accepted_ordered(0, times::current_time_millis()).await?;
         //
         // info!("Getting time-ordered observations");
         // let obs = self.observation.query_time_observation(0, util::current_time_millis()).await?
@@ -134,8 +134,9 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::util::current_time_millis;
+use redgold_schema::util::times::current_time_millis;
 use redgold_schema::util::timers::PerfTimer;
+use redgold_schema::util::times;
 use crate::parquet_min_index::{transaction_simple_parquet_schema, translate_tx_simple};
 
 

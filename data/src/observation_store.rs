@@ -1,9 +1,10 @@
 use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use redgold_schema::structs::{ErrorInfo, Hash, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction, TransactionEntry};
-use redgold_schema::{RgResult, structs, util};
+use redgold_schema::{RgResult, structs};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::util::times;
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
 
@@ -259,7 +260,7 @@ impl ObservationStore {
         let leaf_hash = merkle.and_then(|m| m.leaf.clone()).safe_get()?.vec();
         let obs_hash = proof.observation_hash.safe_get()?.vec();
         let observed_hash = proof.metadata.safe_get()?.observed_hash.safe_get()?.vec();
-        let time = util::current_time_millis();
+        let time = times::current_time_millis();
         let rows = sqlx::query!(
             r#"INSERT OR REPLACE INTO observation_edge
             (root, leaf_hash, observation_hash, observed_hash, edge, time) VALUES

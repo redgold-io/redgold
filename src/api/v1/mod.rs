@@ -12,6 +12,7 @@ use warp::reply::{Json, Response};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::public_key_parse_support::PublicKeyParseSupport;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{CurrencyAmount, Hash, SupportedCurrency};
 use crate::api::as_warp_json_response;
@@ -172,6 +173,21 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             Ok(cleared)
         });
 
+    let party_key = warp::get()
+        .with_v1()
+        .and(warp::path("party"))
+        .and(warp::path("key"))
+        .with_relay_and_ip(r.clone())
+        .and_then_as(move |api_data: ApiData| async move {
+            let data = api_data.relay.external_network_shared_data.clone_read().await;
+            let cleared = data.iter().filter(|(k, v)| {
+                v.active_self()
+            }).flat_map(|(k, v)| v.party_info.party_key.clone())
+                .map(|k| k.hex())
+                .next();
+            Ok(cleared)
+        });
+
     let transaction_get = warp::get()
         .with_v1()
         .and(warp::path("transaction"))
@@ -206,6 +222,7 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(table_sizes)
         .or(seeds)
         .or(genesis)
+        .or(party_key)
         .or(party_data)
         .or(transaction_get)
 

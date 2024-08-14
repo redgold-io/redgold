@@ -1,11 +1,9 @@
-use log::info;
-use redgold_schema::structs::{ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, LocalKeyShare, PartyData, PartyInfo, Proof, PublicKey, RoomId};
-use redgold_schema::{RgResult};
-use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::{ErrorInfo, InitiateMultipartySigningRequest, PartyData, PartyInfo, Proof, PublicKey, RoomId};
+use redgold_schema::RgResult;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::DataStoreContext;
 use crate::schema::SafeOption;
-use redgold_schema::util;
+use redgold_schema::util::times;
 
 #[derive(Clone)]
 pub struct MultipartyStore {
@@ -198,7 +196,7 @@ impl MultipartyStore {
         let keygen_room_id = keygen_room_id.vec();
         let room_id = room_id.vec();
 
-        let time = util::current_time_millis();
+        let time = times::current_time_millis();
         let proof_vec = proof.proto_serialize();
         let init = initiate_signing.proto_serialize();
         let rows = sqlx::query!(

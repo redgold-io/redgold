@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::{error_code, error_info, error_message, RgResult, SafeOption, structs, util};
+use crate::{error_code, error_info, error_message, RgResult, SafeOption, structs};
 use crate::constants::MAX_INPUTS_OUTPUTS;
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
@@ -8,6 +8,7 @@ use crate::pow::TransactionPowValidate;
 use crate::proto_serde::ProtoSerde;
 use crate::structs::{NetworkEnvironment, Transaction, UtxoId};
 use crate::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
+use crate::util::times;
 
 pub trait SchemaValidationSupport {
     fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()>;
@@ -124,7 +125,7 @@ impl SchemaValidationSupport for Transaction  {
     }
 
     fn validate_current_time(&self, max_delta: Option<i64>) -> RgResult<()> {
-        let current_time = util::current_time_millis();
+        let current_time = times::current_time_millis();
         let max_delta = max_delta.unwrap_or(1000 * 60 * 15); // 15 minutes delay
         let this_time = self.time()?.clone();
         if this_time > current_time {

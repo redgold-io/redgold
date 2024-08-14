@@ -2,3 +2,6 @@ anthropic
 simplematrixbotlib
 google-generativeai
 git+https://github.com/microsoft/monitors4codegen/archive/main.zip
+elasticsearch
+tree-sitter
+tree-sitter-rust

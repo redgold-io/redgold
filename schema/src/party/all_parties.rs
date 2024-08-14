@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 use crate::structs::{PartyInfo, PublicKey};
-use crate::{structs, util};
+use crate::util::times;
 
 #[derive(Clone)]
 pub struct AllParties {
@@ -36,7 +36,7 @@ impl AllParties {
                 if let Some(party_key) = party.host_public_key() {
                     let deprecated_party = priors.contains(party_key);
                     let has_successor = party.successor_key.is_some();
-                    let month_ago = util::current_time_millis() - 1000 * 60 * 60 * 24 * 30;
+                    let month_ago = times::current_time_millis() - 1000 * 60 * 60 * 24 * 30;
                     let expired_time = party.expired_time.unwrap_or(0);
                     let expired = expired_time < month_ago;
                     let marked_as_done = deprecated_party || has_successor;

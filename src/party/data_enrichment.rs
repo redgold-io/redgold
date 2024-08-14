@@ -45,6 +45,10 @@ impl PartyInternalData {
         self.party_info.not_debug() && self.party_info.self_initiated.unwrap_or(false)
     }
 
+    pub fn active_self(&self) -> bool {
+        self.party_info.active() && self.party_info.self_initiated.unwrap_or(false)
+    }
+
 
 }
 

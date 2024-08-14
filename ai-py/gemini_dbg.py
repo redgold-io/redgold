@@ -7,13 +7,29 @@ import repo_reader
 system = """
 You are a PM helper for AI development agents. Your role is to ingest a large amount of 
 content related to a particular programming repo, in order to understand how to create 
-and modify issues which will be worked on by AI agents. Please keep in mind the outputs 
+a single new issue which will be worked on by AI agents. Please keep in mind the outputs 
 you are constructing are intended for use by other LLMs which are lacking large scale context 
-information. Please attempt to read in all the ignore-data related to a request, and output information 
+information. Please attempt to read in all the data related to a request, and output information 
 for use in creation of a new ticket that is the highest priority AND must be suitable for AI LLM agent to 
-work on. Please focus on issues that are simple, easy to explain, do not require visualization or the UI, 
-do not involve complex system tests, and are a positive contribution. You will be given input corresponding 
+work on. Please focus on outputting a SINGLE issue that is simple, easy to explain, does not require visualization 
+or the UI, does not involve complex system tests, and is a positive contribution. You will be given input corresponding 
 to all the text ignore-data in the code repository, along with text contents of all the existing git issues and tags.
+
+After you have seen all the issues and code associated with this code repository, please create a new 
+issue for an AI LLM to work on. It should not be a duplicate issue. It should be an important issue to work on. 
+It should have a long, detailed description. It should be a positive contribution to the project. It should not 
+require a human to solve. It should be written as a specification for an AI LLM agent to implement.
+
+Please format your output as JSON, it should look like this
+{
+  "title": "New Issue",
+  "body": "This is the body of the new issue."
+  "tags": ["tag1", "tag2"]
+}
+
+Please limit yourself to outputting only ONE issue. You'll be invoked again to generate a new one, so please 
+choose a new unique issue each time.
+
 """
           # "related to the ticket priority of existing tasks and suitability for use in AI agents, and "
           # "second for generating new issues with complete summary and description and citations of the code "
@@ -44,21 +60,7 @@ contents += "\n"
 contents += repo_reader.all_repo_contents()
 
 instruct = """
-Now that you have seen all the issues and code associated with this code repository, please create a new 
-issue for an AI LLM to work on. It should not be a duplicate issue. It should be an important issue to work on. 
-It should have a long, detailed description. It should be a positive contribution to the project. It should not 
-require a human to solve. It should be written as a specification for an AI LLM agent to implement.
-
-Please format your output as JSON, it should look like this
-{
-  "title": "New Issue",
-  "body": "This is the body of the new issue."
-  "tags": ["tag1", "tag2"]
-}
-
-Please limit yourself to outputting only ONE issue. You'll be invoked again to generate a new one, so please 
-choose a new unique issue each time.
-
+ALL context data has now been supplied, please generate a new issue now corresponding to the JSON spec.
 """
 
 inputs = "\n\n".join([issues, contents, instruct])
@@ -73,12 +75,12 @@ with open("ignore-data/gemini_input.txt", "w") as f:
 import google.generativeai as genai
 import os
 
-# genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-genai.configure(api_key=os.environ["GEMINI_FREE_API_KEY"])
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+# genai.configure(api_key=os.environ["GEMINI_FREE_API_KEY"])
 
 
-# model_name = "gemini-1.5-pro"
-model_name = "gemini-1.5-flash"
+model_name = "gemini-1.5-pro"
+# model_name = "gemini-1.5-flash"
 model = genai.GenerativeModel(model_name=model_name)
 
 # this doesn't work
@@ -103,7 +105,7 @@ print(response.text)
 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 # Create the directory
-dir_path = f"/data/{timestamp}"
+dir_path = f"./ignore-data/{timestamp}"
 os.makedirs(dir_path, exist_ok=True)
 
 # Save as text file

@@ -19,7 +19,7 @@ use structs::{
 };
 use observability::errors::EnhanceErrorInfo;
 use proto_serde::{ProtoHashable, ProtoSerde};
-
+use util::{lang_util, times};
 use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
 
 pub mod structs {
@@ -130,7 +130,7 @@ pub fn struct_metadata(time: i64) -> Option<StructMetadata> {
 }
 
 pub fn struct_metadata_new() -> Option<StructMetadata> {
-    struct_metadata(util::current_time_millis())
+    struct_metadata(times::current_time_millis())
 }
 //
 // pub trait SafeBytesAccess {
@@ -543,12 +543,12 @@ impl NetworkEnvironment {
     }
     pub fn parse(from_str: String) -> Self {
         let mut n = from_str.clone();
-        let string2 = util::make_ascii_titlecase(&mut *n);
+        let string2 = lang_util::make_ascii_titlecase(&mut *n);
         NetworkEnvironment::from_str(&*string2).expect("error parsing network environment")
     }
     pub fn parse_safe(from_str: String) -> Result<Self, ErrorInfo> {
         let mut n = from_str.clone();
-        let string2 = util::make_ascii_titlecase(&mut *n);
+        let string2 = lang_util::make_ascii_titlecase(&mut *n);
         NetworkEnvironment::from_str(&*string2).error_info("error parsing network environment")
     }
 

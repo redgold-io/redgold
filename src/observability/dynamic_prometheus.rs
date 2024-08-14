@@ -8,8 +8,12 @@ use tokio_stream::StreamExt;
 use redgold_schema::ErrorInfoContext;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata};
 use serde::{Deserialize, Serialize};
+use tracing_subscriber::fmt::format;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser, json_from};
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::seeds::get_seeds_by_env_time;
+use redgold_schema::util::lang_util::AnyPrinter;
+use redgold_schema::util::times::current_time_millis;
 use crate::core::relay::Relay;
 use crate::infra::deploy::{SSHLike, SSHProcessInvoke};
 use crate::node::Node;
@@ -91,12 +95,22 @@ async fn update_tick(relay: &Relay) -> Result<(), ErrorInfo> {
     if std::env::var("REDGOLD_GRAFANA_PUBLIC_WRITER").is_ok() {
 
         let targets_path = folder.targets().to_str().expect("str").to_string();
+        let targets_path = format!("{}.debug", targets_path);
         // info!("Updating grafana public targets {}", targets_path.clone());
+
+        SSHProcessInvoke::new("grafana-public-node.redgold.io", None)
+            .execute(format!("rm -rf {}", targets_path.clone()), None).await
+            .add("Failed to update grafana public targets at")
+            .add(targets_path.clone())
+            .log_error().ok();
+
         SSHProcessInvoke::new("grafana-public-node.redgold.io", None)
             .scp(targets_path.clone(), targets_path.clone(), true, None).await
             .add("Failed to update grafana public targets at")
-            .add(targets_path)
+            .add(targets_path.clone())
             .log_error().ok();
+
+
     };
     Ok(())
 }
@@ -124,4 +138,27 @@ async fn debug_targets() {
     // Need to update peer node info to genesis peer node info maybe?
     relay.ds.peer_store.add_peer_new(&relay2.peer_node_info().await.expect(""), &nc.public_key()).await.unwrap();
     update_tick(&relay).await.unwrap();
+}
+
+#[tokio::test]
+async fn produce_test_json() {
+    let mut env_targets = vec![];
+    for env in NetworkEnvironment::status_networks() {
+        if env == NetworkEnvironment::Predev {
+            continue;
+        }
+
+        let mut targets = vec![];
+        for node in get_seeds_by_env_time(&env, current_time_millis()) {
+            let addr = node.external_address.clone();
+            let port = node.port_or(env.default_port_offset()) - 1;
+            targets.push(format!("{}:{}", addr, port))
+        }
+        let t = PrometheusTargetEntry {
+            labels: PrometheusLabels { job: "dynamic".to_string(), environment: env.to_std_string() },
+            targets,
+        };
+        env_targets.push(t);
+    }
+    env_targets.json_or().print();
 }

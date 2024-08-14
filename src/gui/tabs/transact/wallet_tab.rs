@@ -79,6 +79,12 @@ pub enum SendReceiveTabs {
     // Swap
 }
 
+#[derive(Clone, PartialEq, EnumString)]
+pub enum CustomTransactionType {
+    Swap,
+    Stake
+}
+
 // #[derive(Clone)]
 pub struct WalletState {
     pub tab: WalletTab,
@@ -547,8 +553,11 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
         ui.label("Amount");
         let string = &mut ls.wallet_state.amount_input;
         ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
-        ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
-        ui.checkbox(&mut ls.wallet_state.mark_output_as_swap, "Mark as Swap");
+        // ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
+        // ui.checkbox(&mut ls.wallet_state.mark_output_as_swap, "Mark as Swap");
+        // if ls.wallet_state.mark_output_as_stake {
+        //     ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
+        // }
     });
 
 }

@@ -4,7 +4,7 @@ use rocket::form::validate::Contains;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Hash, Transaction, UtxoEntry, UtxoId};
-use redgold_schema::util::ToTimeString;
+use redgold_schema::util::times::ToTimeString;
 use crate::core::relay::Relay;
 use crate::util;
 

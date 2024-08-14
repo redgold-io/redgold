@@ -3,6 +3,10 @@ use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyI
 
 impl PartyInfo {
 
+    pub fn active(&self) -> bool {
+        self.state == PartyState::Active as i32
+    }
+
     pub fn clear_sensitive(&mut self) -> &mut Self {
         self.local_key_share = None;
         self

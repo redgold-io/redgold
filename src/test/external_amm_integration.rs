@@ -15,18 +15,15 @@ use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 // Use this for testing AMM transactions.
 
 pub fn amm_btc_address(network_environment: NetworkEnvironment) -> String {
-    match network_environment {
-        NetworkEnvironment::Dev => { "tb1q4zkz4qlkdkwhwry88a4pk82plcp5fnzmh2y53w" }
-        NetworkEnvironment::Staging => { "tb1qftm7w70xmr7xplzp6w6ntxs4dygxtd2evc7x2e" }
-        _ => { panic!("not implemented"); }
-    }.to_string()
+    amm_public_key(&network_environment)
+        .to_bitcoin_address_typed(&network_environment).expect("address").render_string().expect("address")
 }
 pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
     let pk_hex = match network_environment {
         // NetworkEnvironment::Main => {}
         // NetworkEnvironment::Test => {}
         NetworkEnvironment::Dev => {"0a230a210266f48bc55acec1647168d40fe827359f9b1f8ca457a0c6b111a1881f84aaea46"}
-        // NetworkEnvironment::Staging => {"02efbe0b97d823da74ef2d88b2321d4e52ce2f62b137b0b5c5b415be9e40a9ca15"}
+        NetworkEnvironment::Staging => {"0a230a210214e61824f16e43e769df927ec13148b9f8e9596800878fa76cef3edbc1eb5373"}
         _ => { panic!("not implemented"); }
     };
     PublicKey::from_hex(pk_hex.to_string()).expect("pk")
@@ -45,15 +42,20 @@ pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
     }
 }
 
-#[ignore]
-#[tokio::test]
-pub async fn debug_kp() {
-    if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
-        let path = "m/84'/0'/0'/0/0".to_string();
-        let w = WordsPass::words(w);
-        // w.xpub()
-    }
+pub async fn send_btc(amount: i64, net: &NetworkEnvironment) {
+    let (privk, kp) = dev_ci_kp().expect("keys");
+    let pk = kp.public_key();
+    let mut w =
+        SingleKeyBitcoinWallet::new_wallet(pk, net.clone(), true)
+            .expect("w");
+    let a = w.address().expect("works");
+    println!("wallet address: {a}");
+    let b = w.get_wallet_balance().expect("balance");
+    println!("wallet balance: {b}");
+    let res = w.send_local(amm_btc_address(net.clone()), amount as u64, privk).expect("send");
+    println!("txid: {res}");
 }
+
 
 #[ignore]
 #[tokio::test]
@@ -166,12 +168,33 @@ pub fn dev_balance_check() {
 
 
 
+pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
+    let nc = NodeConfig::default_env(network.clone()).await;
+    let internal_stake_amount = CurrencyAmount::from_fractional(amt).expect("works");
+    let (privk, kp) = dev_ci_kp().expect("keys");
+    let pk = kp.public_key();
+    let rdg_address = pk.address().expect("address");
+    let amm_rdg_address = amm_public_key(&network).address().expect("address");
+    let internal_stake_tx = TransactionBuilder::new(&nc)
+        .with_input_address(&rdg_address)
+        .with_auto_utxos().await.expect("utxos")
+        .with_internal_stake_usd_bounds(
+            None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
+        )
+        .build()
+        .expect("build")
+        .sign(&kp)
+        .expect("sign");
+    let response = internal_stake_tx.broadcast().await.expect("broadcast").json_or();
+    println!("response: {response}");
+
+}
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
-pub async fn send_test_btc_staking_tx() {
-    let network = NetworkEnvironment::Dev;
+pub async fn amm_flow() {
+    let network = NetworkEnvironment::Staging;
     // let amount_sats = 40000;
 
     let nc = NodeConfig::default_env(network).await;
@@ -181,84 +204,67 @@ pub async fn send_test_btc_staking_tx() {
     // let amount = 1.0;
 
     if let Some((privk, kp)) = dev_ci_kp() {
+
+        // send_internal_stake(100.0, &network).await;
+
         let pk = kp.public_key();
         let rdg_address = pk.address().expect("address");
         println!("pk rdg address: {}", rdg_address.render_string().expect(""));
 
-        let mut w =
-            SingleKeyBitcoinWallet::new_wallet(pk.clone(), NetworkEnvironment::Dev, true)
-                .expect("w");
-        let a = w.address().expect("a");
-        println!("wallet address: {a}");
-        let b = w.get_wallet_balance().expect("balance");
-        println!("wallet balance: {b}");
-        // wallet balance: { immature: 0, trusted_pending: 0, untrusted_pending: 0, confirmed: 3818590 }
-        //
         let btc_amt = CurrencyAmount::from_btc(50_000);
         let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
-        // let stake_tx = TransactionBuilder::new(&nc)
-        //     .with_input_address(&rdg_address)
-        //     .with_auto_utxos().await.expect("utxos")
-        //     .with_external_stake_usd_bounds(None, None, &rdg_address, &btc_address, &btc_amt, &amm_addr, &party_fee_amount)
-        //     .build()
-        //     .expect("build")
-        //     .sign(&kp)
-        //     .expect("sign");
+        let stake_tx = TransactionBuilder::new(&nc)
+            .with_input_address(&rdg_address)
+            .with_auto_utxos().await.expect("utxos")
+            .with_external_stake_usd_bounds(None, None, &rdg_address, &btc_address, &btc_amt, &amm_rdg_address, &party_fee_amount)
+            .build()
+            .expect("build")
+            .sign(&kp)
+            .expect("sign");
         // let response = stake_tx.broadcast().await.expect("broadcast").json_or();
         // println!("response: {response}");
-        //
-        //
-        // let res = w.send_local(amm_btc_address(network), 50_000, privk).expect("send");
-        // println!("txid: {res}");
-        // let internal_stake_amount = CurrencyAmount::from_fractional(100).expect("works");
-        //
-        // let internal_stake_tx = TransactionBuilder::new(&nc)
-        //     .with_input_address(&rdg_address)
-        //     .with_auto_utxos().await.expect("utxos")
-        //     .with_internal_stake_usd_bounds(
-        //         None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
-        //     )
-        //     .build()
-        //     .expect("build")
-        //     .sign(&kp)
-        //     .expect("sign");
-        // let response = internal_stake_tx.broadcast().await.expect("broadcast").json_or();
-        // println!("response: {response}");
-
-
+        // send_btc(50_000, &network).await;
 
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
         let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
         //
-        // let stake_tx = TransactionBuilder::new(&nc)
-        //     .with_input_address(&rdg_address)
-        //     .with_auto_utxos().await.expect("utxos")
-        //     .with_external_stake_usd_bounds(
-        //         None, None, &rdg_address, &dev_ci_eth_addr, &exact_eth_stake_amount, &amm_rdg_address, &party_fee_amount
-        //     )
-        //     .build()
-        //     .expect("build")
-        //     .sign(&kp)
-        //     .expect("sign");
-        // let response = stake_tx.broadcast().await.expect("broadcast").json_or();
-        // println!("response: {response}");
-        // info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
-        // info!("tx_stake tx: {}", tx_stake.json_or());
-        //
+        let stake_tx = TransactionBuilder::new(&nc)
+            .with_input_address(&rdg_address)
+            .with_auto_utxos().await.expect("utxos")
+            .with_external_stake_usd_bounds(
+                None, None, &rdg_address, &dev_ci_eth_addr, &exact_eth_stake_amount, &amm_rdg_address, &party_fee_amount
+            )
+            .build()
+            .expect("build")
+            .sign(&kp)
+            .expect("sign");
+        // stake_tx.broadcast().await.expect("broadcast").json_or().print();
+
         let eth_submit = EthWalletWrapper::new(&privk, &network).expect("works");
+        // let res = eth_submit.send(&amm_eth_address, &exact_eth_stake_amount).await.expect("works");
         // let res = eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works");
         // println!("eth tx: {res}");
 
         // test btc swap
-        //
-        // let res = w.send_local(amm_btc_pk_address.render_string().unwrap(), 6_001, privk).expect("send");
-        // println!("txid: {res}");
+        // send_btc(6_001, &network).await;
 
+        // test rdg->btc swap
         nc.tx_builder().with_input_address(&rdg_address)
             .with_auto_utxos().await.expect("utxos")
             .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.0555).unwrap(), &amm_rdg_address)
+            .unwrap()
+            .build()
+            .unwrap()
+            .sign(&kp)
+            .unwrap()
+            .broadcast().await.expect("broadcast").json_pretty_or().print();
+
+        // test rdg->eth swap
+        nc.tx_builder().with_input_address(&rdg_address)
+            .with_auto_utxos().await.expect("utxos")
+            .with_swap(&dev_ci_eth_addr, &CurrencyAmount::from_fractional(0.0555).unwrap(), &amm_rdg_address)
             .unwrap()
             .build()
             .unwrap()

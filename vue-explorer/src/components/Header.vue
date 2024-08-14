@@ -21,7 +21,7 @@
         <a class="navbar-brand brand" href="/faucet">
           Faucet
         </a>
-        <a class="navbar-brand brand" href="https://grafana.redgold.io">
+        <a class="navbar-brand brand" href="https://grafana.redgold.io/d/pj3zzDu4z/redgold?orgId=1&from=now-30m&to=now">
           Grafana
         </a>
         <div class="navbar-right-links">

@@ -1,3 +1,4 @@
+import dataclasses
 import os
 from pathlib import Path
 import tiktoken
@@ -31,6 +32,12 @@ def endings_inclusions():
         "conf", "ini", "ts"
     ]
 
+@dataclasses.dataclass
+class FileData:
+    path: str
+    contents: str
+    lines: list[str]
+
 class AccumFileData:
     def __init__(self):
         self.good_files = []
@@ -39,6 +46,20 @@ class AccumFileData:
     @classmethod
     def from_config(cls, config):
         return scan_tld(config)
+
+    @classmethod
+    def default(cls):
+        return scan_tld()
+
+    def indexed_files(self):
+        indexed = []
+        for gf in self.good_files:
+            with open(gf, 'r') as file:
+                lines = file.readlines()
+                contents = "\n".join(lines)
+                fd = FileData(str(gf), contents, lines)
+                indexed.append(fd)
+        return indexed
 
     def contents_all(self):
         all_content = ""

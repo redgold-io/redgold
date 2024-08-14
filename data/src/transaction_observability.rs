@@ -1,6 +1,7 @@
-use redgold_schema::{RgResult, SafeOption, util};
+use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ErrorInfo, Hash, Transaction};
+use redgold_schema::util::times;
 use crate::DataStoreContext;
 use crate::transaction_store::TransactionStore;
 
@@ -79,7 +80,7 @@ impl TransactionStore {
         &self, time_filter: Option<i64>, limit: Option<i64>
     ) -> RgResult<u64> {
 
-        let ct = util::current_time_millis();
+        let ct = times::current_time_millis();
         let min_time = ct - (3600*24*7*1000);
         let min_time = time_filter.unwrap_or_else(|| min_time);
         let mut rows_changed = self.delete_rejected_before(min_time).await?;
