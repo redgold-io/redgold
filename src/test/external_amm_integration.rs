@@ -191,7 +191,7 @@ pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn amm_flow() {
     let network = NetworkEnvironment::Staging;
