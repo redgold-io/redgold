@@ -9,7 +9,7 @@ use flume::Sender;
 use std::io::prelude::*;
 use async_trait::async_trait;
 use itertools::Itertools;
-
+use redgold_keys::address_support::AddressSupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{ErrorInfoContext, RgResult, structs};
@@ -18,7 +18,7 @@ use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::Server;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
+use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
 use redgold_schema::util::cmd::{run_bash_async, run_powershell_async};
 use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
@@ -596,7 +596,8 @@ pub async fn derive_mnemonic_and_peer_id(
     servers: Vec<Server>,
     trust: Vec<TrustRatingLabel>,
     peer_id_tx: &mut HashMap<String, structs::Transaction>,
-    net: &NetworkEnvironment
+    net: &NetworkEnvironment,
+    reward_address: Option<String>
 )
     -> RgResult<(String, String)> {
 
@@ -634,7 +635,8 @@ pub async fn derive_mnemonic_and_peer_id(
             peer_id_index as i64,
             pkmap,
             node_config.executable_checksum.clone().expect("exe"),
-            net.clone()
+            net.clone(),
+            reward_address.clone().and_then(|a| a.parse_address().ok()),
         );
         peer_data.labels = trust.clone();
         let mut tb = TransactionBuilder::new(&node_config);

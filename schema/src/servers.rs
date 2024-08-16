@@ -7,7 +7,7 @@ use serde::Deserialize;
 use crate::{ErrorInfoContext, RgResult};
 use crate::helpers::easy_json::json_pretty;
 use crate::observability::errors::EnhanceErrorInfo;
-use crate::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PublicKey, TransportInfo, VersionInfo};
+use crate::structs::{Address, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PublicKey, TransportInfo, VersionInfo};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
@@ -19,7 +19,8 @@ pub struct Server {
     pub username: Option<String>,
     pub ipv4: Option<String>,
     pub node_name: Option<String>,
-    pub external_host: Option<String>
+    pub external_host: Option<String>,
+    pub reward_address: Option<String>
 }
 
 impl Server {
@@ -48,10 +49,12 @@ impl Server {
         peer_id_index: i64,
         pk: HashMap<i64, PublicKey>,
         checksum: String,
-        net: NetworkEnvironment
+        net: NetworkEnvironment,
+        reward_address: Option<Address>
     ) -> &mut PeerMetadata {
         let mut nmds = vec![];
         peer_data.network_environment = net.clone() as i32;
+        peer_data.reward_address = reward_address;
         for s in servers {
             if s.peer_id_index == peer_id_index {
                 let mut nmd = NodeMetadata::default();
@@ -98,6 +101,7 @@ impl Server {
             // TODO: Change to mainnet later
             network_environment: NetworkEnvironment::All.to_std_string(),
             external_host: Some(host_str),
+            reward_address: None,
         }
     }
 

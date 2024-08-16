@@ -158,7 +158,8 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
         i.peer_id_index,
         pkmap,
         ls.node_config.executable_checksum.clone().expect("exe"),
-        ls.node_config.network.clone()
+        ls.node_config.network.clone(),
+        None
     );
     let t = ls.local_stored_state.trust
         .iter().filter(|p| p.peer_id_index == i.peer_id_index)
