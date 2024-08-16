@@ -161,6 +161,7 @@ async fn debug_ssh_invoke() {
         ipv4: None,
         node_name: None,
         external_host: None,
+        reward_address: None,
     };
 
     let mut dm = DeployMachine::new(&s, None, None);
@@ -682,7 +683,8 @@ pub async fn offline_generate_keys_servers(
             servers.clone(),
             vec![],
             &mut pid_tx,
-            &node_config.network
+            &node_config.network,
+            ss.reward_address.clone()
         ).await?;
         let peer_tx = pid_tx.get(&peer_id_hex).expect("").clone();
         let peer_tx_ser = peer_tx.json_or();
@@ -806,7 +808,8 @@ pub async fn default_deploy(
             servers.clone(),
             vec![],
             &mut pid_tx,
-            &net
+            &net,
+            ss.reward_address.clone()
         ).await?;
 
         let mut peer_tx_opt: Option<structs::Transaction> = None;
