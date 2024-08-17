@@ -177,6 +177,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
 
     ui.horizontal(|ui| {
         ui.checkbox(&mut local_state.server_state.ops, "Ops");
+        ui.checkbox(&mut local_state.server_state.system, "Apt/System");
         ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
         ui.checkbox(&mut local_state.server_state.skip_logs, "Skip Logging");
     });
@@ -211,6 +212,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         if d.ops == false {
             d.skip_ops = true;
         }
+        d.disable_apt_system_init = !local_state.server_state.system;
         d.skip_redgold_process = !local_state.server_state.redgold_process;
         d.skip_logs = local_state.server_state.skip_logs;
         d.purge_ops = local_state.server_state.purge_ops;
@@ -374,7 +376,8 @@ pub struct ServersState {
     load_offline_path: String,
     load_offline_deploy: bool,
     show_mixing_password: bool,
-    last_env: NetworkEnvironment
+    last_env: NetworkEnvironment,
+    pub system: bool
 }
 
 impl Default for ServersState {
@@ -404,6 +407,7 @@ impl Default for ServersState {
             load_offline_deploy: false,
             show_mixing_password: false,
             last_env: NetworkEnvironment::Dev,
+            system: true,
         }
     }
 }

@@ -128,43 +128,9 @@ def extract_all_functions(file_path) -> list[RustFunction]:
                 trait_name=trait_name
             )
             ret.append(rf)
-    #
-    # for struct in struct_nodes:
-    #     struct_name = get_type_id_name(struct)
-    #
-    #     # Find implementations for this struct
-    #     struct_impls = [impl for impl in impl_nodes if any(
-    #         get_type_id_name(child) == struct_name for child in impl.children)]
-    #     print(struct_name)
-    #
-    #     print(f"Number of impls for {struct_name}: {len(struct_impls)}")
-    #     for impl in struct_impls:
-    #
-    #         # Get the impl name
-    #         impl_name = get_type_id_name(impl)
-    #         # impl_name = "test"
-    #         # Function to recursively search for function_item nodes
-    #
-    #
-    #         # Find all function_item nodes within the impl block
-    #         function_items = find_functions(impl)
-    #         print(f"Number of functions in {impl_name}: {len(function_items)}")
-    #
-    #         for func in function_items:
-    #             # function_code = file_content[func.start_byte:func.end_byte]
-    #             method_name = get_identifier_name(func)
-    #             s = func.start_point
-    #             e = func.end_point
-    #             print(method_name)
-    #             # rf = RustFunction(filename=file_path, name=method_name, start_line=s.row + 1, start_column=s.column + 1,
-    #             #                   end_line=e.row + 1, end_column=e.column + 1, content=function_code, struct=struct_name, impl_name=impl_name)
-    #             # ret.append(rf)
+
     return ret
 
-
-# for impl / struct name
-
-# for method name
 
 
 def main():

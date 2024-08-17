@@ -280,27 +280,30 @@ pub async fn deploy_redgold(
      start_node: bool,
      alias: Option<String>,
      ser_pid_tx: Option<String>,
-     p: &Option<Sender<String>>
+     p: &Option<Sender<String>>,
+     disable_system: bool
  ) -> Result<(), ErrorInfo> {
 
     ssh.verify().await?;
 
     let _host = ssh.server.host.clone();
-
-    ssh.exes("sudo apt update", p).await?;
-    // Issue here with command hanging.
-    // E: dpkg was interrupted, you must manually run 'sudo dpkg --configure -a' to correct the problem.
-    // ssh.exes("sudo apt upgrade -y", p).await?;
     ssh.exes("docker system prune -a -f", p).await?;
-    ssh.exes("apt install -y ufw", p).await?;
-    ssh.exes("sudo ufw allow ssh", p).await?;
-    ssh.exes("sudo ufw allow in on tailscale0", p).await?;
-    ssh.exes("echo 'y' | sudo ufw enable", p).await?;
 
-    let compose = ssh.exes("docker-compose", p).await?;
-    if !(compose.contains("applications")) {
-        ssh.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
-        ssh.exes("sudo apt install -y docker-compose", p).await?;
+    if !disable_system {
+        ssh.exes("sudo apt update", p).await?;
+        // Issue here with command hanging.
+        // E: dpkg was interrupted, you must manually run 'sudo dpkg --configure -a' to correct the problem.
+        // ssh.exes("sudo apt upgrade -y", p).await?;
+        ssh.exes("apt install -y ufw", p).await?;
+        ssh.exes("sudo ufw allow ssh", p).await?;
+        ssh.exes("sudo ufw allow in on tailscale0", p).await?;
+        ssh.exes("echo 'y' | sudo ufw enable", p).await?;
+
+        let compose = ssh.exes("docker-compose", p).await?;
+        if !(compose.contains("applications")) {
+            ssh.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
+            ssh.exes("sudo apt install -y docker-compose", p).await?;
+        }
     }
     let r = Resources::default();
 
@@ -374,12 +377,14 @@ pub async fn deploy_redgold(
         }
     }
 
-     // TODO: Lol not this
-     let port_range: Vec<i64> = vec![-1, 0, 1, 4, 5, 6];
-     for port_i in port_range {
-         let port_o = (port as i64) + port_i;
-         ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port_o), p).await?;
-     }
+    if !disable_system {
+        // TODO: Lol not this
+        let port_range: Vec<i64> = vec![-1, 0, 1, 4, 5, 6];
+        for port_i in port_range {
+            let port_o = (port as i64) + port_i;
+            ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port_o), p).await?;
+        }
+    }
 
     let env_contents = env.iter().map(|(k, v)| {
         format!("{}={}", k, format!("{}", v))
@@ -395,7 +400,10 @@ pub async fn deploy_redgold(
         println!("Purging data");
         ssh.exes(format!("rm -rf {}/{}", path, "data_store.sqlite"), p).await?;
     }
-    ssh.exes("sudo ufw reload", p).await?;
+
+    if !disable_system {
+        ssh.exes("sudo ufw reload", p).await?;
+    }
     ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
     if start_node {
         ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
@@ -840,7 +848,7 @@ pub async fn default_deploy(
             let peer_ser = std::fs::read_to_string(o).expect("offline info");
             let peer_tx =  peer_ser.json_from::<Transaction>().expect("peer tx");
             peer_tx_opt = Some(peer_tx.clone());
-            peer_id_hex_opt = Some(peer_tx.peer_data().expect("").peer_id.expect("").hex_or());
+            peer_id_hex_opt = Some(peer_tx.peer_data().expect("").peer_id.expect("").hex());
             let words_path = pi.join("mnemonic");
             let words_read = std::fs::read_to_string(words_path).expect("offline info");
             words_opt = Some(words_read);
@@ -872,7 +880,8 @@ pub async fn default_deploy(
                 !deploy.debug_skip_start,
                 ss.node_name.clone(),
                 peer_tx_opt.map(|p| p.json_or()),
-                &output_handler
+                &output_handler,
+                deploy.disable_apt_system_init
             )).await.error_info("Timeout")??;
         }
         gen = false;

@@ -509,7 +509,7 @@ pub async fn handle_observation(otx: &Transaction, _r: &Relay) -> RgResult<Detai
         height: otx.height()?,
         parent_hash: o.parent_id.as_ref().and_then(|h| h.transaction_hash.as_ref().map(|h| h.hex())).unwrap_or("".to_string()),
         peer_id: _r.peer_id_for_node_pk(pbs_pk).await.ok().flatten()
-            .map(|p| p.hex_or()).unwrap_or("".to_string()),
+            .map(|p| p.hex()).unwrap_or("".to_string()),
     })
 }
 
@@ -627,7 +627,7 @@ pub struct ExplorerPoolInfoResponse {
 
 async fn render_pool_member(relay: &Relay, member: &PublicKey, party_len: usize) -> RgResult<PoolMember> {
     Ok(PoolMember {
-        peer_id: relay.ds.peer_store.peer_id_for_node_pk(member).await?.map(|p| p.hex_or()).unwrap_or("".to_string()),
+        peer_id: relay.ds.peer_store.peer_id_for_node_pk(member).await?.map(|p| p.hex()).unwrap_or("".to_string()),
         public_key: member.hex(),
         share_fraction: 1f64/(party_len as f64),
         deposit_rating: 10.0,

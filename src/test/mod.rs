@@ -12,6 +12,7 @@ pub mod local_test_context;
 mod debug_genesis_issue;
 mod debug_balance_issue;
 mod debug_staging_mpc_issue;
+mod debug_main_offline;
 
 fn asdf() {
 

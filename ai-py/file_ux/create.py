@@ -1,8 +1,4 @@
-
-
-def edit_file_replace_lines_tooldef():
-    return
-
+from pathlib import Path
 
 def create_file(input):
     rel: str = input['repository_relative_path']
@@ -13,9 +9,22 @@ def create_file(input):
         with open(rel, "w") as f:
             f.write(content)
         if include_as_rust_pub_mod:
-            with open("lib.rs", "a") as f:
-                f.write(f"pub mod {rel.split('.')[0]};\n")
-
+            # first check if libs.rs exists in the same parent directory
+            # if not, check for mod.rs
+            rel_p = Path(rel)
+            fnm = rel_p.name
+            cur = rel_p.parent
+            lib = cur.joinpath("lib.rs")
+            mod = cur.joinpath("mod.rs")
+            export_str = f"\npub mod {fnm.split('.')[0]};\n"
+            if lib.exists():
+                with open(lib, "a") as f:
+                    f.write(export_str)
+            elif mod.exists():
+                with open(mod, "a") as f:
+                    f.write(export_str)
+            else:
+                print("No lib.rs or mod.rs found in the parent directory, not adding the export line")
     tool = {
         "name": "create_file",
         "description": """

@@ -1,4 +1,3 @@
-import json
 import os
 from datetime import datetime
 from typing import Iterable
@@ -6,15 +5,10 @@ from typing import Iterable
 import anthropic
 from anthropic.types import ToolResultBlockParam, MessageParam
 
-import commands
 from claude_fmt import tool_format, user_text_content
-from es_search import full_text_repo_search_tooldef
-from file_ux.edit_files import edit_file_replace_lines_tooldef
-from file_ux.file_viewer import read_file_tooldef
 from git_scrape import get_one_ai_dev_issue
 from templates.agent_system import DEFAULT_SYSTEM_MESSAGE
-from tools.tool_match import get_tool_responses
-from ts_ast.ts_functions import find_rust_function_exact
+from tools.tool_match import get_tool_responses, default_tooldefs
 
 
 def msg(
@@ -22,8 +16,9 @@ def msg(
         history=None,
         override_system=None,
         tool_stuff: Iterable[ToolResultBlockParam] = None,
-        model_settings = None,
-        active_dir=None
+        model_settings=None,
+        active_dir=None,
+        tooldefs=None
 ):
 
     if model_settings is None:
@@ -46,17 +41,12 @@ def msg(
         messages.append(tool_format(tool_stuff))
 
     print("Attempting to send message: ", messages)
-    tooldefs = [
-        commands.redgold_cargo_rust_compile_claude_tooldef(),
-        full_text_repo_search_tooldef(),
-        edit_file_replace_lines_tooldef(),
-        read_file_tooldef(),
-        find_rust_function_exact()[0]
-    ]
+    if tooldefs is None:
+        tooldefs = default_tooldefs()
     message = client.messages.create(
-        model=model_settings['model'],
-        max_tokens=model_settings['max_tokens'],
-        temperature=model_settings['temperature'],
+        model=model_settings.get('model', "claude-3-5-sonnet-20240620"),
+        max_tokens=model_settings.get('max_tokens', 4096),
+        temperature=model_settings.get('temperature', 0),
         system=system,
         messages=messages,
         # tool_choice=any
@@ -96,7 +86,7 @@ def main():
     starting_prompt += get_one_ai_dev_issue()
     response = msg(starting_prompt, model_settings=settings, active_dir=active_dir)
 
-    max_runs = 11
+    max_runs = 30
     #     stop_reason: Optional[Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]] = None
     history: list[MessageParam] = [user_text_content(starting_prompt)]
     msg_count = 0
@@ -119,6 +109,7 @@ def main():
                 h: MessageParam = h
                 f.write(f"ROLE: {h['role']}\n")
                 f.write(f"CONTENT: \n{h['content']}\n")
+
 
 if __name__ == '__main__':
     main()

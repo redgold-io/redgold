@@ -27,7 +27,8 @@ async fn dump_seed_info_string() {
             vec![], // only used for PeerData.servers
             vec![],
             &mut hm,
-            &NetworkEnvironment::Dev // not used for pid / mnemonic
+            &NetworkEnvironment::Dev, // not used for pid / mnemonic
+            None
         ).await.expect("derive");
         let w = WordsPass::words(words);
         let pk = w.default_kp().expect("kp").public_key();

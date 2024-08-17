@@ -359,7 +359,7 @@ impl ArgTranslate {
             self.node_config.peer_id = self.node_config.default_peer_id()?;
         }
 
-        trace!("Starting with peer id {}", self.node_config.peer_id.hex_or());
+        trace!("Starting with peer id {}", self.node_config.peer_id.hex());
 
         Ok(())
 

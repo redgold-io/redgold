@@ -271,7 +271,9 @@ pub struct Deploy {
     #[clap(long)]
     pub skip_redgold_process: bool,
     #[clap(long)]
-    pub skip_logs: bool
+    pub skip_logs: bool,
+    #[clap(long)]
+    pub disable_apt_system_init: bool,
 }
 
 // Wallet commands

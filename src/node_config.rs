@@ -635,6 +635,7 @@ impl NodeConfig {
         std::env::var(commands::REDGOLD_SECURE_DATA_PATH).ok()
     }
 
+    // TODO: this is wrong
     pub fn secure_all_path(&self) -> Option<String> {
         // TODO: Move to arg translate
         std::env::var(commands::REDGOLD_SECURE_DATA_PATH).ok().map(|p| {

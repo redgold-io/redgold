@@ -654,7 +654,7 @@ impl PeerId {
         }
     }
 
-    pub fn hex_or(&self) -> String {
+    pub fn raw_hex_or_from_public_key(&self) -> String {
         self.peer_id.as_ref().map(|x| x.hex()).unwrap_or("missing peer id".to_string())
     }
 
