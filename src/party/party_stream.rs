@@ -446,7 +446,8 @@ impl PartyEvents {
             };
             if let Some(cp) = self.central_prices.get(&currency) {
                 let of = cp.fulfill_taker_order(
-                    amount.amount_i64_or() as u64, is_ask, event_time, tx_id, &destination, primary_event
+                    amount.amount_i64_or() as u64, is_ask, event_time, tx_id, &destination, primary_event,
+                    &self.network
                 );
                 if let Some(of) = of.as_ref() {
                     if is_ask {

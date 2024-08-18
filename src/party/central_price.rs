@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
 use crate::party::address_event::AddressEvent;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::party_stream::PartyEvents;
@@ -98,7 +98,8 @@ impl CentralPricePair {
         event_time: i64,
         tx_id: Option<ExternalTransactionId>,
         destination: &Address,
-        primary_event: AddressEvent
+        primary_event: AddressEvent,
+        network: &NetworkEnvironment
     ) -> Option<OrderFulfillment> {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
@@ -157,7 +158,7 @@ impl CentralPricePair {
 
         // updated_curve.retain(|v| v.volume > 0);
         let cur = destination.currency_or();
-        let fee = PartyEvents::expected_fee_amount(cur).ok_msg("fee").expect("invalid currency in fulfill order").amount_i64_or();
+        let fee = PartyEvents::expected_fee_amount(cur, network).ok_msg("fee").expect("invalid currency in fulfill order").amount_i64_or();
 
         if fulfilled_amount < fee as u64 || fulfilled_amount <= 0 {
             None
@@ -307,7 +308,8 @@ fn debug_calculate_sample_prices() {
 
     let bpp = cpp.get(&SupportedCurrency::Bitcoin).unwrap();
     let f = bpp.fulfill_taker_order(
-        10_000, false, 1000, None, &Address::default(), AddressEvent::External(ExternalTimedTransaction::default())
+        10_000, false, 1000, None, &Address::default(), AddressEvent::External(ExternalTimedTransaction::default()),
+        &NetworkEnvironment::Dev
     ).unwrap();
     let fra = f.fulfilled_currency_amount().to_fractional();
     println!("Fulfillment: {}", f.json_pretty_or());

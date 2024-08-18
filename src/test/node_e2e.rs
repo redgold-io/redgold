@@ -426,7 +426,7 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
         info!("Sending eth stake to party address");
         let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
         info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
-        info!("Fee fixed {}", EthWalletWrapper::fee_fixed_normal().json_or());
+        info!("Fee fixed {}", EthWalletWrapper::fee_fixed_normal_testnet().json_or());
         let res = tokio::time::timeout(
             Duration::from_secs(120), eth.send(&party_eth_address, &exact_eth_stake_amount)
         ).await.expect("works").expect("works");
@@ -695,7 +695,7 @@ async fn e2e_dbg() {
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn debug_send() {
 
@@ -724,6 +724,7 @@ async fn debug_send() {
 
     println!("Fee: {}", fee.json_or());
     println!("Fee: {}", fee.to_fractional());
+    println!("Fee USD: {}", fee.to_fractional() * 2600.0);
     println!("Gas cost: {}", gas_cost.json_or());
     println!("Gas price: {}", gas_price.json_or());
 }

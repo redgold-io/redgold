@@ -1,4 +1,4 @@
-use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
+use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, NetworkEnvironment, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
 use redgold_schema::RgResult;
 use num_bigint::BigInt;
 use itertools::Itertools;
@@ -59,16 +59,21 @@ impl PartyEvents {
         }
     }
 
-    pub fn expected_fee_amount(currency: SupportedCurrency) -> Option<CurrencyAmount> {
+    pub fn expected_fee_amount(currency: SupportedCurrency, env: &NetworkEnvironment) -> Option<CurrencyAmount> {
         match currency {
             SupportedCurrency::Redgold => {
                 Some(CurrencyAmount::from_fractional(0.0001).unwrap())
             }
             SupportedCurrency::Bitcoin => {
-                Some(CurrencyAmount::from_btc(2_000))
+                let btc = if env.is_main() {
+                    500
+                } else {
+                    2_000
+                };
+                Some(CurrencyAmount::from_btc(btc))
             }
             SupportedCurrency::Ethereum => {
-                Some(EthWalletWrapper::fee_fixed_normal())
+                Some(EthWalletWrapper::fee_fixed_normal_by_env(env))
             }
             _ => None
         }
@@ -154,7 +159,7 @@ impl PartyEvents {
                     let minimum_amt = Self::minimum_stake_amount_total(
                         amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
                     );
-                    if let Some(fee) = Self::expected_fee_amount(amt.currency_or()) {
+                    if let Some(fee) = Self::expected_fee_amount(amt.currency_or(), &self.network) {
                         let expected_fee = fee.clone();
                         let delta = existing.clone() - amt.clone() - minimum_amt.clone() - (expected_fee.clone() * 2);
                         let order_amt = if delta > minimum_amt.clone() {

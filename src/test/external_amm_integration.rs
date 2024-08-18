@@ -20,7 +20,7 @@ pub fn amm_btc_address(network_environment: NetworkEnvironment) -> String {
 }
 pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
     let pk_hex = match network_environment {
-        // NetworkEnvironment::Main => {}
+        NetworkEnvironment::Main => {"0a230a210220f12e974037da99be8152333d4b72fc06c9041fbd39ac6b37fb6f65e3057c39"}
         NetworkEnvironment::Test => {"0a230a21034c16cf716ba671c85ccb68d597104ba608fe798e4c4e50eaa36ab68457c25ed8"}
         NetworkEnvironment::Dev => {"0a230a210266f48bc55acec1647168d40fe827359f9b1f8ca457a0c6b111a1881f84aaea46"}
         NetworkEnvironment::Staging => {"0a230a210214e61824f16e43e769df927ec13148b9f8e9596800878fa76cef3edbc1eb5373"}
@@ -191,10 +191,10 @@ pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn amm_flow() {
-    let network = NetworkEnvironment::Test;
+    let network = NetworkEnvironment::Main;
     // let amount_sats = 40000;
 
     let nc = NodeConfig::default_env(network).await;
@@ -203,6 +203,10 @@ pub async fn amm_flow() {
     let amm_btc_pk_address = amm_public_key(&network).to_bitcoin_address_typed(&network).expect("address");
     // let amount = 1.0;
 
+    println!("amm rdg address: {}", amm_rdg_address.render_string().expect(""));
+    println!("amm eth address: {}", amm_eth_address.render_string().expect(""));
+    println!("amm btc address: {}", amm_btc_pk_address.render_string().expect(""));
+
     if let Some((privk, kp)) = dev_ci_kp() {
 
         // send_internal_stake(100.0, &network).await;
@@ -210,6 +214,10 @@ pub async fn amm_flow() {
         let pk = kp.public_key();
         let rdg_address = pk.address().expect("address");
         println!("pk rdg address: {}", rdg_address.render_string().expect(""));
+        let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
+        println!("pk btc address: {}", btc_address.render_string().expect(""));
+        let eth_address = pk.to_ethereum_address_typed().expect("eth address");
+        println!("pk eth address: {}", eth_address.render_string().expect(""));
 
         // let btc_stake_amt = 50_000;
         // let btc_amt = CurrencyAmount::from_btc(btc_stake_amt);

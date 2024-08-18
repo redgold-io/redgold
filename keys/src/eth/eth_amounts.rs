@@ -1,7 +1,7 @@
 use ethers::middleware::Middleware;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use redgold_schema::{ErrorInfoContext, RgResult};
-use redgold_schema::structs::CurrencyAmount;
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
 use crate::eth::eth_wallet::EthWalletWrapper;
 
 impl EthWalletWrapper {
@@ -34,7 +34,7 @@ impl EthWalletWrapper {
     }
 
     // TODO: Set by environment.
-    pub fn gas_price_fixed_normal() -> CurrencyAmount {
+    pub fn gas_price_fixed_normal_testnet() -> CurrencyAmount {
         // Fee: 0.000171425329026 for 21k gas used * below value
         // 8163110906 for ^
         // Higher seen:
@@ -47,14 +47,53 @@ impl EthWalletWrapper {
         CurrencyAmount::from_eth_bigint_string("412793670539")
     }
 
+    pub fn gas_price_fixed_normal_mainnet() -> CurrencyAmount {
+        CurrencyAmount::from_eth_bigint_string("4127936705")
+    }
+
+    pub fn gas_price_fixed_normal_by_env(env: &NetworkEnvironment) -> CurrencyAmount {
+        if env.is_main() {
+            Self::gas_price_fixed_normal_mainnet()
+        } else {
+            Self::gas_price_fixed_normal_testnet()
+        }
+    }
+
     pub fn gas_cost_fixed_normal() -> CurrencyAmount {
         // Fee: 0.000171425329026 for 21k gas used * below value
         CurrencyAmount::from_eth_bigint_string("21000")
     }
 
-    pub fn fee_fixed_normal() -> CurrencyAmount {
+    pub fn fee_fixed_normal_testnet() -> CurrencyAmount {
         // Fee: 0.000171425329026 for 21k gas used * below value
-        Self::gas_cost_fixed_normal() * Self::gas_price_fixed_normal()
+        Self::gas_cost_fixed_normal() * Self::gas_price_fixed_normal_testnet()
     }
+
+    pub fn fee_fixed_normal_mainnet() -> CurrencyAmount {
+        // Fee: 0.000171425329026 for 21k gas used * below value
+        Self::gas_cost_fixed_normal() * Self::gas_price_fixed_normal_mainnet()
+    }
+
+    pub fn fee_fixed_normal_by_env(env: &NetworkEnvironment) -> CurrencyAmount {
+        if env.is_main() {
+            Self::fee_fixed_normal_mainnet()
+        } else {
+            Self::fee_fixed_normal_testnet()
+        }
+    }
+
+
+
+}
+
+
+#[test]
+pub fn test_eth_wallet() {
+    let f = EthWalletWrapper::fee_fixed_normal_testnet().to_fractional();
+    println!("fee_fixed_normal: {}", f);
+    println!("fee_fixed_normalusd: {}", f * 2600.0);
+     let f = EthWalletWrapper::fee_fixed_normal_mainnet().to_fractional();
+    println!("fee_fixed_normal2: {}", f);
+    println!("fee_fixed_normalusd2: {}", f * 2600.0);
 
 }
