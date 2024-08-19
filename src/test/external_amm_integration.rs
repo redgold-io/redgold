@@ -4,8 +4,10 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::local_stored_state::NamedXpub;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey};
 use redgold_schema::util::lang_util::AnyPrinter;
@@ -126,17 +128,19 @@ pub async fn send_test_btc_transaction_deposit() {
 #[test]
 pub fn dev_balance_check() {
 
-    let network = NetworkEnvironment::Dev;
+    let network = NetworkEnvironment::Main;
     let pk = amm_public_key(&network);
 
     let addr = pk.address().expect("address").render_string().expect("");
 
-    println!("address: {addr}");
+    // let xpub = "testmehere";
+    // let pk2 = XpubWrapper::new(xpub.to_string()).public_at(0, 0).expect("works");
+
+    // println!("address: {addr}");
 
     let w =
         SingleKeyBitcoinWallet::new_wallet(pk, network, true).expect("w");
 
-    //
     let a = w.address().expect("a");
     println!("wallet address: {a}");
     let b = w.get_wallet_balance().expect("balance");

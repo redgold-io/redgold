@@ -283,12 +283,14 @@ impl SingleKeyBitcoinWallet<MemoryDatabase> {
         network: NetworkEnvironment,
         do_sync: bool
     ) -> Result<Self, ErrorInfo> {
+        let mut backend = "ssl://electrum.blockstream.info:50002";
         let network = if network == NetworkEnvironment::Main {
             Network::Bitcoin
         } else {
+            backend = "ssl://electrum.blockstream.info:60002";
             Network::Testnet
         };
-        let client = Client::new("ssl://electrum.blockstream.info:60002")
+        let client = Client::new(backend)
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
         let database = MemoryDatabase::default();
