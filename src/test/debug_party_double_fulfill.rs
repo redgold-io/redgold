@@ -8,7 +8,7 @@ use crate::core::relay::Relay;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_event_stream2() {
     debug_events2().await.unwrap();
