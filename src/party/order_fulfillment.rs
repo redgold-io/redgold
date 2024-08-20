@@ -33,7 +33,7 @@ impl PartyWatcher {
             if v.party_info.successor_key.is_some() {
                 continue;
             }
-            if let Some(ps) = v.party_events.as_mut() {
+            if let Some(ps) = v.party_events.as_ref() {
                 let key_address = key.address()?;
                 let btc_starting_balance = v.network_data.get(&SupportedCurrency::Bitcoin)
                     .map(|d| d.balance.amount).unwrap_or(0);
@@ -127,7 +127,11 @@ impl PartyWatcher {
                 if let Some(e) = eth {
                     done_orders.extend(e);
                 }
-                ps.process_locally_fulfilled_orders(done_orders);
+                // ps.process_locally_fulfilled_orders(done_orders);
+                v.locally_fulfilled_orders = Some(ps.locally_fulfilled_orders.clone());
+                // Immediately update processed orders ^ to ensure no duplicate or no persistence failure
+                let pid = v.clone();
+                self.relay.ds.multiparty_store.update_party_data(&key, pid.to_party_data()).await?;
 
                 self.fulfill_rdg_orders(&identifier, &utxos, ps, cutoff_time).await?;
 

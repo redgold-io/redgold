@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::time::Duration;
+use log::info;
 use serde::{Deserialize, Serialize};
 use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
@@ -9,6 +11,7 @@ use crate::core::relay::Relay;
 use crate::infra::deploy::DeployMachine;
 use crate::node_config::NodeConfig;
 use crate::util;
+use crate::util::cli::commands::log_handler;
 
 pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Server>) {
 
@@ -17,6 +20,8 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
     let secure_or = p0.secure_or().by_env(p0.network);
     let bk = secure_or.backups();
     let time_back = bk.join(time.to_string());
+    let (default_fun, output_handler) = log_handler();
+
 
     for s in p1 {
         let server_dir = time_back.join(s.index.to_string());
@@ -25,14 +30,15 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
         let fnm_export = "multiparty.csv";
         std::fs::remove_file(fnm_export).ok();
         let cmd = format!(
-            "sqlite3 ~/.rg/{}/data_store.sqlite \"SELECT \
-            hex(party_info) FROM multiparty;\" > ~/.rg/{}/{}",
+            "sqlite3 /root/.rg/{}/data_store.sqlite \\\"SELECT hex(party_info) FROM multiparty;\\\" > /root/.rg/{}/{}",
             net_str,
             net_str,
             fnm_export
         );
-        ssh.exes("sudo apt install -y sqlite3", &None).await.expect("");
-        ssh.exes(cmd, &None).await.expect("");
+        info!(" backup cmd Running command: {}", cmd);
+        ssh.exes("sudo apt install -y sqlite3", &output_handler).await.expect("");
+        ssh.exes(cmd, &output_handler).await.expect("");
+        tokio::time::sleep(Duration::from_secs(1)).await;
         let user = s.username.unwrap_or("root".to_string());
         let res = redgold_schema::util::cmd::run_bash_async(
             format!(

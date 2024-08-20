@@ -650,7 +650,7 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
 }
 
 fn refresh_balance(ls: &mut LocalState) {
-    address_query::get_address_info(&ls.node_config,
+    address_query::get_address_info(&ls.node_config.clone(),
                                     ls.wallet_state.public_key.clone().expect("pk"),
                                     ls.wallet_state.updates.sender.clone(),
     );

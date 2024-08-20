@@ -37,6 +37,8 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
 use redgold_schema::structs::PartyInfoAbridged;
+use redgold_schema::util::times::ToTimeString;
+use crate::node_config::NodeConfig;
 use crate::party::address_event::AddressEvent;
 use crate::party::central_price::CentralPricePair;
 use crate::party::data_enrichment::PartyInternalData;
@@ -160,7 +162,9 @@ pub struct DetailedEvents {
     network: String,
     amount: f64,
     tx_hash: String,
-    incoming: String
+    incoming: String,
+    time: i64,
+    formatted_time: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -353,7 +357,7 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 asks_usd,
                 central_prices,
                 events: events.clone(),
-                detailed_events: convert_events(events)?,
+                detailed_events: convert_events(events, &r.node_config)?,
             }))
         };
 
@@ -362,7 +366,7 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
     Ok(None)
 }
 
-fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
+pub fn convert_events(p0: PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedEvents>> {
     let mut res = vec![];
     for x in p0.address_events {
         let mut de = DetailedEvents {
@@ -373,7 +377,13 @@ fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
             tx_hash: "".to_string(),
             other_address: "".to_string(),
             incoming: "".to_string(),
+            time: 0,
+            formatted_time: "".to_string(),
         };
+        if let Some(time) = x.time(&nc.seeds_now_pk()) {
+            de.time = time;
+            de.formatted_time = time.to_time_string();
+        }
         let x2 = x.clone();
         match x {
             AddressEvent::External(ett) => {
@@ -384,6 +394,8 @@ fn convert_events(p0: PartyInternalData) -> RgResult<Vec<DetailedEvents>> {
                             "Stake"
                         } else if ps.fulfillment_history.iter().filter(|h| h.1 == x2).next().is_some() {
                             "Swap"
+                        } else if ps.fulfillment_history.iter().filter(|h| h.2 == x2).next().is_some() {
+                            "SwapFulfillment"
                         } else {
                             "Pending"
                         }

@@ -1,0 +1,17 @@
+syntax = "proto3";
+package airgap;
+
+import "structs.proto";
+
+message TestMessage2 {
+  string message = 1;
+}
+
+message TestStructure2 {
+  string message = 1;
+  structs.Transaction transaction = 2;
+  oneof test_one_of {
+    TestMessage2 test_message = 3;
+    string test_string = 4;
+  }
+}

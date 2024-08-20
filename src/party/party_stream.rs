@@ -348,9 +348,9 @@ impl PartyEvents {
         }
     }
 
-    pub fn process_locally_fulfilled_orders(&mut self, orders: Vec<OrderFulfillment>){
-        self.locally_fulfilled_orders.extend(orders);
-    }
+    // pub fn process_locally_fulfilled_orders(&mut self, orders: Vec<OrderFulfillment>){
+    //     self.locally_fulfilled_orders.extend(orders);
+    // }
     pub async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()> {
         self.events.push(e.clone());
         let seeds = self.relay.safe_get_msg("Missing relay in process event")?.node_config.seeds_now_pk();

@@ -1,7 +1,13 @@
 syntax = "proto3";
 package execution;
 
+import "structs.proto";
 
 message TestMessage {
   string message = 1;
+}
+
+message TestStructure {
+  string message = 1;
+  structs.Transaction transaction = 2;
 }

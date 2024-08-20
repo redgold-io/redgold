@@ -19,14 +19,15 @@ pub fn get_address_info(
     let node_config = node_config.clone();
     let address = public_key.address().expect("works");
     let _ = tokio::spawn(async move {
-
+        let environment = node_config.network.clone();
+        info!("Getting balance for environment: {}", environment.to_std_string());
         let btc_bal = SingleKeyBitcoinWallet::new_wallet(
-                public_key.clone(), node_config.network.clone(), true)
+            public_key.clone(), environment, true)
                 .ok().and_then(|w| w.get_wallet_balance().ok())
                 .map(|b| b.confirmed as f64 / 1e8f64);
 
         let mut eth_bal: Option<f64> = None;
-        if let Some(Ok(eth)) = EthHistoricalClient::new(&node_config.network) {
+        if let Some(Ok(eth)) = EthHistoricalClient::new(&environment) {
             let eth_addr = public_key.to_ethereum_address().expect("eth");
             if let Ok(bi) = eth.get_balance(&eth_addr).await {
                 if let Ok(v) = EthHistoricalClient::translate_value_to_float(&bi) {

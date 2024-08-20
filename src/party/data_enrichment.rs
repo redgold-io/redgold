@@ -8,6 +8,7 @@ use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::address_event::AddressEvent;
+use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::party_stream::{PartyEvents, TransactionWithObservationsAndPrice};
 use crate::party::party_watcher::PartyWatcher;
 use crate::party::price_query::PriceDataPointUsdQuery;
@@ -23,6 +24,7 @@ pub struct PartyInternalData {
     pub address_events: Vec<AddressEvent>,
     pub price_data: PriceDataPointUsdQuery,
     pub party_events: Option<PartyEvents>,
+    pub locally_fulfilled_orders: Option<Vec<OrderFulfillment>>
 }
 
 impl PartyInternalData {
@@ -66,6 +68,10 @@ impl PartyWatcher {
             let mut price_data = prior_data
                 .as_ref()
                 .map(|pd| pd.price_data.clone()).unwrap_or(PriceDataPointUsdQuery::new());
+
+            let prior_local_fulfilled = prior_data.as_ref()
+                .and_then(|pd| pd.party_events.as_ref())
+                .map(|pd| pd.locally_fulfilled_orders.clone());
 
             // No filter is required here
             let btc = self.get_public_key_btc_data(&pk).await?;
@@ -126,6 +132,7 @@ impl PartyWatcher {
                 address_events,
                 price_data,
                 party_events: None,
+                locally_fulfilled_orders: prior_local_fulfilled,
             };
 
             shared_data.insert(pk.clone(), pid.clone());

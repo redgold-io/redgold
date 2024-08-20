@@ -1,4 +1,4 @@
-// Test related stuff
+// Test related stuff, primarily debug related scripts or other 'internal' tests here.
 
 pub mod node_e2e;
 pub mod external_amm_integration;
@@ -13,6 +13,7 @@ mod debug_genesis_issue;
 mod debug_balance_issue;
 mod debug_staging_mpc_issue;
 mod debug_main_offline;
+mod debug_party_double_fulfill;
 
 fn asdf() {
 

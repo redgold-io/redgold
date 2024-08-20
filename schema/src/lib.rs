@@ -25,6 +25,15 @@ use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
 }
+
+pub mod execution {
+    include!(concat!(env!("OUT_DIR"), "/execution.rs"));
+}
+
+pub mod airgap {
+    include!(concat!(env!("OUT_DIR"), "/airgap.rs"));
+}
+
 pub mod address;
 pub mod hash;
 pub mod block;

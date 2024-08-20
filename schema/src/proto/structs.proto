@@ -1536,7 +1536,7 @@ message DebugSerChange2 {
 
 
 // Imports not working properly due to issue with prost
-import "execution.proto";
+//import "execution.proto";
 
 // This doesn't work due to prost import issue, important to fix later
 //

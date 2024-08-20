@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
+
 def get_git_diff():
     tooldef = {
         "name": "get_git_diff",

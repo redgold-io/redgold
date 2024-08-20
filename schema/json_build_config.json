@@ -1,6 +1,6 @@
 {
   "includes": ["src/proto"],
-  "files": ["src/proto/structs.proto", "src/proto/execution.proto"],
+  "files": ["src/proto/structs.proto", "src/proto/execution.proto", "src/proto/airgap.proto"],
   "output": "build",
   "opts": [
     {
