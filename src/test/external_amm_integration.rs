@@ -273,7 +273,7 @@ pub async fn amm_flow() {
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
         let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
-        //
+
         // let stake_tx = TransactionBuilder::new(&nc)
         //     .with_input_address(&rdg_address)
         //     .with_auto_utxos().await.expect("utxos")

@@ -94,13 +94,13 @@ export default {
     return {
       searchValue: '',
       btcSwapAddress: '',
-      rgdBtc: 100.012312,
-      rgdBtcStr: '100.012312',
+      rgdBtc: 600.012312,
+      rgdBtcStr: '600.012312',
       usdRdg: 100.012312,
-      usdRdgStr: '1.012',
-      usdEth: 30000.3210,
-      usdBtcStr: '30000.32',
-      usdEthStr: '2000.32'
+      usdRdgStr: '100.012',
+      usdEth: 3000.3210,
+      usdBtcStr: '60000.32',
+      usdEthStr: '3000.32'
     };
   },
   mixins: [fetchHashInfo],

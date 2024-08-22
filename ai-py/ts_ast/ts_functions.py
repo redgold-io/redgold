@@ -100,10 +100,10 @@ def extract_all_functions(file_path) -> list[RustFunction]:
         file_content = file.read()
 
 
-    types = defaultdict(int)
-    for child in root_node.children:
-        types[child.type] += 1
-    print(types)
+    # types = defaultdict(int)
+    # for child in root_node.children:
+    #     types[child.type] += 1
+    # print(types)
 
     # Find all function definitions
     function_nodes = child_functions(root_node)

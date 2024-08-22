@@ -30,6 +30,8 @@ def read_file_tooldef():
 
 def read_file(filename, starting_line=None, ending_line=None) -> list[str]:
     prefix = str(ai_working_dir())
+    if not filename.startswith("/"):
+        prefix += "/"
     filename = prefix + filename
     # if not filename.startswith(prefix):
     #     return ["Error: unauthorized access to file"]

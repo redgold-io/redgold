@@ -110,7 +110,7 @@ def main():
         if last_loop:
             print("Done with last loop after completion.")
             break
-        # print(response)
+        print(response)
         msg_count += 1
         history.append(MessageParam(content=response.content, role=response.role))
         tr = get_tool_responses(response)

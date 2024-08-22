@@ -221,7 +221,8 @@ pub struct SingleKeyBitcoinWallet<D: BatchDatabase> {
     pub psbt: Option<PartiallySignedTransaction>,
     pub transaction_details: Option<TransactionDetails>,
     client: ElectrumBlockchain,
-    custom_signer: Arc<MultipartySigner>
+    custom_signer: Arc<MultipartySigner>,
+    sat_per_vbyte: f32
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -311,6 +312,7 @@ impl SingleKeyBitcoinWallet<MemoryDatabase> {
             transaction_details: None,
             client,
             custom_signer: custom_signer.clone(),
+            sat_per_vbyte: 4.0,
         };
         // Adding the multiparty signer to the BDK wallet
         bitcoin_wallet.wallet.add_signer(
@@ -363,6 +365,7 @@ impl SingleKeyBitcoinWallet<Tree> {
             transaction_details: None,
             client,
             custom_signer: custom_signer.clone(),
+            sat_per_vbyte: 4.0,
         };
         // Adding the multiparty signer to the BDK wallet
         bitcoin_wallet.wallet.add_signer(
@@ -633,7 +636,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         builder
             .add_recipient(addr.script_pubkey(), amount)
             .enable_rbf()
-            .fee_rate(FeeRate::from_sat_per_vb(1.0));
+            .fee_rate(FeeRate::from_sat_per_vb(self.sat_per_vbyte));
 
         let (psbt, details) = builder
             .finish()
@@ -652,7 +655,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         let mut builder = self.wallet.build_tx();
 
         builder.enable_rbf()
-            .fee_rate(FeeRate::from_sat_per_vb(1.0));
+            .fee_rate(FeeRate::from_sat_per_vb(self.sat_per_vbyte));
 
         for (d, amount) in destinations {
             let addr = Address::from_str(&*d).error_info("Unable to parse address")?;

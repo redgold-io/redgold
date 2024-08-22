@@ -66,7 +66,7 @@ impl PartyEvents {
             }
             SupportedCurrency::Bitcoin => {
                 let btc = if env.is_main() {
-                    500
+                    850
                 } else {
                     2_000
                 };
