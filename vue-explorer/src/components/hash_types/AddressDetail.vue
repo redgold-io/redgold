@@ -92,7 +92,20 @@
             </div>
 
             <h6 class="detail-group">Trade Calculator</h6>
+
+
+            <!-- Cryptocurrency Selector -->
+            <label v-if="calculatorTransactionType === 'BUY'">
+              User Pair:
+              <select v-model="userPair">
+<!--                <option value="BTC">BTC</option>-->
+<!--                <option value="ETH">ETH</option>-->
+                <option value="USD">USD</option>
+              </select>
+            </label>
+
             <!-- BUY/SELL Radio Buttons -->
+
             <label>
               <input type="radio" v-model="calculatorTransactionType" value="BUY" /> BUY
             </label>
@@ -100,15 +113,24 @@
               <input type="radio" v-model="calculatorTransactionType" value="SELL" /> SELL
             </label>
 
+            <!-- Cryptocurrency Selector -->
+            <label>
+              Trade Pair:
+              <select v-model="activeTradePair">
+                <option value="Bitcoin" >BTC</option>
+                <option value="Ethereum">ETH</option>
+              </select>
+            </label>
+
+
             <!-- Input Boxes -->
             <div v-if="calculatorTransactionType === 'BUY'">
               <label>
-                USD:
-                <input type="number" class="search-input" v-model="inputUSD" />
+                {{ userPair }}:
+                <input type="number" class="search-input" v-model="inputUser" />
               </label>
               <label>
-                BTC:
-                <input type="number" class="search-input" v-model="inputBTC" />
+                {{activeTradePair}}: {{ buyCalculatedAmount }}
               </label>
             </div>
             <div v-if="calculatorTransactionType === 'SELL'">
@@ -126,7 +148,7 @@
 
               <span v-if="calculatorTransactionType === 'SELL'">You'll receive:</span>
               <TextCopy v-if="calculatorTransactionType === 'SELL'" :data="btc_sell_amount.toFixed(8)"/>
-              <span v-if="calculatorTransactionType === 'SELL'">BTC</span>
+              <span v-if="calculatorTransactionType === 'SELL'">{{ activeTradePair }}</span>
             </div>
 
 
@@ -231,8 +253,10 @@ export default {
   data: function() {
     return {
       inputUSD: null,
-      inputBTC: null,
+      inputPair: null,
       inputRDG: null,
+      inputUser: null,
+      buyCalculatedAmount: null,
       rdg_buy_amount: 0.0,
       btc_sell_amount: 0.0,
       updatingValue: false,
@@ -242,6 +266,8 @@ export default {
       transactionType: 'all',
       currentPage: 1,
       perPage: 25,
+      activeTradePair: 'Bitcoin',
+      userPair: 'USD',
       hashData: this.hashDataInitial,
       exampleBidAskData: {
         labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', "", "", "", ""],
@@ -266,27 +292,56 @@ export default {
     }
   },
   watch: {
-    inputUSD(newUSDValue) {
-      // If the value is updated by the other watcher, do not recompute
-      if (this.updatingValue || this.lastEdited === "BTC") return;
 
-      this.updatingValue = true;
-      let floatUSDValue = parseFloat(newUSDValue);
-      if (!isNaN(floatUSDValue)) {
-        // console.log("New usd value " + floatUSDValue)
-        this.inputBTC = floatUSDValue / this.usdBtcRate;
-        this.lastEdited = "USD";
-        // console.log("New BTC value " + this.inputBTC)
-
+    inputUser(newUserValue) {
+      let floatUserValue = parseFloat(newUserValue);
+      if (this.calculatorTransactionType === 'BUY') {
+        if (this.userPair === "USD") {
+          if (this.activeTradePair === "Bitcoin") {
+            this.buyCalculatedAmount = floatUserValue / this.usdBtcRate;
+          }
+          if (this.activeTradePair === "Ethereum") {
+            this.buyCalculatedAmount = floatUserValue / this.usdEthRate;
+          }
+          this.inputPair = this.buyCalculatedAmount
+        } else {
+          if (this.userPair === "Bitcoin") {
+            this.buyCalculatedAmount = floatUserValue * this.usdBtcRate;
+          }
+          if (this.userPair === "Ethereum") {
+            this.buyCalculatedAmount = floatUserValue * this.usdEthRate;
+          }
+          this.inputPair = this.userPair
+        }
       }
-      this.updatingValue = false;
     },
+    // inputUSD(newUSDValue) {
+    //   // If the value is updated by the other watcher, do not recompute
+    //   if (this.updatingValue || this.lastEdited === "BTC") return;
+    //
+    //   this.updatingValue = true;
+    //   let floatUSDValue = parseFloat(newUSDValue);
+    //   if (!isNaN(floatUSDValue)) {
+    //     // console.log("New usd value " + floatUSDValue)
+    //     if (this.activeTradePair === "Bitcoin") {
+    //       this.inputPair = floatUSDValue / this.usdBtcRate;
+    //     }
+    //     if (this.activeTradePair === "Ethereum") {
+    //       this.inputPair = floatUSDValue / this.usdEthRate;
+    //     }
+    //
+    //     this.lastEdited = "USD";
+    //     // console.log("New BTC value " + this.inputBTC)
+    //
+    //   }
+    //   this.updatingValue = false;
+    // },
     inputRDG(newRDGValue) {
       let floatRDGValue = parseFloat(newRDGValue);
       // console.log("New RDG value " + newRDGValue)
       if (this.hashData.address_pool_info != null && !(isNaN(floatRDGValue))) {
 
-        let bids = this.hashData.address_pool_info.bids['Bitcoin'];
+        let bids = this.hashData.address_pool_info.bids[this.activeTradePair];
         let total_rdg = floatRDGValue;
         let total_fulfilled = 0;
         // console.log("Total RDG: " + total_rdg)
@@ -313,43 +368,43 @@ export default {
         this.btc_sell_amount = total_fulfilled;
       }
     },
-    inputBTC(newBTCValue) {
-      let floatBtcValue = parseFloat(newBTCValue);
+      inputPair(newBTCValue) {
+        let floatBtcValue = parseFloat(newBTCValue);
 
-      if (this.hashData.address_pool_info != null && !(isNaN(floatBtcValue))) {
-        let asks = this.hashData.address_pool_info.asks['Bitcoin'];
-        let total_btc = floatBtcValue;
-        let total_fulfilled = 0;
-        for (let i = 0; i < asks.length;  i++) {
-          let ask = asks[i];
-          let p = ask.price // RDG / BTC now
-          let v = ask.volume / 1e8 // amount RDG available for sale via ask
-          let requested_vol = total_btc * p // BTC * (RDG/BTC) = vol RDG unit;
-          let thisBtc = v / p; // RDG / RDG / BTC = BTC
-          console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
-          thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
-          if (requested_vol > v) {
-            total_btc -= thisBtc;
-            total_fulfilled += v
-          } else {
-            total_btc = 0;
-            total_fulfilled += requested_vol
-            break
+        if (this.hashData.address_pool_info != null && !(isNaN(floatBtcValue))) {
+          let asks = this.hashData.address_pool_info.asks[this.activeTradePair];
+          let total_btc = floatBtcValue;
+          let total_fulfilled = 0;
+          for (let i = 0; i < asks.length; i++) {
+            let ask = asks[i];
+            let p = ask.price // RDG / BTC now
+            let v = ask.volume / 1e8 // amount RDG available for sale via ask
+            let requested_vol = total_btc * p // BTC * (RDG/BTC) = vol RDG unit;
+            let thisBtc = v / p; // RDG / RDG / BTC = BTC
+            console.log(`ask ${ask} p ${p} v ${v} requested_vol ${requested_vol}
+            thisBtc ${thisBtc} total_btc ${total_btc} total_fulfilled ${total_fulfilled} float_btc_value ${floatBtcValue}`)
+            if (requested_vol > v) {
+              total_btc -= thisBtc;
+              total_fulfilled += v
+            } else {
+              total_btc = 0;
+              total_fulfilled += requested_vol
+              break
+            }
           }
+          this.rdg_buy_amount = total_fulfilled;
         }
-        this.rdg_buy_amount = total_fulfilled;
-      }
 
-      // If the value is updated by the other watcher, do not recompute
-      if (this.updatingValue) return;
+        // If the value is updated by the other watcher, do not recompute
+        if (this.updatingValue) return;
 
-      this.updatingValue = true;
-      if (!isNaN(floatBtcValue)) {
-        // console.log("New usd value " + floatBtcValue)
-        this.inputUSD = floatBtcValue * this.usdBtcRate;
+        this.updatingValue = true;
+        if (!isNaN(floatBtcValue)) {
+          // console.log("New usd value " + floatBtcValue)
+          this.inputUSD = floatBtcValue * this.usdBtcRate;
+        }
+        this.updatingValue = false;
       }
-      this.updatingValue = false;
-    }
   },
   mixins: [fetchHashInfo],
   computed: {
@@ -430,6 +485,9 @@ export default {
     // },
     usdBtcRate() {
       return this.$store.state.btcExchangeRate;
+    },
+    usdEthRate() {
+      return this.$store.state.ethExchangeRate;
     },
     exampleOptions(){
       return {

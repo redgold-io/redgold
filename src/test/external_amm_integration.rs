@@ -1,3 +1,4 @@
+use std::time::Duration;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
@@ -24,7 +25,7 @@ pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
     let pk_hex = match network_environment {
         NetworkEnvironment::Main => {"0a230a210220f12e974037da99be8152333d4b72fc06c9041fbd39ac6b37fb6f65e3057c39"}
         NetworkEnvironment::Test => {"0a230a21034c16cf716ba671c85ccb68d597104ba608fe798e4c4e50eaa36ab68457c25ed8"}
-        NetworkEnvironment::Dev => {"0a230a210266f48bc55acec1647168d40fe827359f9b1f8ca457a0c6b111a1881f84aaea46"}
+        NetworkEnvironment::Dev => {"0a230a2103f952d12024fd41e9817470b6910d545799a0fabf6a1e40228ea91d9a330c051b"}
         NetworkEnvironment::Staging => {"0a230a210214e61824f16e43e769df927ec13148b9f8e9596800878fa76cef3edbc1eb5373"}
         _ => { panic!("not implemented"); }
     };
@@ -194,11 +195,40 @@ pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
 
 }
 
+struct AMMTestHarness {
+    network: NetworkEnvironment,
+    private_key: String,
+    keypair: KeyPair,
+    amm_public_key: PublicKey,
+    node_config: NodeConfig
+}
 
-#[ignore]
+impl AMMTestHarness {
+
+    pub async fn from(
+        network: &NetworkEnvironment,
+        public_key: &PublicKey,
+        private_key: impl Into<String>,
+        keypair: KeyPair
+    ) -> Self {
+        let private_key = private_key.into();
+        let amm_public_key = public_key.clone();
+        Self {
+            network: network.clone(),
+            private_key,
+            keypair,
+            amm_public_key,
+            node_config: NodeConfig::default_env(network.clone()).await,
+        }
+    }
+}
+
+
+// #[ignore]
 #[tokio::test]
 pub async fn amm_flow() {
-    let network = NetworkEnvironment::Main;
+    let network = NetworkEnvironment::Dev;
+    // let network = NetworkEnvironment::Main;
     // let amount_sats = 40000;
 
     let nc = NodeConfig::default_env(network).await;
@@ -223,10 +253,10 @@ pub async fn amm_flow() {
         let eth_address = pk.to_ethereum_address_typed().expect("eth address");
         println!("pk eth address: {}", eth_address.render_string().expect(""));
         //
-        // let btc_stake_amt = 100_000;
-        // let btc_amt = CurrencyAmount::from_btc(btc_stake_amt);
-        // let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
-        // let party_fee_amount = CurrencyAmount::from_rdg(100000);
+        let btc_stake_amt = 40_000;
+        let btc_amt = CurrencyAmount::from_btc(btc_stake_amt);
+        let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
+        let party_fee_amount = CurrencyAmount::from_rdg(100000);
         // let stake_tx = TransactionBuilder::new(&nc)
         //     .with_input_address(&rdg_address)
         //     .with_auto_utxos().await.expect("utxos")
@@ -237,12 +267,13 @@ pub async fn amm_flow() {
         //     .expect("sign");
         // stake_tx.broadcast().await.expect("broadcast").json_or().print();
 
+        // tokio::time::sleep(Duration::from_secs(5)).await;
         // send_btc(btc_stake_amt, &network).await;
         //
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
         let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
-        // //
+        //
         // let stake_tx = TransactionBuilder::new(&nc)
         //     .with_input_address(&rdg_address)
         //     .with_auto_utxos().await.expect("utxos")
@@ -253,7 +284,8 @@ pub async fn amm_flow() {
         //     .expect("build")
         //     .sign(&kp)
         //     .expect("sign");
-        // // stake_tx.broadcast().await.expect("broadcast").json_or().print();
+        // stake_tx.broadcast().await.expect("broadcast").json_or().print();
+        // tokio::time::sleep(Duration::from_secs(5)).await;
 
         let eth_submit = EthWalletWrapper::new(&privk, &network).expect("works");
         // eth_submit.send(&amm_eth_address, &exact_eth_stake_amount).await.expect("works").print();
@@ -261,6 +293,7 @@ pub async fn amm_flow() {
 
 
         // External to internal swaps
+        // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works").print();
         // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works").print();
         // test btc swap
         // send_btc(6_004, &network).await;

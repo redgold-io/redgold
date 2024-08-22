@@ -61,6 +61,7 @@
           <div>{{ rgdBtcStr }} RDG/BTC</div>
           <div>${{ usdRdgStr }} USD/RDG</div>
           <div>${{ usdBtcStr }} USD/BTC</div>
+          <div>${{ usdEthStr }} USD/ETH</div>
         </div>
 
 
@@ -97,8 +98,9 @@ export default {
       rgdBtcStr: '100.012312',
       usdRdg: 100.012312,
       usdRdgStr: '1.012',
-      usdBtc: 30000.3210,
-      usdBtcStr: '30000.32'
+      usdEth: 30000.3210,
+      usdBtcStr: '30000.32',
+      usdEthStr: '2000.32'
     };
   },
   mixins: [fetchHashInfo],
@@ -109,11 +111,14 @@ export default {
   },
   async created() {
     this.usdBtc = await this.btcUsdPrice();
+    this.usdEth = await this.ethUsdPrice();
     // Commit the value to the store
     this.$store.commit('setBtcExchangeRate', this.usdBtc);
+    this.$store.commit('setEthExchangeRate', this.usdEth);
 
     console.log(this.usdBtc);
     this.usdBtcStr = this.usdBtc.toFixed(2);
+    this.usdEthStr = this.usdEth.toFixed(2);
     let swapInfo = await this.fetchSwapInfo();
     if (swapInfo != null) {
       this.btcSwapAddress = swapInfo.addresses['Bitcoin'];

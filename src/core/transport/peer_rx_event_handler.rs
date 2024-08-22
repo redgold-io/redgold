@@ -124,6 +124,10 @@ impl PeerRxEventHandler {
 
         let auth_required = request.auth_required();
 
+        if let Some(r) = &request.get_active_party_key_request {
+            response.get_active_party_key_response = relay.active_party_key().await;
+        }
+
         if let Some(fr) = &request.faucet_request {
             response.faucet_response = Some(faucet_request(fr, &relay, request.origin.as_ref()).await.log_error().with_err_count("redgold.faucet.error")?);
         }

@@ -186,6 +186,15 @@ pub struct Relay {
 
 impl Relay {
 
+    pub async fn active_party_key(&self) -> Option<PublicKey> {
+        let data = self.external_network_shared_data.clone_read().await;
+        let cleared = data.iter().filter(|(k, v)| {
+            v.active_self()
+        }).flat_map(|(k, v)| v.party_info.party_key.clone())
+            .next();
+        cleared
+    }
+
     pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
         let mut guard = self.btc_wallets.lock().await;
         let result = guard.get(pk);

@@ -33,8 +33,8 @@ def get_tool_responses(response) -> Iterable[ToolResultBlockParam]:
                 elif n == "edit_file_replace_lines":
                     edit_file(
                         block.input['filename'],
-                        block.input('starting_line'),
-                        block.input('ending_line'),
+                        block.input.get('starting_line'),
+                        block.input.get('ending_line'),
                         block.input.get('replacement_lines', [])
                     )
                 elif n == "read_file":

@@ -1,8 +1,9 @@
+import json
 import os
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypedDict
 
 from repo_reader import AccumFileData
 from ts_ast.ts_util import ts_read, child_functions, impl_items, get_identifier_name, get_impl_details, find_functions
@@ -43,7 +44,7 @@ def find_rust_function_exact():
 
         # dependencies here, deal with clean reloading later
         ac = AccumFileData.default()
-        good_files = [k for k in ac.good_files if k.endswith('.rs')]
+        good_files = [str(k) for k in ac.good_files if str(k).endswith('.rs')]
 
         name = input['name']
         path = input.get('path', None)
@@ -61,8 +62,9 @@ def find_rust_function_exact():
                     if trait is not None and rf.trait_name not in trait:
                         continue
                     ret.append(rf)
-        return ret
+        return [r.llm_ser() for r in ret]
     return tooldef, find_function_exact_inner
+
 
 @dataclass
 class RustFunction:
@@ -73,8 +75,8 @@ class RustFunction:
     end_line: int
     end_column: int
     content: str
-    impl_name: Optional[str] = None,
-    trait_name: Optional[str] = None
+    impl_name: Optional[str]
+    trait_name: Optional[str]
 
     def debug_str(self):
         r = self
@@ -85,6 +87,9 @@ class RustFunction:
             return f"{self.impl_name}::{self.name}"
         return self.name
 
+    def llm_ser(self):
+        start = self.debug_str()
+        return start + "\n" + self.content
 
 def extract_all_functions(file_path) -> list[RustFunction]:
     ret = []
@@ -107,7 +112,8 @@ def extract_all_functions(file_path) -> list[RustFunction]:
         func_name = get_identifier_name(func)
         ret.append(RustFunction(filename=file_path, name=func_name, start_line=func.start_point.row + 1,
                      start_column=func.start_point.column + 1, end_line=func.end_point.row + 1,
-                     end_column=func.end_point.column + 1, content=file_content[func.start_byte:func.end_byte]))
+                     end_column=func.end_point.column + 1, content=file_content[func.start_byte:func.end_byte],
+                                impl_name=None, trait_name=None))
 
     impl_nodes = impl_items(root_node)
     for node in impl_nodes:

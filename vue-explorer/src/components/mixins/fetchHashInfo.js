@@ -21,6 +21,13 @@ export default {
             console.log(data);
             return Number(data.data.rates.USD)
         },
+        async ethUsdPrice() {
+            const url = "https://api.coinbase.com/v2/exchange-rates?currency=ETH"
+            const response = await fetch(url);
+            const data = await response.json();
+            console.log(data);
+            return Number(data.data.rates.USD)
+        },
         async fetchSwapInfo() {
             try {
                 let url = this.getUrl()

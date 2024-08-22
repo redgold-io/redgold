@@ -987,6 +987,10 @@ message BatchTransactionResolveResponse {
   repeated TransactionEntry transactions = 1;
 }
 
+message GetActivePartyKeyRequest {
+
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -1021,6 +1025,7 @@ message Request {
   optional string origin = 32;
   BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
   PublicKey get_address_info_public_key_request = 34;
+  GetActivePartyKeyRequest get_active_party_key_request = 35;
 }
 
 message HealthResponse {
@@ -1069,7 +1074,9 @@ message Response {
   GetPartiesInfoResponse get_parties_info_response = 23;
   BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
   AddressInfo get_address_info_public_key_response = 25;
+  PublicKey get_active_party_key_response = 26;
 }
+
 
 message PartyMember {
   PublicKey public_key = 1;
