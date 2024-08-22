@@ -63,7 +63,7 @@ def search(query_text):
             {
                 "_index": index_name,
                 "_source": {
-                    "filename": k.path,
+                    "filename": a.relative_path(k.path),
                     "content": k.contents,
                     "lines": [
                         {"number": i + 1, "text": line}
@@ -171,7 +171,7 @@ def full_text_repo_search_tooldef():
     }
 
 
-def full_text_repo_search(input) -> list[TextBlockParam]:
+def full_text_repo_search(input) -> list[str]:
     query = input['query']
     hits = search(query)
     return hits

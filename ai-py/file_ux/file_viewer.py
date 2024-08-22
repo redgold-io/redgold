@@ -11,7 +11,7 @@ def read_file_tooldef():
             "properties": {
                 "filename": {
                     "type": "string",
-                    "description": """The filename to read from disk, this should be a path matching 
+                    "description": """The relative filename to read from disk, this should be a path matching 
                     the syntax of something you've been given by other queries."""
                 },
                 "starting_line": {
@@ -30,8 +30,9 @@ def read_file_tooldef():
 
 def read_file(filename, starting_line=None, ending_line=None) -> list[str]:
     prefix = str(ai_working_dir())
-    if not filename.startswith(prefix):
-        return ["Error: unauthorized access to file"]
+    filename = prefix + filename
+    # if not filename.startswith(prefix):
+    #     return ["Error: unauthorized access to file"]
     with open(filename, "r") as f:
         lines = f.readlines()
         processed_lines = []

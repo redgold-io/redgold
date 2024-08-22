@@ -27,4 +27,6 @@ contributing to is called "Redgold" and is a cryptocurrency related project. You
 others like it. Please remember also, it is important for you to optimize your own API usage. As an agent model, it 
 costs money to run each API call, so avoiding rabbit-holes and optimizing for efficiency of thought is just as 
 important as a human programmer attempting not to overexert themselves.
+
+Please make sure to compile your code after you have written to check it for errors.
 """

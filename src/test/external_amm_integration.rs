@@ -224,11 +224,11 @@ impl AMMTestHarness {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn amm_flow() {
-    let network = NetworkEnvironment::Dev;
-    // let network = NetworkEnvironment::Main;
+    // let network = NetworkEnvironment::Dev;
+    let network = NetworkEnvironment::Main;
     // let amount_sats = 40000;
 
     let nc = NodeConfig::default_env(network).await;
@@ -253,7 +253,7 @@ pub async fn amm_flow() {
         let eth_address = pk.to_ethereum_address_typed().expect("eth address");
         println!("pk eth address: {}", eth_address.render_string().expect(""));
         //
-        let btc_stake_amt = 40_000;
+        let btc_stake_amt = 100_000;
         let btc_amt = CurrencyAmount::from_btc(btc_stake_amt);
         let btc_address = pk.to_bitcoin_address_typed(&network).expect("btc address");
         let party_fee_amount = CurrencyAmount::from_rdg(100000);

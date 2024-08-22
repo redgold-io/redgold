@@ -12,7 +12,7 @@ def edit_file_replace_lines_tooldef():
             "properties": {
                 "filename": {
                     "type": "string",
-                    "description": """The text to search for, for example, what a programmer"""
+                    "description": """The filename to edit, this must be a relative path within the AI working directory"""
                 },
                 "starting_line": {
                     "type": "string",

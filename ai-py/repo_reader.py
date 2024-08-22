@@ -42,6 +42,7 @@ class AccumFileData:
     def __init__(self):
         self.good_files = []
         self.unknown_files = []
+        self.root = Path.cwd().parent
 
     @classmethod
     def from_config(cls, config):
@@ -50,6 +51,9 @@ class AccumFileData:
     @classmethod
     def default(cls):
         return scan_tld()
+
+    def relative_path(self, path):
+        return path[len(str(self.root))+1:]
 
     def indexed_files(self):
         indexed = []
@@ -114,6 +118,7 @@ def scan_tld(scan_config=None):
     parent_dir = current_dir.parent
 
     accum = AccumFileData()
+    accum.root = parent_dir
 
     directory_excl = directory_exclusions()
     file_excl = file_exclusions()
@@ -161,12 +166,16 @@ def all_repo_contents():
 def test_scan_tld():
     config = ScanConfig()
     ac = AccumFileData.from_config(config)
-    print(f"Token count: {ac.token_count_all()}")
+    # print(f"Token count: {ac.token_count_all()}")
     lc = ac.line_counts()
     tlc = sum(count for _, count in lc)
-    print(f"Total line count: {tlc}")
-    print(f"Line counts: {lc}")
-    print(f"Token counts: {ac.token_counts()}")
+    # print(f"Total line count: {tlc}")
+    # print(f"Line counts: {lc}")
+    # print(f"Token counts: {ac.token_counts()}")
+    for k in ac.indexed_files():
+        root = ac.root
+        print(k.path[len(str(root)):])
+        print(root)
 
 
 if __name__ == "__main__":
