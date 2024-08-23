@@ -59,7 +59,7 @@ impl RgHttpClient {
         Self {
             url,
             port,
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_secs(150),
             relay,
         }
     }
@@ -67,7 +67,7 @@ impl RgHttpClient {
         Self {
             url,
             port: network_environment.default_port_offset() + 1,
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_secs(150),
             relay: None,
         }
     }

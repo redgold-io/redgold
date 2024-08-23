@@ -43,7 +43,7 @@ impl PeerMessage {
             destinations: vec![],
             node_metadata: None,
             dynamic_node_metadata: None,
-            send_timeout: Duration::from_secs(60),
+            send_timeout: Duration::from_secs(150),
         }
     }
 

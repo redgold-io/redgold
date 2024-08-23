@@ -57,7 +57,7 @@ pub async fn resolve_output(
         let resolve_request = addr.clone();
         request.resolve_code_request = Some(resolve_request);
 
-        let results = relay.broadcast_async(peer_keys.clone(), request, Some(Duration::from_secs(10))).await?;
+        let results = relay.broadcast_async(peer_keys.clone(), request, Some(Duration::from_secs(60))).await?;
 
         for (result, _pk) in results.iter().zip(peer_keys.iter()) {
             match validate_resolve_output_response(addr, result) {

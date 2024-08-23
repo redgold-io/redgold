@@ -73,7 +73,7 @@ impl PublicClient {
         Self {
             url: "localhost".to_string(),
             port,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(120),
             relay: None,
         }
     }
@@ -82,7 +82,7 @@ impl PublicClient {
         Self {
             url,
             port,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(120),
             relay,
         }
     }

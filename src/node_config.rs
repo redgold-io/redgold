@@ -578,7 +578,7 @@ impl NodeConfig {
             node_info: NodeInfoConfig::default(),
             contract: Default::default(),
             contention: Default::default(),
-            default_timeout: Duration::from_secs(120),
+            default_timeout: Duration::from_secs(150),
             disable_metrics: false
         }
     }

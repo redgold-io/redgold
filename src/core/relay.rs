@@ -910,7 +910,7 @@ impl Relay {
         let mut results = vec![];
         for p in nodes {
             let req = request.clone();
-            let timeout = Some(timeout.unwrap_or(Duration::from_secs(30)));
+            let timeout = Some(timeout.unwrap_or(Duration::from_secs(60)));
             let res = self.send_message_async(&req, &p, timeout).await?;
             results.push((p, res));
         }

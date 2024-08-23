@@ -14,6 +14,7 @@ mod debug_balance_issue;
 mod debug_staging_mpc_issue;
 mod debug_main_offline;
 mod debug_party_double_fulfill;
+mod debug_party_invalid_fulfillment;
 
 fn asdf() {
 
