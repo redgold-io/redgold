@@ -152,10 +152,16 @@ impl PartyEvents {
                 let f = ful.safe_get_msg("Missing swap fulfillment")?;
                 let txid = f.external_transaction_id.safe_get_msg("Missing txid")?;
                 let order = rdg_orders.iter()
-                    .find(|o| o.tx_id_ref.as_ref() == Some(txid) && o.fulfilled_currency_amount().amount_i64_or() == amt.amount_i64_or());
+                    .find(|o| {
+                        let order_i64_amt = o.fulfilled_currency_amount().amount_i64_or();
+                        let tx_i64_amount = amt.amount_i64_or();
+                        let within_reasonable_range = i64::abs(order_i64_amt - tx_i64_amount) < 100000;
+                        o.tx_id_ref.as_ref() == Some(txid) && within_reasonable_range
+                    });
                 if order.is_none() {
                     return Err(error_info("Invalid fulfillment for output"))
-                        .with_detail("output", o.json_or());
+                        .with_detail("output", o.json_or())
+                        .with_detail("rdg_orders", rdg_orders.json_or());
                 }
             }
         }

@@ -1,12 +1,16 @@
 use itertools::Itertools;
+use log::info;
+use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::{RgResult, structs};
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
+use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
 
@@ -16,6 +20,19 @@ async fn debug_event_stream2() {
     debug_events2().await.unwrap();
 }
 async fn debug_events2() -> RgResult<()> {
+    let home = dirs::home_dir().expect("home");
+    let hnds_path = home.join(".rg/hostnoc/main/data_store.sqlite".to_string());
+    let dshn = DataStore::from_config_path(&hnds_path).await;
+
+    let hn_info = dshn.multiparty_store.all_party_info_with_key().await?.get(0).expect("head").clone()
+        .party_key.clone().expect("key");;
+    let hn_pid = dshn.multiparty_store.party_data(&hn_info).await.expect("data")
+        .and_then(|pd| pd.json_party_internal_data)
+        .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
+    let hn_pev = hn_pid.party_events.clone().expect("v");
+
+
+    hn_pev.json_or().print();
 
     let relay = Relay::env_default(NetworkEnvironment::Main).await;
     relay.ds.run_migrations().await?;
@@ -28,25 +45,48 @@ async fn debug_events2() -> RgResult<()> {
         .and_then(|pd| pd.json_party_internal_data)
         .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
 
-    let pev = data.party_events.clone().expect("v");
+    // info!("Party key {}", key.hex());
+
+    let mut pev = data.party_events.clone().expect("v");
+    pev.json_or().print();
 
     let ev = pev.events.clone();
 
-    let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
-    convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    // let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
+    // convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    //
+    // // this matches
+    // for e in &ev {
+    //     duplicate.process_event(e).await.expect("works");
+    // }
 
-    // this matches
-    for e in &ev {
-        duplicate.process_event(e).await.expect("works");
-    }
-
-    let order = duplicate.orders().get(0).expect("order").clone();
-    order.json_pretty_or().print();
+    let order = hn_pev.orders().get(0).expect("order").clone();
+    // order.json_pretty_or().print();
     let eth = relay.eth_wallet()?;
     let mp_eth_addr = key.to_ethereum_address_typed()?;
     let dest = order.destination.clone();
     let fulfilled_currency = order.fulfilled_currency_amount();
+    let mut tb = TransactionBuilder::new(&relay.node_config);
+    tb.with_input_address(&key.address().expect("works"));
+    tb.with_auto_utxos().await?;
 
+    let orig_orders = hn_pev.orders();
+    let orders = orig_orders.iter()
+        // .filter(|e| e.event_time < cutoff_time)
+        .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold)
+        .collect_vec();
+    for o in orders.clone() {
+        tb.with_output(&o.destination, &o.fulfilled_currency_amount());
+        if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
+            tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
+        } else {
+            tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
+        };
+    }
+
+    let tx = tb.build().expect("build");
+    pev.relay = Some(relay.clone());
+    pev.validate_rdg_swap_fulfillment_transaction(&tx).expect("");
 
     //
     // let tx = eth.create_transaction_typed(

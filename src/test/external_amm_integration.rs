@@ -268,7 +268,7 @@ pub async fn amm_flow() {
         // stake_tx.broadcast().await.expect("broadcast").json_or().print();
 
         // tokio::time::sleep(Duration::from_secs(5)).await;
-        // send_btc(btc_stake_amt, &network).await;
+        send_btc(btc_stake_amt, &network).await;
         //
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
         let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
@@ -294,7 +294,7 @@ pub async fn amm_flow() {
 
         // External to internal swaps
         // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works").print();
-        // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works").print();
+        // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.002)).await.expect("works").print();
         // test btc swap
         // send_btc(6_004, &network).await;
         // internal_to_external_swap(nc, &amm_rdg_address, &kp, &rdg_address, &btc_address, &dev_ci_eth_addr).await;
