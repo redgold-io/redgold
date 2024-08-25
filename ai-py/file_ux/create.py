@@ -1,11 +1,14 @@
 from pathlib import Path
 
-def create_file(input):
-    rel: str = input['repository_relative_path']
-    content: str = input['content']
-    include_as_rust_pub_mod: bool = input.get('include_as_rust_pub_mod', True)
+def create_file():
 
-    def inner():
+    def inner(input):
+        rel_start = Path.home().joinpath("ai/redgold")
+        rel: str = input['repository_relative_path']
+        rel = str(rel_start.joinpath(rel))
+        content: str = input['content']
+        include_as_rust_pub_mod: bool = input.get('include_as_rust_pub_mod', True)
+
         with open(rel, "w") as f:
             f.write(content)
         if include_as_rust_pub_mod:
@@ -52,3 +55,14 @@ def create_file(input):
         }
     }
     return tool, inner
+
+
+if __name__ == "__main__":
+    tool, inner = create_file()
+    inner({
+        "repository_relative_path": "data/src/my_new_file.rs",
+        "content": "pub fn my_new_fn() { println!(\"Hello, world!\"); }"
+    })
+    print("File created successfully")
+    # print("Tool definition:")
+    # print(tool)

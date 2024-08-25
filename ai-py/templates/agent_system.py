@@ -29,4 +29,8 @@ costs money to run each API call, so avoiding rabbit-holes and optimizing for ef
 important as a human programmer attempting not to overexert themselves.
 
 Please make sure to compile your code after you have written to check it for errors.
+
+Do not be a hero, please do not attempt to fix issues unrelated to your current task, do not attempt to refactor 
+code outside the scope of what you have been assigned to work on. Please focus on making the minimal number 
+of changes required to accomplish your goal.
 """

@@ -334,12 +334,14 @@ impl SingleKeyBitcoinWallet<Tree> {
         do_sync: bool,
         database_path: PathBuf
     ) -> Result<Self, ErrorInfo> {
+        let mut backend = "ssl://electrum.blockstream.info:50002";
         let network = if network == NetworkEnvironment::Main {
             Network::Bitcoin
         } else {
+            backend = "ssl://electrum.blockstream.info:60002";
             Network::Testnet
         };
-        let client = Client::new("ssl://electrum.blockstream.info:60002")
+        let client = Client::new(backend)
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
         // KeyValueDatabase
@@ -851,7 +853,7 @@ async fn tx_debug() {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn balance_test2() {
     let mut w = SingleKeyBitcoinWallet
@@ -923,3 +925,23 @@ async fn balance_test() {
 
 // // https://bitcoindevkit.org/blog/2021/12/first-bdk-taproot-tx-look-at-the-code-part-2/
 // // https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md
+
+
+#[ignore]
+#[tokio::test]
+async fn balance_test_mn() {
+    let mut w = SingleKeyBitcoinWallet
+    ::new_wallet_db_backed(PublicKey::from_hex("0a230a210220f12e974037da99be8152333d4b72fc06c9041fbd39ac6b37fb6f65e3057c39")
+                                     .expect(""), NetworkEnvironment::Main, true, PathBuf::from("testdb")).expect("worx");
+    let balance = w.get_wallet_balance().expect("");
+
+
+    println!("balance: {:?}", balance);
+    println!("address: {:?}", w.address().expect(""));
+    let txs = w.get_all_tx().expect("");
+    for t in txs {
+        println!("tx: {}", t.json_or());
+    }
+
+
+}
