@@ -14,6 +14,9 @@ export default {
 
             return url
         },
+        isMainnet() {
+            return hostname.includes("explorer.redgold.io")
+        },
         async btcUsdPrice() {
             const url = "https://api.coinbase.com/v2/exchange-rates?currency=BTC"
             const response = await fetch(url);

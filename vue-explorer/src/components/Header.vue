@@ -18,7 +18,7 @@
         <a class="navbar-brand brand" href="/pools">
           Pools
         </a>
-        <a class="navbar-brand brand" href="/faucet">
+        <a class="navbar-brand brand" href="/faucet" v-if="!isMainnet">
           Faucet
         </a>
         <a class="navbar-brand brand" href="https://grafana.redgold.io/d/pj3zzDu4z/redgold?orgId=1&from=now-30m&to=now">

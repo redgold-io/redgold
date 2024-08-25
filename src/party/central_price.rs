@@ -76,8 +76,8 @@ impl CentralPricePair {
             vol,
             self.min_ask, // Price here is RDG/BTC
                 Self::default_divisions(),
-            -1.0*self.min_ask,
-            self.min_ask * 3.0
+            -0.5*self.min_ask,
+            self.min_ask * 1.0
         )
     }
 
@@ -300,18 +300,18 @@ fn debug_calculate_sample_prices() {
             a.1.volume.partial_cmp(&b.1.volume).unwrap()).map(|(i, v)| {
             println!("Max bid: {:?} at index {:?}", v, i);
         });
-        println!("Asks: {:?}", v.asks());
+        // println!("Asks: {:?}", v.asks());
         println!("Asks_usd: {:?}", v.asks_usd());
-        println!("bids: {:?}", v.bids());
-        println!("bids_usd: {:?}", v.bids_usd());
+        // println!("bids: {:?}", v.bids());
+        // println!("bids_usd: {:?}", v.bids_usd());
     }
 
     let bpp = cpp.get(&SupportedCurrency::Bitcoin).unwrap();
-    let f = bpp.fulfill_taker_order(
-        10_000, false, 1000, None, &Address::default(), AddressEvent::External(ExternalTimedTransaction::default()),
-        &NetworkEnvironment::Dev
-    ).unwrap();
-    let fra = f.fulfilled_currency_amount().to_fractional();
-    println!("Fulfillment: {}", f.json_pretty_or());
-    println!("Fulfillment amount: {}", fra);
+    // let f = bpp.fulfill_taker_order(
+    //     10_000, false, 1000, None, &Address::default(), AddressEvent::External(ExternalTimedTransaction::default()),
+    //     &NetworkEnvironment::Dev
+    // ).unwrap();
+    // let fra = f.fulfilled_currency_amount().to_fractional();
+    // println!("Fulfillment: {}", f.json_pretty_or());
+    // println!("Fulfillment amount: {}", fra);
 }

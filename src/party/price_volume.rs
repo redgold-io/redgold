@@ -41,7 +41,9 @@ impl PriceVolume {
                 // error!("Price is invalid: {} center_price: {} price_offset: {} price_width: {} divisions_f64: {}",
                 //        price, center_price, price_offset, price_width, divisions_f64);
             } else {
-                let volume = (first_term * ratio.powi(divisions - i)) as u64;
+                let multiplier = ratio.powi(divisions - i);
+                let multiplier = f64::sqrt(multiplier);
+                let volume = (first_term * multiplier) as u64;
                 price_volumes.push(PriceVolume { price, volume });
             }
         }

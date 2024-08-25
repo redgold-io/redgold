@@ -243,7 +243,7 @@ pub async fn amm_flow() {
 
     if let Some((privk, kp)) = dev_ci_kp() {
 
-        // send_internal_stake(1000.0, &network).await;
+        // send_internal_stake(5500.0, &network).await;
 
         let pk = kp.public_key();
         let rdg_address = pk.address().expect("address");
@@ -268,7 +268,7 @@ pub async fn amm_flow() {
         // stake_tx.broadcast().await.expect("broadcast").json_or().print();
 
         // tokio::time::sleep(Duration::from_secs(5)).await;
-        send_btc(btc_stake_amt, &network).await;
+        // send_btc(btc_stake_amt, &network).await;
         //
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
         let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
