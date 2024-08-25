@@ -2,6 +2,7 @@ use redgold_schema::structs::{PublicKey, State, SupportedCurrency, ValidationLiv
 use rocket::serde::{Deserialize, Serialize};
 use itertools::Itertools;
 use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::party_stream::TransactionWithObservationsAndPrice;
 
@@ -18,6 +19,13 @@ impl AddressEvent {
         match self {
             AddressEvent::External(e) => e.tx_id.clone(),
             AddressEvent::Internal(t) => t.tx.hash_or().hex()
+        }
+    }
+
+    pub fn ser_tx(&self) -> String {
+        match self {
+            AddressEvent::External(e) => e.json_or(),
+            AddressEvent::Internal(t) => t.tx.json_or()
         }
     }
 

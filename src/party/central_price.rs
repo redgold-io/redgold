@@ -11,7 +11,7 @@ use crate::party::price_volume::PriceVolume;
 
 pub const DUST_LIMIT: i64 = 2500;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct CentralPricePair {
     // Denominated in RDG/BTC for example
     pub min_ask: f64,

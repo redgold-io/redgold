@@ -6,6 +6,7 @@ use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::database::BatchDatabase;
 use itertools::Itertools;
 use num_bigint::BigInt;
+use rocket::form::validate::with;
 use rocket::serde::{Deserialize, Serialize};
 use rocket::yansi::Paint;
 use serde::__private::de::IdentifierDeserializer;
@@ -155,7 +156,8 @@ impl PartyEvents {
                     .find(|o| {
                         let order_i64_amt = o.fulfilled_currency_amount().amount_i64_or();
                         let tx_i64_amount = amt.amount_i64_or();
-                        let within_reasonable_range = i64::abs(order_i64_amt - tx_i64_amount) < 100000;
+                        let rdg_sats_tolerance = 1_000_000;
+                        let within_reasonable_range = i64::abs(order_i64_amt - tx_i64_amount) < rdg_sats_tolerance;
                         o.tx_id_ref.as_ref() == Some(txid) && within_reasonable_range
                     });
                 if order.is_none() {
@@ -201,7 +203,12 @@ impl PartyEvents {
                 .find(|&a| a == &out_addr).is_some() {
                 continue;
             }
-            if btc.iter().find(|(addr, amt) | addr == &out_addr && *amt == out_amt).is_none() {
+            if btc.iter().find(|(addr, amt) | addr == &out_addr && {
+                let this_amt = *amt as i64;
+                let out_amt_i64 = out_amt as i64;
+                let within_reasonable_range = i64::abs(this_amt - out_amt_i64) < 10_000;
+                within_reasonable_range
+            }).is_none() {
                 return Err(error_info("Invalid BTC fulfillment output"))
                     .with_detail("output_address", out_addr)
                     .with_detail("output_amount", out_amt.to_string());
