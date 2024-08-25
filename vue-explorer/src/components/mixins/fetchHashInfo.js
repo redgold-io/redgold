@@ -15,6 +15,7 @@ export default {
             return url
         },
         isMainnet() {
+            const hostname = window.location.hostname;
             return hostname.includes("explorer.redgold.io")
         },
         async btcUsdPrice() {
