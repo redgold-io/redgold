@@ -223,6 +223,13 @@ impl AMMTestHarness {
     }
 }
 
+#[test]
+pub fn fs_test() {
+    let a = 2;
+    let b = 2;
+    let c = redgold_fs::add(a, b);
+    assert_eq!(c, 4);
+}
 
 #[ignore]
 #[tokio::test]
@@ -294,9 +301,9 @@ pub async fn amm_flow() {
 
         // External to internal swaps
         // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works").print();
-        // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.002)).await.expect("works").print();
+        eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.002)).await.expect("works").print();
         // test btc swap
-        // send_btc(6_004, &network).await;
+        // send_btc(20_004, &network).await;
         // internal_to_external_swap(nc, &amm_rdg_address, &kp, &rdg_address, &btc_address, &dev_ci_eth_addr).await;
 
     }

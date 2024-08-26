@@ -33,6 +33,16 @@
           />
         </td>
         <td>{{ transaction.amount }}</td>
+        <td>
+          <HashLink :data="transaction.tx_hash" :use-external-link="true"
+                    :is-address="false"
+                    :bitcoin-external-link="transaction.other_address.startsWith('bc') || transaction.other_address.startsWith('tb')"
+                    :ethereum-external-link="transaction.other_address.startsWith('0x')"
+          />
+        </td>
+        <td>
+          {{ formatLocalTime(transaction.time) }}
+        </td>
       </tr>
       </tbody>
     </table>
@@ -51,6 +61,20 @@ export default {
   props: {
     events: Array,
   },
+  methods: {
+    formatLocalTime(milliseconds) {
+      const date = new Date(milliseconds);
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true // Use this if you want 12-hour format
+      });
+    }
+  },
   data() {
     return {
       transactionFields: [
@@ -60,7 +84,9 @@ export default {
           'Network',
           'Other Address',
           'TX Hash',
-          'Amount'
+          'Amount',
+          'Other TX Hash',
+          'Time'
       ],
     };
   },

@@ -165,6 +165,7 @@ pub struct DetailedEvents {
     incoming: String,
     time: i64,
     formatted_time: String,
+    pub other_tx_hash: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -379,10 +380,11 @@ pub fn convert_events(p0: PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<De
             incoming: "".to_string(),
             time: 0,
             formatted_time: "".to_string(),
+            other_tx_hash: "".to_string(),
         };
         if let Some(time) = x.time(&nc.seeds_now_pk()) {
             de.time = time;
-            de.formatted_time = time.to_time_string();
+            de.formatted_time = time.to_time_string_shorter();
         }
         let x2 = x.clone();
         match x {
@@ -390,14 +392,20 @@ pub fn convert_events(p0: PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<De
                 de.event_type = "External".to_string();
                 if let Some(ps) = p0.party_events.as_ref() {
                     de.extended_type = {
-                        if ps.external_staking_events.iter().filter(|e| e.event == x2).next().is_some() {
-                            "Stake"
-                        } else if ps.fulfillment_history.iter().filter(|h| h.1 == x2).next().is_some() {
+                        let swap = ps.fulfillment_history.iter().filter(|h| h.1 == x2).next();
+                        let stake_fulfill = ps.external_staking_events.iter().filter(|e| e.event == x2).next();
+                        let swap_fulfillment = ps.fulfillment_history.iter().filter(|h| h.2 == x2).next();
+                        if let Some(stake_fulfill) = stake_fulfill {
+                            de.other_tx_hash = stake_fulfill.pending_event.tx.hash_or().hex();
+                            "StakeDepositFulfillment"
+                        } else if let Some(swap) = swap {
+                            de.other_tx_hash = swap.2.identifier();
                             "Swap"
-                        } else if ps.fulfillment_history.iter().filter(|h| h.2 == x2).next().is_some() {
+                        } else if let Some(swap_fulfillment) = swap_fulfillment {
+                            de.other_tx_hash = swap_fulfillment.1.identifier();
                             "SwapFulfillment"
                         } else {
-                            "Pending"
+                            "Pending/Unknown"
                         }
                     }.to_string();
                 };
@@ -410,7 +418,9 @@ pub fn convert_events(p0: PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<De
             AddressEvent::Internal(i) => {
                 de.event_type = "Internal".to_string();
                 de.extended_type = {
-                    if i.tx.is_swap_fulfillment() {
+                    // Okay technically this first type should be a Vec<String> but let's ignore that for now.
+                    if let Some(sf) = i.tx.swap_fulfillment() {
+                        de.other_tx_hash = sf.external_transaction_id.as_ref().map(|t| t.identifier.clone()).unwrap_or("".to_string());
                         "SwapFulfillment"
                     } else if i.tx.is_swap() {
                         "Swap"

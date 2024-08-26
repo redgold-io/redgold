@@ -115,7 +115,7 @@ async fn debug_events2() -> RgResult<()> {
     //     assert_eq!(bal1b, bal2b);
     // }
 
-    // convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
 
     // for e in &hn_pev.events {
     //     duplicatehn.process_event(e).await.expect("works");
@@ -130,33 +130,33 @@ async fn debug_events2() -> RgResult<()> {
     //
 
 
-    let order = hn_pev.orders().get(0).expect("order").clone();
+    // let order = hn_pev.orders().get(0).expect("order").clone();
     // order.json_pretty_or().print();
-    let eth = relay.eth_wallet()?;
-    let mp_eth_addr = key.to_ethereum_address_typed()?;
-    let dest = order.destination.clone();
-    let fulfilled_currency = order.fulfilled_currency_amount();
-    let mut tb = TransactionBuilder::new(&relay.node_config);
-    tb.with_input_address(&key.address().expect("works"));
-    tb.with_auto_utxos().await?;
-
-    let orig_orders = hn_pev.orders();
-    let orders = orig_orders.iter()
-        // .filter(|e| e.event_time < cutoff_time)
-        .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold)
-        .collect_vec();
-    for o in orders.clone() {
-        tb.with_output(&o.destination, &o.fulfilled_currency_amount());
-        if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
-            tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
-        } else {
-            tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
-        };
-    }
-
-    let tx = tb.build().expect("build");
-    pev.relay = Some(relay.clone());
-    pev.validate_rdg_swap_fulfillment_transaction(&tx).expect("");
+    // let eth = relay.eth_wallet()?;
+    // let mp_eth_addr = key.to_ethereum_address_typed()?;
+    // let dest = order.destination.clone();
+    // let fulfilled_currency = order.fulfilled_currency_amount();
+    // let mut tb = TransactionBuilder::new(&relay.node_config);
+    // tb.with_input_address(&key.address().expect("works"));
+    // tb.with_auto_utxos().await?;
+    //
+    // let orig_orders = hn_pev.orders();
+    // let orders = orig_orders.iter()
+    //     // .filter(|e| e.event_time < cutoff_time)
+    //     .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold)
+    //     .collect_vec();
+    // for o in orders.clone() {
+    //     tb.with_output(&o.destination, &o.fulfilled_currency_amount());
+    //     if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
+    //         tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
+    //     } else {
+    //         tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
+    //     };
+    // }
+    //
+    // let tx = tb.build().expect("build");
+    // pev.relay = Some(relay.clone());
+    // pev.validate_rdg_swap_fulfillment_transaction(&tx).expect("");
 
     //
     // let tx = eth.create_transaction_typed(
