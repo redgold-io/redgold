@@ -301,10 +301,10 @@ pub async fn amm_flow() {
 
         // External to internal swaps
         // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.0111)).await.expect("works").print();
-        eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.002)).await.expect("works").print();
+        // eth_submit.send(&amm_eth_address, &CurrencyAmount::from_eth_fractional(0.002)).await.expect("works").print();
         // test btc swap
         // send_btc(20_004, &network).await;
-        // internal_to_external_swap(nc, &amm_rdg_address, &kp, &rdg_address, &btc_address, &dev_ci_eth_addr).await;
+        internal_to_external_swap(nc, &amm_rdg_address, &kp, &rdg_address, &btc_address, &dev_ci_eth_addr).await;
 
     }
 //     }
@@ -348,7 +348,7 @@ async fn internal_to_external_swap(nc: NodeConfig, amm_rdg_address: &Address, kp
     // test rdg->btc swap
     nc.tx_builder().with_input_address(&rdg_address)
         .with_auto_utxos().await.expect("utxos")
-        .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.0555).unwrap(), &amm_rdg_address)
+        .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.05551).unwrap(), &amm_rdg_address)
         .unwrap()
         .build()
         .unwrap()
@@ -359,7 +359,7 @@ async fn internal_to_external_swap(nc: NodeConfig, amm_rdg_address: &Address, kp
     // test rdg->eth swap
     nc.tx_builder().with_input_address(&rdg_address)
         .with_auto_utxos().await.expect("utxos")
-        .with_swap(&dev_ci_eth_addr, &CurrencyAmount::from_fractional(0.0555).unwrap(), &amm_rdg_address)
+        .with_swap(&dev_ci_eth_addr, &CurrencyAmount::from_fractional(0.05552).unwrap(), &amm_rdg_address)
         .unwrap()
         .build()
         .unwrap()

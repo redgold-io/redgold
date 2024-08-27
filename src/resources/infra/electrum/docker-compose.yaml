@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  electrs:
+    image: electrs-app
+    container_name: electrs
+    network_mode: host
+    volumes:
+      - /disk/bitcoin:/home/user/.bitcoin:ro
+      - ./db:/home/user/db
+    environment:
+      - ELECTRS_DB_DIR=/home/user/db
+    tty: true
+    stdin_open: true
+    restart: unless-stopped

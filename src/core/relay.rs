@@ -205,7 +205,8 @@ impl Relay {
             None => {
                 let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
                     pk.clone(), self.node_config.network.clone(), true,
-                    self.node_config.env_data_folder().bdk_sled_path()
+                    self.node_config.env_data_folder().bdk_sled_path(),
+                    None
                 )?;
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
                 guard.insert(pk.clone(), w.clone());

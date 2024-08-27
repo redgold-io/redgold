@@ -14,7 +14,7 @@ use bdk::bitcoin::util::{psbt, sighash};
 use bdk::bitcoin::util::psbt::PartiallySignedTransaction;
 use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetTx};
 use bdk::database::{BatchDatabase, MemoryDatabase};
-use bdk::electrum_client::Client;
+use bdk::electrum_client::{Client, Config};
 use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrdering};
 use bdk::sled::Tree;
 use itertools::Itertools;
@@ -277,6 +277,20 @@ impl ExternalTimedTransaction {
 
 }
 
+
+pub fn electrum_mainnet_backends() -> Vec<String> {
+    vec![
+        "ssl://fulcrum.sethforprivacy.com:50002",
+        "ssl://electrum.blockstream.info:50002"
+    ].iter().map(|x| x.to_string()).collect_vec()
+}
+
+pub fn electrum_testnet_backends() -> Vec<String> {
+    vec![
+        "ssl://electrum.blockstream.info:60002"
+    ].iter().map(|x| x.to_string()).collect_vec()
+}
+
 impl SingleKeyBitcoinWallet<MemoryDatabase> {
 
     pub fn new_wallet(
@@ -284,14 +298,16 @@ impl SingleKeyBitcoinWallet<MemoryDatabase> {
         network: NetworkEnvironment,
         do_sync: bool
     ) -> Result<Self, ErrorInfo> {
-        let mut backend = "ssl://electrum.blockstream.info:50002";
+        let vec = electrum_mainnet_backends();
+        let mut backend = vec.get(0).unwrap().clone();
         let network = if network == NetworkEnvironment::Main {
             Network::Bitcoin
         } else {
-            backend = "ssl://electrum.blockstream.info:60002";
+            let vec1 = electrum_testnet_backends();
+            backend = vec1.get(0).unwrap().clone();
             Network::Testnet
         };
-        let client = Client::new(backend)
+        let client = Client::new(&*backend)
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
         let database = MemoryDatabase::default();
@@ -332,16 +348,23 @@ impl SingleKeyBitcoinWallet<Tree> {
         public_key: PublicKey,
         network: NetworkEnvironment,
         do_sync: bool,
-        database_path: PathBuf
+        database_path: PathBuf,
+        electrum_mn_backend: Option<String>
     ) -> Result<Self, ErrorInfo> {
-        let mut backend = "ssl://electrum.blockstream.info:50002";
+        let vec = electrum_mainnet_backends();
+        let mut backend = vec.get(0).unwrap().clone();
+        if let Some(electrum_mn_backend) = electrum_mn_backend {
+            backend = electrum_mn_backend;
+        }
         let network = if network == NetworkEnvironment::Main {
             Network::Bitcoin
         } else {
-            backend = "ssl://electrum.blockstream.info:60002";
+            let vec1 = electrum_testnet_backends();
+            backend = vec1.get(0).unwrap().clone();
             Network::Testnet
         };
-        let client = Client::new(backend)
+        let mut config = Config::builder().validate_domain(false).build();
+        let client = Client::from_config(&*backend, config)
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
         // KeyValueDatabase
@@ -931,8 +954,11 @@ async fn balance_test() {
 #[tokio::test]
 async fn balance_test_mn() {
     let mut w = SingleKeyBitcoinWallet
-    ::new_wallet_db_backed(PublicKey::from_hex("0a230a210220f12e974037da99be8152333d4b72fc06c9041fbd39ac6b37fb6f65e3057c39")
-                                     .expect(""), NetworkEnvironment::Main, true, PathBuf::from("testdb")).expect("worx");
+    ::new_wallet_db_backed(
+        PublicKey::from_hex("0a230a210220f12e974037da99be8152333d4b72fc06c9041fbd39ac6b37fb6f65e3057c39")
+                                     .expect(""), NetworkEnvironment::Main, true, PathBuf::from("testdb"),
+        Some("ssl://fulcrum.sethforprivacy.com:50002".to_string())
+    ).expect("worx");
     let balance = w.get_wallet_balance().expect("");
 
 
