@@ -11,6 +11,7 @@ def create_file():
 
         with open(rel, "w") as f:
             f.write(content)
+            print(f"File created at {rel}")
         if include_as_rust_pub_mod:
             # first check if libs.rs exists in the same parent directory
             # if not, check for mod.rs

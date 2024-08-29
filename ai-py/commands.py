@@ -76,5 +76,14 @@ def empty_input_schema():
         "required": []
     }
 
+
+def main():
+    print(redgold_cargo_rust_compile())
+
+
+if __name__ == "__main__":
+    main()
+
+
 #print(f"Success: {success}")
 #print(f"Number of errors: {len(errors)}")

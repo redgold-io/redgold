@@ -46,7 +46,7 @@ def msg(
     try:
         message = client.messages.create(
             model=model_settings.get('model', "claude-3-5-sonnet-20240620"),
-            max_tokens=model_settings.get('max_tokens', 4096),
+            max_tokens=model_settings.get('max_tokens', 8192),
             temperature=model_settings.get('temperature', 0),
             system=system,
             messages=messages,
@@ -64,9 +64,9 @@ def msg(
 def main():
 
     settings = {
-        'model': "claude-3-5-sonnet-20240620",
-        'max_tokens': 4096,
-        'temperature': 0.0
+        # "model": "claude-3-5-sonnet-20240620",
+        # "max_tokens": 8192,
+        # "temperature": 0
     }
     # Create a timestamp for the filename
     day_timestamp = datetime.now().strftime("%Y/%m/%d")
@@ -89,7 +89,7 @@ def main():
     starting_prompt += get_one_ai_dev_issue()
     response = msg(starting_prompt, model_settings=settings, active_dir=active_dir)
 
-    max_runs = 200
+    max_runs = 1000
     #     stop_reason: Optional[Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]] = None
     history: list[MessageParam] = [user_text_content(starting_prompt)]
     msg_count = 0

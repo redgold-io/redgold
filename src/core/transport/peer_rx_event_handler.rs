@@ -39,6 +39,7 @@ use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use crate::api::faucet::faucet_request;
 // use crate::multiparty_gg20::watcher::DepositWatcher;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::observability::metrics_help::WithMetrics;
 use redgold_schema::structs::BatchTransactionResolveResponse;
 use redgold_schema::util::timers::PerfTimer;
@@ -117,9 +118,37 @@ impl PeerRxEventHandler {
     ) -> RgResult<Response> {
 
 
+        if let Some(addr) = origin_ip.as_ref() {
+            let ip = addr.ip().to_string();
+            let labels = [("ip".to_string(), ip)];
+            counter!("redgold_request_response_ip", &labels).increment(1)
+        }
+
         // TODO: Rate limiting here
 
         // TODO: add a uuid here
+
+        if let Ok(npk) = verified.as_ref() {
+            let npk_hex = npk.hex();
+            let labels = [("public_key".to_string(), npk_hex)];
+            counter!("redgold_request_response_pk", &labels).increment(1);
+            if !relay.is_seed(npk) {
+                if let Some(nmd) = request.node_metadata.as_ref() {
+                    let opt_reward = relay.ds.peer_store.query_nodes_peer_node_info(&npk).await.ok()
+                        .and_then(|x| x)
+                        .and_then(|x| x.latest_peer_transaction)
+                        .and_then(|x| x.peer_data().ok())
+                        .and_then(|x| x.reward_address);
+                    let addr = opt_reward.or(npk.address().ok());
+                    if let Some(a) = addr {
+                        let h = a.hex();
+                        let labels = [("address".to_string(), h)];
+                        counter!("redgold_request_reward", &labels).increment(1)
+                    }
+                }
+            }
+        }
+
         let mut response = Response::empty_success();
 
         let auth_required = request.auth_required();

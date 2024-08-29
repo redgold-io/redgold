@@ -648,6 +648,7 @@ impl TransactionProcessContext {
         // Here now we need to send this transaction to a contract state manager if it's appropriate
 
         // For now this is the 'deploy' operation -- but it's not correct / validated yet.
+        if !self.relay.node_config.network.is_main() {
         for o in &transaction.outputs {
             if let Some(c) = o.contract
                 .as_ref().and_then(|c| c.code_execution_contract.as_ref()) {
@@ -681,6 +682,7 @@ impl TransactionProcessContext {
                 info!("Accepted CSM: {}", csm.json_or())
             }
         }
+            }
 
         // TODO: Task local metrics update here
         // let hm: HashMap<String, String> = HashMap::new();
