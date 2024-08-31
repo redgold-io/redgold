@@ -33,3 +33,6 @@ redgold_linux
 redgold_mac
 redgold.exe
 redgold_linux_ubuntu20
+src/resources/infra/electrum/db
+/redgold
+yarn.lock

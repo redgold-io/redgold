@@ -24,7 +24,7 @@ members = [
     "keys",
     "sdk-client"
 , "fs"]
-exclude = ["examples/experiments/rust_wasm", "ai"] #, "sdk", "sdk/*"]
+exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"] #, "sdk", "sdk/*"]
 
 
 [workspace.package]
