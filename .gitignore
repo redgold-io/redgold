@@ -36,3 +36,8 @@ redgold_linux_ubuntu20
 src/resources/infra/electrum/db
 /redgold
 yarn.lock
+/ai-py/ignore-data
+/ai-py/include
+/ai-py/session.txt
+__pycache__
+/keys/testdb
