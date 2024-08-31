@@ -132,7 +132,7 @@ impl PeerRxEventHandler {
             let npk_hex = npk.hex();
             let labels = [("public_key".to_string(), npk_hex)];
             counter!("redgold_request_response_pk", &labels).increment(1);
-            if !relay.is_seed(npk) {
+            if !relay.is_seed(npk).await {
                 if let Some(nmd) = request.node_metadata.as_ref() {
                     let opt_reward = relay.ds.peer_store.query_nodes_peer_node_info(&npk).await.ok()
                         .and_then(|x| x)
