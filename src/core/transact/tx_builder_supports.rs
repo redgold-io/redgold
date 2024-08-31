@@ -326,7 +326,7 @@ impl TransactionBuilder {
     pub fn last_output_request_or(&mut self) -> Option<&mut StandardRequest> {
         self.last_output_data().and_then(|d| {
             let mut default = StandardRequest::default();
-            let mut r = d.standard_request.as_mut().unwrap_or(&mut default);
+            let r = d.standard_request.as_mut().unwrap_or(&mut default);
             d.standard_request = Some(r.clone());
             d.standard_request.as_mut()
         })

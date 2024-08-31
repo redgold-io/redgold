@@ -10,7 +10,7 @@ use redgold_schema::observability::errors::Loggable;
 // TODO: Abstract over spawn/send updates
 pub fn broadcast_transaction(nc: NodeConfig, tx: Transaction, send: Sender<StateUpdate>) {
     tokio::spawn(async move {
-        let mut nc = nc.clone();
+        let nc = nc.clone();
         let res = nc.clone().api_client().send_transaction(&tx.clone(), true).await;
 
         let st = Some(res.clone());

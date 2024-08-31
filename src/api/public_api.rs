@@ -580,7 +580,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
 
     let relay_arc = Arc::new(relay2.clone());
 
-    let mut routes = hello
+    let routes = hello
         .or(trust)
         .or(peer_tx)
         .or(node_tx)

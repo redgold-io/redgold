@@ -151,7 +151,7 @@ async fn debug_ssh_invoke() {
     let result = ssh.execute("ls", None).await.expect("ssh");
     println!("Result: {}", result);
 
-    let mut s = Server{
+    let s = Server{
         name: "".to_string(),
         host,
         index: 0,

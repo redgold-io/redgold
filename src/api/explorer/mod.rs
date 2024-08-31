@@ -700,7 +700,7 @@ async fn convert_party_info(relay: &Relay, pi: &PartyInfoAbridged) -> RgResult<E
 
 }
 async fn handle_explorer_pool(relay: Relay) -> RgResult<ExplorerPoolsResponse> {
-    let mut pools = vec![];
+    let pools = vec![];
     // if let Some(dw) = DepositWatcher::get_deposit_config(&relay.ds).await? {
     //     let opt = dw.deposit_allocations.get(0);
     //     if let Some(dk) = opt {

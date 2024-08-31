@@ -487,7 +487,7 @@ async fn test_transaction_dev() {
 #[tokio::test]
 async fn test_new_deploy() {
     // init_logger(); //.ok();
-    let mut nc = NodeConfig::dev_default().await;
+    let nc = NodeConfig::dev_default().await;
     let mut dep = Deploy::default();
     dep.ops = false;
     info!("Deploying with {:?}", dep.clone());

@@ -187,7 +187,7 @@ impl LiveE2E {
     }
 
     pub fn build_live_tx(nc: &NodeConfig, destination_choice: Address, spendable_utxos: Vec<SpendableUTXO>) -> Result<Transaction, ErrorInfo> {
-        let mut tx_b = TransactionBuilder::new(&nc);
+        let tx_b = TransactionBuilder::new(&nc);
         let destination = destination_choice;
         let amount = CurrencyAmount::from_fractional(0.01f64).expect("");
         let first_utxos = spendable_utxos.iter().take(100).cloned().collect_vec();

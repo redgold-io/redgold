@@ -21,7 +21,7 @@ async fn historical_parity_debug() {
     println!("delta: {}", delta/1000f64);
     println!("res: {:?}", all_txs.len());
     println!("{}", all_txs.get(0).unwrap().json_or());
-    let mut valid_utxos: HashMap<UtxoId, UtxoEntry> = Default::default();
+    let valid_utxos: HashMap<UtxoId, UtxoEntry> = Default::default();
 
     validate_utxos(&mut all_txs, valid_utxos);
 
@@ -79,12 +79,12 @@ async fn historical_parity_debug_cached() {
         }
         for (output_index, o) in tx.outputs.iter().enumerate() {
             let utxo_id = UtxoId::new(&tx.hash_or(), output_index as i64);
-            let mut valid_utxo = r.ds.utxo.utxo_id_valid(&utxo_id).await.unwrap();
+            let valid_utxo = r.ds.utxo.utxo_id_valid(&utxo_id).await.unwrap();
             let option = r.ds.utxo.utxo_child(&utxo_id).await.unwrap();
             if let Some(child) = &option {
                 children_to_explore.push(child.0.clone());
             }
-            let mut child = option.json_or();
+            let child = option.json_or();
             let output_addr = o.address.as_ref().expect("").render_string().unwrap_or("MISSING ADDRESS OUTPUT".to_string());
             let amt = o.opt_amount();
             let is_swap = o.is_swap();
@@ -171,7 +171,7 @@ fn validate_utxos(all_txs: &mut Vec<Transaction>, mut valid_utxos: HashMap<UtxoI
 
     let mut bad_txs = vec![];
 
-    for (idx, mut t) in all_txs.iter_mut().dropping(1).enumerate() {
+    for (idx, t) in all_txs.iter_mut().dropping(1).enumerate() {
             t.with_hash();
 
             let has_amount = t.output_amounts_opt().filter(|&a| a.amount > 0).next().is_some();

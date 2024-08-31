@@ -349,7 +349,7 @@ async fn debug_sign_tx () {
         balance: 0,
         recent_transactions: vec![]
     };
-    let mut nc = NodeConfig::default();
+    let nc = NodeConfig::default();
     let mut tb = TransactionBuilder::new(&nc);
     tb.with_address_info(ai);
     let destination = address.clone();

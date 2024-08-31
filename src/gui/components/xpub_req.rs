@@ -139,7 +139,7 @@ impl RequestXpubState {
                         if let Ok(xpub) = r {
                             ui.label("XPub:");
                             let mut string = xpub.clone();
-                            let mut string2 = string.clone();
+                            let string2 = string.clone();
                             bounded_text_area_size(ui, &mut string, 300.0, 4);
                             copy_to_clipboard(ui, string2.clone());
                             editable_text_input_copy(ui, "Save Name", &mut self.save_name, 150.0);

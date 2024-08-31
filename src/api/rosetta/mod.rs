@@ -52,7 +52,7 @@ where
 async fn rosetta_relay() -> Relay {
     // util::init_logger();
     let nc = NodeConfig::from_test_id(&(8 as u16));
-    let mut relay = Relay::new(nc).await;
+    let relay = Relay::new(nc).await;
     let mut relay = Relay::default().await;
     let port = random_port();
     relay.node_config.rosetta_port = Some(port);

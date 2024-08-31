@@ -188,7 +188,7 @@ impl RgHttpClient {
             r.trace_id = Some(Uuid::new_v4().to_string());
         }
 
-        let mut r = if let Some(relay) = nc.or(self.relay.as_ref()) {
+        let r = if let Some(relay) = nc.or(self.relay.as_ref()) {
             let rrr = r.with_metadata(relay.node_metadata().await?)
                 .with_auth(&relay.node_config.keypair());
             rrr.verify_auth().add("Self request signing immediate auth failure")?;

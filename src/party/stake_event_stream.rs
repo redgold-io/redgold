@@ -116,7 +116,7 @@ impl PartyEvents {
             .map(|a| CurrencyAmount::from(a));
         let opt_stake_request_utxo_id = tx.stake_requests();
         // let opt_stake_request_utxo_id = addrs.iter().flat_map(|a| tx.liquidity_of(a)).next();
-        for ((utxo_id, req)) in opt_stake_request_utxo_id {
+        for (utxo_id, req) in opt_stake_request_utxo_id {
             if let Some(deposit) = req.deposit.as_ref() {
                 // This represents an external deposit.
                 if let Some(deposit_inner) = deposit.deposit.as_ref() {

@@ -503,7 +503,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
     ui.spacing();
 
     if let Some(srt) = &ls.wallet_state.send_receive.clone() {
-        let mut show_prepared = true;
+        let show_prepared = true;
         match srt {
             SendReceiveTabs::Send => {
                 send_view(ui, ls, pk);

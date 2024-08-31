@@ -252,7 +252,7 @@ impl Relay {
 
     pub async fn mark_peer_send_failure(&self, pk: &PublicKey, error: &ErrorInfo) -> RgResult<()> {
         let mut l = self.peer_send_failures.safe_lock().await?;
-        let mut v = l.get(pk).map(|v| v.clone()).unwrap_or(
+        let v = l.get(pk).map(|v| v.clone()).unwrap_or(
             (error.clone(), util::current_time_millis_i64()));
         l.insert(pk.clone(), v);
         Ok(())

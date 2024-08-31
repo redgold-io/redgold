@@ -82,8 +82,8 @@ async fn debug_events2() -> RgResult<()> {
     let evhn = hn_pev.events.clone();
     assert_eq!(ev.len(), evhn.len());
 
-    let mut p1 = PartyEvents::new(&key, &NetworkEnvironment::Main, &relay);
-    let mut p2 = PartyEvents::new(&key, &NetworkEnvironment::Main, &relay);
+    let p1 = PartyEvents::new(&key, &NetworkEnvironment::Main, &relay);
+    let p2 = PartyEvents::new(&key, &NetworkEnvironment::Main, &relay);
     //
     // let seeds = relay.node_config.seeds_now_pk();
     // for (ev1, ev2) in ev.iter().zip(evhn.iter()) {

@@ -12,7 +12,7 @@ pub async fn manual_deploy_grafana_public() -> RgResult<()> {
     let s = Server::new("grafana-public-node.redgold.io".to_string());
 
     let (default_fun, output_handler) = log_handler();
-    let mut ssh = DeployMachine::new(&s, None, output_handler.clone());
+    let ssh = DeployMachine::new(&s, None, output_handler.clone());
 
     let p = &output_handler.clone();
     // ssh.exes("apt install -y ufw", p).await.expect("");

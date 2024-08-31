@@ -418,7 +418,7 @@ async fn servers_multiple() -> std::io::Result<()> {
 
     let mut pm = PeerMessage::empty();
     let pair = relay1.node_config.words().default_kp().expect("").clone();
-    let mut request = Request::empty().about();
+    let request = Request::empty().about();
     let msg = request.with_auth(&pair);
     msg.verify_auth().expect("");
     pm.request = msg.clone();

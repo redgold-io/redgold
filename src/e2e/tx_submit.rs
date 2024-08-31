@@ -54,7 +54,7 @@ impl TransactionSubmitter {
     pub(crate) async fn submit_used_utxo(&self) {
         let mut gen = self.generator.lock().unwrap();
         let transaction = gen.generate_simple_used_utxo_tx_otherwise_valid().clone().expect("tx");
-        let mut tx = transaction.transaction.clone();
+        let tx = transaction.transaction.clone();
         assert!(tx.validate_keys(None).is_ok());
         let res = self.client.clone().send_transaction(&tx, true).await;
         assert!(res.is_err());

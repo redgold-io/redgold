@@ -207,7 +207,7 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
     // let min_time = recent.iter().filter_map(|t| t.time().ok()).min().cloned().unwrap_or(EARLIEST_TIME);
 
     // Time slice by days backwards.
-    let mut no_data_count = 0;
+    let no_data_count = 0;
 
     // TODO: Not this, also a maximum earliest lookback period.
     let bootstrap = bootstrap_pks.get(0).expect("bootstrap").clone();
@@ -409,7 +409,7 @@ async fn download_genesis(relay: &Relay, bootstrap_pks: Vec<PublicKey>) -> Resul
         let mut r = Request::default();
         r.genesis_request = Some(structs::GenesisRequest::default());
         let genesis = relay.broadcast_async(bootstrap_pks.clone(), r, None).await?;
-        let mut hm: HashMap<Hash, (Transaction, i64)> = HashMap::new();
+        let hm: HashMap<Hash, (Transaction, i64)> = HashMap::new();
         let filtered = genesis.iter().filter_map(|g| {
             if let Ok(r) = g {
                 if let Some(genesis) = &r.genesis_response {
