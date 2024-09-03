@@ -21,7 +21,7 @@ use redgold_schema::{empty_public_request, error_info, ErrorInfoContext, RgResul
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Transaction, UtxoId};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, GetActivePartyKeyRequest, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Transaction, UtxoId};
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
@@ -238,6 +238,20 @@ impl RgHttpClient {
         req.about_node_request = Some(AboutNodeRequest::default());
         let response = self.proto_post_request(req, None, None).await?;
         Ok(response.about_node_response.ok_or(error_info("Missing about node response"))?)
+    }
+
+    pub async fn active_party_key(&self) -> RgResult<PublicKey> {
+        let mut req = Request::default();
+        req.get_active_party_key_request = Some(GetActivePartyKeyRequest::default());
+        let response = self.proto_post_request(req, None, None).await?;
+        Ok(response.get_active_party_key_response.ok_or(error_info("Missing about node response"))?)
+    }
+
+    pub async fn executable_checksum(&self) -> RgResult<String> {
+        let abt = self.about().await?;
+        let latest = abt.latest_node_metadata.safe_get_msg("Missing about node metadata latest node metadata")?;
+        let checksum = latest.node_metadata()?.version_info.map(|v| v.executable_checksum.clone());
+        checksum.safe_get_msg("Missing executable checksum").cloned()
     }
 
     pub async fn resolve_code(&self, address: &Address) -> RgResult<structs::ResolveCodeResponse> {
