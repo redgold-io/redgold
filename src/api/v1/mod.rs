@@ -188,6 +188,14 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             Ok(cleared)
         });
 
+    let exe_hash = warp::get()
+        .with_v1()
+        .and(warp::path("checksum"))
+        .with_relay_and_ip(r.clone())
+        .and_then_as(move |api_data: ApiData| async move {
+            Ok(api_data.relay.node_config.executable_checksum.clone())
+        });
+
     let transaction_get = warp::get()
         .with_v1()
         .and(warp::path("transaction"))
@@ -225,6 +233,7 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(party_key)
         .or(party_data)
         .or(transaction_get)
+        .or(exe_hash)
 
 }
 
