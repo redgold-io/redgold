@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct DebugSettings {
+    pub use_e2e_external_resource_mocks: bool
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PartyConfigData {
     // Enable multiparty support, requires API keys and additional setup for oracle pricing info.
@@ -11,7 +17,8 @@ pub struct PartyConfigData {
 // Migrate node_config stuff here
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ConfigData {
-    pub party_config_data: PartyConfigData
+    pub party_config_data: PartyConfigData,
+    pub debug_settings: DebugSettings
 }
 
 impl Default for ConfigData {
@@ -21,6 +28,9 @@ impl Default for ConfigData {
                 enable_party_mode: false,
                 order_cutoff_delay_time: 300_000,
                 poll_interval: 300_000,
+            },
+            debug_settings: DebugSettings {
+                use_e2e_external_resource_mocks: false,
             },
         }
     }

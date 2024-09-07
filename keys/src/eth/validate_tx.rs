@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use ethers::prelude::Transaction;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use num_bigint::BigInt;
 use num_traits::Signed;
@@ -10,6 +11,16 @@ use crate::eth::eth_wallet::EthWalletWrapper;
 use crate::eth::historical_client::EthHistoricalClient;
 
 impl EthWalletWrapper {
+
+    pub fn translate_serialized_tx(payload: String) -> RgResult<TypedTransaction> {
+        let tx = payload.json_from::<TypedTransaction>()?;
+        Ok(tx)
+    }
+
+    pub fn decode_rlp_tx(payload: Vec<u8>) -> RgResult<Transaction> {
+        let res = ethers::utils::rlp::decode::<Transaction>(&payload).error_info("rlp decode failure")?;
+        Ok(res)
+    }
 
     pub fn validate_eth_fulfillment(
         fulfills: Vec<(structs::Address, CurrencyAmount)>,

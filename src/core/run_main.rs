@@ -14,6 +14,7 @@ use redgold_schema::structs::ErrorInfo;
 
 use crate::core::internal_message;
 use crate::core::relay::Relay;
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util::cli::arg_parse_config;
@@ -50,8 +51,9 @@ pub async fn main_from_args(opts: RgArgs) {
 
     Node::prelim_setup(relay.clone()).await.expect("prelim");
 
+    // TODO: Match on node_config external network resources impl
     // TODO: Tokio select better?
-    let join_handles = Node::start_services(relay.clone()).await;
+    let join_handles = Node::start_services(relay.clone(), ExternalNetworkResourcesImpl::new(&node_config).expect("works")).await;
     let mut futures = FuturesUnordered::new();
     for jhi in join_handles {
         futures.push(jhi.result())
