@@ -7,6 +7,7 @@ use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::party::address_event::AddressEvent;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::party_stream::{PartyEvents, TransactionWithObservationsAndPrice};
@@ -54,7 +55,7 @@ impl PartyInternalData {
 
 }
 
-impl PartyWatcher {
+impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
     pub async fn enrich_prepare_data(&self, active: Vec<PartyInfo>) -> Result<HashMap<PublicKey, PartyInternalData>, ErrorInfo> {
         let seeds = self.relay.node_config.seeds_now_pk();
@@ -107,7 +108,6 @@ impl PartyWatcher {
             address_events.sort_by(|a, b| {
                 a.time(&seeds).cmp(&b.time(&seeds))
             });
-
 
 
             // Filter out all orders before initiation period (testing mostly.)

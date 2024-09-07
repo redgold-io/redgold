@@ -175,6 +175,10 @@ impl EthWalletWrapper {
 
     }
 
+    pub async fn broadcast_tx_vec(&self, tx: Vec<u8>) -> RgResult<()> {
+        self.broadcast_tx(Bytes::from(tx)).await
+    }
+
     pub async fn broadcast_tx(&self, tx: Bytes) -> RgResult<()> {
         let result = self.client.send_raw_transaction(tx).await;
         match result {

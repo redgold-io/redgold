@@ -69,6 +69,7 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
+use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl, MockExternalResources};
 use crate::party::party_watcher::PartyWatcher;
 use crate::sanity::{historical_parity, migrations};
 use crate::sanity::recent_parity::RecentParityCheck;
@@ -111,8 +112,9 @@ impl Node {
     * Each of these application background services communicates via channels instantiated by the relay
     TODO: Refactor this into multiple start routines, or otherwise delay service start until after preliminary setup.
     */
-    #[tracing::instrument(skip(relay), fields(node_id = %relay.node_config.public_key().short_id()))]
-    pub async fn start_services(relay: Relay) -> Vec<NamedHandle> {
+    #[tracing::instrument(skip(relay, external_network_resources), fields(node_id = %relay.node_config.public_key().short_id()))]
+    pub async fn start_services<T>(relay: Relay, external_network_resources: T) -> Vec<NamedHandle>
+    where T: ExternalNetworkResources + Send + 'static + Sync {
 
         let node_config = relay.node_config.clone();
 
@@ -146,11 +148,8 @@ impl Node {
         let ojh = ObservationBuffer::new(relay.clone()).await;
         join_handles.push(NamedHandle::new("ObservationBuffer", ojh));
 
-        // Rewards::new(relay.clone(), runtimes.auxiliary.clone());
-
         join_handles.push(NamedHandle::new("PeerRxEventHandler", PeerRxEventHandler::new(
             relay.clone(),
-            // runtimes.auxiliary.clone(),
         )));
 
         join_handles.push(NamedHandle::new("public_api", public_api::start_server(relay.clone(),
@@ -163,32 +162,12 @@ impl Node {
 
         let obs_handler = ObservationHandler{relay: relay.clone()};
         join_handles.push(NamedHandle::new("obs_handler", tokio::spawn(async move { obs_handler.run().await })));
-        //
-        // let mut mph = MultipartyHandler::new(
-        //     relay.clone(),
-        //     // runtimes.auxiliary.clone()
-        // );
-        // join_handles.push(tokio::spawn(async move { mph.run().await }));
 
         let sm_port = relay.node_config.mparty_port();
         let sm_relay = relay.clone();
         join_handles.push(NamedHandle::new("gg20_sm_manager", tokio::spawn(async move { gg20_sm_manager::run_server(sm_port, sm_relay)
                 .await.map_err(|e| error_info(e.to_string())) })));
 
-
-        // let relay_c = relay.clone();
-        // let amh = runtimes.async_multi.spawn(async move {
-        //     let r = relay_c.clone();
-        //     let blocks = BlockFormationProcess::default(r.clone()).await?;
-        //     // TODO: Select from list of futures.
-        //     Ok::<(), ErrorInfo>(tokio::select! {
-        //         res = blocks.run() => {res?}
-        //         // res = obs_handler.run() => {res?}
-        //         // _ = rosetta::run_server(r.clone()) => {}
-        //         // _ = public_api::run_server(r.clone()) => {}
-        //     })
-        // });
-        // join_handles.push(amh);
         let c_config = relay.clone();
         if node_config.e2e_enabled {
             // TODO: Distinguish errors here
@@ -208,11 +187,10 @@ impl Node {
             discovery, relay.discovery.receiver.clone(), 100
         ).await));
 
-        // TODO: Use anon func to push to named handles
+        let watcher = PartyWatcher::new(&relay, external_network_resources);
         join_handles.push(NamedHandle::new("PartyWatcher", stream_handlers::run_interval_fold(
-            PartyWatcher::new(&relay), Duration::from_millis(relay.node_config.config_data.party_config_data.poll_interval as u64), false
+            watcher, Duration::from_millis(relay.node_config.config_data.party_config_data.poll_interval as u64), false
         ).await));
-
 
         join_handles.push(NamedHandle::new("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone()))));
 

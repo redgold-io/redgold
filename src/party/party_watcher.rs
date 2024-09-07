@@ -9,19 +9,22 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PublicKey;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
+use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
 
 // TODO: Future event streaming solution here
 #[derive(Clone)]
-pub struct PartyWatcher {
-    pub(crate) relay: Relay
+pub struct PartyWatcher<T> where T: ExternalNetworkResources + Send {
+    pub relay: Relay,
+    pub external_network_resources: T
 }
 
-impl PartyWatcher {
-    pub fn new(relay: &Relay) -> Self {
+impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
+    pub fn new(relay: &Relay, t: T) -> Self {
         Self {
-            relay: relay.clone()
+            relay: relay.clone(),
+            external_network_resources: t,
         }
     }
     pub async fn tick(&self) -> RgResult<()> {
@@ -70,7 +73,7 @@ impl PartyWatcher {
 }
 
 #[async_trait]
-impl IntervalFold for PartyWatcher {
+impl<T> IntervalFold for PartyWatcher<T> where T: ExternalNetworkResources + Send + Sync {
     async fn interval_fold(&mut self) -> RgResult<()> {
         self.tick().await.log_error().bubble_abort()?.ok();
         Ok(())

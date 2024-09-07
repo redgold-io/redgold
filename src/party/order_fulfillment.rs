@@ -15,6 +15,7 @@ use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
+use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use crate::party::address_event::AddressEvent;
 use crate::party::data_enrichment::PartyInternalData;
@@ -23,7 +24,7 @@ use crate::party::party_watcher::PartyWatcher;
 use crate::party::price_volume::PriceVolume;
 use crate::util::current_time_millis_i64;
 
-impl PartyWatcher {
+impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn handle_order_fulfillment(&self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
         for (key,v ) in data.iter_mut() {
             let v2 = v.clone();

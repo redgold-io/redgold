@@ -577,59 +577,69 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(res)
     }
     pub fn get_all_tx(&self) -> Result<Vec<ExternalTimedTransaction>, ErrorInfo> {
-        let self_addr = self.address()?;
         let mut res = vec![];
         let result = self.wallet.list_transactions(true)
             .error_info("Error listing transactions")?;
-        for x in result.iter() {
-            let tx = x.transaction.safe_get_msg("Error getting transaction")?;
-            let output_amounts = self.outputs_convert(&tx.output);
-            let other_output_addresses = output_amounts.iter().filter_map(|(x,_y)| {
-                if x != &self_addr {
-                    Some(x.clone())
-                } else {
-                    None
-                }
-            }).collect();
-            let input_addrs = self.convert_tx_inputs_address(&tx.input)?;
-
-            // Not needed?
-            // let has_self_output = output_amounts.iter().filter(|(x,y)| x != &self_addr).next().is_some();
-            let has_self_input = input_addrs.iter().filter(|(x,_y)| x == &self_addr).next().is_some();
-            let incoming = !has_self_input;
-
-            let other_address = if incoming {
-                input_addrs.iter().filter(|(x,_y)| x != &self_addr).next().map(|(x,_y)| x.clone())
-            } else {
-                output_amounts.iter().filter(|(x,_y)| x != &self_addr).next().map(|(x,_y)| x.clone())
-            };
-
-            let amount = if incoming {
-                output_amounts.iter().filter(|(x,_y)| x == &self_addr).next().map(|(_x,y)| y.clone())
-            } else {
-                output_amounts.iter().filter(|(x,_y)| x != &self_addr).next().map(|(_x,y)| y.clone())
-            };
-
-            let block_timestamp = x.confirmation_time.clone().map(|x| x.timestamp).map(|t| t * 1000);
-            let fee = x.fee.map(|f| CurrencyAmount::from_btc(f as i64));
-            if let (Some(a), Some(value)) = (other_address, amount) {
-                let ett = ExternalTimedTransaction {
-                    tx_id: x.txid.to_string(),
-                    timestamp: block_timestamp,
-                    other_address: a,
-                    other_output_addresses,
-                    amount: value,
-                    bigint_amount: None,
-                    incoming,
-                    currency: SupportedCurrency::Bitcoin,
-                    block_number: None,
-                    price_usd: None,
-                    fee,
-                };
+        for tranaction_details in result.iter() {
+            let ett = self.extract_ett(tranaction_details)?;
+            if let Some(ett) = ett {
                 res.push(ett)
             }
         }
         Ok(res)
+    }
+
+    pub fn extract_ett(&self, transaction_details: &TransactionDetails) -> Result<Option<ExternalTimedTransaction>, ErrorInfo> {
+        let self_addr = self.address()?;
+
+        let tx = transaction_details.transaction.safe_get_msg("Error getting transaction")?;
+        let output_amounts = self.outputs_convert(&tx.output);
+        let other_output_addresses = output_amounts.iter().filter_map(|(output_address, _y)| {
+            if output_address != &self_addr {
+                Some(output_address.clone())
+            } else {
+                None
+            }
+        }).collect();
+        let input_addrs = self.convert_tx_inputs_address(&tx.input)?;
+
+        // Not needed?
+        // let has_self_output = output_amounts.iter().filter(|(x,y)| x != &self_addr).next().is_some();
+        let has_self_input = input_addrs.iter().filter(|(x, _y)| x == &self_addr).next().is_some();
+        let incoming = !has_self_input;
+
+        let other_address = if incoming {
+            input_addrs.iter().filter(|(x, _y)| x != &self_addr).next().map(|(x, _y)| x.clone())
+        } else {
+            output_amounts.iter().filter(|(x, _y)| x != &self_addr).next().map(|(x, _y)| x.clone())
+        };
+
+        let amount = if incoming {
+            output_amounts.iter().filter(|(x, _y)| x == &self_addr).next().map(|(_x, y)| y.clone())
+        } else {
+            output_amounts.iter().filter(|(x, _y)| x != &self_addr).next().map(|(_x, y)| y.clone())
+        };
+
+        let block_timestamp = transaction_details.confirmation_time.clone().map(|x| x.timestamp).map(|t| t * 1000);
+        let fee = transaction_details.fee.map(|f| CurrencyAmount::from_btc(f as i64));
+        let ett = if let (Some(a), Some(value)) = (other_address, amount) {
+            Some(ExternalTimedTransaction {
+                tx_id: transaction_details.txid.to_string(),
+                timestamp: block_timestamp,
+                other_address: a,
+                other_output_addresses,
+                amount: value,
+                bigint_amount: None,
+                incoming,
+                currency: SupportedCurrency::Bitcoin,
+                block_number: None,
+                price_usd: None,
+                fee,
+            })
+        } else {
+            None
+        };
+        Ok(ett)
     }
 
     pub fn get_wallet_balance(&self
