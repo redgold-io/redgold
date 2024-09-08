@@ -50,6 +50,6 @@ export default defineAppConfig({
           icon: 'simple-icons:r'
         }
       ]
-    }
+    },
   }
 })
