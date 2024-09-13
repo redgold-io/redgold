@@ -13,3 +13,6 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+fuser = "0.14.0"
+libc = "0.2.101"
+dirs = "5.0.1"
