@@ -14,3 +14,6 @@ sudo apt-get install -y libxcb-xfixes0-dev libxcb1-dev libxcb-keysyms1-dev libpa
 sudo apt-get install -y libgmp3-dev lld
 
 #rustup default nightly
+
+# fuse support
+sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev pkg-config
