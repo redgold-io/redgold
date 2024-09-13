@@ -11,6 +11,7 @@ use crate::api::control_api::ControlClient;
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
+use crate::integrations::external_network_resources::MockExternalResources;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
@@ -47,7 +48,7 @@ impl LocalTestNodeContext {
         // info!("Test starting node services");
         // info!("Test starting node services for node id {id}");
 
-        let futures = Node::start_services(relay.clone()).await;
+        let futures = Node::start_services(relay.clone(), MockExternalResources::new(&node_config).expect("works")).await;
 
         // info!("Test completed starting node services for node id {id}");
         tokio::spawn(async move {

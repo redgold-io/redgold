@@ -78,7 +78,8 @@ jobs:
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref) }}
+      ', github.ref) && !(contains(github.event.head_commit.message, '[skip ci]') && contains('refs/heads/dev', github.ref))
+      }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v2
@@ -129,7 +130,7 @@ jobs:
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref) }}
+      ', github.ref) && !(contains(github.event.head_commit.message, '[skip ci]') && contains('refs/heads/dev', github.ref)) }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 100
     permissions:
@@ -225,7 +226,7 @@ jobs:
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref) }}
+      ', github.ref) && !(contains(github.event.head_commit.message, '[skip ci]') && contains('refs/heads/dev', github.ref))}}
     runs-on: ubuntu-20.04
     timeout-minutes: 100
     permissions:
@@ -254,7 +255,7 @@ jobs:
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref) }}
+      ', github.ref) && !(contains(github.event.head_commit.message, '[skip ci]') && contains('refs/heads/dev', github.ref))}}
     runs-on: windows-latest
     timeout-minutes: 100
     permissions:
@@ -326,7 +327,7 @@ jobs:
       refs/heads/staging
       refs/heads/test
       refs/heads/main
-      ', github.ref) }}
+      ', github.ref) && !(contains(github.event.head_commit.message, '[skip ci]') && contains('refs/heads/dev', github.ref))}}
     runs-on: macos-latest
     timeout-minutes: 100
     permissions:
@@ -390,7 +391,7 @@ jobs:
           refs/heads/staging
           refs/heads/test
           refs/heads/main
-          ', github.ref) }}
+          ', github.ref) && !(contains(github.event.head_commit.message, '[skip ci]') && contains('refs/heads/dev', github.ref))}}
     runs-on: ubuntu-latest-m
     timeout-minutes: 100
     permissions:

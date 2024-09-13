@@ -1,0 +1,11 @@
+mod debug_n3_observations;
+mod debug_genesis_issue;
+mod debug_balance_issue;
+mod debug_staging_mpc_issue;
+mod debug_main_offline;
+mod debug_party_double_fulfill;
+mod debug_party_invalid_fulfillment;
+mod debug_party_dupe_cross_fulfillment;
+mod connection_refused_test;
+mod database_table_size;
+mod double_spend_it;
