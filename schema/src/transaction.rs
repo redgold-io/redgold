@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof, SwapFulfillment};
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof, SwapFulfillment, PortfolioRequest};
 use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
 use rand::Rng;
@@ -237,6 +237,19 @@ impl Transaction {
     pub fn is_stake(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_stake()).count() > 0
     }
+
+    pub fn has_portfolio_request(&self) -> bool {
+        self.portfolio_request().is_some()
+    }
+
+    pub fn portfolio_request(&self) -> Option<&PortfolioRequest> {
+        self.outputs.iter()
+            .filter_map(|o| o.request())
+            .filter_map(|r| r.portfolio_request.as_ref())
+            .next()
+    }
+
+
     pub fn is_metadata(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_metadata()).count() > 0
     }

@@ -23,7 +23,7 @@ use crate::api::public_api::PublicClient;
 use crate::util::cli::args::RgArgs;
 use crate::util::cli::commands;
 use crate::util::cli::data_folder::{DataFolder, EnvDataFolder};
-use redgold_schema::util::lang_util::JsonCombineResult;
+use redgold_schema::util::lang_util::{AnyPrinter, JsonCombineResult};
 use crate::api::RgHttpClient;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::util::cli::arg_parse_config::ArgTranslate;
@@ -428,7 +428,7 @@ impl NodeConfig {
         let maybe_port = last.parse::<u16>();
         let (host, port) = match maybe_port {
             Ok(p) => {
-                (vec.join(":").to_string(), p)
+                (vec.get(0).unwrap().to_string(), p)
             },
             Err(_) => {
                 (self.load_balancer_url.clone(), self.network.default_port_offset() + 1)
@@ -653,7 +653,10 @@ impl NodeConfig {
 }
 
 
-#[test]
-fn debug(){
+#[tokio::test]
+async fn debug(){
 
+    let mut nc = NodeConfig::default_env(NetworkEnvironment::Local).await;
+    nc.load_balancer_url = "localhost:22320".to_string();
+    nc.api_client().client_wrapper().url().print();
 }

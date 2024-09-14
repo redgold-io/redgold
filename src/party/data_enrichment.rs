@@ -94,6 +94,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     tx: t.clone(),
                     observations: obs,
                     price_usd: None,
+                    all_relevant_prices_usd: Default::default(),
                 };
                 let ae = AddressEvent::Internal(txo);
                 address_events.push(ae);
@@ -121,9 +122,10 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
             // info!("enrich data eth: {}", eth.json_or());
 
-            price_data.enrich_address_events(&mut address_events, &self.relay.ds).await?;
+            price_data.enrich_address_events(&mut address_events, &self.relay.ds, &self.external_network_resources).await?;
 
             // info!("events with prices: {}", address_events.json_or());
+            price_data.daily_enrichment(&self.external_network_resources, &self.relay.ds).await?;
 
             let pid = PartyInternalData {
                 party_info: party.clone(),
@@ -142,15 +144,16 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
     // This is backed by a database, so the query parameter isn't really necessary here
     pub async fn get_public_key_btc_data(&self, pk: &PublicKey) -> RgResult<ExternalNetworkData> {
-        let arc = self.relay.btc_wallet(pk).await?;
-        let btc = arc.lock().await;
-        let all_tx = btc.get_all_tx()?;
-        let raw_balance = btc.get_wallet_balance()?.confirmed;
-        let amount = CurrencyAmount::from_btc(raw_balance as i64);
+        // let arc = self.relay.btc_wallet(pk).await?;
+        // let btc = arc.lock().await;
+        // let all_tx = btc.get_all_tx()?;
+        let all_tx = self.external_network_resources.get_all_tx_for_pk(pk, SupportedCurrency::Bitcoin, None).await?;
+        // let raw_balance = btc.get_wallet_balance()?.confirmed;
+        // let amount = CurrencyAmount::from_btc(raw_balance as i64);
         let end = ExternalNetworkData {
             pk: pk.clone(),
             transactions: all_tx.clone(),
-            balance: amount,
+            // balance: amount,
             currency: SupportedCurrency::Bitcoin,
             max_ts: all_tx.iter().flat_map(|t| t.timestamp).max(),
             max_block: None,
@@ -159,19 +162,20 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     }
 
     pub async fn get_public_key_eth_data(&self, pk: &PublicKey, start_block: Option<u64>) -> RgResult<ExternalNetworkData> {
-        let eth = EthHistoricalClient::new(&self.relay.node_config.network).ok_msg("eth client creation")??;
-        let eth_addr = pk.to_ethereum_address_typed()?;
-        let amount = eth.get_balance_typed(&eth_addr).await?;
-        let eth_addr_str = eth_addr.render_string()?;
+        // let eth = EthHistoricalClient::new(&self.relay.node_config.network).ok_msg("eth client creation")??;
+        // let eth_addr = pk.to_ethereum_address_typed()?;
+        // let amount = eth.get_balance_typed(&eth_addr).await?;
+        // let eth_addr_str = eth_addr.render_string()?;
 
         // Ignoring for now to debug
-        let start_block_arg = None;
+        // let start_block_arg = None;
         // let start_block_arg = start_block;
-        let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
+        // let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
+        let all_tx = self.external_network_resources.get_all_tx_for_pk(pk, SupportedCurrency::Ethereum, None).await?;
         let end = ExternalNetworkData {
             pk: pk.clone(),
             transactions: all_tx.clone(),
-            balance: amount,
+            // balance: amount,
             currency: SupportedCurrency::Ethereum,
             max_ts: None,
             max_block: all_tx.iter().flat_map(|t| t.block_number).max()

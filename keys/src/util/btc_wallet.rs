@@ -846,6 +846,29 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(txid)
     }
 
+    pub fn send(&mut self, destination: &structs::Address, amount: &CurrencyAmount, pkey_hex: String, broadcast: bool) -> RgResult<String> {
+        self.create_transaction_output_batch(vec![(destination.render_string()?, amount.amount as u64)])?;
+        let kp = KeyPair::from_private_hex(pkey_hex)?;
+        let signables = self.signable_hashes()?;
+        for (i, (hash, sighashtype)) in signables.iter().enumerate() {
+            // println!("signable {}: {}", i, hex::encode(hash));
+            let prf = Proof::from_keypair(hash, kp);
+            self.affix_input_signature(i, &prf, sighashtype);
+        }
+        let finalized = self.sign()?;
+        if !finalized {
+            return Err(error_info("Not finalized"));
+        }
+
+        if broadcast {
+            self.broadcast_tx()?;
+        }
+        let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid.to_string();
+        // let txid = w.broadcast_tx().expect("txid");
+        // println!("txid: {:?}", txid);
+        Ok(txid)
+    }
+
     pub fn convert_psbt_outputs(&self) -> Vec<(String, u64)> {
         let tx = self.psbt.clone().expect("psbt").extract_tx();
         let outputs = self.outputs_convert(&tx.output);

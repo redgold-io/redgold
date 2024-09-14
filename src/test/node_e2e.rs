@@ -30,6 +30,7 @@ use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::observability::metrics_registry;
 use crate::party::party_stream::PartyEvents;
+use crate::test::harness::amm_harness::PartyTestHarness;
 use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 //
 // #[test]
@@ -210,6 +211,30 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let mp_eth_addr = public.to_ethereum_address().expect("eth address");
 
     let environment = NetworkEnvironment::Dev;
+
+    let kp = dev_ci_kp().expect("kp").1;
+
+
+
+
+    let mut config2 = config.clone();
+    let string = client.client_wrapper().url();
+    info!("setting test harness to {} ", string.clone());
+    info!("active party key {}", client.client_wrapper().active_party_key().await.expect("works").json_or());
+    config2.load_balancer_url = string;
+    let vec = local_nodes.nodes.iter().map(|n| n.ext.clone()).collect_vec();
+
+    let mut amm_test_harness = PartyTestHarness::from(
+        &config2, kp, vec, Some(client.client_wrapper())).await;
+
+    let address = amm_test_harness.self_rdg_address();
+    submit.send_to(&address).await.expect("works");
+    submit.send_to(&address).await.expect("works");
+    submit.send_to(&address).await.expect("works");
+
+    let b = client.balance(address).await.expect("works");
+    info!("Balance: {}", b.json_or());
+    amm_test_harness.run_test().await.expect("works");
     //
     // // Manual test uses up funds.
 

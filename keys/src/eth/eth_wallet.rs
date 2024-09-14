@@ -5,7 +5,7 @@ use ethers::prelude::{Bytes, LocalWallet, maybe, Provider, Signature, Signer, to
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::providers;
 use ethers::providers::Http;
-
+use log::kv::Key;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
@@ -14,6 +14,7 @@ use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurre
 use crate::address_external::ToEthereumAddress;
 use crate::eth::historical_client::EthHistoricalClient;
 use crate::KeyPair;
+use crate::util::sign;
 
 pub struct EthWalletWrapper {
     pub wallet: LocalWallet,
@@ -61,6 +62,20 @@ impl EthWalletWrapper {
     pub fn address(&self) -> RgResult<structs::Address> {
         let addr = self.keypair.public_key().to_ethereum_address_typed()?;
         Ok(addr)
+    }
+
+    pub async fn send_or_form_fake(&self, to: &structs::Address, value: &CurrencyAmount, kp: &KeyPair, do_broadcast: bool) -> RgResult<String> {
+        let tx = self.create_transaction_typed(&self.address()?, to, value.clone(), None).await?;
+        let from_address: Address = self.address()?.render_string()?.parse().error_info("from address parse failure")?;
+        let signed = self.client.sign_transaction(&tx, from_address)
+            .await.error_info("Signing error")?;
+        // Return the raw rlp-encoded signed transaction
+        let bytes = tx.rlp_signed(&signed);
+        let tx = Self::decode_rlp_tx(bytes.to_vec())?;
+        if do_broadcast {
+            self.broadcast_tx(bytes).await?;
+        }
+        Ok(tx.hash.to_string())
     }
 
     pub async fn send(&self, to: &structs::Address, value: &CurrencyAmount) -> RgResult<String> {

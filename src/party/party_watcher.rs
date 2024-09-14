@@ -27,7 +27,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             external_network_resources: t,
         }
     }
-    pub async fn tick(&self) -> RgResult<()> {
+    pub async fn tick(&mut self) -> RgResult<()> {
         let parties = self.relay.ds.multiparty_store.all_party_info_with_key().await?;
 
         let all_parties = AllParties::new(parties.clone());
@@ -66,6 +66,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             for e in v.address_events.iter() {
                 pe.process_event(e).await?;
             }
+            pe.calculate_update_portfolio_imbalance().await.log_error().bubble_abort()?.ok();
             v.party_events = Some(pe);
         }
         Ok(())

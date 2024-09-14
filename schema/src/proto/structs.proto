@@ -449,13 +449,19 @@ message StakeWithdrawal {
   Address destination = 1;
 }
 
+message PortfolioFulfillmentParams {
+
+}
+
 // Pre-claim deposit operation designating native multiparty groups to watch address for native deposits
 // Requires that the address on this network match the address of the external network, so that the private
 // key used for both is the same.
 message StakeDeposit {
-  // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within
+  // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within for AMM-like activity
   repeated LiquidityRange liquidity_ranges = 1;
   DepositRequest deposit = 2;
+  // Indicates the stake may be used to fulfill portfolio target requests.
+  PortfolioFulfillmentParams portfolio_fulfillment_params = 3;
 }
 
 // Request to update external liquidity to a native pool

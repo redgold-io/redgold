@@ -7,11 +7,11 @@
           <h2 style="margin-top: 10px">Peer-to-Peer ETFs, Portfolios & Data Lake Engine</h2>
           <p class="sub-intro-text">
             Redgold is a decentralized platform for building data-oriented crypto applications and smart contracts, with
-            a focus on ETFs & portfolio models.
+            a focus on ETFs, portfolio models & portfolio contracts.
           </p>
           <p>
             With multiparty encryption support and customized financial ratings, construct your own
-            user-defined native crypto ETFs, data stores, analytics, and SQL backed smart contracts.
+            user-defined native crypto ETFs using data stores, analytics queries, and SQL backed smart contracts.
           </p>
           <div class="d-flex justify-content-center intro-buttons">
             <a href="https://dev.docs.redgold.io/introduction/getting-started" class="btn btn-primary intro-button">Get Started</a>

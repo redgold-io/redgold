@@ -96,4 +96,27 @@ impl PriceTimeStore {
         Ok(rows_m.map(|x| x.price))
     }
 
+    pub async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>> {
+        let mut pool = self.ctx.pool().await?;
+        let c = currency as i32;
+        let u = SupportedCurrency::Usd as i32;
+        let p = PriceSource::OkxMinute as i32;
+        let rows = sqlx::query!(
+            r#"
+        SELECT price FROM price_time
+        WHERE currency = ?1 AND denomination = ?2 AND source = ?3 AND time <= ?4
+        ORDER BY time DESC
+        LIMIT 1
+        "#,
+            c,
+            u,
+            p,
+            max_time
+        )
+            .fetch_optional(&mut *pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.map(|x| x.price))
+    }
+
 }

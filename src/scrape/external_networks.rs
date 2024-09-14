@@ -18,7 +18,7 @@ pub struct ExternalNetworkScraper {
 pub struct ExternalNetworkData {
     pub pk: structs::PublicKey,
     pub transactions: Vec<ExternalTimedTransaction>,
-    pub balance: CurrencyAmount,
+    // pub balance: CurrencyAmount,
     pub currency: SupportedCurrency,
     pub max_ts: Option<u64>,
     pub max_block: Option<u64>

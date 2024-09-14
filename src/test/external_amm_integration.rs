@@ -195,41 +195,6 @@ pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
 
 }
 
-struct AMMTestHarness {
-    network: NetworkEnvironment,
-    private_key: String,
-    keypair: KeyPair,
-    amm_public_key: PublicKey,
-    node_config: NodeConfig
-}
-
-impl AMMTestHarness {
-
-    pub async fn from(
-        network: &NetworkEnvironment,
-        public_key: &PublicKey,
-        private_key: impl Into<String>,
-        keypair: KeyPair
-    ) -> Self {
-        let private_key = private_key.into();
-        let amm_public_key = public_key.clone();
-        Self {
-            network: network.clone(),
-            private_key,
-            keypair,
-            amm_public_key,
-            node_config: NodeConfig::default_env(network.clone()).await,
-        }
-    }
-}
-
-#[test]
-pub fn fs_test() {
-    let a = 2;
-    let b = 2;
-    let c = redgold_fs::add(a, b);
-    assert_eq!(c, 4);
-}
 
 #[ignore]
 #[tokio::test]

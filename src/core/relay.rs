@@ -186,6 +186,15 @@ pub struct Relay {
 
 impl Relay {
 
+    pub async fn public_party_data(&self) -> HashMap<PublicKey, PartyInternalData> {
+        let data = self.external_network_shared_data.clone_read().await;
+        data.into_iter().map(|(k, v)| {
+            let mut v = v.clone();
+            v.clear_sensitive();
+            (k, v)
+        }).collect()
+    }
+
     pub async fn active_party_key(&self) -> Option<PublicKey> {
         let data = self.external_network_shared_data.clone_read().await;
         let cleared = data.iter().filter(|(k, v)| {

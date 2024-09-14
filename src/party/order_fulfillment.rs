@@ -15,7 +15,7 @@ use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use crate::integrations::external_network_resources::{EncodedTransactionPayload, ExternalNetworkResources};
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use crate::party::address_event::AddressEvent;
 use crate::party::data_enrichment::PartyInternalData;
@@ -25,7 +25,7 @@ use crate::party::price_volume::PriceVolume;
 use crate::util::current_time_millis_i64;
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
-    pub async fn handle_order_fulfillment(&self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
+    pub async fn handle_order_fulfillment(&mut self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
         for (key,v ) in data.iter_mut() {
             let v2 = v.clone();
             if !v.party_info.self_initiated.unwrap_or(false) {
@@ -36,8 +36,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             }
             if let Some(ps) = v.party_events.as_ref() {
                 let key_address = key.address()?;
-                let btc_starting_balance = v.network_data.get(&SupportedCurrency::Bitcoin)
-                    .map(|d| d.balance.amount).unwrap_or(0);
+                let btc_starting_balance = ps.balance_with_deltas_applied.get(&SupportedCurrency::Bitcoin)
+                    .map(|d| d.amount).unwrap_or(0);
 
                 let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party_config_data.order_cutoff_delay_time; //
                 let orders = ps.orders();
@@ -142,7 +142,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         Ok(())
     }
 
-    async fn fulfill_btc_orders(&self, key: &PublicKey, identifier: &MultipartyIdentifier, ps: &PartyEvents, cutoff_time: i64) -> RgResult<Vec<OrderFulfillment>> {
+    async fn fulfill_btc_orders(&mut self, key: &PublicKey, identifier: &MultipartyIdentifier, ps: &PartyEvents, cutoff_time: i64) -> RgResult<Vec<OrderFulfillment>> {
         let orders_to_fulfill = ps.orders().iter()
             .filter(|e| e.event_time < cutoff_time)
             .filter(|e| e.destination.currency_or() == SupportedCurrency::Bitcoin)
@@ -223,8 +223,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             return Ok(())
         }
         let dest = order.destination.clone();
-        let network_balance = v.network_data.get(&SupportedCurrency::Ethereum)
-            .map(|d| d.balance.clone());
+        let network_balance = pes.balance_with_deltas_applied.get(&SupportedCurrency::Ethereum)
+            .map(|d| d.string_amount());
         let fulfilled_currency = order.fulfilled_currency_amount();
         info!("Attempting to fulfill ETH network_balance: {} balances: {} order {} fulfilled_currency {}",
                 network_balance.json_or(), pes.balance_map.json_or(), order.json_or(),
@@ -271,7 +271,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         Ok((hashes, validation))
     }
 
-    pub async fn mp_send_btc(&self, public_key: &PublicKey, identifier: &MultipartyIdentifier,
+    pub async fn mp_send_btc(&mut self, public_key: &PublicKey, identifier: &MultipartyIdentifier,
                              outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<ExternalTransactionId> {
         // TODO: Split this lock into a separate function?
 
@@ -297,6 +297,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             w.affix_input_signature(i, &result.proof, hash_type);
         }
         w.sign()?;
+        self.external_network_resources.broadcast(public_key, SupportedCurrency::Bitcoin, EncodedTransactionPayload::JsonPayload(w.psbt.clone().json_or())).await?;
         w.broadcast_tx()?;
         let string = w.txid()?;
         let mut txid = ExternalTransactionId::default();

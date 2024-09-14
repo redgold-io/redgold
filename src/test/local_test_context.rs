@@ -1,9 +1,12 @@
 use log::info;
-use redgold_schema::structs::{ErrorInfo, Seed, Transaction};
+use redgold_schema::structs::{ErrorInfo, Seed, SupportedCurrency, Transaction};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use redgold_schema::{SafeOption, structs};
 use serde::Serialize;
 use itertools::Itertools;
+use tokio::sync::Mutex;
+use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
@@ -24,6 +27,7 @@ pub struct LocalTestNodeContext {
     pub(crate) public_client: PublicClient,
     pub(crate) control_client: ControlClient,
     // futures: Vec<JoinHandle<Result<(), ErrorInfo>>>
+    pub ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
 }
 
 impl LocalTestNodeContext {
@@ -48,7 +52,9 @@ impl LocalTestNodeContext {
         // info!("Test starting node services");
         // info!("Test starting node services for node id {id}");
 
-        let futures = Node::start_services(relay.clone(), MockExternalResources::new(&node_config).expect("works")).await;
+        let resources = MockExternalResources::new(&node_config).expect("works");
+        let ext = resources.external_transactions.clone();
+        let futures = Node::start_services(relay.clone(), resources).await;
 
         // info!("Test completed starting node services for node id {id}");
         tokio::spawn(async move {
@@ -75,6 +81,7 @@ impl LocalTestNodeContext {
             node: node.clone(),
             public_client: PublicClient::local(node.relay.node_config.public_port(), Some(relay.clone())),
             control_client: ControlClient::local(node.relay.node_config.control_port()),
+            ext
             // futures
         }
     }
@@ -85,7 +92,7 @@ async fn throw_panic() {
 }
 
 pub struct LocalNodes {
-    nodes: Vec<LocalTestNodeContext>,
+    pub nodes: Vec<LocalTestNodeContext>,
     current_seed: Seed,
     pub(crate) seeds: Vec<Seed>,
 }

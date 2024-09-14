@@ -33,6 +33,7 @@ use crate::party::address_event::AddressEvent::External;
 use crate::party::central_price::CentralPricePair;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::order_fulfillment::OrderFulfillment;
+use crate::party::portfolio_request::PortfolioRequestEvents;
 use crate::party::price_query::PriceDataPointUsdQuery;
 use crate::party::stake_event_stream::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
 use crate::util::current_time_millis_i64;
@@ -41,7 +42,8 @@ use crate::util::current_time_millis_i64;
 pub struct TransactionWithObservationsAndPrice {
     pub tx: Transaction,
     pub observations: Vec<ObservationProof>,
-    pub price_usd: Option<f64>
+    pub price_usd: Option<f64>,
+    pub all_relevant_prices_usd: HashMap<SupportedCurrency, f64>
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -71,7 +73,8 @@ pub struct PartyEvents {
     // This needs to be populated if deserializing.
     #[serde(skip)]
     pub relay: Option<Relay>,
-    pub locally_fulfilled_orders: Vec<OrderFulfillment>
+    pub locally_fulfilled_orders: Vec<OrderFulfillment>,
+    pub portfolio_request_events: PortfolioRequestEvents
 }
 
 impl PartyEvents {
@@ -358,6 +361,7 @@ impl PartyEvents {
             central_prices: Default::default(),
             relay: Some(relay.clone()),
             locally_fulfilled_orders: vec![],
+            portfolio_request_events: Default::default(),
         }
     }
 
@@ -518,6 +522,8 @@ impl PartyEvents {
                 self.handle_stake_requests(e, time, &t.tx)?;
                 // Represents a stake deposit initiation event OR just a regular transaction sending here
                 // TODO: Don't match this an else, but rather allow both swaps and stakes as part of the same TX.
+            } else if t.tx.has_portfolio_request() {
+                self.handle_portfolio_request(e, time, &t.tx)?;
             }
         } else {
             let outgoing_amount = t.tx.output_rdg_amount_of_exclude_pk(&self.party_public_key)?;
@@ -621,7 +627,7 @@ impl PartyEvents {
                 if !res {
                     // This represents and outgoing BTC fulfillment of an incoming RDG tx
                     let fulfillment = (of.clone(), d.clone(), ec.clone());
-                    self.fulfillment_history.push(fulfillment);
+                    self.fulfillment_history.push(fulfillment.clone());
                     found_match = true;
                     // info!("Outgoing BTC tx fulfillment with hash: {} to {} fulfillment {}", t.tx_id.clone(), t.other_address, of.json_or());
                 };
@@ -630,7 +636,10 @@ impl PartyEvents {
 
 
             if found_match {
+                let fulfillment = self.fulfillment_history.last().unwrap().clone();
+                self.handle_maybe_portfolio_stake_withdrawal_event(fulfillment, t.clone());
                 self.modify_pending_and_deltas(t.balance_change());
+
             }
 
             self.remove_unconfirmed_event(&e);

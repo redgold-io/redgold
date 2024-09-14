@@ -49,6 +49,7 @@ impl TransactionBuilderSupport for TransactionBuilder {
     }
 }
 
+#[derive(Clone)]
 pub struct TransactionBuilder {
     pub transaction: Transaction,
     pub utxos: Vec<UtxoEntry>,

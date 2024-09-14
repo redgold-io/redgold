@@ -22,9 +22,11 @@ use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, GetActivePartyKeyRequest, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Transaction, UtxoId};
+use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::relay::Relay;
 use crate::node_config::NodeConfig;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
+use crate::party::data_enrichment::PartyInternalData;
 
 pub mod control_api;
 pub mod public_api;
@@ -63,6 +65,21 @@ impl RgHttpClient {
             relay,
         }
     }
+
+    pub async fn balance(
+        &self,
+        address: &Address,
+    ) -> Result<i64, ErrorInfo> {
+        let response = self.query_hash(address.render_string().expect("")).await?;
+        let ai = response.address_info.safe_get_msg("missing address_info")?;
+        Ok(ai.balance)
+    }
+
+
+    pub fn url(&self) -> String {
+        format!("{}:{}", self.url, self.port)
+    }
+
     pub fn from_env(url: String, network_environment: &NetworkEnvironment) -> Self {
         Self {
             url,
@@ -174,7 +191,9 @@ impl RgHttpClient {
             .body(r.encode_to_vec())
             .send();
         let response = sent.await.map_err(|e| ErrorInfo::error_info(
-            format!("Proto request failure: {}", e.to_string())))?;
+            format!("Proto request failure: {}", e.to_string())))
+            .with_detail("url", self.url.clone())
+            .with_detail("port", self.port.clone().to_string())?;
         let bytes = response.bytes().await.map_err(|e| ErrorInfo::error_info(
             format!("Proto request bytes decode failure: {}", e.to_string())))?;
         let vec = bytes.to_vec();
@@ -245,6 +264,17 @@ impl RgHttpClient {
         req.get_active_party_key_request = Some(GetActivePartyKeyRequest::default());
         let response = self.proto_post_request(req, None, None).await?;
         Ok(response.get_active_party_key_response.ok_or(error_info("Missing about node response"))?)
+    }
+
+    pub async fn party_data(&self) -> RgResult<HashMap<PublicKey, PartyInternalData>> {
+        let pid = self.json_get::<Vec<PartyInternalData>>("v1/party/data").await?;
+        let mut hm = HashMap::new();
+        for pd in pid {
+            if let Some(k) = pd.party_info.party_key.as_ref() {
+                hm.insert(k.clone(), pd);
+            }
+        }
+        Ok(hm)
     }
 
     pub async fn executable_checksum(&self) -> RgResult<String> {

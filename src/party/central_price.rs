@@ -33,6 +33,7 @@ pub struct CentralPricePair {
     pub reserve_ratio_pair: f64,
     pub base_volume: CurrencyAmount,
     pub pair_quote_volume: CurrencyAmount,
+    // USD / PAIR
     pub pair_quote_price_estimate: f64,
 }
 

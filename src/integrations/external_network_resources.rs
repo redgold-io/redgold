@@ -5,6 +5,7 @@ use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::sled::Tree;
 use bdk::{BlockTime, TransactionDetails};
 use surf::http::headers::ToHeaderValues;
+use tokio::sync::Mutex;
 use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
@@ -24,7 +25,7 @@ use crate::util::current_time_millis_i64;
 pub trait ExternalNetworkResources {
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>>;
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<()>;
-    async fn query_price(&mut self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
+    async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
 
 }
 
@@ -130,7 +131,7 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         }
     }
 
-    async fn query_price(&mut self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
+    async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
         let price = okx_point(time, currency).await?.close;
         Ok(price)
     }
@@ -139,7 +140,7 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
 
 
 pub struct MockExternalResources {
-    pub external_transactions: HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>,
+    pub external_transactions: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
     pub inner: ExternalNetworkResourcesImpl
 }
 
@@ -148,7 +149,7 @@ impl MockExternalResources {
     pub fn new(node_config: &NodeConfig) -> RgResult<MockExternalResources> {
         let inner = ExternalNetworkResourcesImpl::new(node_config)?;
         Ok(MockExternalResources {
-            external_transactions: HashMap::new(),
+            external_transactions: Arc::new(Mutex::new(HashMap::new())),
             inner
         })
     }
@@ -159,7 +160,8 @@ impl ExternalNetworkResources for MockExternalResources {
 
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
                                -> RgResult<Vec<ExternalTimedTransaction>> {
-        Ok(self.external_transactions.get(&currency).cloned().unwrap_or_default())
+        let arc = self.external_transactions.lock().await;
+        Ok(arc.get(&currency).cloned().unwrap_or_default())
     }
 
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<()> {
@@ -220,11 +222,12 @@ impl ExternalNetworkResources for MockExternalResources {
             }
             _ => Err(error_info("Unsupported currency"))?
         };
-        self.external_transactions.entry(currency).or_insert_with(Vec::new).push(ett);
+        let mut arc = self.external_transactions.lock().await;
+        arc.entry(currency).or_insert_with(Vec::new).push(ett);
         Ok(())
     }
 
-    async fn query_price(&mut self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
+    async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
         match currency {
             SupportedCurrency::Bitcoin => {
                 let price = 60_000.0;
