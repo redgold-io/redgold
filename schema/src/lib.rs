@@ -72,9 +72,10 @@ pub mod helpers;
 pub mod party;
 pub mod tx;
 pub mod config_data;
-mod server_config;
-
-
+pub mod server_config;
+pub mod portfolio;
+pub mod conf;
+pub mod data_folder;
 impl BytesData {
     pub fn from(data: Vec<u8>) -> Self {
         BytesData {

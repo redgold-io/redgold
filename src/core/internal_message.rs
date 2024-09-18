@@ -87,7 +87,7 @@ use tokio::task::JoinHandle;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
 use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata};
 use crate::api::rosetta::models::Peer;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 #[async_trait]
 pub trait RecvAsyncErrorInfo<T> {

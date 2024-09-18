@@ -12,7 +12,7 @@ use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Request, RoomId};
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::MultipartyAuthenticationRequest;
 
 pub async fn join_computation<M>(

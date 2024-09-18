@@ -44,10 +44,11 @@ use crate::api::{about, as_warp_json_response, explorer};
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::{AnyPrinter, SameResult};
 use crate::api::explorer::server::{extract_ip, process_origin};
 use crate::api::v1::v1_api_routes;
+use crate::node_config::ApiNodeConfig;
 use crate::util::runtimes::build_runtime;
 
 // https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
@@ -220,6 +221,7 @@ impl PublicClient {
         let ai = response.address_info.safe_get_msg("missing address_info")?;
         Ok(ai.clone())
     }
+
 
     pub async fn about(&self) -> Result<AboutNodeResponse, ErrorInfo> {
         let mut request = empty_public_request();

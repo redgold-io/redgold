@@ -9,6 +9,7 @@ use rocket::serde::{Deserialize, Serialize};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
+use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_stream::PartyEvents;
 
@@ -29,8 +30,10 @@ impl PartyEvents {
                     let ev = ConfirmedExternalStakeEvent {
                         pending_event: m,
                         event: event_o.clone(),
+                        ett: event.clone()
                     };
-                    self.external_staking_events.push(ev);
+                    self.external_staking_events.push(ev.clone());
+                    self.handle_maybe_portfolio_stake_event(ev);
                     return true;
                 }
             }
@@ -156,8 +159,7 @@ impl PartyEvents {
             };
             if let Some(amt) = amount {
                 if let Some(existing) = self.balance_map.get(&amt.currency_or()) {
-                    let minimum_amt = Self::minimum_stake_amount_total(
-                        amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
+                    let minimum_amt = Self::minimum_stake_amount_total(amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
                     );
                     if let Some(fee) = Self::expected_fee_amount(amt.currency_or(), &self.network) {
                         let expected_fee = fee.clone();
@@ -267,7 +269,8 @@ pub struct PendingExternalStakeEvent {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfirmedExternalStakeEvent {
     pub pending_event: PendingExternalStakeEvent,
-    pub event: AddressEvent
+    pub event: AddressEvent,
+    pub ett: ExternalTimedTransaction,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

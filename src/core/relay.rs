@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use bdk::sled::Tree;
 
 use crate::core::internal_message;
-use crate::core::internal_message::{Channel, new_channel};
+use crate::core::internal_message::{new_channel, Channel};
 use crate::schema::structs::{
     ErrorCode, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
@@ -25,7 +25,7 @@ use rocket::http::ext::IntoCollection;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
+use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
@@ -41,6 +41,7 @@ use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
@@ -49,7 +50,7 @@ use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
-use crate::node_config::NodeConfig;
+use crate::node_config::{DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, ToTransactionBuilder, WordsPassNodeConfig};
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::SafeOption;
 use crate::scrape::external_networks::ExternalNetworkData;
@@ -186,6 +187,15 @@ pub struct Relay {
 
 impl Relay {
 
+    // pub async fn public_party_data(&self) -> HashMap<PublicKey, PartyInternalData> {
+    //     let data = self.external_network_shared_data.clone_read().await;
+    //     data.into_iter().map(|(k, v)| {
+    //         let mut v = v.clone();
+    //         v.clear_sensitive();
+    //         (k, v)
+    //     }).collect()
+    // }
+
     pub async fn active_party_key(&self) -> Option<PublicKey> {
         let data = self.external_network_shared_data.clone_read().await;
         let cleared = data.iter().filter(|(k, v)| {
@@ -205,7 +215,7 @@ impl Relay {
             None => {
                 let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
                     pk.clone(), self.node_config.network.clone(), true,
-                    self.node_config.env_data_folder().bdk_sled_path(),
+                    self.node_config.env_data_folder().bdk_sled_path2(),
                     None
                 )?;
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
@@ -360,7 +370,7 @@ are instantiated by the node
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
+use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::e2e::tx_gen::SpendableUTXO;

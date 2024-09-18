@@ -22,7 +22,7 @@ fn debug() {
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::json_pretty;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::util::current_time_millis_i64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

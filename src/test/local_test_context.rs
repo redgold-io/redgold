@@ -1,9 +1,12 @@
 use log::info;
-use redgold_schema::structs::{ErrorInfo, Seed, Transaction};
+use redgold_schema::structs::{ErrorInfo, Seed, SupportedCurrency, Transaction};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use redgold_schema::{SafeOption, structs};
 use serde::Serialize;
 use itertools::Itertools;
+use tokio::sync::Mutex;
+use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
@@ -13,7 +16,8 @@ use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::integrations::external_network_resources::MockExternalResources;
 use crate::node::Node;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::WordsPassNodeConfig;
 use crate::util;
 
 #[derive(Clone)]
@@ -27,7 +31,9 @@ pub struct LocalTestNodeContext {
 }
 
 impl LocalTestNodeContext {
-    async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>) -> Self {
+    async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>,
+                 ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
+    ) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.config_data.party_config_data.order_cutoff_delay_time = 5_000;
         node_config.config_data.party_config_data.poll_interval = 20_000;
@@ -48,7 +54,9 @@ impl LocalTestNodeContext {
         // info!("Test starting node services");
         // info!("Test starting node services for node id {id}");
 
-        let futures = Node::start_services(relay.clone(), MockExternalResources::new(&node_config).expect("works")).await;
+        let resources = MockExternalResources::new(&node_config, None, ext).expect("works");
+        let ext = resources.external_transactions.clone();
+        let futures = Node::start_services(relay.clone(), resources).await;
 
         // info!("Test completed starting node services for node id {id}");
         tokio::spawn(async move {
@@ -85,9 +93,10 @@ async fn throw_panic() {
 }
 
 pub struct LocalNodes {
-    nodes: Vec<LocalTestNodeContext>,
+    pub nodes: Vec<LocalTestNodeContext>,
     current_seed: Seed,
     pub(crate) seeds: Vec<Seed>,
+    pub ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
 }
 
 impl LocalNodes {
@@ -132,11 +141,13 @@ impl LocalNodes {
         //     .expect("test failure create tables");
         let seeds = Self::seeds();
         let s = seeds.get(0).expect("").port_offset.expect("") as u16;
-        let start = LocalTestNodeContext::new(0, s, Self::seeds()).await;
+        let arc = Arc::new(Mutex::new(HashMap::new()));
+        let start = LocalTestNodeContext::new(0, s, Self::seeds(), arc.clone()).await;
         LocalNodes {
             current_seed: start.node.relay.node_config.self_seed(),
             nodes: vec![start],
             seeds,
+            ext: arc,
         }
     }
 
@@ -281,6 +292,7 @@ impl LocalNodes {
             self.current_seed_id(),
             port_offset,
             self.seeds.clone(),
+            self.ext.clone()
         ).await;
 
         info!(

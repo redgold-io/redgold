@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+use std::env;
 use std::fmt::format;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
@@ -78,6 +80,11 @@ pub struct LocalState {
     pub local_stored_state: LocalStoredState,
     pub updates: Channel<StateUpdate>,
     pub keytab_state: KeyTabState,
+    pub is_mac: bool,
+    pub is_linux: bool,
+    pub swap_state: SwapState,
+    pub external_network_resources: ExternalNetworkResourcesImpl,
+    pub price_map_usd_pair: HashMap<SupportedCurrency, f64>,
 }
 
 impl LocalState {
@@ -199,7 +206,7 @@ impl LocalState {
 
 #[allow(dead_code)]
 impl LocalState {
-    pub async fn from(node_config: NodeConfig) -> Result<LocalState, ErrorInfo> {
+    pub async fn from(node_config: NodeConfig, res: ExternalNetworkResourcesImpl) -> Result<LocalState, ErrorInfo> {
         let mut node_config = node_config.clone();
         node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
@@ -221,6 +228,13 @@ impl LocalState {
 
         ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
             .all().servers_path().to_str().expect("").to_string();
+
+        let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
+        for c in vec![SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin] {
+            let price = res.query_price(util::current_time_millis_i64(), c).await.unwrap();
+            price_map.insert(c, price);
+        }
+
         // ss.genesis = node_config.opts.development_mode;
         let mut ls = LocalState {
             active_tab: Tab::Home,
@@ -264,6 +278,11 @@ impl LocalState {
             local_stored_state,
             updates: new_channel(),
             keytab_state: Default::default(),
+            is_mac: env::consts::OS == "macos",
+            is_linux: env::consts::OS == "linux",
+            swap_state: Default::default(),
+            external_network_resources: res,
+            price_map_usd_pair: price_map
         };
 
         if node_config.opts.development_mode {
@@ -366,8 +385,8 @@ fn random_bytes() -> [u8; 32] {
 
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
-use redgold_schema::structs::{ErrorInfo, PublicKey};
-use crate::node_config::NodeConfig; // 0.17.1
+use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
+use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 
 
 
@@ -426,6 +445,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use crate::gui::components::swap::SwapState;
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
@@ -436,7 +456,10 @@ use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{StateUpdate, wallet_screen, WalletState};
-use crate::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
+use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
+use crate::infra::deploy::is_windows;
+use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
+use crate::node_config::DataStoreNodeConfig;
 
 static INIT: Once = Once::new();
 
@@ -455,7 +478,14 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
-        ctx.set_pixels_per_point(2.5);
+        let amt = if local_state.is_mac {
+            2.5
+        } else if local_state.is_linux {
+            1.8
+        } else {
+            2.0
+        };
+        ctx.set_pixels_per_point(amt);
     });
 
     local_state.current_time = util::current_time_millis_i64();

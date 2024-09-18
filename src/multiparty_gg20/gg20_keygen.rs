@@ -9,7 +9,7 @@ use round_based::async_runtime::AsyncProtocol;
 use redgold_schema::error_info;
 use redgold_schema::structs::ErrorInfo;
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 use super::gg20_sm_client::join_computation;
 //

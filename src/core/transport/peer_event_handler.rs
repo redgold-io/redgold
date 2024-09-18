@@ -18,7 +18,7 @@ use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerM
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::json;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util;

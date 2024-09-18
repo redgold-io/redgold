@@ -22,17 +22,18 @@ use tracing::trace;
 
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption};
+use redgold_schema::{error_info, from_hex, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::seeds::{get_seeds_by_env, get_seeds_by_env_time};
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, Transaction, TrustData};
 
 use crate::{e2e, gui, util};
 use crate::api::RgHttpClient;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::conf::rg_args::{NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli, GUI};
 // use crate::gui::image_capture::debug_capture;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
@@ -40,9 +41,8 @@ use crate::observability::metrics_registry;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
 use crate::util::cli::{args, commands};
-use crate::util::cli::args::{GUI, NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli};
-use crate::util::cli::data_folder::DataFolder;
-
+use redgold_schema::data_folder::DataFolder;
+use crate::node_config::WordsPassNodeConfig;
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
 
 pub fn get_default_data_top_folder() -> PathBuf {
@@ -127,11 +127,11 @@ impl ArgTranslate {
         Ok(())
     }
 
-    pub fn read_servers_file(servers: PathBuf) -> Result<Vec<Server>, ErrorInfo> {
+    pub fn read_servers_file(servers: PathBuf) -> Result<Vec<ServerOldFormat>, ErrorInfo> {
         let result = if servers.is_file() {
             let contents = fs::read_to_string(servers)
                 .error_info("Failed to read servers file")?;
-            let servers = Server::parse(contents)?;
+            let servers = ServerOldFormat::parse(contents)?;
             servers
         } else {
             vec![]
@@ -307,19 +307,24 @@ impl ArgTranslate {
         };
 
 
+
         // If empty, generate a new mnemonic;
         if self.node_config.mnemonic_words.is_empty() {
-            tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
-            tracing::info!("Generating with entropy for 24 words, process may halt if insufficient entropy on system");
-            let mnem = WordsPass::generate()?.words;
-            tracing::info!("Successfully generated new mnemonic");
-            self.node_config.mnemonic_words = mnem.clone();
-            let buf = self.node_config.env_data_folder().mnemonic_path();
-            fs::write(
-                buf.clone(),
-                self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
+            if let Some(dbg_id) = self.opts.debug_id.as_ref() {
+                self.node_config.mnemonic_words = WordsPass::from_str_hashed(dbg_id.to_string()).words;
+            } else {
+                tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
+                tracing::info!("Generating with entropy for 24 words, process may halt if insufficient entropy on system");
+                let mnem = WordsPass::generate()?.words;
+                tracing::info!("Successfully generated new mnemonic");
+                self.node_config.mnemonic_words = mnem.clone();
+                let buf = self.node_config.env_data_folder().mnemonic_path();
+                fs::write(
+                    buf.clone(),
+                    self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
 
-            info!("Wrote mnemonic to path: {}", buf.to_str().expect("Path format failure"));
+                info!("Wrote mnemonic to path: {}", buf.to_str().expect("Path format failure"));
+            }
         };
 
         // Validate that this is loadable
@@ -523,6 +528,7 @@ impl ArgTranslate {
                                                      None
                     ).about().await;
                     if let Ok(response) = response {
+                        info!("Seed enrichment response issue: {}", response.json_or());
                         let nmd = response.peer_node_info.as_ref()
                             .and_then(|n| n.latest_node_transaction.as_ref())
                             .and_then(|n| n.node_metadata().ok());
@@ -537,6 +543,7 @@ impl ArgTranslate {
                 }
             }
         }
+        info!("Seeds: {:?}", self.node_config.seeds.json_or());
         // We should enrich this too
         // TODO: Test config should pass ids so we get ids for local_test
 
@@ -584,7 +591,7 @@ impl ArgTranslate {
 
     }
     fn set_public_key(&mut self) {
-        let pk = self.node_config.public_key();
+        let pk = self.node_config.words().default_public_key().unwrap();
         self.node_config.public_key = pk.clone();
         info!("Public key: {}", pk.hex());
     }
@@ -741,6 +748,10 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
                 }
                 RgTopLevelSubcommand::DebugCommand(d) => {
                     commands::debug_commands(d, &config).await
+                }
+                RgTopLevelSubcommand::GenerateConfig(d) => {
+                    println!("Not implemented");
+                    Ok(())
                 }
                 _ => {
                     abort = false;

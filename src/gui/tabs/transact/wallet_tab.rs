@@ -32,13 +32,14 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::gui::components::passphrase_input::PassphraseInput;
+use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
 use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardware_signing, hot_wallet, prepare_tx, prepared_tx_view};
@@ -74,9 +75,9 @@ pub struct StateUpdate {
 #[derive(Clone, PartialEq)]
 pub enum SendReceiveTabs {
     Send,
-    // Receive,
+    Receive,
     CustomTx,
-    // Swap
+    Swap
 }
 
 #[derive(Clone, PartialEq, EnumString)]
@@ -508,17 +509,16 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
             SendReceiveTabs::Send => {
                 send_view(ui, ls, pk);
             }
-            // SendReceiveTabs::Receive => {
-            //     show_prepared = false;
-            // }
+            SendReceiveTabs::Receive => {
+                // show_prepared = false;
+            }
             SendReceiveTabs::CustomTx => {
                 ui.label("Enter custom transaction JSON:");
                 ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet_state.custom_tx_json));
             }
-            // SendReceiveTabs::Swap => {
-            //     // show_prepared = false;
-            //     // swap_view(ui, ls, pk);
-            // }
+            SendReceiveTabs::Swap => {
+                SwapState::view(ui, ls)
+            }
         }
         if show_prepared {
             prepared_tx_view::prepared_view(ui, ls, pk, is_hot);
@@ -527,15 +527,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
 }
 
 fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
-
-    ComboBox::from_label("Currency")
-        .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
-        .show_ui(ui, |ui| {
-            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
-            for style in styles {
-                ui.selectable_value(&mut ls.wallet_state.send_currency_type, style.clone(), format!("{:?}", style));
-            }
-        });
+    currency_selection_box(ui, ls);
     ui.horizontal(|ui| {
         ui.label("To:");
         let string = &mut ls.wallet_state.destination_address;
@@ -560,6 +552,17 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
         // }
     });
 
+}
+
+fn currency_selection_box(ui: &mut Ui, ls: &mut LocalState) {
+    ComboBox::from_label("Currency")
+        .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
+        .show_ui(ui, |ui| {
+            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
+            for style in styles {
+                ui.selectable_value(&mut ls.wallet_state.send_currency_type, style.clone(), format!("{:?}", style));
+            }
+        });
 }
 
 fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {
@@ -596,6 +599,7 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     ui.horizontal(|ui| {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Heading);
+        // todo: use enum iter here
         if ui.button("Send").clicked() {
             let some = Some(SendReceiveTabs::Send);
             if ls.wallet_state.send_receive == some.clone() {
@@ -620,14 +624,14 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 ls.wallet_state.send_receive = some;
             }
         }
-        // if ui.button("Swap").clicked() {
-        //     let some = Some(SendReceiveTabs::Swap);
-        //     if ls.wallet_state.send_receive == some.clone() {
-        //         ls.wallet_state.send_receive = None;
-        //     } else {
-        //         ls.wallet_state.send_receive = some;
-        //     }
-        // }
+        if ui.button("Swap").clicked() {
+            let some = Some(SendReceiveTabs::Swap);
+            if ls.wallet_state.send_receive == some.clone() {
+                ls.wallet_state.send_receive = None;
+            } else {
+                ls.wallet_state.send_receive = some;
+            }
+        }
 
         let layout = egui::Layout::right_to_left(egui::Align::RIGHT);
 

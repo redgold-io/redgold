@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::result;
 use std::sync::Arc;
+use async_trait::async_trait;
 use futures::future::Either;
 use futures::{Stream, StreamExt};
 
@@ -21,6 +22,7 @@ use crate::observation_store::ObservationStore;
 use crate::peer::PeerStore;
 use crate::transaction_store::TransactionStore;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs, util};
+use redgold_schema::data_folder::EnvDataFolder;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
@@ -415,7 +417,9 @@ WHERE
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Wal) // Set journal mode to WAL
             .busy_timeout(std::time::Duration::from_secs(60)) // Set busy timeout to 10 seconds
-            .filename(Path::new(&path.clone()));
+            .filename(Path::new(&path.clone()))
+            .pragma("synchronous", "NORMAL")
+            .pragma("cache_size", "-2000");
         /*
 
          */
@@ -427,6 +431,13 @@ WHERE
             .expect("Connection failure");
         // info!("Opened pool");
         let pl = Arc::new(pool);
+
+        // Initialize the database
+        sqlx::query("PRAGMA busy_timeout = 60000;")
+            .execute(&*pl)
+            .await
+            .expect("Failed to set busy_timeout");
+
         let ctx = DataStoreContext { file_path: original_path.clone(), connection_path: path.clone(), pool: pl.clone() };
         DataStore {
             ctx: ctx.clone(),
@@ -479,3 +490,20 @@ WHERE
 
 }
 
+
+#[async_trait]
+pub trait EnvDataFolderSupport {
+
+    async fn data_store(&self) -> DataStore;
+
+}
+
+#[async_trait]
+impl EnvDataFolderSupport for EnvDataFolder {
+
+    async fn data_store(&self) -> DataStore {
+        // TODO: From file path
+        DataStore::from_file_path(self.data_store_path().to_str().expect("Data store path").to_string()).await
+    }
+
+}

@@ -1,7 +1,7 @@
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
-use crate::servers::Server;
+use crate::servers::ServerOldFormat;
 use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
 
@@ -28,14 +28,14 @@ pub struct NamedXpub {
     pub skip_persist: Option<bool>
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SavedAddress {
     name: String,
     address: Address,
     contact_name: String
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WatchedAddress {
     name: String,
     address: Address,
@@ -44,26 +44,26 @@ pub struct WatchedAddress {
 }
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ServerTrustRatingLabels {
     pub peer_id_index: i64,
     pub labels: Vec<TrustRatingLabel>
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Identity {
     pub name: String,
     pub peer_id_index: i64,
     pub xpub_name: String
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Contact {
     pub name: String,
     pub peer_id: Option<PeerId>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct StoredMnemonic {
     pub name: String,
     pub mnemonic: String,
@@ -71,16 +71,16 @@ pub struct StoredMnemonic {
     pub persist_disk: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct StoredPrivateKey {
     pub name: String,
     pub key_hex: String,
 }
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LocalStoredState {
-    pub servers: Vec<Server>,
+    pub servers: Vec<ServerOldFormat>,
     pub xpubs: Vec<NamedXpub>,
     pub trust: Vec<ServerTrustRatingLabels>,
     pub saved_addresses: Option<Vec<SavedAddress>>,
@@ -133,22 +133,5 @@ impl LocalStoredState {
             }
         }
         None
-    }
-}
-
-impl Default for LocalStoredState {
-    fn default() -> Self {
-        Self {
-            servers: vec![],
-            xpubs: vec![],
-            trust: vec![],
-            saved_addresses: None,
-            contacts: vec![],
-            watched_address: vec![],
-            email_alert_config: None,
-            identities: vec![],
-            mnemonics: None,
-            private_keys: None,
-        }
     }
 }

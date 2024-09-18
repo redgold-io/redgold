@@ -14,7 +14,7 @@ use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::relay::Relay;
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-
+use crate::node_config::WordsPassNodeConfig;
 //
 // async fn faucet_request_old(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
 //     info!("Faucet request {}", address_input);

@@ -7,5 +7,6 @@ pub mod timers;
 pub mod cmd;
 pub mod machine_info;
 pub mod times;
+mod retry;
 
 

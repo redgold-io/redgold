@@ -27,6 +27,18 @@ impl CurrencyAmount {
         Ok(a)
     }
 
+    pub fn from_fractional_cur(a: impl Into<f64>, cur: SupportedCurrency) -> RgResult<Self> {
+        let into = a.into();
+        let mut res = match cur {
+            SupportedCurrency::Redgold => {Self::from_fractional(into)}
+            SupportedCurrency::Bitcoin => {Self::from_fractional(into)}
+            SupportedCurrency::Ethereum => {Ok(Self::from_eth_fractional(into))}
+            _ => Err(ErrorInfo::error_info("Invalid currency"))
+        }?;
+        res.currency = Some(cur as i32);
+        Ok(res)
+    }
+
     pub fn from_usd(a: impl Into<f64>) -> RgResult<Self> {
         let a = a.into();
         if a <= 0f64 {
@@ -75,6 +87,10 @@ impl CurrencyAmount {
         self.currency
             .and_then(|c| SupportedCurrency::from_i32(c))
             .unwrap_or(SupportedCurrency::Redgold)
+    }
+
+    pub fn is_rdg(&self) -> bool {
+        self.currency_or() == SupportedCurrency::Redgold
     }
 
     pub fn min_fee() -> Self {

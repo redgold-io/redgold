@@ -53,7 +53,7 @@ impl EthWalletWrapper {
                 .with_detail("amount_str", amount_str);
         }
         let signing = Self::signing_data(&tx)?;
-        if signing != *signing_data {
+        if signing != *signing_data && network.is_main_stage_network() {
             return Err(error_info("signing data does not match transaction"));
         }
 
