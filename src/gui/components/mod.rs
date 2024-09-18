@@ -5,4 +5,4 @@ pub(crate) mod derivation_path_sel;
 pub mod key_info;
 pub mod account_deriv_sel;
 pub mod passphrase_input;
-mod swap;
+pub mod swap;

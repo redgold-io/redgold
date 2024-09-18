@@ -39,6 +39,7 @@ use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivat
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use crate::gui::components::passphrase_input::PassphraseInput;
+use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
 use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardware_signing, hot_wallet, prepare_tx, prepared_tx_view};
@@ -74,9 +75,9 @@ pub struct StateUpdate {
 #[derive(Clone, PartialEq)]
 pub enum SendReceiveTabs {
     Send,
-    // Receive,
+    Receive,
     CustomTx,
-    // Swap
+    Swap
 }
 
 #[derive(Clone, PartialEq, EnumString)]
@@ -508,17 +509,16 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
             SendReceiveTabs::Send => {
                 send_view(ui, ls, pk);
             }
-            // SendReceiveTabs::Receive => {
-            //     show_prepared = false;
-            // }
+            SendReceiveTabs::Receive => {
+                // show_prepared = false;
+            }
             SendReceiveTabs::CustomTx => {
                 ui.label("Enter custom transaction JSON:");
                 ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet_state.custom_tx_json));
             }
-            // SendReceiveTabs::Swap => {
-            //     // show_prepared = false;
-            //     // swap_view(ui, ls, pk);
-            // }
+            SendReceiveTabs::Swap => {
+                SwapState::view(ui, ls)
+            }
         }
         if show_prepared {
             prepared_tx_view::prepared_view(ui, ls, pk, is_hot);

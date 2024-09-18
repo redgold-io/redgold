@@ -5,7 +5,7 @@ use redgold_schema::structs::SupportedCurrency;
 use crate::gui::app_loop::LocalState;
 
 fn currency_selection_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency) {
-    ComboBox::from_label("Currency")
+    ComboBox::from_label("Input")
         .selected_text(format!("{:?}", currency_selector))
         .show_ui(ui, |ui| {
             let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum];
@@ -17,7 +17,7 @@ fn currency_selection_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
-enum SwapStage {
+pub enum SwapStage {
     StartPreparing,
     ShowAmountsPromptSigning,
     ViewSignedAllowBroadcast,
@@ -25,15 +25,23 @@ enum SwapStage {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-struct SwapState {
+pub struct SwapState {
     pub active: bool,
-    pub input_currency: SupportedCurrency
+    pub input_currency: SupportedCurrency,
+    pub stage: SwapStage
 }
 
+impl Default for SwapState {
+    fn default() -> Self {
+        Self {
+            active: false,
+            input_currency: SupportedCurrency::Ethereum,
+            stage: SwapStage::StartPreparing,
+        }
+    }
+}
 impl SwapState {
-    pub fn view(&self, ui: &mut Ui, ls: &mut LocalState) {
-        ui.horizontal(|ui| {
-            // currency_selection_box(ui, &mut ls.swap_state.input_currency);
-        });
+    pub fn view(ui: &mut Ui, ls: &mut LocalState) {
+        currency_selection_box(ui, &mut ls.swap_state.input_currency);
     }
 }

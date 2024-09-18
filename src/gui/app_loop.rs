@@ -81,6 +81,7 @@ pub struct LocalState {
     pub keytab_state: KeyTabState,
     pub is_mac: bool,
     pub is_linux: bool,
+    pub swap_state: SwapState
 }
 
 impl LocalState {
@@ -270,6 +271,7 @@ impl LocalState {
             keytab_state: Default::default(),
             is_mac: env::consts::OS == "macos",
             is_linux: env::consts::OS == "linux",
+            swap_state: Default::default(),
         };
 
         if node_config.opts.development_mode {
@@ -432,6 +434,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use crate::gui::components::swap::SwapState;
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
