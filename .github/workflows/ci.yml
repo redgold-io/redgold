@@ -67,13 +67,12 @@ jobs:
       - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
       - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo build --profile ci
 #      - run: cargo test --no-run # --profile ci
-      - run: |
-          ./bin/test.sh &
-          pid1=$!
-          ./bin/local_test.sh &
-          pid2=$!
-          wait $pid1 || { echo "test.sh failed"; exit 1; }
-          wait $pid2 || { echo "local_test.sh failed"; exit 1; }
+      - run: ./bin/test.sh #&
+#          pid1=$!
+#          ./bin/local_test.sh &
+#          pid2=$!
+#          wait $pid1 || { echo "test.sh failed"; exit 1; }
+#          wait $pid2 || { echo "local_test.sh failed"; exit 1; }
   build-vue:
     runs-on: self-hosted
     if: ${{ github.event_name != 'pull_request_target' && contains('

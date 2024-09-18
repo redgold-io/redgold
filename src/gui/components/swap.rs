@@ -8,7 +8,7 @@ fn currency_selection_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency
     ComboBox::from_label("Currency")
         .selected_text(format!("{:?}", currency_selector))
         .show_ui(ui, |ui| {
-            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
+            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum];
             for style in styles {
                 ui.selectable_value(currency_selector, style.clone(), format!("{:?}", style));
             }
