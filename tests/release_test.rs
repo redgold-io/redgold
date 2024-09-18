@@ -5,7 +5,7 @@ use redgold_keys::eth::example::dev_ci_kp;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment};
 use redgold::core::transact::tx_broadcast_support::TxBroadcastSupport;
-
+use redgold::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 #[tokio::test]
 async fn release_it() -> Result<(), ErrorInfo> {
 
