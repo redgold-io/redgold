@@ -4,6 +4,7 @@ use rocket::form::validate::Len;
 use redgold::api::public_api::PublicClient;
 
 use redgold::e2e::tx_submit::TransactionSubmitter;
+use redgold::node_config::EnvDefaultNodeConfig;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold::test::harness::amm_harness::PartyTestHarness;
 use redgold::util;
@@ -39,6 +40,7 @@ async fn local_e2e_it() -> Result<(), ErrorInfo> {
 
     let res = submit.submit().await.expect("");
     assert!(res.query_transaction_response.is_some());
+    Ok(())
     //
     // tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
     //
