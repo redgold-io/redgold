@@ -43,7 +43,9 @@ pub async fn main_from_args(opts: RgArgs) {
     }
 
     if arg_translate.is_gui() {
-        crate::gui::initialize::attempt_start(node_config.clone()).await.expect("GUI to start");
+        let res = ExternalNetworkResourcesImpl::new(&node_config).expect("works");
+
+        crate::gui::initialize::attempt_start(node_config.clone(), res).await.expect("GUI to start");
         return;
     }
     gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);

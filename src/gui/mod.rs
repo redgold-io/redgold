@@ -6,6 +6,7 @@ use redgold_schema::structs::ErrorInfo;
 use crate::gui::app_loop::LocalState;
 // use crate::gui::image_load::Image;
 use redgold_schema::conf::node_config::NodeConfig;
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
 pub mod app_loop;
 pub mod image_load;
@@ -33,11 +34,13 @@ pub struct ClientApp {
 
 impl ClientApp {
     pub async fn from(logo: RetainedImage, nc: NodeConfig
-                // , rt: Arc<Runtime>
+                      // , rt: Arc<Runtime>
+                      ,
+                      res: ExternalNetworkResourcesImpl
     ) -> Result<Self, ErrorInfo> {
         Ok(Self {
             logo,
-            local_state: LocalState::from(nc).await?,
+            local_state: LocalState::from(nc, res).await?,
         })
     }
 }

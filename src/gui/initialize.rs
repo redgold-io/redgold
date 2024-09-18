@@ -8,6 +8,7 @@ use redgold_schema::structs::ErrorInfo;
 use crate::gui;
 use crate::gui::ClientApp;
 use redgold_schema::conf::node_config::NodeConfig;
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
 pub(crate) fn load_icon() -> IconData {
     let (icon_rgba, icon_width, icon_height) = {
@@ -30,11 +31,13 @@ pub(crate) fn load_icon() -> IconData {
 
 pub async fn attempt_start(nc: NodeConfig
                            // , rt: Arc<Runtime>
+                           ,
+                           res: ExternalNetworkResourcesImpl
 ) -> Result<(), ErrorInfo> {
     let resources = crate::resources::Resources::default();
     let bytes = resources.logo_bytes;
     let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
-    let app = gui::ClientApp::from(ri, nc).await?;
+    let app = gui::ClientApp::from(ri, nc, res).await?;
 
     let x = 1200.0;
     let y = 1000.0;
