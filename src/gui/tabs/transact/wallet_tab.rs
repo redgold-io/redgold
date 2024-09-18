@@ -599,6 +599,7 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     ui.horizontal(|ui| {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Heading);
+        // todo: use enum iter here
         if ui.button("Send").clicked() {
             let some = Some(SendReceiveTabs::Send);
             if ls.wallet_state.send_receive == some.clone() {
@@ -623,14 +624,14 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
                 ls.wallet_state.send_receive = some;
             }
         }
-        // if ui.button("Swap").clicked() {
-        //     let some = Some(SendReceiveTabs::Swap);
-        //     if ls.wallet_state.send_receive == some.clone() {
-        //         ls.wallet_state.send_receive = None;
-        //     } else {
-        //         ls.wallet_state.send_receive = some;
-        //     }
-        // }
+        if ui.button("Swap").clicked() {
+            let some = Some(SendReceiveTabs::Swap);
+            if ls.wallet_state.send_receive == some.clone() {
+                ls.wallet_state.send_receive = None;
+            } else {
+                ls.wallet_state.send_receive = some;
+            }
+        }
 
         let layout = egui::Layout::right_to_left(egui::Align::RIGHT);
 
