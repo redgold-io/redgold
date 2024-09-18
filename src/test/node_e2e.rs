@@ -740,7 +740,7 @@ async fn e2e_dbg() {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_send() {
 

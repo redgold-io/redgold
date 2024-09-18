@@ -1051,6 +1051,7 @@ pub async fn handle_explorer_swap(relay: Relay) -> RgResult<Option<AddressPoolIn
     get_address_pool_info(relay).await
 }
 
+#[ignore]
 #[tokio::test]
 async fn debug_peers_load() {
     let r = Relay::dev_default().await;
