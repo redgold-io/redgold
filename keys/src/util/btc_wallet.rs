@@ -23,7 +23,7 @@ use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
 // use crate::util::cli::commands::send;
-use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::{KeyPair, TestConstants};
 use crate::address_external::ToBitcoinAddress;
@@ -31,7 +31,7 @@ use crate::address_support::AddressSupport;
 use crate::eth::example::dev_ci_kp;
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk, WordsPass};
 
 
 #[test]
@@ -275,6 +275,7 @@ impl ExternalTimedTransaction {
         self.timestamp.is_some()
     }
 
+
 }
 
 
@@ -292,6 +293,7 @@ pub fn electrum_testnet_backends() -> Vec<String> {
 }
 
 impl SingleKeyBitcoinWallet<MemoryDatabase> {
+
 
     pub fn new_wallet(
         public_key: PublicKey,
@@ -406,6 +408,7 @@ impl SingleKeyBitcoinWallet<Tree> {
     }
 }
 impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
+
 
     //
     // pub fn new_hardware_wallet(
@@ -546,10 +549,29 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(res)
     }
 
+    pub fn convert_network(network_environment: &NetworkEnvironment) -> Network {
+        if *network_environment == NetworkEnvironment::Main {
+            Network::Bitcoin
+        } else {
+            Network::Testnet
+        }
+    }
+
     pub fn outputs_convert(&self, outs: &Vec<TxOut>) -> Vec<(String, u64)> {
         let mut res = vec![];
         for o in outs {
             let a = Address::from_script(&o.script_pubkey, self.network).ok();
+            if let Some(a) = a {
+                res.push((a.to_string(), o.value))
+            }
+        }
+        res
+    }
+
+    pub fn outputs_convert_static(outs: &Vec<TxOut>, network: NetworkEnvironment) -> Vec<(String, u64)> {
+        let mut res = vec![];
+        for o in outs {
+            let a = Address::from_script(&o.script_pubkey, Self::convert_network(&network)).ok();
             if let Some(a) = a {
                 res.push((a.to_string(), o.value))
             }
@@ -763,6 +785,14 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         let transaction = psbt.clone().extract_tx();
         self.client.broadcast(&transaction).error_info("Error broadcasting transaction")?;
         Ok(())
+    }
+    pub fn broadcast_tx_static(psbt: String, network: &NetworkEnvironment) -> RgResult<String> {
+        let psbt = psbt.json_from::<PartiallySignedTransaction>()?;
+        let key = WordsPass::test_words().default_public_key()?;
+        let mut w = SingleKeyBitcoinWallet::new_wallet(key, network.clone(), false)?;
+        w.psbt = Some(psbt.clone());
+        w.broadcast_tx()?;
+        Ok(psbt.extract_tx().txid().to_string())
     }
 
     // TODO: How to implement this check native to BDK?

@@ -58,6 +58,8 @@ jobs:
           git config --local user.email "info@redgold.io"
           git config --local user.name "Redgold GitHub Action"
 
+      - name: Install test dependencies
+        run: ./bin/install_build_deps.sh
       - run: ./bin/release_rollout.sh ${{env.SOURCE_BRANCH}} ${{env.DESTINATION_BRANCH}}
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}

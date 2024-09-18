@@ -1,7 +1,7 @@
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
-use crate::servers::Server;
+use crate::servers::ServerOldFormat;
 use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
 
@@ -80,7 +80,7 @@ pub struct StoredPrivateKey {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct LocalStoredState {
-    pub servers: Vec<Server>,
+    pub servers: Vec<ServerOldFormat>,
     pub xpubs: Vec<NamedXpub>,
     pub trust: Vec<ServerTrustRatingLabels>,
     pub saved_addresses: Option<Vec<SavedAddress>>,

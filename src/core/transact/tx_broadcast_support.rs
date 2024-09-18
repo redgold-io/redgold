@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{SubmitTransactionResponse, Transaction};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 
 #[async_trait]
 pub trait TxBroadcastSupport {

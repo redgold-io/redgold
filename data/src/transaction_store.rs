@@ -1,7 +1,7 @@
-use futures::StreamExt;
+use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Transaction, UtxoEntry, UtxoId};
-use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::{retry_ms, RgResult, SafeOption};
 use crate::DataStoreContext;
 use sqlx::Executor;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -220,6 +220,12 @@ impl TransactionStore {
             }
         })
     }
+    pub async fn get_balance_retry(&self, address: &Address) -> RgResult<i64> {
+        retry_ms!(async {
+            self.get_balance(address).await.and_then(|r| r.ok_msg("error getting balance with retry"))
+        })
+    }
+
 
     pub async fn utxo_for_addresses(&self, addresses: &Vec<Address>) -> RgResult<Vec<UtxoEntry>> {
         let mut res = vec![];
@@ -269,7 +275,20 @@ impl TransactionStore {
             })
                     .transpose())
     }
-
+    pub async fn get_all_tx_for_address_retries(
+        &self,
+        address: &Address,
+        limit: i64,
+        offset: i64
+    ) -> Result<Vec<Transaction>, ErrorInfo> {
+        retry_ms!(async { self.get_all_tx_for_address(address, limit, offset).await.and_then(|r| {
+            if r.len() == 0 {
+                Err(ErrorInfo::new("No transactions found in retry"))
+            } else {
+                Ok(r)
+            }
+        })})
+    }
 
     pub async fn get_all_tx_for_address(
         &self,

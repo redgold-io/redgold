@@ -38,7 +38,9 @@ use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
 use redgold_schema::structs::PartyInfoAbridged;
 use redgold_schema::util::times::ToTimeString;
-use crate::node_config::NodeConfig;
+use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::ApiNodeConfig;
 use crate::party::address_event::AddressEvent;
 use crate::party::central_price::CentralPricePair;
 use crate::party::data_enrichment::PartyInternalData;
@@ -169,7 +171,7 @@ pub struct DetailedEvents {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct AddressPoolInfo {
+pub struct AddressPoolInfo{
     public_key: String,
     // currency to address
     addresses: HashMap<String, String>,

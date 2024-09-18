@@ -15,3 +15,4 @@ pub mod central_price;
 pub mod pool_initiated_sell;
 pub mod event_validator;
 pub mod portfolio_request;
+mod portfolio_fulfillment_agent;

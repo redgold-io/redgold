@@ -12,7 +12,8 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use crate::gui::app_loop;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables::text_table;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::ApiNodeConfig;
 use crate::util;
 
 pub fn gui_status_networks() -> Vec<NetworkEnvironment> {

@@ -14,7 +14,7 @@ use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
 

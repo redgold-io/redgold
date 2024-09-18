@@ -9,6 +9,7 @@ use rocket::serde::{Deserialize, Serialize};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
+use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_stream::PartyEvents;
 

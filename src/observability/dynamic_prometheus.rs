@@ -17,8 +17,8 @@ use redgold_schema::util::times::current_time_millis;
 use crate::core::relay::Relay;
 use crate::infra::deploy::{SSHLike, SSHProcessInvoke};
 use crate::node::Node;
-use crate::node_config::NodeConfig;
-
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::WordsPassNodeConfig;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 struct PrometheusScrapeConfig {

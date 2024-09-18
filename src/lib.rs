@@ -22,7 +22,6 @@ pub mod observability;
 pub mod integrations;
 pub mod shuffle;
 pub mod test;
-pub mod qr_window;
 pub mod scrape;
 pub mod sanity;
 pub mod party;

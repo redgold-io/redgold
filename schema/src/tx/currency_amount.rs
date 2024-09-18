@@ -89,6 +89,10 @@ impl CurrencyAmount {
             .unwrap_or(SupportedCurrency::Redgold)
     }
 
+    pub fn is_rdg(&self) -> bool {
+        self.currency_or() == SupportedCurrency::Redgold
+    }
+
     pub fn min_fee() -> Self {
         Self::from(MIN_RDG_SATS_FEE)
     }

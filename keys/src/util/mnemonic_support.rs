@@ -80,7 +80,7 @@ impl WordsPass {
             let pk = self.public_at(path.clone())?;
             res.push(WordsPassBtcMessageAccountMetadata {
                 derivation_path: path.clone(),
-                account: account.clone(),
+                account,
                 rdg_address: pk.address()?.render_string()?,
                 rdg_btc_main_address: pk.to_bitcoin_address(&NetworkEnvironment::Main)?,
                 rdg_btc_test_address: pk.to_bitcoin_address(&NetworkEnvironment::Test)?,
@@ -307,6 +307,10 @@ impl WordsPass {
     println!("Pkhex2 {}", pkhex2.clone());
     assert_eq!(pkhex, pkhex2);
      */
+
+    pub fn test_words() -> Self {
+        WordsPass::new("abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string(), None)
+    }
 }
 
 #[test]

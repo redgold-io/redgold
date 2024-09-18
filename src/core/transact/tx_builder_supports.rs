@@ -9,8 +9,8 @@ use redgold_schema::fee_validator::{MIN_RDG_SATS_FEE, TransactionFeeValidator};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::tx_schema_validate::SchemaValidationSupport;
-use crate::node_config::NodeConfig;
-
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::ApiNodeConfig;
 // Really just move the transaction builder to the main thing??
 
 //

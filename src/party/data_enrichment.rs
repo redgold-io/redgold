@@ -7,7 +7,8 @@ use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_schema::{RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_schema::observability::errors::Loggable;
+use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
 use crate::party::address_event::AddressEvent;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::party_stream::{PartyEvents, TransactionWithObservationsAndPrice};
@@ -71,8 +72,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 .map(|pd| pd.price_data.clone()).unwrap_or(PriceDataPointUsdQuery::new());
 
             let prior_local_fulfilled = prior_data.as_ref()
-                .and_then(|pd| pd.party_events.as_ref())
-                .map(|pd| pd.locally_fulfilled_orders.clone());
+                .and_then(|pd| pd.locally_fulfilled_orders.clone());
 
             // No filter is required here
             let btc = self.get_public_key_btc_data(&pk).await?;
@@ -84,7 +84,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             hm.insert(SupportedCurrency::Bitcoin, btc.clone());
             hm.insert(SupportedCurrency::Ethereum, eth.clone());
             // Change to time filter query to get prior data.
-            let mut txs = self.relay.ds.transaction_store.get_all_tx_for_address(&pk.address()?, 1e9 as i64, 0).await?;
+            let mut txs = self.relay.ds.transaction_store.get_all_tx_for_address(&pk.address()?, 1e9 as i64, 0)
+                .await?;
             txs.sort_by_key(|t| t.time().expect("time missing").clone());
             let mut address_events = vec![];
             for t in &txs {
@@ -121,6 +122,10 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             // info!("enrich data Address events len after filter: {}", address_events.len());
 
             // info!("enrich data eth: {}", eth.json_or());
+            // if btc.transactions.len() > 2 {
+            //     info!("btc transactions exceed bp");
+            //     info!("btc transactions exceed bp");
+            // }
 
             price_data.enrich_address_events(&mut address_events, &self.relay.ds, &self.external_network_resources).await?;
 

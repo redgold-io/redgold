@@ -5,7 +5,7 @@ use redgold_schema::structs::ErrorInfo;
 // 0.8
 use crate::gui::app_loop::LocalState;
 // use crate::gui::image_load::Image;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 pub mod app_loop;
 pub mod image_load;
@@ -16,10 +16,10 @@ pub mod common;
 pub mod tabs;
 pub mod top_panel;
 pub mod webcam;
-pub mod image_capture;
 pub mod qr_render;
 pub mod components;
 pub mod airgap;
+pub mod qr_window;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]

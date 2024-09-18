@@ -5,7 +5,7 @@ use metrics::{counter, gauge};
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
-use redgold_schema::structs::{ErrorInfo, Hash, HealthRequest, PublicKey, Request};
+use redgold_schema::structs::{ErrorInfo, Hash, HealthRequest, NetworkEnvironment, PublicKey, Request};
 use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::multiparty_gg20::initiate_mp;
 use crate::party::data_enrichment::PartyInternalData;
@@ -20,9 +20,16 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         // info!("Initial party key formation");
         // Initiate MP keysign etc. gather public key and original proof and params
         // TODO: Add deposit trust scored peers.
-        let seeds = self.relay.node_config.non_self_seeds_pk().clone();
+        let mut seeds = self.relay.node_config.non_self_seeds_pk().clone();
         gauge!("redgold_party_initial_formation_non_self_seeds").set(seeds.len() as f64);
-
+        if self.relay.node_config.network == NetworkEnvironment::Local {
+            seeds = self.relay.ds.peer_store.active_nodes(None).await.unwrap_or(vec![]);
+        }
+        if seeds.len() < 2 {
+            info!("Not enough peers in local network for party formation");
+            return Ok(())
+        }
+        info!("Local network party formation with {} peers", seeds.len());
         let party_peers = seeds.clone();
         self.form_keygen_group(party_peers).await?;
         // info!("Initial party key formation success");

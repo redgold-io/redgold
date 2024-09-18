@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -7,6 +9,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use log::{error, info};
 use metrics::{counter, gauge};
+use tokio::sync::Mutex;
 use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
@@ -14,12 +17,12 @@ use redgold_schema::structs::ErrorInfo;
 
 use crate::core::internal_message;
 use crate::core::relay::Relay;
-use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use crate::node::Node;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::util::cli::arg_parse_config;
 use crate::util::cli::arg_parse_config::ArgTranslate;
-use crate::util::cli::args::RgArgs;
+use redgold_schema::conf::rg_args::RgArgs;
 use crate::util::runtimes::build_runtime;
 
 pub async fn main_from_args(opts: RgArgs) {
@@ -46,14 +49,21 @@ pub async fn main_from_args(opts: RgArgs) {
     gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);
     gauge!("redgold_start_fail", &node_config.gauge_id()).set(0);
 
-    let relay = Relay::new(node_config.clone()).await;
+    let mut relay = Relay::new(node_config.clone()).await;
 
 
     Node::prelim_setup(relay.clone()).await.expect("prelim");
 
     // TODO: Match on node_config external network resources impl
     // TODO: Tokio select better?
-    let join_handles = Node::start_services(relay.clone(), ExternalNetworkResourcesImpl::new(&node_config).expect("works")).await;
+    let join_handles = if node_config.opts.debug_id.is_none() {
+        Node::start_services(relay.clone(), ExternalNetworkResourcesImpl::new(&node_config).expect("works")).await
+    } else {
+        let dir = node_config.data_folder.path.join("mock_resources");
+        let resources = MockExternalResources::new(&node_config, Some(dir), Arc::new(Mutex::new(HashMap::new()))).expect("works");
+        relay.node_config.config_data.party_config_data.poll_interval = 10_000;
+        Node::start_services(relay.clone(), resources).await
+    };
     let mut futures = FuturesUnordered::new();
     for jhi in join_handles {
         futures.push(jhi.result())

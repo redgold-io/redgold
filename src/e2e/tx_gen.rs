@@ -13,7 +13,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 #[derive(Clone, PartialEq)]
 pub struct SpendableUTXO {

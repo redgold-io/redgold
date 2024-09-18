@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::env;
 use std::fmt::format;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
@@ -78,6 +79,8 @@ pub struct LocalState {
     pub local_stored_state: LocalStoredState,
     pub updates: Channel<StateUpdate>,
     pub keytab_state: KeyTabState,
+    pub is_mac: bool,
+    pub is_linux: bool,
 }
 
 impl LocalState {
@@ -221,6 +224,7 @@ impl LocalState {
 
         ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
             .all().servers_path().to_str().expect("").to_string();
+
         // ss.genesis = node_config.opts.development_mode;
         let mut ls = LocalState {
             active_tab: Tab::Home,
@@ -264,6 +268,8 @@ impl LocalState {
             local_stored_state,
             updates: new_channel(),
             keytab_state: Default::default(),
+            is_mac: env::consts::OS == "macos",
+            is_linux: env::consts::OS == "linux",
         };
 
         if node_config.opts.development_mode {
@@ -367,7 +373,7 @@ fn random_bytes() -> [u8; 32] {
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
 use redgold_schema::structs::{ErrorInfo, PublicKey};
-use crate::node_config::NodeConfig; // 0.17.1
+use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 
 
 
@@ -436,7 +442,9 @@ use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{StateUpdate, wallet_screen, WalletState};
-use crate::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
+use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
+use crate::infra::deploy::is_windows;
+use crate::node_config::DataStoreNodeConfig;
 
 static INIT: Once = Once::new();
 
@@ -455,7 +463,14 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
-        ctx.set_pixels_per_point(2.5);
+        let amt = if local_state.is_mac {
+            2.5
+        } else if local_state.is_linux {
+            1.8
+        } else {
+            2.0
+        };
+        ctx.set_pixels_per_point(amt);
     });
 
     local_state.current_time = util::current_time_millis_i64();

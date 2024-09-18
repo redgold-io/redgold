@@ -17,7 +17,8 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoHashable;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::util::lang_util::SameResult;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::WordsPassNodeConfig;
 use crate::util::random_port;
 
 pub mod models;

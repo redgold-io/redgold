@@ -997,6 +997,10 @@ message GetActivePartyKeyRequest {
 
 }
 
+message GetSeedsRequest {
+
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -1032,6 +1036,8 @@ message Request {
   BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
   PublicKey get_address_info_public_key_request = 34;
   GetActivePartyKeyRequest get_active_party_key_request = 35;
+  GetSeedsRequest get_seeds_request = 36;
+  PublicKey get_public_key_balance_request = 37;
 }
 
 message HealthResponse {
@@ -1081,6 +1087,8 @@ message Response {
   BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
   AddressInfo get_address_info_public_key_response = 25;
   PublicKey get_active_party_key_response = 26;
+  repeated Seed get_seeds_response = 27;
+  CurrencyAmount get_public_key_balance_response = 28;
 }
 
 

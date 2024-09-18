@@ -1,4 +1,4 @@
-
+# 26880
 REDGOLD_BINARY_PATH=$1
 network=$2
 

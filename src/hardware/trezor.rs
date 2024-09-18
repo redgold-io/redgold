@@ -15,7 +15,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::cmd::{run_cmd, run_cmd_safe};
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use crate::util::init_logger_once;

@@ -5,13 +5,13 @@ use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::local_stored_state::Identity;
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{PeerMetadata, Transaction};
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
 use crate::gui::app_loop::{LocalState, PublicKeyStoredState};
 use crate::gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
-
+use crate::node_config::ApiNodeConfig;
 
 #[derive(Clone)]
 pub struct IdentityState {
@@ -152,7 +152,7 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
         .map(|c| c.clone())
         .collect_vec();
     let mut peer_data = PeerMetadata::default();
-    Server::peer_data(
+    ServerOldFormat::peer_data(
         s,
         &mut peer_data,
         i.peer_id_index,

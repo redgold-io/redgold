@@ -4,7 +4,7 @@ use redgold_schema::seeds::get_all_hardcoded_seeds;
 use redgold_schema::structs::{NetworkEnvironment, TrustData};
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 #[ignore]
 #[tokio::test]

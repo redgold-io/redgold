@@ -73,6 +73,7 @@ pub struct KeyPair {
     pub public_key: bdk::bitcoin::secp256k1::PublicKey,
 }
 
+
 impl KeyPair {
     pub fn new(
         secret_key: &bdk::bitcoin::secp256k1::SecretKey,

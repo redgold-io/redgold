@@ -32,7 +32,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use crate::gui::common;
 use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
@@ -527,15 +527,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
 }
 
 fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
-
-    ComboBox::from_label("Currency")
-        .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
-        .show_ui(ui, |ui| {
-            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
-            for style in styles {
-                ui.selectable_value(&mut ls.wallet_state.send_currency_type, style.clone(), format!("{:?}", style));
-            }
-        });
+    currency_selection_box(ui, ls);
     ui.horizontal(|ui| {
         ui.label("To:");
         let string = &mut ls.wallet_state.destination_address;
@@ -560,6 +552,17 @@ fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
         // }
     });
 
+}
+
+fn currency_selection_box(ui: &mut Ui, ls: &mut LocalState) {
+    ComboBox::from_label("Currency")
+        .selected_text(format!("{:?}", ls.wallet_state.send_currency_type))
+        .show_ui(ui, |ui| {
+            let styles = vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold];
+            for style in styles {
+                ui.selectable_value(&mut ls.wallet_state.send_currency_type, style.clone(), format!("{:?}", style));
+            }
+        });
 }
 
 fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {

@@ -5,6 +5,7 @@ use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::database::BatchDatabase;
 use itertools::Itertools;
+use log::info;
 use num_bigint::BigInt;
 use rocket::form::validate::with;
 use rocket::serde::{Deserialize, Serialize};
@@ -27,6 +28,8 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransa
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
 use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use crate::integrations::external_network_resources::ExternalNetworkResources;
+use crate::node_config::ToTransactionBuilder;
 // use crate::multiparty_gg20::watcher::{get_btc_per_rdg_starting_min_ask, OrderFulfillment};
 use crate::party::address_event::AddressEvent;
 use crate::party::address_event::AddressEvent::External;
@@ -47,7 +50,7 @@ pub struct TransactionWithObservationsAndPrice {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct PartyEvents {
+pub struct PartyEvents where {
     pub(crate) network: NetworkEnvironment,
     key_address: Address,
     pub(crate) party_public_key: PublicKey,
@@ -74,10 +77,21 @@ pub struct PartyEvents {
     #[serde(skip)]
     pub relay: Option<Relay>,
     pub locally_fulfilled_orders: Vec<OrderFulfillment>,
-    pub portfolio_request_events: PortfolioRequestEvents
+    pub portfolio_request_events: PortfolioRequestEvents,
 }
 
 impl PartyEvents {
+
+    pub fn balances_with_deltas_sub_portfolio(&self) -> HashMap<SupportedCurrency, CurrencyAmount> {
+        let mut map = self.balance_with_deltas_applied.clone();
+        for (amt, v) in self.portfolio_request_events.external_stake_balance_deltas.iter() {
+            if let Some(cur) = map.get(&amt) {
+                let new = cur.clone() - v.clone();
+                map.insert(amt.clone(), new);
+            }
+        }
+        map
+    }
 
     pub fn num_internal_events(&self) -> usize {
         self.events.iter().filter(|e| match e {
@@ -212,9 +226,17 @@ impl PartyEvents {
                 let within_reasonable_range = i64::abs(this_amt - out_amt_i64) < 10_000;
                 within_reasonable_range
             }).is_none() {
-                return Err(error_info("Invalid BTC fulfillment output"))
+                let has_matching_address = btc.iter().find(|(addr, amt) | addr == &out_addr).is_some();
+                let err = Err(error_info("Invalid BTC fulfillment output"))
                     .with_detail("output_address", out_addr)
-                    .with_detail("output_amount", out_amt.to_string());
+                    .with_detail("has_matching_address", has_matching_address.to_string())
+                    .with_detail("btc_orders_len", btc.len().to_string())
+                    .with_detail("output_amount", out_amt.to_string())
+                    .with_detail("btc_orders", btc.json_or());
+                if self.network.clone() != NetworkEnvironment::Debug {
+                    // err.log_error().ok();
+                    return err
+                }
             }
         }
         Ok(())
@@ -229,10 +251,6 @@ impl PartyEvents {
         EthWalletWrapper::validate_eth_fulfillment(fulfills, &typed_tx_payload, &signing_data, &self.network)?;
         Ok(())
     }
-}
-
-
-impl PartyEvents {
 
     pub fn unconfirmed_rdg_output_btc_txid_refs(&self) -> HashSet<String> {
         self.unconfirmed_events.iter().filter_map(|e| {
@@ -309,7 +327,7 @@ impl PartyEvents {
                                 Err::<(), ErrorInfo>(error_info("MPC claims event fulfillment but external TXID not yet recognized as unconfirmed"))
                                     .with_detail("txid", t.tx.hash_hex())
                                     .with_detail("event", ae.json_or())
-                                    .log_error()
+                                    // .log_error()
                                     .ok();
                             } else {
                                 orders.push(of.clone());
@@ -361,7 +379,7 @@ impl PartyEvents {
             central_prices: Default::default(),
             relay: Some(relay.clone()),
             locally_fulfilled_orders: vec![],
-            portfolio_request_events: Default::default(),
+            portfolio_request_events: Default::default()
         }
     }
 
@@ -435,7 +453,7 @@ impl PartyEvents {
     pub fn recalculate_prices(&mut self, time: i64) -> RgResult<()> {
         self.central_prices = CentralPricePair::recalculate_no_quote_price_change(
             self.central_prices.clone(),
-            self.balance_with_deltas_applied.clone(),
+            self.balances_with_deltas_sub_portfolio(),
             time
         )?;
         Ok(())
@@ -621,6 +639,9 @@ impl PartyEvents {
             // Represents a receipt transaction for outgoing swap / stake event / withdrawal.
             // Should have a paired internal deposit event
             let mut found_match = false;
+            // if t.currency == SupportedCurrency::Ethereum {
+            //     info!("Eth outgoing");
+            // }
 
             self.unfulfilled_external_withdrawals.retain(|(of, d)| {
                 let res = Self::retain_unfulfilled_withdrawals(t, d);
@@ -670,22 +691,26 @@ impl PartyEvents {
     fn retain_unfulfilled_withdrawals(t: &ExternalTimedTransaction, d: &AddressEvent) -> bool {
         match d {
             AddressEvent::Internal(t2) => {
-                let this_outgoing_destination = t.other_address_typed().ok();
-                if let Some(this_dest) = this_outgoing_destination {
-                    if let Some(dest) = t2.tx.swap_destination() {
-                        let matching_receipt = &this_dest == dest;
-                        if !matching_receipt {
+                let this_dest = t.other_address.clone().to_lowercase();
+                let swap_dest = t2.tx.swap_destination();
+                let swap_dest_str = swap_dest.and_then(|sd| sd.render_string().ok())
+                    .map(|s| s.to_lowercase());
+                // if t.currency == SupportedCurrency::Ethereum {
+                //     info!("debug");
+                // }
+                if let Some(dest) = swap_dest_str {
+                        let matching_receipt = this_dest == dest;
+                        if matching_receipt {
                             return false
                         }
                     }
-                    if let Some(sw) = t2.tx.stake_withdrawal_request().and_then(|sr| sr.destination.as_ref()) {
-                        let matching_receipt = &this_dest == sw;
-                        if !matching_receipt {
+                    if let Some(sw) = t2.tx.stake_withdrawal_request().and_then(|sr| sr.destination.as_ref()).and_then(|a| a.render_string().ok()) {
+                        let matching_receipt = this_dest == sw;
+                        if matching_receipt {
                             return false
                         }
                     }
                 }
-            }
             _ => {}
         }
         true
@@ -827,29 +852,29 @@ async fn debug_events2() -> RgResult<()> {
     let pi = res.get(0).expect("head");
 
     let key = pi.party_key.clone().expect("key");
-    let data = relay.ds.multiparty_store.party_data(&key).await.expect("data")
-        .and_then(|pd| pd.json_party_internal_data)
-        .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
-
-    let pev = data.party_events.clone().expect("v");
-
-    let ev = pev.events.clone();
-
-    let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
-
-    // this matches
-    for e in &ev {
-        duplicate.process_event(e).await.expect("works");
-
-    }
-    let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
-
-    past_orders.clone().json_pretty_or().print();
-
+    // let data = relay.ds.multiparty_store.party_data(&key).await.expect("data")
+    //     .and_then(|pd| pd.json_party_internal_data)
+    //     .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
     //
-    let mut tb = relay.node_config.tx_builder();
-    tb.with_input_address(&key.address().expect("works"))
-        .with_auto_utxos().await.expect("works");
+    // let pev = data.party_events.clone().expect("v");
+    //
+    // let ev = pev.events.clone();
+    //
+    // let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
+    //
+    // // this matches
+    // for e in &ev {
+    //     duplicate.process_event(e).await.expect("works");
+    //
+    // }
+    // let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
+    //
+    // past_orders.clone().json_pretty_or().print();
+    //
+    // //
+    // let mut tb = relay.node_config.tx_builder();
+    // tb.with_input_address(&key.address().expect("works"))
+    //     .with_auto_utxos().await.expect("works");
     //
     // for o in past_orders.iter()
     //     // .filter(|e| e.event_time < cutoff_time)

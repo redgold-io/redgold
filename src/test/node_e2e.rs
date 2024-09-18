@@ -11,7 +11,9 @@ use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{bytes_data, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::{bytes_data, structs, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
@@ -23,7 +25,7 @@ use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
 // use crate::multiparty_gg20::watcher::DepositWatcherConfig;
 use crate::node::Node;
-use crate::node_config::NodeConfig;
+use crate::node_config::{ToTransactionBuilder, WordsPassNodeConfig};
 use crate::util;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
@@ -118,6 +120,123 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         &start_node.node.relay.node_config
     );
 
+    single_node_tests(&mut local_nodes, &submit).await;
+
+    local_nodes.add_node(
+        // runtime.clone()
+    ).await;
+
+    two_node_tests(&mut local_nodes, &submit).await;
+    two_node_keygen_test(&mut local_nodes, &client1, &submit).await?;
+
+    // three nodes
+    local_nodes.add_node().await;
+
+    three_node_keygen_tests(&mut local_nodes, client1, &submit).await?;
+
+    let kp = WordsPass::test_words().keypair_at_change(0).unwrap();
+    // let kp = dev_ci_kp().expect("kp").1;
+
+    tokio::time::sleep(Duration::from_secs(40)).await;
+
+
+    let mut config2 = config.clone();
+    let string = client.client_wrapper().url();
+    info!("setting test harness to {} ", string.clone());
+    info!("active party key {}", client.client_wrapper().active_party_key().await.expect("works").json_or());
+    config2.load_balancer_url = string;
+    let vec = local_nodes.ext.clone();
+
+    let mut amm_test_harness = PartyTestHarness::from(
+        &config2, kp, vec![vec], Some(client.client_wrapper()), vec![]).await;
+
+    let address = amm_test_harness.self_rdg_address();
+    submit.send_to(&address).await.expect("works");
+    submit.send_to(&address).await.expect("works");
+    submit.send_to(&address).await.expect("works");
+
+    let b = client.balance(address).await.expect("works");
+    info!("Balance: {}", b.json_or());
+    amm_test_harness.run_test().await.expect("works");
+    //
+    // // Manual test uses up funds.
+
+    // manual_eth_mp_signing_test(client1, keygen2, &mp_eth_addr, &environment).await;
+    // TODO: AMM tests
+
+    // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
+    // ETH support.
+    // let ds = start_node.node.relay.ds.clone();
+    //
+    // let mut loaded = false;
+    // for _ in 0..10 {
+    //     let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
+    //     if let Ok(Some(t)) = test_load {
+    //         info!("Deposit watcher config: {}", t.json_or());
+    //         loaded = true;
+    //         break;
+    //     }
+    //     tokio::time::sleep(Duration::from_secs(2)).await;
+    // }
+    // assert!(loaded);
+
+    // Eth staking tests.
+    // ignore for now, too flakey.
+    // if false {
+    // eth_amm_e2e(start_node, relay_start, &submit).await.expect("works");
+
+    info!("Test passed");
+
+    std::mem::forget(local_nodes);
+    std::mem::forget(submit);
+    Ok(())
+}
+
+async fn three_node_keygen_tests(local_nodes: &mut LocalNodes, client1: ControlClient, submit: &TransactionSubmitter) -> Result<(), ErrorInfo> {
+    local_nodes.verify_data_equivalent().await;
+    local_nodes.verify_peers().await?;
+    //
+    // This works but is really flaky for some reason?
+    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+
+    submit.submit().await?.at_least_n(3).unwrap();
+
+    // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
+    // let public = res.public_key.expect("public key");
+    // let mp_eth_addr = public.to_ethereum_address().expect("eth address");
+    //
+    // let environment = NetworkEnvironment::Dev;
+    Ok(())
+}
+
+async fn two_node_keygen_test(local_nodes: &mut LocalNodes, client1: &ControlClient, submit: &TransactionSubmitter) -> Result<(), ErrorInfo> {
+    // let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
+
+    // tokio::time::sleep(Duration::from_secs(10)).await;
+
+
+    // let signing_data = Hash::from_string_calculate("hey");
+    // let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
+
+    tracing::info!("After MP test");
+
+    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
+
+    local_nodes.verify_data_equivalent().await;
+    Ok(())
+}
+
+async fn two_node_tests(local_nodes: &mut LocalNodes, submit: &TransactionSubmitter) {
+    local_nodes.verify_data_equivalent().await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let after_2_nodes = submit.submit().await.expect("submit");
+    after_2_nodes.at_least_n(2).unwrap();
+
+    local_nodes.verify_peers().await.expect("verify peers");
+}
+
+async fn single_node_tests(local_nodes: &mut LocalNodes, submit: &TransactionSubmitter) {
     submit.submit().await.expect("submit");
     //
     // if contract_tests {
@@ -168,105 +287,6 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     submit.submit_used_utxo().await;
 
     local_nodes.verify_data_equivalent().await;
-
-    local_nodes.add_node(
-        // runtime.clone()
-    ).await;
-
-    local_nodes.verify_data_equivalent().await;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    let after_2_nodes = submit.submit().await.expect("submit");
-    after_2_nodes.at_least_n(2).unwrap();
-
-    local_nodes.verify_peers().await.expect("verify peers");
-
-
-    let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
-
-    // tokio::time::sleep(Duration::from_secs(10)).await;
-
-
-    let signing_data = Hash::from_string_calculate("hey");
-    let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
-
-    tracing::info!("After MP test");
-
-    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
-
-    local_nodes.verify_data_equivalent().await;
-
-    // three nodes
-    local_nodes.add_node().await;
-    local_nodes.verify_data_equivalent().await;
-    local_nodes.verify_peers().await?;
-    //
-    // This works but is really flaky for some reason?
-    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
-
-    submit.submit().await?.at_least_n(3).unwrap();
-
-    let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
-    let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
-    let public = res.public_key.expect("public key");
-    let mp_eth_addr = public.to_ethereum_address().expect("eth address");
-
-    let environment = NetworkEnvironment::Dev;
-
-    let kp = dev_ci_kp().expect("kp").1;
-
-
-
-
-    let mut config2 = config.clone();
-    let string = client.client_wrapper().url();
-    info!("setting test harness to {} ", string.clone());
-    info!("active party key {}", client.client_wrapper().active_party_key().await.expect("works").json_or());
-    config2.load_balancer_url = string;
-    let vec = local_nodes.nodes.iter().map(|n| n.ext.clone()).collect_vec();
-
-    let mut amm_test_harness = PartyTestHarness::from(
-        &config2, kp, vec, Some(client.client_wrapper())).await;
-
-    let address = amm_test_harness.self_rdg_address();
-    submit.send_to(&address).await.expect("works");
-    submit.send_to(&address).await.expect("works");
-    submit.send_to(&address).await.expect("works");
-
-    let b = client.balance(address).await.expect("works");
-    info!("Balance: {}", b.json_or());
-    amm_test_harness.run_test().await.expect("works");
-    //
-    // // Manual test uses up funds.
-
-    // manual_eth_mp_signing_test(client1, keygen2, &mp_eth_addr, &environment).await;
-    // TODO: AMM tests
-
-    // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
-    // ETH support.
-    // let ds = start_node.node.relay.ds.clone();
-    //
-    // let mut loaded = false;
-    // for _ in 0..10 {
-    //     let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
-    //     if let Ok(Some(t)) = test_load {
-    //         info!("Deposit watcher config: {}", t.json_or());
-    //         loaded = true;
-    //         break;
-    //     }
-    //     tokio::time::sleep(Duration::from_secs(2)).await;
-    // }
-    // assert!(loaded);
-
-    // Eth staking tests.
-    // ignore for now, too flakey.
-    // if false {
-    // eth_amm_e2e(start_node, relay_start, &submit).await.expect("works");
-
-    info!("Test passed");
-
-    std::mem::forget(local_nodes);
-    std::mem::forget(submit);
-    Ok(())
 }
 //
 // async fn manual_eth_mp_signing_test(client1: ControlClient, keygen2: ControlMultipartyKeygenResponse, mp_eth_addr: &String, environment: &NetworkEnvironment) {

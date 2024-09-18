@@ -2,7 +2,7 @@
 use std::thread::sleep;
 use std::time::Duration;
 use redgold::core::run_main::main_from_args;
-use redgold::util::cli::args::RgArgs;
+use redgold_schema::conf::rg_args::RgArgs;
 use redgold::util::runtimes::{build_simple_runtime};
 
 #[test]

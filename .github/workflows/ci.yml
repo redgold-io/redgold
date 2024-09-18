@@ -69,8 +69,11 @@ jobs:
 #      - run: cargo test --no-run # --profile ci
       - run: |
           ./bin/test.sh &
+          pid1=$!
           ./bin/local_test.sh &
-          wait
+          pid2=$!
+          wait $pid1 || { echo "test.sh failed"; exit 1; }
+          wait $pid2 || { echo "local_test.sh failed"; exit 1; }
   build-vue:
     runs-on: self-hosted
     if: ${{ github.event_name != 'pull_request_target' && contains('
@@ -163,7 +166,7 @@ jobs:
       - run: rustup -V
 #      - run: cargo clean
 #      - run: ./bin/test.sh
-      - run: echo "${{ github.run_number }}" > src/resources/build_number
+      - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
       - run: cargo build --release
         # try CWD?
 #      - run: ./bin/local_test.sh "./target/release/redgold"
@@ -241,7 +244,7 @@ jobs:
         with:
           cache-on-failure: true
       - run: ./bin/install_build_deps.sh
-      - run: echo "${{ github.run_number }}" > src/resources/build_number
+      - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
       - run: cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
       - uses: actions/upload-artifact@v3
@@ -360,7 +363,7 @@ jobs:
         run: ./bin/release_branches.sh
       - run: echo "release branch match output ${{ steps.check-branch.outputs.match }}"
       - run: echo steps.check-branch.outputs.match
-      - run: echo "${{ github.run_number }}" > src/resources/build_number
+      - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
       - name: Install GMP
         run: brew install gmp

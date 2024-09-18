@@ -17,7 +17,7 @@ use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
 use redgold_schema::util::cmd::{run_bash_async, run_powershell_async};
 use crate::api::rosetta::models::Peer;
@@ -27,11 +27,11 @@ use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::resources::Resources;
 use crate::util::cli::arg_parse_config::ArgTranslate;
-use crate::util::cli::args::Deploy;
-use crate::util::cli::data_folder::DataFolder;
+use redgold_schema::conf::rg_args::Deploy;
+use redgold_schema::data_folder::DataFolder;
 
 #[async_trait]
 pub trait SSHLike {
@@ -151,7 +151,7 @@ async fn debug_ssh_invoke() {
     let result = ssh.execute("ls", None).await.expect("ssh");
     println!("Result: {}", result);
 
-    let s = Server{
+    let s = ServerOldFormat {
         name: "".to_string(),
         host,
         index: 0,
@@ -171,13 +171,13 @@ async fn debug_ssh_invoke() {
 }
 
 pub struct DeployMachine<S: SSHLike> {
-    pub server: Server,
+    pub server: ServerOldFormat,
     pub ssh: S,
 }
 
 impl DeployMachine<SSHProcessInvoke> {
 
-    pub fn new(s: &Server, identity_path: Option<String>, output_handler: Option<Sender<String>>) -> Self {
+    pub fn new(s: &ServerOldFormat, identity_path: Option<String>, output_handler: Option<Sender<String>>) -> Self {
         let ssh = SSHProcessInvoke {
             user: s.username.clone(),
             // TODO: Home dir .join(".ssh").join("id_rsa")
@@ -433,7 +433,7 @@ pub async fn deploy_ops_services(
     purge_data: bool,
     p: &Option<Sender<String>>,
     skip_start: bool,
-    node_exporter_template: Option<Vec<Server>>,
+    node_exporter_template: Option<Vec<ServerOldFormat>>,
     skip_logs: bool,
     include_smtp: bool,
     allow_anon_read: bool
@@ -602,7 +602,7 @@ pub async fn derive_mnemonic_and_peer_id(
     passphrase: Option<String>,
     opt_peer_id: Option<String>,
     server_id_index: i64,
-    servers: Vec<Server>,
+    servers: Vec<ServerOldFormat>,
     trust: Vec<TrustRatingLabel>,
     peer_id_tx: &mut HashMap<String, structs::Transaction>,
     net: &NetworkEnvironment,
@@ -638,7 +638,7 @@ pub async fn derive_mnemonic_and_peer_id(
 
         let mut pkmap = HashMap::default();
         pkmap.insert(server_id_index, new.default_public_key().expect("pk"));
-        Server::peer_data(
+        ServerOldFormat::peer_data(
             servers.clone(),
             &mut peer_data,
             peer_id_index as i64,
@@ -673,7 +673,7 @@ pub async fn derive_mnemonic_and_peer_id(
 /// Allow offline (airgapped) generation of peer TX / node TX from servers manifest
 pub async fn offline_generate_keys_servers(
     node_config: NodeConfig,
-    servers: Vec<Server>,
+    servers: Vec<ServerOldFormat>,
     save_path: PathBuf,
     salt_mnemonic: String,
     passphrase: Option<String>
@@ -712,7 +712,7 @@ pub async fn default_deploy(
     deploy: &mut Deploy,
     node_config: &NodeConfig,
     output_handler: Option<Sender<String>>,
-    servers_opt: Option<Vec<Server>>
+    servers_opt: Option<Vec<ServerOldFormat>>
 ) -> RgResult<()> {
 
     // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();

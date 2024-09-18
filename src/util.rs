@@ -14,7 +14,7 @@ use rand::rngs::OsRng;
 
 use redgold_keys::util::dhash_str;
 
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::observability::trace_setup::init_tracing;
 
 pub mod auto_update;

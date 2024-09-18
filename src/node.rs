@@ -33,7 +33,7 @@ use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use crate::data::download;
 use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::{ControlRequest, ErrorInfo, NodeState};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 // use crate::trust::rewards::Rewards;
@@ -70,6 +70,7 @@ use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
 use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl, MockExternalResources};
+use crate::node_config::WordsPassNodeConfig;
 use crate::party::party_watcher::PartyWatcher;
 use crate::sanity::{historical_parity, migrations};
 use crate::sanity::recent_parity::RecentParityCheck;
@@ -114,7 +115,7 @@ impl Node {
     */
     #[tracing::instrument(skip(relay, external_network_resources), fields(node_id = %relay.node_config.public_key().short_id()))]
     pub async fn start_services<T>(relay: Relay, external_network_resources: T) -> Vec<NamedHandle>
-    where T: ExternalNetworkResources + Send + 'static + Sync {
+    where T: ExternalNetworkResources + Send + 'static + Sync + Clone {
 
         let node_config = relay.node_config.clone();
 

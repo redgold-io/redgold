@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use std::sync::{Arc, Mutex};
 use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
@@ -17,20 +17,20 @@ use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy,
 use crate::gui::tables;
 use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};
-use crate::util::cli::args::Deploy;
+use redgold_schema::conf::rg_args::Deploy;
 
 pub trait ServerClient {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient;
 }
 
-impl ServerClient for Server {
+impl ServerClient for ServerOldFormat {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient {
         RgHttpClient::from_env(self.host.clone(), network_environment)
     }
 }
 
 pub async fn update_server_status(
-    servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>,
+    servers: Vec<ServerOldFormat>, status: Arc<Mutex<Vec<ServerStatus>>>,
     network_environment: NetworkEnvironment
 ) {
 
@@ -146,7 +146,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         );
         if ui.button("Load").clicked() {
             let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
-            let res = Server::parse_from_file(buf);
+            let res = ServerOldFormat::parse_from_file(buf);
             if let Ok(res) = res {
                 local_state.local_stored_state.servers = res;
                 local_state.persist_local_state_store();

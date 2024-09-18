@@ -16,7 +16,8 @@ use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::integrations::external_network_resources::MockExternalResources;
 use crate::node::Node;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::WordsPassNodeConfig;
 use crate::util;
 
 #[derive(Clone)]
@@ -27,11 +28,12 @@ pub struct LocalTestNodeContext {
     pub(crate) public_client: PublicClient,
     pub(crate) control_client: ControlClient,
     // futures: Vec<JoinHandle<Result<(), ErrorInfo>>>
-    pub ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
 }
 
 impl LocalTestNodeContext {
-    async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>) -> Self {
+    async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>,
+                 ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
+    ) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
         node_config.config_data.party_config_data.order_cutoff_delay_time = 5_000;
         node_config.config_data.party_config_data.poll_interval = 20_000;
@@ -52,7 +54,7 @@ impl LocalTestNodeContext {
         // info!("Test starting node services");
         // info!("Test starting node services for node id {id}");
 
-        let resources = MockExternalResources::new(&node_config).expect("works");
+        let resources = MockExternalResources::new(&node_config, None, ext).expect("works");
         let ext = resources.external_transactions.clone();
         let futures = Node::start_services(relay.clone(), resources).await;
 
@@ -81,7 +83,6 @@ impl LocalTestNodeContext {
             node: node.clone(),
             public_client: PublicClient::local(node.relay.node_config.public_port(), Some(relay.clone())),
             control_client: ControlClient::local(node.relay.node_config.control_port()),
-            ext
             // futures
         }
     }
@@ -95,6 +96,7 @@ pub struct LocalNodes {
     pub nodes: Vec<LocalTestNodeContext>,
     current_seed: Seed,
     pub(crate) seeds: Vec<Seed>,
+    pub ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
 }
 
 impl LocalNodes {
@@ -139,11 +141,13 @@ impl LocalNodes {
         //     .expect("test failure create tables");
         let seeds = Self::seeds();
         let s = seeds.get(0).expect("").port_offset.expect("") as u16;
-        let start = LocalTestNodeContext::new(0, s, Self::seeds()).await;
+        let arc = Arc::new(Mutex::new(HashMap::new()));
+        let start = LocalTestNodeContext::new(0, s, Self::seeds(), arc.clone()).await;
         LocalNodes {
             current_seed: start.node.relay.node_config.self_seed(),
             nodes: vec![start],
             seeds,
+            ext: arc,
         }
     }
 
@@ -288,6 +292,7 @@ impl LocalNodes {
             self.current_seed_id(),
             port_offset,
             self.seeds.clone(),
+            self.ext.clone()
         ).await;
 
         info!(

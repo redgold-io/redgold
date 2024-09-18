@@ -1,31 +1,48 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use async_trait::async_trait;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::sled::Tree;
 use bdk::{BlockTime, TransactionDetails};
-use surf::http::headers::ToHeaderValues;
+use bdk::bitcoin::EcdsaSighashType;
+use bdk::bitcoin::hashes::hex::ToHex;
+use bdk::database::MemoryDatabase;
+use itertools::Itertools;
+use log::info;
 use tokio::sync::Mutex;
-use redgold_data::data_store::DataStore;
-use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
-use redgold_keys::TestConstants;
+use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
-use redgold_schema::{error_info, RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use redgold_schema::structs::{Address, PublicKey, SupportedCurrency};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::node_config::NodeConfig;
+use crate::node_config::NodeConfigKeyPair;
 use crate::party::party_stream::PartyEvents;
 use crate::scrape::okx_point;
+use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;
 
 #[async_trait]
 pub trait ExternalNetworkResources {
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>>;
-    async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<()>;
+    async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String>;
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
+    async fn send(&mut self, destination: &Address, currency_amount: &CurrencyAmount) -> RgResult<String>;
+    async fn self_balance(&self, currency: SupportedCurrency) -> RgResult<CurrencyAmount>;
+
+    async fn btc_payloads(
+        &self, outputs: Vec<(String, u64)>, public_key: &PublicKey)
+        -> RgResult<(Vec<(Vec<u8>, EcdsaSighashType)>, PartySigningValidation)>;
+    async fn btc_add_signatures(
+        &mut self, pk: &PublicKey, psbt: String,
+        results: Vec<Proof>, hashes: Vec<(Vec<u8>, EcdsaSighashType)>) -> RgResult<EncodedTransactionPayload>;
+
+    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)>;
 
 }
 
@@ -40,11 +57,13 @@ pub enum EncodedTransactionPayload {
 }
 
 
+#[derive(Clone)]
 pub struct ExternalNetworkResourcesImpl {
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub node_config: NodeConfig,
-    // pub self_secret_key: String,
-    pub dummy_secret_key: String
+    pub self_secret_key: String,
+    pub dummy_secret_key: String,
+    pub self_public: PublicKey
 }
 
 impl ExternalNetworkResourcesImpl {
@@ -55,7 +74,9 @@ impl ExternalNetworkResourcesImpl {
         Ok(ExternalNetworkResourcesImpl {
             btc_wallets,
             node_config: node_config.clone(),
-            dummy_secret_key
+            self_secret_key: node_config.keypair().to_private_hex(),
+            dummy_secret_key,
+            self_public: node_config.keypair().public_key()
         })
     }
     pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
@@ -78,12 +99,47 @@ impl ExternalNetworkResourcesImpl {
         };
         Ok(mutex)
     }
+    pub async fn eth_dummy_wallet(&self) -> RgResult<EthWalletWrapper> {
+        EthWalletWrapper::new(&self.dummy_secret_key, &self.node_config.network)
+    }
 
 }
 
 
 #[async_trait]
 impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
+
+    async fn btc_payloads(
+        &self, outputs: Vec<(String, u64)>, public_key: &PublicKey)
+        -> RgResult<(Vec<(Vec<u8>, EcdsaSighashType)>, PartySigningValidation)> {
+        let arc = self.btc_wallet(public_key).await?;
+        let mut w = arc.lock().await;
+        w.create_transaction_output_batch(outputs)?;
+
+        let pbst_payload = w.psbt.safe_get_msg("Missing PSBT")?.clone().json_or();
+        let mut validation = structs::PartySigningValidation::default();
+        validation.json_payload = Some(pbst_payload.clone());
+        validation.currency = SupportedCurrency::Bitcoin as i32;
+
+        let hashes = w.signable_hashes()?.clone();
+        Ok((hashes, validation))
+    }
+
+    async fn btc_add_signatures(
+        &mut self, pk: &PublicKey, psbt: String,
+        results: Vec<Proof>, hashes: Vec<(Vec<u8>, EcdsaSighashType)>) -> RgResult<EncodedTransactionPayload> {
+        let psbt = psbt.json_from::<PartiallySignedTransaction>()?;
+        let mut w = SingleKeyBitcoinWallet::new_wallet(self.self_public.clone(), self.node_config.network.clone(), false)?;
+        // let arc = self.btc_wallet(pk).await?;
+        // let mut w = arc.lock().await;
+        w.psbt = Some(psbt);
+        for (i, ((_, hash_type), result)) in
+            hashes.iter().zip(results.iter()).enumerate() {
+            w.affix_input_signature(i, result, hash_type);
+        }
+        w.sign()?;
+        Ok(EncodedTransactionPayload::JsonPayload(w.psbt.json_or()))
+    }
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
                                -> RgResult<Vec<ExternalTimedTransaction>> {
         match currency {
@@ -107,17 +163,15 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         }
     }
 
-    async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<()> {
+    async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String> {
         match currency {
             SupportedCurrency::Bitcoin => {
-                let arc = self.btc_wallet(pk).await?;
-                let mut w = arc.lock().await;
                 let payload = match payload {
                     EncodedTransactionPayload::JsonPayload(s) => s,
                     _ => Err(error_info("Missing payload"))?
                 };
-                w.psbt = Some(payload.json_from::<PartiallySignedTransaction>()?);
-                w.broadcast_tx()
+                let txid = SingleKeyBitcoinWallet::<MemoryDatabase>::broadcast_tx_static(payload, &self.node_config.network)?;
+                Ok(txid)
             },
             SupportedCurrency::Ethereum => {
                 let payload = match payload {
@@ -125,7 +179,10 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                     _ => Err(error_info("Missing payload"))?
                 };
                 let w = EthWalletWrapper::new(&self.dummy_secret_key, &self.node_config.network)?;
-                w.broadcast_tx_vec(payload).await
+                let dec = EthWalletWrapper::decode_rlp_tx(payload.clone())?;
+                let txid = dec.hash().to_string();
+                w.broadcast_tx_vec(payload).await?;
+                Ok(txid)
             }
             _ => Err(error_info("Unsupported currency"))
         }
@@ -135,24 +192,109 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         let price = okx_point(time, currency).await?.close;
         Ok(price)
     }
+
+    async fn send(&mut self, destination: &Address, currency_amount: &CurrencyAmount) -> RgResult<String> {
+        let txid = match currency_amount.currency_or() {
+            SupportedCurrency::Bitcoin => {
+                let arc = self.btc_wallet(&self.self_public).await?;
+                let mut w = arc.lock().await;
+                let tx = w.send(&destination, currency_amount, self.self_secret_key.clone(), true)?;
+                tx
+            },
+            SupportedCurrency::Ethereum => {
+                let w = EthWalletWrapper::new(&self.self_secret_key, &self.node_config.network)?;
+                let tx = w.send(destination, currency_amount).await?;
+                tx
+            }
+            _ => return Err(error_info("Unsupported currency"))
+        };
+        Ok(txid)
+    }
+
+    async fn self_balance(&self, currency: SupportedCurrency) -> RgResult<CurrencyAmount> {
+        let amount = match currency {
+            SupportedCurrency::Bitcoin => {
+                let arc = self.btc_wallet(&self.self_public).await?;
+                let w = arc.lock().await;
+                let raw_balance = w.get_wallet_balance()?.confirmed;
+                CurrencyAmount::from_btc(raw_balance as i64)
+            },
+            SupportedCurrency::Ethereum => {
+                let eth = EthHistoricalClient::new(&self.node_config.network).ok_msg("eth client creation")??;
+                let eth_addr = self.self_public.to_ethereum_address_typed()?;
+                let amount = eth.get_balance_typed(&eth_addr).await?;
+                amount
+            }
+            _ => return Err(error_info("Unsupported currency"))
+        };
+        Ok(amount)
+    }
+
+    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
+        let eth = self.eth_dummy_wallet().await?;
+        let mut tx = eth.create_transaction_typed(
+            &src, &dst, amount.clone(), None
+        ).await?;
+        let data = EthWalletWrapper::signing_data(&tx)?;
+        let tx_ser = tx.json_or();
+        let mut valid = structs::PartySigningValidation::default();
+        valid.json_payload = Some(tx_ser.clone());
+        valid.currency = SupportedCurrency::Ethereum as i32;
+        Ok((data, valid, tx_ser))
+    }
 }
 
 
-
+#[derive(Clone)]
 pub struct MockExternalResources {
     pub external_transactions: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
-    pub inner: ExternalNetworkResourcesImpl
+    pub inner: ExternalNetworkResourcesImpl,
+    pub file_based_prefix: Option<PathBuf>,
+    pub node_config: NodeConfig,
+    pub dev_ci_kp: KeyPair
 }
 
 impl MockExternalResources {
 
-    pub fn new(node_config: &NodeConfig) -> RgResult<MockExternalResources> {
+    pub fn new(node_config: &NodeConfig, file_based_prefix: Option<PathBuf>, ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>) -> RgResult<MockExternalResources> {
         let inner = ExternalNetworkResourcesImpl::new(node_config)?;
+        if let Some(dir) = file_based_prefix.as_ref() {
+            std::fs::create_dir_all(dir).error_info("create dir")?;
+        }
         Ok(MockExternalResources {
-            external_transactions: Arc::new(Mutex::new(HashMap::new())),
-            inner
+            external_transactions: ext,
+            inner,
+            file_based_prefix,
+            node_config: node_config.clone(),
+            dev_ci_kp: dev_ci_kp().unwrap().1,
         })
     }
+    pub fn currency_tx_prefix(&self, currency: SupportedCurrency) -> Option<PathBuf> {
+        self.file_based_prefix.clone().map(|p| p.join(format!("{:?}", currency)))
+    }
+
+    pub fn read_currency_tx(&self, currency: SupportedCurrency) -> RgResult<Vec<ExternalTimedTransaction>> {
+        let prefix = self.currency_tx_prefix(currency);
+        let path = prefix.ok_or_else(|| error_info("No prefix"))?;
+        let contents = std::fs::read_to_string(path).error_info("read to string")?;
+        let txs = contents.json_from()?;
+        Ok(txs)
+    }
+
+    pub fn write_currency_tx(&self, currency: SupportedCurrency, txs: Vec<ExternalTimedTransaction>) -> RgResult<()> {
+        let prefix = self.currency_tx_prefix(currency);
+        let path = prefix.ok_or_else(|| error_info("No prefix"))?;
+        let contents = txs.json_or();
+        std::fs::write(path, contents).error_info("write")?;
+        Ok(())
+    }
+
+    pub fn append_currency_tx(&self, currency: SupportedCurrency, tx: Vec<ExternalTimedTransaction>) -> RgResult<()> {
+        let mut txs = self.read_currency_tx(currency).unwrap_or(vec![]);
+        txs.extend(tx);
+        self.write_currency_tx(currency, txs)
+    }
+
 }
 
 #[async_trait]
@@ -161,38 +303,64 @@ impl ExternalNetworkResources for MockExternalResources {
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
                                -> RgResult<Vec<ExternalTimedTransaction>> {
         let arc = self.external_transactions.lock().await;
-        Ok(arc.get(&currency).cloned().unwrap_or_default())
+        let option = arc.get(&currency);
+        let option1 = option.cloned();
+        Ok(option1.unwrap_or_default())
     }
 
-    async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<()> {
+    async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String> {
         let time = current_time_millis_i64();
         let option = PartyEvents::expected_fee_amount(currency.clone(), &self.inner.node_config.network);
         let expected_fee = option
             .ok_msg("Expected fee missing")?;
         let ett = match currency {
             SupportedCurrency::Bitcoin => {
-                let arc = self.inner.btc_wallet(pk).await?;
-                let mut w = arc.lock().await;
+
                 let payload = match payload {
                     EncodedTransactionPayload::JsonPayload(s) => s,
                     _ => Err(error_info("Missing payload"))?
                 };
                 let psbt = payload.json_from::<PartiallySignedTransaction>()?;
                 let tx = psbt.extract_tx();
-                let time = (time / 1000) as u64;
-                let block_time = BlockTime {
-                    height: 0,
-                    timestamp: time,
+                let time = (time) as u64;
+                // let block_time = BlockTime {
+                //     height: 0,
+                //     timestamp: time,
+                // };
+                // let det = TransactionDetails{
+                //     transaction: Some(tx.clone()),
+                //     txid: tx.txid(),
+                //     received: 0,
+                //     sent: 0,
+                //     fee: Some(expected_fee.amount_i64() as u64),
+                //     confirmation_time: Some(block_time),
+                // };
+                let dev_ci = self.dev_ci_kp.public_key().to_bitcoin_address_typed(&self.node_config.network)?.render_string()?;
+
+                let this_btc_addr = pk.to_bitcoin_address_typed(&self.node_config.network)?;
+                let this_btc_addr_str = this_btc_addr.render_string()?;
+                let outputs = SingleKeyBitcoinWallet::<MemoryDatabase>::outputs_convert_static(&tx.output, self.node_config.network.clone());
+                let other_outputs = outputs.iter()
+                    .filter(|(ad, am)| ad != &this_btc_addr_str)
+                    .filter(|(ad, am)| ad != &dev_ci)
+                    .collect_vec();
+                let other_output_addresses = other_outputs.iter().map(|(ad, _)| ad.clone()).collect_vec();
+                let (other_address, other_amount) = other_outputs.get(0).ok_msg("Missing other output")?.clone().clone();
+
+                // This needs to satisfy multiple 'output' etts
+                let ett = ExternalTimedTransaction {
+                    tx_id: tx.txid().to_string(),
+                    timestamp: Some(time.clone()),
+                    other_address,
+                    other_output_addresses,
+                    amount: other_amount,
+                    bigint_amount: None,
+                    incoming: false,
+                    currency,
+                    block_number: Some(0),
+                    price_usd: None,
+                    fee: Some(expected_fee),
                 };
-                let det = TransactionDetails{
-                    transaction: Some(tx.clone()),
-                    txid: tx.txid(),
-                    received: 0,
-                    sent: 0,
-                    fee: Some(expected_fee.amount_i64() as u64),
-                    confirmation_time: Some(block_time),
-                };
-                let ett = w.extract_ett(&det)?.ok_msg("ett missing")?;
                 ett
             },
             SupportedCurrency::Ethereum => {
@@ -206,10 +374,12 @@ impl ExternalNetworkResources for MockExternalResources {
                 let value_str = tx.value.to_string();
                 let amount = EthHistoricalClient::translate_value(&value_str)?;
 
+                let other_addr = format!("0x{}", hex::encode(tx.to.ok_msg("to missing")?.0));
+                let other_addr = get_checksum_address(other_addr);
                 ExternalTimedTransaction {
                     tx_id: hex::encode(tx.hash.0),
                     timestamp: Some(time as u64),
-                    other_address: tx.to.ok_msg("to missing")?.to_string(),
+                    other_address: other_addr,
                     other_output_addresses: vec![],
                     amount: amount as u64,
                     bigint_amount: Some(value_str),
@@ -222,9 +392,17 @@ impl ExternalNetworkResources for MockExternalResources {
             }
             _ => Err(error_info("Unsupported currency"))?
         };
+        info!("External network resource broadcast {}", ett.json_or());
         let mut arc = self.external_transactions.lock().await;
-        arc.entry(currency).or_insert_with(Vec::new).push(ett);
-        Ok(())
+        let existing = arc.get_mut(&currency);
+        if let Some(e) = existing {
+            info!("Appending to existing txs with len {}" , e.len());
+            e.push(ett.clone());
+        } else {
+            info!("Adding to new txs with len 0");
+            arc.insert(currency, vec![ett.clone()]);
+        }
+        Ok(ett.tx_id.clone())
     }
 
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
@@ -239,6 +417,64 @@ impl ExternalNetworkResources for MockExternalResources {
             }
             _ => Err(error_info("Unsupported currency"))
         }
+    }
+
+    async fn send(&mut self, destination: &Address, currency_amount: &CurrencyAmount) -> RgResult<String> {
+        let self_pub = self.inner.self_public.clone();
+        let self_secret = self.inner.self_secret_key.clone();
+
+        match currency_amount.currency_or() {
+            SupportedCurrency::Bitcoin => {
+                let arc = self.inner.btc_wallet(&self_pub).await?;
+                let mut w = arc.lock().await;
+                let tx = w.send(destination, currency_amount, self_secret, false)?;
+                self.broadcast(&self_pub, SupportedCurrency::Bitcoin, EncodedTransactionPayload::JsonPayload(w.psbt.json_or())).await?;
+                Ok(tx)
+            },
+            SupportedCurrency::Ethereum => {
+                let w = EthWalletWrapper::new(&self_secret, &self.inner.node_config.network)?;
+                let (txid, bytes) = w.send_or_form_fake(destination, currency_amount, &self.inner.node_config.keypair(), false).await?;
+                self.broadcast(&self_pub, SupportedCurrency::Ethereum, EncodedTransactionPayload::BytesPayload(bytes)).await?;
+                Ok(txid)
+            }
+            _ => Err(error_info("Unsupported currency"))
+        }
+    }
+
+    async fn self_balance(&self, currency: SupportedCurrency) -> RgResult<CurrencyAmount> {
+        match currency {
+            SupportedCurrency::Bitcoin => {
+                let amount = CurrencyAmount::from_btc(100_000_000);
+                Ok(amount)
+            },
+            SupportedCurrency::Ethereum => {
+                let amount = CurrencyAmount::from_eth_fractional(100.0);
+                Ok(amount)
+            }
+            _ => Err(error_info("Unsupported currency"))
+        }
+    }
+
+    async fn btc_payloads(&self, outputs: Vec<(String, u64)>, public_key: &PublicKey) -> RgResult<(Vec<(Vec<u8>, EcdsaSighashType)>, PartySigningValidation)> { //
+        self.inner.btc_payloads(outputs, &self.dev_ci_kp.public_key()).await
+    }
+
+    async fn btc_add_signatures(&mut self, pk: &PublicKey, psbt: String, results: Vec<Proof>, hashes: Vec<(Vec<u8>, EcdsaSighashType)>) -> RgResult<EncodedTransactionPayload> {
+        self.inner.btc_add_signatures(&pk, psbt, results, hashes).await
+    }
+
+    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
+        let eth = self.inner.eth_dummy_wallet().await?;
+        let dev_eth_addr = self.dev_ci_kp.public_key().to_ethereum_address_typed().unwrap();
+        let mut tx = eth.create_transaction_typed(
+            &dev_eth_addr, &dst, amount.clone(), None
+        ).await?;
+        let data = EthWalletWrapper::signing_data(&tx)?;
+        let tx_ser = tx.json_or();
+        let mut valid = structs::PartySigningValidation::default();
+        valid.json_payload = Some(tx_ser.clone());
+        valid.currency = SupportedCurrency::Ethereum as i32;
+        Ok((data, valid, tx_ser))
     }
 }
 

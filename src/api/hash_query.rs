@@ -51,7 +51,7 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
                 return Ok(response);
             }
             let id = PeerId::from_pk(pk);
-            if relay.node_config.peer_id == id {
+            if relay.node_config.peer_id() == id {
                 response.peer_id_info = Some(relay.peer_id_info().await?);
                 return Ok(response);
             }

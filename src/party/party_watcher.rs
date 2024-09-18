@@ -49,11 +49,11 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         if self.relay.node_config.opts.enable_party_mode {
             // info!("Party watcher tick num parties total {} active {}", parties.len(), active.len());
             self.tick_formations(&shared_data).await?;
-            info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
+            // info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
             for (pk, pid) in shared_data.iter() {
                 let mut pid2 = pid.clone();
                 pid2.clear_sensitive();
-                info!("Party {} data {}", pk.hex(), pid2.json_or());
+                // info!("Party {} data {}", pk.hex(), pid2.json_or());
             }
         }
         Ok(())
@@ -67,14 +67,20 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 pe.process_event(e).await?;
             }
             pe.calculate_update_portfolio_imbalance().await.log_error().bubble_abort()?.ok();
-            v.party_events = Some(pe);
+            pe.locally_fulfilled_orders = v.locally_fulfilled_orders.clone().unwrap_or(vec![]);
+            v.party_events = Some(pe.clone());
+            // let len = pe.unfulfilled_external_withdrawals.len();
+            // if len  > 0 {
+            //     info!("Party {} has unfulfilled external withdrawals {:?}", k.hex(), pe.unfulfilled_external_withdrawals.len());
+            //     info!("pause here");
+            // }
         }
         Ok(())
     }
 }
 
 #[async_trait]
-impl<T> IntervalFold for PartyWatcher<T> where T: ExternalNetworkResources + Send + Sync {
+impl<T> IntervalFold for PartyWatcher<T> where T: ExternalNetworkResources + Send + Sync + Clone {
     async fn interval_fold(&mut self) -> RgResult<()> {
         self.tick().await.log_error().bubble_abort()?.ok();
         Ok(())

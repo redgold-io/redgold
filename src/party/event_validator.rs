@@ -1,6 +1,7 @@
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::structs::{PartySigningValidation, SupportedCurrency};
 use crate::core::relay::Relay;
+use crate::integrations::external_network_resources::ExternalNetworkResources;
 use crate::party::party_stream::PartyEvents;
 
 impl PartyEvents {
