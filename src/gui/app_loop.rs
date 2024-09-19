@@ -210,7 +210,7 @@ impl LocalState {
     }
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug() {
     let nc = NodeConfig::dev_default().await;
