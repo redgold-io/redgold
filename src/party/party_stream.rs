@@ -41,7 +41,7 @@ use crate::party::price_query::PriceDataPointUsdQuery;
 use crate::party::stake_event_stream::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
 use crate::util::current_time_millis_i64;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct TransactionWithObservationsAndPrice {
     pub tx: Transaction,
     pub observations: Vec<ObservationProof>,

@@ -124,6 +124,7 @@ impl RgArgs {
         c.words = None;
         c.aws_access_key_id = None;
         c.aws_secret_access_key = None;
+        c.etherscan_api_key = None;
         c
     }
 }

@@ -201,3 +201,4 @@ pub async fn query_network_status(
     // info!("Network status: {}", map2.to_string());
     Ok(())
 }
+

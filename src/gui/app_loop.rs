@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, Once};
 use eframe::egui::widgets::TextEdit;
 use eframe::egui::{Align, ScrollArea, TextStyle};
 use eframe::egui;
+use flume::Sender;
 use itertools::Itertools;
 use log::{error, info};
 use redgold_schema::{error_info, RgResult};
@@ -85,6 +86,8 @@ pub struct LocalState {
     pub swap_state: SwapState,
     pub external_network_resources: ExternalNetworkResourcesImpl,
     pub price_map_usd_pair: HashMap<SupportedCurrency, f64>,
+    pub party_data: HashMap<PublicKey, PartyInternalData>,
+    pub first_party: Option<PartyInternalData>,
 }
 
 impl LocalState {
@@ -131,6 +134,9 @@ impl LocalState {
     }
     pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
         updates.sender.send(StateUpdate{update: Box::new(p0)}).unwrap();
+    }
+    pub fn send_update_sender<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Sender<StateUpdate>, p0: F) {
+        updates.send(StateUpdate{update: Box::new(p0)}).unwrap();
     }
 
     pub fn persist_local_state_store(&self) {
@@ -204,6 +210,36 @@ impl LocalState {
     }
 }
 
+// #[ignore]
+#[tokio::test]
+async fn debug() {
+    let nc = NodeConfig::dev_default().await;
+    let party_data = nc.api_rg_client().party_data().await.log_error().unwrap();
+    let p = party_data.into_iter().next().unwrap().1;
+    let p = p.party_events.unwrap().central_prices.get(&SupportedCurrency::Ethereum).cloned().unwrap();
+    let amt = (0.04143206 * 1e8) as u64;
+    let result = p.dummy_fulfill(amt, true, &nc.network);
+    println!("Result: {:?}", result);
+}
+
+
+impl LocalState {
+
+    pub fn spawn_update_party_data(ls: &mut LocalState) {
+        let ups = ls.updates.sender.clone();
+        let config = ls.node_config.clone();
+        tokio::spawn(async move {
+
+            let party_data = config.api_rg_client().party_data().await.log_error().unwrap_or_default();
+            let first_party = party_data.clone().into_values().next();
+            LocalState::send_update_sender(&ups, move |lss| {
+                lss.party_data = party_data.clone();
+                lss.first_party = first_party.clone();
+            });
+        });
+    }
+}
+
 #[allow(dead_code)]
 impl LocalState {
     pub async fn from(node_config: NodeConfig, res: ExternalNetworkResourcesImpl) -> Result<LocalState, ErrorInfo> {
@@ -216,6 +252,7 @@ impl LocalState {
         info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
         let string = ds_or.ctx.connection_path.clone().replace("file:", "");
         info!("ds_or connection path {}", string);
+        info!("starting environment {}", node_config.network.to_std_string());
         ds_or.run_migrations_fallback_delete(
             true,
             PathBuf::from(string)
@@ -234,6 +271,11 @@ impl LocalState {
             let price = res.query_price(util::current_time_millis_i64(), c).await.unwrap();
             price_map.insert(c, price);
         }
+
+        let party_data = node_config.api_rg_client().party_data().await.log_error();
+        let first_party = party_data.clone().ok().and_then(|pd| pd.into_values().next());
+        info!("Party data {}", first_party.json_or());
+        let party_data = party_data.unwrap_or_default();
 
         // ss.genesis = node_config.opts.development_mode;
         let mut ls = LocalState {
@@ -282,7 +324,9 @@ impl LocalState {
             is_linux: env::consts::OS == "linux",
             swap_state: Default::default(),
             external_network_resources: res,
-            price_map_usd_pair: price_map
+            price_map_usd_pair: price_map,
+            party_data,
+            first_party
         };
 
         if node_config.opts.development_mode {
@@ -445,6 +489,8 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{Channel, new_channel};
 use crate::gui::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::observability::errors::Loggable;
+use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::SwapState;
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
@@ -459,7 +505,8 @@ use crate::gui::tabs::transact::wallet_tab::{StateUpdate, wallet_screen, WalletS
 use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
 use crate::infra::deploy::is_windows;
 use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
-use crate::node_config::DataStoreNodeConfig;
+use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
+use crate::party::data_enrichment::PartyInternalData;
 
 static INIT: Once = Once::new();
 

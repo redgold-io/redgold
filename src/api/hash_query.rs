@@ -63,6 +63,11 @@ pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, of
                 return Ok(response);
             }
 
+            // TODO: instead query all address, merge results.
+            // if let Ok(addrs) = pk.to_all_addresses_for_network(&relay.node_config.network) {
+            //
+            // }
+
         }
     }
 
