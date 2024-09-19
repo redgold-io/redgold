@@ -74,10 +74,12 @@ pub struct StateUpdate {
 
 #[derive(Clone, PartialEq)]
 pub enum SendReceiveTabs {
+    Home,
     Send,
     Receive,
     CustomTx,
-    Swap
+    Swap,
+    Portfolio
 }
 
 #[derive(Clone, PartialEq, EnumString)]
@@ -491,6 +493,8 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
         balance_str = "loading address info".to_string();
     }
 
+    rdg_explorer(ui, ls, pk);
+
     ui.heading(RichText::new(balance_str).color(Color32::LIGHT_GREEN));
 
     // ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
@@ -504,26 +508,57 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
     ui.spacing();
 
     if let Some(srt) = &ls.wallet_state.send_receive.clone() {
-        let show_prepared = true;
+        let mut show_prepared = false;
         match srt {
             SendReceiveTabs::Send => {
+                show_prepared = true;
                 send_view(ui, ls, pk);
             }
             SendReceiveTabs::Receive => {
-                // show_prepared = false;
             }
             SendReceiveTabs::CustomTx => {
+                show_prepared = true;
                 ui.label("Enter custom transaction JSON:");
                 ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet_state.custom_tx_json));
             }
             SendReceiveTabs::Swap => {
                 SwapState::view(ui, ls)
             }
+            SendReceiveTabs::Home => {
+            }
+            SendReceiveTabs::Portfolio => {}
         }
         if show_prepared {
             prepared_tx_view::prepared_view(ui, ls, pk, is_hot);
         }
     }
+}
+
+fn rdg_explorer(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+    let mut explorer_prefix = ls.node_config.network.to_std_string();
+    let is_main = explorer_prefix == "main".to_string();
+    if is_main {
+        explorer_prefix = "".to_string();
+    } else {
+        explorer_prefix = format!("{}.", explorer_prefix);
+    }
+    ui.horizontal(|ui| {
+        let rdg_address = pk.address().unwrap().render_string().unwrap();
+        ui.hyperlink_to("RDG Explorer", format!("https://{}explorer.redgold.io/hash/{}", explorer_prefix, rdg_address));
+        let btc_address = pk.to_bitcoin_address_typed(&ls.node_config.network).unwrap().render_string().unwrap();
+        let mut net = "testnet/";
+        if is_main {
+            net = "";
+        }
+        let eth_url = if is_main {
+            "https://etherscan.io/address/"
+        } else {
+            "https://sepolia.etherscan.io/address/"
+        };
+        let eth_address = pk.to_ethereum_address().unwrap();
+        ui.hyperlink_to("BTC Explorer", format!("https://blockstream.info/{net}address/{btc_address}"));
+        ui.hyperlink_to("ETH Explorer", format!("{}{}", eth_url, eth_address));
+    });
 }
 
 fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {

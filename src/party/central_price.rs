@@ -92,6 +92,23 @@ impl CentralPricePair {
         }).collect()
     }
 
+    pub fn dummy_fulfill(
+        &self,
+        order_amount: u64,
+        is_ask: bool,
+        network: &NetworkEnvironment
+    ) -> f64 {
+        self.fulfill_taker_order(
+            order_amount,
+            is_ask,
+            0,
+            None,
+            &Address::default(),
+            AddressEvent::External(ExternalTimedTransaction::default()),
+            network
+        ).map(|f| f.fulfilled_currency_amount().to_fractional()).unwrap_or(0.0)
+    }
+
     pub fn fulfill_taker_order(
         &self,
         order_amount: u64,
