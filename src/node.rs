@@ -70,6 +70,7 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
+use crate::core::services::service_join_handles::{NamedHandle, ServiceJoinHandles};
 use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use crate::node_config::WordsPassNodeConfig;
 use crate::party::party_watcher::PartyWatcher;
@@ -88,25 +89,6 @@ pub struct Node {
     pub relay: Relay,
 }
 
-pub struct NamedHandle {
-    pub name: String,
-    pub handle: JoinHandle<RgResult<()>>
-}
-
-impl NamedHandle {
-    pub fn new(name: impl Into<String>, handle: JoinHandle<RgResult<()>>) -> Self {
-        Self {
-            name: name.into(),
-            handle,
-        }
-    }
-
-    pub async fn result(self) -> RgResult<String> {
-        self.handle.await.error_info("Join error")??;
-        Ok(self.name)
-    }
-}
-
 impl Node {
 
     /**
@@ -120,21 +102,23 @@ impl Node {
 
         let node_config = relay.node_config.clone();
 
-        let mut join_handles = vec![
-            // Internal RPC control equivalent, used for issuing commands to node
-            // Disabled in high security mode
-            // Only needs to run on certain environments?
-            NamedHandle::new("ControlServer", control_api::ControlServer {
+        let mut sjh = ServiceJoinHandles::default();
+
+        // Internal RPC control equivalent, used for issuing commands to node
+        // Disabled in high security mode
+        // Only needs to run on certain environments?
+        sjh.add("ControlServer", control_api::ControlServer {
             relay: relay.clone(),
-            }.start()),
-            // Stream processor for sending external peer messages
-            // Negotiates appropriate protocol depending on peer
-            NamedHandle::new("PeerOutgoingEventHandler", PeerOutgoingEventHandler::new(relay.clone())),
+        }.start());
+        // Stream processor for sending external peer messages
+        // Negotiates appropriate protocol depending on peer
+        sjh.add("PeerOutgoingEventHandler", PeerOutgoingEventHandler::new(relay.clone()));
+
             // Main transaction processing loop, watches over lifecycle of a given transaction
             // as it's drawn from the mem-pool
-            NamedHandle::new("TransactionProcessContext", TransactionProcessContext::new(relay.clone())),
-            NamedHandle::new("TxWriter", run_recv_single(TxWriter::new(&relay), relay.tx_writer.receiver.clone()).await),
-        ];
+            sjh.add("TransactionProcessContext", TransactionProcessContext::new(relay.clone()));
+        sjh.add("TxWriter", run_recv_single(TxWriter::new(&relay), relay.tx_writer.receiver.clone()).await);
+        let mut join_handles = sjh.handles;
         // TODO: Filter out any join handles that have terminated immediately with success due to disabled services.
 
         // TODO: Re-enable auto-update process for installed service as opposed to watchtower docker usage.

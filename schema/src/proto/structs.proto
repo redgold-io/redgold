@@ -1001,6 +1001,10 @@ message GetSeedsRequest {
 
 }
 
+message KeepAliveRequest {
+
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -1038,6 +1042,7 @@ message Request {
   GetActivePartyKeyRequest get_active_party_key_request = 35;
   GetSeedsRequest get_seeds_request = 36;
   PublicKey get_public_key_balance_request = 37;
+  KeepAliveRequest keep_alive_request = 38;
 }
 
 message HealthResponse {
@@ -1089,8 +1094,13 @@ message Response {
   PublicKey get_active_party_key_response = 26;
   repeated Seed get_seeds_response = 27;
   CurrencyAmount get_public_key_balance_response = 28;
+  KeepAliveResponse keep_alive_response = 29;
 }
 
+message KeepAliveResponse {
+  string ip = 1;
+  int64 port = 2;
+}
 
 message PartyMember {
   PublicKey public_key = 1;

@@ -22,3 +22,4 @@ pub mod discover;
 pub mod transport;
 pub mod misc_periodic;
 pub(crate) mod backup;
+pub mod services;
