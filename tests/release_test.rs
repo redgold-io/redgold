@@ -1,4 +1,4 @@
-use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::tx::tx_builder::{TransactionBuilder, TransactionBuilderSupport};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_keys::eth::example::dev_ci_kp;
 use redgold_keys::transaction_support::TransactionSupport;
