@@ -5,7 +5,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
 use crate::api::public_api::PublicClient;
-use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::tx::tx_builder::{TransactionBuilder, TransactionBuilderSupport};
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 use crate::test::external_amm_integration::dev_ci_kp;
 
