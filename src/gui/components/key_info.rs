@@ -10,7 +10,7 @@ use redgold_schema::{error_info, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{data_item, editable_text_input_copy, valid_label};
+use redgold_gui::common::{data_item, editable_text_input_copy, valid_label};
 
 
 const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
@@ -30,7 +30,8 @@ pub struct KeyInfo {
     pub btc_address: String,
     pub eth_address: String,
     pub network: NetworkEnvironment,
-    pub derivation_path: String
+    pub derivation_path: String,
+    pub secret_key: Option<String>,
 }
 
 
@@ -50,6 +51,7 @@ impl KeyInfo {
             eth_address: "".to_string(),
             network: NetworkEnvironment::Dev,
             derivation_path: DEFAULT_DP.to_string(),
+            secret_key: None,
         };
         ki.update_public_key_info();
         ki

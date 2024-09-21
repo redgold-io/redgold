@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use redgold_schema::RgResult;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_common::external_resources::ExternalNetworkResources;
 
 struct PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources {
     pub relay: Relay,

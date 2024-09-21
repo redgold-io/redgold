@@ -6,7 +6,7 @@ use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::{ErrorInfo, Hash, HealthRequest, NetworkEnvironment, PublicKey, Request};
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::multiparty_gg20::initiate_mp;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::deposit_key_allocation::DepositKeyAllocation;

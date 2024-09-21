@@ -24,7 +24,8 @@ members = [
     "keys",
     "sdk-client",
     "fs",
-    "gui"
+    "gui",
+    "common"
 ]
 exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"] #, "sdk", "sdk/*"]
 
@@ -51,6 +52,7 @@ redgold-executor = { path = "executor", version = "0.1.25"}
 redgold-sdk-client = { path = "sdk-client", version = "0.1.25"}
 redgold-fs = { path = "./fs"}
 redgold-gui = { path = "./gui"}
+redgold-common = { path = "./common"}
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"
@@ -75,6 +77,7 @@ arc-swap = "1.7.1"
 redgold-schema = {workspace = true}
 redgold-fs = {workspace = true}
 redgold-gui = {workspace = true}
+redgold-common = {workspace = true}
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
 #redgold-sdk-client = {workspace = true}

@@ -4,7 +4,7 @@ use log::error;
 use crate::party::central_price::DUST_LIMIT;
 
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PriceVolume {
     pub price: f64, // RDG/BTC (in satoshis for both) for now
     pub volume: u64, // Volume of RDG available

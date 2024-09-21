@@ -3,7 +3,7 @@ use eframe::egui::{ComboBox, Context, TextEdit, Ui};
 use itertools::{Either, Itertools};
 use redgold_keys::util::mnemonic_support::WordsPass;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item};
+use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item};
 use crate::gui::tables::text_table;
 
 

@@ -12,6 +12,7 @@ use futures::TryFutureExt;
 use itertools::Itertools;
 use log::info;
 use rocket::form::FromForm;
+use rocket::yansi::Paint;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use crate::api::hash_query::hash_query;
 use crate::core::relay::Relay;
@@ -22,6 +23,7 @@ use strum_macros::EnumString;
 use tokio::time::Instant;
 use tracing::trace;
 use warp::get;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use crate::api::public_api::{Pagination, TokenParam};
 // use crate::multiparty_gg20::watcher::{DepositWatcher, DepositWatcherConfig};
@@ -38,7 +40,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use crate::util::current_time_millis_i64;
 use redgold_schema::structs::PartyInfoAbridged;
 use redgold_schema::util::times::ToTimeString;
-use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use redgold_schema::conf::node_config::NodeConfig;
 use crate::node_config::ApiNodeConfig;
 use crate::party::address_event::AddressEvent;
@@ -47,7 +49,7 @@ use crate::party::data_enrichment::PartyInternalData;
 use crate::party::price_volume::PriceVolume;
 // use crate::party::bid_ask::BidAsk;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct HashResponse {
     pub hash: String,
     pub height: u64,
@@ -55,7 +57,7 @@ pub struct HashResponse {
     pub transactions: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct BriefTransaction {
     pub hash: String,
     pub from: String,
@@ -70,14 +72,14 @@ pub struct BriefTransaction {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct PeerSignerDetailed {
     pub peer_id: String,
     pub nodes: Vec<NodeSignerDetailed>,
     pub trust: f64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct NodeSignerDetailed {
     pub signature: String,
     pub node_id: String,
@@ -91,7 +93,7 @@ pub struct NodeSignerDetailed {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedInput {
     pub transaction_hash: String,
     pub output_index: i64,
@@ -100,14 +102,14 @@ pub struct DetailedInput {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct UtxoChild {
     pub used_by_tx: String,
     pub used_by_tx_input_index: i32,
     pub status: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedOutput {
     pub output_index: i32,
     pub address: String,
@@ -118,8 +120,13 @@ pub struct DetailedOutput {
     pub is_liquidity: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct PartyRelatedInfo {
+    party_address: String,
+    event: Option<DetailedPartyEvent>
+}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedTransaction {
     pub info: BriefTransaction,
     /// Normalized to mimic conventional confirmations, i.e. number of stacked observations
@@ -138,6 +145,7 @@ pub struct DetailedTransaction {
     pub raw_transaction: Transaction,
     // pub first_amount: f64,
     pub remainder_amount: f64,
+    pub party_related_info: Option<PartyRelatedInfo>
     // pub fee_amount: i64,
 }
 
@@ -156,8 +164,8 @@ enum AddressEventExtendedType {
 }
 
 
-#[derive(Serialize, Deserialize)]
-pub struct DetailedEvents {
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct DetailedPartyEvent {
     event_type: String,
     extended_type: String,
     other_address: String,
@@ -170,7 +178,7 @@ pub struct DetailedEvents {
     pub other_tx_hash: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct AddressPoolInfo{
     public_key: String,
     // currency to address
@@ -182,10 +190,10 @@ pub struct AddressPoolInfo{
     asks_usd: HashMap<String, Vec<PriceVolume>>,
     central_prices: HashMap<String, CentralPricePair>,
     events: PartyInternalData,
-    detailed_events: Vec<DetailedEvents>
+    detailed_events: Vec<DetailedPartyEvent>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DetailedAddress {
     pub address: String,
     pub balance: f64,
@@ -201,7 +209,7 @@ pub struct DetailedAddress {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct BriefUtxoEntry {
     pub transaction_hash: String,
     pub output_index: i64,
@@ -211,7 +219,7 @@ pub struct BriefUtxoEntry {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedObservationMetadata {
     pub observed_hash: String,
     pub observed_hash_type: String,
@@ -222,7 +230,7 @@ pub struct DetailedObservationMetadata {
     pub metadata_hash: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedObservation {
     pub merkle_root: String,
     pub observations: Vec<DetailedObservationMetadata>,
@@ -239,21 +247,21 @@ pub struct DetailedObservation {
 
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedTrust {
     pub peer_id: String,
     pub trust: f64,
 }
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedPeer {
     pub peer_id: String,
     pub nodes: Vec<DetailedPeerNode>,
     pub trust: Vec<DetailedTrust>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct DetailedPeerNode {
     pub external_address: String,
     pub public_key: String,
@@ -271,22 +279,30 @@ pub struct DetailedPeerNode {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct ExternalTxidInfo {
+    pub external_explorer_link: String,
+    pub party_address: String,
+    pub event: DetailedPartyEvent
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ExplorerHashSearchResponse {
     pub transaction: Option<DetailedTransaction>,
     pub address: Option<DetailedAddress>,
     pub observation: Option<DetailedObservation>,
     pub peer: Option<DetailedPeer>,
     pub peer_node: Option<DetailedPeerNode>,
+    pub external_txid_info: Option<ExternalTxidInfo>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ExplorerFaucetResponse {
     pub transaction_hash: Option<String>,
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct RecentDashboardResponse {
     pub recent_transactions: Vec<BriefTransaction>,
     pub total_accepted_transactions: i64,
@@ -360,7 +376,7 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 asks_usd,
                 central_prices,
                 events: events.clone(),
-                detailed_events: convert_events(events, &r.node_config)?,
+                detailed_events: convert_events(&events, &r.node_config)?,
             }))
         };
 
@@ -369,10 +385,10 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
     Ok(None)
 }
 
-pub fn convert_events(p0: PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedEvents>> {
+pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedPartyEvent>> {
     let mut res = vec![];
-    for x in p0.address_events {
-        let mut de = DetailedEvents {
+    for x in p0.address_events.iter() {
+        let mut de = DetailedPartyEvent {
             event_type: "".to_string(),
             extended_type: "".to_string(),
             network: "".to_string(),
@@ -414,8 +430,8 @@ pub fn convert_events(p0: PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<De
                 de.incoming = ett.incoming.to_string();
                 de.network = format!("{:?}", ett.currency);
                 de.amount = ett.currency_amount().to_fractional();
-                de.tx_hash = ett.tx_id;
-                de.other_address = ett.other_address;
+                de.tx_hash = ett.tx_id.clone();
+                de.other_address = ett.other_address.clone();
             }
             AddressEvent::Internal(i) => {
                 de.event_type = "Internal".to_string();
@@ -620,12 +636,12 @@ pub async fn handle_explorer_faucet(hash_input: String, r: Relay, token: TokenPa
 
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct ExplorerPoolsResponse {
     pub pools: Vec<ExplorerPoolInfoResponse>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct PoolMember {
     pub peer_id: String,
     pub public_key: String,
@@ -637,7 +653,7 @@ pub struct PoolMember {
     pub is_seed: bool
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct ExplorerPoolInfoResponse {
     pub public_key: String,
     pub owner: String,
@@ -739,36 +755,66 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
     // TODO: Math min
     let limit = Some(std::cmp::min(pagination.limit.unwrap_or(10) as i64, 100));
     let offset = Some(pagination.offset.unwrap_or(0) as i64);
-    let hq = hash_query(r.clone(), hash_input, limit.clone(), offset.clone()).await?;
+    let hq = hash_query(r.clone(), hash_input.clone(), limit.clone(), offset.clone()).await?;
     let mut h = ExplorerHashSearchResponse{
         transaction: None,
         address: None,
         observation: None,
         peer: None,
         peer_node: None,
+        external_txid_info: None,
     };
+    let mut has_response = false;
     if let Some(ai) = &hq.address_info {
         h.address = Some(handle_address_info(ai, &r, limit, offset).await?);
+        has_response = true;
     }
     if let Some(o) = &hq.observation {
         h.observation = Some(handle_observation(o, &r).await?);
+        has_response = true;
+
     }
     if let Some(p) = &hq.peer_id_info {
         h.peer = Some(handle_peer(p, &r, false).await?);
+        has_response = true;
+
     }
     if let Some(p) = &hq.peer_node_info {
         h.peer_node = Some(handle_peer_node(p, &r, false).await?);
+        has_response = true;
+
     }
 
     if let Some(t) = hq.transaction_info {
-        let detailed = convert_detailed_transaction(r, &t).await?;
-        h.transaction = Some(detailed)
+        let detailed = convert_detailed_transaction(&r, &t).await?;
+        h.transaction = Some(detailed);
+        has_response = true;
+    }
+    if !has_response {
+        if r.party_event_for_txid(&hash_input).await.is_some() {
+            if let Some(pid) = r.active_party().await {
+                if let Ok(ev) = convert_events(&pid, &r.node_config) {
+                    if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == hash_input).next() {
+                        h.external_txid_info = Some(ExternalTxidInfo {
+                            external_explorer_link: "".to_string(),
+                            party_address: pid.party_info.party_key.as_ref()
+                                .and_then(|k| k.address().ok())
+                                .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
+                            event: ev.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        // let external_txid_info = ExternalNetworkResourcesImpl::get_external_txid_info(&r, &hash_input).await?;
+        // h.external_txid_info = Some(external_txid_info);
     }
     Ok(h)
 }
 
-async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<DetailedTransaction, ErrorInfo> {
+async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<DetailedTransaction, ErrorInfo> {
     let tx = t.transaction.safe_get_msg("Missing transaction but have transactionInfo")?;
+
     // For confirmation score, should we store that internally in the database or re-calculate it?
     let message = tx.options
         .clone()
@@ -916,7 +962,8 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
 
     let num_pending_signers = counts.get(&(State::Pending as i32)).unwrap_or(&0).clone() as i64;
     let num_accepted_signers = counts.get(&(State::Accepted as i32)).unwrap_or(&0).clone() as i64;
-    let detailed = DetailedTransaction {
+
+    let mut detailed = DetailedTransaction {
         info: brief_transaction(tx)?,
         confirmation_score: 1.0,
         acceptance_score: 1.0,
@@ -931,7 +978,25 @@ async fn convert_detailed_transaction(r: Relay, t: &TransactionInfo) -> Result<D
         signable_hash: tx.signable_hash().hex(),
         raw_transaction: tx.clone(),
         remainder_amount: CurrencyAmount::from(tx.remainder_amount()).to_fractional(),
+        party_related_info: None,
     };
+
+
+    if r.party_event_for_txid(&detailed.info.hash).await.is_some() {
+        if let Some(pid) = r.active_party().await {
+            if let Ok(ev) = convert_events(&pid, &r.node_config) {
+                if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == detailed.info.hash).next() {
+                    detailed.party_related_info = Some(PartyRelatedInfo {
+                        party_address: pid.party_info.party_key.as_ref()
+                            .and_then(|k| k.address().ok())
+                            .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
+                        event: Some(ev.clone()),
+                    });
+                }
+            }
+        }
+    }
+
     Ok(detailed)
 }
 

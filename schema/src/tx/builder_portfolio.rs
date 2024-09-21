@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use redgold_schema::RgResult;
-use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, Output, PortfolioFulfillmentParams, PortfolioRequest, PortfolioWeighting, StakeDeposit, StakeRequest, StandardData, StandardRequest, SupportedCurrency, Weighting};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use crate::RgResult;
+use crate::structs::{Address, CurrencyAmount, DepositRequest, Output, PortfolioFulfillmentParams, PortfolioRequest, PortfolioWeighting, StakeDeposit, StakeRequest, StandardData, StandardRequest, SupportedCurrency, Weighting};
+use crate::tx::tx_builder::TransactionBuilder;
 
 impl TransactionBuilder {
 
@@ -20,7 +20,7 @@ impl TransactionBuilder {
             wee.currency = Some(c as i32);
             wee
         }).collect_vec();
-        let mut pi = redgold_schema::structs::PortfolioInfo::default();
+        let mut pi = crate::structs::PortfolioInfo::default();
         pi.portfolio_weightings = transformed_weights;
         pr.portfolio_info = Some(pi);
         let mut o = Output::default();

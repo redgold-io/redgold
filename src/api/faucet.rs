@@ -9,11 +9,11 @@ use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{error_info, ErrorInfoContext, SafeOption};
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::core::relay::Relay;
 use redgold_schema::helpers::easy_json::EasyJson;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::node_config::WordsPassNodeConfig;
 //
 // async fn faucet_request_old(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {

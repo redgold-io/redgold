@@ -26,8 +26,8 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkE
 use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;

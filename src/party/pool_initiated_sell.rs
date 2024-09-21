@@ -1,5 +1,5 @@
 use redgold_schema::RgResult;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::party::party_stream::PartyEvents;
 
 

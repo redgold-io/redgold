@@ -9,7 +9,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::NetworkEnvironment;
 
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
+use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
 use crate::gui::tables::text_table;
 use crate::util;
 use crate::util::argon_kdf::argon2d_hash;

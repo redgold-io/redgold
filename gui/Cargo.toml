@@ -14,8 +14,16 @@ categories.workspace = true
 
 [dependencies]
 redgold-schema = {workspace = true}
+redgold-common = {workspace = true}
+serde = { workspace = true, features = ["derive"] }
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
 rqrr = "0.6.0"
+eframe = "0.25.0" # Gives us egui, epi and web+native backends
+egui_extras = {version = "0.25.0", features = ["default", "image", "all_loaders"]}
+strum = "0.25"
+strum_macros = "0.25"
+log = "0.4.21"
+
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openpnp_capture = "0.2.4"

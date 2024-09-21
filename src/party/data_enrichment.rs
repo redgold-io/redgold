@@ -1,14 +1,10 @@
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PartyData, PartyInfo, PublicKey, SupportedCurrency, Transaction};
+use redgold_schema::structs::{ErrorInfo, PartyData, PartyInfo, PublicKey, SupportedCurrency, Transaction};
 use rocket::serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::info;
-use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
-use redgold_schema::{RgResult, SafeOption, structs};
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::observability::errors::Loggable;
-use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
 use crate::party::address_event::AddressEvent;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::party_stream::{PartyEvents, TransactionWithObservationsAndPrice};
@@ -16,7 +12,7 @@ use crate::party::party_watcher::PartyWatcher;
 use crate::party::price_query::PriceDataPointUsdQuery;
 use crate::scrape::external_networks::ExternalNetworkData;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PartyInternalData {
     pub party_info: PartyInfo,
     pub network_data: HashMap<SupportedCurrency, ExternalNetworkData>,

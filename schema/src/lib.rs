@@ -548,6 +548,56 @@ mod tests {
 }
 
 impl NetworkEnvironment {
+
+    pub fn btc_explorer_link(&self) -> String {
+        let mut net = "testnet/";
+        if self.is_main() {
+            net = "";
+        }
+        format!("https://blockstream.info/{net}")
+    }
+
+    pub fn btc_address_link(&self, address: String) -> String {
+        format!("{}address/{}", self.btc_explorer_link(), address)
+    }
+
+
+    pub fn btc_tx_link(&self, address: String) -> String {
+        format!("{}tx/{}", self.btc_explorer_link(), address)
+    }
+
+    pub fn eth_explorer_link(&self) -> String {
+        let eth_url = if self.is_main() {
+            "https://etherscan.io"
+        } else {
+            "https://sepolia.etherscan.io"
+        };
+        eth_url.to_string()
+    }
+
+    pub fn eth_address_link(&self, eth_address: String) -> String {
+        format!("{}/address/{}", self.eth_explorer_link(), eth_address)
+    }
+
+    pub fn eth_tx_link(&self, txid: String) -> String {
+        format!("{}/tx/{}", self.eth_explorer_link(), txid)
+    }
+
+
+    pub fn explorer_link(&self) -> String {
+        let self_str = self.to_std_string();
+        let pfx = if self.is_main() {
+            "".to_string()
+        } else {
+            format!("{}.", self_str)
+        };
+      format!("https://{}explorer.redgold.io", pfx)
+    }
+
+    pub fn explorer_hash_link(&self, hash: String) -> String {
+        format!("{}/hash/{}", self.explorer_link(), hash)
+    }
+
     pub fn to_std_string(&self) -> String {
         format!("{:?}", &self).to_lowercase()
     }

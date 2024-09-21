@@ -4,4 +4,3 @@ pub mod tx_builder_supports;
 pub mod tx_writer;
 pub mod tx_validate;
 pub mod tx_broadcast_support;
-pub mod builder_portfolio;

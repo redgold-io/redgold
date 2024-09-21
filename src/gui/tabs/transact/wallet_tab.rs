@@ -24,20 +24,20 @@ use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
-use crate::gui::common;
-use crate::gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
+use redgold_gui::common;
+use redgold_gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::gui::components::passphrase_input::PassphraseInput;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
@@ -45,13 +45,14 @@ use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
 use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardware_signing, hot_wallet, prepare_tx, prepared_tx_view};
 
 
-#[derive(Debug, EnumIter, EnumString, PartialEq)]
+#[derive(Debug, EnumIter, EnumString, PartialEq, Clone)]
 #[repr(i32)]
 pub enum WalletTab {
     Hardware,
     Software,
 }
 
+#[derive(Clone)]
 pub struct DeviceListStatus {
     pub device_output: Option<String>,
     last_polled: Instant,
@@ -88,7 +89,6 @@ pub enum CustomTransactionType {
     Stake
 }
 
-// #[derive(Clone)]
 pub struct WalletState {
     pub tab: WalletTab,
     pub(crate) device_list_status: DeviceListStatus,
@@ -156,6 +156,7 @@ pub struct WalletState {
     pub mark_output_as_stake: bool,
     pub mark_output_as_swap: bool,
     pub passphrase_input: PassphraseInput,
+    pub hot_secret_key: Option<String>
 }
 
 impl WalletState {
@@ -171,6 +172,7 @@ impl WalletState {
             let m = self.hot_mnemonic();
             let check = m.checksum_words().unwrap_or("".to_string());
             let pk = m.public_at(self.derivation_path.clone());
+            self.hot_secret_key = m.private_at(self.derivation_path.clone()).ok();
             self.public_key = pk.ok();
             self.mnemonic_or_key_checksum = check;
             self.seed_checksum = m.checksum().ok().clone();
@@ -308,6 +310,7 @@ impl WalletState {
             mark_output_as_swap: false,
             last_selected_xpub_name: "".to_string(),
             passphrase_input: Default::default(),
+            hot_secret_key: None,
         }
     }
     pub fn update_hardware(&mut self) {
@@ -533,6 +536,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
         }
     }
 }
+
 
 fn rdg_explorer(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
     let mut explorer_prefix = ls.node_config.network.to_std_string();

@@ -1,20 +1,15 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use log::info;
-use num_bigint::BigInt;
 use redgold_data::data_store::DataStore;
-use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::{RgResult, structs};
+use redgold_schema::RgResult;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{CurrencyAmount, Hash, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{Hash, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
-use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
 
@@ -115,7 +110,7 @@ async fn debug_events2() -> RgResult<()> {
     //     assert_eq!(bal1b, bal2b);
     // }
 
-    convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    convert_events(&data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
 
     // for e in &hn_pev.events {
     //     duplicatehn.process_event(e).await.expect("works");

@@ -64,8 +64,8 @@ jobs:
 
 #      - run: cargo build --release
       - run: cargo tree --workspace
-      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo test --no-run --profile ci
-      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld"; cargo build --profile ci
+      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld -A warnings"; cargo test --no-run --profile ci
+      - run: export RUSTFLAGS="-C link-arg=-fuse-ld=lld -A warnings"; cargo build --profile ci
 #      - run: cargo test --no-run # --profile ci
       - run: export REDGOLD_TEST_WORDS="${{secrets.REDGOLD_TEST_WORDS}}"; ./bin/test.sh #&
 #          pid1=$!
@@ -166,7 +166,7 @@ jobs:
 #      - run: cargo clean
 #      - run: ./bin/test.sh
       - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
-      - run: cargo build --release
+      - run: export RUSTFLAGS="-A warnings"; cargo build --release
         # try CWD?
 #      - run: ./bin/local_test.sh "./target/release/redgold"
 
@@ -244,7 +244,7 @@ jobs:
           cache-on-failure: true
       - run: ./bin/install_build_deps.sh
       - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
-      - run: cargo build --release
+      - run: export RUSTFLAGS="-A warnings"; cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
       - uses: actions/upload-artifact@v3
         with:
@@ -377,7 +377,7 @@ jobs:
           refs/heads/main
           ', github.ref)
 
-        run: cargo clean;  cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
+        run: cargo clean;  export RUSTFLAGS="-A warnings"; cargo build --release; cp ${{ env.BUILD_OUTPUT }} ./redgold_mac
       # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; ./bin/sqlx_prepare.sh &&
 
       - uses: actions/upload-artifact@v3

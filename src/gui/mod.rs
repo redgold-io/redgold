@@ -13,7 +13,6 @@ pub mod image_load;
 pub mod initialize;
 pub mod tables;
 pub mod home;
-pub mod common;
 pub mod tabs;
 pub mod top_panel;
 pub mod webcam;

@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
-use bdk::{Balance, FeeRate, KeychainKind, SignOptions, sled, SyncOptions, TransactionDetails, Wallet};
-use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash, TxIn, TxOut};
+use bdk::{sled, Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
+use bdk::bitcoin::{ecdsa, Address, EcdsaSighashType, Network, Script, Sighash, TxIn, TxOut};
 use bdk::bitcoin::blockdata::opcodes;
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::bitcoin::hashes::Hash;
@@ -19,15 +19,15 @@ use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrderi
 use bdk::sled::Tree;
 use itertools::Itertools;
 // use crate::util::cli::commands::send;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
 // use crate::util::cli::commands::send;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::{KeyPair, TestConstants};
 use crate::address_external::ToBitcoinAddress;
-use crate::address_support::AddressSupport;
 use crate::eth::example::dev_ci_kp;
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
@@ -229,53 +229,6 @@ pub struct SingleKeyBitcoinWallet<D: BatchDatabase> {
 pub struct RawTransaction {
     pub psbt: Option<PartiallySignedTransaction>,
     pub transaction_details: Option<TransactionDetails>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
-pub struct ExternalTimedTransaction {
-    pub tx_id: String,
-    pub timestamp: Option<u64>,
-    pub other_address: String,
-    pub other_output_addresses: Vec<String>,
-    pub amount: u64,
-    pub bigint_amount: Option<String>,
-    pub incoming: bool,
-    pub currency: SupportedCurrency,
-    pub block_number: Option<u64>,
-    pub price_usd: Option<f64>,
-    pub fee: Option<CurrencyAmount>,
-}
-
-impl ExternalTimedTransaction {
-
-    pub fn balance_change(&self) -> CurrencyAmount {
-        let fee = self.fee.clone().unwrap_or(CurrencyAmount::zero(self.currency));
-        if self.incoming {
-            self.currency_amount()
-        } else {
-            self.currency_amount() - fee
-        }
-    }
-
-    pub fn other_address_typed(&self) -> RgResult<structs::Address> {
-        let mut addr = self.other_address.parse_address()?;
-        Ok(addr)
-    }
-
-    pub fn currency_amount(&self) -> CurrencyAmount {
-        let mut ca = if let Some(ba) = self.bigint_amount.as_ref() {
-            CurrencyAmount::from_eth_bigint_string(ba.clone())
-        } else {
-            CurrencyAmount::from(self.amount as i64)
-        };
-        ca.currency = Some(self.currency as i32);
-        ca
-    }
-    pub fn confirmed(&self) -> bool {
-        self.timestamp.is_some()
-    }
-
-
 }
 
 

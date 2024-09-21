@@ -8,11 +8,11 @@ use redgold_keys::proof_support::PublicKeySupport;
 use rocket::serde::{Deserialize, Serialize};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
-use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_stream::PartyEvents;
-
+use redgold_keys::external_tx_support::ExternalTxSupport;
 impl PartyEvents {
     //
 
@@ -243,7 +243,7 @@ impl PartyEvents {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct InternalStakeEvent {
     pub event: AddressEvent,
     pub tx: Transaction,
@@ -266,14 +266,14 @@ pub struct PendingExternalStakeEvent {
 }
 
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ConfirmedExternalStakeEvent {
     pub pending_event: PendingExternalStakeEvent,
     pub event: AddressEvent,
     pub ett: ExternalTimedTransaction,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PendingWithdrawalStakeEvent {
     pub address: Address,
     pub amount: CurrencyAmount,

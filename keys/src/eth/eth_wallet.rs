@@ -78,7 +78,7 @@ impl EthWalletWrapper {
         if do_broadcast {
             self.broadcast_tx(bytes).await?;
         }
-        Ok((tx.hash.to_string(), byte_vec))
+        Ok((hex::encode(tx.hash.0), byte_vec))
     }
 
     pub async fn send(&self, to: &structs::Address, value: &CurrencyAmount) -> RgResult<String> {
@@ -92,6 +92,25 @@ impl EthWalletWrapper {
         // println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
         // println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
         Ok(receipt.transaction_hash.0.to_hex())
+
+    }
+
+
+    pub async fn send_maybe_broadcast(&self, to: &structs::Address, value: &CurrencyAmount, broadcast: bool) -> RgResult<(String, String)> {
+        let tx = self.create_transaction_typed(&self.address()?, to, value.clone(), None).await?;
+        // send it!
+        if broadcast {
+            let pending_tx = self.client.send_transaction(tx, None).await.expect("works");
+
+            // get the mined tx
+            let receipt = pending_tx.await.expect("mined").expect("no error");
+            let tx = self.client.get_transaction(receipt.transaction_hash).await.expect("works");
+            // println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
+            // println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
+            Ok((hex::encode(receipt.transaction_hash.0), tx.json_or()))
+        } else {
+            Ok((hex::encode(tx.sighash().0), tx.json_or()))
+        }
 
     }
 

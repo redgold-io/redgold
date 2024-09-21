@@ -1,7 +1,7 @@
 use redgold_schema::structs::{PublicKey, State, SupportedCurrency, ValidationLiveness};
 use rocket::serde::{Deserialize, Serialize};
 use itertools::Itertools;
-use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::party_stream::TransactionWithObservationsAndPrice;

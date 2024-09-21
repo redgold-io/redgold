@@ -1,36 +1,19 @@
+use std::collections::HashMap;
+use bdk::Utxo::Local;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use tracing_subscriber::fmt::format;
-use redgold_schema::structs::SupportedCurrency;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
 use crate::gui::app_loop::LocalState;
+use redgold_gui::common;
+use redgold_gui::components::currency_input::{currency_selection_box, supported_wallet_currencies, CurrencyInputBox};
+use redgold_gui::components::tx_progress::TransactionProgressFlow;
+use redgold_keys::address_external::ToBitcoinAddress;
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs;
-
-fn currency_selection_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency, label: impl Into<String>, supported: Vec<SupportedCurrency>, locked: bool) -> bool {
-    let mut changed = false;
-    let mut c = currency_selector.clone();
-    let currency_selector = if locked {
-        &mut c
-    } else {
-        currency_selector
-    };
-    ComboBox::from_label(label.into())
-        .selected_text(format!("{:?}", currency_selector))
-        .show_ui(ui, |ui| {
-            let styles = supported;
-            for style in styles {
-                if ui.selectable_value(currency_selector, style.clone(), format!("{:?}", style)).changed() {
-                    changed = true;
-                }
-            }
-        });
-    changed
-}
-
-pub fn supported_swap_currencies() -> Vec<SupportedCurrency> {
-    vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
-}
+use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs::Swap;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {
@@ -40,50 +23,32 @@ pub enum SwapStage {
     CompleteShowTrackProgress
 }
 
+
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SwapState {
     pub active: bool,
-    pub input_currency: SupportedCurrency,
     pub output_currency: SupportedCurrency,
     pub stage: SwapStage,
-    pub swap_amount_input_string: String,
-    pub swap_amount_usd_denomination: bool,
-    pub swap_amount_use_sats: bool
+    pub tx_progress: TransactionProgressFlow,
+    pub currency_input_box: CurrencyInputBox,
+    pub changing_stages: bool
 }
 
 impl Default for SwapState {
     fn default() -> Self {
         Self {
             active: false,
-            input_currency: SupportedCurrency::Ethereum,
             output_currency: SupportedCurrency::Redgold,
             stage: SwapStage::StartPreparing,
-            swap_amount_input_string: "".to_string(),
-            swap_amount_usd_denomination: true,
-            swap_amount_use_sats: false,
+
+            tx_progress: Default::default(),
+            currency_input_box: CurrencyInputBox::from_currency(SupportedCurrency::Ethereum, "Input".to_string()),
+            changing_stages: false,
         }
     }
 }
 impl SwapState {
-
-    pub fn input_amount_value(&self) -> f64 {
-        let input = self.swap_amount_input_string.parse::<f64>().unwrap_or(0.0);
-        let amt_fract = if self.swap_amount_usd_denomination {
-            input
-        } else {
-            let currency = self.input_currency.clone();
-            if currency == SupportedCurrency::Bitcoin || currency == SupportedCurrency::Redgold {
-                if self.swap_amount_use_sats {
-                    input / 1e8
-                } else {
-                    input
-                }
-            } else {
-                input
-            }
-        };
-        amt_fract
-    }
 
     pub fn view(ui: &mut Ui, ls: &mut LocalState) {
         ls.swap_state.active = ls.wallet_state.send_receive == Some(SendReceiveTabs::Swap);
@@ -91,104 +56,149 @@ impl SwapState {
         //     ls.price_map_usd_pair
         // }
         if ls.swap_state.active {
+            ui.horizontal(|ui| {
+                ui.heading("Swap");
+                Self::party_explorer_link(ui, &ls);
+            });
+            // ui.separator();
+            let mut next_stage = SwapStage::ShowAmountsPromptSigning;;
+            let mut previous_stage = SwapStage::StartPreparing;;
+            let mut button_text = "Start Swap";
+
             match ls.swap_state.stage {
                 SwapStage::StartPreparing => {
-                    ui.heading("Enter Swap Details");
                     Self::swap_details(ui, ls, false);
-                    let next_stage = SwapStage::ShowAmountsPromptSigning;
-                    let button_text = "Start Swap";
-                    Self::big_proceed_button(ui, ls, next_stage, button_text);
+                    ui.heading("Lock Swap Details");
+                    next_stage = SwapStage::ShowAmountsPromptSigning;
+                    button_text = "Start Swap";
                 }
                 SwapStage::ShowAmountsPromptSigning => {
-                    ui.heading("Swap Values Locked: Prepare to Sign");
                     Self::swap_details(ui, ls, true);
-                    let next_stage = SwapStage::ShowAmountsPromptSigning;
-                    let button_text = "Sign Transaction";
-                    Self::big_proceed_button(ui, ls, next_stage, button_text);
+                    ui.heading("Swap Values Locked: Prepare to Sign");
+                    next_stage = SwapStage::ViewSignedAllowBroadcast;
+                    button_text = "Sign Transaction";
                 }
                 SwapStage::ViewSignedAllowBroadcast => {
-                    ui.heading("Swap Signed: Prepare to Broadcast");
                     Self::swap_details(ui, ls, true);
-                    let next_stage = SwapStage::ShowAmountsPromptSigning;
-                    let button_text = "Broadcast Transaction";
-                    Self::big_proceed_button(ui, ls, next_stage, button_text);
+                    ui.heading("Swap Signed: Prepare to Broadcast");
+                    previous_stage = SwapStage::ShowAmountsPromptSigning;
+                    next_stage = SwapStage::CompleteShowTrackProgress;
+                    button_text = "Broadcast Transaction";
                 }
                 SwapStage::CompleteShowTrackProgress => {
-                    ui.heading("Swap Complete");
                     Self::swap_details(ui, ls, true);
+                    previous_stage = SwapStage::StartPreparing;
+                    ui.heading("Swap Complete");
                 }
             }
 
+            ls.swap_state.tx_progress.view(ui);
+
+            ui.horizontal(|ui| {
+                ui.horizontal(|ui| {
+                let style = ui.style_mut();
+                style.override_text_style = Some(TextStyle::Heading);
+                if ui.button("Reset").clicked() {
+                    ls.swap_state.tx_progress.reset();
+                    ls.swap_state.currency_input_box.input_box_str = "".to_string();
+                    ls.swap_state.stage = SwapStage::StartPreparing;
+                }
+                });
+                if ls.swap_state.stage != SwapStage::StartPreparing {
+                    ui.horizontal(|ui| {
+                        let style = ui.style_mut();
+                        style.override_text_style = Some(TextStyle::Heading);
+                        let mut text = "Back";
+                        if ls.swap_state.stage == SwapStage::CompleteShowTrackProgress {
+                            text = "Start New Swap";
+                        }
+                        if ui.button(text).clicked() {
+                            ls.swap_state.stage = previous_stage;
+
+                            if ls.swap_state.stage == SwapStage::CompleteShowTrackProgress {
+                                ls.swap_state.tx_progress.reset();
+                                ls.swap_state.currency_input_box.input_box_str = "".to_string();
+                                ls.swap_state.stage = SwapStage::StartPreparing;
+                            }
+                        }
+                    });
+                }
+
+            if ls.swap_state.stage != SwapStage::CompleteShowTrackProgress {
+                if ls.swap_state.tx_progress.stage_err.is_none() {
+                    if !ls.swap_state.changing_stages {
+                        let changed = Self::big_proceed_button(ui, ls, next_stage, button_text);
+                        if changed {
+                            // All these stages are off by one because they've just "changed" already.
+                            match ls.swap_state.stage {
+                                SwapStage::StartPreparing => {}
+                                SwapStage::ShowAmountsPromptSigning => {
+                                    LocalState::create_swap_tx(ls);
+                                }
+                                SwapStage::ViewSignedAllowBroadcast => {
+                                    LocalState::sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                                }
+                                SwapStage::CompleteShowTrackProgress => {
+                                    LocalState::broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            });
+
+            if SwapStage::CompleteShowTrackProgress == ls.swap_state.stage {
+                ui.label("Track your swap progress on the party AMM explorer link above");
+            }
         }
     }
 
-    fn big_proceed_button(ui: &mut Ui, ls: &mut LocalState, next_stage: SwapStage, button_text: &str) {
+    fn big_proceed_button(ui: &mut Ui, ls: &mut LocalState, next_stage: SwapStage, button_text: &str) -> bool {
+        let mut changed = false;
         ui.horizontal(|ui| {
             let style = ui.style_mut();
             style.override_text_style = Some(TextStyle::Heading);
-            if ui.button(button_text).clicked() {
+            changed = ui.button(button_text).clicked();
+            if changed {
                 ls.swap_state.stage = next_stage;
             }
         });
+        changed
     }
 
     fn swap_details(ui: &mut Ui, ls: &mut LocalState, locked: bool) {
         ui.separator();
+        let price_map_incl = ls.price_map_incl_rdg();
+
         ui.horizontal(|ui| {
-            ui.label("Swap From: ");
-            let input_changed = currency_selection_box(ui, &mut ls.swap_state.input_currency, "Input Currency To", supported_swap_currencies(), locked);
+            // ui.label("Swap From: ");
+            ls.swap_state.currency_input_box.locked = locked;
+            ls.swap_state.currency_input_box.view(ui, &price_map_incl);
+        });
+        ui.horizontal(|ui| {
+            // ui.label("Swap To: ");
+            let input_changed = ls.swap_state.currency_input_box.currency_has_changed;
+            // let input_changed = currency_selection_box(ui, &mut ls.swap_state.input_currency, "To", supported_wallet_currencies(), locked);
             if input_changed {
-                if ls.swap_state.input_currency == SupportedCurrency::Redgold {
+                if ls.swap_state.currency_input_box.input_currency == SupportedCurrency::Redgold {
                     ls.swap_state.output_currency = SupportedCurrency::Ethereum;
                 } else {
                     ls.swap_state.output_currency = SupportedCurrency::Redgold;
                 }
             }
-            let currency = ls.swap_state.input_currency;
+            let currency = ls.swap_state.currency_input_box.input_currency;
             let filtered_swap_outputs = Self::filter_swap_output(&currency);
-            currency_selection_box(ui, &mut ls.swap_state.output_currency, "Output Destination Currency",
+            currency_selection_box(ui, &mut ls.swap_state.output_currency, "Destination",
                                    filtered_swap_outputs, locked);
-        });
-        let use_usd = ls.swap_state.swap_amount_usd_denomination.clone();
 
-        ui.horizontal(|ui| {
-            ui.label("Amount to swap");
-            let mut text = &mut ls.swap_state.swap_amount_input_string;
-            let mut string = text.clone();
-            if locked {
-                text = &mut string;
-            }
-            ui.add(egui::TextEdit::singleline(text).desired_width(200.0));
-            let allow_sats = ls.swap_state.input_currency == SupportedCurrency::Bitcoin || ls.swap_state.input_currency == SupportedCurrency::Redgold &&
-                !ls.swap_state.swap_amount_usd_denomination;
-            let swap_denom = if ls.swap_state.swap_amount_usd_denomination {
-                "USD".to_string()
-            } else {
-                format!("{:?}{}", ls.swap_state.input_currency.clone(),
-                        if ls.swap_state.swap_amount_use_sats && allow_sats { " sats" } else { "" })
-            };
-            ui.label(format!("{}", swap_denom));
-            let mut check = &mut ls.swap_state.swap_amount_usd_denomination;
-            let mut x1 = check.clone();
-            if locked {
-                check = &mut x1;
-            }
-            ui.checkbox(check, "USD Denomination");
+            let use_usd = ls.swap_state.currency_input_box.use_usd_input.clone();
 
-            if allow_sats {
-                let mut use_sats = &mut ls.swap_state.swap_amount_use_sats;
-                let mut x2 = use_sats.clone();
-                if locked {
-                    use_sats = &mut x2;
-                }
-                ui.checkbox(use_sats, "Use Sats");
-            }
-        });
-        let mut no_data = false;
-        ui.horizontal(|ui| {
+            let mut no_data = false;
+
             let is_ask = ls.swap_state.output_currency == SupportedCurrency::Redgold;
             let get_prices_of_currency = if is_ask {
-                ls.swap_state.input_currency.clone()
+                ls.swap_state.currency_input_box.input_currency.clone()
             } else {
                 ls.swap_state.output_currency.clone()
             };
@@ -199,7 +209,7 @@ impl SwapState {
 
                 // ETH => RDG for example, get_prices = ETH
                 // RDG => BTC for example, get_prices = BTC
-                let pair_price_usd = ls.price_map_usd_pair.get(&get_prices_of_currency).map(|x| x.clone());
+                let pair_price_usd = price_map_incl.get(&get_prices_of_currency).map(|x| x.clone());
 
                 let mut price_usd_est = cp.min_bid_estimated.clone();
                 let mut price_usd_est_inverse = cp.min_bid_estimated.clone();
@@ -212,7 +222,7 @@ impl SwapState {
                 };
 
 
-                let input_amount_value = ls.swap_state.input_amount_value();
+                let input_amount_value = ls.swap_state.currency_input_box.input_amount_value();
                 let mut usd_value = if use_usd {
                     input_amount_value
                 } else {
@@ -225,19 +235,6 @@ impl SwapState {
                     input_amount_value
                 };
 
-                let prefix = if !use_usd {
-                    "Value USD:".to_string()
-                } else {
-                    format!("Value {:?}:", ls.swap_state.input_currency.clone())
-                };
-                ui.label(prefix);
-                let value = if !use_usd {
-                    format!("${:.2}", usd_value)
-                } else {
-                    format!("{:.8} {:?}", pair_value, get_prices_of_currency.clone())
-                };
-                ui.label(RichText::new(value).color(Color32::GREEN));
-
                 let x = pair_value * 1e8;
                 let fulfilled_amt = cp.dummy_fulfill(x as u64, is_ask, &ls.node_config.network);
                 let mut fulfilled_value_usd = fulfilled_amt * price_usd_est_inverse;
@@ -247,10 +244,8 @@ impl SwapState {
                 ui.label(RichText::new(format!("{:.8}", fulfilled_amt)).color(Color32::GREEN));
 
 
-                if ls.node_config.opts.development_mode {
-                    ui.label("Bid value:");
-                    ui.label(RichText::new(fulfilled_usd_str).color(Color32::RED));
-                }
+                ui.label("Bid value:");
+                ui.label(RichText::new(fulfilled_usd_str).color(Color32::RED));
             } else {
                 ui.label("No price data available");
                 no_data = true;
@@ -258,8 +253,18 @@ impl SwapState {
         });
     }
 
+    fn party_explorer_link(ui: &mut Ui, ls: &&mut LocalState) {
+        if let Some(pa) = ls.first_party.as_ref()
+            .and_then(|p| p.party_info.party_key.as_ref())
+            .and_then(|p| p.to_bitcoin_address_typed(&ls.node_config.network).ok())
+            .and_then(|p| p.render_string().ok())
+        {
+            ui.hyperlink_to("Party Explorer Link", ls.node_config.network.explorer_hash_link(pa));
+        }
+    }
+
     fn filter_swap_output(currency: &SupportedCurrency) -> Vec<SupportedCurrency> {
-        let remaining = supported_swap_currencies()
+        let remaining = supported_wallet_currencies()
             .iter().filter(|c| { c != &currency }).cloned().collect();
         if currency != &SupportedCurrency::Redgold {
             vec![SupportedCurrency::Redgold]

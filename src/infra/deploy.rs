@@ -22,8 +22,8 @@ use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, Pe
 use redgold_schema::util::cmd::{run_bash_async, run_powershell_async};
 use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};

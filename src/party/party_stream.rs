@@ -1,43 +1,31 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Sub;
-use std::sync::{Arc, Mutex};
-use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::database::BatchDatabase;
 use itertools::Itertools;
-use log::info;
 use num_bigint::BigInt;
-use rocket::form::validate::with;
 use rocket::serde::{Deserialize, Serialize};
 use rocket::yansi::Paint;
 use serde::__private::de::IdentifierDeserializer;
-use tracing::event;
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
-use redgold_schema::output::output_data;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::seeds::get_seeds_by_env_time;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, ObservationProof, PublicKey, SupportedCurrency, Transaction, UtxoId};
-use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
-use crate::node_config::ToTransactionBuilder;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_keys::external_tx_support::ExternalTxSupport;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 // use crate::multiparty_gg20::watcher::{get_btc_per_rdg_starting_min_ask, OrderFulfillment};
 use crate::party::address_event::AddressEvent;
 use crate::party::address_event::AddressEvent::External;
 use crate::party::central_price::CentralPricePair;
-use crate::party::data_enrichment::PartyInternalData;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::portfolio_request::PortfolioRequestEvents;
-use crate::party::price_query::PriceDataPointUsdQuery;
 use crate::party::stake_event_stream::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
 use crate::util::current_time_millis_i64;
 
@@ -49,7 +37,7 @@ pub struct TransactionWithObservationsAndPrice {
     pub all_relevant_prices_usd: HashMap<SupportedCurrency, f64>
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PartyEvents where {
     pub(crate) network: NetworkEnvironment,
     key_address: Address,
