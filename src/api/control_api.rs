@@ -208,8 +208,7 @@ impl ControlServer {
         });
         as_warp_json_response(res)
     }
-    pub fn start(self) -> JoinHandle<Result<(), ErrorInfo>> {
-        return tokio::spawn(self.run_control_server());
+    pub fn start(self) -> JoinHandle<Result<(), ErrorInfo>> { return tokio::spawn(self.run_control_server())
     }
 }
 //

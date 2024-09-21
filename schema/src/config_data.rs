@@ -27,7 +27,8 @@ pub struct PortfolioFulfillmentConfigData {
 pub struct NodeData {
     pub words: Option<String>,
     pub peer_id: Option<String>,
-    pub network: Option<String>
+    pub network: Option<String>,
+    pub disable_control_api: Option<bool>
 }
 
 // Migrate node_config stuff here

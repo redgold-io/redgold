@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
-use std::env;
+use std::{env, fs};
 use std::fmt::format;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once};
@@ -375,6 +375,8 @@ impl LocalState {
         // DataStore::run_migrations(&ds_or).await.expect("");
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
         let local_stored_state = ds_or.config_store.get_stored_state().await?;
+
+        fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
 
         let mut ss = crate::gui::tabs::server_tab::ServersState::default();
 
