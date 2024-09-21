@@ -11,8 +11,8 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, OutputType, Te
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 
 #[derive(Clone, PartialEq)]

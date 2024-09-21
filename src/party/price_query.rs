@@ -1,22 +1,19 @@
 use rocket::serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use sha3::digest::generic_array::functional::FunctionalSequence;
 use redgold_data::data_store::DataStore;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::RgResult;
-use redgold_schema::structs::{PortfolioWeighting, SupportedCurrency};
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_schema::structs::SupportedCurrency;
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::party::address_event::AddressEvent;
 use crate::party::portfolio_request::get_most_recent_day_millis;
-use crate::scrape::okx_point;
-
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct UsdPrice {
     currency: SupportedCurrency,
     price: f64,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct PriceDataPointUsdQuery {
     inner: HashMap<i64, UsdPrice>,
 }

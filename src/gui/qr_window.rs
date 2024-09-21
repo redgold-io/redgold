@@ -4,10 +4,12 @@ use egui_extras::RetainedImage;
 use image::DynamicImage;
 use rqrr::MetaData;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::bounded_text_area;
+use redgold_gui::common::bounded_text_area;
 // use crate::gui::image_capture::{CaptureStream, default_stream};
 use crate::gui::qr_render::qr_encode;
 
+
+// #[derive(Clone)]
 pub struct QrState {
     pub show_window: bool,
     // pub capture_stream: Option<CaptureStream>,

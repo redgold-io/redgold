@@ -6,3 +6,4 @@ pub mod key_info;
 pub mod account_deriv_sel;
 pub mod passphrase_input;
 pub mod swap;
+pub(crate) mod tx_signer;

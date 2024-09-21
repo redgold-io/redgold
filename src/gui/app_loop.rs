@@ -16,7 +16,7 @@ use redgold_schema::{error_info, RgResult};
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::{ClientApp, home, top_panel};
+use crate::gui::{home, top_panel, ClientApp};
 use crate::util;
 use rand::Rng;
 use rocket::form::validate::Contains;
@@ -25,6 +25,7 @@ use rocket::form::validate::Contains;
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
 //     }
 // }
+use crate::gui::components::tx_signer::{TxSignerProgress, TxBroadcastProgress};
 
 pub trait PublicKeyStoredState {
     fn public_key(&self, xpub_name: String) -> Option<PublicKey>;
@@ -229,7 +230,6 @@ impl LocalState {
         let ups = ls.updates.sender.clone();
         let config = ls.node_config.clone();
         tokio::spawn(async move {
-
             let party_data = config.api_rg_client().party_data().await.log_error().unwrap_or_default();
             let first_party = party_data.clone().into_values().next();
             LocalState::send_update_sender(&ups, move |lss| {
@@ -238,6 +238,121 @@ impl LocalState {
             });
         });
     }
+
+    pub fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64> {
+        let mut price_map = self.price_map_usd_pair.clone();
+        let cpp = self.first_party.as_ref().and_then(|p| p.party_events.as_ref())
+            .and_then(|pe| pe.central_prices.get(&SupportedCurrency::Ethereum))
+            .map(|c| c.min_bid_estimated.clone())
+            .unwrap_or(100.0);
+        price_map.insert(SupportedCurrency::Redgold, cpp);
+        price_map
+    }
+    pub fn create_swap_tx(ls: &mut LocalState) {
+
+        let party_pk = ls.first_party.as_ref()
+            .and_then(|p| p.party_info.party_key.as_ref())
+            .cloned().unwrap();
+        let party_addr = party_pk.address().unwrap();
+
+        let ups = ls.updates.sender.clone();
+        let res = ls.external_network_resources.clone();
+        let config = ls.node_config.clone();
+        let currency = ls.swap_state.currency_input_box.input_currency.clone();
+        let pk = ls.wallet_state.public_key.clone().unwrap();
+        let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+        let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
+        info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
+        let map = ls.price_map_incl_rdg();
+        let amount = ls.swap_state.currency_input_box.input_currency_amount(&map);
+        let mut from_eth_addr_dir = pk.to_ethereum_address_typed().unwrap();
+        info!("from_eth_addr_dir: {}", from_eth_addr_dir.render_string().unwrap());
+        from_eth_addr_dir.mark_external();
+        info!("from_eth_addr_dir after mark external: {}", from_eth_addr_dir.render_string().unwrap());
+        let from_eth_addr = from_eth_addr_dir.clone();
+        info!("from_eth_addr: {}", from_eth_addr.render_string().unwrap());
+        let to = match ls.swap_state.currency_input_box.input_currency {
+            SupportedCurrency::Redgold => {
+                party_pk.address().unwrap()
+            }
+            SupportedCurrency::Bitcoin => {
+                party_pk.to_bitcoin_address_typed(&config.network).unwrap().mark_external().clone()
+            }
+            SupportedCurrency::Ethereum => {
+                let mut addr = party_pk.to_ethereum_address_typed().unwrap();
+                addr.mark_external();
+                addr.clone()
+            }
+            _ => panic!("Unsupported currency")
+        };
+        let address_info = ls.wallet_state.address_info.clone();
+
+        let secret = kp.to_private_hex();
+        // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
+        tokio::spawn(async move {
+            let res = TransactionProgressFlow::make_transaction(
+                &config,
+                res,
+                &currency,
+                &pk,
+                &to,
+                &amount,
+                address_info.as_ref(),
+                Some(&party_addr),
+                None,
+                Some(from_eth_addr),
+                false,
+                false,
+                Some(secret)
+            ).await;
+            // info!("prepared transaction: {}", res.json_or());
+            LocalState::send_update_sender(&ups, move |lss| {
+                let (err, tx) = match &res {
+                    Ok(tx) => (None, Some(tx)),
+                    Err(e) => (Some(e.json_or()), None)
+                };
+                if err.is_none() {
+                    lss.swap_state.stage = SwapStage::ShowAmountsPromptSigning;
+                }
+                lss.swap_state.tx_progress.created(tx.cloned(), err);
+                lss.swap_state.changing_stages = false;
+
+            });
+        });
+    }
+    pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
+        let ups = ls.updates.sender.clone();
+        let res = ls.external_network_resources.clone();
+        tokio::spawn(async move {
+            let res = tx.sign(res).await;
+            LocalState::send_update_sender(&ups, move |lss| {
+                let (err, tx) = match &res {
+                    Ok(tx) => (None, Some(tx)),
+                    Err(e) => (Some(e.json_or()), None)
+                };
+                lss.swap_state.tx_progress.signed(tx.cloned(), err);
+                lss.swap_state.changing_stages = false;
+
+            });
+        });
+    }
+
+    pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
+        let ups = ls.updates.sender.clone();
+        let res = ls.external_network_resources.clone();
+        tokio::spawn(async move {
+            let res = tx.broadcast(res).await;
+            LocalState::send_update_sender(&ups, move |lss| {
+                let (err, tx) = match &res {
+                    Ok(tx) => (None, Some(tx)),
+                    Err(e) => (Some(e.json_or()), None)
+                };
+                lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
+                lss.swap_state.changing_stages = false;
+            });
+        });
+    }
+
 }
 
 #[allow(dead_code)]
@@ -274,7 +389,7 @@ impl LocalState {
 
         let party_data = node_config.api_rg_client().party_data().await.log_error();
         let first_party = party_data.clone().ok().and_then(|pd| pd.into_values().next());
-        info!("Party data {}", first_party.json_or());
+        // info!("Party data {}", first_party.json_or());
         let party_data = party_data.unwrap_or_default();
 
         // ss.genesis = node_config.opts.development_mode;
@@ -429,6 +544,7 @@ fn random_bytes() -> [u8; 32] {
 
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 
@@ -482,29 +598,31 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 }
 
 use redgold_data::data_store::DataStore;
+use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::dhash_vec;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
-use crate::core::internal_message::{Channel, new_channel};
+use crate::core::internal_message::{new_channel, Channel};
 use crate::gui::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::gui::components::swap::SwapState;
+use crate::gui::components::swap::{SwapStage, SwapState};
 use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::server_tab;
 use crate::gui::tabs::keys::keygen_subtab::KeygenState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
-use crate::gui::tabs::server_tab::{ServersState, ServerStatus};
+use crate::gui::tabs::server_tab::{ServerStatus, ServersState};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
-use crate::gui::tabs::transact::wallet_tab::{StateUpdate, wallet_screen, WalletState};
+use crate::gui::tabs::transact::wallet_tab::{wallet_screen, StateUpdate, WalletState};
 use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
 use crate::infra::deploy::is_windows;
-use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl};
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use crate::party::data_enrichment::PartyInternalData;
 

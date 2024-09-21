@@ -5,6 +5,8 @@
 pub mod image_capture;
 #[cfg(target_os = "linux")]
 pub mod image_capture_openpnp;
+pub mod components;
+pub mod common;
 
 #[cfg(not(target_os = "linux"))]
 pub mod image_capture_stub {

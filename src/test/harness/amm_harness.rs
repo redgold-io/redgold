@@ -6,14 +6,14 @@ use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{error_info, retry, RgResult, SafeOption};
 use redgold_schema::structs::{Address, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::RgHttpClient;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
-use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
+use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use redgold_schema::conf::node_config::NodeConfig;
 use crate::party::data_enrichment::PartyInternalData;
 use crate::party::party_stream::PartyEvents;
@@ -25,6 +25,9 @@ use std::time::Duration;
 use log::info;
 use tokio::task::JoinHandle;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
+use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 // https://stackoverflow.com/questions/75533630/how-to-write-a-retry-function-in-rust-that-involves-async
 
@@ -131,6 +134,8 @@ impl PartyTestHarness {
     pub async fn tx_builder(&self) -> TransactionBuilder {
         TransactionBuilder::new(&self.node_config)
             .with_input_address(&self.self_rdg_address())
+            .clone()
+            .into_api_wrapper()
             .with_auto_utxos().await.expect("utxos")
             .clone()
     }
@@ -151,9 +156,7 @@ impl PartyTestHarness {
         let internal_stake_amount = CurrencyAmount::from_fractional(7.0).expect("works");
         let rdg_address = self.self_rdg_address();
         let amm_rdg_address = self.amm_public_key.address().expect("address");
-        let internal_stake_tx = TransactionBuilder::new(&self.node_config)
-            .with_input_address(&rdg_address)
-            .with_auto_utxos().await.expect("utxos")
+        let internal_stake_tx = self.tx_builder().await
             .with_internal_stake_usd_bounds(
                 None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
             )

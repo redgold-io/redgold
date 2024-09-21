@@ -3,7 +3,7 @@ use serde::Serialize;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::local_stored_state::LocalStoredState;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area, editable_text_input_copy, valid_label};
+use redgold_gui::common::{bounded_text_area, editable_text_input_copy, valid_label};
 
 
 #[derive(Clone)]

@@ -13,7 +13,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
+use redgold_gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use crate::gui::tables;
 use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};

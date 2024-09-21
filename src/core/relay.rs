@@ -28,7 +28,7 @@ use tracing::trace;
 use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
@@ -47,7 +47,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::transaction::{amount_to_raw_amount, TransactionMaybeError};
 use redgold_schema::util::lang_util::WithMaxLengthString;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::{DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, ToTransactionBuilder, WordsPassNodeConfig};
@@ -203,6 +203,28 @@ impl Relay {
         }).flat_map(|(k, v)| v.party_info.party_key.clone())
             .next();
         cleared
+    }
+    pub async fn active_party(&self) -> Option<PartyInternalData> {
+        if let Some(pk) = self.active_party_key().await {
+            let data = self.external_network_shared_data.clone_read().await;
+            if let Some(pid) = data.get(&pk) {
+                return Some(pid.clone())
+            }
+        }
+        None
+    }
+    pub async fn active_party_events(&self) -> Option<PartyEvents> {
+        if let Some(p) = self.active_party().await {
+            return p.party_events.clone()
+        }
+        None
+    }
+
+    pub async fn party_event_for_txid(&self, txid: &String) -> Option<AddressEvent> {
+        let p = self.active_party().await?;
+        p.address_events.iter().filter(|ae| {
+            &ae.identifier() == txid
+        }).next().cloned()
     }
 
     pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
@@ -374,7 +396,9 @@ use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::e2e::tx_gen::SpendableUTXO;
+use crate::party::address_event::AddressEvent;
 use crate::party::data_enrichment::PartyInternalData;
+use crate::party::party_stream::PartyEvents;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data

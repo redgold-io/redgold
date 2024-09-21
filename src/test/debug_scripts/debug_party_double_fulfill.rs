@@ -31,7 +31,7 @@ async fn debug_events2() -> RgResult<()> {
     let ev = pev.events.clone();
 
     let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
-    convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    convert_events(&data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
 
     // this matches
     for e in &ev {

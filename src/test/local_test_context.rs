@@ -6,7 +6,7 @@ use redgold_schema::{SafeOption, structs};
 use serde::Serialize;
 use itertools::Itertools;
 use tokio::sync::Mutex;
-use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};

@@ -5,7 +5,7 @@ use redgold_schema::local_stored_state::{StoredMnemonic, StoredPrivateKey};
 use std::str::FromStr;
 use eframe::egui;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{editable_text_input_copy, valid_label};
+use redgold_gui::common::{editable_text_input_copy, valid_label};
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 
 pub fn save_key_window(

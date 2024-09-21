@@ -3,7 +3,7 @@ use eframe::egui::{Context, Ui};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size_id, editable_text_input_copy};
+use redgold_gui::common::{bounded_text_area_size_id, editable_text_input_copy};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtpMetadata {

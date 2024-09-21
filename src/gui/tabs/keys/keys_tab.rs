@@ -11,7 +11,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
+use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
 use crate::gui::components::account_deriv_sel::AccountDerivationPathInputState;
 use crate::gui::components::derivation_path_sel::DerivationPathInputState;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};

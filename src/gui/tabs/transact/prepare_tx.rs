@@ -5,7 +5,8 @@ use redgold_keys::address_support::AddressSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::gui::tabs::transact::wallet_tab::WalletState;
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 

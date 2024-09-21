@@ -2,7 +2,7 @@ use eframe::egui;
 use eframe::egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 use redgold_keys::xpub_wrapper::ValidateDerivationPath;
-use crate::gui::common::{editable_text_input_copy, valid_label};
+use redgold_gui::common::{editable_text_input_copy, valid_label};
 
 
 

@@ -9,8 +9,8 @@ use crate::util;
 use chrono::{Utc, TimeZone, Duration, Datelike};
 use itertools::Itertools;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::party::order_fulfillment::OrderFulfillment;
 use crate::party::stake_event_stream::ConfirmedExternalStakeEvent;
 

@@ -6,16 +6,17 @@ use itertools::Itertools;
 use log::{error, info};
 use metrics::gauge;
 use serde::{Deserialize, Serialize};
+use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources};
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{error_info, RgResult, SafeOption, structs};
+use redgold_schema::{error_info, structs, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
-use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use crate::integrations::external_network_resources::{EncodedTransactionPayload, ExternalNetworkResources};
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use crate::party::address_event::AddressEvent;
 use crate::party::data_enrichment::PartyInternalData;
@@ -355,7 +356,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct OrderFulfillment {
     pub order_amount: u64,
     pub fulfilled_amount: u64,

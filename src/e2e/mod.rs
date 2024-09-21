@@ -24,8 +24,8 @@ pub mod alert;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::transaction::amount_to_raw_amount;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::observability::errors::Loggable;
 // i think this is the one currently in use?
 

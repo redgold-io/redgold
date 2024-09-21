@@ -2,12 +2,12 @@ use itertools::Itertools;
 use redgold_keys::address_support::AddressSupport;
 use crate::schema::structs::Transaction;
 use redgold_keys::TestConstants;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::constants::{EARLIEST_TIME, MAX_COIN_SUPPLY};
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, Seed};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::node_config::EnvDefaultNodeConfig;
 use crate::test::external_amm_integration::dev_ci_kp;
 

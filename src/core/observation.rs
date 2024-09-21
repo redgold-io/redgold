@@ -20,12 +20,12 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Hash, ObservationProof, Transaction};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::observability::errors::Loggable;
 use crate::node_config::WordsPassNodeConfig;
