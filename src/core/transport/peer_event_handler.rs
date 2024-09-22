@@ -49,6 +49,7 @@ impl PeerOutgoingEventHandler {
             if let Some(nmd) = res {
                 if nmd.transport_info.as_ref().and_then(|r| r.nat_restricted).unwrap_or(false) {
                     relay.peer_info.
+
                 }
                 Self::send_message_rest(message.clone(), nmd, &relay).await?;
             } else {
