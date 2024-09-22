@@ -37,7 +37,6 @@ use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::gui::components::passphrase_input::PassphraseInput;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;

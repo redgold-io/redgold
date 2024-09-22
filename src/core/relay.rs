@@ -4,6 +4,7 @@ use std::pin::pin;
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bdk::sled::Tree;
 
@@ -25,6 +26,7 @@ use rocket::http::ext::IntoCollection;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
@@ -47,7 +49,6 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::transaction::{amount_to_raw_amount, TransactionMaybeError};
 use redgold_schema::util::lang_util::WithMaxLengthString;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::node_config::{DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, ToTransactionBuilder, WordsPassNodeConfig};
@@ -183,6 +184,29 @@ pub struct Relay {
     pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
+    pub peer_info: PeerInfo
+}
+
+#[derive(Clone)]
+pub struct PeerInfo {
+    pub dynamic: Arc<DashMap<PublicKey, DynamicNodeMetadata>>
+}
+
+impl PeerInfo {
+    pub fn write_dynamic(&self, pk: &PublicKey, d: &DynamicNodeMetadata) {
+        self.dynamic.insert(pk.clone(), d.clone());
+    }
+    pub fn read_dynamic(&self, pk: &PublicKey) -> Option<DynamicNodeMetadata> {
+        self.dynamic.get(pk).map(|v| v.clone())
+    }
+}
+
+impl Default for PeerInfo {
+    fn default() -> Self {
+        Self {
+            dynamic: Arc::new(DashMap::new())
+        }
+    }
 }
 
 impl Relay {

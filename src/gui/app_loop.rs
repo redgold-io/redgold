@@ -547,6 +547,7 @@ fn random_bytes() -> [u8; 32] {
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 

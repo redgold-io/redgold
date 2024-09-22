@@ -19,6 +19,12 @@ use tokio::task::JoinError;
 //     };
 // }
 
+#[derive(Clone)]
+pub enum MessageOrigin {
+    Udp,
+    Rest
+}
+
 /// Bidirectional message type
 #[derive(Clone)]
 pub struct PeerMessage {
@@ -30,7 +36,8 @@ pub struct PeerMessage {
     pub destinations: Vec<PublicKey>,
     pub node_metadata: Option<NodeMetadata>,
     pub dynamic_node_metadata: Option<DynamicNodeMetadata>,
-    pub send_timeout: Duration
+    pub send_timeout: Duration,
+    pub origin: MessageOrigin
 }
 
 impl PeerMessage {
@@ -44,6 +51,7 @@ impl PeerMessage {
             node_metadata: None,
             dynamic_node_metadata: None,
             send_timeout: Duration::from_secs(150),
+            origin: MessageOrigin::Rest,
         }
     }
 

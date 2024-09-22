@@ -23,8 +23,8 @@ use tokio_util::either::Either;
 use uuid::Uuid;
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::{bytes_data, ErrorInfoContext};
-use redgold_schema::structs::{ErrorInfo, Request, UdpMessage};
-use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo};
+use redgold_schema::structs::{ErrorInfo, Request, Response, UdpMessage};
+use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, MessageOrigin};
 use crate::core::relay::Relay;
 use crate::util;
 use crate::util::keys::public_key_from_bytes;
@@ -204,24 +204,36 @@ impl UdpMessageSupport for UdpMessage {
             parts,
             uuid: Uuid::new_v4().to_string(),
             timestamp: util::current_time_millis_i64(),
+            response_to_uuid: None,
         }
     }
 }
 
-struct UdpServer {
+struct UdpResponseHandler {
+    timestamp: i64,
+    sender: flume::Sender<Response>
+}
+
+pub struct UdpServer {
     // socket: UdpSocket,
-    relay: Relay,
     // TODO: optimize reassembly with parts array?
     messages: HashMap<String, (Vec<UdpMessage>, SocketAddr)>,
     sink: SplitSink<UdpFramed<UdpMessageCodec>, (UdpMessage, SocketAddr)>,
+    peer_message_rx: Channel<PeerMessage>,
+    udp_outgoing_messages: Channel<PeerMessage>,
+    response_channels: HashMap<String, UdpResponseHandler>
 }
 
 
 
-const UDP_CHUNK_SIZE : usize = 1024;
+const UDP_CHUNK_SIZE : usize = 4096;
 
 impl UdpServer {
-    async fn new(relay: Relay, port: Option<u16>) -> Result<(), ErrorInfo> {
+    pub(crate) async fn new(
+        peer_messages: &Channel<PeerMessage>,
+        udp_messages: &Channel<PeerMessage>,
+        port: Option<u16>
+    ) -> Result<(), ErrorInfo> {
         let port = port.unwrap_or(0);
         let addr = format!("0.0.0.0:{}", port.to_string());
         let socket =
@@ -233,8 +245,10 @@ impl UdpServer {
         let mut server = Self {
             // socket,
             sink,
-            relay,
+            peer_message_rx: peer_messages.clone(),
+            udp_outgoing_messages: udp_messages.clone(),
             messages: Default::default(),
+            response_channels: Default::default(),
         };
         server.run(stream).await
     }
@@ -248,7 +262,7 @@ impl UdpServer {
         let interval_stream = IntervalStream::new(interval).map(|_| UdpOperation::Interval);
         let incoming_stream = stream
             .map(|m| UdpOperation::Incoming(m.error_info("Failed to receive UDP message")));
-        let r = self.relay.udp_outgoing_messages.receiver.clone();
+        let r = self.udp_outgoing_messages.receiver.clone();
         let outgoing_stream = r.into_stream().map(|m| UdpOperation::Outgoing(m));
 
         let interval_stream = futures::StreamExt::boxed(interval_stream);
@@ -267,33 +281,41 @@ impl UdpServer {
         Ok(())
     }
 
-    async fn send_rx_incoming_log(&mut self, data: Vec<u8>, addr: SocketAddr) -> Result<(), ErrorInfo> {
-        self.send_rx_incoming(data, addr.clone()).await.map_err(|e| {
-            log::error!("Failed to send UDP message to relay: {}", e.json_or());
-            e
-        })
-}
+    async fn check_is_response(&mut self, request: &Request) -> bool {
+        if let Some(r) = request.response.as_ref() {
+            if let Some(m) = r.response_metadata.as_ref() {
+                if let Some(handler) = self.response_channels.get(m.request_id.as_ref()) {
+                    handler.sender.send_rg_err(r.clone()).ok();
+                    // todo metric
+                }
+            }
+        }
+    }
 
-    async fn send_rx_incoming(&mut self, data: Vec<u8>, addr: SocketAddr) -> Result<(), ErrorInfo> {
+    async fn send_rx_incoming_log(&mut self, data: Vec<u8>, addr: SocketAddr) -> Result<(), ErrorInfo> {
         let req = Request::proto_deserialize(data)?;
         let node_pk = req.verify_auth()?;
-        let mut pm = PeerMessage::empty();
-        pm.public_key = Some(node_pk.clone());
-        pm.socket_addr = Some(addr);
-        pm.request = req;
-        self.relay.peer_message_rx.sender.send_rg_err(pm)?;
+
+        if !self.check_is_response(&req).await {
+            let mut pm = PeerMessage::empty();
+            pm.origin = MessageOrigin::Udp;
+            pm.public_key = Some(node_pk.clone());
+            pm.socket_addr = Some(addr);
+            pm.request = req;
+            self.peer_message_rx.sender.send_rg_err(pm)?;
+        }
         Ok(())
     }
 
-    async fn process_typed(&mut self, typed: Result<(UdpMessage, SocketAddr), ErrorInfo>) -> Result<(), ErrorInfo> {
+    async fn process_incoming_udp_message(&mut self, typed: Result<(UdpMessage, SocketAddr), ErrorInfo>) -> Result<(), ErrorInfo> {
         match typed {
             Err(e) => {
-                log::error!("UDP error: {}", e.json_or());
+                // log::error!("UDP error: {}", e.json_or());
             }
             Ok((wrapper, addr)) => {
                 let w = wrapper.clone();
-                let json_msg = json(&w).expect("json");
-                log::info!("UDP message received from: {} - contents - {}", addr.clone(), json_msg);
+                // let json_msg = json(&w).expect("json");
+                // log::info!("UDP message received from: {} - contents - {}", addr.clone(), json_msg);
 
                 let mut message = wrapper.clone();
                 message.timestamp = util::current_time_millis() as i64;
@@ -339,14 +361,14 @@ impl UdpServer {
                     let parts = chunks.len();
                     for (i, chunk) in chunks.enumerate() {
                         let msg = UdpMessage::new(chunk.to_vec(), i as i64, parts as i64);
-                        log::debug!("Sending UDP message to {}", b_addr);
+                        // log::debug!("Sending UDP message to {}", b_addr);
                         self.sink.send((msg, b_addr)).await.error_info("Failed to send UDP message")?;
                     }
                 }
                 Ok(())
             },
             UdpOperation::Incoming(i) => {
-                self.process_typed(i).await?;
+                self.process_incoming_udp_message(i).await?;
                 Ok(())
             }
             UdpOperation::Interval => {
@@ -375,58 +397,58 @@ enum UdpOperation {
     Incoming(Result<(UdpMessage, SocketAddr), ErrorInfo>),
     Interval,
 }
-
-#[ignore]
-#[tokio::test]
-async fn send_request_internal() -> std::io::Result<()> {
-    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
-    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
-
-    // let a_addr = a_soc.local_addr()?;
-    let b_addr = b_soc.local_addr()?;
-
-    let mut a = UdpFramed::new(a_soc, UdpMessageCodec{});
-    let mut b = UdpFramed::new(b_soc, UdpMessageCodec{});
-
-    let msg = Request::empty().about().proto_serialize();
-    let msg = UdpMessage::new(msg, 0, 1);
-    a.send((msg.clone(), b_addr)).await?;
-
-    let option = b.next().await;
-    let x = option.unwrap().unwrap().0;
-    let dbg = x.clone();
-    println!("option: {}", json(&dbg).expect(""));
-    assert_eq!(x, msg);
-
-    Ok(())
-}
-// did these break CI?
-#[ignore]
-#[tokio::test]
-async fn servers_multiple() -> std::io::Result<()> {
-
-    // util::init_logger();
-    let port1 = random_port();
-    let port2 = random_port();
-    println!("port 1: {}, port 2: {}", port1.to_string(), port2.to_string());
-    let relay1 = Relay::default().await;
-    let relay2 = Relay::default().await;
-    tokio::spawn(UdpServer::new(relay1.clone(), Some(port1)));
-    tokio::spawn(UdpServer::new(relay2.clone(), Some(port2)));
-
-    // let socket_addr1 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port1);
-    let socket_addr2 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port2);
-
-    let mut pm = PeerMessage::empty();
-    let pair = relay1.node_config.words().default_kp().expect("").clone();
-    let request = Request::empty().about();
-    let msg = request.with_auth(&pair);
-    msg.verify_auth().expect("");
-    pm.request = msg.clone();
-    pm.socket_addr = Some(socket_addr2);
-
-    relay1.udp_outgoing_messages.sender.send(pm.clone()).expect("");
-    let output = relay2.peer_message_rx.receiver.recv_async_err().await.expect("");
-    assert_eq!(pm.request.proto_serialize(), output.request.proto_serialize());
-    Ok(())
-}
+//
+// #[ignore]
+// #[tokio::test]
+// async fn send_request_internal() -> io::Result<()> {
+//     let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+//     let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+//
+//     // let a_addr = a_soc.local_addr()?;
+//     let b_addr = b_soc.local_addr()?;
+//
+//     let mut a = UdpFramed::new(a_soc, UdpMessageCodec{});
+//     let mut b = UdpFramed::new(b_soc, UdpMessageCodec{});
+//
+//     let msg = Request::empty().about().proto_serialize();
+//     let msg = UdpMessage::new(msg, 0, 1);
+//     a.send((msg.clone(), b_addr)).await?;
+//
+//     let option = b.next().await;
+//     let x = option.unwrap().unwrap().0;
+//     let dbg = x.clone();
+//     println!("option: {}", json(&dbg).expect(""));
+//     assert_eq!(x, msg);
+//
+//     Ok(())
+// }
+// // did these break CI?
+// #[ignore]
+// #[tokio::test]
+// async fn servers_multiple() -> std::io::Result<()> {
+//
+//     // util::init_logger();
+//     let port1 = random_port();
+//     let port2 = random_port();
+//     println!("port 1: {}, port 2: {}", port1.to_string(), port2.to_string());
+//     let relay1 = Relay::default().await;
+//     let relay2 = Relay::default().await;
+//     tokio::spawn(UdpServer::new(relay1.clone(), Some(port1)));
+//     tokio::spawn(UdpServer::new(relay2.clone(), Some(port2)));
+//
+//     // let socket_addr1 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port1);
+//     let socket_addr2 = SocketAddr::new(IpAddr::from_str("127.0.0.1").expect(""), port2);
+//
+//     let mut pm = PeerMessage::empty();
+//     let pair = relay1.node_config.words().default_kp().expect("").clone();
+//     let request = Request::empty().about();
+//     let msg = request.with_auth(&pair);
+//     msg.verify_auth().expect("");
+//     pm.request = msg.clone();
+//     pm.socket_addr = Some(socket_addr2);
+//
+//     relay1.udp_outgoing_messages.sender.send(pm.clone()).expect("");
+//     let output = relay2.peer_message_rx.receiver.recv_async_err().await.expect("");
+//     assert_eq!(pm.request.proto_serialize(), output.request.proto_serialize());
+//     Ok(())
+// }

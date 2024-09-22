@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use log::info;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ExternalTransactionId, PartySigningValidation, PublicKey, SupportedCurrency, Transaction};
-use redgold_schema::tx::tx_builder::{TransactionBuilder, TransactionBuilderSupport};
+use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use crate::common;
 use crate::common::data_item;
 

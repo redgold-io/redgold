@@ -19,6 +19,7 @@ pub struct PortfolioRequestEvents {
     pub events: Vec<PortfolioRequestEventInstance>,
     pub external_stake_balance_deltas: HashMap<SupportedCurrency, CurrencyAmount>,
     pub stake_utxos: Vec<(UtxoId, ConfirmedExternalStakeEvent)>,
+    // Positive amount means it wants more stake, negative means it wants a withdrawal
     pub current_portfolio_imbalance: HashMap<SupportedCurrency, CurrencyAmount>
 }
 

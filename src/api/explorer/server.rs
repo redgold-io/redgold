@@ -6,6 +6,7 @@ use log::{info, trace};
 use tokio::task::JoinHandle;
 use warp::{Filter, get, Rejection};
 use warp::path::Exact;
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_keys::address_support::AddressSupport;
 use redgold_schema::structs::{Address, ErrorInfo, FaucetRequest, Request};
 use crate::api::{as_warp_json_response, explorer};

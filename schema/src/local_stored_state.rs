@@ -47,7 +47,8 @@ pub struct WatchedAddress {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ServerTrustRatingLabels {
     pub peer_id_index: i64,
-    pub labels: Vec<TrustRatingLabel>
+    pub labels: Vec<TrustRatingLabel>,
+    pub environment: Option<String>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -89,7 +90,7 @@ pub struct LocalStoredState {
     pub email_alert_config: Option<String>,
     pub identities: Vec<Identity>,
     pub mnemonics: Option<Vec<StoredMnemonic>>,
-    pub private_keys: Option<Vec<StoredPrivateKey>>
+    pub private_keys: Option<Vec<StoredPrivateKey>>,
 }
 
 impl LocalStoredState {

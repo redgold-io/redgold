@@ -19,8 +19,9 @@ use log::{error, info};
 use metrics::{gauge, Label};
 use tokio::runtime::Runtime;
 use tracing::trace;
-
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_data::data_store::DataStore;
+use redgold_gui::image_capture_openpnp::debug_capture;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, from_hex, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::constants::default_node_internal_derivation_path;
@@ -611,11 +612,13 @@ impl ArgTranslate {
     fn immediate_debug(&self) {
         if let Some(cmd) = &self.opts.subcmd {
             match cmd {
-                RgTopLevelSubcommand::TestCapture(_t) => {
+                RgTopLevelSubcommand::TestCapture(t) => {
                     println!("Attempting test capture");
-                    // debug_capture();
-                    unsafe {
-                        exit(0)
+                    #[cfg(target_os = "linux")] {
+                        debug_capture(t.cam);
+                        unsafe {
+                            exit(0)
+                        }
                     }
                 }
                 _ => {}
@@ -635,7 +638,7 @@ There's internal libraries for getting the current exe path and calculating chec
 seem to produce a different result than the shell script.
 */
 fn calc_sha_sum(path: String) -> RgResult<String> {
-    redgold_schema::util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
+    redgold_common_no_wasm::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
         .and_then(|x|
             x.0
              .split_whitespace()

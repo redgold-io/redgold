@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use log::info;
 use serde::{Deserialize, Serialize};
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
@@ -40,7 +41,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
         ssh.exes(cmd, &output_handler).await.expect("");
         tokio::time::sleep(Duration::from_secs(1)).await;
         let user = s.username.unwrap_or("root".to_string());
-        let res = redgold_schema::util::cmd::run_bash_async(
+        let res = redgold_common_no_wasm::cmd::run_bash_async(
             format!(
                 "scp {}@{}:~/.rg/{}/{} {}",
                 user, s.host.clone(), net_str, fnm_export, fnm_export)

@@ -8,6 +8,8 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "structs.PortOpenRequest",
+        "structs.PortOpenResponse",
         "structs.KeepAliveRequest",
         "structs.KeepAliveResponse",
         "structs.GetSeedsRequest",
@@ -178,6 +180,7 @@
       "description": "serde support for enum",
       "attr": "#[derive(serde::Serialize, serde::Deserialize, strum_macros::EnumString, strum_macros::EnumIter)]",
       "paths": [
+        "structs.TransportBackend",
         "structs.PowProofType",
         "structs.PartyPurpose",
         "structs.PriceSource",

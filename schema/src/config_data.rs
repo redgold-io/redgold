@@ -28,7 +28,14 @@ pub struct NodeData {
     pub words: Option<String>,
     pub peer_id: Option<String>,
     pub network: Option<String>,
-    pub disable_control_api: Option<bool>
+    pub disable_control_api: Option<bool>,
+    pub nat_traversal_required: Option<bool>
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct SecureData {
+    salt_mnemonic: String
 }
 
 // Migrate node_config stuff here
@@ -40,6 +47,7 @@ pub struct ConfigData {
     pub debug_settings: DebugSettings,
     pub local_stored_state: LocalStoredState,
     pub portfolio_fulfillment_config_data: PortfolioFulfillmentConfigData,
+    pub secure_data: SecureData,
 }
 
 impl Default for ConfigData {
@@ -56,6 +64,7 @@ impl Default for ConfigData {
             },
             local_stored_state: Default::default(),
             portfolio_fulfillment_config_data: Default::default(),
+            secure_data: Default::default(),
         }
     }
 }

@@ -12,10 +12,10 @@ use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
 use uuid::Uuid;
-use redgold_schema::{RgResult, SafeOption, struct_metadata_new, structs, task_local, task_local_map};
+use redgold_schema::{struct_metadata_new, structs, RgResult, SafeOption};
 use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, UtxoId, ValidationType};
 
-use crate::core::internal_message::{Channel, new_bounded_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::{new_bounded_channel, Channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::transaction::TransactionTestContext;
 use redgold_data::data_store::DataStore;
@@ -46,6 +46,7 @@ use crate::core::transact::tx_validate::TransactionValidator;
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
+use redgold_schema::util::task_local::task_local_impl::task_local_map;
 
 #[derive(Clone)]
 pub struct Conflict {

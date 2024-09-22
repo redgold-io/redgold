@@ -47,6 +47,9 @@ impl PeerOutgoingEventHandler {
             let res = relay.ds.peer_store.query_public_key_metadata(&pk).await?;
             // TODO if metadata known, check if udp is required
             if let Some(nmd) = res {
+                if nmd.transport_info.as_ref().and_then(|r| r.nat_restricted).unwrap_or(false) {
+                    relay.peer_info.
+                }
                 Self::send_message_rest(message.clone(), nmd, &relay).await?;
             } else {
                 // error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);

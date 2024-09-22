@@ -4,13 +4,15 @@ use std::{error::Error, io};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::task_local;
-use tracing::{debug, error, event, info, Level, span, Span, warn};
+use tracing::{debug, error, event, info, span, warn, Level, Span};
 use tracing_subscriber::fmt::format::{FmtSpan, Format};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use redgold_schema::{error_info, error_message, task_local, task_local_map};
+use redgold_schema::{error_info, error_message};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::ErrorInfo;
+use redgold_schema::util::task_local;
+use redgold_schema::util::task_local::task_local_map;
 use crate::api::public_api::run_server;
 use crate::core::relay::Relay;
 
@@ -218,7 +220,7 @@ async fn debug_task() -> ErrorInfo {
 #[ignore]
 #[tokio::test]
 pub async fn debug_task_local() {
-    let r = task_local("test", "asdf", debug_task()).await;
+    let r = task_local::task_local("test", "asdf", debug_task()).await;
     println!("r: {}", r.json_pretty_or());
 }
 

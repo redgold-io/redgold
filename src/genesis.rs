@@ -1,8 +1,8 @@
 use itertools::Itertools;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_support::AddressSupport;
 use crate::schema::structs::Transaction;
 use redgold_keys::TestConstants;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::constants::{EARLIEST_TIME, MAX_COIN_SUPPLY};

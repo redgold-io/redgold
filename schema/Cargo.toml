@@ -14,6 +14,7 @@ categories = ["cryptography::cryptocurrencies"]
 
 
 [dependencies]
+toml = {workspace = true}
 sha3 = "0.10.8"
 prost = "0.11.9"
 prost-helper = "0.7.0"
@@ -30,8 +31,8 @@ anyhow = "1"
 #uuid = { version = "1.3.3", features = ["serde", "v4"] }
 csv = "1.1"
 num-traits = "0.2.15"
-tokio = { version = "1.36.0", features = ["rt", "process", "fs"]}
-rand = { workspace = true }
+
+#rand = { workspace = true }
 num-bigint = { workspace = true }
 async-trait = "0.1.78"
 chrono = "0.4.33"
@@ -39,6 +40,9 @@ log = "0.4.21"
 tracing = { workspace = true }
 # TODO: Remove dependency
 clap = { version = "4.3.21", features = ["derive", "env"] }
+
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "wasi")))'.dependencies]
+tokio = { version = "1.36.0", features = ["rt", "process", "fs"]}
 
 # TODO: Change to feature only for not including in WASM
 
