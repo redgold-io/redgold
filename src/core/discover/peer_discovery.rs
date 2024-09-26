@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::TryFutureExt;
 use itertools::Itertools;
 // use libp2p::request_response::RequestResponseMessage::Request;
-use log::{info, trace};
+use tracing::{info, trace};
 use metrics::counter;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;

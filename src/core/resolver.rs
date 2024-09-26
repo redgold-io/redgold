@@ -8,7 +8,7 @@ use crate::core::relay::Relay;
 use async_trait::async_trait;
 use futures::{future, TryFutureExt};
 use itertools::Itertools;
-use log::info;
+use tracing::info;
 use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};

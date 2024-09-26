@@ -10,7 +10,7 @@ use eframe::egui::{Align, ScrollArea, TextStyle};
 use eframe::egui;
 use flume::Sender;
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use redgold_schema::{error_info, RgResult};
 
 use crate::util::sym_crypt;
@@ -41,7 +41,6 @@ impl PublicKeyStoredState for LocalStoredState {
 
 
 // #[derive(Clone)]
-// #[derive(Clone)]
 pub struct LocalState {
     active_tab: Tab,
     session_salt: [u8; 32],
@@ -70,7 +69,7 @@ pub struct LocalState {
     pub server_state: ServersState,
     pub current_time: i64,
     pub keygen_state: KeygenState,
-    pub wallet_state: WalletState,
+    pub wallet: WalletState,
     pub qr_state: QrState,
     pub qr_show_state: QrShowState,
     pub identity_state: IdentityState,
@@ -96,7 +95,7 @@ impl LocalState {
         match p0 {
             Tab::Home => {}
             Tab::Keys => {
-                init_state(&mut self.wallet_state)
+                init_state(&mut self.wallet)
             }
             Tab::Transact => {}
             Tab::Portfolio => {}
@@ -259,8 +258,8 @@ impl LocalState {
         let res = ls.external_network_resources.clone();
         let config = ls.node_config.clone();
         let currency = ls.swap_state.currency_input_box.input_currency.clone();
-        let pk = ls.wallet_state.public_key.clone().unwrap();
-        let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+        let pk = ls.wallet.public_key.clone().unwrap();
+        let kp = ls.wallet.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
         let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
         info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
         let map = ls.price_map_incl_rdg();
@@ -285,7 +284,7 @@ impl LocalState {
             }
             _ => panic!("Unsupported currency")
         };
-        let address_info = ls.wallet_state.address_info.clone();
+        let address_info = ls.wallet.address_info.clone();
 
         let secret = kp.to_private_hex();
         // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
@@ -421,7 +420,7 @@ impl LocalState {
             keygen_state: KeygenState::new(
                 node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
             ),
-            wallet_state: WalletState::new(hot_mnemonic, local_stored_state.xpubs.first()),
+            wallet: WalletState::new(hot_mnemonic, local_stored_state.xpubs.first()),
             qr_state: Default::default(),
             qr_show_state: Default::default(),
             identity_state: IdentityState::new(),
@@ -460,7 +459,7 @@ impl LocalState {
             if let Ok(m) = df.all().mnemonic().await {
                 if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
                     let key_name = "secure_df_all".to_string();
-                    ls.wallet_state.selected_key_name = key_name.clone();
+                    ls.wallet.selected_key_name = key_name.clone();
                     ls.add_mnemonic(key_name.clone(), m, false);
                     if let Ok(xpub) = w.named_xpub(key_name, true) {
                         new_xpubs.push(xpub);
@@ -503,7 +502,7 @@ impl LocalState {
 
         if !new_xpubs.is_empty() {
             let first_xpub = new_xpubs.get(0).unwrap().clone();
-            ls.wallet_state.selected_xpub_name = first_xpub.name.clone();
+            ls.wallet.selected_xpub_name = first_xpub.name.clone();
             ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
         }
 
@@ -569,7 +568,7 @@ pub enum Tab {
     OTP,
 }
 
-fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
+fn update_lock_screen<G>(app: &mut ClientApp<G>, ctx: &egui::Context) where G: GuiDepends + Clone + Send {
     let ClientApp { local_state, .. } = app;
     egui::CentralPanel::default().show(ctx, |ui| {
         let layout = egui::Layout::top_down(egui::Align::Center);
@@ -602,6 +601,7 @@ fn update_lock_screen(app: &mut ClientApp, ctx: &egui::Context) {
 
 use redgold_data::data_store::DataStore;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::dhash_vec;
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -638,11 +638,9 @@ static INIT: Once = Once::new();
 //     });
 // }
 
-pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-    let ClientApp {
-        logo,
-        local_state,
-    } = app;
+pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send {
+    let logo = app.logo.clone();
+    let local_state = &mut app.local_state;
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
@@ -687,25 +685,11 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     egui::SidePanel::left("side_panel")
         .resizable(false)
         .show(ctx, |ui| {
-            // ui.horizontal(|ui| {
-            //     ui.label("Write something: ");
-            //     ui.text_edit_singleline(label);
-            // });
-            // ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-
-            //https://github.com/emilk/egui/blob/master/egui_demo_lib/src/apps/http_app.rs
-            // ui.image(TextureId::default())
-
             ui.set_max_width(54f32);
-            // ui.set_max_width(104f32);
 
             ui.with_layout(
                 egui::Layout::top_down_justified(egui::Align::default()),
                 |ui| {
-                    let scale = 2.0;
-                    let size =
-                        egui::Vec2::new((img.size()[0] as f32 / scale) as f32, (img.size()[1] as f32 / scale) as f32);
-                    // ui.style_mut().spacing.window_padding.y += 20.0f32;
                     ui.add_space(10f32);
                     // ui.image(texture_id); //, size);
                     let image = egui::Image::new(egui::include_image!("../resources/images/historical/design_one/logo_orig_crop.png"));
@@ -719,10 +703,6 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
 
                     ui.style_mut().spacing.item_spacing.y = 5f32;
                     ui.add_space(10f32);
-                    //
-                    // if ui.button("Home").clicked() {
-                    //     *tab = Tab::Home;
-                    // }
                     for tab_i in Tab::iter() {
                         let tab_str = format!("{:?}", tab_i);
                         if ui.button(tab_str).clicked() {
@@ -731,27 +711,10 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                             changed_tab = Some(tab_i.clone());
                         }
                     }
-                    //
-                    // if ui.button("Wallet").clicked() {
-                    //     *tab = Tab::Wallet;
-                    // }
-                    //
-                    // if ui.button("Settings").clicked() {
-                    //     *tab = Tab::Wallet;
-                    // }
                 },
             );
-
-            // ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-            //     ui.add(
-            //         egui::Hyperlink::new("https://github.com/emilk/egui/").text("powered by egui"),
-            //     );
-            // });
         });
 
-    // if ctx.input().key_pressed(egui::Key::Escape) {
-    //     local_state.session_locked = true;
-    // }
     let has_changed_tab = changed_tab.is_some();
 
     egui::CentralPanel::default().show(ctx, |ui| {
@@ -761,7 +724,6 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
                 home::home_screen(ui, ctx, local_state);
             }
             Tab::Keys => {
-
                 keys_tab(ui, ctx, local_state, has_changed_tab);
             }
             Tab::Settings => {
@@ -787,11 +749,6 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
             }
             _ => {}
         }
-        // ui.hyperlink("https://github.com/emilk/egui_template");
-        // ui.add(egui::github_link_file!(
-        //     "https://github.com/emilk/egui_template/blob/master/",
-        //     "Source code."
-        // ));
         ui.with_layout(egui::Layout::top_down(Align::BOTTOM), |ui| {
             egui::warn_if_debug_build(ui)
         });
@@ -800,6 +757,4 @@ pub fn app_update(app: &mut ClientApp, ctx: &egui::Context, _frame: &mut eframe:
     qr_window(ctx, local_state);
     qr_show_window(ctx, local_state);
 
-    // sync local data to RDS -- apart from data associated with phrases
-    // discuss extra features around confirmation process. p2p negotation, contacts table.
 }

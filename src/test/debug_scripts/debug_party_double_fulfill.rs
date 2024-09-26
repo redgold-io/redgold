@@ -6,7 +6,8 @@ use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
 use crate::party::data_enrichment::PartyInternalData;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_events::PartyEvents;
+use crate::party::party_stream::PartyEventBuilder;
 
 #[ignore]
 #[tokio::test]

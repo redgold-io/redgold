@@ -172,7 +172,7 @@ qrencode = "0.14.0"
 csscolorparser = "0.6.2"
 
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
-
+derivative = "2.2.0"
 
 [dependencies.getrandom]
 version = "0.2.12"
@@ -223,3 +223,6 @@ dns-lookup = "2.0.2" #Dependencies for email sending
 # Re-enable later
 #openpnp_capture = "0.2.4"
 #openpnp_capture_sys = "0.4.0"
+
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-Wl,-stack_size,81920000"]

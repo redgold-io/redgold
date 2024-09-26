@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use itertools::Itertools;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
@@ -10,10 +11,10 @@ use redgold_schema::structs::{Hash, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::party::data_enrichment::PartyInternalData;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_events::PartyEvents;
+use crate::party::party_stream::PartyEventBuilder;
 
 #[ignore]
 #[tokio::test]
@@ -152,7 +153,7 @@ async fn debug_events2() -> RgResult<()> {
     }
 
     let tx = tb.build().expect("build");
-    pev.relay = Some(relay.clone());
+    // pev.relay = Some(relay.clone());
     pev.validate_rdg_swap_fulfillment_transaction(&tx).expect("");
 
     //

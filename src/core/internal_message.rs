@@ -37,7 +37,14 @@ pub struct PeerMessage {
     pub node_metadata: Option<NodeMetadata>,
     pub dynamic_node_metadata: Option<DynamicNodeMetadata>,
     pub send_timeout: Duration,
-    pub origin: MessageOrigin
+    pub origin: MessageOrigin,
+    pub requested_transport: Option<TransportBackend>
+}
+
+impl Default for PeerMessage {
+    fn default() -> Self {
+        Self::empty()
+    }
 }
 
 impl PeerMessage {
@@ -52,6 +59,7 @@ impl PeerMessage {
             dynamic_node_metadata: None,
             send_timeout: Duration::from_secs(150),
             origin: MessageOrigin::Rest,
+            requested_transport: None,
         }
     }
 
@@ -93,7 +101,7 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::select;
 use tokio::task::JoinHandle;
 use redgold_schema::{error_info, ErrorInfoContext, structs};
-use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata};
+use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata, TransportBackend};
 use crate::api::rosetta::models::Peer;
 use redgold_schema::conf::node_config::NodeConfig;
 

@@ -1,7 +1,7 @@
 use bdk::bitcoin::bech32::ToBase32;
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, ScrollArea, TextEdit, Ui};
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
@@ -38,6 +38,7 @@ pub enum KeygenSubSubTab {
     XPubs
 }
 
+#[derive(Clone)]
 pub struct KeyTabState {
     pub keygen_subtab: KeygenSubTab,
     pub subsubtab: KeygenSubSubTab,
@@ -78,13 +79,13 @@ pub fn manage_view(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_
     ui.horizontal(|ui| {
         add_new_key_button(ls, ui);
         add_xpub_csv_button(ls, ui, ctx);
-        ls.keytab_state.request_xpub.view(ui, ctx, &ls.updates, ls.wallet_state.device_list_status.device_output.clone());
+        ls.keytab_state.request_xpub.view(ui, ctx, &ls.updates, ls.wallet.device_list_status.device_output.clone());
     });
 
     save_key_window::save_key_window(ui, ls, ctx);
 
-    if ls.wallet_state.public_key.is_none() {
-        ls.wallet_state.update_hot_mnemonic_or_key_info();
+    if ls.wallet.public_key.is_none() {
+        ls.wallet.update_hot_mnemonic_or_key_info();
     }
 
     keygen_subtab::mnemonic_window(ctx, ls);
@@ -133,12 +134,12 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
     ui.horizontal(|ui| {
         let has_changed_key = key_source(ui, ls);
         need_keys_update = has_changed_key;
-        medium_data_item(ui,"Checksum: ", &ls.wallet_state.mnemonic_or_key_checksum);
+        medium_data_item(ui,"Checksum: ", &ls.wallet.mnemonic_or_key_checksum);
         if ui.button("Show Key").clicked() {
-            if ls.wallet_state.active_hot_private_key_hex.is_none() {
+            if ls.wallet.active_hot_private_key_hex.is_none() {
                 ls.keygen_state.mnemonic_window_state.set_words(
-                    ls.wallet_state.hot_mnemonic().words,
-                    ls.wallet_state.selected_key_name.clone(),
+                    ls.wallet.hot_mnemonic().words,
+                    ls.wallet.selected_key_name.clone(),
                 );
             } else {
                 ls.keytab_state.show_private_key_window = true;
@@ -148,7 +149,7 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
 
     let dp_has_changed_key = ls.keytab_state.key_derivation_path_input.view(ui);
     // TODO: Hot passphrase should ONLY apply to mnemonics as it doesn't work for private keys
-    if ls.wallet_state.active_hot_private_key_hex.is_none() {
+    if ls.wallet.active_hot_private_key_hex.is_none() {
         let update_clicked = hot_passphrase_section(ui, ls);
         if update_clicked {
             need_keys_update = true;
@@ -159,19 +160,19 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
         update_keys_key_info(ls);
     }
     // Show seed checksum (if mnemonic)
-    if ls.wallet_state.active_hot_private_key_hex.is_none() {
-        medium_data_item(ui,"Seed Checksum: ", ls.wallet_state.seed_checksum.as_ref().unwrap_or(&"".to_string()));
+    if ls.wallet.active_hot_private_key_hex.is_none() {
+        medium_data_item(ui,"Seed Checksum: ", ls.wallet.seed_checksum.as_ref().unwrap_or(&"".to_string()));
     }
 
     ls.keytab_state.keys_key_info.view(ui);
 
-    if ls.wallet_state.active_hot_private_key_hex.is_none() {
+    if ls.wallet.active_hot_private_key_hex.is_none() {
         ui.horizontal(|ui| {
             editable_text_input_copy(ui, "Save XPub Account Name:", &mut ls.keytab_state.save_xpub_account_name, 150.0);
             if ui.button("Save").clicked() {
                 let derivation_path = ls.keytab_state.key_derivation_path_input.derivation_path.as_account_path();
                 if let Some(derivation_account_path) = derivation_path {
-                    let m = ls.wallet_state.hot_mnemonic();
+                    let m = ls.wallet.hot_mnemonic();
                     if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
                         let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
                         let check = m.checksum().unwrap_or("".to_string());
@@ -181,13 +182,13 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
                         let equal = words_public == xpub_public;
                         info!("Adding xpub to local state from keys tab with words pass \
                         checksum: {check} equal {equal} words public: {words_public} xpub public: {xpub_public}");
-                        let ho = Some(ls.wallet_state.hot_offset.clone()).filter(|x| !x.is_empty());
+                        let ho = Some(ls.wallet.hot_offset.clone()).filter(|x| !x.is_empty());
                         ls.add_named_xpubs(true,  vec![NamedXpub {
                             name: ls.keytab_state.save_xpub_account_name.clone(),
                             xpub,
                             derivation_path: derivation_account_path,
                             hot_offset: ho,
-                            key_name_source: Some(ls.wallet_state.selected_key_name.clone()),
+                            key_name_source: Some(ls.wallet.selected_key_name.clone()),
                             device_id: None,
                             key_reference_source: None,
                             key_nickname_source: None,
@@ -236,9 +237,9 @@ pub(crate) fn show_private_key_window(
         .default_width(300.0)
         .show(ctx, |ui| {
             ui.vertical(|ui| {
-                ui.label(ls.wallet_state.selected_key_name.clone());
+                ui.label(ls.wallet.selected_key_name.clone());
                 ui.horizontal(|ui| {
-                    let mut kp = ls.wallet_state.active_hot_private_key_hex.clone().unwrap_or("".to_string());
+                    let mut kp = ls.wallet.active_hot_private_key_hex.clone().unwrap_or("".to_string());
                     TextEdit::multiline(&mut kp)
                         .desired_width(400f32).show(ui);
                     copy_to_clipboard(ui, kp.clone());
@@ -261,15 +262,15 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
         ui.label("Select XPub");
         ComboBox::from_label("".to_string())
             .width(125.0)
-            .selected_text(ls.wallet_state.selected_xpub_name.clone())
+            .selected_text(ls.wallet.selected_xpub_name.clone())
             .show_ui(ui, |ui| {
                 for style in ls.local_stored_state.xpubs.iter().map(|x| x.name.clone()) {
-                    ui.selectable_value(&mut ls.wallet_state.selected_xpub_name, style.clone(), style.to_string());
+                    ui.selectable_value(&mut ls.wallet.selected_xpub_name, style.clone(), style.to_string());
                 }
-                ui.selectable_value(&mut ls.wallet_state.selected_xpub_name,
+                ui.selectable_value(&mut ls.wallet.selected_xpub_name,
                                     "Select Xpub".to_string(), "Select Xpub".to_string());
             });
-        xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name)
+        xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
                 .cloned();
         if let Some(xp) = &xpub {
             let i = xp.xpub.len();
@@ -279,59 +280,60 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
             if ui.button("Show XPub").clicked() {
                 ls.keytab_state.show_xpub = true;
             }
+            ui.checkbox(&mut ls.wallet.view_additional_xpub_details, "Show Key Details");
         }
 
     });
 
+    if ls.wallet.view_additional_xpub_details {
+        if let Some(xp) = xpub.as_ref() {
+            show_xpub_window(ctx, ls, xp.clone());
 
-    if let Some(xp) = xpub.as_ref() {
-        show_xpub_window(ctx, ls, xp.clone());
+            ui.horizontal(|ui| {
+                if let Some(ap) = xp.derivation_path.as_account_path() {
+                    ls.keytab_state.derivation_path_xpub_input_account.account_derivation_path = ap;
+                    // medium_data_item(ui, "Account:", ap);
+                }
+                if let Some(rt) = &xp.request_type {
+                    medium_data_item(ui, "Type:", format!("{:?}", rt));
+                }
+                if let Some(ks) = &xp.key_name_source {
+                    medium_data_item(ui, "Key Name:", ks);
+                }
+                if let Some(ho) = &xp.hot_offset {
+                    medium_data_item(ui, "Hot Offset:", ho);
+                }
+            });
+        }
 
         ui.horizontal(|ui| {
-        if let Some(ap) = xp.derivation_path.as_account_path() {
-            ls.keytab_state.derivation_path_xpub_input_account.account_derivation_path = ap;
-            // medium_data_item(ui, "Account:", ap);
-        }
-        if let Some(rt) = &xp.request_type {
-            medium_data_item(ui, "Type:", format!("{:?}", rt));
-        }
-        if let Some(ks) = &xp.key_name_source {
-            medium_data_item(ui, "Key Name:", ks);
-        }
-        if let Some(ho) = &xp.hot_offset {
-            medium_data_item(ui, "Hot Offset:", ho);
-        }
+            if ls.keytab_state.derivation_path_xpub_input_account.view(ui) {
+                update = true;
+            }
+            if ui.button("Update").clicked() {
+                update = true;
+            }
         });
 
-    }
-
-    ui.horizontal(|ui| {
-        if ls.keytab_state.derivation_path_xpub_input_account.view(ui) {
+        if ls.wallet.last_selected_xpub_name != ls.wallet.selected_xpub_name {
+            ls.wallet.last_selected_xpub_name = ls.wallet.selected_xpub_name.clone();
+            info!("Selected xpub changed to {} returning {}", ls.wallet.selected_xpub_name.clone(), xpub.json_or());
             update = true;
         }
-        if ui.button("Update").clicked() {
-            update = true;
+
+        if update || first_init {
+            update_xpub_key_info(ls);
         }
-    });
 
-    if ls.wallet_state.last_selected_xpub_name != ls.wallet_state.selected_xpub_name {
-        ls.wallet_state.last_selected_xpub_name = ls.wallet_state.selected_xpub_name.clone();
-        info!("Selected xpub changed to {} returning {}", ls.wallet_state.selected_xpub_name.clone(), xpub.json_or());
-        update = true;
+        ls.keytab_state.xpub_key_info.view(ui);
     }
-
-    if update || first_init {
-        update_xpub_key_info(ls);
-    }
-
-    ls.keytab_state.xpub_key_info.view(ui);
 
     (update, xpub)
 }
 pub fn add_xpub_csv_button(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context) {
     window_xpub_loader(ui, ls, ctx);
     if ui.button("Add XPubs From CSV").clicked() {
-        ls.wallet_state.show_xpub_loader_window = true;
+        ls.wallet.show_xpub_loader_window = true;
     }
 }
 

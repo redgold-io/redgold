@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use futures::TryStreamExt;
-use log::info;
+use tracing::info;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;

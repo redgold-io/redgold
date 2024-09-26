@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use async_trait::async_trait;
-use log::info;
+use tracing::info;
 use redgold_data::data_store::DataStore;
 use redgold_data::parquet_export::ParquetExporter;
 use redgold_schema::{ErrorInfoContext, RgResult};

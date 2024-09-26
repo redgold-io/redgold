@@ -1,7 +1,7 @@
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::util::{self};
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 

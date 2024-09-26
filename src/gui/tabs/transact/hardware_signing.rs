@@ -28,9 +28,9 @@ pub fn initiate_hardware_signing(t: Transaction, send: Sender<StateUpdate>, publ
             .unwrap_or("Signing error".to_string()));
 
         let fun = move |ls: &mut LocalState| {
-            ls.wallet_state.update_signed_tx(st.clone());
-            ls.wallet_state.signing_flow_transaction_box_msg = st_msg.clone();
-            ls.wallet_state.signing_flow_status = ss.clone();
+            ls.wallet.update_signed_tx(st.clone());
+            ls.wallet.signing_flow_transaction_box_msg = st_msg.clone();
+            ls.wallet.signing_flow_status = ss.clone();
         };
         let up = StateUpdate {
             update: Box::new(fun),

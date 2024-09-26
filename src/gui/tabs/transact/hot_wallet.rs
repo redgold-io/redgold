@@ -12,7 +12,7 @@ pub fn hot_header(ls: &mut LocalState, ui: &mut Ui, _ctx: &egui::Context) {
 
     key_source(ui, ls);
 
-    let state = &mut ls.wallet_state;
+    let state = &mut ls.wallet;
 
     let check = state.mnemonic_or_key_checksum.clone();
     ui.label(format!("Hot Wallet Checksum: {check}"));

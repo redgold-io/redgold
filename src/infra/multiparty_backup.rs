@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeOption};

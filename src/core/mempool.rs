@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use flume::{SendError, TrySendError};
 use futures::FutureExt;
 use itertools::Itertools;
-use log::Level;
+use tracing::Level;
 use metrics::{counter, gauge};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
@@ -55,7 +55,6 @@ impl Mempool {
         let is_known = self.relay.transaction_known(&h).await.mark_abort()?;
         if is_known {
             Err(error_info("Transaction already in process or known"))
-                .level(Level::Trace)
                 .mark_skip_log()?
             // TODO: Add a subscriber to relay and at end of transaction process notify all subscribers
             // Notify subscribers for transaction channel rather than just dropping and returning error

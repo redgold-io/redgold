@@ -6,7 +6,7 @@ use dashmap::mapref::entry::Entry;
 use flume::{Sender, TryRecvError};
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use metrics::{counter, histogram};
 use tokio::runtime::Runtime;
 use tokio::select;

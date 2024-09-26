@@ -280,7 +280,7 @@ fn use_hot_mnemonic(ui: &mut Ui, ls: &mut LocalState) {
     if ls.otp_state.use_hot_mnemonic {
         ui.horizontal(|ui| {
             ui.label("Mnemonic checksum");
-            ui.label(ls.wallet_state.hot_mnemonic().checksum().expect("ok"));
+            ui.label(ls.wallet.hot_mnemonic().checksum().expect("ok"));
         });
     }
 }

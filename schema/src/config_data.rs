@@ -29,13 +29,16 @@ pub struct NodeData {
     pub peer_id: Option<String>,
     pub network: Option<String>,
     pub disable_control_api: Option<bool>,
-    pub nat_traversal_required: Option<bool>
+    pub nat_traversal_required: Option<bool>,
+    pub udp_keepalive_seconds: Option<u64>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(default)]
 pub struct SecureData {
-    salt_mnemonic: String
+    salt_mnemonic: String,
+    session_salt: String,
+    session_hashed_password: String,
 }
 
 // Migrate node_config stuff here

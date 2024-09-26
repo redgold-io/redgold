@@ -1,4 +1,4 @@
-use log::info;
+use tracing::info;
 use redgold_schema::structs::{ErrorInfo, Seed, SupportedCurrency, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

@@ -6,7 +6,7 @@ use std::time::Duration;
 use futures::executor::block_on;
 use itertools::Itertools;
 // use futures::{SinkExt, StreamExt};
-use log::{error, info};
+use tracing::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tracing::trace;

@@ -8,6 +8,13 @@ impl HashClear for NodeMetadata {
 }
 
 impl NodeMetadata {
+
+    pub fn nat_traversal_required(&self) -> bool {
+        self.transport_info
+            .as_ref()
+            .and_then(|t| t.nat_restricted)
+            .unwrap_or(false)
+    }
     pub fn port_or(&self, network: NetworkEnvironment) -> u16 {
         self.transport_info.as_ref()
             .and_then(|ti| ti.port_offset)

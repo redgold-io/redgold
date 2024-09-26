@@ -14,7 +14,6 @@ use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_common_no_wasm::cmd::{run_cmd, run_cmd_safe};
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use flume::Sender;
 use itertools::Itertools;
 
-use log::{error, info};
+use tracing::{error, info};
 use rocket::form::FromForm;
 use tokio::task::JoinHandle;
 

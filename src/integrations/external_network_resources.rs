@@ -8,7 +8,7 @@ use bdk::sled::Tree;
 use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::MemoryDatabase;
 use itertools::Itertools;
-use log::info;
+use tracing::info;
 use tokio::sync::Mutex;
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
@@ -23,7 +23,7 @@ use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, Pa
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::node_config::NodeConfigKeyPair;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_events::PartyEvents;
 use crate::scrape::okx_point;
 use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;

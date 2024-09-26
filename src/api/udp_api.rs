@@ -18,11 +18,12 @@ use std::sync::Arc;
 use futures::{Stream, TryStreamExt};
 use futures::stream::{BoxStream, SplitSink, SplitStream};
 use itertools::Itertools;
+use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
 use uuid::Uuid;
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{bytes_data, ErrorInfoContext};
+use redgold_schema::{bytes_data, ErrorInfoContext, RgResult};
 use redgold_schema::structs::{ErrorInfo, Request, Response, UdpMessage};
 use crate::core::internal_message::{Channel, new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, MessageOrigin};
 use crate::core::relay::Relay;
@@ -204,7 +205,6 @@ impl UdpMessageSupport for UdpMessage {
             parts,
             uuid: Uuid::new_v4().to_string(),
             timestamp: util::current_time_millis_i64(),
-            response_to_uuid: None,
         }
     }
 }
@@ -229,11 +229,11 @@ pub struct UdpServer {
 const UDP_CHUNK_SIZE : usize = 4096;
 
 impl UdpServer {
-    pub(crate) async fn new(
-        peer_messages: &Channel<PeerMessage>,
-        udp_messages: &Channel<PeerMessage>,
+    pub async fn new(
+        incoming_peer_messages: Channel<PeerMessage>,
+        outgoing_udp_messages: Channel<PeerMessage>,
         port: Option<u16>
-    ) -> Result<(), ErrorInfo> {
+    ) -> RgResult<()> {
         let port = port.unwrap_or(0);
         let addr = format!("0.0.0.0:{}", port.to_string());
         let socket =
@@ -245,8 +245,8 @@ impl UdpServer {
         let mut server = Self {
             // socket,
             sink,
-            peer_message_rx: peer_messages.clone(),
-            udp_outgoing_messages: udp_messages.clone(),
+            peer_message_rx: incoming_peer_messages.clone(),
+            udp_outgoing_messages: outgoing_udp_messages.clone(),
             messages: Default::default(),
             response_channels: Default::default(),
         };
@@ -284,12 +284,16 @@ impl UdpServer {
     async fn check_is_response(&mut self, request: &Request) -> bool {
         if let Some(r) = request.response.as_ref() {
             if let Some(m) = r.response_metadata.as_ref() {
-                if let Some(handler) = self.response_channels.get(m.request_id.as_ref()) {
-                    handler.sender.send_rg_err(r.clone()).ok();
-                    // todo metric
+                if let Some(rid) = m.request_id.as_ref() {
+                    if let Some(handler) = self.response_channels.get(rid) {
+                        handler.sender.send_rg_err(r.clone()).ok();
+                        return true
+                        // todo metric
+                    }
                 }
             }
         }
+        false
     }
 
     async fn send_rx_incoming_log(&mut self, data: Vec<u8>, addr: SocketAddr) -> Result<(), ErrorInfo> {

@@ -8,7 +8,7 @@ use crate::schema::structs::{
     DownloadDataType, DownloadRequest, DownloadResponse, NodeState, Request, Response,
 };
 use crate::util;
-use log::{error, info};
+use tracing::{error, info};
 use redgold_schema::constants::EARLIEST_TIME;
 use std::time::Duration;
 use futures::StreamExt;

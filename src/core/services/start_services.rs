@@ -17,6 +17,7 @@ use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::{api, e2e};
 use crate::api::udp_api::UdpServer;
+use crate::api::udp_keepalive::UdpKeepAlive;
 use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty_gg20::gg20_sm_manager;
@@ -43,7 +44,23 @@ impl Node {
         let mut sjh = ServiceJoinHandles::default();
 
 
-        sjh.add("UdpServer", UdpServer::new(relay.clone(), None));
+        let udp = UdpServer::new(
+            relay.peer_message_rx.clone(),
+            relay.udp_outgoing_messages.clone(),
+            Some(node_config.udp_port()));
+        sjh.add("UdpServer", tokio::spawn(udp));
+
+        if node_config.config_data.node_data.nat_traversal_required.unwrap_or(false) ||
+            relay.node_metadata().await.map(|n| n.nat_traversal_required()).unwrap_or(false) {
+            let alive = UdpKeepAlive::new(&relay.peer_message_tx,
+                                          node_config.config_data.node_data
+                                              .udp_keepalive_seconds
+                                              .map(Duration::from_secs),
+                                          vec![],
+                                          &relay
+            );
+            sjh.add("UdpKeepAlive", alive);
+        };
         // Internal RPC control equivalent, used for issuing commands to node
         // Disabled in high security mode
         // Only needs to run on certain environments?
@@ -99,7 +116,7 @@ impl Node {
         let discovery = Discovery::new(relay.clone()).await;
         sjh.add("discovery.interval", run_interval_fold(
             discovery.clone(), relay.node_config.discovery_interval, false
-        ).await);
+        ));
 
 
         sjh.add("discovery.receiver", run_recv_concurrent(
@@ -109,17 +126,17 @@ impl Node {
         let watcher = PartyWatcher::new(&relay, external_network_resources);
         sjh.add("PartyWatcher", run_interval_fold(
             watcher, Duration::from_millis(relay.node_config.config_data.party_config_data.poll_interval as u64), false
-        ).await);
+        ));
 
         sjh.add("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone())));
 
         sjh.add("Shuffle", run_interval_fold(
             Shuffle::new(&relay), relay.node_config.shuffle_interval, false
-        ).await);
+        ));
 
         sjh.add("Mempool", run_interval_fold(
             crate::core::mempool::Mempool::new(&relay), relay.node_config.mempool.interval.clone(), false
-        ).await);
+        ));
 
         for i in 0..relay.node_config.contract.bucket_parallelism {
             let opt_c = relay.contract_state_manager_channels.get(i);
@@ -147,17 +164,17 @@ impl Node {
             DataDiscovery {
                 relay: relay.clone(),
             }, Duration::from_secs(300), false
-        ).await);
+        ));
 
         sjh.add("MiscPeriodic", run_interval_fold(
             MiscPeriodic::new(&relay), Duration::from_secs(300), false
-        ).await);
+        ));
         sjh.add("AwsBackup", run_interval_fold(
             crate::core::backup::aws_backup::AwsBackup::new(&relay), Duration::from_secs(86400), false
-        ).await);
+        ));
         sjh.add("RecentParityCheck", run_interval_fold(
             RecentParityCheck::new(&relay), Duration::from_secs(3600), false
-        ).await);
+        ));
 
         sjh.handles
     }

@@ -2,13 +2,29 @@ use eframe::egui;
 use eframe::egui::Ui;
 use egui_extras::{Column, TableBuilder};
 
-pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
 
-    if data.len() == 0 {
-        return;
+#[derive(Clone)]
+pub struct TextTableEvent {
+    pub delete_row_id: Option<usize>,
+}
+
+pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
+    text_table_advanced(ui, data, false, false);
+}
+pub fn text_table_advanced(ui: &mut Ui, data: Vec<Vec<String>>, delete_button: bool, show_empty_headers: bool) -> TextTableEvent {
+
+    let mut event = TextTableEvent {
+        delete_row_id: None,
+    };
+
+    if data.len() < 2 && !show_empty_headers {
+        return event;
     }
 
-    let headers = data.get(0).expect("").clone();
+    let mut headers = data.get(0).expect("").clone();
+    if delete_button {
+        headers.push("".to_string());
+    }
     let columns = headers.len();
 
     let text_height = 25.0;
@@ -32,14 +48,22 @@ pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
         }).body(|body| {
         body.rows(text_height, data.len() - 1, |mut row| {
             let row_index = row.index();
-            let row_data = data.get(row_index + 1).expect("value row missing");
+            let data_ri = row_index + 1;
+            let row_data = data.get(data_ri).expect("value row missing");
             for cell in row_data {
                 row.col(|ui| {
                     ui.label(cell);
                     ui.spacing();
                 });
             }
+            if delete_button {
+                row.col(|ui| {
+                    if ui.button("Delete").clicked() {
+                        event.delete_row_id = Some(row_index);
+                    }
+                });
+            }
         });
     });
-
+    event
 }

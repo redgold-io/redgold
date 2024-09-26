@@ -5,7 +5,8 @@ use crate::core::stream_handlers::IntervalFold;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToCurrencyAddress};
 use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_events::PartyEvents;
+use crate::party::stake_event_stream::StakeMethods;
 
 struct PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources {
     pub relay: Relay,
@@ -29,7 +30,7 @@ impl<T> PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources + Send {
                 delta.clone()
             };
             if to_send > min {
-                let dest = apk.to_currency_address(currency, &self.relay.node_config.network)?;
+                let dest = apk.to_currency_address(currency, &self.relay.node_config.network);
                 if let Ok(mut dest) = dest {
                     dest.mark_external();
                     self.external_resources.send(&dest, &to_send, true, None, None).await?;
@@ -52,7 +53,7 @@ impl<T> IntervalFold for PortfolioFullfillmentAgent<T> where T: ExternalNetworkR
                             // this represents a request for more stake
                             if PartyEvents::meets_minimum_stake_amount(a) {
                                 // proceed potentially with fulfillment.
-                                self.attempt_fulfillment(c, a, &apk)?
+                                self.attempt_fulfillment(c, a, &apk).await?
                             }
                         } else {
                             // this represents a request for a stake withdrawal.

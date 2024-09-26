@@ -14,28 +14,28 @@ pub fn save_key_window(
     ctx: &egui::Context,
 ) {
     egui::Window::new("Add Mnemonic/Private Key")
-        .open(&mut ls.wallet_state.add_new_key_window)
+        .open(&mut ls.wallet.add_new_key_window)
         .resizable(false)
         .collapsible(false)
         .min_width(500.0)
         .default_width(500.0)
         .show(ctx, |ui| {
             ui.vertical(|ui| {
-                editable_text_input_copy(ui, "Name", &mut ls.wallet_state.mnemonic_save_name, 150.0);
-                editable_text_input_copy(ui, "Mnemonic / Key", &mut ls.wallet_state.mnemonic_save_data, 150.0);
-                ui.checkbox(&mut ls.wallet_state.mnemonic_save_persist, "Persist to Disk");
-                valid_label(ui, ls.wallet_state.is_mnemonic_or_kp.is_some());
+                editable_text_input_copy(ui, "Name", &mut ls.wallet.mnemonic_save_name, 150.0);
+                editable_text_input_copy(ui, "Mnemonic / Key", &mut ls.wallet.mnemonic_save_data, 150.0);
+                ui.checkbox(&mut ls.wallet.mnemonic_save_persist, "Persist to Disk");
+                valid_label(ui, ls.wallet.is_mnemonic_or_kp.is_some());
 
                 if ui.button("Save Internal").clicked() {
-                    let name = ls.wallet_state.mnemonic_save_name.clone();
-                    let data = ls.wallet_state.mnemonic_save_data.clone();
+                    let name = ls.wallet.mnemonic_save_name.clone();
+                    let data = ls.wallet.mnemonic_save_data.clone();
                     let mut is_mnemonic: Option<bool> = None;
                     if WordsPass::new(data.clone(), None).mnemonic().is_ok() {
                         is_mnemonic = Some(true);
                     } else if PrivateKey::from_str(data.as_str()).is_ok() {
                         is_mnemonic = Some(false);
                     }
-                    ls.wallet_state.is_mnemonic_or_kp = is_mnemonic.clone();
+                    ls.wallet.is_mnemonic_or_kp = is_mnemonic.clone();
 
                     if let Some(is_m) = is_mnemonic {
                         ls.updates.sender.send(StateUpdate {
@@ -55,10 +55,10 @@ pub fn save_key_window(
                                     }
                                 })
                         }).unwrap();
-                        ls.wallet_state.mnemonic_save_name = "".to_string();
-                        ls.wallet_state.mnemonic_save_data = "".to_string();
+                        ls.wallet.mnemonic_save_name = "".to_string();
+                        ls.wallet.mnemonic_save_data = "".to_string();
                         LocalState::send_update(&ls.updates, |lss| {
-                            lss.wallet_state.add_new_key_window = false;
+                            lss.wallet.add_new_key_window = false;
                         })
                     }
                 }

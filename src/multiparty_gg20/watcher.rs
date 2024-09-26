@@ -3,7 +3,7 @@
 // use bdk::database::MemoryDatabase;
 // use futures::TryFutureExt;
 // use itertools::Itertools;
-// use log::{error, info};
+// use tracing::{error, info};
 //
 // use redgold_schema::{error_info, ErrorInfoContext, from_hex, from_hex_ref, RgResult, SafeOption, structs};
 // use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, InitiateMultipartyKeygenRequest, StakeDeposit, MultipartyIdentifier, NetworkEnvironment, PartyId, PartyInfo, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, Weighting};

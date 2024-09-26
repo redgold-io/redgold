@@ -1,11 +1,11 @@
 use redgold_schema::error_info;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, PublicKey, Transaction};
 use tracing::info;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_support::AddressSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::gui::tabs::transact::wallet_tab::WalletState;
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};

@@ -6,4 +6,5 @@ pub mod hardware_signing;
 pub mod address_query;
 pub mod prepare_tx;
 pub mod broadcast_tx;
-mod prepared_tx_view;
+pub mod prepared_tx_view;
+pub mod portfolio_transact;

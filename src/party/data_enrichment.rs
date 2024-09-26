@@ -5,12 +5,13 @@ use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::party::address_event::AddressEvent;
-use crate::party::order_fulfillment::OrderFulfillment;
-use crate::party::party_stream::{PartyEvents, TransactionWithObservationsAndPrice};
+use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
+use redgold_schema::party::party_events::OrderFulfillment;
+use redgold_schema::party::party_events::PartyEvents;
 use crate::party::party_watcher::PartyWatcher;
-use crate::party::price_query::PriceDataPointUsdQuery;
-use crate::scrape::external_networks::ExternalNetworkData;
+use redgold_schema::party::external_data::PriceDataPointUsdQuery;
+use redgold_schema::party::external_data::ExternalNetworkData;
+use crate::party::price_query::PriceDataPointQueryImpl;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PartyInternalData {

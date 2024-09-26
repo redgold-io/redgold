@@ -1,3 +1,4 @@
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
@@ -8,7 +9,6 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey};
-use redgold_schema::tx::tx_builder::{TransactionBuilderSupport};
 use redgold_schema::util::lang_util::AnyPrinter;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::node_config::{EnvDefaultNodeConfig, ToTransactionBuilder};

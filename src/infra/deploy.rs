@@ -21,10 +21,10 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
 use redgold_common_no_wasm::cmd::{run_bash_async, run_powershell_async};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;

@@ -1,6 +1,6 @@
 use std::hash::Hash;
 use itertools::Itertools;
-use log::info;
+use tracing::info;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 // use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};

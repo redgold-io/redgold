@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use futures::TryFutureExt;
 use itertools::Itertools;
-use log::{info, trace};
+use tracing::{info, trace};
 use tokio::task::JoinHandle;
 use warp::{Filter, get, Rejection};
 use warp::path::Exact;

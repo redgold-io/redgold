@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 use itertools::Itertools;
-use log::info;
+use tracing::info;
 use metrics::counter;
 use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};

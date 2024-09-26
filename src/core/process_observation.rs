@@ -1,6 +1,6 @@
 use dashmap::mapref::one::Ref;
 use futures::{StreamExt, TryStreamExt};
-use log::{debug, info, trace};
+use tracing::{debug, info, trace};
 use metrics::counter;
 use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
 use redgold_schema::util;

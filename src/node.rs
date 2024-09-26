@@ -8,7 +8,7 @@ use futures::{stream, StreamExt};
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
 
-use log::info;
+use tracing::info;
 use metrics::{counter, gauge};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;

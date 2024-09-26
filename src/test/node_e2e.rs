@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use itertools::Itertools;
-use log::info;
-use log::kv::Source;
+use tracing::info;
 use serde::Serialize;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::eth::example::dev_ci_kp;
@@ -29,10 +28,9 @@ use crate::node_config::{ToTransactionBuilder, WordsPassNodeConfig};
 use crate::util;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::observability::metrics_registry;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_events::PartyEvents;
 use crate::test::harness::amm_harness::PartyTestHarness;
 use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 //
@@ -416,7 +414,7 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
         let utxos_tx_external_stake = test_tx.to_utxo_address(&dev_ci_rdg_address);
 
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
-        let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
+        let exact_eth_stake_amount = CurrencyAmount::stake_test_amount_typed();
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
 
         let tx_stake = config.tx_builder().with_utxos(&utxos_tx_external_stake)?
@@ -472,7 +470,7 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
         info!("Sending eth stake to party address");
         let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
         info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
-        info!("Fee fixed {}", EthWalletWrapper::fee_fixed_normal_testnet().json_or());
+        info!("Fee fixed {}", CurrencyAmount::fee_fixed_normal_testnet().json_or());
         let res = tokio::time::timeout(
             Duration::from_secs(120), eth.send(&party_eth_address, &exact_eth_stake_amount)
         ).await.expect("works").expect("works");
@@ -635,7 +633,7 @@ async fn proceed_swap_test_from_eth_send(
 
     eth.send(
         &party_eth_address,
-        &EthWalletWrapper::test_send_amount_typed()
+        &CurrencyAmount::test_send_amount_typed()
     ).await?;
     // let fee_amount_pool = CurrencyAmount::from_rdg(10000);
 

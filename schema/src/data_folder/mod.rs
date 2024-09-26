@@ -11,6 +11,10 @@ pub struct EnvDataFolder {
 
 impl EnvDataFolder {
 
+    pub fn mnemonic_no_tokio(&self) -> RgResult<String> {
+        std::fs::read_to_string(self.mnemonic_path()).error_info("Bad mnemonic read")
+    }
+
     pub fn backups(&self) -> PathBuf {
         self.path.join("backups")
     }
