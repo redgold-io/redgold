@@ -44,7 +44,7 @@ impl<G> ClientApp<G> where G: GuiDepends + Clone + Send{
     ) -> Result<Self, ErrorInfo> where G: Send + Clone + GuiDepends {
         Ok(Self {
             logo,
-            local_state: LocalState::from(nc, res).await?,
+            local_state: LocalState::from(nc, res, gui_depends.clone()).await?,
             gui_depends,
         })
     }

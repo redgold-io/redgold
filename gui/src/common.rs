@@ -79,12 +79,14 @@ pub fn medium_data_item_vertical(ui: &mut Ui, label: impl Into<String>, text: im
     });
 }
 
-pub fn big_button<S: Into<String>>(mut ui: Ui, lb: S) {
+pub fn big_button<S: Into<String>>(ui: &mut Ui, lb: S) -> bool {
+    let mut changed = false;
     ui.horizontal(|ui| {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Heading);
-        ui.button(lb.into())
+        changed = ui.button(lb.into()).clicked()
     });
+    changed
 }
 
 pub fn bounded_text_area(ui: &mut Ui, string1: &mut String) {

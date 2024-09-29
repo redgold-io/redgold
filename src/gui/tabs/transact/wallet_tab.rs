@@ -32,6 +32,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
 use redgold_gui::common;
 use redgold_gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
@@ -325,7 +326,8 @@ impl WalletState {
     }
 }
 
-pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool) {
+pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: G)
+    where G: GuiDepends + Clone + Send {
     match local_state.wallet.updates.recv_while() {
         Ok(updates) => {
             for mut update in updates {
@@ -338,13 +340,13 @@ pub fn wallet_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalSt
     }
     local_state.wallet.update_hardware();
     ui.style_mut().spacing.item_spacing.y = 2f32;
-    ui.heading("Transact");
-    ui.separator();
-    ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state, has_changed_tab));
+
+    ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state, has_changed_tab, depends));
 }
 
 
-pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool) {
+pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: G)
+    where G: GuiDepends + Clone + Send {
     let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab);
     let mut is_hot = false;
     if has_changed_tab {
@@ -395,7 +397,7 @@ pub fn wallet_screen_scrolled(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalSt
 
 
         }
-        proceed_from_pk(ui, ls, &pk, is_hot);
+        proceed_from_pk(ui, ls, &pk, is_hot, depends);
     }
 
 }
@@ -481,7 +483,8 @@ pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
     update_clicked
 }
 
-fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool) {
+fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, depends: G)
+    where G: GuiDepends + Clone + Send {
     // data_item(ui, "Public Key:", pk.hex_or());
     // let address_str = pk.address()
     //     .and_then(|a| a.render_string())
@@ -537,7 +540,7 @@ fn proceed_from_pk(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: boo
             SendReceiveTabs::Home => {
             }
             SendReceiveTabs::Portfolio => {
-                portfolio_transact::portfolio_view(ui, ls, pk);
+                portfolio_transact::portfolio_view(ui, ls, pk, depends);
             }
         }
         if show_prepared {

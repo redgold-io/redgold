@@ -356,7 +356,8 @@ impl LocalState {
 
 #[allow(dead_code)]
 impl LocalState {
-    pub async fn from(node_config: NodeConfig, res: ExternalNetworkResourcesImpl) -> Result<LocalState, ErrorInfo> {
+    pub async fn from<G>(node_config: NodeConfig, res: ExternalNetworkResourcesImpl, gui_depends: G) -> Result<LocalState, ErrorInfo>
+        where G: Send + Clone + GuiDepends {
         let mut node_config = node_config.clone();
         node_config.load_balancer_url = "lb.redgold.io".to_string();
         let iv = sym_crypt::get_iv();
@@ -375,7 +376,7 @@ impl LocalState {
         let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
         let local_stored_state = ds_or.config_store.get_stored_state().await?;
 
-        fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
+        // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
 
         let mut ss = crate::gui::tabs::server_tab::ServersState::default();
 
@@ -545,6 +546,7 @@ fn random_bytes() -> [u8; 32] {
 
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
+use surf::http::security::default;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
@@ -640,6 +642,7 @@ static INIT: Once = Once::new();
 
 pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send {
     let logo = app.logo.clone();
+    let depends = app.gui_depends.clone();
     let local_state = &mut app.local_state;
 
     // TODO: Replace with config query and check.
@@ -736,7 +739,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 });
             }
             Tab::Transact => {
-                wallet_screen(ui, ctx, local_state, has_changed_tab);
+                wallet_screen(ui, ctx, local_state, has_changed_tab, depends);
             }
             Tab::Identity => {
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);

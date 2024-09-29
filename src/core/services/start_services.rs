@@ -43,6 +43,8 @@ impl Node {
 
         let mut sjh = ServiceJoinHandles::default();
 
+        sjh.add(PortfolioF)
+
 
         let udp = UdpServer::new(
             relay.peer_message_rx.clone(),

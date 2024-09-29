@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use log::info;
 use redgold_schema::RgResult;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
@@ -6,9 +7,10 @@ use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToCurrencyAddress};
 use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
 use redgold_schema::party::party_events::PartyEvents;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::party::stake_event_stream::StakeMethods;
 
-struct PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources {
+pub struct PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources {
     pub relay: Relay,
     pub external_resources: T
 }
@@ -34,6 +36,10 @@ impl<T> PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources + Send {
                 if let Ok(mut dest) = dest {
                     dest.mark_external();
                     self.external_resources.send(&dest, &to_send, true, None, None).await?;
+                    info!("Sent attempted portfolio fulfillment external \
+                    transaction to dest {} with amount: {}",
+                        dest.render_string().unwrap(), to_send.to_fractional()
+                    )
                 }
             }
         }

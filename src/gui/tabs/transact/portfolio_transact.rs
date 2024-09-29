@@ -1,10 +1,17 @@
+use std::str::FromStr;
 use eframe::egui;
 use eframe::egui::{ScrollArea, TextEdit, TextStyle, Ui};
 use egui_extras::{Column, TableBuilder};
+use itertools::Itertools;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
+use redgold_gui::common::big_button;
 use redgold_gui::components::currency_input::{currency_combo_box, CurrencyInputBox, supported_wallet_currencies};
-use redgold_schema::structs::{PublicKey, SupportedCurrency};
+use redgold_gui::components::tx_progress::{TransactionProgressFlow, TransactionStage};
+use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_schema::RgResult;
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PublicKey, SupportedCurrency};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tables;
 use crate::gui::tables::text_table_advanced;
@@ -38,7 +45,8 @@ pub struct PortfolioState {
     pub portfolio_input_name: String,
     pub add_new_currency: SupportedCurrency,
     pub port: Portfolio,
-    pub weight_input: String
+    pub weight_input: String,
+    pub tx: TransactionProgressFlow
 }
 
 impl Default for PortfolioState {
@@ -52,6 +60,7 @@ impl Default for PortfolioState {
             add_new_currency: SupportedCurrency::Bitcoin,
             port: Default::default(),
             weight_input: "1".to_string(),
+            tx: Default::default(),
         }
     }
 }
@@ -65,7 +74,7 @@ pub enum PortfolioTransactSubTab {
 }
 
 
-pub fn portfolio_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+pub fn portfolio_view<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, depends: G) where G: GuiDepends + Clone + Send {
     port_subtabs(ui, ls, pk);
     ui.separator();
     ui.heading(format!("{:?}", ls.wallet.port.tab));
@@ -74,7 +83,7 @@ pub fn portfolio_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
         PortfolioTransactSubTab::View => {}
         PortfolioTransactSubTab::Update => {}
         PortfolioTransactSubTab::Create => {
-            create_portfolio(ui, ls, pk)
+            create_portfolio(ui, ls, pk, depends)
         }
         PortfolioTransactSubTab::Liquidate => {}
     }
@@ -114,38 +123,65 @@ impl PortfolioRow {
 
 }
 
-fn create_portfolio(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G) where G: GuiDepends + Clone + Send {
+    let locked = ls.wallet.port.tx.locked();
     ui.horizontal(|ui| {
         ui.label("Portfolio Name:");
-        TextEdit::singleline(&mut ls.wallet.port.portfolio_input_name).desired_width(100.0).show(ui);
+        let mut locked_text = ls.wallet.port.portfolio_input_name.clone();
+        let mut text = &mut ls.wallet.port.portfolio_input_name;
+        if locked {
+            text = &mut locked_text;
+        }
+
+        TextEdit::singleline(text).desired_width(150.0).show(ui);
+        // TODO: Privacy options.
+        // ui.checkbox(&mut ls.wallet.port.portfolio_input_name, "Editable");
     });
     let price_map = ls.price_map_incl_rdg();
     ui.horizontal(|ui| {
         ui.label("Stake Input");
+        ls.wallet.port.rdg_input.locked = locked;
         ls.wallet.port.rdg_input.view(ui, &price_map);
     });
     ui.separator();
-    ui.horizontal(|ui| {
-        ui.label("Add Portfolio Entry:");
-        currency_combo_box(ui, &mut ls.wallet.port.add_new_currency, "Id", supported_wallet_currencies(), false);
-        ui.label("Weight:");
-        TextEdit::singleline(&mut ls.wallet.port.weight_input).desired_width(50.0).show(ui);
-        if ui.button("Add").clicked() {
-            let new_row = PortfolioRow {
-                entry_type: PortfolioEntryType::Currency,
-                id: format!("{:?}", ls.wallet.port.add_new_currency),
-                weight: ls.wallet.port.weight_input.parse().unwrap(),
-                weight_normalized: 0.0,
-                editable: false,
-                nav_usd: 0.0,
-                nav_pair: 0.0,
-                fulfillment_imbalance_usd: 0.0,
-                fulfillment_imbalance_pair: 0.0,
-            };
-            ls.wallet.port.port.rows.push(new_row);
-            ls.wallet.port.port.normalize_weight_update();
+    if !locked {
+        ui.horizontal(|ui| {
+            ui.label("Add Portfolio Entry:");
+            currency_combo_box(ui, &mut ls.wallet.port.add_new_currency, "Id", supported_wallet_currencies(), false);
+            ui.label("Weight:");
+            TextEdit::singleline(&mut ls.wallet.port.weight_input).desired_width(50.0).show(ui);
+            if ui.button("Add").clicked() {
+                let new_row = PortfolioRow {
+                    entry_type: PortfolioEntryType::Currency,
+                    id: format!("{:?}", ls.wallet.port.add_new_currency),
+                    weight: ls.wallet.port.weight_input.parse().unwrap(),
+                    weight_normalized: 0.0,
+                    editable: false,
+                    nav_usd: 0.0,
+                    nav_pair: 0.0,
+                    fulfillment_imbalance_usd: 0.0,
+                    fulfillment_imbalance_pair: 0.0,
+                };
+                ls.wallet.port.port.rows.push(new_row);
+                ls.wallet.port.port.normalize_weight_update();
+            }
+        });
+    }
+    ls.wallet.port.tx.info_box_view(ui);
+    let event = ls.wallet.port.tx.progress_buttons(ui);
+    if event.reset {
+        ls.wallet.port.portfolio_input_name = "".to_string();
+    }
+    if event.next_stage {
+        match ls.wallet.port.tx.stage {
+            TransactionStage::NotCreated => {}
+            TransactionStage::Created => {
+                create_portfolio_tx(ls, &pk, g)
+            }
+            TransactionStage::Signed => {}
+            TransactionStage::Broadcast => {}
         }
-    });
+    }
     ui.separator();
     ScrollArea::vertical().id_source("porttable")
         .max_height(250.0)
@@ -159,6 +195,31 @@ fn create_portfolio(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             });
         });
 
+
+}
+
+fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &&PublicKey, g: G) -> RgResult<()> where G: GuiDepends + Clone + Send {
+    if let Some(ai) = ls.wallet.address_info.as_ref() {
+        if let Some(fp) = ls.first_party.as_ref() {
+            if let Some(pa) = fp.party_info.party_key.as_ref().and_then(|pk| pk.address().ok()) {
+                let ports = ls.wallet.port.port.rows.iter()
+                    .filter(|r| { r.entry_type == PortfolioEntryType::Currency })
+                    .map(|r| SupportedCurrency::from_str(&*r.id).map(|s| (s, r.weight)).ok())
+                    .flatten()
+                    .collect_vec();
+                let tx = g.tx_builder()
+                    .with_input_address(&pk.address().unwrap())
+                    .with_utxos(ai.utxo_entries.as_ref())
+                    .unwrap()
+                    .with_portfolio_request(ports, &CurrencyAmount::from_rdg(100_000), &pa)
+                    .build()
+                    .unwrap();
+                ls.wallet.port.tx.prepared_tx
+
+            }
+        }
+    }
+    Ok(())
 }
 
 

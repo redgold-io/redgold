@@ -25,7 +25,7 @@ pub enum SwapStage {
 
 
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwapState {
     pub active: bool,
     pub output_currency: SupportedCurrency,
@@ -92,7 +92,7 @@ impl SwapState {
                 }
             }
 
-            ls.swap_state.tx_progress.view(ui);
+            ls.swap_state.tx_progress.info_box_view(ui);
 
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {

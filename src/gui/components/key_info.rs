@@ -108,8 +108,10 @@ impl KeyInfo {
         if self.key.is_some() {
             data_item(ui, "Public Key Hex", self.public_key.clone());
             data_item(ui, "RDG Address", self.address.clone());
-            data_item(ui, "BTC Address", self.btc_address.clone());
-            data_item(ui, "ETH Address", self.eth_address.clone());
+            ui.horizontal(|ui| {
+                data_item(ui, "BTC Address", self.btc_address.clone());
+                data_item(ui, "ETH Address", self.eth_address.clone());
+            });
         }
     }
 

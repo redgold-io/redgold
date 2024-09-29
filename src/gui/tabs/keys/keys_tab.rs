@@ -259,6 +259,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
 
 
     ui.horizontal(|ui| {
+        ui.heading("Transact");
         ui.label("Select XPub");
         ComboBox::from_label("".to_string())
             .width(125.0)
@@ -284,6 +285,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
         }
 
     });
+    ui.separator();
 
     if ls.wallet.view_additional_xpub_details {
         if let Some(xp) = xpub.as_ref() {
