@@ -41,7 +41,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let btc_starting_balance = ps.balance_with_deltas_applied.get(&SupportedCurrency::Bitcoin)
                     .map(|d| d.amount).unwrap_or(0);
 
-                let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party_config_data.order_cutoff_delay_time; //
+                let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party_config_data
+                    .as_ref().unwrap().order_cutoff_delay_time; //
                 let orders = ps.orders();
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
                 let identifier = v.party_info.initiate.safe_get()?.identifier.safe_get().cloned()?;

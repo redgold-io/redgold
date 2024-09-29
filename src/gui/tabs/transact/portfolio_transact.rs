@@ -176,7 +176,7 @@ fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G) w
         match ls.wallet.port.tx.stage {
             TransactionStage::NotCreated => {}
             TransactionStage::Created => {
-                create_portfolio_tx(ls, &pk, g)
+                create_portfolio_tx(ls, &pk, g).unwrap();
             }
             TransactionStage::Signed => {}
             TransactionStage::Broadcast => {}
@@ -214,7 +214,7 @@ fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &&PublicKey, g: G) -> RgResul
                     .with_portfolio_request(ports, &CurrencyAmount::from_rdg(100_000), &pa)
                     .build()
                     .unwrap();
-                ls.wallet.port.tx.prepared_tx
+                // ls.wallet.port.tx.prepared_tx
 
             }
         }

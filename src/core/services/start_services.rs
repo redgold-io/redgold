@@ -24,6 +24,7 @@ use crate::multiparty_gg20::gg20_sm_manager;
 use crate::node::Node;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::party::party_watcher::PartyWatcher;
+use crate::party::portfolio_fulfillment_agent::PortfolioFullfillmentAgent;
 use crate::sanity::recent_parity::RecentParityCheck;
 use crate::shuffle::shuffle_interval::Shuffle;
 
@@ -43,8 +44,15 @@ impl Node {
 
         let mut sjh = ServiceJoinHandles::default();
 
-        sjh.add(PortfolioF)
-
+        let agent = PortfolioFullfillmentAgent::new(
+            &relay, external_network_resources.clone());
+        let agent_duration = Duration::from_secs(node_config.config_data.clone().node_data
+            .unwrap()
+            .service_intervals
+            .unwrap()
+            .portfolio_fulfillment_agent_seconds
+            .unwrap());
+        sjh.add("PortfolioFulfillmentAgent", run_interval_fold(agent, agent_duration, false));
 
         let udp = UdpServer::new(
             relay.peer_message_rx.clone(),
@@ -52,10 +60,11 @@ impl Node {
             Some(node_config.udp_port()));
         sjh.add("UdpServer", tokio::spawn(udp));
 
-        if node_config.config_data.node_data.nat_traversal_required.unwrap_or(false) ||
+        if node_config.config_data.clone().node_data.unwrap().nat_traversal_required.unwrap_or(false) ||
             relay.node_metadata().await.map(|n| n.nat_traversal_required()).unwrap_or(false) {
             let alive = UdpKeepAlive::new(&relay.peer_message_tx,
-                                          node_config.config_data.node_data
+                                          node_config.config_data.clone().node_data
+                                              .unwrap()
                                               .udp_keepalive_seconds
                                               .map(Duration::from_secs),
                                           vec![],
@@ -127,7 +136,7 @@ impl Node {
 
         let watcher = PartyWatcher::new(&relay, external_network_resources);
         sjh.add("PartyWatcher", run_interval_fold(
-            watcher, Duration::from_millis(relay.node_config.config_data.party_config_data.poll_interval as u64), false
+            watcher, Duration::from_millis(relay.node_config.config_data.clone().party_config_data.unwrap().poll_interval as u64), false
         ));
 
         sjh.add("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone())));

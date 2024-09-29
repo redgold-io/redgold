@@ -1,8 +1,9 @@
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, PublicKey, SubmitTransactionResponse, Transaction};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::times::current_time_millis;
-use crate::dependencies::gui_depends::GuiDepends;
+use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 
 pub struct WasmGuiDepends {
 
@@ -31,6 +32,14 @@ impl GuiDepends for WasmGuiDepends {
     }
 
     async fn about_node(&self) -> RgResult<AboutNodeResponse> {
+        todo!()
+    }
+
+    fn tx_builder(&self) -> TransactionBuilder {
+        todo!()
+    }
+
+    fn sign_transaction(&self, tx: &Transaction, sign_info: &TransactionSignInfo) -> RgResult<Transaction> {
         todo!()
     }
 }

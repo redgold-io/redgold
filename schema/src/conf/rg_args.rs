@@ -335,7 +335,7 @@ pub struct TestTransactionCli {}
 /// Debug webcam capture
 #[derive(Args, Debug, Clone)]
 pub struct TestCaptureCli {
-    cam: Option<i64>
+    pub cam: Option<i64>
 }
 
 #[derive(Subcommand, Debug, Clone)]

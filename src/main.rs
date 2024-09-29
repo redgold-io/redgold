@@ -63,7 +63,6 @@ async fn main() {
     } else {
         let dir = node_config.data_folder.path.join("mock_resources");
         let resources = MockExternalResources::new(&node_config, Some(dir), Arc::new(Mutex::new(HashMap::new()))).expect("works");
-        relay.node_config.config_data.party_config_data.poll_interval = 10_000;
         Node::start_services(relay.clone(), resources).await
     };
     let mut futures = FuturesUnordered::new();
