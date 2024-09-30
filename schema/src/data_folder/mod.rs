@@ -11,6 +11,10 @@ pub struct EnvDataFolder {
 
 impl EnvDataFolder {
 
+    pub fn mnemonic_no_tokio(&self) -> RgResult<String> {
+        std::fs::read_to_string(self.mnemonic_path()).error_info("Bad mnemonic read")
+    }
+
     pub fn backups(&self) -> PathBuf {
         self.path.join("backups")
     }
@@ -29,10 +33,6 @@ impl EnvDataFolder {
 
     pub fn mnemonic_path(&self) -> PathBuf {
         self.path.join("mnemonic")
-    }
-
-    pub async fn mnemonic(&self) -> RgResult<String> {
-        tokio::fs::read_to_string(self.mnemonic_path()).await.error_info("Bad mnemonic read")
     }
 
     pub fn peer_tx(&self) -> RgResult<Transaction> {
@@ -73,40 +73,14 @@ impl EnvDataFolder {
         ServerOldFormat::parse_from_file(self.servers_path())
     }
 
-    pub async fn multiparty_import_str(&self) -> RgResult<String> {
-        let mp_import = self.multiparty_import();
-        tokio::fs::read_to_string(mp_import).await.error_info("Failed to read multiparty import")
-    }
-
     pub fn multiparty_import(&self) -> PathBuf {
         self.path.join("multiparty-import.csv")
-    }
-
-    pub async fn remove_multiparty_import(&self) -> RgResult<()> {
-        tokio::fs::remove_file(self.multiparty_import()).await.error_info("Failed to remove multiparty import")
     }
 
     // Change to cert.pem
     pub fn cert_path(&self) -> PathBuf {
         //self.path.join("certificate.crt")
         PathBuf::from("/etc/letsencrypt/live/lb.redgold.io/fullchain.pem")
-    }
-
-    pub async fn cert(&self) -> Result<Vec<u8>, ErrorInfo> {
-        tokio::fs::read(self.cert_path()).await.error_info("Missing cert")
-            .or(
-                tokio::fs::read(self.path.join("certificate.crt")).await
-                    .error_info("Missing cert")
-            )
-    }
-
-    pub async fn key(&self) -> Result<Vec<u8>, ErrorInfo> {
-        tokio::fs::read(self.key_path()).await
-            .error_info("Missing key")
-            .or(
-                tokio::fs::read(self.path.join("private_key.key")).await
-                    .error_info("Missing key")
-            )
     }
 
     // Change to privkey.pem

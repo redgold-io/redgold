@@ -10,30 +10,6 @@ use crate::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount
 use crate::transaction::amount_data;
 use crate::tx_schema_validate::SchemaValidationSupport;
 
-pub trait TransactionBuilderSupport {
-    fn new(network: &NodeConfig) -> Self;
-}
-
-impl TransactionBuilderSupport for TransactionBuilder {
-    fn new(config: &NodeConfig) -> Self {
-        let tx = Transaction::new_blank();
-        let network = config.network.clone();
-        let fee_addrs = config.seed_peer_addresses();
-        let mut s = Self {
-            transaction: tx,
-            utxos: vec![],
-            used_utxos: vec![],
-            network: Some(network.clone()),
-            nc: Some(config.clone()),
-            fee_addrs,
-            allow_bypass_fee: false,
-            input_addresses: vec![],
-        };
-        s.with_network(&network);
-        s
-    }
-}
-
 #[derive(Clone)]
 pub struct TransactionBuilder {
     pub transaction: Transaction,

@@ -1,6 +1,6 @@
 
 use std::time::Duration;
-use log::info;
+use tracing::info;
 use std::path::PathBuf;
 use std::fs;
 use itertools::Itertools;
@@ -370,7 +370,7 @@ impl NodeConfig {
 
 
     pub fn control_port(&self) -> u16 {
-        self.control_port.unwrap_or(self.port_offset - 3)
+        self.control_port.unwrap_or(self.port_offset - 10)
     }
     pub fn p2p_port(&self) -> u16 {
         self.p2p_port.unwrap_or(self.port_offset + 0)

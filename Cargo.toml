@@ -25,7 +25,8 @@ members = [
     "sdk-client",
     "fs",
     "gui",
-    "common"
+    "common",
+    "common-no-wasm",
 ]
 exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"] #, "sdk", "sdk/*"]
 
@@ -53,6 +54,7 @@ redgold-sdk-client = { path = "sdk-client", version = "0.1.25"}
 redgold-fs = { path = "./fs"}
 redgold-gui = { path = "./gui"}
 redgold-common = { path = "./common"}
+redgold-common-no-wasm = { path = "./common-no-wasm"}
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"
@@ -78,6 +80,7 @@ redgold-schema = {workspace = true}
 redgold-fs = {workspace = true}
 redgold-gui = {workspace = true}
 redgold-common = {workspace = true}
+redgold-common-no-wasm = {workspace = true}
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
 #redgold-sdk-client = {workspace = true}
@@ -169,7 +172,7 @@ qrencode = "0.14.0"
 csscolorparser = "0.6.2"
 
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
-
+derivative = "2.2.0"
 
 [dependencies.getrandom]
 version = "0.2.12"
@@ -220,3 +223,6 @@ dns-lookup = "2.0.2" #Dependencies for email sending
 # Re-enable later
 #openpnp_capture = "0.2.4"
 #openpnp_capture_sys = "0.4.0"
+
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-Wl,-stack_size,81920000"]

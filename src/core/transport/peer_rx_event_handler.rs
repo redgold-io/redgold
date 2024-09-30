@@ -8,7 +8,7 @@ use futures::prelude::*;
 use itertools::Itertools;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 use metrics::{counter, histogram};
 // use svg::Node;
 use tokio::runtime::Runtime;

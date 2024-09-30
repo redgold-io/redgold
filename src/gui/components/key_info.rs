@@ -1,5 +1,5 @@
 use eframe::egui::{Color32, RichText, Ui};
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
@@ -108,8 +108,10 @@ impl KeyInfo {
         if self.key.is_some() {
             data_item(ui, "Public Key Hex", self.public_key.clone());
             data_item(ui, "RDG Address", self.address.clone());
-            data_item(ui, "BTC Address", self.btc_address.clone());
-            data_item(ui, "ETH Address", self.eth_address.clone());
+            ui.horizontal(|ui| {
+                data_item(ui, "BTC Address", self.btc_address.clone());
+                data_item(ui, "ETH Address", self.eth_address.clone());
+            });
         }
     }
 
@@ -117,9 +119,9 @@ impl KeyInfo {
 
 
 pub fn extract_gui_key(ls: &mut LocalState) -> GuiKey {
-    ls.wallet_state.active_hot_private_key_hex
+    ls.wallet.active_hot_private_key_hex
         .as_ref().map(|x| GuiKey::DirectPrivateKey(x.clone()))
-        .unwrap_or(GuiKey::Mnemonic(ls.wallet_state.hot_mnemonic()))
+        .unwrap_or(GuiKey::Mnemonic(ls.wallet.hot_mnemonic()))
 }
 
 
@@ -133,7 +135,7 @@ pub fn update_keys_key_info(ls: &mut LocalState) {
 }
 
 pub fn update_xpub_key_info(ls: &mut LocalState) {
-    let xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name);
+    let xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet.selected_xpub_name);
     if let Some(xpub) = xpub {
         let gui_key = GuiKey::XPub(xpub.xpub.clone());
         ls.keytab_state.xpub_key_info.update_fields(

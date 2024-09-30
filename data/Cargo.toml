@@ -17,6 +17,7 @@ categories = ["cryptography::cryptocurrencies"]
 [dependencies]
 sqlx = { version = "0.7.2", features = [ "runtime-tokio-native-tls" , "sqlite"] } # Tokio:
 redgold-schema = { workspace = true }
+redgold-common-no-wasm = { workspace = true }
 redgold-keys = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }

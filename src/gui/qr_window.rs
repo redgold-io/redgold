@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use eframe::egui;
 use eframe::egui::Context;
 use egui_extras::RetainedImage;
@@ -9,18 +10,29 @@ use redgold_gui::common::bounded_text_area;
 use crate::gui::qr_render::qr_encode;
 
 
-// #[derive(Clone)]
+
+#[derive(Derivative)]
+#[derivative(Clone)]
 pub struct QrState {
     pub show_window: bool,
     // pub capture_stream: Option<CaptureStream>,
     pub last_image: Option<DynamicImage>,
     pub contents: Option<String>,
     pub metadata: Option<MetaData>,
+    #[derivative(Clone(clone_with = "clone_option_retained_image"))]
     pub retained_image: Option<RetainedImage>
 }
 
+pub fn clone_option_retained_image(opt: &Option<RetainedImage>) -> Option<RetainedImage> {
+    None
+}
+
+
+#[derive(Derivative)]
+#[derivative(Clone)]
 pub struct QrShowState {
     pub show_window: bool,
+    #[derivative(Clone(clone_with = "clone_option_retained_image"))]
     pub qr_image: Option<RetainedImage>,
     pub qr_text: Option<String>
 }

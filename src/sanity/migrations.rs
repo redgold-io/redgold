@@ -1,4 +1,4 @@
-use log::{error, info};
+use tracing::{error, info};
 use redgold_schema::RgResult;
 use redgold_schema::structs::{Hash, UtxoId};
 use rocket::serde::{Deserialize, Serialize};

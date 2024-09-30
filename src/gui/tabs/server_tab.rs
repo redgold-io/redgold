@@ -5,7 +5,7 @@ use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
 use itertools::{Either, Itertools};
-use log::{error, info};
+use tracing::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
 use redgold_schema::RgResult;
@@ -327,8 +327,8 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
                 config1,
                 local_state.local_stored_state.servers.clone(),
                 PathBuf::from(local_state.server_state.generate_offline_path.clone()),
-                local_state.wallet_state.hot_mnemonic().words.clone(),
-                local_state.wallet_state.hot_mnemonic().passphrase.clone(),
+                local_state.wallet.hot_mnemonic().words.clone(),
+                local_state.wallet.hot_mnemonic().passphrase.clone(),
             ));
         }
     });

@@ -1001,6 +1001,21 @@ message GetSeedsRequest {
 
 }
 
+message KeepAliveRequest {
+
+}
+
+enum TransportBackend {
+  REST = 0;
+  UDP = 1;
+}
+
+message PortOpenRequest {
+  string ip = 1;
+  int64 port = 2;
+  TransportBackend transport = 3;
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -1038,6 +1053,9 @@ message Request {
   GetActivePartyKeyRequest get_active_party_key_request = 35;
   GetSeedsRequest get_seeds_request = 36;
   PublicKey get_public_key_balance_request = 37;
+  KeepAliveRequest keep_alive_request = 38;
+  Response response = 39;
+  PortOpenRequest port_open_request = 40;
 }
 
 message HealthResponse {
@@ -1056,6 +1074,9 @@ message UtxoValidResponse {
   optional int64 child_transaction_input = 3;
 }
 
+message PortOpenResponse {
+  bool open = 1;
+}
 
 message Response {
   ResponseMetadata response_metadata = 1;
@@ -1089,8 +1110,14 @@ message Response {
   PublicKey get_active_party_key_response = 26;
   repeated Seed get_seeds_response = 27;
   CurrencyAmount get_public_key_balance_response = 28;
+  KeepAliveResponse keep_alive_response = 29;
+  PortOpenResponse port_open_response = 30;
 }
 
+message KeepAliveResponse {
+  string ip = 1;
+  int64 port = 2;
+}
 
 message PartyMember {
   PublicKey public_key = 1;

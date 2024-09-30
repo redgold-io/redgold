@@ -1,6 +1,5 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::future::Future;
 use std::str::FromStr;
@@ -10,8 +9,6 @@ use backtrace::Backtrace;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
 use serde::Serialize;
-use tokio::task::futures::TaskLocalFuture;
-use tokio::task_local;
 
 use structs::{
     Address, BytesData, ErrorCode, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
@@ -20,7 +17,8 @@ use structs::{
 use observability::errors::EnhanceErrorInfo;
 use proto_serde::{ProtoHashable, ProtoSerde};
 use util::{lang_util, times};
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
+use crate::util::task_local::task_local_impl::task_local_error_details;
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -72,10 +70,12 @@ pub mod helpers;
 pub mod party;
 pub mod tx;
 pub mod config_data;
-pub mod server_config;
 pub mod portfolio;
 pub mod conf;
 pub mod data_folder;
+pub mod errors;
+pub mod peer;
+
 impl BytesData {
     pub fn from(data: Vec<u8>) -> Self {
         BytesData {
@@ -379,54 +379,13 @@ pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
     ret
 }
 
-// TODO: This feature is only available in tokio RT, need to substitute this for a
-// standard local key implementation depending on the features available for WASM crate.
-task_local! {
-
-    pub static TASK_LOCAL: HashMap<String, String>;
-    // pub static TASK_LOCAL: String;
-    // pub static ONE: u32;
-    //
-    // #[allow(unused)]
-    // static TWO: f32;
-    //
-    // static NUMBER: u32;
-}
-
-pub fn get_task_local() -> HashMap<String, String> {
-    TASK_LOCAL.try_with(|local| { local.clone() })
-        .unwrap_or(HashMap::new())
-}
-
-pub fn task_local<K: Into<String>, V: Into<String>, F>(k: K, v: V, f: F) -> TaskLocalFuture<HashMap<String, String>, F>
-where F : Future{
-    let mut current = get_task_local();
-    current.insert(k.into(), v.into());
-    TASK_LOCAL.scope(current, f)
-}
-
-pub fn task_local_map<F>(kv: HashMap<String, String>, f: F) -> TaskLocalFuture<HashMap<String, String>, F>
-where F : Future{
-    let mut current = get_task_local();
-    for (k, v) in kv {
-        current.insert(k, v);
-    }
-    TASK_LOCAL.scope(current, f)
-}
-
-
 pub fn error_msg<S: Into<String>, P: Into<String>>(code: ErrorCode, message: S, lib_message: P) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
     let stack = slice_vec_eager(stacktrace_abridged, 0, 50).join("\n").to_string();
 
-    let details = get_task_local().iter().map(|(k, v)| {
-        ErrorDetails {
-            detail_name: k.clone(),
-            detail: v.clone(),
-        }
-    }).collect_vec();
+    let details = task_local_error_details();
 
     ErrorInfo {
         code: code as i32,

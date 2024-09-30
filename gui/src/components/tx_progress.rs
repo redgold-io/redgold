@@ -1,17 +1,20 @@
-use eframe::egui::Ui;
+use std::collections::HashMap;
+use eframe::egui::{TextStyle, Ui};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use log::info;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ExternalTransactionId, PartySigningValidation, PublicKey, SupportedCurrency, Transaction};
-use redgold_schema::tx::tx_builder::{TransactionBuilder, TransactionBuilderSupport};
+use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use crate::common;
-use crate::common::data_item;
+use crate::common::{big_button, data_item};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TransactionProgressFlow {
     pub stage: TransactionStage,
     pub unsigned_info_box: String,
@@ -21,11 +24,14 @@ pub struct TransactionProgressFlow {
     pub broadcast_info: String,
     pub use_single_box: bool,
     pub prepared_tx: Option<PreparedTransaction>,
-    pub stage_err: Option<String>
+    pub stage_err: Option<String>,
+    pub heading_details: HashMap<TransactionStage, String>,
+    pub proceed_button_text: HashMap<TransactionStage, String>,
+    pub changing_stages: bool,
 }
 
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString, Eq, Hash)]
 pub enum TransactionStage {
     NotCreated,
     Created,
@@ -34,6 +40,7 @@ pub enum TransactionStage {
 }
 
 impl Default for TransactionProgressFlow {
+
     fn default() -> Self {
         TransactionProgressFlow {
             stage: TransactionStage::NotCreated,
@@ -45,6 +52,9 @@ impl Default for TransactionProgressFlow {
             use_single_box: true,
             prepared_tx: None,
             stage_err: None,
+            heading_details: Default::default(),
+            proceed_button_text: Default::default(),
+            changing_stages: false,
         }
     }
 }
@@ -75,6 +85,18 @@ pub struct PreparedTransaction {
 
 impl TransactionProgressFlow {
 
+
+    pub fn rdg_only_prepared_tx(tx: Transaction) -> PreparedTransaction {
+        let mut def = PreparedTransaction::default();
+        def.tx = Some(tx.clone());
+        def.ser_tx = Some(tx.json_or());
+        def.internal_unsigned_hash = Some(tx.hash_hex());
+        def
+    }
+
+    pub fn locked(&self) -> bool {
+        self.stage != TransactionStage::NotCreated
+    }
     pub async fn make_transaction<T: ExternalNetworkResources>(
         nc: &NodeConfig,
         mut external_resources: T,
@@ -165,7 +187,7 @@ impl TransactionProgressFlow {
             }
             self.unsigned_hash_txid = tx.internal_unsigned_hash.clone().or(
                 tx.txid.clone().map(|x| x.identifier.clone()))
-                    .unwrap_or("".to_string());
+                .unwrap_or("".to_string());
         }
         self.stage_err = err;
     }
@@ -202,8 +224,7 @@ impl TransactionProgressFlow {
         self.stage_err = None;
     }
 
-    pub fn view(&self, ui: &mut Ui) {
-
+    pub fn info_box_view(&self, ui: &mut Ui) {
         if self.stage != TransactionStage::NotCreated {
             let mut box_label = "";
             let mut box_text = "";
@@ -245,5 +266,89 @@ impl TransactionProgressFlow {
         }
     }
 
+    pub fn back(&mut self) {
+        match self.stage {
+            TransactionStage::Created => {
+                self.stage = TransactionStage::NotCreated;
+            }
+            TransactionStage::Signed => {
+                self.stage = TransactionStage::Created;
+            }
+            TransactionStage::Broadcast => {
+                self.stage = TransactionStage::Signed;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn next_stage(&mut self) {
+        match self.stage {
+            TransactionStage::NotCreated => {
+                self.stage = TransactionStage::Created;
+            }
+            TransactionStage::Created => {
+                self.stage = TransactionStage::Signed;
+            }
+            TransactionStage::Signed => {
+                self.stage = TransactionStage::Broadcast;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn stage_proceed_next_text(&self) -> String {
+        let ret = self.proceed_button_text.get(&self.stage)
+            .map(|x| x.clone());
+        let default = match self.stage {
+            TransactionStage::NotCreated => { "Create Transaction" }
+            TransactionStage::Created => { "Sign Transaction" }
+            TransactionStage::Signed => { "Broadcast Transaction" }
+            TransactionStage::Broadcast => { "Complete" }
+        };
+        ret.unwrap_or(default.to_string())
+    }
+
+    pub fn progress_buttons(&mut self, ui: &mut Ui) -> TxProgressEvent {
+        let mut event = TxProgressEvent {
+            reset: false,
+            next_stage: false
+        };
+
+        let header = self.heading_details.get(&self.stage)
+            .map(|h| h.clone()).unwrap_or(format!("{:?}", self.stage));
+
+        ui.heading(header);
+
+        ui.horizontal(|ui| {
+            if big_button(ui, "Reset") {
+                event.reset = true;
+                self.reset();
+            };
+            if self.stage != TransactionStage::NotCreated {
+                if self.stage != TransactionStage::Broadcast {
+                    let back = big_button(ui, "Back");
+                    if back {
+                        self.back();
+                    }
+                }
+            }
+
+            if self.stage != TransactionStage::Broadcast && self.stage_err.is_none() {
+                let changed = big_button(ui, self.stage_proceed_next_text());
+                if changed {
+                    event.next_stage = true;
+                    self.next_stage();
+                }
+            }
+        });
+        event
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct TxProgressEvent {
+    pub reset: bool,
+    pub next_stage: bool
 }
 

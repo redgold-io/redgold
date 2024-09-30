@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use metrics::{counter, gauge};
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;

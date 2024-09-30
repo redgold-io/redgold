@@ -9,7 +9,7 @@ use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
 use crate::gui::app_loop::LocalState;
 use redgold_gui::common;
-use redgold_gui::components::currency_input::{currency_selection_box, supported_wallet_currencies, CurrencyInputBox};
+use redgold_gui::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
 use redgold_gui::components::tx_progress::TransactionProgressFlow;
 use redgold_keys::address_external::ToBitcoinAddress;
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs;
@@ -25,7 +25,7 @@ pub enum SwapStage {
 
 
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwapState {
     pub active: bool,
     pub output_currency: SupportedCurrency,
@@ -51,7 +51,7 @@ impl Default for SwapState {
 impl SwapState {
 
     pub fn view(ui: &mut Ui, ls: &mut LocalState) {
-        ls.swap_state.active = ls.wallet_state.send_receive == Some(SendReceiveTabs::Swap);
+        ls.swap_state.active = ls.wallet.send_receive == Some(SendReceiveTabs::Swap);
         // if ui.button("Refresh Rates").clicked() {
         //     ls.price_map_usd_pair
         // }
@@ -92,7 +92,7 @@ impl SwapState {
                 }
             }
 
-            ls.swap_state.tx_progress.view(ui);
+            ls.swap_state.tx_progress.info_box_view(ui);
 
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
@@ -189,8 +189,8 @@ impl SwapState {
             }
             let currency = ls.swap_state.currency_input_box.input_currency;
             let filtered_swap_outputs = Self::filter_swap_output(&currency);
-            currency_selection_box(ui, &mut ls.swap_state.output_currency, "Destination",
-                                   filtered_swap_outputs, locked);
+            currency_combo_box(ui, &mut ls.swap_state.output_currency, "Destination",
+                               filtered_swap_outputs, locked);
 
             let use_usd = ls.swap_state.currency_input_box.use_usd_input.clone();
 

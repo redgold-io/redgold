@@ -127,7 +127,7 @@ impl EthWalletWrapper {
             .with_detail("to", to.render_string()?)
             .with_detail("value", value.clone().json_or())
             .with_detail("fee", fee_gas_price.clone().json_or())
-            .with_detail("default_fee", Self::fee_fixed_normal_by_env(&self.network).json_or())
+            .with_detail("default_fee", CurrencyAmount::fee_fixed_normal_by_env(&self.network).json_or())
     }
     pub async fn create_transaction_typed_inner(
         &self, from: &structs::Address, to: &structs::Address, value: CurrencyAmount,
@@ -136,7 +136,7 @@ impl EthWalletWrapper {
         if value.currency_or() != SupportedCurrency::Ethereum {
             return Err(error_info("Currency must be Ethereum"));
         }
-        let fee_gas_price = fee_gas_price.unwrap_or(Self::gas_price_fixed_normal_by_env(&self.network));
+        let fee_gas_price = fee_gas_price.unwrap_or(CurrencyAmount::gas_price_fixed_normal_by_env(&self.network));
         let big_value = value.bigint_amount().ok_msg("CurrencyAmount bigint amount missing")?;
         // let big_value = EthHistoricalClient::translate_value_bigint(value as i64)?;
         // U256::from_dec_str()

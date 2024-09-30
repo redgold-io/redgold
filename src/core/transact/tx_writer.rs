@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use log::info;
+use tracing::info;
 use metrics::counter;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;

@@ -4,13 +4,14 @@ use std::{error::Error, io};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::task_local;
-use tracing::{debug, error, event, info, Level, span, Span, warn};
+use tracing::{debug, error, event, info, span, warn, Level, Span};
 use tracing_subscriber::fmt::format::{FmtSpan, Format};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use redgold_schema::{error_info, error_message, task_local, task_local_map};
+use redgold_schema::{error_info, error_message};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::ErrorInfo;
+use redgold_schema::util::task_local;
 use crate::api::public_api::run_server;
 use crate::core::relay::Relay;
 
@@ -210,58 +211,58 @@ pub fn init_tracing(log_level: &str) {
         .with(fmt_layer)
         .init();
 }
-
-async fn debug_task() -> ErrorInfo {
-    error_info("yo")
-}
-
-#[ignore]
-#[tokio::test]
-pub async fn debug_task_local() {
-    let r = task_local("test", "asdf", debug_task()).await;
-    println!("r: {}", r.json_pretty_or());
-}
-
-// This is proper pattern to follow.
-#[tracing::instrument(fields(other_param))]
-pub async fn nested_func(nested_param: &str, opt_param: Option<&str>) {
-    Span::current().record("other_param", Some("filled"));
-    Span::current().record("outer_empty", Some("filled_from_inner_does_not_work"));
-    tracing::info!("Nested func info");
-    error!("error info: {}", error_info("test_error_info").json_or())
-}
-
-
-#[tracing::instrument(fields(outer_empty))]
-pub async fn some_trace_func(param1: &str) {
-    tracing::info!("outer function info");
-    let span = Span::current();
-    span.record("outer_empty", Some("filled_from_outer"));
-    let mut hm: HashMap<String, String> = HashMap::default();
-    hm.insert("func_error_key".to_string(), "func_error_value_initial".to_string());
-    task_local_map(hm, nested_func("nested_param", None)).await
-}
-
-#[ignore]
-#[tokio::test]
-pub async fn debug_span_inject() {
-    init_tracing("DEBUG");
-    let mut hm: HashMap<String, String> = HashMap::default();
-    hm.insert("error_key".to_string(), "error_value_initial".to_string());
-    task_local_map(hm, some_trace_func("param1")).await;
-
-}
-
-#[tracing::instrument(fields(outer_empty))]
-pub async fn some_boring_fun() {
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    event!(Level::INFO, "Boring function info");
-}
-
-#[ignore]
-#[tokio::test]
-pub async fn test_perf_timing() {
-    init_tracing("DEBUG");
-    some_boring_fun().await;
-
-}
+//
+// async fn debug_task() -> ErrorInfo {
+//     error_info("yo")
+// }
+//
+// #[ignore]
+// #[tokio::test]
+// pub async fn debug_task_local() {
+//     let r = task_local::task_local("test", "asdf", debug_task()).await;
+//     println!("r: {}", r.json_pretty_or());
+// }
+//
+// // This is proper pattern to follow.
+// #[tracing::instrument(fields(other_param))]
+// pub async fn nested_func(nested_param: &str, opt_param: Option<&str>) {
+//     Span::current().record("other_param", Some("filled"));
+//     Span::current().record("outer_empty", Some("filled_from_inner_does_not_work"));
+//     tracing::info!("Nested func info");
+//     error!("error info: {}", error_info("test_error_info").json_or())
+// }
+//
+//
+// #[tracing::instrument(fields(outer_empty))]
+// pub async fn some_trace_func(param1: &str) {
+//     tracing::info!("outer function info");
+//     let span = Span::current();
+//     span.record("outer_empty", Some("filled_from_outer"));
+//     let mut hm: HashMap<String, String> = HashMap::default();
+//     hm.insert("func_error_key".to_string(), "func_error_value_initial".to_string());
+//     task_local_map(hm, nested_func("nested_param", None)).await
+// }
+//
+// #[ignore]
+// #[tokio::test]
+// pub async fn debug_span_inject() {
+//     init_tracing("DEBUG");
+//     let mut hm: HashMap<String, String> = HashMap::default();
+//     hm.insert("error_key".to_string(), "error_value_initial".to_string());
+//     task_local_map(hm, some_trace_func("param1")).await;
+//
+// }
+//
+// #[tracing::instrument(fields(outer_empty))]
+// pub async fn some_boring_fun() {
+//     tokio::time::sleep(Duration::from_secs(1)).await;
+//     event!(Level::INFO, "Boring function info");
+// }
+//
+// #[ignore]
+// #[tokio::test]
+// pub async fn test_perf_timing() {
+//     init_tracing("DEBUG");
+//     some_boring_fun().await;
+//
+// }

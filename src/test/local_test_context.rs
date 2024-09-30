@@ -1,4 +1,4 @@
-use log::info;
+use tracing::info;
 use redgold_schema::structs::{ErrorInfo, Seed, SupportedCurrency, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -35,8 +35,8 @@ impl LocalTestNodeContext {
                  ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
     ) -> Self {
         let mut node_config = NodeConfig::from_test_id(&id);
-        node_config.config_data.party_config_data.order_cutoff_delay_time = 5_000;
-        node_config.config_data.party_config_data.poll_interval = 20_000;
+        node_config.config_data.party_config_data.as_mut().unwrap().order_cutoff_delay_time = 5_000;
+        node_config.config_data.party_config_data.as_mut().unwrap().poll_interval = 20_000;
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;

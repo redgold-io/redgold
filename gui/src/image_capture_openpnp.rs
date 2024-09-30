@@ -186,18 +186,18 @@ pub fn test_pnp() {
 
 }
 
-pub fn default_stream() -> RgResult<CaptureStream> {
+pub fn default_stream(i: i64) -> RgResult<CaptureStream> {
     let devices = get_devices()?;
-    let d = devices.get(0).expect("device 0");
+    let d = devices.get(i as usize).expect("device 0");
     let formats = d.formats();
     let f = formats.get(0).expect("format 0");
     let mut s = get_stream(d, f)?;
     Ok(CaptureStream{ stream: s })
 }
 
-pub fn test_pnp2() -> RgResult<()> {
+pub fn test_pnp2(option: Option<i64>) -> RgResult<()> {
 
-    let mut s = default_stream()?;
+    let mut s = default_stream(option.unwrap_or(0))?;
     sleep(Duration::from_secs(2));
     let mut last_bytes = vec![];
     let mut iter = 0;
@@ -216,15 +216,15 @@ pub fn test_pnp2() -> RgResult<()> {
         sleep(Duration::from_millis(100));
         iter += 1;
         if iter % 20 == 0 {
-            save_image(&image)
+            save_image(&image);
         }
     }
     Ok(())
 
 }
 
-pub fn debug_capture() {
-    test_pnp2().expect("works");
+pub fn debug_capture(option: Option<i64>) {
+    test_pnp2(option).expect("works");
 }
 
 #[test]

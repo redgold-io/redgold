@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use eframe::egui::{ComboBox, Context, Ui};
 use itertools::Itertools;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::local_stored_state::Identity;

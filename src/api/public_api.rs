@@ -6,7 +6,7 @@ use bytes::Bytes;
 use futures::TryFutureExt;
 
 use itertools::Itertools;
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use metrics::counter;
 use rand::rngs::OsRng;
 use rand::RngCore;

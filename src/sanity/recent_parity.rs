@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use async_trait::async_trait;
-use log::info;
+use tracing::info;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;

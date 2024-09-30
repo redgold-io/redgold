@@ -15,11 +15,10 @@ use crypto::sha2::Sha256;
 #[allow(unused_imports)]
 use futures::StreamExt;
 use itertools::Itertools;
-use log::{error, info};
 use metrics::{gauge, Label};
 use tokio::runtime::Runtime;
-use tracing::trace;
-
+use tracing::{error, info, trace};
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, from_hex, ErrorInfoContext, RgResult, SafeOption};
@@ -150,7 +149,7 @@ impl ArgTranslate {
         }
         self.data_folder()?;
         self.secure_data_folder();
-        self.load_mnemonic().await?;
+        self.load_mnemonic()?;
         self.load_peer_id()?;
         self.load_peer_tx()?;
         self.set_public_key();
@@ -158,13 +157,18 @@ impl ArgTranslate {
         self.calculate_executable_checksum_hash();
         self.guard_faucet();
         self.e2e_enable();
+        info!("E2e enabled");
         self.configure_seeds().await;
         self.set_discovery_interval();
         self.apply_node_opts();
         self.genesis();
         self.alias();
 
-        self.abort = immediate_commands(&self.opts, &self.node_config, self.args()).await;
+        if self.is_gui() {
+            return Ok(());
+        }
+
+        self.abort = immediate_commands(&self.opts.clone(), &self.node_config.clone(), self.args()).await;
         if self.abort {
             return Ok(());
         }
@@ -270,18 +274,18 @@ impl ArgTranslate {
         gauge!("redgold.node.executable_checksum_last_8", &labels).set(1.0);
     }
 
-    async fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
+    fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
 
         // Remove any defaults; we want to be explicit
         self.node_config.mnemonic_words = "".to_string();
 
         // First try to load from the all environment data folder for re-use across environments
-        if let Ok(words) = self.node_config.data_folder.all().mnemonic().await {
+        if let Ok(words) = self.node_config.data_folder.all().mnemonic_no_tokio() {
             self.node_config.mnemonic_words = words;
         };
 
         // Then override with environment specific mnemonic;
-        if let Ok(words) = self.node_config.env_data_folder().mnemonic().await {
+        if let Ok(words) = self.node_config.env_data_folder().mnemonic_no_tokio() {
             self.node_config.mnemonic_words = words;
         };
 
@@ -488,6 +492,7 @@ impl ArgTranslate {
     }
     async fn configure_seeds(&mut self) {
 
+        info!("configure seeds");
         let seeds = get_seeds_by_env_time(&self.node_config.network, util::current_time_millis_i64());
         for seed in seeds {
             if !self.node_config.ignore_default_seeds {
@@ -514,6 +519,7 @@ impl ArgTranslate {
             self.node_config.manually_added_seeds.push(cli_seed_arg);
         }
 
+        info!("self is node");
         // Enrich keys for missing seed info
         if self.is_node() {
             for seed in self.node_config.seeds.iter_mut() {
@@ -611,11 +617,14 @@ impl ArgTranslate {
     fn immediate_debug(&self) {
         if let Some(cmd) = &self.opts.subcmd {
             match cmd {
-                RgTopLevelSubcommand::TestCapture(_t) => {
+                RgTopLevelSubcommand::TestCapture(t) => {
                     println!("Attempting test capture");
-                    // debug_capture();
-                    unsafe {
-                        exit(0)
+                    #[cfg(target_os = "linux")] {
+                        use redgold_gui::image_capture_openpnp::debug_capture;
+                        debug_capture(t.cam);
+                        unsafe {
+                            exit(0)
+                        }
                     }
                 }
                 _ => {}
@@ -635,7 +644,7 @@ There's internal libraries for getting the current exe path and calculating chec
 seem to produce a different result than the shell script.
 */
 fn calc_sha_sum(path: String) -> RgResult<String> {
-    redgold_schema::util::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
+    redgold_common_no_wasm::cmd::run_cmd_safe("shasum", vec!["-a", "256", &*path])
         .and_then(|x|
             x.0
              .split_whitespace()

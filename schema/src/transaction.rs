@@ -4,7 +4,6 @@ use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
 use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof, SwapFulfillment, PortfolioRequest};
 use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 use crate::proto_serde::ProtoHashable;
@@ -142,17 +141,6 @@ impl Transaction {
         Ok(net.clone())
     }
 
-    pub fn new_blank() -> Self {
-        let mut rng = rand::thread_rng();
-        let mut tx = Self::default();
-        tx.struct_metadata = struct_metadata_new();
-
-        let mut opts = TransactionOptions::default();
-        opts.salt = Some(rng.gen::<i64>());
-        opts.transaction_type = TransactionType::Standard as i32;
-        tx.options = Some(opts);
-        tx
-    }
     pub fn is_test(&self) -> bool {
         self.options.as_ref().and_then(|o| o.is_test).unwrap_or(false)
     }

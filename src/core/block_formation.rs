@@ -8,7 +8,7 @@
 // use crate::util;
 // use crate::util::rg_merkle;
 // use itertools::Itertools;
-// use log::{debug, error};
+// use tracing::{debug, error};
 // use std::collections::HashMap;
 // use std::sync::Arc;
 // use tokio::runtime::Runtime;

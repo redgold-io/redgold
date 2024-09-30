@@ -4,7 +4,7 @@ use eframe::egui::{Color32, ComboBox, RichText, Ui};
 use serde::{Deserialize, Serialize};
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
 
-pub fn currency_selection_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency, label: impl Into<String>, supported: Vec<SupportedCurrency>, locked: bool) -> bool {
+pub fn currency_combo_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency, label: impl Into<String>, supported: Vec<SupportedCurrency>, locked: bool) -> bool {
     let mut changed = false;
     let mut c = currency_selector.clone();
     let currency_selector = if locked {
@@ -41,6 +41,7 @@ pub struct CurrencyInputBox {
     pub input_has_changed: bool,
     pub currency_has_changed: bool,
     pub currency_box_right_label: String,
+    pub allowed_currencies: Option<Vec<SupportedCurrency>>
 }
 
 impl Default for CurrencyInputBox {
@@ -54,6 +55,7 @@ impl Default for CurrencyInputBox {
             input_has_changed: false,
             currency_has_changed: false,
             currency_box_right_label: "Currency".to_string(),
+            allowed_currencies: None,
         }
     }
 }
@@ -100,9 +102,10 @@ impl CurrencyInputBox {
     }
     pub fn view(&mut self, ui: &mut Ui, price_map_usd: &HashMap<SupportedCurrency, f64>) {
         ui.horizontal(|ui| {
-            self.currency_has_changed = currency_selection_box(
+            let allowed = self.allowed_currencies.clone().unwrap_or(supported_wallet_currencies());
+            self.currency_has_changed = currency_combo_box(
                 ui, &mut self.input_currency, self.currency_box_right_label.clone(),
-                supported_wallet_currencies(), self.locked);
+                allowed, self.locked);
             self.input_box(ui);
             self.input_denomination(ui);
             self.usd_checkbox(ui);

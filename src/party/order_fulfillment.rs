@@ -3,26 +3,27 @@ use std::sync::{Arc, Mutex};
 use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::MemoryDatabase;
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use metrics::gauge;
 use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{error_info, structs, RgResult, SafeOption};
+use redgold_schema::{error_info, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
-use crate::party::address_event::AddressEvent;
+use redgold_schema::party::address_event::AddressEvent;
 use crate::party::data_enrichment::PartyInternalData;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
 use crate::party::party_watcher::PartyWatcher;
-use crate::party::price_volume::PriceVolume;
+use redgold_schema::party::price_volume::PriceVolume;
+use crate::party::party_stream::PartyEventBuilder;
 use crate::util::current_time_millis_i64;
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
@@ -40,7 +41,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let btc_starting_balance = ps.balance_with_deltas_applied.get(&SupportedCurrency::Bitcoin)
                     .map(|d| d.amount).unwrap_or(0);
 
-                let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party_config_data.order_cutoff_delay_time; //
+                let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party_config_data
+                    .as_ref().unwrap().order_cutoff_delay_time; //
                 let orders = ps.orders();
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
                 let identifier = v.party_info.initiate.safe_get()?.identifier.safe_get().cloned()?;
@@ -353,36 +355,5 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         tx.add_proof_per_input(&result.proof);
         self.relay.submit_transaction_sync(tx).await
     }
-
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-pub struct OrderFulfillment {
-    pub order_amount: u64,
-    pub fulfilled_amount: u64,
-    pub is_ask_fulfillment_from_external_deposit: bool,
-    pub event_time: i64,
-    pub tx_id_ref: Option<ExternalTransactionId>,
-    pub destination: Address,
-    pub is_stake_withdrawal: bool,
-    pub stake_withdrawal_fulfilment_utxo_id: Option<UtxoId>,
-    pub primary_event: AddressEvent,
-    pub prior_related_event: Option<AddressEvent>,
-    pub successive_related_event: Option<AddressEvent>,
-    pub fulfillment_txid_external: Option<ExternalTransactionId>
-}
-
-impl OrderFulfillment {
-
-    pub fn fulfilled_currency_amount(&self) -> CurrencyAmount {
-        let c = self.destination.currency_or();
-        if c == SupportedCurrency::Ethereum {
-            CurrencyAmount::from_eth_i64(self.fulfilled_amount as i64)
-        } else {
-            CurrencyAmount::from_currency(self.fulfilled_amount as i64, c)
-        }
-    }
-
-
 
 }

@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use eframe::{egui};
+use eframe::egui::Image;
 use crate::gui::egui::IconData;
 use egui_extras::RetainedImage;
 use tokio::runtime::Runtime;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::{error_info, ErrorInfoContext};
 use redgold_schema::structs::ErrorInfo;
 use crate::gui;
@@ -29,18 +31,23 @@ pub(crate) fn load_icon() -> IconData {
     }
 }
 
-pub async fn attempt_start(nc: NodeConfig
+pub async fn attempt_start<G>(nc: NodeConfig
                            // , rt: Arc<Runtime>
                            ,
-                           res: ExternalNetworkResourcesImpl
-) -> Result<(), ErrorInfo> {
+                           res: ExternalNetworkResourcesImpl,
+                          gui_depends: G
+) -> Result<(), ErrorInfo> where G: Send + Clone + GuiDepends + 'static {
     let resources = crate::resources::Resources::default();
     let bytes = resources.logo_bytes;
-    let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
-    let app = gui::ClientApp::from(ri, nc, res).await?;
+    let logo_img = Image::from_bytes("bytes://logo", bytes);
+    // let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
+    let app = gui::ClientApp::from(logo_img, nc, res, gui_depends).await?;
 
     let x = 1200.0;
-    let y = 1000.0;
+    let mut y = 1000.0;
+    if cfg!(target_os = "macos") {
+        y = 800.0;
+    }
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([x,y])
@@ -67,7 +74,7 @@ pub async fn attempt_start(nc: NodeConfig
         native_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::<ClientApp>::new(app)
+            Box::<ClientApp<G>>::new(app)
         })
     ).map_err(|e| error_info(format!("GUI failed to start: {}", e.to_string())))
 }

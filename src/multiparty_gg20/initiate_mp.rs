@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
-use log::{error, info};
+use tracing::{error, info};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
@@ -23,6 +23,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::json_pretty;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::conf::node_config::NodeConfig;
+use crate::party::event_validator::PartyEventValidator;
 use crate::util::current_time_millis_i64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -28,7 +28,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, Hash, Transaction, TransactionInfo, TransactionState, UtxoEntry, UtxoId};
-use redgold_schema::util::machine_info::{available_bytes, cores_total, file_size_bytes, memory_total_kb};
+use redgold_common_no_wasm::machine_info::{available_bytes, cores_total, file_size_bytes, memory_total_kb};
 use crate::price_time::PriceTimeStore;
 
 use crate::schema::structs::{

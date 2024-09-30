@@ -19,7 +19,7 @@ pub trait IntervalFold  {
     async fn interval_fold(&mut self) -> RgResult<()>;
 }
 
-pub async fn run_interval_fold(interval_f: impl IntervalFold + Send + 'static, interval_duration: Duration, run_at_start: bool)
+pub fn run_interval_fold(interval_f: impl IntervalFold + Send + 'static, interval_duration: Duration, run_at_start: bool)
     -> JoinHandle<RgResult<()>> {
     tokio::spawn(run_interval_inner(interval_f, interval_duration, run_at_start))
 }

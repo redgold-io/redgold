@@ -3,7 +3,7 @@ use std::ops::Sub;
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_keys::transaction_support::TransactionSupport;

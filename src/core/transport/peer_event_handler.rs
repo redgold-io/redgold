@@ -1,24 +1,28 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use bdk::bitcoin::secp256k1::PublicKey;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use futures::FutureExt;
 // use libp2p::Multiaddr;
-use log::{error, info};
+use tracing::{error, info};
 use metrics::counter;
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
-use redgold_schema::{error_info, ErrorInfoContext, SafeOption, structs};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request};
+use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request, TransportBackend};
 
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{PeerMessage, SendErrorInfo};
 use crate::core::relay::Relay;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::conf::port_offsets::PortOffsetHelpers;
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::json;
 use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util;
@@ -47,7 +51,9 @@ impl PeerOutgoingEventHandler {
             let res = relay.ds.peer_store.query_public_key_metadata(&pk).await?;
             // TODO if metadata known, check if udp is required
             if let Some(nmd) = res {
-                Self::send_message_rest(message.clone(), nmd, &relay).await?;
+                if !Self::maybe_udp_message(&relay, &message, pk, &nmd).await? {
+                    Self::send_message_rest(message.clone(), nmd, &relay).await?;
+                }
             } else {
                 // error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);
             }
@@ -65,6 +71,28 @@ impl PeerOutgoingEventHandler {
             return Err(error_info(s));
         }
         Ok(())
+    }
+
+    async fn maybe_udp_message(relay: &Relay, message: &PeerMessage, pk: &structs::PublicKey, nmd: &NodeMetadata) -> RgResult<bool> {
+        let mut message = message.clone();
+        if let Some(ti) = nmd.transport_info.as_ref() {
+            let nat_restricted = ti.nat_restricted.unwrap_or(false);
+            if message.requested_transport == Some(TransportBackend::Udp) || nat_restricted {
+                let dynamic_udp_port = relay.peer_info.read_dynamic(pk).and_then(|d| d.udp_port);
+                if nat_restricted && dynamic_udp_port.is_none() {
+                    return "Nat restricted and no dynamic UDP port available".to_error()
+                }
+                let offset = dynamic_udp_port.unwrap_or(nmd.port_or(relay.node_config.network.clone()) as i64);
+                let udp_port = offset.udp_port();
+                if let Some(ip) = ti.external_ipv4.clone() {
+                    let ip = Ipv4Addr::from_str(&*ip).error_info("ip parse")?;
+                    let socket_addr = SocketAddr::new(IpAddr::V4(ip), udp_port);
+                    message.socket_addr = Some(socket_addr);
+                    relay.udp_outgoing_messages.send(message).await?
+                }
+            }
+        }
+        Ok(false)
     }
 
     async fn run(&mut self) -> Result<(), ErrorInfo> {

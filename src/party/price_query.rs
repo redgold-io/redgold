@@ -1,40 +1,42 @@
-use rocket::serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use redgold_data::data_store::DataStore;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::RgResult;
 use redgold_schema::structs::SupportedCurrency;
 use redgold_common::external_resources::ExternalNetworkResources;
-use crate::party::address_event::AddressEvent;
+use redgold_schema::party::address_event::AddressEvent;
+use redgold_schema::party::external_data::{PriceDataPointUsdQuery, UsdPrice};
 use crate::party::portfolio_request::get_most_recent_day_millis;
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-pub struct UsdPrice {
-    currency: SupportedCurrency,
-    price: f64,
+
+
+
+pub trait PriceDataPointQueryImpl {
+    async fn daily_enrichment<T: ExternalNetworkResources + Send>(&mut self, t: &T, ds: &DataStore) -> RgResult<()>;
+    fn new() -> Self;
+    async fn query_price<T: ExternalNetworkResources + Send>(
+        &mut self, time: i64, currency: SupportedCurrency, ds: &DataStore, external_network_resources: &T
+    ) -> RgResult<f64>;
+    async fn enrich_address_events<T: ExternalNetworkResources + Send>(
+        &mut self, events: &mut Vec<AddressEvent>, ds: &DataStore, external_network_resources: &T
+    ) -> RgResult<()>;
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-pub struct PriceDataPointUsdQuery {
-    inner: HashMap<i64, UsdPrice>,
-}
+impl PriceDataPointQueryImpl for PriceDataPointUsdQuery {
 
-impl PriceDataPointUsdQuery {
-    pub async fn daily_enrichment<T: ExternalNetworkResources + Send>(&mut self, t: &T, ds: &DataStore) -> RgResult<()> {
+    async fn daily_enrichment<T: ExternalNetworkResources + Send>(&mut self, t: &T, ds: &DataStore) -> RgResult<()> {
         let recent = get_most_recent_day_millis();
 
         self.query_price(recent, SupportedCurrency::Bitcoin, ds, t).await?;
         self.query_price(recent, SupportedCurrency::Ethereum, ds, t).await?;
         Ok(())
     }
-}
 
-impl PriceDataPointUsdQuery {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             inner: HashMap::new()
         }
     }
-    pub async fn query_price<T: ExternalNetworkResources + Send>(
+    async fn query_price<T: ExternalNetworkResources + Send>(
         &mut self, time: i64, currency: SupportedCurrency, ds: &DataStore, external_network_resources: &T
     ) -> RgResult<f64> {
         let price = self.inner.get(&time);
@@ -55,7 +57,7 @@ impl PriceDataPointUsdQuery {
         Ok(price)
     }
 
-    pub async fn enrich_address_events<T: ExternalNetworkResources + Send>(
+    async fn enrich_address_events<T: ExternalNetworkResources + Send>(
         &mut self, events: &mut Vec<AddressEvent>, ds: &DataStore, external_network_resources: &T
     ) -> RgResult<()> {
         for event in events.iter_mut() {

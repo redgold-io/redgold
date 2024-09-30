@@ -90,7 +90,7 @@ impl RequestXpubState {
 
                     if request_type == XPubRequestType::Cold {
                         LocalState::send_update(&updates, |lss| {
-                            lss.wallet_state.update_hardware();
+                            lss.wallet.update_hardware();
                         });
                         ui.horizontal(|ui| {
                             ui.label("Hardware Wallet: ");

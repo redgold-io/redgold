@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::structs::Address;
 use crate::api::RgHttpClient;
-use crate::party::party_stream::TransactionWithObservationsAndPrice;
+use redgold_schema::party::address_event::TransactionWithObservationsAndPrice;
 
 #[async_trait]
 pub trait AllTxObsForAddress {

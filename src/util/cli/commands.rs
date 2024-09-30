@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use flume::Sender;
 use itertools::Itertools;
 
-use log::{error, info};
+use tracing::{error, info};
 use rocket::form::FromForm;
 use tokio::task::JoinHandle;
 
@@ -27,12 +27,12 @@ use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use redgold_schema::tx::tx_builder::TransactionBuilderSupport;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, WordsPassNodeConfig};
-use redgold_schema::util::cmd::run_cmd;
+use redgold_common_no_wasm::cmd::run_cmd;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {

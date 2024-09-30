@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use anyhow::{Context, Result};
 use futures::{Sink, Stream, StreamExt, TryStreamExt};
-use log::info;
+use tracing::info;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // use structopt::StructOpt;
 

@@ -1,4 +1,3 @@
-use log::Log;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
 

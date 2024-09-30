@@ -7,7 +7,7 @@ use eframe::egui;
 use egui_extras::{Column, TableBuilder};
 use itertools::Itertools;
 use std::time::Duration;
-use log::{error, info};
+use tracing::{error, info};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::gui::app_loop;
 use crate::gui::app_loop::LocalState;
