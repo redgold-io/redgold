@@ -31,6 +31,7 @@ use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::observability::metrics_registry;
 use redgold_schema::party::party_events::PartyEvents;
+use crate::party::stake_event_stream::StakeMethods;
 use crate::test::harness::amm_harness::PartyTestHarness;
 use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 //
@@ -750,7 +751,7 @@ async fn debug_send() {
     let eth = EthWalletWrapper::new(&dev_secret, &NetworkEnvironment::Dev).expect("works");
 
     let a = structs::Address::from_eth(&dest.to_string());
-    let amt = EthWalletWrapper::stake_test_amount_typed();
+    let amt = CurrencyAmount::stake_test_amount_typed();
 
     assert!(PartyEvents::meets_minimum_stake_amount(&amt));
     // eth.send_tx_typed(&a, &amt).await.expect("works");

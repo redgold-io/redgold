@@ -16,6 +16,7 @@ use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Inpu
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_common_no_wasm::cmd::{run_cmd, run_cmd_safe};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use crate::util::init_logger_once;
 

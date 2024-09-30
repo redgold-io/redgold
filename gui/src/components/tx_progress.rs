@@ -86,7 +86,7 @@ pub struct PreparedTransaction {
 impl TransactionProgressFlow {
 
 
-    pub async fn rdg_only_prepared_tx(tx: Transaction) -> PreparedTransaction {
+    pub fn rdg_only_prepared_tx(tx: Transaction) -> PreparedTransaction {
         let mut def = PreparedTransaction::default();
         def.tx = Some(tx.clone());
         def.ser_tx = Some(tx.json_or());

@@ -7,7 +7,7 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use redgold_gui::common::big_button;
 use redgold_gui::components::currency_input::{currency_combo_box, CurrencyInputBox, supported_wallet_currencies};
-use redgold_gui::components::tx_progress::{TransactionProgressFlow, TransactionStage};
+use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow, TransactionStage};
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PublicKey, SupportedCurrency};
@@ -214,7 +214,8 @@ fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &&PublicKey, g: G) -> RgResul
                     .with_portfolio_request(ports, &CurrencyAmount::from_rdg(100_000), &pa)
                     .build()
                     .unwrap();
-                // ls.wallet.port.tx.prepared_tx
+                let prepared = TransactionProgressFlow::rdg_only_prepared_tx(tx);
+                ls.wallet.port.tx.created(Some(prepared), None);
 
             }
         }
