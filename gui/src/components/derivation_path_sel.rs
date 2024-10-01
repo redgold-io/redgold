@@ -1,7 +1,7 @@
 use eframe::egui::Ui;
 use serde::{Deserialize, Serialize};
 use redgold_keys::xpub_wrapper::ValidateDerivationPath;
-use redgold_gui::common::{editable_text_input_copy, valid_label};
+use crate::common::{editable_text_input_copy, valid_label};
 
 
 const DEFAULT_DP: &str = "m/44'/16180'/0'/0/0";

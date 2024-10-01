@@ -1,6 +1,5 @@
 use eframe::{egui, Frame};
 use eframe::egui::Image;
-use egui_extras::RetainedImage;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::structs::ErrorInfo;
 // 0.17.1
@@ -20,7 +19,6 @@ pub mod top_panel;
 pub mod webcam;
 pub mod qr_render;
 pub mod components;
-pub mod airgap;
 pub mod qr_window;
 pub mod native_gui_dependencies;
 

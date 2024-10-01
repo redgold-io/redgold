@@ -12,6 +12,7 @@ pub mod dependencies;
 
 #[cfg(not(target_os = "linux"))]
 pub mod image_capture_stub;
+pub mod airgap;
 
 #[cfg(not(target_os = "linux"))]
 pub use image_capture_stub as image_capture;

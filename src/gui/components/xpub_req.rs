@@ -10,7 +10,7 @@ use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use crate::core::internal_message::Channel;
 use crate::gui::app_loop::LocalState;
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
-use crate::gui::components::derivation_path_sel::DerivationPathInputState;
+use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
 use redgold_schema::observability::errors::Loggable;
