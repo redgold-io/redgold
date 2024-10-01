@@ -43,10 +43,11 @@ pub async fn attempt_start<G>(nc: NodeConfig
     // let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
     let app = gui::ClientApp::from(logo_img, nc, res, gui_depends).await?;
 
-    let x = 1200.0;
+    let mut x = 1400.0;
     let mut y = 1000.0;
     if cfg!(target_os = "macos") {
         y = 800.0;
+        x = 1200.0;
     }
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

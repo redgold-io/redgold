@@ -219,6 +219,7 @@ impl Transaction {
 
     pub fn external_destination_currency(&self) -> Option<SupportedCurrency> {
         self.swap_destination().or(self.stake_destination())
+            .map(|d| d.clone().mark_external().clone())
             .map(|a| a.currency_or())
     }
 

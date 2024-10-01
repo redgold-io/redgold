@@ -4,6 +4,8 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::RgResult;
 use redgold_schema::structs::SupportedCurrency;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::external_data::{PriceDataPointUsdQuery, UsdPrice};
 use crate::party::portfolio_request::get_most_recent_day_millis;
@@ -66,8 +68,12 @@ impl PriceDataPointQueryImpl for PriceDataPointUsdQuery {
                     let time = txo.tx.time()?.clone();
                     let currency = txo.tx.external_destination_currency();
                     if let Some(c) = currency {
-                        let price = self.query_price(time, c, ds, external_network_resources).await?;
-                        txo.price_usd = Some(price);
+                        if let Ok(price) = self.query_price(time, c, ds, external_network_resources).await
+                            .with_detail("tx", txo.tx.json_or())
+                            .with_detail("destination_currency", c.json_or())
+                            .log_error() {
+                            txo.price_usd = Some(price);
+                        }
                     }
                     if let Some(pr) = txo.tx.portfolio_request() {
                         let mut hs = HashSet::new();
