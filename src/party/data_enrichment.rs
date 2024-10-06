@@ -1,57 +1,15 @@
-use redgold_schema::structs::{ErrorInfo, PartyData, PartyInfo, PublicKey, SupportedCurrency, Transaction};
-use rocket::serde::{Deserialize, Serialize};
+use redgold_schema::structs::{ErrorInfo, PartyInfo, PublicKey, SupportedCurrency};
 use std::collections::HashMap;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::{RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
-use redgold_schema::party::party_events::OrderFulfillment;
-use redgold_schema::party::party_events::PartyEvents;
 use crate::party::party_watcher::PartyWatcher;
 use redgold_schema::party::external_data::PriceDataPointUsdQuery;
 use redgold_schema::party::external_data::ExternalNetworkData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::party::price_query::PriceDataPointQueryImpl;
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PartyInternalData {
-    pub party_info: PartyInfo,
-    pub network_data: HashMap<SupportedCurrency, ExternalNetworkData>,
-    pub internal_data: Vec<Transaction>,
-    // Technically network data / internal data above transactions are redundant in light of the
-    // below field, can remove maybe later, but this is easy to use for now
-    pub address_events: Vec<AddressEvent>,
-    pub price_data: PriceDataPointUsdQuery,
-    pub party_events: Option<PartyEvents>,
-    pub locally_fulfilled_orders: Option<Vec<OrderFulfillment>>
-}
-
-impl PartyInternalData {
-
-    pub fn clear_sensitive(&mut self) -> &mut Self {
-        self.party_info.clear_sensitive();
-        self
-    }
-    pub fn to_party_data(&self) -> PartyData {
-        PartyData {
-            json_party_internal_data: Some(self.json_or())
-        }
-    }
-
-    pub fn not_debug(&self) -> bool {
-        self.party_info.not_debug()
-    }
-
-    pub fn self_initiated_not_debug(&self) -> bool {
-        self.party_info.not_debug() && self.party_info.self_initiated.unwrap_or(false)
-    }
-
-    pub fn active_self(&self) -> bool {
-        self.party_info.active() && self.party_info.self_initiated.unwrap_or(false)
-    }
-
-
-}
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 

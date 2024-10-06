@@ -7,11 +7,12 @@ use strum_macros::{EnumIter, EnumString};
 use tracing_subscriber::fmt::format;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common;
 use redgold_gui::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
 use redgold_gui::components::tx_progress::TransactionProgressFlow;
 use redgold_keys::address_external::ToBitcoinAddress;
+use crate::gui::ls_ext::{broadcast_swap, create_swap_tx, sign_swap};
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs;
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs::Swap;
 
@@ -133,13 +134,13 @@ impl SwapState {
                             match ls.swap_state.stage {
                                 SwapStage::StartPreparing => {}
                                 SwapStage::ShowAmountsPromptSigning => {
-                                    LocalState::create_swap_tx(ls);
+                                    create_swap_tx(ls);
                                 }
                                 SwapStage::ViewSignedAllowBroadcast => {
-                                    LocalState::sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                                    sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
                                 }
                                 SwapStage::CompleteShowTrackProgress => {
-                                    LocalState::broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                                    broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
                                 }
                             }
                         }

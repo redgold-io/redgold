@@ -9,7 +9,7 @@ pub trait ExternalNetworkResources {
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String>;
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
     async fn send(&mut self, destination: &Address, currency_amount: &CurrencyAmount, broadcast: bool,
-    from: Option<PublicKey>, secret: Option<String>
+                  from: Option<PublicKey>, secret: Option<String>
     ) -> RgResult<(ExternalTransactionId, String)>;
     async fn self_balance(&self, currency: SupportedCurrency) -> RgResult<CurrencyAmount>;
 
@@ -23,6 +23,7 @@ pub trait ExternalNetworkResources {
 
     async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)>;
 
+    async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>>;
 }
 
 pub struct NetworkDataFilter {

@@ -45,7 +45,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use crate::node_config::ApiNodeConfig;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::central_price::CentralPricePair;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::price_volume::PriceVolume;
 // use crate::party::bid_ask::BidAsk;
 

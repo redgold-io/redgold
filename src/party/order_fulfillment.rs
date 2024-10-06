@@ -19,7 +19,7 @@ use redgold_schema::structs::{Address, BytesData, CurrencyAmount, ErrorInfo, Ext
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use redgold_schema::party::address_event::AddressEvent;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
 use crate::party::party_watcher::PartyWatcher;
 use redgold_schema::party::price_volume::PriceVolume;
@@ -41,7 +41,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let btc_starting_balance = ps.balance_with_deltas_applied.get(&SupportedCurrency::Bitcoin)
                     .map(|d| d.amount).unwrap_or(0);
 
-                let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party_config_data
+                let cutoff_time = current_time_millis_i64() - self.relay.node_config.config_data.party
                     .as_ref().unwrap().order_cutoff_delay_time; //
                 let orders = ps.orders();
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
@@ -104,7 +104,10 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     }]
                 }).collect_vec().json_or();
                 let last_fulfilled = " ".to_string() ; //ps.locally_fulfilled_orders.last().json_or();
-
+                let imba = ps.portfolio_request_events.current_portfolio_imbalance.json_or();
+                let imba2 = ps.portfolio_request_events.external_stake_balance_deltas.json_or();
+                let imba3 = ps.portfolio_request_events.stake_utxos.len();
+                let alloc = ps.portfolio_request_events.current_rdg_allocations.json_or();
                 info!("\
                 watcher balances: RDG:{}, BTC:{}, ETH:{} ETH_address={} \
         BTC_address: {} environment: {} orders {} cutoff_orders {} num_events: {} \
@@ -118,7 +121,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
          internal_staking_events {} \
          external_staking_events {} \
          rejected_stake_withdrawals {rejected_stake_withdrawals} \
-         central_prices: {} orders_len {} self_pk {} locally_fulfilled_orders {} orders: {} last_fulfilled: {}",
+         central_prices: {} orders_len {} self_pk {} locally_fulfilled_orders {} orders: {} last_fulfilled: {} portfolio_imbalance: {imba} external_stake_balance_deltas: {imba2} stake_utxos_len: {imba3} alloc {alloc}",
             rdg_starting_balance, btc_starting_balance, eth_balance, eth_address, btc_address, environment.to_std_string(),
             orders.len(),
             cutoff_orders.len(),

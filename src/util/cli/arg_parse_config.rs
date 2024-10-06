@@ -102,11 +102,11 @@ impl ArgTranslate {
     }
 
     pub fn secure_data_path_string() -> Option<String> {
-        std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
+        std::env::var("REDGOLD_SECURE_PATH").ok()
     }
 
     pub fn secure_data_path_buf() -> Option<PathBuf> {
-        std::env::var("REDGOLD_SECURE_DATA_PATH").ok().map(|a| PathBuf::from(a))
+        std::env::var("REDGOLD_SECURE_PATH").ok().map(|a| PathBuf::from(a))
     }
 
     pub fn secure_data_or_cwd() -> PathBuf {
@@ -376,7 +376,7 @@ impl ArgTranslate {
 
     fn data_folder(&mut self) -> Result<(), ErrorInfo> {
 
-        let mut data_folder_path =  self.opts.data_folder.clone()
+        let mut data_folder_path =  self.opts.data_path.clone()
             .map(|p| PathBuf::from(p))
             .unwrap_or(get_default_data_top_folder());
 

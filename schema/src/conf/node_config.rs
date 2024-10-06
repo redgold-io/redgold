@@ -254,6 +254,10 @@ impl NodeConfig {
         }
     }
 
+    // pub fn secure_path_or(&self) -> String {
+    //     self.config_data.secure_data.
+    // }
+
 
     // This should ONLY be used by the genesis node when starting for the very first time
     // Probably another way to deal with this, mostly used for debug runs and so on

@@ -8,7 +8,7 @@ use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::{ErrorInfo, Hash, HealthRequest, NetworkEnvironment, PublicKey, Request};
 use redgold_common::external_resources::ExternalNetworkResources;
 use crate::multiparty_gg20::initiate_mp;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::party::deposit_key_allocation::DepositKeyAllocation;
 use crate::party::party_watcher::PartyWatcher;
 

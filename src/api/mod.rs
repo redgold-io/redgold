@@ -28,7 +28,7 @@ use crate::core::relay::Relay;
 use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 
 pub mod control_api;
 pub mod public_api;

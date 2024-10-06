@@ -9,7 +9,7 @@ use redgold_schema::structs::{Hash, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::party::party_stream::PartyEventBuilder;
 

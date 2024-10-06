@@ -347,7 +347,8 @@ async fn debug_sign_tx () {
         address: None,
         utxo_entries: vec![utxo],
         balance: 0,
-        recent_transactions: vec![]
+        recent_transactions: vec![],
+        balances: vec![],
     };
     let nc = NodeConfig::default();
     let mut tb = TransactionBuilder::new(&nc);

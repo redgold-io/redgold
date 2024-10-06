@@ -6,6 +6,7 @@ pub mod party_events;
 pub mod central_price;
 pub mod price_volume;
 pub mod portfolio;
+pub mod party_internal_data;
 
 use crate::structs::RoomId;
 

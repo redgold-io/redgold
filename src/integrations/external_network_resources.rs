@@ -24,6 +24,7 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::party::party_events::PartyEvents;
+use crate::core::relay::Relay;
 use crate::scrape::okx_point;
 use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;
@@ -34,12 +35,13 @@ pub struct ExternalNetworkResourcesImpl {
     pub node_config: NodeConfig,
     pub self_secret_key: String,
     pub dummy_secret_key: String,
-    pub self_public: PublicKey
+    pub self_public: PublicKey,
+    pub relay: Option<Relay>
 }
 
 impl ExternalNetworkResourcesImpl {
 
-    pub fn new(node_config: &NodeConfig) -> RgResult<ExternalNetworkResourcesImpl> {
+    pub fn new(node_config: &NodeConfig, relay: Option<Relay>) -> RgResult<ExternalNetworkResourcesImpl> {
         let btc_wallets = Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         let dummy_secret_key = "25474115328e46e8e636edf6b6f1c90cbd997ae24f5a043fd8ecf2381118e22f".to_string();
         Ok(ExternalNetworkResourcesImpl {
@@ -47,7 +49,8 @@ impl ExternalNetworkResourcesImpl {
             node_config: node_config.clone(),
             self_secret_key: node_config.keypair().to_private_hex(),
             dummy_secret_key,
-            self_public: node_config.keypair().public_key()
+            self_public: node_config.keypair().public_key(),
+            relay
         })
     }
     pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
@@ -229,6 +232,10 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         valid.currency = SupportedCurrency::Ethereum as i32;
         Ok((data, valid, tx_ser))
     }
+
+    async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>> {
+        self.relay.as_ref().unwrap().ds.price_time.max_time_price_by(currency, max_time).await
+    }
 }
 
 
@@ -244,7 +251,7 @@ pub struct MockExternalResources {
 impl MockExternalResources {
 
     pub fn new(node_config: &NodeConfig, file_based_prefix: Option<PathBuf>, ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>) -> RgResult<MockExternalResources> {
-        let inner = ExternalNetworkResourcesImpl::new(node_config)?;
+        let inner = ExternalNetworkResourcesImpl::new(node_config, None)?;
         if let Some(dir) = file_based_prefix.as_ref() {
             std::fs::create_dir_all(dir).error_info("create dir")?;
         }
@@ -473,6 +480,20 @@ impl ExternalNetworkResources for MockExternalResources {
         valid.json_payload = Some(tx_ser.clone());
         valid.currency = SupportedCurrency::Ethereum as i32;
         Ok((data, valid, tx_ser))
+    }
+
+    async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>> {
+        match currency {
+            SupportedCurrency::Bitcoin => {
+                let price = 60_000.0;
+                Ok(Some(price))
+            },
+            SupportedCurrency::Ethereum => {
+                let price = 3_000.0;
+                Ok(Some(price))
+            }
+            _ => Err(error_info("Unsupported currency"))
+        }
     }
 }
 

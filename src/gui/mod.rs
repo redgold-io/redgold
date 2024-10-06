@@ -7,6 +7,7 @@ use redgold_schema::structs::ErrorInfo;
 use crate::gui::app_loop::LocalState;
 // use crate::gui::image_load::Image;
 use redgold_schema::conf::node_config::NodeConfig;
+use crate::gui::ls_ext::local_state_from;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
 pub mod app_loop;
@@ -21,11 +22,13 @@ pub mod qr_render;
 pub mod components;
 pub mod qr_window;
 pub mod native_gui_dependencies;
+pub mod lock_screen;
+pub mod ls_ext;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
-pub struct ClientApp<G> where G: GuiDepends + Clone + Send {
+pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     #[cfg_attr(feature = "persistence", serde(skip))]
     logo: Image<'static>,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -34,7 +37,7 @@ pub struct ClientApp<G> where G: GuiDepends + Clone + Send {
     gui_depends: G,
 }
 
-impl<G> ClientApp<G> where G: GuiDepends + Clone + Send{
+impl<G> ClientApp<G> where G: GuiDepends + Clone + Send + 'static{
     pub async fn from(logo: Image<'static>,
                       nc: NodeConfig,
                       res: ExternalNetworkResourcesImpl,
@@ -42,13 +45,13 @@ impl<G> ClientApp<G> where G: GuiDepends + Clone + Send{
     ) -> Result<Self, ErrorInfo> where G: Send + Clone + GuiDepends {
         Ok(Self {
             logo,
-            local_state: LocalState::from(nc, res, gui_depends.clone()).await?,
+            local_state: local_state_from(nc, res, gui_depends.clone()).await?,
             gui_depends,
         })
     }
 }
 
-impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send {
+impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut Frame) {

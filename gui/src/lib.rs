@@ -9,10 +9,14 @@ pub mod components;
 pub mod common;
 pub mod dependencies;
 
+pub mod state;
+
 
 #[cfg(not(target_os = "linux"))]
 pub mod image_capture_stub;
 pub mod airgap;
+pub mod data_query;
+pub mod tab;
 
 #[cfg(not(target_os = "linux"))]
 pub use image_capture_stub as image_capture;

@@ -7,7 +7,7 @@ use redgold_schema::structs::PublicKey;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use redgold_common::external_resources::ExternalNetworkResources;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::party::party_stream::PartyEventBuilder;
 use crate::party::portfolio_request::PortfolioEventMethods;
@@ -65,7 +65,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             for e in v.address_events.iter() {
                 pe.process_event(e).await?;
             }
-            pe.calculate_update_portfolio_imbalance(&self.relay.ds).await.log_error().bubble_abort()?.ok();
+            pe.calculate_update_portfolio_imbalance(&self.external_network_resources).await.log_error().bubble_abort()?.ok();
             pe.locally_fulfilled_orders = v.locally_fulfilled_orders.clone().unwrap_or(vec![]);
             v.party_events = Some(pe.clone());
             // let len = pe.unfulfilled_external_withdrawals.len();

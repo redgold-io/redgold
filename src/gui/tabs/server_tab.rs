@@ -12,7 +12,7 @@ use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use crate::gui::tables;
 use crate::infra::deploy::{default_deploy, DeployMachine};
@@ -159,7 +159,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     if let Some(p) = local_state.server_state.parse_success {
         ui.horizontal(|ui| {
             ui.label("Parse result: ");
-            valid_label(ui, p);
+            valid_label(ui, p, );
         });
 
     }

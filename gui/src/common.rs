@@ -11,12 +11,15 @@ pub fn valid_label(ui: &mut Ui, bool: bool) {
 
 pub fn editable_text_input_copy(
     ui: &mut Ui, label: impl Into<String>, edit_str: &mut String, width: f32
-) {
+) -> bool {
+    let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(label.into());
-        ui.add(egui::TextEdit::singleline(edit_str).desired_width(width));
+        let r = ui.add(egui::TextEdit::singleline(edit_str).desired_width(width));
+        changed = r.changed();
         copy_to_clipboard(ui, edit_str.clone());
     });
+    changed
 }
 
 pub fn copy_to_clipboard(ui: &mut Ui, text: impl Into<String>) {

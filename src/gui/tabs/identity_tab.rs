@@ -8,7 +8,7 @@ use redgold_schema::local_stored_state::Identity;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{PeerMetadata, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::gui::app_loop::{LocalState, PublicKeyStoredState};
+use crate::gui::app_loop::{LocalState, LocalStateAddons, PublicKeyStoredState};
 use redgold_gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::node_config::ApiNodeConfig;

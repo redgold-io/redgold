@@ -8,12 +8,14 @@ use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use crate::core::internal_message::Channel;
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
 use redgold_schema::observability::errors::Loggable;
+use crate::gui::ls_ext::send_update;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct RequestXpubState {
@@ -59,7 +61,7 @@ impl RequestXpubState {
         }
     }
 
-    pub fn view(&mut self, ui: &mut Ui, ctx: &egui::Context, updates: &Channel<StateUpdate>, device_list: Option<String>) {
+    pub fn view<G>(&mut self, ui: &mut Ui, ctx: &egui::Context, updates: &Channel<StateUpdate>, device_list: Option<String>, g: &G) where G: GuiDepends {
         self.button(ui);
 
         egui::Window::new("Request XPub")
@@ -86,10 +88,10 @@ impl RequestXpubState {
                             }
                         });
 
-                    self.derivation_path.view(ui);
+                    self.derivation_path.view(ui, g.clone());
 
                     if request_type == XPubRequestType::Cold {
-                        LocalState::send_update(&updates, |lss| {
+                        send_update(&updates, |lss| {
                             lss.wallet.update_hardware();
                         });
                         ui.horizontal(|ui| {
@@ -156,7 +158,7 @@ impl RequestXpubState {
                                     request_type: Some(request_type.clone()),
                                     skip_persist: None,
                                 };
-                                LocalState::send_update(&updates, move |lss| {
+                                send_update(&updates, move |lss| {
                                     let named2 = named.clone();
                                     lss.add_named_xpubs(true, vec![named2], false).log_error().ok();
                                     lss.persist_local_state_store();

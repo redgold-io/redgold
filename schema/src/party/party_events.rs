@@ -15,7 +15,7 @@ use crate::structs::{Address, CurrencyAmount, DepositRequest, ErrorInfo, Externa
 use crate::tx::external_tx::ExternalTimedTransaction;
 use crate::util::times::current_time_millis;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PartyEvents where {
     pub network: NetworkEnvironment,
     pub key_address: Address,
@@ -323,7 +323,7 @@ impl PartyEvents {
 }
 
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct OrderFulfillment {
     pub order_amount: u64,
     pub fulfilled_amount: u64,
@@ -364,7 +364,7 @@ pub struct InternalStakeEvent {
     pub utxo_id: UtxoId,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct PendingExternalStakeEvent {
     pub event: AddressEvent,
     pub tx: Transaction,
@@ -377,14 +377,14 @@ pub struct PendingExternalStakeEvent {
 }
 
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct ConfirmedExternalStakeEvent {
     pub pending_event: PendingExternalStakeEvent,
     pub event: AddressEvent,
     pub ett: ExternalTimedTransaction,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct PendingWithdrawalStakeEvent {
     pub address: Address,
     pub amount: CurrencyAmount,
