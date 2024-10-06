@@ -20,12 +20,14 @@ use crate::gui::{home, top_panel, ClientApp};
 use crate::util;
 use rand::Rng;
 use rocket::form::validate::Contains;
+use serde::{Deserialize, Serialize};
+use redgold_gui::dependencies::gui_depends::TransactionSignInfo;
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
 //     }
 // }
-use crate::gui::components::tx_signer::{TxSignerProgress, TxBroadcastProgress};
+use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
 
 pub trait PublicKeyStoredState {
     fn public_key(&self, xpub_name: String) -> Option<PublicKey>;
@@ -42,29 +44,9 @@ impl PublicKeyStoredState for LocalStoredState {
 
 // #[derive(Clone)]
 pub struct LocalState {
-    active_tab: Tab,
-    session_salt: [u8; 32],
-    session_password_hashed: Option<[u8; 32]>,
-    session_locked: bool,
-    // This is only used by the text box and should be cleared immediately
-    password_entry: String,
-    // This is only used by the text box and should be cleared immediately
-    wallet_passphrase_entry: String,
-    // wallet_words_entry: String,
-    active_passphrase: Option<String>,
-    password_visible: bool,
-    show_mnemonic: bool,
-    visible_mnemonic: Option<String>,
-    // TODO: Encrypt these with session password
-    // TODO: Allow multiple passphrase, i'm too lazy for now
-    // stored_passphrases: HashMap<String, String>,
-    stored_passphrase: Vec<u8>,
-    // stored_mnemonics: Vec<String>,
-    stored_private_key_hexes: Vec<String>,
-    iv: [u8; 16],
-    wallet_first_load_state: bool,
+    pub(crate) active_tab: Tab,
+    pub data: DataQueryInfo,
     pub node_config: NodeConfig,
-    // pub runtime: Arc<Runtime>,
     pub home_state: HomeState,
     pub server_state: ServersState,
     pub current_time: i64,
@@ -83,6 +65,7 @@ pub struct LocalState {
     pub keytab_state: KeyTabState,
     pub is_mac: bool,
     pub is_linux: bool,
+    pub is_wasm: bool,
     pub swap_state: SwapState,
     pub external_network_resources: ExternalNetworkResourcesImpl,
     pub price_map_usd_pair: HashMap<SupportedCurrency, f64>,
@@ -90,8 +73,27 @@ pub struct LocalState {
     pub first_party: Option<PartyInternalData>,
 }
 
-impl LocalState {
-    pub(crate) fn process_tab_change(&mut self, p0: Tab) {
+pub trait LocalStateAddons {
+    fn process_tab_change(&mut self, p0: Tab);
+    fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool);
+    fn secure_or(&self) -> DataStore;
+    fn persist_local_state_store(&self);
+    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()>;
+    fn upsert_identity(&mut self, new_named: Identity) -> ();
+    fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> ();
+    fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> ();
+    fn process_updates(&mut self);
+    fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64>;
+    fn keysign_info<G>(&self, g: &G) -> TransactionSignInfo;
+    // fn encrypt(&self, str: String) -> Vec<u8>;
+    // fn decrypt(&self, data: &[u8]) -> Vec<u8>;
+    // fn accept_passphrase(&mut self, pass: String);
+    // fn hash_password(&mut self) -> [u8; 32];
+    // fn store_password(&mut self);
+}
+
+impl LocalStateAddons for LocalState {
+    fn process_tab_change(&mut self, p0: Tab) {
         match p0 {
             Tab::Home => {}
             Tab::Keys => {
@@ -107,16 +109,10 @@ impl LocalState {
             Tab::Settings => {
                 self.settings_state.lss_serialized = self.local_stored_state.json_or();
             }
-            _ => {
-
-            }
+            _ => {}
         }
     }
-}
-
-impl LocalState {
-
-    pub fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool) {
+    fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool) {
         self.updates.sender.send(StateUpdate {
             update: Box::new(
                 move |lss: &mut LocalState| {
@@ -129,17 +125,12 @@ impl LocalState {
         }).unwrap();
     }
 
-    pub fn secure_or(&self) -> DataStore {
+    fn secure_or(&self) -> DataStore {
         self.ds_env_secure.clone().unwrap_or(self.ds_env.clone())
     }
-    pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
-        updates.sender.send(StateUpdate{update: Box::new(p0)}).unwrap();
-    }
-    pub fn send_update_sender<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Sender<StateUpdate>, p0: F) {
-        updates.send(StateUpdate{update: Box::new(p0)}).unwrap();
-    }
 
-    pub fn persist_local_state_store(&self) {
+
+    fn persist_local_state_store(&self) {
         let store = self.secure_or();
         let mut state = self.local_stored_state.clone();
         state.clear_sensitive();
@@ -147,7 +138,7 @@ impl LocalState {
             store.config_store.update_stored_state(state).await
         });
     }
-    pub fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()> {
+    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()> {
         let new_names = new_named.iter().map(|x| x.name.clone())
             .collect_vec();
         let existing = self.local_stored_state.xpubs.clone();
@@ -168,7 +159,7 @@ impl LocalState {
         self.persist_local_state_store();
         Ok(())
     }
-    pub fn upsert_identity(&mut self, new_named: Identity) -> () {
+    fn upsert_identity(&mut self, new_named: Identity) -> () {
         let mut updated = self.local_stored_state.identities.iter().filter(|x| {
             x.name != new_named.name
         }).map(|x| x.clone()).collect_vec();
@@ -179,7 +170,7 @@ impl LocalState {
     }
 
 
-    pub fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> () {
+    fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> () {
         let mut updated = self.local_stored_state.mnemonics.as_ref().unwrap_or(&vec![]).iter().filter(|x| {
             x.name != new_named.name
         }).map(|x| x.clone()).collect_vec();
@@ -188,7 +179,7 @@ impl LocalState {
         self.persist_local_state_store();
     }
 
-    pub fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> () {
+    fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> () {
         let mut updated = self.local_stored_state.private_keys.as_ref().unwrap_or(&vec![]).iter().filter(|x| {
             x.name != new_named.name
         }).map(|x| x.clone()).collect_vec();
@@ -198,7 +189,7 @@ impl LocalState {
     }
 
 
-    pub fn process_updates(&mut self) {
+    fn process_updates(&mut self) {
         match self.updates.recv_while() {
             Ok(updates) => {
                 for mut update in updates {
@@ -208,37 +199,8 @@ impl LocalState {
             Err(e) => { error!("Error receiving updates: {}", e.json_or()) }
         }
     }
-}
 
-#[ignore]
-#[tokio::test]
-async fn debug() {
-    let nc = NodeConfig::dev_default().await;
-    let party_data = nc.api_rg_client().party_data().await.log_error().unwrap();
-    let p = party_data.into_iter().next().unwrap().1;
-    let p = p.party_events.unwrap().central_prices.get(&SupportedCurrency::Ethereum).cloned().unwrap();
-    let amt = (0.04143206 * 1e8) as u64;
-    let result = p.dummy_fulfill(amt, true, &nc.network);
-    println!("Result: {:?}", result);
-}
-
-
-impl LocalState {
-
-    pub fn spawn_update_party_data(ls: &mut LocalState) {
-        let ups = ls.updates.sender.clone();
-        let config = ls.node_config.clone();
-        tokio::spawn(async move {
-            let party_data = config.api_rg_client().party_data().await.log_error().unwrap_or_default();
-            let first_party = party_data.clone().into_values().next();
-            LocalState::send_update_sender(&ups, move |lss| {
-                lss.party_data = party_data.clone();
-                lss.first_party = first_party.clone();
-            });
-        });
-    }
-
-    pub fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64> {
+    fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64> {
         let mut price_map = self.price_map_usd_pair.clone();
         let cpp = self.first_party.as_ref().and_then(|p| p.party_events.as_ref())
             .and_then(|pe| pe.central_prices.get(&SupportedCurrency::Ethereum))
@@ -247,302 +209,42 @@ impl LocalState {
         price_map.insert(SupportedCurrency::Redgold, cpp);
         price_map
     }
-    pub fn create_swap_tx(ls: &mut LocalState) {
 
-        let party_pk = ls.first_party.as_ref()
-            .and_then(|p| p.party_info.party_key.as_ref())
-            .cloned().unwrap();
-        let party_addr = party_pk.address().unwrap();
-
-        let ups = ls.updates.sender.clone();
-        let res = ls.external_network_resources.clone();
-        let config = ls.node_config.clone();
-        let currency = ls.swap_state.currency_input_box.input_currency.clone();
-        let pk = ls.wallet.public_key.clone().unwrap();
-        let kp = ls.wallet.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
-        let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
-        info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
-        let map = ls.price_map_incl_rdg();
-        let amount = ls.swap_state.currency_input_box.input_currency_amount(&map);
-        let mut from_eth_addr_dir = pk.to_ethereum_address_typed().unwrap();
-        info!("from_eth_addr_dir: {}", from_eth_addr_dir.render_string().unwrap());
-        from_eth_addr_dir.mark_external();
-        info!("from_eth_addr_dir after mark external: {}", from_eth_addr_dir.render_string().unwrap());
-        let from_eth_addr = from_eth_addr_dir.clone();
-        info!("from_eth_addr: {}", from_eth_addr.render_string().unwrap());
-        let to = match ls.swap_state.currency_input_box.input_currency {
-            SupportedCurrency::Redgold => {
-                party_pk.address().unwrap()
-            }
-            SupportedCurrency::Bitcoin => {
-                party_pk.to_bitcoin_address_typed(&config.network).unwrap().mark_external().clone()
-            }
-            SupportedCurrency::Ethereum => {
-                let mut addr = party_pk.to_ethereum_address_typed().unwrap();
-                addr.mark_external();
-                addr.clone()
-            }
-            _ => panic!("Unsupported currency")
-        };
-        let address_info = ls.wallet.address_info.clone();
-
-        let secret = kp.to_private_hex();
-        // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
-        tokio::spawn(async move {
-            let res = TransactionProgressFlow::make_transaction(
-                &config,
-                res,
-                &currency,
-                &pk,
-                &to,
-                &amount,
-                address_info.as_ref(),
-                Some(&party_addr),
-                None,
-                Some(from_eth_addr),
-                false,
-                false,
-                Some(secret)
-            ).await;
-            // info!("prepared transaction: {}", res.json_or());
-            LocalState::send_update_sender(&ups, move |lss| {
-                let (err, tx) = match &res {
-                    Ok(tx) => (None, Some(tx)),
-                    Err(e) => (Some(e.json_or()), None)
-                };
-                if err.is_none() {
-                    lss.swap_state.stage = SwapStage::ShowAmountsPromptSigning;
-                }
-                lss.swap_state.tx_progress.created(tx.cloned(), err);
-                lss.swap_state.changing_stages = false;
-
-            });
-        });
+    fn keysign_info<G>(&self, g: &G) -> TransactionSignInfo {
+        // TODO: Need to migrate WordsPass to schema for trait impls.
+        let kp = self.wallet.hot_mnemonic().keypair_at(self.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+        let hex = kp.to_private_hex();
+        TransactionSignInfo::PrivateKey(hex)
     }
-    pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-        let ups = ls.updates.sender.clone();
-        let res = ls.external_network_resources.clone();
-        tokio::spawn(async move {
-            let res = tx.sign(res).await;
-            LocalState::send_update_sender(&ups, move |lss| {
-                let (err, tx) = match &res {
-                    Ok(tx) => (None, Some(tx)),
-                    Err(e) => (Some(e.json_or()), None)
-                };
-                lss.swap_state.tx_progress.signed(tx.cloned(), err);
-                lss.swap_state.changing_stages = false;
-
-            });
-        });
-    }
-
-    pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-        let ups = ls.updates.sender.clone();
-        let res = ls.external_network_resources.clone();
-        tokio::spawn(async move {
-            let res = tx.broadcast(res).await;
-            LocalState::send_update_sender(&ups, move |lss| {
-                let (err, tx) = match &res {
-                    Ok(tx) => (None, Some(tx)),
-                    Err(e) => (Some(e.json_or()), None)
-                };
-                lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
-                lss.swap_state.changing_stages = false;
-            });
-        });
-    }
-
+    //
+    // fn encrypt(&self, str: String) -> Vec<u8> {
+    //     return sym_crypt::encrypt(
+    //         str.as_bytes(),
+    //         &self.session_password_hashed.unwrap(),
+    //         &self.iv,
+    //     )
+    //     .unwrap();
+    // }
+    //
+    // fn decrypt(&self, data: &[u8]) -> Vec<u8> {
+    //     return sym_crypt::decrypt(data, &self.session_password_hashed.unwrap(), &self.iv).unwrap();
+    // }
+    //
+    // fn accept_passphrase(&mut self, pass: String) {
+    //     let encrypted = self.encrypt(pass);
+    //     self.stored_passphrase = encrypted;
+    // } // https://www.quora.com/Is-it-useful-to-multi-hash-like-10-000-times-a-password-for-an-anti-brute-force-encryption-algorithm-Do-different-challenges-exist
+    //
+    // fn hash_password(&mut self) -> [u8; 32] {
+    //     let mut vec = self.password_entry.as_bytes().to_vec();
+    //     vec.extend(self.session_salt.to_vec());
+    //     return dhash_vec(&vec);
+    // }
+    // fn store_password(&mut self) {
+    //     self.session_password_hashed = Some(self.hash_password());
+    // }
 }
 
-#[allow(dead_code)]
-impl LocalState {
-    pub async fn from<G>(node_config: NodeConfig, res: ExternalNetworkResourcesImpl, gui_depends: G) -> Result<LocalState, ErrorInfo>
-        where G: Send + Clone + GuiDepends {
-        let mut node_config = node_config.clone();
-        node_config.load_balancer_url = "lb.redgold.io".to_string();
-        let iv = sym_crypt::get_iv();
-        let ds_env = node_config.data_store_all().await;
-        let ds_env_secure = node_config.data_store_all_secure().await;
-        let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
-        info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
-        let string = ds_or.ctx.connection_path.clone().replace("file:", "");
-        info!("ds_or connection path {}", string);
-        info!("starting environment {}", node_config.network.to_std_string());
-        ds_or.run_migrations_fallback_delete(
-            true,
-            PathBuf::from(string)
-        ).await.expect("migrations");
-        // DataStore::run_migrations(&ds_or).await.expect("");
-        let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
-        let local_stored_state = ds_or.config_store.get_stored_state().await?;
-
-        // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
-
-        let mut ss = crate::gui::tabs::server_tab::ServersState::default();
-
-        ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
-            .all().servers_path().to_str().expect("").to_string();
-
-        let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
-        for c in vec![SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin] {
-            let price = res.query_price(util::current_time_millis_i64(), c).await.unwrap();
-            price_map.insert(c, price);
-        }
-
-        let party_data = node_config.api_rg_client().party_data().await.log_error();
-        let first_party = party_data.clone().ok().and_then(|pd| pd.into_values().next());
-        // info!("Party data {}", first_party.json_or());
-        let party_data = party_data.unwrap_or_default();
-
-        // ss.genesis = node_config.opts.development_mode;
-        let mut ls = LocalState {
-            active_tab: Tab::Home,
-            session_salt: random_bytes(),
-            session_password_hashed: None,
-            session_locked: false,
-            password_entry: "".to_string(),
-            wallet_passphrase_entry: "".to_string(),
-            // wallet_words_entry: "".to_string(),
-            active_passphrase: None,
-            password_visible: false,
-            show_mnemonic: false,
-            visible_mnemonic: None,
-            stored_passphrase: vec![],
-            // stored_passphrases: HashMap::new(),
-            // stored_mnemonics: vec![],
-            stored_private_key_hexes: vec![],
-            iv,
-            wallet_first_load_state: true,
-            node_config: node_config.clone(),
-            // runtime,
-            home_state: HomeState::from(),
-            server_state: ss,
-            current_time: util::current_time_millis_i64(),
-            keygen_state: KeygenState::new(
-                node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
-            ),
-            wallet: WalletState::new(hot_mnemonic, local_stored_state.xpubs.first()),
-            qr_state: Default::default(),
-            qr_show_state: Default::default(),
-            identity_state: IdentityState::new(),
-            settings_state: SettingsState::new(local_stored_state.json_or(),
-                                               node_config.data_folder.clone().path.parent().unwrap().to_str().unwrap().to_string(),
-                                               node_config.secure_data_folder.clone().unwrap_or(node_config.data_folder.clone())
-                                                   .path.parent().unwrap().to_str().unwrap().to_string()
-            ),
-            address_state: Default::default(),
-            otp_state: Default::default(),
-            ds_env,
-            ds_env_secure,
-            local_stored_state,
-            updates: new_channel(),
-            keytab_state: Default::default(),
-            is_mac: env::consts::OS == "macos",
-            is_linux: env::consts::OS == "linux",
-            swap_state: Default::default(),
-            external_network_resources: res,
-            price_map_usd_pair: price_map,
-            party_data,
-            first_party
-        };
-
-        if node_config.opts.development_mode {
-            ls.server_state.ops = false;
-            ls.server_state.system = false;
-            if node_config.network.is_main()  {
-                ls.server_state.words_and_id = false;
-            }
-        }
-
-        let mut new_xpubs = vec![];
-
-        if let Some(df) = node_config.secure_data_folder.as_ref() {
-            if let Ok(m) = df.all().mnemonic().await {
-                if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
-                    let key_name = "secure_df_all".to_string();
-                    ls.wallet.selected_key_name = key_name.clone();
-                    ls.add_mnemonic(key_name.clone(), m, false);
-                    if let Ok(xpub) = w.named_xpub(key_name, true) {
-                        new_xpubs.push(xpub);
-                    }
-                }
-            }
-        }
-
-        if let Ok(m) = node_config.data_folder.all().mnemonic().await {
-            if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
-                let key_name = "df_all".to_string();
-                ls.add_mnemonic(key_name.clone(), m, false);
-                if let Ok(xpub) = w.named_xpub(key_name, true) {
-                    new_xpubs.push(xpub);
-                }
-            }
-        }
-
-        if let Ok(m) = std::env::var("REDGOLD_TEST_WORDS") {
-            if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
-                let key_name = "test_words".to_string();
-                ls.add_mnemonic(key_name.clone(), m, false);
-                if let Ok(xpub) = w.named_xpub(&key_name, true) {
-                    new_xpubs.push(xpub);
-                }
-                let dp_btc_faucet = "m/84'/0'/0'/0/0".to_string();
-                if let Ok(xpub) = w.xpub_str(&dp_btc_faucet.as_account_path().expect("acc")) {
-                    let mut named = NamedXpub::default();
-                    let key_into = key_name.clone();
-                    named.name = format!("{}_840", key_into);
-                    named.xpub = xpub;
-                    named.key_name_source = Some(key_into);
-                    named.request_type = Some(XPubRequestType::Hot);
-                    named.skip_persist = Some(true);
-                    named.derivation_path = dp_btc_faucet.clone();
-                    new_xpubs.push(named);
-                }
-            }
-        }
-
-        if !new_xpubs.is_empty() {
-            let first_xpub = new_xpubs.get(0).unwrap().clone();
-            ls.wallet.selected_xpub_name = first_xpub.name.clone();
-            ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
-        }
-
-        // TODO: Add from environment
-
-        Ok(ls)
-    }
-
-    fn encrypt(&self, str: String) -> Vec<u8> {
-        return sym_crypt::encrypt(
-            str.as_bytes(),
-            &self.session_password_hashed.unwrap(),
-            &self.iv,
-        )
-        .unwrap();
-    }
-
-    fn decrypt(&self, data: &[u8]) -> Vec<u8> {
-        return sym_crypt::decrypt(data, &self.session_password_hashed.unwrap(), &self.iv).unwrap();
-    }
-
-    pub fn accept_passphrase(&mut self, pass: String) {
-        let encrypted = self.encrypt(pass);
-        self.stored_passphrase = encrypted;
-    } // https://www.quora.com/Is-it-useful-to-multi-hash-like-10-000-times-a-password-for-an-anti-brute-force-encryption-algorithm-Do-different-challenges-exist
-
-    fn hash_password(&mut self) -> [u8; 32] {
-        let mut vec = self.password_entry.as_bytes().to_vec();
-        vec.extend(self.session_salt.to_vec());
-        return dhash_vec(&vec);
-    }
-    fn store_password(&mut self) {
-        self.session_password_hashed = Some(self.hash_password());
-    }
-}
-
-fn random_bytes() -> [u8; 32] {
-    return rand::thread_rng().gen::<[u8; 32]>();
-}
 
 use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
@@ -553,57 +255,11 @@ use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 
 
-
-#[derive(Debug, EnumIter, Clone)]
-#[repr(i32)]
-pub enum Tab {
-    Home,
-    Keys,
-    Transact,
-    Portfolio,
-    Identity,
-    Contacts,
-    Address,
-    Servers,
-    Ratings,
-    Settings,
-    OTP,
-}
-
-fn update_lock_screen<G>(app: &mut ClientApp<G>, ctx: &egui::Context) where G: GuiDepends + Clone + Send {
-    let ClientApp { local_state, .. } = app;
-    egui::CentralPanel::default().show(ctx, |ui| {
-        let layout = egui::Layout::top_down(egui::Align::Center);
-        ui.with_layout(layout, |ui| {
-            ui.add_space(ctx.available_rect().max.y / 3f32);
-            ui.heading("Enter session password");
-            ui.add_space(20f32);
-
-            let edit = TextEdit::singleline(&mut local_state.password_entry)
-                .password(true)
-                .lock_focus(true);
-            ui.add(edit).request_focus();
-            if ctx.input(|i| { i.key_pressed(egui::Key::Enter)}) {
-                if local_state.session_locked {
-                    if local_state.session_password_hashed.unwrap() == local_state.hash_password() {
-                        local_state.session_locked = false;
-                    } else {
-                        panic!("Session password state error");
-                    }
-                } else {
-                    local_state.store_password();
-                }
-                local_state.password_entry = "".to_string();
-                ()
-            };
-            //ui.text_edit_singleline(texts);
-        });
-    });
-}
-
 use redgold_data::data_store::DataStore;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
-use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::data_query::data_query::DataQueryInfo;
+use redgold_gui::dependencies::gui_depends::{GuiDepends};
+use redgold_gui::tab::tabs::Tab;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::dhash_vec;
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -629,7 +285,7 @@ use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
 use crate::infra::deploy::is_windows;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 
 static INIT: Once = Once::new();
 
@@ -640,9 +296,9 @@ static INIT: Once = Once::new();
 //     });
 // }
 
-pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send {
+pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
     let logo = app.logo.clone();
-    let depends = app.gui_depends.clone();
+    let g = app.gui_depends.clone();
     let local_state = &mut app.local_state;
 
     // TODO: Replace with config query and check.
@@ -724,10 +380,10 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
         // The central panel the region left after adding TopPanel's and SidePanel's
         match local_state.active_tab {
             Tab::Home => {
-                home::home_screen(ui, ctx, local_state);
+                local_state.home_state.home_screen(ui, ctx, &g, &local_state.data, &local_state.node_config, vec![], local_state.current_time);
             }
             Tab::Keys => {
-                keys_tab(ui, ctx, local_state, has_changed_tab);
+                keys_tab(ui, ctx, local_state, has_changed_tab, &g);
             }
             Tab::Settings => {
                 settings_tab(ui, ctx, local_state);
@@ -739,7 +395,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 });
             }
             Tab::Transact => {
-                wallet_screen(ui, ctx, local_state, has_changed_tab, depends);
+                wallet_screen(ui, ctx, local_state, has_changed_tab, &g);
             }
             Tab::Identity => {
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
@@ -759,5 +415,22 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
 
     qr_window(ctx, local_state);
     qr_show_window(ctx, local_state);
+
+}
+
+
+#[ignore]
+#[tokio::test]
+async fn debug() {
+    let nc = NodeConfig::dev_default().await;
+    let party_data = nc.api_rg_client().party_data().await.log_error().unwrap();
+    let p = party_data.into_iter().next().unwrap().1;
+    let p = p.party_events.unwrap().central_prices.get(&SupportedCurrency::Ethereum).cloned().unwrap();
+    let amt = (0.04143206 * 1e8) as u64;
+    let result = p.dummy_fulfill(amt, true, &nc.network);
+    println!("Result: {:?}", result);
+}
+
+impl LocalState {
 
 }

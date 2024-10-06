@@ -1,8 +1,7 @@
 use eframe::egui::Ui;
 use serde::{Deserialize, Serialize};
-use redgold_keys::xpub_wrapper::ValidateDerivationPath;
-use redgold_gui::common::{editable_text_input_copy, medium_data_item, valid_label};
-
+use crate::common::{editable_text_input_copy, medium_data_item, valid_label};
+use crate::dependencies::gui_depends::GuiDepends;
 
 const DEFAULT_ACCOUNT_DP: &str = "m/44'/0'/50'";
 
@@ -38,25 +37,25 @@ impl AccountDerivationPathInputState {
     pub fn derivation_path(&self) -> String {
         format!("{}/{}/{}", self.account_derivation_path, self.change, self.index)
     }
-    pub fn validation(&mut self) -> bool {
+    pub fn validation(&mut self, g: impl GuiDepends + Sized) -> bool {
         let has_changed = self.account_derivation_path != self.last_account_derivation_path ||
             self.index != self.last_index || self.change != self.last_change;
         if has_changed {
             self.last_account_derivation_path = self.account_derivation_path.clone();
             self.last_index = self.index.clone();
             self.last_change = self.change.clone();
-            self.valid = self.derivation_path().valid_derivation_path();
+            self.valid = g.validate_derivation_path(self.derivation_path());
         }
         has_changed && self.valid
     }
 
-    pub fn view(&mut self, ui: &mut Ui) -> bool {
+    pub fn view(&mut self, ui: &mut Ui, g: impl GuiDepends) -> bool {
         ui.horizontal(|ui| {
             medium_data_item(ui, "Account", self.account_derivation_path.clone());
             editable_text_input_copy(ui, "Index", &mut self.index, 50.0);
             editable_text_input_copy(ui, "Change", &mut self.change, 50.0);
-            valid_label(ui, self.valid);
+            valid_label(ui, self.valid, );
         });
-        self.validation()
+        self.validation(g)
     }
 }

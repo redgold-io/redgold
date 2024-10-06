@@ -2,12 +2,14 @@ use clap::{Args, Parser, Subcommand};
 
 pub fn empty_args() -> RgArgs {
     RgArgs {
+        home: None,
         config_path: None,
+        data_path: None,
+        bulk_data_path: None,
         words: None,
         mnemonic_path: None,
         peer_id: None,
         peer_id_path: None,
-        data_folder: None,
         // Is this the right thing to do here? Good question
         network: Some("local".to_string()),
         debug_id: None,
@@ -28,6 +30,8 @@ pub fn empty_args() -> RgArgs {
         from_email: None,
         to_email: None,
         enable_party_mode: false,
+        secure_data_path: None,
+        secure_data_config_path: None,
     }
 }
 
@@ -35,9 +39,41 @@ pub fn empty_args() -> RgArgs {
 #[derive(Parser, Debug, Clone)]
 #[clap(author, version, about, long_about = None)]
 pub struct RgArgs {
-    /// Load configs from a specified path instead of standard path
-    #[clap(short, long)]
+
+    // Main loader paths for configs / data
+
+    /// Home directory to use for default configuration and data storage, defaults to $HOME
+    #[clap(long, env = "HOME")]
+    pub home: Option<String>,
+    /// Load configs from a specified path instead of standard path ~/.rg/config or ~/.rg/env/config
+    #[clap(long, env = "REDGOLD_CONFIG")]
     pub config_path: Option<String>,
+    /// Default directory, relative to home, to store all data. Defaults to ~/.rg/
+    #[clap(long, env = "REDGOLD_DATA")]
+    pub data_path: Option<String>,
+    /// Bulk data directory, used for slow / non-SSD storage -- rarely required to configure
+    #[clap(long, env = "REDGOLD_BULK")]
+    pub bulk_data_path: Option<String>,
+
+    // Secure config loaders, priority order ahead during config merge
+
+    /// Load secure configs from a specified path instead of the standard data/config or data/env/config
+    #[clap(long, env = "REDGOLD_SECURE_CONFIG")]
+    pub secure_data_config_path: Option<String>,
+    /// Load secure data from a specified path instead of the standard data/config or data/env/config
+    #[clap(long, env = "REDGOLD_SECURE_PATH")]
+    pub secure_data_path: Option<String>,
+
+    // Most important configs first:
+    /// Network environment to connect to, e.g. main or test
+    #[clap(long)]
+    pub network: Option<String>,
+    #[clap(long)]
+    /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
+    pub log_level: Option<String>,
+
+    // Below need organization.
+
     #[clap(short, long)]
     /// A directly embedded string of mnemonic words for controlling node identity
     pub words: Option<String>,
@@ -50,12 +86,7 @@ pub struct RgArgs {
     /// Path to file containing hex encoded peer id
     #[clap(long)]
     pub peer_id_path: Option<String>,
-    /// Path to internal top level data directory
-    #[clap(long)]
-    pub data_folder: Option<String>,
-    /// Network environment to connect to, e.g. main or test
-    #[clap(long)]
-    pub network: Option<String>,
+
     /// DEBUG ONLY PARAMETER for local testing, automatically generates keys based on index
     #[clap(long)]
     pub debug_id: Option<i32>,
@@ -80,9 +111,7 @@ pub struct RgArgs {
     #[clap(long, env = "REDGOLD_LIVE_E2E_ENABLED")]
     /// Debug only option to enable an internal continuous E2E test sending transactions
     pub enable_live_e2e: bool,
-    #[clap(long)]
-    /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
-    pub log_level: Option<String>,
+
     // TODO: File logger path
     /// Use development mode defaults -- only for use by developers, sets defaults to DEV
     /// Instead of Main for network for instance.

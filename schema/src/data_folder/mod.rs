@@ -1,6 +1,7 @@
 use std::path::PathBuf;
-use crate::helpers::easy_json::json_from;
+use crate::helpers::easy_json::{json_from, EasyJsonDeser};
 use crate::{ErrorInfoContext, RgResult};
+use crate::config_data::ConfigData;
 use crate::servers::ServerOldFormat;
 use crate::structs::{ErrorInfo, NetworkEnvironment, Transaction};
 
@@ -119,6 +120,19 @@ impl DataFolder {
 
     pub fn all(&self) -> EnvDataFolder {
         self.by_env(NetworkEnvironment::All)
+    }
+
+    pub fn config_path(&self) -> PathBuf {
+        self.path.join("config.toml")
+    }
+
+    pub fn config(&self) -> Option<RgResult<ConfigData>> {
+        std::fs::read_to_string(self.config_path()).ok().map(|s| toml::from_str(&s).error_info("Bad config read"))
+    }
+
+    pub fn write_config(&self, config: &ConfigData) -> RgResult<()> {
+        let string = toml::to_string(config).error_info("Bad config write")?;
+        std::fs::write(self.config_path(), string).error_info("Bad config write")
     }
 
     pub fn by_env(&self, env: NetworkEnvironment) -> EnvDataFolder {

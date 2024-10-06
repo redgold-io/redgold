@@ -10,10 +10,11 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
-use crate::gui::components::account_deriv_sel::AccountDerivationPathInputState;
-use crate::gui::components::derivation_path_sel::DerivationPathInputState;
+use redgold_gui::components::account_deriv_sel::AccountDerivationPathInputState;
+use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
 use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
 use crate::gui::components::save_key_window;
@@ -70,7 +71,7 @@ impl Default for KeyTabState {
 }
 
 
-pub fn manage_view(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_init: bool) {
+pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static  {
     ui.add_space(10.0);
     ui.heading("Add");
     ui.separator();
@@ -79,7 +80,7 @@ pub fn manage_view(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_
     ui.horizontal(|ui| {
         add_new_key_button(ls, ui);
         add_xpub_csv_button(ls, ui, ctx);
-        ls.keytab_state.request_xpub.view(ui, ctx, &ls.updates, ls.wallet.device_list_status.device_output.clone());
+        ls.keytab_state.request_xpub.view(ui, ctx, &ls.updates, ls.wallet.device_list_status.device_output.clone(), g);
     });
 
     save_key_window::save_key_window(ui, ls, ctx);
@@ -114,13 +115,13 @@ pub fn manage_view(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_
         KeygenSubSubTab::Keys => {
             ui.label("Internal Stored Keys");
             ui.spacing();
-            internal_stored_keys(ui, ls, first_init);
+            internal_stored_keys(ui, ls, first_init, g);
 
         }
         KeygenSubSubTab::XPubs => {
             ui.label("Internal Stored XPubs");
             ui.spacing();
-            internal_stored_xpubs(ls, ui, ctx, first_init);
+            internal_stored_xpubs(ls, ui, ctx, first_init, g);
         }
     }
     // TODO: Sub-subtabs for these two
@@ -129,7 +130,7 @@ pub fn manage_view(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_
 
 }
 
-fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
+fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static {
     let mut need_keys_update = false;
     ui.horizontal(|ui| {
         let has_changed_key = key_source(ui, ls);
@@ -147,7 +148,7 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
         }
     });
 
-    let dp_has_changed_key = ls.keytab_state.key_derivation_path_input.view(ui);
+    let dp_has_changed_key = ls.keytab_state.key_derivation_path_input.view(ui, g);
     // TODO: Hot passphrase should ONLY apply to mnemonics as it doesn't work for private keys
     if ls.wallet.active_hot_private_key_hex.is_none() {
         let update_clicked = hot_passphrase_section(ui, ls);
@@ -203,7 +204,7 @@ fn internal_stored_keys(ui: &mut Ui, ls: &mut LocalState, first_init: bool) {
 }
 
 
-pub fn keys_tab(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, first_init: bool) {
+pub fn keys_tab<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static  {
     ui.heading("Keys");
     ui.separator();
 
@@ -216,7 +217,7 @@ pub fn keys_tab(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, 
     });
     match local_state.keytab_state.keygen_subtab {
         KeygenSubTab::Manage => {
-            manage_view(ui, ctx, local_state, first_init);
+            manage_view(ui, ctx, local_state, first_init, g);
         }
         KeygenSubTab::Generate => {
             keygen_subtab::keys_screen(ui, ctx, local_state);
@@ -250,7 +251,7 @@ pub(crate) fn show_private_key_window(
 
 
 
-pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context, first_init: bool) -> (bool, Option<NamedXpub>) {
+pub fn internal_stored_xpubs<G>(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context, first_init: bool, g: &G) -> (bool, Option<NamedXpub>) where G: GuiDepends + Clone + Send + 'static  {
 
 
     let mut xpub : Option<NamedXpub> = None;
@@ -309,7 +310,7 @@ pub fn internal_stored_xpubs(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Conte
         }
 
         ui.horizontal(|ui| {
-            if ls.keytab_state.derivation_path_xpub_input_account.view(ui) {
+            if ls.keytab_state.derivation_path_xpub_input_account.view(ui, g.clone()) {
                 update = true;
             }
             if ui.button("Update").clicked() {

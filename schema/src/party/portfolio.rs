@@ -4,17 +4,18 @@ use crate::party::address_event::AddressEvent;
 use crate::party::party_events::ConfirmedExternalStakeEvent;
 use crate::structs::{CurrencyAmount, PortfolioRequest, PortfolioWeighting, SupportedCurrency, Transaction, UtxoId};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PortfolioRequestEvents {
     pub events: Vec<PortfolioRequestEventInstance>,
     pub external_stake_balance_deltas: HashMap<SupportedCurrency, CurrencyAmount>,
     pub stake_utxos: Vec<(UtxoId, ConfirmedExternalStakeEvent)>,
     // Positive amount means it wants more stake, negative means it wants a withdrawal
-    pub current_portfolio_imbalance: HashMap<SupportedCurrency, CurrencyAmount>
+    pub current_portfolio_imbalance: HashMap<SupportedCurrency, CurrencyAmount>,
+    pub current_rdg_allocations: HashMap<SupportedCurrency, CurrencyAmount>
 }
 
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PortfolioRequestEventInstance {
     pub event: AddressEvent,
     pub tx: Transaction,
@@ -33,6 +34,7 @@ impl Default for PortfolioRequestEvents {
             external_stake_balance_deltas: Default::default(),
             stake_utxos: vec![],
             current_portfolio_imbalance: Default::default(),
+            current_rdg_allocations: Default::default(),
         }
     }
 

@@ -25,6 +25,16 @@ strum = "0.25"
 strum_macros = "0.25"
 log = "0.4.21"
 
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+
+# to access the DOM (to hide the loading text)
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+# HACK: pin web-sys to <0.3.70 until a new `eframe` is released containing
+# the following PR: https://github.com/emilk/egui/pull/4980
+version = ">= 0.3.4, < 0.3.70"
+
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openpnp_capture = "0.2.4"

@@ -15,7 +15,7 @@ use crate::api::RgHttpClient;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use redgold_schema::conf::node_config::NodeConfig;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::util;
 

@@ -213,7 +213,8 @@ impl AddressInfo {
             address: Some(address.clone()),
             utxo_entries: entries,
             balance: bal,
-            recent_transactions: vec![]
+            recent_transactions: vec![],
+            balances: vec![]
         }
     }
 }

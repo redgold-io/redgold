@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 use eframe::egui::{TextStyle, Ui};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
@@ -9,10 +11,11 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ExternalTransactionId, PartySigningValidation, PublicKey, SupportedCurrency, Transaction};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use crate::common;
 use crate::common::{big_button, data_item};
+use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TransactionProgressFlow {
@@ -28,6 +31,7 @@ pub struct TransactionProgressFlow {
     pub heading_details: HashMap<TransactionStage, String>,
     pub proceed_button_text: HashMap<TransactionStage, String>,
     pub changing_stages: bool,
+    pub rdg_broadcast_response: Arc<Mutex<Option<RgResult<SubmitTransactionResponse>>>>
 }
 
 
@@ -55,6 +59,7 @@ impl Default for TransactionProgressFlow {
             heading_details: Default::default(),
             proceed_button_text: Default::default(),
             changing_stages: false,
+            rdg_broadcast_response: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -281,16 +286,35 @@ impl TransactionProgressFlow {
         }
     }
 
-    pub fn next_stage(&mut self) {
+    pub fn next_stage(&mut self, g: impl GuiDepends + Sized + Clone + Send + 'static, sign_info: &TransactionSignInfo) {
         match self.stage {
             TransactionStage::NotCreated => {
                 self.stage = TransactionStage::Created;
             }
             TransactionStage::Created => {
+                let res = g.sign_transaction(
+                    self.prepared_tx.as_ref().unwrap().tx.as_ref().unwrap(), &sign_info
+                );
+                if let Ok(res) = res {
+                    let mut prepped = self.prepared_tx.clone().unwrap();
+                    prepped.tx = Some(res.clone());
+                    prepped.ser_tx = Some(res.json_or());
+                    self.signed(Some(prepped.clone()), None);
+                } else if let Err(e) = res {
+                    self.signed(None, Some(e.json_or()));
+                }
                 self.stage = TransactionStage::Signed;
             }
             TransactionStage::Signed => {
-                self.stage = TransactionStage::Broadcast;
+                let arc = self.rdg_broadcast_response.clone();
+                let g2 = g.clone();
+                let tx = self.prepared_tx.as_ref().unwrap().tx.as_ref().unwrap().clone();
+                let res = async move {
+                    let s = g2.submit_transaction(&tx).await;
+                    let mut guard = arc.lock().unwrap();
+                    *guard = Some(s);
+                };
+                g.spawn(res);
             }
             _ => {}
         }
@@ -308,11 +332,20 @@ impl TransactionProgressFlow {
         ret.unwrap_or(default.to_string())
     }
 
-    pub fn progress_buttons(&mut self, ui: &mut Ui) -> TxProgressEvent {
+    pub fn progress_buttons(&mut self, ui: &mut Ui, g: impl GuiDepends + Sized + Clone + Send + 'static, ksi: &TransactionSignInfo) -> TxProgressEvent {
+
         let mut event = TxProgressEvent {
             reset: false,
             next_stage: false
         };
+        if let Ok(mut r) = self.rdg_broadcast_response.lock() {
+            if r.is_some() && self.stage == TransactionStage::Signed {
+                let res = r.as_ref().unwrap();
+                self.broadcast_info = res.json_or();
+                self.stage = TransactionStage::Broadcast;
+                *r = None;
+            }
+        }
 
         let header = self.heading_details.get(&self.stage)
             .map(|h| h.clone()).unwrap_or(format!("{:?}", self.stage));
@@ -337,7 +370,7 @@ impl TransactionProgressFlow {
                 let changed = big_button(ui, self.stage_proceed_next_text());
                 if changed {
                     event.next_stage = true;
-                    self.next_stage();
+                    self.next_stage(g, ksi);
                 }
             }
         });

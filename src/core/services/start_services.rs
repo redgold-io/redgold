@@ -46,7 +46,7 @@ impl Node {
 
         let agent = PortfolioFullfillmentAgent::new(
             &relay, external_network_resources.clone());
-        let agent_duration = Duration::from_secs(node_config.config_data.clone().node_data
+        let agent_duration = Duration::from_secs(node_config.config_data.clone().node
             .unwrap()
             .service_intervals
             .unwrap()
@@ -60,10 +60,10 @@ impl Node {
             Some(node_config.udp_port()));
         sjh.add("UdpServer", tokio::spawn(udp));
 
-        if node_config.config_data.clone().node_data.unwrap().nat_traversal_required.unwrap_or(false) ||
+        if node_config.config_data.clone().node.unwrap().nat_traversal_required.unwrap_or(false) ||
             relay.node_metadata().await.map(|n| n.nat_traversal_required()).unwrap_or(false) {
             let alive = UdpKeepAlive::new(&relay.peer_message_tx,
-                                          node_config.config_data.clone().node_data
+                                          node_config.config_data.clone().node
                                               .unwrap()
                                               .udp_keepalive_seconds
                                               .map(Duration::from_secs),
@@ -136,7 +136,7 @@ impl Node {
 
         let watcher = PartyWatcher::new(&relay, external_network_resources);
         sjh.add("PartyWatcher", run_interval_fold(
-            watcher, Duration::from_millis(relay.node_config.config_data.clone().party_config_data.unwrap().poll_interval as u64), false
+            watcher, Duration::from_millis(relay.node_config.config_data.clone().party.unwrap().poll_interval as u64), false
         ));
 
         sjh.add("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone())));

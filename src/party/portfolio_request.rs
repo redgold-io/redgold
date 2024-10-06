@@ -12,13 +12,14 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_data::data_store::DataStore;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::party::party_events::OrderFulfillment;
 use redgold_schema::party::party_events::ConfirmedExternalStakeEvent;
 use redgold_schema::party::portfolio::PortfolioRequestEventInstance;
 
 pub trait PortfolioEventMethods {
-    async fn calculate_update_portfolio_imbalance(&mut self, ds: &DataStore) -> RgResult<()>;// Represents amount missing from requested fulfillment, negative means excess
-    async fn calculate_portfolio_imbalance(&self, ds: &DataStore) -> RgResult<HashMap<SupportedCurrency, CurrencyAmount>>;
+    async fn calculate_update_portfolio_imbalance<T>(&mut self, ds: &T) -> RgResult<()> where T: ExternalNetworkResources + Send;
+    async fn calculate_portfolio_imbalance<T>(&mut self, ds: &T) -> RgResult<HashMap<SupportedCurrency, CurrencyAmount>> where T: ExternalNetworkResources + Send;
     fn usd_rdg_estimate(&self) -> RgResult<f64>;
     fn handle_maybe_portfolio_stake_event(&mut self, ev: ConfirmedExternalStakeEvent) -> RgResult<()>;
     fn handle_maybe_portfolio_stake_withdrawal_event(&mut self, f: (OrderFulfillment, AddressEvent, AddressEvent), t: ExternalTimedTransaction);
@@ -27,41 +28,58 @@ pub trait PortfolioEventMethods {
 
 impl PortfolioEventMethods for PartyEvents {
     
-    async fn calculate_update_portfolio_imbalance(&mut self, ds: &DataStore) -> RgResult<()> {
+    async fn calculate_update_portfolio_imbalance<T>(&mut self, ds: &T) -> RgResult<()> where T: ExternalNetworkResources + Send {
         let imbalance = self.calculate_portfolio_imbalance(ds).await?;
         self.portfolio_request_events.current_portfolio_imbalance = imbalance;
         Ok(())
     }
     // Represents amount missing from requested fulfillment, negative means excess
-    async fn calculate_portfolio_imbalance(&self, ds: &DataStore) -> RgResult<HashMap<SupportedCurrency, CurrencyAmount>> {
+    async fn calculate_portfolio_imbalance<T>(&mut self, ds: &T) -> RgResult<HashMap<SupportedCurrency, CurrencyAmount>> where T: ExternalNetworkResources + Send {
 
         let usd_rdg = self.usd_rdg_estimate().unwrap_or(100.0);
         let mut requested_allocations = HashMap::new();
         requested_allocations.insert(SupportedCurrency::Bitcoin, CurrencyAmount::zero(SupportedCurrency::Bitcoin));
         requested_allocations.insert(SupportedCurrency::Ethereum, CurrencyAmount::zero(SupportedCurrency::Ethereum));
+        let mut rdg_allocations: HashMap<SupportedCurrency, CurrencyAmount> = HashMap::new();
+
         for e in self.portfolio_request_events.events.iter() {
             let rdg_amount = e.portfolio_rdg_amount.clone();
             for (cur, alloc) in e.fixed_currency_allocations.clone() {
-                let p = ds.price_time.max_time_price_by(cur.clone(), e.time.clone()).await?;
-                let usd_value = rdg_amount.to_fractional() * alloc * usd_rdg;
+                let p = ds.max_time_price_by(cur.clone(), e.time.clone()).await?;
+                let rdg_alloc = rdg_amount.to_fractional() * alloc;
+                let rdg_alloc_c = CurrencyAmount::from_fractional(rdg_alloc).unwrap();
+                if let Some(amt) = rdg_allocations.get(&cur) {
+                    let mut sum = amt.clone();
+                    sum = sum + rdg_alloc_c.clone();
+                    rdg_allocations.insert(cur.clone(), sum);
+                } else {
+                    rdg_allocations.insert(cur.clone(), rdg_alloc_c);
+                }
+                let usd_value = rdg_alloc * usd_rdg;
                 if let Some(usd_p_pair) = p {
                     let pair_amount = usd_value / usd_p_pair;
                     if let Ok(amt) = CurrencyAmount::from_fractional_cur(pair_amount, cur.clone()) {
                         let current_amount = requested_allocations.get(&cur).unwrap().clone();
                         requested_allocations.insert(cur.clone(), current_amount + amt);
                     }
+                } else {
+                    tracing::error!("Missing price data for {}", cur.json_or());
                 }
             }
         }
+        self.portfolio_request_events.current_rdg_allocations = rdg_allocations.clone();
 
         let mut delta_allocation = HashMap::new();
         delta_allocation.insert(SupportedCurrency::Bitcoin, CurrencyAmount::zero(SupportedCurrency::Bitcoin));
         delta_allocation.insert(SupportedCurrency::Ethereum, CurrencyAmount::zero(SupportedCurrency::Ethereum));
 
-        for (k, v) in self.portfolio_request_events.external_stake_balance_deltas.iter() {
-            let requested = requested_allocations.get(k).unwrap().clone();
-            let fulfilled = v.clone();
-            let delta = requested - fulfilled;
+        for (k, requested) in requested_allocations.iter() {
+            let v = self.portfolio_request_events.external_stake_balance_deltas.get(k);
+            let delta = if let Some(v) = v {
+                requested.clone() - v.clone()
+            } else {
+                requested.clone()
+            };
             delta_allocation.insert(k.clone(), delta);
         }
         Ok(delta_allocation)

@@ -202,7 +202,7 @@ pub fn mnemonic_generate_test() {
     assert_eq!(generate_random_mnemonic().words.split(" ").count(), 24);
 }
 
-pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_DATA_PATH";
+pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_PATH";
 
 pub fn default_path() -> PathBuf {
     dirs::home_dir().expect("home directory not found").join(".rg")
@@ -338,7 +338,7 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
                     if answer.trim().to_lowercase() == "y" {
                         println!("Adding path to ~/.bash_profile");
                         let (stdout, stderr) = run_cmd(
-                            "echo", vec![&*format!("'export REDGOLD_SECURE_DATA_PATH={}'", path), ">>", "~/.bash_profile"]);
+                            "echo", vec![&*format!("'export REDGOLD_SECURE_PATH={}'", path), ">>", "~/.bash_profile"]);
                         println!("{} {}", stdout, stderr);
                     }
                     data_dir = PathBuf::from(path).join("all");

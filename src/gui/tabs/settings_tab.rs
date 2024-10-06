@@ -2,7 +2,7 @@ use eframe::egui::{Context, Ui};
 use serde::Serialize;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::local_stored_state::LocalStoredState;
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area, editable_text_input_copy, valid_label};
 
 
@@ -40,7 +40,7 @@ pub fn settings_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     ui.label("Local stored state json");
     bounded_text_area(ui, &mut ls.settings_state.lss_serialized);
 
-    valid_label(ui,ls.settings_state.valid_json);
+    valid_label(ui, ls.settings_state.valid_json, );
 
     if ls.settings_state.last_lss_serialized != ls.settings_state.lss_serialized {
         ls.settings_state.last_lss_serialized = ls.settings_state.lss_serialized.clone();

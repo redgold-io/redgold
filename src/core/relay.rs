@@ -421,7 +421,7 @@ use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionM
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::e2e::tx_gen::SpendableUTXO;
 use redgold_schema::party::address_event::AddressEvent;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
 
 pub struct StrictRelay {}

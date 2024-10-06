@@ -16,6 +16,7 @@ use redgold::gui::native_gui_dependencies::NativeGuiDepends;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
+use redgold::util::cli::load_config::load_full_config;
 use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
@@ -26,11 +27,15 @@ use redgold_schema::conf::rg_args::RgArgs;
 
 #[tokio::main]
 async fn main() {
+
+    let cfg = load_full_config();
+
     let opts = RgArgs::parse();
     info!("Starting node main method");
     counter!("redgold.node.main_started").increment(1);
 
     let mut node_config = NodeConfig::default();
+    node_config.config_data = *cfg.clone();
 
     let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
     let _ = &arg_translate.translate_args().await.expect("arg translation");
@@ -43,7 +48,7 @@ async fn main() {
     }
 
     if arg_translate.is_gui() {
-        let res = ExternalNetworkResourcesImpl::new(&node_config).expect("works");
+        let res = ExternalNetworkResourcesImpl::new(&node_config, None).expect("works");
         let g = NativeGuiDepends::new(node_config.clone());
         gui::initialize::attempt_start(node_config.clone(), res, g).await.expect("GUI to start");
         return;
@@ -59,7 +64,7 @@ async fn main() {
     // TODO: Match on node_config external network resources impl
     // TODO: Tokio select better?
     let join_handles = if node_config.opts.debug_id.is_none() {
-        Node::start_services(relay.clone(), ExternalNetworkResourcesImpl::new(&node_config).expect("works")).await
+        Node::start_services(relay.clone(), ExternalNetworkResourcesImpl::new(&node_config, Some(relay.clone())).expect("works")).await
     } else {
         let dir = node_config.data_folder.path.join("mock_resources");
         let resources = MockExternalResources::new(&node_config, Some(dir), Arc::new(Mutex::new(HashMap::new()))).expect("works");

@@ -1263,6 +1263,7 @@ message AddressInfo {
   repeated UtxoEntry utxo_entries = 2;
   int64 balance = 3;
   repeated Transaction recent_transactions = 4;
+  repeated CurrencyAmount balances = 5;
 }
 
 message HashSearchResponse {

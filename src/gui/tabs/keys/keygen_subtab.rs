@@ -8,7 +8,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::NetworkEnvironment;
 
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
 use crate::gui::tables::text_table;
 use crate::util;
@@ -282,7 +282,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.label("Salt Words");
-            valid_label(ui, WordsPass::new(&key.generate_mnemonic_state.salt_words, None).mnemonic().is_ok());
+            valid_label(ui, WordsPass::new(&key.generate_mnemonic_state.salt_words, None).mnemonic().is_ok(), );
         });
         TextEdit::multiline(&mut key.generate_mnemonic_state.salt_words)
             .desired_width(500f32)
@@ -406,7 +406,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                             .desired_width(80f32)
                         );
                         let num_rounds = key.generate_mnemonic_state.num_rounds.parse::<u32>();
-                        valid_label(ui, num_rounds.is_ok());
+                        valid_label(ui, num_rounds.is_ok(), );
                     }
                 }
             });

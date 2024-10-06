@@ -12,7 +12,7 @@ use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::party::party_stream::PartyEventBuilder;
 

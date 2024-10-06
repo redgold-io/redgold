@@ -5,7 +5,8 @@ use itertools::Itertools;
 use redgold_schema::local_stored_state::NamedXpub;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
+use crate::gui::ls_ext::send_update;
 use crate::gui::tabs::transact::wallet_tab;
 
 
@@ -57,7 +58,7 @@ pub fn window_xpub_loader(
                     let data = ls.wallet.xpub_loader_rows.clone();
                     let parsed = parse_xpub_rows(&*data).ok();
                     if let Some(rows) = parsed {
-                        LocalState::send_update(&ls.updates, move |lss| {
+                        send_update(&ls.updates, move |lss| {
                             let rows2 = rows.clone();
                             info!("Parsed Xpub rows: {:?}", rows2.json_or());
                             let names = rows2.iter().map(|n| n.name.clone()).collect_vec();

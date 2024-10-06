@@ -4,8 +4,9 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::local_stored_state::{StoredMnemonic, StoredPrivateKey};
 use std::str::FromStr;
 use eframe::egui;
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{editable_text_input_copy, valid_label};
+use crate::gui::ls_ext::send_update;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 
 pub fn save_key_window(
@@ -24,7 +25,7 @@ pub fn save_key_window(
                 editable_text_input_copy(ui, "Name", &mut ls.wallet.mnemonic_save_name, 150.0);
                 editable_text_input_copy(ui, "Mnemonic / Key", &mut ls.wallet.mnemonic_save_data, 150.0);
                 ui.checkbox(&mut ls.wallet.mnemonic_save_persist, "Persist to Disk");
-                valid_label(ui, ls.wallet.is_mnemonic_or_kp.is_some());
+                valid_label(ui, ls.wallet.is_mnemonic_or_kp.is_some(), );
 
                 if ui.button("Save Internal").clicked() {
                     let name = ls.wallet.mnemonic_save_name.clone();
@@ -57,7 +58,7 @@ pub fn save_key_window(
                         }).unwrap();
                         ls.wallet.mnemonic_save_name = "".to_string();
                         ls.wallet.mnemonic_save_data = "".to_string();
-                        LocalState::send_update(&ls.updates, |lss| {
+                        send_update(&ls.updates, |lss| {
                             lss.wallet.add_new_key_window = false;
                         })
                     }

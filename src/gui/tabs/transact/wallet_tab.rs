@@ -38,7 +38,7 @@ use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::gui::components::passphrase_input::PassphraseInput;
+use redgold_gui::components::passphrase_input::PassphraseInput;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
@@ -326,8 +326,8 @@ impl WalletState {
     }
 }
 
-pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: G)
-    where G: GuiDepends + Clone + Send {
+pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &G)
+    where G: GuiDepends + Clone + Send + 'static {
     match local_state.wallet.updates.recv_while() {
         Ok(updates) => {
             for mut update in updates {
@@ -345,9 +345,9 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
 }
 
 
-pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: G)
-    where G: GuiDepends + Clone + Send {
-    let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab);
+pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: &G)
+    where G: GuiDepends + Clone + Send + 'static {
+    let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab, depends);
     let mut is_hot = false;
     if has_changed_tab {
         update = true;
@@ -483,8 +483,8 @@ pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
     update_clicked
 }
 
-fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, depends: G)
-    where G: GuiDepends + Clone + Send {
+fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, depends: &G)
+    where G: GuiDepends + Clone + Send + 'static {
     // data_item(ui, "Public Key:", pk.hex_or());
     // let address_str = pk.address()
     //     .and_then(|a| a.render_string())

@@ -6,14 +6,14 @@ use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
 
 
-#[derive(Clone, Debug, EnumIter, EnumString, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumIter, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum XPubRequestType {
     Cold,
     Hot,
     QR
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct NamedXpub {
     pub name: String,
     pub derivation_path: String,
@@ -28,14 +28,14 @@ pub struct NamedXpub {
     pub skip_persist: Option<bool>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct SavedAddress {
     name: String,
     address: Address,
     contact_name: String
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct WatchedAddress {
     name: String,
     address: Address,
@@ -44,27 +44,27 @@ pub struct WatchedAddress {
 }
 
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct ServerTrustRatingLabels {
     pub peer_id_index: i64,
     pub labels: Vec<TrustRatingLabel>,
     pub environment: Option<String>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct Identity {
     pub name: String,
     pub peer_id_index: i64,
     pub xpub_name: String
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct Contact {
     pub name: String,
     pub peer_id: Option<PeerId>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct StoredMnemonic {
     pub name: String,
     pub mnemonic: String,
@@ -72,14 +72,16 @@ pub struct StoredMnemonic {
     pub persist_disk: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct StoredPrivateKey {
     pub name: String,
     pub key_hex: String,
 }
 
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+// TODO: Change server to new format
+// TODO: Make all values optional for config loader.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct LocalStoredState {
     pub servers: Vec<ServerOldFormat>,
     pub xpubs: Vec<NamedXpub>,
