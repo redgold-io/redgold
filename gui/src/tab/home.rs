@@ -7,7 +7,8 @@ use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
 
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::dollar_formatter::format_dollar_amount;
-use crate::components::tables::{text_table, text_table_advanced};
+use crate::common::data_item;
+use crate::components::tables::{text_table_advanced};
 
 pub fn gui_status_networks() -> Vec<NetworkEnvironment> {
     let _vec = NetworkEnvironment::status_networks();
@@ -56,6 +57,9 @@ impl HomeState {
             let str = format!("${}", str);
             ui.label("NAV USD: ");
             ui.label(RichText::new(str).color(Color32::GREEN));
+            if let Some(p) = g.config_df_path_label() {
+                data_item(ui, "Config Path", p);
+            };
         });
         ui.separator();
         if self.last_query_started_time
@@ -73,23 +77,44 @@ impl HomeState {
             }
         }
         self.network_stats_table(ui, d, nc);
-        if let Some(p) = g.config_df_path_label() {
-            ui.horizontal(|ui| {
-                ui.label("Config Path:");
-                ui.label(p);
-            });
-        };
 
-        let headers = vec!["Redgold Total", "Bitcoin Total", "Ethereum Total", "Num Keys"]
+
+        let headers = vec!["Denomination", "Redgold", "Bitcoin", "Ethereum"]
             .iter().map(|x| x.to_string()).collect::<Vec<String>>();
         let mut table_data: Vec<Vec<String>> = vec![];
         table_data.push(headers.clone());
         let balances = d.balance_totals(&nc.network);
-        let mut row = vec![];
-        for c in vec![SupportedCurrency::Redgold, SupportedCurrency::Bitcoin, SupportedCurrency::Ethereum] {
-            row.push(format!("{:.8}", balances.get(&c).cloned().unwrap_or(0.0)));
+        let mut row = vec!["Native".to_string()];
+        let ordered_cur = vec![SupportedCurrency::Redgold, SupportedCurrency::Bitcoin, SupportedCurrency::Ethereum];
+        for c in ordered_cur.iter() {
+            let bal = balances.get(&c).cloned().unwrap_or(0.0);
+            if bal > 1.0 {
+                row.push(format!("{:.2}", bal));
+            } else {
+                row.push(format!("{:.8}", bal));
+            }
         }
-        row.push(loaded_pks.len().to_string());
+        table_data.push(row);
+
+        let mut row = vec!["USD/Pair Price".to_string()];
+        let price_map = d.price_map_usd_pair_incl_rdg.clone();
+        for c in ordered_cur.iter() {
+            let price = price_map.get(&c).cloned().unwrap_or(0.0);
+            row.push(format!("${:.2} USD", price));
+        }
+
+        let mut row = vec!["NAV USD".to_string()];
+        let nav_totals = d.nav_usd_by_currency(&nc.network);
+        let row_idx = 1;
+        let mut green_fields = (1..4).map(|x| (row_idx, x)).collect::<Vec<(usize, usize)>>();
+        for c in ordered_cur.iter() {
+            row.push(format!("${} USD", format_dollar_amount(nav_totals.get(&c).cloned().unwrap_or(0.0))));
+        }
+        table_data.push(row);
+        text_table_advanced(ui, table_data, false, false, None, green_fields);
+
+
+        // row.push(loaded_pks.len().to_string());
 
 
     }
@@ -153,6 +178,6 @@ impl HomeState {
             utxo
         ];
         table_data.push(data);
-        text_table_advanced(ui, table_data, false, false, Some((1, vec!["Link".to_string()])));
+        text_table_advanced(ui, table_data, false, false, Some((1, vec!["Link".to_string()])), vec![]);
     }
 }

@@ -7,16 +7,18 @@ use itertools::Itertools;
 use serde::Serialize;
 use sha3::digest::generic_array::functional::FunctionalSequence;
 use warp::{Filter, Rejection};
-use warp::path::Exact;
-use warp::reply::{Json, Response};
+use warp::reply::Json;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::public_key_parse_support::PublicKeyParseSupport;
+use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::RgResult;
-use redgold_schema::structs::{CurrencyAmount, Hash, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
 use crate::api::as_warp_json_response;
+use crate::api::explorer::handle_address_info;
 use crate::api::explorer::server::{extract_ip, process_origin};
+use crate::api::hash_query::get_address_info;
 use crate::core::relay::Relay;
 
 
@@ -224,6 +226,22 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             balance_lookup(api_data.relay, api_data.param.unwrap().clone()).await
         });
 
+    // TODO: Waterfall function, from address / raw address / public key proto / compact public key /
+    let explorer_public_address = warp::get()
+        .with_v1()
+        .and(warp::path("explorer"))
+        .and(warp::path("public"))
+        .and(warp::path("address"))
+        .with_relay_and_ip(r.clone())
+        .and(warp::path::param())
+        .map(|mut api_data: ApiData, s: String| {
+            api_data.param = Some(s);
+            api_data
+        })
+        .and_then_as(move |api_data: ApiData| async move {
+            explorer_public_address(api_data.relay, api_data.param.unwrap().clone()).await
+        });
+
 
 
     hello
@@ -234,8 +252,21 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(party_data)
         .or(transaction_get)
         .or(exe_hash)
+        .or(explorer_public_address)
 
 }
+async fn explorer_public_address(relay: Arc<Relay>, hash: String) -> RgResult<Vec<DetailedAddress>> {
+    let pk = hash.parse_public_key()?;
+    let addrs = pk.to_all_addresses_for_network(&relay.node_config.network)?;
+    let mut res = vec![];
+    for addr in addrs {
+        let ai = get_address_info(&relay, None, None, &addr).await?;
+        let det = handle_address_info(&ai, &relay, None, None).await?;
+        res.push(det);
+    }
+    Ok(res)
+}
+
 
 async fn balance_lookup(relay: Arc<Relay>, hash: String) -> RgResult<CurrencyAmount> {
     let net = relay.node_config.network.clone();

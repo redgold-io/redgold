@@ -75,6 +75,7 @@ pub mod conf;
 pub mod data_folder;
 pub mod errors;
 pub mod peer;
+pub mod explorer;
 
 impl BytesData {
     pub fn from(data: Vec<u8>) -> Self {

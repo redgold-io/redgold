@@ -25,6 +25,10 @@ pub fn editable_text_input_copy(
 pub fn copy_to_clipboard(ui: &mut Ui, text: impl Into<String>) {
     let style = ui.style_mut();
     style.override_text_style = Some(TextStyle::Small);
+    copy_button(ui, text);
+}
+
+pub fn copy_button(ui: &mut Ui, text: impl Into<String> + Sized) {
     if ui.small_button("Copy").clicked() {
         ui.ctx().output_mut(|o| o.copied_text = text.into().clone());
     }

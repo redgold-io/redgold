@@ -241,9 +241,11 @@ impl EthWalletWrapper {
         let addr = public_key.to_ethereum_address()?;
         let addr = Self::parse_address(&addr)?;
         let b = self.provider.get_balance(addr, None).await.error_info("balance lookup eth failure")?;
-        let mut vec = vec![];
+        let bi = BigInt::from_str(&*b.to_string()).error_info("BigInt parse failure")?;
+        // this doesn't work
+        /*let mut vec = vec![];
         b.to_big_endian(&mut *vec);
-        let bi = BigInt::from_bytes_be(Sign::Plus, &*vec);
+        let bi = BigInt::from_bytes_be(Sign::Plus, &*vec);*/
         Ok(CurrencyAmount::from_eth_bigint(bi))
     }
 
