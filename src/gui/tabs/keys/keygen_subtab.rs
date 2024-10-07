@@ -10,7 +10,7 @@ use redgold_schema::structs::NetworkEnvironment;
 
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
-use crate::gui::tables::text_table;
+use redgold_gui::components::tables::text_table;
 use crate::util;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;

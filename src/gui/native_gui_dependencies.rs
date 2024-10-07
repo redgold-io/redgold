@@ -7,16 +7,18 @@ use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::xpub_wrapper::ValidateDerivationPath;
+use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::local_stored_state::NamedXpub;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::relay::Relay;
 use crate::node_config::ApiNodeConfig;
+use crate::util;
 
 #[derive(Clone)]
 pub struct NativeGuiDepends {
@@ -95,7 +97,9 @@ impl GuiDepends for NativeGuiDepends {
     }
 
     async fn s3_checksum(&self) -> RgResult<String> {
-        todo!()
+        let s3_release_exe_hash = util::auto_update::
+        get_s3_sha256_release_hash_short_id(self.nc.network.clone(), None).await;
+        s3_release_exe_hash
     }
 
     fn set_network(&mut self, network: &NetworkEnvironment) {
@@ -117,5 +121,9 @@ impl GuiDepends for NativeGuiDepends {
 
     async fn party_data(&self) -> RgResult<HashMap<PublicKey, PartyInternalData>> {
         self.nc.api_rg_client().party_data().await
+    }
+
+    fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey> {
+        XpubWrapper::new(xpub).public_at_dp(&path)
     }
 }

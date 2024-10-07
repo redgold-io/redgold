@@ -624,6 +624,11 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(balance)
     }
 
+    pub fn balance(&self) -> RgResult<CurrencyAmount> {
+        let c = self.get_wallet_balance()?.confirmed;
+        Ok(CurrencyAmount::from_btc(c as i64))
+    }
+
     pub fn create_transaction(&mut self, destination: Option<structs::PublicKey>, destination_str: Option<String>, amount: u64) -> Result<(), ErrorInfo> {
 
         let addr = if let Some(destination) = destination {

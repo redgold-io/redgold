@@ -1,6 +1,7 @@
 use eframe::egui;
-use eframe::egui::{ComboBox, Context};
+use eframe::egui::{ComboBox, Context, RichText};
 use redgold_schema::structs::NetworkEnvironment;
+use redgold_schema::util::times::ToTimeString;
 use crate::gui::app_loop::LocalState;
 
 pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
@@ -29,6 +30,19 @@ pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
                         ui.selectable_value(&mut local_state.node_config.network, style.clone(), style.to_std_string());
                     }
                 });
+            ui.label("Network Health:");
+            match local_state.home_state.network_healthy {
+                true => {
+                    ui.label(RichText::new("Healthy").color(egui::Color32::GREEN));
+                }
+                false => {
+                    ui.label(RichText::new("Unhealthy").color(egui::Color32::RED));
+                }
+            }
+            ui.label("Int Time:");
+            ui.label(RichText::new(local_state.current_time.to_string()).color(egui::Color32::KHAKI));
+            ui.label("Date:");
+            ui.label(RichText::new(local_state.current_time.to_time_string_shorter()).color(egui::Color32::LIGHT_BLUE));
         });
 
 

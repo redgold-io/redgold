@@ -13,8 +13,6 @@ use crate::integrations::external_network_resources::ExternalNetworkResourcesImp
 pub mod app_loop;
 pub mod image_load;
 pub mod initialize;
-pub mod tables;
-pub mod home;
 pub mod tabs;
 pub mod top_panel;
 pub mod webcam;

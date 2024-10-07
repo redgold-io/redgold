@@ -96,6 +96,7 @@ pub struct LocalStoredState {
 }
 
 impl LocalStoredState {
+
     pub fn clear_sensitive(&mut self) {
         self.mnemonics = self.mnemonics.clone().map(|mnemonics| {
             mnemonics.iter().filter(|mnemonic| {

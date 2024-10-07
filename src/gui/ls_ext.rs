@@ -7,6 +7,7 @@ use rand::Rng;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
+use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_gui::tab::tabs::Tab;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
@@ -21,7 +22,7 @@ use crate::core::internal_message::{new_channel, Channel};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use crate::gui::components::swap::SwapStage;
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
-use crate::gui::home::HomeState;
+use redgold_gui::tab::home::HomeState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::keys::keygen_subtab::KeygenState;
 use crate::gui::tabs::settings_tab::SettingsState;
@@ -72,10 +73,10 @@ where G: Send + Clone + GuiDepends {
     // ss.genesis = node_config.opts.development_mode;
     let mut ls = LocalState {
         active_tab: Tab::Home,
-        data: Default::default(),
+        data: DataQueryInfo::new(&res),
         node_config: node_config.clone(),
         // runtime,
-        home_state: HomeState::from(),
+        home_state: HomeState::default(),
         server_state: ss,
         current_time: util::current_time_millis_i64(),
         keygen_state: KeygenState::new(
@@ -106,6 +107,8 @@ where G: Send + Clone + GuiDepends {
         party_data,
         first_party,
     };
+
+    ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
 
     if node_config.opts.development_mode {
         ls.server_state.ops = false;

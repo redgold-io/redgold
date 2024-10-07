@@ -14,8 +14,8 @@ use redgold_schema::RgResult;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PublicKey, SupportedCurrency};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use crate::gui::tables;
-use crate::gui::tables::text_table_advanced;
+use redgold_gui::components::tables;
+use redgold_gui::components::tables::text_table_advanced;
 use crate::gui::tabs::transact::wallet_tab::{SendReceiveTabs};
 
 #[derive(Clone, Default)]
@@ -244,7 +244,7 @@ pub fn portfolio_table(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             format!("{:.2}", row.fulfillment_imbalance_pair),
         ]);
     };
-    let event = text_table_advanced(ui, data_str, true, false);
+    let event = text_table_advanced(ui, data_str, true, false, None);
     if let Some(index) = event.delete_row_id.as_ref() {
         ls.wallet.port.port.rows.remove(index.clone());
         ls.wallet.port.port.normalize_weight_update();

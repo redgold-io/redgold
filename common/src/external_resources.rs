@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use redgold_schema::{error_info, structs, RgResult};
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 
 #[async_trait]
@@ -24,6 +24,9 @@ pub trait ExternalNetworkResources {
     async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)>;
 
     async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>>;
+
+    async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey) -> RgResult<CurrencyAmount>;
+
 }
 
 pub struct NetworkDataFilter {

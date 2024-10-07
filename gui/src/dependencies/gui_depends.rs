@@ -54,4 +54,6 @@ pub trait GuiDepends {
     fn metrics(&self) -> impl std::future::Future<Output = RgResult<Vec<(String, String)>>> + Send;
     fn table_sizes(&self) -> impl std::future::Future<Output = RgResult<Vec<(String, i64)>>> + Send;
     fn party_data(&self) -> impl std::future::Future<Output = RgResult<HashMap<PublicKey, PartyInternalData>>> + Send;
+
+    fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey>;
 }

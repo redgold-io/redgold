@@ -20,7 +20,7 @@ pub struct UsdPrice {
     pub price: f64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub struct PriceDataPointUsdQuery {
     pub inner: HashMap<i64, UsdPrice>,
 }
