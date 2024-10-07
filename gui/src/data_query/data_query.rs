@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
@@ -23,6 +24,7 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     pub price_map_usd_pair_incl_rdg: HashMap<SupportedCurrency, f64>,
     pub external_balances: Arc<Mutex<HashMap<(PublicKey, NetworkEnvironment, SupportedCurrency), CurrencyAmount>>>,
     pub external_tx: Arc<Mutex<HashMap<(PublicKey, NetworkEnvironment), Vec<ExternalTimedTransaction>>>>,
+    pub detailed_address: Arc<Mutex<HashMap<PublicKey, Vec<DetailedAddress>>>>,
 }
 
 
@@ -42,6 +44,24 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         }
 
         nav
+    }
+
+    pub fn nav_usd_by_currency(&self, nett: &NetworkEnvironment) -> HashMap<SupportedCurrency, f64> {
+        let mut hm = HashMap::new();
+        if let Some(b) = self.external_balances.lock().ok() {
+            for ((pk, net, cur), amt) in b.iter() {
+                if *net != *nett {
+                    continue
+                }
+                if let Some(price) = self.price_map_usd_pair_incl_rdg.get(&cur) {
+                    let usd_amt = amt.to_fractional() * price;
+                    let current = hm.get(cur).unwrap_or(&0.0);
+                    hm.insert(cur.clone(), current + usd_amt);
+                }
+            }
+        }
+
+        hm
     }
 
     pub fn balance_totals(&self, nett: &NetworkEnvironment) -> HashMap<SupportedCurrency, f64> {
@@ -80,6 +100,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
             price_map_usd_pair_incl_rdg: Default::default(),
             external_balances: Arc::new(Mutex::new(Default::default())),
             external_tx: Arc::new(Mutex::new(Default::default())),
+            detailed_address: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -95,6 +116,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                     ai.insert(pk, address_info);
                 }
             });
+
         }
     }
 

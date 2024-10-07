@@ -10,7 +10,8 @@ on:
     - cron: '0 0 * * 3'  # Run every Wednesday at 00:00 UTC
 
 jobs:
-  staging-release-rollout:
+  release-rollout:
+    if: ${{ vars.RELEASE_ROLLOUT == 'true' }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 120
     steps:

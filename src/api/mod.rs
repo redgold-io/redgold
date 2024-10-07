@@ -29,6 +29,7 @@ use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::explorer::DetailedAddress;
 
 pub mod control_api;
 pub mod public_api;
@@ -67,6 +68,8 @@ impl RgHttpClient {
             relay,
         }
     }
+
+
 
     pub async fn balance(
         &self,
@@ -121,6 +124,10 @@ impl RgHttpClient {
 
     pub async fn table_sizes(&self) -> RgResult<Vec<(String, i64)>> {
         self.json_get("v1/tables").await
+    }
+
+    pub async fn explorer_public_address(&self, pk: &PublicKey) -> RgResult<Vec<DetailedAddress>> {
+        self.json_get(format!("v1/explorer/public/address/{}", pk.hex())).await
     }
 
     pub async fn table_sizes_map(&self) -> RgResult<HashMap<String, i64>> {

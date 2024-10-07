@@ -1,7 +1,9 @@
 # <img src="src/resources/svg_rg_2_crop.png" width="9%" height="9%"> Redgold
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Dev](https://github.com/redgold-io/redgold/actions/workflows/ci.yml/badge.svg?branch=dev) | 
+![Dev](https://github.com/redgold-io/redgold/actions/workflows/ci.yml/badge.svg?branch=dev)
+
+
 [Website](https://redgold.io) |
 [Contributing](https://dev.docs.redgold.io/contribute/guide) | 
 [Dev Setup](https://dev.docs.redgold.io/contribute/dev-setup) | 

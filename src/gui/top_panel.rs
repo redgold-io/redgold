@@ -1,8 +1,13 @@
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, RichText};
+use redgold_gui::common::copy_button;
 use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::times::ToTimeString;
 use crate::gui::app_loop::LocalState;
+
+fn round_down_to_minute(time_millis: i64) -> i64 {
+    time_millis - (time_millis % 60000)
+}
 
 pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
     egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -40,9 +45,15 @@ pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
                 }
             }
             ui.label("Int Time:");
-            ui.label(RichText::new(local_state.current_time.to_string()).color(egui::Color32::KHAKI));
+            let current_time = local_state.current_time.to_string();
+            let rounded = round_down_to_minute(local_state.current_time).to_string();
+            ui.label(RichText::new(rounded).color(egui::Color32::KHAKI));
+            copy_button(ui, current_time);
             ui.label("Date:");
-            ui.label(RichText::new(local_state.current_time.to_time_string_shorter()).color(egui::Color32::LIGHT_BLUE));
+            let time_str = local_state.current_time.to_time_string_shorter_no_seconds();
+            ui.label(RichText::new(time_str.clone()).color(egui::Color32::LIGHT_BLUE));
+            copy_button(ui, local_state.current_time.to_time_string_shorter());
+            ui.hyperlink_to("Explorer Link", local_state.node_config.network.explorer_link());
         });
 
 

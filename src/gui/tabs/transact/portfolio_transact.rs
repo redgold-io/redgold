@@ -244,7 +244,7 @@ pub fn portfolio_table(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             format!("{:.2}", row.fulfillment_imbalance_pair),
         ]);
     };
-    let event = text_table_advanced(ui, data_str, true, false, None);
+    let event = text_table_advanced(ui, data_str, true, false, None, vec![]);
     if let Some(index) = event.delete_row_id.as_ref() {
         ls.wallet.port.port.rows.remove(index.clone());
         ls.wallet.port.port.normalize_weight_update();
