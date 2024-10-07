@@ -6,5 +6,6 @@ pub mod lang_util;
 pub mod timers;
 pub mod times;
 pub mod task_local;
+pub mod dollar_formatter;
 
 

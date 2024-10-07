@@ -1,7 +1,7 @@
 use ethers::middleware::Middleware;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use redgold_schema::{ErrorInfoContext, RgResult};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey};
 use crate::eth::eth_wallet::EthWalletWrapper;
 
 impl EthWalletWrapper {
@@ -26,10 +26,10 @@ impl EthWalletWrapper {
 
 #[test]
 pub fn test_eth_wallet() {
-    let f = EthWalletWrapper::fee_fixed_normal_testnet().to_fractional();
+    let f = CurrencyAmount::fee_fixed_normal_testnet().to_fractional();
     println!("fee_fixed_normal: {}", f);
     println!("fee_fixed_normalusd: {}", f * 2600.0);
-     let f = EthWalletWrapper::fee_fixed_normal_mainnet().to_fractional();
+     let f = CurrencyAmount::fee_fixed_normal_mainnet().to_fractional();
     println!("fee_fixed_normal2: {}", f);
     println!("fee_fixed_normalusd2: {}", f * 2600.0);
 

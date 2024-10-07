@@ -2,7 +2,7 @@ use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 use clap::Parser;
-use config::Config;
+use config::{Config, Environment};
 use log::info;
 use redgold_schema::conf::rg_args::RgArgs;
 use redgold_schema::config_data::ConfigData;
@@ -39,16 +39,20 @@ pub fn environment_only_builder() -> Box<ConfigData> {
     let mut builder = Config::builder();
     builder = builder
         .add_source(
-            config::Environment::with_prefix("REDGOLD")
-                .try_parsing(true)
-                .separator("_")
-                .with_list_parse_key("")
-                .list_separator(","),
+            config_env_source(),
         );
     let config = builder
         .build()
         .unwrap();
     Box::new(config.try_deserialize::<ConfigData>().unwrap())
+}
+
+fn config_env_source() -> Environment {
+    config::Environment::with_prefix("REDGOLD")
+        .try_parsing(true)
+        .separator("_")
+        .with_list_parse_key("")
+        .list_separator(",")
 }
 
 pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
@@ -100,10 +104,7 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
 
     let config = builder
         .add_source(
-            config::Environment::with_prefix("REDGOLD")
-                .try_parsing(true)
-                .separator("_")
-                .list_separator(" "),
+            config_env_source()
         )
         .build()
         .unwrap();

@@ -6,7 +6,7 @@ use crate::party::external_data::{ExternalNetworkData, PriceDataPointUsdQuery};
 use crate::party::party_events::{OrderFulfillment, PartyEvents};
 use crate::structs::{PartyData, PartyInfo, SupportedCurrency, Transaction};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct PartyInternalData {
     pub party_info: PartyInfo,
     pub network_data: HashMap<SupportedCurrency, ExternalNetworkData>,

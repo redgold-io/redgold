@@ -14,7 +14,7 @@ use crate::api::RgHttpClient;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
-use crate::gui::tables;
+use redgold_gui::components::tables;
 use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};
 use redgold_schema::conf::rg_args::Deploy;

@@ -16,7 +16,7 @@ use redgold_schema::{error_info, RgResult};
 use crate::util::sym_crypt;
 // 0.8
 // use crate::gui::image_load::TexMngr;
-use crate::gui::{home, top_panel, ClientApp};
+use crate::gui::{top_panel, ClientApp};
 use crate::util;
 use rand::Rng;
 use rocket::form::validate::Contains;
@@ -45,7 +45,7 @@ impl PublicKeyStoredState for LocalStoredState {
 // #[derive(Clone)]
 pub struct LocalState {
     pub(crate) active_tab: Tab,
-    pub data: DataQueryInfo,
+    pub data: DataQueryInfo<ExternalNetworkResourcesImpl>,
     pub node_config: NodeConfig,
     pub home_state: HomeState,
     pub server_state: ServersState,
@@ -258,7 +258,11 @@ use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 use redgold_data::data_store::DataStore;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
 use redgold_gui::data_query::data_query::DataQueryInfo;
-use redgold_gui::dependencies::gui_depends::{GuiDepends};
+use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
+// 0.8
+// use crate::gui::image_load::TexMngr;
+use redgold_gui::tab::home;
 use redgold_gui::tab::tabs::Tab;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::dhash_vec;
@@ -266,7 +270,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{new_channel, Channel};
-use crate::gui::home::HomeState;
+use redgold_gui::tab::home::HomeState;
 use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
@@ -380,7 +384,11 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
         // The central panel the region left after adding TopPanel's and SidePanel's
         match local_state.active_tab {
             Tab::Home => {
-                local_state.home_state.home_screen(ui, ctx, &g, &local_state.data, &local_state.node_config, vec![], local_state.current_time);
+                let pks = local_state.local_stored_state.extract(&g);
+                local_state.home_state.home_screen(
+                    ui, ctx, &g, &local_state.external_network_resources, &local_state.data,
+                    &local_state.node_config, pks.iter().collect_vec(), local_state.current_time
+                );
             }
             Tab::Keys => {
                 keys_tab(ui, ctx, local_state, has_changed_tab, &g);

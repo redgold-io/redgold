@@ -18,8 +18,9 @@ use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::node_config::NodeConfigKeyPair;
@@ -235,6 +236,19 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
 
     async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>> {
         self.relay.as_ref().unwrap().ds.price_time.max_time_price_by(currency, max_time).await
+    }
+
+    async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey)
+        -> RgResult<CurrencyAmount> {
+        match currency {
+            SupportedCurrency::Bitcoin => {
+                SingleKeyBitcoinWallet::new_wallet(pk.clone(), network.clone(), false)?.balance()
+            }
+            SupportedCurrency::Ethereum => {
+                self.eth_dummy_wallet().await?.get_balance(pk).await
+            }
+            _ => "Unsupported currency".to_error()
+        }
     }
 }
 
@@ -494,6 +508,10 @@ impl ExternalNetworkResources for MockExternalResources {
             }
             _ => Err(error_info("Unsupported currency"))
         }
+    }
+
+    async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey) -> RgResult<CurrencyAmount> {
+        self.inner.get_balance_no_cache(network, currency, pk).await
     }
 }
 

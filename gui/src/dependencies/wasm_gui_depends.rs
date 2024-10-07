@@ -82,4 +82,8 @@ impl GuiDepends for WasmGuiDepends {
     async fn party_data(&self) -> RgResult<HashMap<PublicKey, PartyInternalData>> {
         todo!()
     }
+
+    fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey> {
+        todo!()
+    }
 }

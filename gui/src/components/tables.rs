@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use eframe::egui;
 use eframe::egui::Ui;
 use egui_extras::{Column, TableBuilder};
@@ -9,9 +10,15 @@ pub struct TextTableEvent {
 }
 
 pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
-    text_table_advanced(ui, data, false, false);
+    text_table_advanced(ui, data, false, false, None);
 }
-pub fn text_table_advanced(ui: &mut Ui, data: Vec<Vec<String>>, delete_button: bool, show_empty_headers: bool) -> TextTableEvent {
+pub fn text_table_advanced(
+    ui: &mut Ui,
+    data: Vec<Vec<String>>,
+    delete_button: bool,
+    show_empty_headers: bool,
+    link_column_and_replacement_text: Option<(usize, Vec<String>)>
+) -> TextTableEvent {
 
     let mut event = TextTableEvent {
         delete_row_id: None,
@@ -50,7 +57,15 @@ pub fn text_table_advanced(ui: &mut Ui, data: Vec<Vec<String>>, delete_button: b
             let row_index = row.index();
             let data_ri = row_index + 1;
             let row_data = data.get(data_ri).expect("value row missing");
-            for cell in row_data {
+            for (column_idx, cell) in row_data.iter().enumerate() {
+                if let Some((link_column, replacement_text)) = &link_column_and_replacement_text {
+                    if column_idx == *link_column {
+                        row.col(|ui| {
+                            ui.hyperlink_to(cell, replacement_text.get(row_index).expect("replacement text missing"));
+                        });
+                        continue;
+                    }
+                }
                 row.col(|ui| {
                     ui.label(cell);
                     ui.spacing();

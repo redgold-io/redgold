@@ -4,7 +4,7 @@ use egui_extras::{Column, TableBuilder};
 use redgold_schema::structs::SupportedCurrency;
 use crate::gui::app_loop::LocalState;
 use redgold_gui::common::editable_text_input_copy;
-use crate::gui::tables::text_table;
+use redgold_gui::components::tables::text_table;
 
 
 pub fn data_table(ui: &mut Ui, data: Vec<Vec<String>>) {

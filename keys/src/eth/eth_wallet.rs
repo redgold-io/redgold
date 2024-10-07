@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use bdk::bitcoin::hashes::hex::ToHex;
 use ethers::addressbook::Address;
 use ethers::middleware::{Middleware, SignerMiddleware};
@@ -6,10 +7,11 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::providers;
 use ethers::providers::Http;
 use log::kv::Key;
+use num_bigint::{BigInt, Sign};
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
 
 use crate::address_external::ToEthereumAddress;
 use crate::eth::historical_client::EthHistoricalClient;
@@ -233,6 +235,16 @@ impl EthWalletWrapper {
                 Err(error_info(format!("tx send failure {}", "error")))
             }
         }
+    }
+
+    pub async fn get_balance(&self, public_key: &PublicKey) -> RgResult<CurrencyAmount> {
+        let addr = public_key.to_ethereum_address()?;
+        let addr = Self::parse_address(&addr)?;
+        let b = self.provider.get_balance(addr, None).await.error_info("balance lookup eth failure")?;
+        let mut vec = vec![];
+        b.to_big_endian(&mut *vec);
+        let bi = BigInt::from_bytes_be(Sign::Plus, &*vec);
+        Ok(CurrencyAmount::from_eth_bigint(bi))
     }
 
 }
