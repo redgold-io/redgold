@@ -6,7 +6,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
-use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
 use crate::core::internal_message::Channel;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};

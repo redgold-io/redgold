@@ -296,8 +296,13 @@ message AbridgedNodeMetadata {
   PartitionInfo partition_info = 2;
 }
 
+message PortfolioId {
+  optional string name = 1;
+}
+
 message PortfolioRequest {
   PortfolioInfo portfolio_info = 1;
+  PortfolioId portfolio_id = 2;
 }
 
 
@@ -1512,6 +1517,9 @@ enum SupportedCurrency {
   Usd = 3;
   Usdc = 4;
   Usdt = 5;
+  Solana = 6;
+  Monero = 7;
+  Cardano = 8;
 }
 
 

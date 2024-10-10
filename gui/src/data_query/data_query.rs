@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::explorer::DetailedAddress;
+use redgold_schema::explorer::{BriefTransaction, DetailedAddress};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
@@ -25,6 +25,15 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     pub external_balances: Arc<Mutex<HashMap<(PublicKey, NetworkEnvironment, SupportedCurrency), CurrencyAmount>>>,
     pub external_tx: Arc<Mutex<HashMap<(PublicKey, NetworkEnvironment), Vec<ExternalTimedTransaction>>>>,
     pub detailed_address: Arc<Mutex<HashMap<PublicKey, Vec<DetailedAddress>>>>,
+    pub total_incoming: Arc<Mutex<i64>>,
+    pub total_outgoing: Arc<Mutex<i64>>,
+    pub total_utxos: Arc<Mutex<i64>>,
+    pub total_transactions: Arc<Mutex<i64>>,
+    pub delta_24hr_external: HashMap<SupportedCurrency, f64>,
+    // not yet used, would require a channel update on completion or collecting all the async in
+    // future.
+    pub recent_tx_sorted: Arc<Mutex<Vec<BriefTransaction>>>,
+    pub party_nav: Arc<Mutex<f64>>
 }
 
 
@@ -42,7 +51,8 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                 }
             }
         }
-
+        let rdg_nav = self.rdg_nav_usd();
+        nav += rdg_nav;
         nav
     }
 
@@ -60,8 +70,21 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                 }
             }
         }
-
+        let rdg_nav = self.rdg_nav_usd();
+        hm.insert(SupportedCurrency::Redgold, rdg_nav);
         hm
+    }
+
+    fn rdg_nav_usd(&self) -> f64 {
+        let mut total = 0i64;
+        let rdg_price = self.price_map_usd_pair_incl_rdg.get(&SupportedCurrency::Redgold).unwrap_or(&100.0);
+        if let Some(ai) = self.address_infos.lock().ok() {
+            for (pk, info) in ai.iter() {
+                total += info.balance
+            }
+        }
+        let rdg_nav = CurrencyAmount::from(total).to_fractional() * rdg_price;
+        rdg_nav
     }
 
     pub fn balance_totals(&self, nett: &NetworkEnvironment) -> HashMap<SupportedCurrency, f64> {
@@ -101,6 +124,13 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
             external_balances: Arc::new(Mutex::new(Default::default())),
             external_tx: Arc::new(Mutex::new(Default::default())),
             detailed_address: Arc::new(Mutex::new(Default::default())),
+            total_incoming: Arc::new(Mutex::new(0)),
+            total_outgoing: Arc::new(Mutex::new(0)),
+            total_utxos: Arc::new(Mutex::new(0)),
+            total_transactions: Arc::new(Mutex::new(0)),
+            delta_24hr_external: Default::default(),
+            recent_tx_sorted: Arc::new(Mutex::new(vec![])),
+            party_nav: Arc::new(Mutex::new(0.0)),
         }
     }
 
@@ -116,7 +146,35 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                     ai.insert(pk, address_info);
                 }
             });
+        }
+    }
+    pub fn refresh_detailed_address_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
+        for pk in pks {
+            let arc = self.detailed_address.clone();
+            let total_incoming = self.total_incoming.clone();
+            *total_incoming.lock().unwrap() = 0;
+            let total_outgoing = self.total_outgoing.clone();
+            *total_outgoing.lock().unwrap() = 0;
+            let total_utxos = self.total_utxos.clone();
+            *total_utxos.lock().unwrap() = 0;
+            let total_transactions = self.total_transactions.clone();
+            *total_transactions.lock().unwrap() = 0;
 
+            let pk = pk.clone();
+            let g2 = g.clone();
+            g.spawn(async move {
+                let address_info = g2.get_detailed_address(&pk).await.log_error();
+                if let Ok(address_info) = address_info {
+                    for ai in &address_info {
+                        *total_incoming.lock().unwrap() += ai.incoming_count;
+                        *total_outgoing.lock().unwrap() += ai.outgoing_count;
+                        *total_utxos.lock().unwrap() += ai.total_utxos;
+                        *total_transactions.lock().unwrap() += ai.total_count;
+                    }
+                    let mut ai = arc.lock().unwrap();
+                    ai.insert(pk, address_info);
+                }
+            });
         }
     }
 
@@ -147,13 +205,28 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     {
         let arc = self.party_data.clone();
         let arc2 = self.first_party.clone();
+        let nav = self.party_nav.clone();
+        let pm = self.price_map_usd_pair_incl_rdg.clone();
         let g2 = g.clone();
         g.spawn(async move {
             let party_data = g2.party_data().await.log_error();
             if let Ok(party_data) = party_data {
                 if let Some(pd) = party_data.iter().next().clone() {
                     let mut a2 = arc2.lock().unwrap();
-                    *a2 = pd.1.clone();
+                    let data = pd.1.clone();
+                    let mut total = 0.0;
+                    if let Some(bm) = data.party_events.as_ref()
+                        .map(|pev| pev.balance_map.clone()) {
+                        for (k, v) in bm.iter() {
+                            if k != &SupportedCurrency::Redgold {
+                                pm.get(&k).map(|price| {
+                                    total += v.to_fractional() * price;
+                                });
+                            }
+                        }
+                    }
+                    *nav.lock().unwrap() = total;
+                    *a2 = data;
                 }
                 let mut ai = arc.lock().unwrap();
                 *ai = party_data;

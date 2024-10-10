@@ -46,11 +46,11 @@ pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
             }
             ui.label("Int Time:");
             let current_time = local_state.current_time.to_string();
-            let rounded = round_down_to_minute(local_state.current_time).to_string();
+            let rounded = (round_down_to_minute(local_state.current_time)/1000).to_string();
             ui.label(RichText::new(rounded).color(egui::Color32::KHAKI));
             copy_button(ui, current_time);
             ui.label("Date:");
-            let time_str = local_state.current_time.to_time_string_shorter_no_seconds();
+            let time_str = local_state.current_time.to_time_string_shorter_no_seconds_am_pm();
             ui.label(RichText::new(time_str.clone()).color(egui::Color32::LIGHT_BLUE));
             copy_button(ui, local_state.current_time.to_time_string_shorter());
             ui.hyperlink_to("Explorer Link", local_state.node_config.network.explorer_link());

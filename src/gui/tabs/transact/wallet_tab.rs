@@ -36,9 +36,10 @@ use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_gui::components::passphrase_input::PassphraseInput;
+use crate::gui::components::explorer_links::rdg_explorer;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
@@ -347,7 +348,7 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
 
 pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: &G)
     where G: GuiDepends + Clone + Send + 'static {
-    let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab, depends);
+    let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab, depends, None);
     let mut is_hot = false;
     if has_changed_tab {
         update = true;
@@ -506,7 +507,7 @@ fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: 
         balance_str = "loading address info".to_string();
     }
 
-    rdg_explorer(ui, ls, pk);
+    rdg_explorer(ui, &ls.node_config.network, pk);
 
     ui.heading(RichText::new(balance_str).color(Color32::LIGHT_GREEN));
 
@@ -547,34 +548,6 @@ fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: 
             prepared_tx_view::prepared_view(ui, ls, pk, is_hot);
         }
     }
-}
-
-
-fn rdg_explorer(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
-    let mut explorer_prefix = ls.node_config.network.to_std_string();
-    let is_main = explorer_prefix == "main".to_string();
-    if is_main {
-        explorer_prefix = "".to_string();
-    } else {
-        explorer_prefix = format!("{}.", explorer_prefix);
-    }
-    ui.horizontal(|ui| {
-        let rdg_address = pk.address().unwrap().render_string().unwrap();
-        ui.hyperlink_to("RDG Explorer", format!("https://{}explorer.redgold.io/hash/{}", explorer_prefix, rdg_address));
-        let btc_address = pk.to_bitcoin_address_typed(&ls.node_config.network).unwrap().render_string().unwrap();
-        let mut net = "testnet/";
-        if is_main {
-            net = "";
-        }
-        let eth_url = if is_main {
-            "https://etherscan.io/address/"
-        } else {
-            "https://sepolia.etherscan.io/address/"
-        };
-        let eth_address = pk.to_ethereum_address().unwrap();
-        ui.hyperlink_to("BTC Explorer", format!("https://blockstream.info/{net}address/{btc_address}"));
-        ui.hyperlink_to("ETH Explorer", format!("{}{}", eth_url, eth_address));
-    });
 }
 
 fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {

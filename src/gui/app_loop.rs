@@ -35,8 +35,8 @@ pub trait PublicKeyStoredState {
 
 impl PublicKeyStoredState for LocalStoredState {
     fn public_key(&self, xpub_name: String) -> Option<PublicKey> {
-        let pk = self.xpubs.iter().find(|x| x.name == xpub_name)
-            .and_then(|g| XpubWrapper::new(g.xpub.clone()).public_at(0, 0).ok());
+        let pk = self.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == xpub_name)
+            .and_then(|g| XpubWrapper::new(g.xpub.clone()).public_at(0, 0).ok()));
         pk
     }
 }
@@ -141,7 +141,7 @@ impl LocalStateAddons for LocalState {
     fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()> {
         let new_names = new_named.iter().map(|x| x.name.clone())
             .collect_vec();
-        let existing = self.local_stored_state.xpubs.clone();
+        let existing = self.local_stored_state.xpubs.clone().unwrap_or(vec![]);
         let mut filtered = existing.iter().filter(|x| {
             !new_names.contains(&x.name)
         }).map(|x| x.clone()).collect_vec();
@@ -151,21 +151,22 @@ impl LocalStateAddons for LocalState {
         let mut new_named2 = new_named.clone();
         if !prepend {
             filtered.extend(new_named);
-            self.local_stored_state.xpubs = filtered;
+            self.local_stored_state.xpubs = Some(filtered);
         } else {
             new_named2.extend(filtered);
-            self.local_stored_state.xpubs = new_named2;
+            self.local_stored_state.xpubs = Some(new_named2);
         }
         self.persist_local_state_store();
         Ok(())
     }
     fn upsert_identity(&mut self, new_named: Identity) -> () {
-        let mut updated = self.local_stored_state.identities.iter().filter(|x| {
+        let option = self.local_stored_state.identities.clone().unwrap_or(vec![]);
+        let mut updated = option.iter().filter(|x| {
             x.name != new_named.name
         }).map(|x| x.clone()).collect_vec();
         updated.push(new_named);
 
-        self.local_stored_state.identities = updated;
+        self.local_stored_state.identities = Some(updated);
         self.persist_local_state_store();
     }
 
@@ -271,7 +272,7 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{new_channel, Channel};
 use redgold_gui::tab::home::HomeState;
-use redgold_schema::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::{SwapStage, SwapState};
@@ -387,7 +388,8 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 let pks = local_state.local_stored_state.extract(&g);
                 local_state.home_state.home_screen(
                     ui, ctx, &g, &local_state.external_network_resources, &local_state.data,
-                    &local_state.node_config, pks.iter().collect_vec(), local_state.current_time
+                    &local_state.node_config, pks.iter().collect_vec(), local_state.current_time,
+                    &local_state.local_stored_state
                 );
             }
             Tab::Keys => {

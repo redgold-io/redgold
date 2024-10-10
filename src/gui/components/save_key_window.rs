@@ -1,7 +1,7 @@
 use eframe::egui::Ui;
 use bdk::bitcoin::PrivateKey;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::local_stored_state::{StoredMnemonic, StoredPrivateKey};
+use redgold_schema::conf::local_stored_state::{StoredMnemonic, StoredPrivateKey};
 use std::str::FromStr;
 use eframe::egui;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};

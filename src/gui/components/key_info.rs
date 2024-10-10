@@ -135,7 +135,7 @@ pub fn update_keys_key_info(ls: &mut LocalState) {
 }
 
 pub fn update_xpub_key_info(ls: &mut LocalState) {
-    let xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet.selected_xpub_name);
+    let xpub = ls.local_stored_state.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name));
     if let Some(xpub) = xpub {
         let gui_key = GuiKey::XPub(xpub.xpub.clone());
         ls.keytab_state.xpub_key_info.update_fields(

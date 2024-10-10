@@ -59,7 +59,6 @@ pub mod debug_version;
 pub mod transaction_info;
 pub mod exec;
 pub mod contract;
-pub mod local_stored_state;
 pub mod weighting;
 pub mod pow;
 pub mod tx_schema_validate;
@@ -697,12 +696,28 @@ impl StructMetadata {
 
 pub trait ShortString {
     fn short_string(&self) -> Result<String, ErrorInfo>;
+    fn first_four_last_four_ellipses(&self) -> Result<String, ErrorInfo>;
     fn last_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo>;
+    fn first_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo>;
 }
 
 impl ShortString for String {
     fn short_string(&self) -> Result<String, ErrorInfo> {
         self.last_n(6)
+    }
+
+    fn first_four_last_four_ellipses(&self) -> Result<String, ErrorInfo> {
+        let exclude_prefixes = ["0a220a20", "0a230a2103", "0a230a2102"];
+        let stripped = {
+            exclude_prefixes.iter()
+                .find(|&prefix| self.starts_with(prefix))
+                .map(|prefix| self[prefix.len()..].to_string())
+                .unwrap_or_else(|| self.clone())
+        };
+
+        let first_4 = stripped.first_n(4)?;
+        let last_4 = self.last_n(4)?;
+        Ok(format!("{}...{}", first_4, last_4))
     }
 
     fn last_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo> {
@@ -715,6 +730,19 @@ impl ShortString for String {
         let x = &self[start..len];
         Ok(x.to_string())
     }
+
+    fn first_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo> {
+        let len = self.len();
+        let start = 0i32;
+        let end = n.into() as usize;
+        if len < end {
+            return Err(error_info("string too short to short_string"));
+        }
+        let start = start as usize;
+        let x = &self[start..end];
+        Ok(x.to_string())
+    }
+
 }
 
 pub type RgResult<T> = Result<T, ErrorInfo>;

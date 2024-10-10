@@ -1,6 +1,7 @@
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
+use crate::conf::server_config::Deployment;
 use crate::servers::ServerOldFormat;
 use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
@@ -83,14 +84,15 @@ pub struct StoredPrivateKey {
 // TODO: Make all values optional for config loader.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct LocalStoredState {
-    pub servers: Vec<ServerOldFormat>,
-    pub xpubs: Vec<NamedXpub>,
-    pub trust: Vec<ServerTrustRatingLabels>,
+    pub deploy: Option<Deployment>,
+    pub servers: Option<Vec<ServerOldFormat>>,
+    pub xpubs: Option<Vec<NamedXpub>>,
+    pub trust: Option<Vec<ServerTrustRatingLabels>>,
     pub saved_addresses: Option<Vec<SavedAddress>>,
-    pub contacts: Vec<Contact>,
-    pub watched_address: Vec<Address>,
+    pub contacts: Option<Vec<Contact>>,
+    pub watched_address: Option<Vec<Address>>,
     pub email_alert_config: Option<String>,
-    pub identities: Vec<Identity>,
+    pub identities: Option<Vec<Identity>>,
     pub mnemonics: Option<Vec<StoredMnemonic>>,
     pub private_keys: Option<Vec<StoredPrivateKey>>,
 }
@@ -103,10 +105,12 @@ impl LocalStoredState {
                 mnemonic.persist_disk.unwrap_or(true)
             }).map(|d| d.clone()).collect_vec()
         });
-        self.xpubs = self.xpubs.iter().filter(|xpubs| {
-            !xpubs.skip_persist.unwrap_or(false)
-        }).map(|d| d.clone()).collect_vec();
-
+        self.xpubs = self.xpubs.clone().map(|x| {
+            let vec = x.iter().filter(|xpubs| {
+                !xpubs.skip_persist.unwrap_or(false)
+            }).map(|d| d.clone()).collect_vec();
+            vec
+        });
     }
 }
 

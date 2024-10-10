@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
-use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};

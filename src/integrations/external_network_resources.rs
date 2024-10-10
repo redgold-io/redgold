@@ -26,7 +26,7 @@ use redgold_schema::util::lang_util::AnyPrinter;
 use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::core::relay::Relay;
-use crate::scrape::okx_point;
+use crate::scrape::{crypto_compare_point_query, okx_point};
 use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;
 
@@ -131,6 +131,9 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         }
     }
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
+        if currency == SupportedCurrency::Monero {
+            return crypto_compare_point_query(currency, time).await
+        };
         let price = okx_point(time, currency).await?.close;
         Ok(price)
     }

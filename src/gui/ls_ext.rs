@@ -15,7 +15,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::ValidateDerivationPath;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{ErrorInfo, SupportedCurrency};
 use crate::core::internal_message::{new_channel, Channel};
@@ -60,7 +60,10 @@ where G: Send + Clone + GuiDepends {
         .all().servers_path().to_str().expect("").to_string();
 
     let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
-    for c in vec![SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin] {
+    for c in HomeState::queryable_balances() {
+        if c == SupportedCurrency::Redgold {
+            continue;
+        }
         let price = res.query_price(util::current_time_millis_i64(), c).await.unwrap();
         price_map.insert(c, price);
     }
@@ -82,7 +85,7 @@ where G: Send + Clone + GuiDepends {
         keygen_state: KeygenState::new(
             node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
         ),
-        wallet: WalletState::new(hot_mnemonic, local_stored_state.xpubs.first()),
+        wallet: WalletState::new(hot_mnemonic, local_stored_state.xpubs.as_ref().and_then(|x| x.first())),
         qr_state: Default::default(),
         qr_show_state: Default::default(),
         identity_state: IdentityState::new(),
@@ -109,6 +112,15 @@ where G: Send + Clone + GuiDepends {
     };
 
     ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
+    info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
+
+    for cur in vec![
+        SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::Usdt, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::Usdc
+    ].iter() {
+        let delta = gui_depends.get_24hr_delta(cur.clone()).await;
+        ls.data.delta_24hr_external.insert(cur.clone(), delta);
+    }
+    info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
 
     if node_config.opts.development_mode {
         ls.server_state.ops = false;

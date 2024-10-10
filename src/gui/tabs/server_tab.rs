@@ -148,7 +148,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
             let res = ServerOldFormat::parse_from_file(buf);
             if let Ok(res) = res {
-                local_state.local_stored_state.servers = res;
+                local_state.local_stored_state.servers = Some(res);
                 local_state.persist_local_state_store();
                 local_state.server_state.parse_success = Some(true);
             } else {
@@ -323,9 +323,10 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
             let config1 = local_state.node_config.clone();
+            let option = local_state.local_stored_state.servers.clone().unwrap_or(vec![]);
             tokio::spawn(deploy::offline_generate_keys_servers(
                 config1,
-                local_state.local_stored_state.servers.clone(),
+                option,
                 PathBuf::from(local_state.server_state.generate_offline_path.clone()),
                 local_state.wallet.hot_mnemonic().words.clone(),
                 local_state.wallet.hot_mnemonic().passphrase.clone(),
@@ -334,9 +335,10 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     });
 
     if ui.button("Backup Multiparty Local Shares").clicked() {
+        let option1 = local_state.local_stored_state.servers.clone().unwrap_or(vec![]);
         tokio::spawn(multiparty_backup::backup_multiparty_local_shares(
             local_state.node_config.clone(),
-            local_state.local_stored_state.servers.clone(),
+            option1,
         ));
     }
 

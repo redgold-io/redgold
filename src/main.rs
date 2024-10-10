@@ -7,6 +7,7 @@ use std::time::Duration;
 use clap::Parser;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use itertools::Itertools;
 use tracing::{error, info};
 use metrics::{counter, gauge};
 use tokio::sync::Mutex;
@@ -16,7 +17,7 @@ use redgold::gui::native_gui_dependencies::NativeGuiDepends;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
-use redgold::util::cli::load_config::load_full_config;
+use redgold::util::cli::load_config::{load_full_config, main_config};
 use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
@@ -28,18 +29,14 @@ use redgold_schema::conf::rg_args::RgArgs;
 #[tokio::main]
 async fn main() {
 
-    let cfg = load_full_config();
+    let nc = main_config();
 
-    let opts = RgArgs::parse();
+    let mut arg_translate = ArgTranslate::new(nc);
+    let _ = &arg_translate.translate_args().await.expect("arg translation");
+    let node_config = *arg_translate.node_config.clone();
+
     info!("Starting node main method");
     counter!("redgold.node.main_started").increment(1);
-
-    let mut node_config = NodeConfig::default();
-    node_config.config_data = *cfg.clone();
-
-    let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
-    let _ = &arg_translate.translate_args().await.expect("arg translation");
-    node_config = arg_translate.node_config.clone();
 
     tracing::trace!("Starting network environment: {}", node_config.clone().network.to_std_string());
 

@@ -214,19 +214,21 @@ pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<D
 pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>, offset: Option<i64>) -> RgResult<DetailedAddress> {
 
     let a = ai.address.safe_get_msg("Missing address")?.clone();
+    let address_str = a.render_string()?;
+    let outgoing_from = Some(address_str.clone());
+
     let recent: Vec<Transaction> = ai.recent_transactions.clone();
     let incoming_transactions = r.ds.transaction_store.get_filter_tx_for_address(
         &a, limit.unwrap_or(10), offset.unwrap_or(0), true
-    ).await?.iter().map(|u| brief_transaction(&u)).collect::<RgResult<Vec<BriefTransaction>>>()?;
+    ).await?.iter().map(|u| brief_transaction(&u, outgoing_from.clone())).collect::<RgResult<Vec<BriefTransaction>>>()?;
     let outgoing_transactions = r.ds.transaction_store.get_filter_tx_for_address(
         &a, limit.unwrap_or(10), offset.unwrap_or(0), false
-    ).await?.iter().map(|u| brief_transaction(&u)).collect::<RgResult<Vec<BriefTransaction>>>()?;
+    ).await?.iter().map(|u| brief_transaction(&u, outgoing_from.clone())).collect::<RgResult<Vec<BriefTransaction>>>()?;
 
     let incoming_count = r.ds.transaction_store.get_count_filter_tx_for_address(&a, true).await?;
     let outgoing_count = r.ds.transaction_store.get_count_filter_tx_for_address(&a, false).await?;
     let total_count = incoming_count.clone() + outgoing_count.clone();
 
-    let address_str = a.render_string()?;
     let address_pool_info = get_address_pool_info(r.clone()).await?
         .filter(|p| p.addresses.values().collect_vec().contains(&&address_str));
 
@@ -234,7 +236,7 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
         address: address_str,
         balance: rounded_balance_i64(ai.balance.clone()),
         total_utxos: ai.utxo_entries.len() as i64,
-        recent_transactions: recent.iter().map(|u| brief_transaction(&u)).collect::<RgResult<Vec<BriefTransaction>>>()?,
+        recent_transactions: recent.iter().map(|u| brief_transaction(&u, outgoing_from.clone())).collect::<RgResult<Vec<BriefTransaction>>>()?,
         utxos: ai.utxo_entries.iter().map(|u| convert_utxo(u)).collect::<RgResult<Vec<BriefUtxoEntry>>>()?,
         incoming_transactions,
         outgoing_transactions,
@@ -668,7 +670,7 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
     let num_accepted_signers = counts.get(&(State::Accepted as i32)).unwrap_or(&0).clone() as i64;
 
     let mut detailed = DetailedTransaction {
-        info: brief_transaction(tx)?,
+        info: brief_transaction(tx, None)?,
         confirmation_score: 1.0,
         acceptance_score: 1.0,
         message,
@@ -706,12 +708,13 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
 
 
 // TODO Make trait implicit
-fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
+fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgResult<BriefTransaction> {
+    let from_str = tx.first_input_address()
+        .and_then(|a| a.render_string().ok())
+        .unwrap_or("".to_string());
     Ok(BriefTransaction {
         hash: tx.hash_or().hex(),
-        from: tx.first_input_address()
-            .and_then(|a| a.render_string().ok())
-            .unwrap_or("".to_string()),
+        from: from_str.clone(),
         to: tx.first_output_address_non_input_or_fee().safe_get_msg("Missing output address")?.render_string()?,
         amount: tx.total_output_amount_float(),
         fee: tx.fee_amount(),
@@ -719,6 +722,7 @@ fn brief_transaction(tx: &Transaction) -> RgResult<BriefTransaction> {
         timestamp: tx.struct_metadata.clone().and_then(|s| s.time).safe_get_msg("Missing tx timestamp")?.clone(),
         first_amount: tx.first_output_amount().safe_get_msg("Missing first output amount")?.clone(),
         is_test: tx.is_test(),
+        incoming: outgoing_from.map(|i| i != from_str),
     })
 }
 
@@ -733,7 +737,7 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     trace!("Dashboard query time elapsed: {:?}", current_time_millis_i64() - start);
     let mut recent_transactions = Vec::new();
     for tx in recent {
-        let brief_tx = brief_transaction(&tx)?;
+        let brief_tx = brief_transaction(&tx, None)?;
         recent_transactions.push(brief_tx);
     }
     trace!("Brief transaction build time elapsed: {:?}", current_time_millis_i64() - start);

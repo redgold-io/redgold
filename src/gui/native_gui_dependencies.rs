@@ -11,13 +11,15 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::local_stored_state::NamedXpub;
+use redgold_schema::explorer::DetailedAddress;
+use redgold_schema::conf::local_stored_state::NamedXpub;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
-use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
+use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::relay::Relay;
 use crate::node_config::ApiNodeConfig;
+use crate::scrape::get_24hr_delta_change_pct;
 use crate::util;
 
 #[derive(Clone)]
@@ -125,5 +127,13 @@ impl GuiDepends for NativeGuiDepends {
 
     fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey> {
         XpubWrapper::new(xpub).public_at_dp(&path)
+    }
+
+    async fn get_24hr_delta(&self, currency: SupportedCurrency) -> f64 {
+        get_24hr_delta_change_pct(currency).await.unwrap_or(0.0)
+    }
+
+    async fn get_detailed_address(&self, pk: &PublicKey) -> RgResult<Vec<DetailedAddress>> {
+        self.nc.api_rg_client().explorer_public_address(pk).await
     }
 }

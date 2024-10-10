@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 use redgold_schema::config_data::ConfigData;
+use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
@@ -56,4 +57,9 @@ pub trait GuiDepends {
     fn party_data(&self) -> impl std::future::Future<Output = RgResult<HashMap<PublicKey, PartyInternalData>>> + Send;
 
     fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey>;
+
+    async fn get_24hr_delta(&self, currency: SupportedCurrency) -> f64;
+
+    fn get_detailed_address(&self, pk: &PublicKey) -> impl std::future::Future<Output = RgResult<Vec<DetailedAddress>>> + Send;
+
 }

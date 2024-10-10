@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::future::Future;
 use redgold_schema::config_data::ConfigData;
+use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
-use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
+use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::times::current_time_millis;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
@@ -84,6 +85,14 @@ impl GuiDepends for WasmGuiDepends {
     }
 
     fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey> {
+        todo!()
+    }
+
+    async fn get_24hr_delta(&self, currency: SupportedCurrency) -> f64 {
+        todo!()
+    }
+
+    async fn get_detailed_address(&self, pk: &PublicKey) -> RgResult<Vec<DetailedAddress>> {
         todo!()
     }
 }

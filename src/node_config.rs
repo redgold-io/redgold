@@ -1,5 +1,6 @@
 use std::hash::Hash;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use itertools::Itertools;
 use tracing::info;
@@ -91,12 +92,13 @@ impl EnvDefaultNodeConfig for NodeConfig {
         let mut opts = RgArgs::default();
         opts.network = Some(network_environment.to_std_string());
         let mut node_config = NodeConfig::default();
+        node_config.opts = Arc::new(opts.clone());
         node_config.disable_metrics = true;
-        let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
+        let mut arg_translate = ArgTranslate::new(Box::new(node_config.clone()));
         arg_translate.translate_args().await.unwrap();
         let mut nc = arg_translate.node_config;
         nc.network = network_environment.clone();
-        nc
+        *nc
     }
 
 }
