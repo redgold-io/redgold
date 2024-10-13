@@ -140,7 +140,7 @@ impl ArgTranslate {
         Ok(result)
     }
 
-    pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
+    pub async fn translate_args(mut self) -> Result<Box<NodeConfig>, ErrorInfo> {
         self.immediate_debug();
         self.set_gui_on_empty();
         self.check_load_logger()?;
@@ -167,12 +167,14 @@ impl ArgTranslate {
         self.alias();
 
         if self.is_gui() {
-            return Ok(());
+            self.node_config.is_gui = true;
+            return Ok(self.node_config);
         }
 
         self.abort = immediate_commands(&self.opts().clone(), &self.node_config.clone(), self.args()).await;
         if self.abort {
-            return Ok(());
+            self.node_config.abort = true;
+            return Ok(self.node_config);
         }
 
         // Unnecessary for CLI commands, hence after immediate commands
@@ -183,7 +185,7 @@ impl ArgTranslate {
         tracing::info!("RgArgs options parsed: {:?}", self.opts().clear_sensitive());
         // info!("Development mode: {}", self.opts().development_mode);
 
-        Ok(())
+        Ok(self.node_config)
     }
 
     fn set_discovery_interval(&mut self) {

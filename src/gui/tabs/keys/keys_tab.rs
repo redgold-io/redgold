@@ -15,6 +15,7 @@ use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, 
 use redgold_gui::components::account_deriv_sel::AccountDerivationPathInputState;
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_schema::structs::PublicKey;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
 use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
 use crate::gui::components::save_key_window;
@@ -121,7 +122,7 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
         // }
         // KeygenSubSubTab::XPubs => {
         //     ui.spacing();
-            internal_stored_xpubs(ls, ui, ctx, first_init, g, Some("Internal Stored XPubs".to_string()));
+            internal_stored_xpubs(ls, ui, ctx, first_init, g, Some("Internal Stored XPubs".to_string()), None, false);
     //     }
     // }
     // TODO: Sub-subtabs for these two
@@ -166,7 +167,7 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
         medium_data_item(ui,"Seed Checksum: ", ls.wallet.seed_checksum.as_ref().unwrap_or(&"".to_string()));
     }
 
-    ls.keytab_state.keys_key_info.view(ui);
+    ls.keytab_state.keys_key_info.view(ui, None, ls.node_config.network.clone());
 
     if ls.wallet.active_hot_private_key_hex.is_none() {
         ui.horizontal(|ui| {
@@ -178,14 +179,16 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
                     if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
                         let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
                         let check = m.checksum().unwrap_or("".to_string());
-                        let words_public = m.public_at(&dp2).expect("Public at failed").hex();
+                        let pk = m.public_at(&dp2).expect("Public at failed");
+                        let all = g.to_all_address(&pk);
+                        let words_public = pk.hex();
                         let xpub_w = XpubWrapper::new(xpub.clone());
                         let xpub_public = xpub_w.public_at_dp(&dp2).expect("Public at DP failed").hex();
                         let equal = words_public == xpub_public;
                         info!("Adding xpub to local state from keys tab with words pass \
                         checksum: {check} equal {equal} words public: {words_public} xpub public: {xpub_public}");
                         let ho = Some(ls.wallet.hot_offset.clone()).filter(|x| !x.is_empty());
-                        ls.add_named_xpubs(true,  vec![NamedXpub {
+                        ls.add_named_xpubs(true, vec![NamedXpub {
                             name: ls.keytab_state.save_xpub_account_name.clone(),
                             xpub,
                             derivation_path: derivation_account_path,
@@ -196,6 +199,9 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
                             key_nickname_source: None,
                             request_type: Some(XPubRequestType::Hot),
                             skip_persist: None,
+                            preferred_address: None,
+                            all_address: Some(all),
+                            public_key: Some(pk),
                         }], false).ok();
                     }
                 }
@@ -258,7 +264,9 @@ pub fn internal_stored_xpubs<G>(
     ui: &mut Ui,
     ctx: &egui::Context,
     first_init: bool, g: &G,
-    heading_override: Option<String>
+    heading_override: Option<String>,
+    option: Option<PublicKey>,
+    show_balance_checkbox: bool,
 ) -> (bool, Option<NamedXpub>) where G: GuiDepends + Clone + Send + 'static  {
 
 
@@ -292,6 +300,9 @@ pub fn internal_stored_xpubs<G>(
                 ls.keytab_state.show_xpub = true;
             }
             ui.checkbox(&mut ls.wallet.view_additional_xpub_details, "Show Key Details");
+            if show_balance_checkbox {
+                ui.checkbox(&mut ls.wallet.show_xpub_balance_info, "Show Balance Info");
+            }
         }
 
     });
@@ -337,7 +348,7 @@ pub fn internal_stored_xpubs<G>(
             update_xpub_key_info(ls);
         }
 
-        ls.keytab_state.xpub_key_info.view(ui);
+        ls.keytab_state.xpub_key_info.view(ui, option, ls.node_config.network.clone());
     }
 
     (update, xpub)

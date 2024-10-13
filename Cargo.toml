@@ -73,6 +73,10 @@ async-trait = "0.1.56"
 num-bigint = "0.4"
 toml = "0.8.12"
 arc-swap = "1.7.1"
+flume = { version = "0.11.0", features = ["futures-core", "futures-sink", "default"] }
+qrencode = "0.14.0"
+csscolorparser = "0.6.2"
+
 
 
 [dependencies]
@@ -83,13 +87,13 @@ redgold-common = {workspace = true}
 redgold-common-no-wasm = {workspace = true}
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
+flume = {workspace = true}
 #redgold-sdk-client = {workspace = true}
 tempfile = "3.3.0"
 argon2 = "0.5.0"
 dirs = "5.0.1"
 #backtrace = "0.3.65"
 num-bigint = { workspace = true }
-flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
 dotenv = "0.15.0"
 futures = {workspace = true}
 # Used for Sha256 but can be deprecated
@@ -168,11 +172,12 @@ rpassword = "7.2.0"
 
 nix = { version = "0.26.4", features = ["user"] }
 
-qrencode = "0.14.0"
-csscolorparser = "0.6.2"
+qrencode = {workspace = true}
+csscolorparser = {workspace = true}
 
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
 derivative = "2.2.0"
+backtrace = "0.3.72"
 
 [dependencies.getrandom]
 version = "0.2.12"
@@ -186,6 +191,9 @@ assert_cmd = "2.0.11"
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
+
+[profile.dev]
+overflow-checks = true
 
 #
 [profile.ci]

@@ -25,7 +25,8 @@ pub struct BriefTransaction {
     pub first_amount: f64,
     pub is_test: bool,
     pub fee: i64,
-    pub incoming: Option<bool>
+    pub incoming: Option<bool>,
+    pub currency: Option<String>
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]

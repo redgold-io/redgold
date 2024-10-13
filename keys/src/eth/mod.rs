@@ -1,5 +1,6 @@
 pub mod example;
 pub mod historical_client;
 pub mod eth_wallet;
-mod eth_amounts;
-mod validate_tx;
+pub mod eth_amounts;
+pub mod validate_tx;
+pub mod offline_eth;

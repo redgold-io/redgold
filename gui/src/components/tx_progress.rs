@@ -5,17 +5,30 @@ use eframe::egui::{TextStyle, Ui};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use log::info;
+use strum::IntoEnumIterator;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::conf::local_stored_state::XPubRequestType;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use crate::common;
 use crate::common::{big_button, data_item};
-use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use crate::components::combo_box::combo_box;
+use crate::components::currency_input::currency_combo_box;
+use crate::dependencies::gui_depends::{GuiDepends, QrMessage, TransactionSignInfo};
+
+
+
+// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString, Eq, Hash)]
+// pub enum SigningMethod {
+//     Hot,
+//     Hardware,
+//     QR
+// }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TransactionProgressFlow {
@@ -31,7 +44,10 @@ pub struct TransactionProgressFlow {
     pub heading_details: HashMap<TransactionStage, String>,
     pub proceed_button_text: HashMap<TransactionStage, String>,
     pub changing_stages: bool,
-    pub rdg_broadcast_response: Arc<Mutex<Option<RgResult<SubmitTransactionResponse>>>>
+    pub rdg_broadcast_response: Arc<Mutex<Option<RgResult<String>>>>,
+    pub signing_method: XPubRequestType,
+    // todo: change this to a transaction stage
+    pub awaiting_broadcast: bool
 }
 
 
@@ -60,6 +76,8 @@ impl Default for TransactionProgressFlow {
             proceed_button_text: Default::default(),
             changing_stages: false,
             rdg_broadcast_response: Arc::new(Mutex::new(None)),
+            signing_method: XPubRequestType::Hot,
+            awaiting_broadcast: false,
         }
     }
 }
@@ -76,15 +94,16 @@ pub struct PreparedTransaction {
     pub party_address: Option<Address>,
     pub party_fee: Option<CurrencyAmount>,
     pub eth_payload: Option<(Vec<u8>, PartySigningValidation, String)>,
-    pub use_airgap: bool,
-    pub use_cold: bool,
     pub txid: Option<ExternalTransactionId>,
     pub internal_unsigned_hash: Option<String>,
     pub ser_tx: Option<String>,
-    pub secret: Option<String>,
     pub unsigned_hash: String,
     pub signed_hash: String,
-    pub broadcast_response: String
+    pub broadcast_response: String,
+    pub tsi: TransactionSignInfo,
+    pub signing_in_progress: bool,
+    pub signing_method: XPubRequestType,
+    pub qr_message: Option<QrMessage>
 }
 
 
@@ -104,32 +123,24 @@ impl TransactionProgressFlow {
     }
     pub async fn make_transaction<T: ExternalNetworkResources>(
         nc: &NodeConfig,
-        mut external_resources: T,
+        mut external_resources: &mut T,
         currency: &SupportedCurrency,
         from: &PublicKey,
-        to: &Address,
+        to_address: &Address,
         amount: &CurrencyAmount,
         address_info: Option<&AddressInfo>,
         party_address: Option<&Address>,
         party_fee: Option<&CurrencyAmount>,
         from_eth_addr: Option<Address>,
-        use_cold: bool,
-        use_airgap: bool,
-        secret: Option<String>
+        transaction_sign_info: &TransactionSignInfo
     ) -> RgResult<PreparedTransaction> {
-        if let Some(e) = from_eth_addr.as_ref() {
-            info!("prepare tx From eth ddr {}", e.render_string().unwrap());
-            info!("prepare tx from pk {}", from.json_or());
-        }
         let mut prepped = PreparedTransaction::default();
         prepped.currency = currency.clone();
         prepped.from = from.clone();
-        prepped.to = to.clone();
+        prepped.to = to_address.clone();
         prepped.amount = amount.clone();
         prepped.address_info = address_info.cloned();
-        prepped.use_cold = use_cold;
-        prepped.use_airgap = use_airgap;
-        prepped.secret = secret.clone();
+        prepped.tsi = transaction_sign_info.clone();
 
         match currency {
             SupportedCurrency::Redgold => {
@@ -143,12 +154,12 @@ impl TransactionProgressFlow {
                     let p_address = party_address.unwrap();
                     prepped.party_address = Some(p_address.clone());
                     tx_b = tx_b.with_swap(
-                        to,
+                        to_address,
                         fee,
                         p_address
                     )?;
                 } else {
-                    tx_b = tx_b.with_output(&to, &amount);
+                    tx_b = tx_b.with_output(&to_address, &amount);
                 }
                 let tx = tx_b.build()?;
                 prepped.internal_unsigned_hash = Some(tx.signable_hash().hex());
@@ -156,21 +167,23 @@ impl TransactionProgressFlow {
                 prepped.tx = Some(tx);
             }
             SupportedCurrency::Bitcoin => {
-                let out = to.render_string()?;
+                let secret = transaction_sign_info.secret().ok_msg("No secret")?;
+                let out = to_address.render_string()?;
                 let payloads = external_resources.btc_payloads(vec![(out, amount.amount as u64)], from).await?;
                 prepped.btc_payloads = Some(payloads);
                 let (txid, tx_ser) = external_resources.send(
-                    to, amount, false, Some(from.clone()), secret
+                    to_address, amount, false, Some(from.clone()), Some(secret)
                 ).await?;
                 prepped.txid = Some(txid);
                 prepped.ser_tx = Some(tx_ser);
             }
             SupportedCurrency::Ethereum => {
+                let secret = transaction_sign_info.secret().ok_msg("No secret")?;
                 let f = from_eth_addr.ok_msg("Ethereum address required")?;
-                let res = external_resources.eth_tx_payload(&f, to, amount).await?;
+                let res = external_resources.eth_tx_payload(&f, to_address, amount).await?;
                 prepped.eth_payload = Some(res);
-                let (txid, tx_ser) = external_resources.send(to, amount, false,
-                                                             Some(from.clone()), secret).await?;
+                let (txid, tx_ser) = external_resources.send(to_address, amount, false,
+                                                             Some(from.clone()), Some(secret)).await?;
                 prepped.txid = Some(txid);
                 prepped.ser_tx = Some(tx_ser);
             }
@@ -229,7 +242,7 @@ impl TransactionProgressFlow {
         self.stage_err = None;
     }
 
-    pub fn info_box_view(&self, ui: &mut Ui) {
+    pub fn info_box_view(&mut self, ui: &mut Ui) {
         if self.stage != TransactionStage::NotCreated {
             let mut box_label = "";
             let mut box_text = "";
@@ -240,34 +253,41 @@ impl TransactionProgressFlow {
                 TransactionStage::Created => {
                     box_label = "Unsigned Transaction Details";
                     box_text = &self.unsigned_info_box;
-                    extra_label = "Unsigned Transaction Hash / TXID";
+                    extra_label = "Unsigned Transaction Hash";
                     txid = &self.unsigned_hash_txid;
                 }
                 TransactionStage::Signed => {
                     box_label = "Signed Transaction Details";
                     box_text = &self.signed_info_box;
-                    extra_label = "Signed Transaction Hash / TXID";
+                    extra_label = "Signed Transaction Hash";
                     txid = &self.signed_hash_txid;
                 }
                 TransactionStage::Broadcast => {
                     box_label = "Broadcast Transaction Details";
                     box_text = &self.broadcast_info;
-                    extra_label = "Broadcast Transaction Hash / TXID";
+                    extra_label = "Broadcast Transaction Hash";
                     txid = &self.signed_hash_txid;
                 }
             }
             if self.use_single_box {
-                ui.label(box_label);
+                ui.heading(box_label);
                 let mut string1 = box_text.clone().to_string();
                 if let Some(e) = self.stage_err.as_ref() {
                     string1 = e.clone();
                 }
                 common::bounded_text_area_size_id(ui, &mut string1, 800.0, 5, "tx_progress");
+                ui.spacing();
             }
             ui.spacing();
             ui.separator();
-            ui.label(extra_label);
-            data_item(ui, "TXID:", txid.clone());
+            ui.horizontal(|ui| {
+                if self.stage == TransactionStage::Created {
+                    ui.label("Signing Method:");
+                    combo_box(ui, &mut self.signing_method, "", XPubRequestType::iter().collect(), false, 100.0, Some("signing_method_box".to_string()));
+                }
+                // ui.label(extra_label);
+                data_item(ui, "TXID:", txid.clone());
+            });
         }
     }
 
@@ -286,19 +306,25 @@ impl TransactionProgressFlow {
         }
     }
 
-    pub fn next_stage(&mut self, g: impl GuiDepends + Sized + Clone + Send + 'static, sign_info: &TransactionSignInfo) {
+    pub fn next_stage<G>(&mut self, g: &G, sign_info: &TransactionSignInfo) where G:  GuiDepends + Sized + Clone + Send + 'static {
         match self.stage {
             TransactionStage::NotCreated => {
                 self.stage = TransactionStage::Created;
+                self.awaiting_broadcast = false;
             }
             TransactionStage::Created => {
-                let res = g.sign_transaction(
-                    self.prepared_tx.as_ref().unwrap().tx.as_ref().unwrap(), &sign_info
-                );
+                let option = self.prepared_tx.as_mut().unwrap();
+                option.tsi = sign_info.clone();
+                option.signing_method = self.signing_method.clone();
+                let (s, r) = flume::unbounded();
+                let res = g.clone().sign_prepared_transaction(option, s);
+                let res = r.recv().unwrap();
                 if let Ok(res) = res {
+                    let res = res.tx.unwrap();
                     let mut prepped = self.prepared_tx.clone().unwrap();
                     prepped.tx = Some(res.clone());
                     prepped.ser_tx = Some(res.json_or());
+                    prepped.signed_hash = res.hash_hex();
                     self.signed(Some(prepped.clone()), None);
                 } else if let Err(e) = res {
                     self.signed(None, Some(e.json_or()));
@@ -306,13 +332,17 @@ impl TransactionProgressFlow {
                 self.stage = TransactionStage::Signed;
             }
             TransactionStage::Signed => {
+
                 let arc = self.rdg_broadcast_response.clone();
-                let g2 = g.clone();
-                let tx = self.prepared_tx.as_ref().unwrap().tx.as_ref().unwrap().clone();
+                let option = self.prepared_tx.as_mut().unwrap();
+                let (s, r) = flume::unbounded();
+                let res = g.clone().broadcast_prepared_transaction(option, s);
+                self.awaiting_broadcast = true;
+
                 let res = async move {
-                    let s = g2.submit_transaction(&tx).await;
+                    let s = r.recv().unwrap();
                     let mut guard = arc.lock().unwrap();
-                    *guard = Some(s);
+                    *guard = Some(s.map(|x| x.broadcast_response));
                 };
                 g.spawn(res);
             }
@@ -332,7 +362,8 @@ impl TransactionProgressFlow {
         ret.unwrap_or(default.to_string())
     }
 
-    pub fn progress_buttons(&mut self, ui: &mut Ui, g: impl GuiDepends + Sized + Clone + Send + 'static, ksi: &TransactionSignInfo) -> TxProgressEvent {
+    pub fn progress_buttons<G>(&mut self, ui: &mut Ui, g: &G, ksi: &TransactionSignInfo) -> TxProgressEvent
+     where G:  GuiDepends + Sized + Clone + Send + 'static {
 
         let mut event = TxProgressEvent {
             reset: false,
@@ -349,8 +380,8 @@ impl TransactionProgressFlow {
 
         let header = self.heading_details.get(&self.stage)
             .map(|h| h.clone()).unwrap_or(format!("{:?}", self.stage));
-
-        ui.heading(header);
+        //
+        // ui.heading(header);
 
         ui.horizontal(|ui| {
             if big_button(ui, "Reset") {

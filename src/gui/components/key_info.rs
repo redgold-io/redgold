@@ -8,10 +8,10 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{NetworkEnvironment, PublicKey};
+use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
 use crate::gui::app_loop::LocalState;
-use redgold_gui::common::{data_item, editable_text_input_copy, valid_label};
-
+use redgold_gui::common::{data_item, data_item_hyperlink, editable_text_input_copy, valid_label};
+use crate::gui::components::explorer_links::{rdg_explorer, rdg_explorer_links};
 
 const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
 
@@ -104,13 +104,31 @@ impl KeyInfo {
         self.update_public_key_info();
     }
 
-    pub fn view(&mut self, ui: &mut Ui) {
+    pub fn view(&mut self, ui: &mut Ui, option: Option<PublicKey>, environment: NetworkEnvironment) {
+
+        let links = option.map(|pk| rdg_explorer_links(&environment, &pk)).unwrap_or_default();
+        let rdg_link = links.get(&SupportedCurrency::Redgold);
+        let btc_link = links.get(&SupportedCurrency::Bitcoin);
+        let eth_link = links.get(&SupportedCurrency::Ethereum);
+
         if self.key.is_some() {
             data_item(ui, "Public Key Hex", self.public_key.clone());
-            data_item(ui, "RDG Address", self.address.clone());
+            if let Some(r) = rdg_link {
+                data_item_hyperlink(ui, "RDG Address", self.address.clone(), r.clone());
+            } else {
+                data_item(ui, "RDG Address", self.address.clone());
+            }
             ui.horizontal(|ui| {
-                data_item(ui, "BTC Address", self.btc_address.clone());
-                data_item(ui, "ETH Address", self.eth_address.clone());
+                if let Some(b) = btc_link {
+                    data_item_hyperlink(ui, "BTC Address", self.btc_address.clone(), b.clone());
+                } else {
+                    data_item(ui, "BTC Address", self.btc_address.clone());
+                }
+                if let Some(e) = eth_link {
+                    data_item_hyperlink(ui, "ETH Address", self.eth_address.clone(), e.clone());
+                } else {
+                    data_item(ui, "ETH Address", self.eth_address.clone());
+                }
             });
         }
     }

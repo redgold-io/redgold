@@ -303,8 +303,9 @@ static INIT: Once = Once::new();
 
 pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
     let logo = app.logo.clone();
-    let g = app.gui_depends.clone();
+    let mut g = app.gui_depends.clone();
     let local_state = &mut app.local_state;
+    g.set_network(&local_state.node_config.network);
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
@@ -405,7 +406,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 });
             }
             Tab::Transact => {
-                wallet_screen(ui, ctx, local_state, has_changed_tab, &g);
+                wallet_screen(ui, ctx, local_state, has_changed_tab, &g, &local_state.data.clone());
             }
             Tab::Identity => {
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);

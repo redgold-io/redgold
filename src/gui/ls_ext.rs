@@ -6,13 +6,14 @@ use log::info;
 use rand::Rng;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
+use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
 use redgold_gui::data_query::data_query::DataQueryInfo;
-use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_gui::tab::tabs::Tab;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_keys::xpub_wrapper::ValidateDerivationPath;
+use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
@@ -60,11 +61,16 @@ where G: Send + Clone + GuiDepends {
         .all().servers_path().to_str().expect("").to_string();
 
     let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
-    for c in HomeState::queryable_balances() {
+    for c in queryable_balances() {
         if c == SupportedCurrency::Redgold {
             continue;
         }
-        let price = res.query_price(util::current_time_millis_i64(), c).await.unwrap();
+        // TODO: offline mode.
+        let price = if node_config.offline() {
+            c.price_default()
+        } else {
+            res.query_price(util::current_time_millis_i64(), c).await.unwrap()
+        };
         price_map.insert(c, price);
     }
 
@@ -138,7 +144,7 @@ where G: Send + Clone + GuiDepends {
                 let key_name = "secure_df_all".to_string();
                 ls.wallet.selected_key_name = key_name.clone();
                 ls.add_mnemonic(key_name.clone(), m, false);
-                if let Ok(xpub) = w.named_xpub(key_name, true) {
+                if let Ok(xpub) = w.named_xpub(key_name, true, &node_config.network) {
                     new_xpubs.push(xpub);
                 }
             }
@@ -149,7 +155,7 @@ where G: Send + Clone + GuiDepends {
         if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
             let key_name = "df_all".to_string();
             ls.add_mnemonic(key_name.clone(), m, false);
-            if let Ok(xpub) = w.named_xpub(key_name, true) {
+            if let Ok(xpub) = w.named_xpub(key_name, true, &node_config.network) {
                 new_xpubs.push(xpub);
             }
         }
@@ -159,15 +165,18 @@ where G: Send + Clone + GuiDepends {
         if let Ok(w) = WordsPass::new_validated(m.clone(), None) {
             let key_name = "test_words".to_string();
             ls.add_mnemonic(key_name.clone(), m, false);
-            if let Ok(xpub) = w.named_xpub(&key_name, true) {
+            if let Ok(xpub) = w.named_xpub(&key_name, true, &node_config.network) {
                 new_xpubs.push(xpub);
             }
             let dp_btc_faucet = "m/84'/0'/0'/0/0".to_string();
             if let Ok(xpub) = w.xpub_str(&dp_btc_faucet.as_account_path().expect("acc")) {
+                let pk = XpubWrapper::new(xpub.clone()).public_at(0, 0).unwrap();
                 let mut named = NamedXpub::default();
+                named.all_address = Some(gui_depends.to_all_address(&pk));
                 let key_into = key_name.clone();
                 named.name = format!("{}_840", key_into);
                 named.xpub = xpub;
+                named.public_key = Some(pk);
                 named.key_name_source = Some(key_into);
                 named.request_type = Some(XPubRequestType::Hot);
                 named.skip_persist = Some(true);
@@ -219,7 +228,7 @@ pub fn create_swap_tx(ls: &mut LocalState) {
     let party_addr = party_pk.address().unwrap();
 
     let ups = ls.updates.sender.clone();
-    let res = ls.external_network_resources.clone();
+    let mut res = ls.external_network_resources.clone();
     let config = ls.node_config.clone();
     let currency = ls.swap_state.currency_input_box.input_currency.clone();
     let pk = ls.wallet.public_key.clone().unwrap();
@@ -234,9 +243,21 @@ pub fn create_swap_tx(ls: &mut LocalState) {
     info!("from_eth_addr_dir after mark external: {}", from_eth_addr_dir.render_string().unwrap());
     let from_eth_addr = from_eth_addr_dir.clone();
     info!("from_eth_addr: {}", from_eth_addr.render_string().unwrap());
+
+    let ksi = TransactionSignInfo::PrivateKey(kp.to_private_hex());
+
     let to = match ls.swap_state.currency_input_box.input_currency {
         SupportedCurrency::Redgold => {
-            party_pk.address().unwrap()
+            match ls.swap_state.output_currency {
+                SupportedCurrency::Bitcoin => {
+                    pk.to_bitcoin_address_typed(&config.network).unwrap().clone()
+                }
+                SupportedCurrency::Ethereum => {
+                    let mut addr = pk.to_ethereum_address_typed().unwrap();
+                    addr.clone()
+                }
+                _ => panic!("Unsupported currency")
+            }
         }
         SupportedCurrency::Bitcoin => {
             party_pk.to_bitcoin_address_typed(&config.network).unwrap().mark_external().clone()
@@ -250,12 +271,11 @@ pub fn create_swap_tx(ls: &mut LocalState) {
     };
     let address_info = ls.wallet.address_info.clone();
 
-    let secret = kp.to_private_hex();
     // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
     tokio::spawn(async move {
         let res = TransactionProgressFlow::make_transaction(
             &config,
-            res,
+            &mut res,
             &currency,
             &pk,
             &to,
@@ -264,9 +284,7 @@ pub fn create_swap_tx(ls: &mut LocalState) {
             Some(&party_addr),
             None,
             Some(from_eth_addr),
-            false,
-            false,
-            Some(secret)
+            &ksi,
         ).await;
         // info!("prepared transaction: {}", res.json_or());
         send_update_sender(&ups, move |lss| {

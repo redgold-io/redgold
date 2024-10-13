@@ -81,6 +81,57 @@ pub fn run_trezor_cmd(args: Vec<&str>) -> Result<(HashMap<String, String>, Vec<(
     Ok(map)
 }
 
+/*
+
+#[derive(Debug)]
+pub struct SignTxResponse {
+    pub serialized_tx: Vec<u8>,
+    pub signatures: Vec<Vec<u8>>,
+}
+
+pub fn sign_tx(json_file_path: &PathBuf) -> Result<SignTxResponse, Box<dyn std::error::Error>> {
+    // Check if the file exists
+    if !Path::new(json_file_path).exists() {
+        return Err(format!("File not found: {}", json_file_path).into());
+    }
+
+    // Run trezorctl command
+    let output = Command::new("trezorctl")
+        .args(&["btc", "sign-tx", json_file_path])
+        .output()?;
+
+    if !output.status.success() {
+        return Err(format!("trezorctl command failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+
+    // Parse the output
+    let output_str = String::from_utf8(output.stdout)?;
+    let lines: Vec<&str> = output_str.lines().collect();
+
+    // Extract serialized transaction and signatures
+    let mut serialized_tx = Vec::new();
+    let mut signatures = Vec::new();
+
+    for line in lines {
+        if line.starts_with("Serialized tx:") {
+            serialized_tx = hex::decode(line.trim_start_matches("Serialized tx: "))?;
+        } else if line.starts_with("Signature ") {
+            let sig = hex::decode(line.split(": ").nth(1).ok_or("Invalid signature format")?)?;
+            signatures.push(sig);
+        }
+    }
+
+    if serialized_tx.is_empty() {
+        return Err("Serialized transaction not found in output".into());
+    }
+
+    Ok(SignTxResponse {
+        serialized_tx,
+        signatures,
+    })
+}
+ */
+
 
 /*
 

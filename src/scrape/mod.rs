@@ -338,7 +338,7 @@ fn translate_currency(supported_currency: SupportedCurrency) -> RgResult<String>
             "USDC-USD"
         }
         _ => {
-            return Err(error_info("Unsupported currency for coinbase historical data".to_string()));
+            return Err(error_info("Unsupported currency for translate_currency historical data".to_string()));
         }
     };
     Ok(product.to_string())

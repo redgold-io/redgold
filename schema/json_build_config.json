@@ -237,6 +237,12 @@
       "description": "skip option default values",
       "attr": "#[serde(skip_serializing_if = \"Option::is_none\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
       "paths": [
+        "structs.StandardRequest.selector",
+        "structs.OutputContract.code_execution_contract",
+        "structs.OutputContract.threshold",
+        "structs.StandardRequest.stake_request",
+        "structs.StandardRequest.portfolio_request",
+        "structs.StandardRequest.deposit_request",
         "structs.Input.product_id",
         "structs.CurrencyAmount.bytes",
         "structs.CurrencyAmount.currency",
@@ -362,6 +368,8 @@
       "description": "skip vec default values",
       "attr": "#[serde(skip_serializing_if = \"Vec::is_empty\", default, deserialize_with = \"prost_helper::deserialize_null_default\")]",
       "paths": [
+        "structs.OutputContract.weights",
+        "structs.OutputContract.standard_contracts",
         "structs.StandardData.typed_value_list",
         "structs.Transaction.inputs",
         "structs.Output.counter_party_proofs",

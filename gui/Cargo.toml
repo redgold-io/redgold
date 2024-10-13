@@ -25,6 +25,9 @@ strum = "0.25"
 strum_macros = "0.25"
 log = "0.4.21"
 web-sys = "0.3.69"
+flume = { workspace = true }
+qrencode = { workspace = true }
+csscolorparser = { workspace = true }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]

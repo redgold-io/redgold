@@ -146,9 +146,12 @@ impl RequestXpubState {
                             copy_to_clipboard(ui, string2.clone());
                             editable_text_input_copy(ui, "Save Name", &mut self.save_name, 150.0);
                             if ui.button("Save").clicked() {
+                                let dp = self.derivation_path.derivation_path.clone();
+                                let pk = g.xpub_public(xpub.clone(), dp.clone()).log_error().ok();
+                                let all = pk.as_ref().map(|p| g.to_all_address(&p));
                                 let named = NamedXpub{
                                     name: self.save_name.clone(),
-                                    derivation_path: self.derivation_path.derivation_path.clone(),
+                                    derivation_path: dp,
                                     xpub: string2.clone(),
                                     hot_offset: None,
                                     key_name_source: None,
@@ -157,6 +160,9 @@ impl RequestXpubState {
                                     key_nickname_source: None,
                                     request_type: Some(request_type.clone()),
                                     skip_persist: None,
+                                    preferred_address: None,
+                                    all_address: all,
+                                    public_key: pk,
                                 };
                                 send_update(&updates, move |lss| {
                                     let named2 = named.clone();

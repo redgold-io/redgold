@@ -17,6 +17,7 @@ pub mod image_capture_stub;
 pub mod airgap;
 pub mod data_query;
 pub mod tab;
+pub mod functionality;
 
 #[cfg(not(target_os = "linux"))]
 pub use image_capture_stub as image_capture;

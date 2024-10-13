@@ -62,6 +62,16 @@ impl Default for CurrencyInputBox {
 
 impl CurrencyInputBox {
 
+    pub fn reset(&mut self) {
+        self.input_box_str = "".to_string();
+        self.input_has_changed = false;
+        self.currency_has_changed = false;
+        self.use_usd_input = true;
+        self.use_sats_input = false;
+        self.input_currency = SupportedCurrency::Redgold;
+        self.locked = false;
+    }
+
     pub fn input_amount_value(&self) -> f64 {
         let input = self.input_box_str.parse::<f64>().unwrap_or(0.0);
         let amt_fract = if self.use_usd_input {

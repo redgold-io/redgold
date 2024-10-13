@@ -1,3 +1,4 @@
 pub mod tabs;
 pub mod home;
-mod keys;
+pub mod keys;
+pub mod receive;

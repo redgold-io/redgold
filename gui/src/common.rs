@@ -46,6 +46,19 @@ pub fn data_item(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>)
     });
 }
 
+pub fn data_item_hyperlink(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>, to: impl Into<String>) {
+    ui.horizontal(|ui| {
+        let style = ui.style_mut();
+        style.override_text_style = Some(TextStyle::Small);
+        // ui.label(label.into());
+        ui.hyperlink_to(label.into(), to.into());
+        let string = text.into();
+        let text_line = &mut string.clone();
+        ui.add(egui::TextEdit::singleline(text_line).clip_text(false));
+        copy_to_clipboard(ui, string.clone());
+    });
+}
+
 pub fn data_item_multiline_fixed(ui: &mut Ui, label: impl Into<String>, text: impl Into<String>, width: impl Into<f32>) {
     ui.horizontal(|ui| {
         let style = ui.style_mut();

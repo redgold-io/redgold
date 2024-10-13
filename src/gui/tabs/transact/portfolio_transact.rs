@@ -86,7 +86,7 @@ pub fn portfolio_view<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, depen
         }
         PortfolioTransactSubTab::Update => {}
         PortfolioTransactSubTab::Create => {
-            create_portfolio(ui, ls, pk, depends.clone(), ls.keysign_info(depends))
+            create_portfolio(ui, ls, pk, depends, ls.keysign_info(depends))
         }
         PortfolioTransactSubTab::Liquidate => {}
     }
@@ -126,7 +126,7 @@ impl PortfolioRow {
 
 }
 
-fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G, ksi: TransactionSignInfo) where G: GuiDepends + Clone + Send + 'static {
+fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G, ksi: TransactionSignInfo) where G: GuiDepends + Clone + Send + 'static {
     let locked = ls.wallet.port.tx.locked();
     ui.horizontal(|ui| {
         ui.label("Portfolio Name:");
@@ -171,7 +171,7 @@ fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G, k
         });
     }
     ls.wallet.port.tx.info_box_view(ui);
-    let event = ls.wallet.port.tx.progress_buttons(ui, g.clone(), &ksi);
+    let event = ls.wallet.port.tx.progress_buttons(ui, g, &ksi);
     if event.reset {
         ls.wallet.port.portfolio_input_name = "".to_string();
     }
@@ -201,7 +201,7 @@ fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G, k
 
 }
 
-fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &PublicKey, g: G, x: &String) -> RgResult<()> where G: GuiDepends + Clone + Send {
+fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &PublicKey, g: &G, x: &String) -> RgResult<()> where G: GuiDepends + Clone + Send + 'static {
     if let Some(ai) = ls.wallet.address_info.as_ref() {
         if let Some(fp) = ls.first_party.as_ref() {
             if let Some(pa) = fp.party_info.party_key.as_ref().and_then(|pk| pk.address().ok()) {

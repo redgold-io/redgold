@@ -723,6 +723,7 @@ fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgResul
         first_amount: tx.first_output_amount().safe_get_msg("Missing first output amount")?.clone(),
         is_test: tx.is_test(),
         incoming: outgoing_from.map(|i| i != from_str),
+        currency: Some(SupportedCurrency::Redgold.to_display_string()),
     })
 }
 

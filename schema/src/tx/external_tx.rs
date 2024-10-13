@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::{structs, RgResult};
+use crate::explorer::BriefTransaction;
 use crate::structs::{CurrencyAmount, SupportedCurrency};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -39,6 +40,22 @@ impl ExternalTimedTransaction {
     }
     pub fn confirmed(&self) -> bool {
         self.timestamp.is_some()
+    }
+
+    pub fn to_brief(&self) -> BriefTransaction {
+        BriefTransaction {
+            hash: self.tx_id.clone(),
+            from: if self.incoming { self.other_address.clone() } else { "".to_string() },
+            to: if self.incoming { "".to_string() } else { self.other_address.clone() },
+            amount: self.currency_amount().to_fractional(),
+            bytes: 0,
+            timestamp: self.timestamp.unwrap_or(0) as i64,
+            first_amount: self.currency_amount().to_fractional(),
+            is_test: false,
+            fee: self.fee.clone().unwrap_or(CurrencyAmount::zero(self.currency)).to_fractional() as i64,
+            incoming: Some(self.incoming),
+            currency: Some(self.currency.to_display_string()),
+        }
     }
 
 

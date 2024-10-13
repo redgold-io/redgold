@@ -22,6 +22,7 @@ pub mod hw_wallet_wrapper;
 pub mod tx_proof_validate;
 pub mod public_key_parse_support;
 pub mod external_tx_support;
+pub mod solana;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,

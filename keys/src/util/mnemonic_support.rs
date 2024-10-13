@@ -20,6 +20,7 @@ use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
+use crate::proof_support::PublicKeySupport;
 use crate::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::xpub_wrapper::ValidateDerivationPath;
 
@@ -119,7 +120,7 @@ impl WordsPass {
         self.xpub_str(account_path)
     }
 
-    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool) -> RgResult<NamedXpub> {
+    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<NamedXpub> {
         self.default_xpub().map(|xpub| {
             let mut named = NamedXpub::default();
             let key_into = key_name.into();
@@ -129,6 +130,8 @@ impl WordsPass {
             named.request_type = Some(XPubRequestType::Hot);
             named.skip_persist = Some(skip_persist);
             named.derivation_path = Self::default_rg_path(0);
+            named.public_key = self.public_at(&named.derivation_path).ok();
+            named.all_address = Some(named.public_key.as_ref().unwrap().to_all_addresses_for_network(n).unwrap());
             named
         })
     }
@@ -251,6 +254,15 @@ impl WordsPass {
         let xprv = self.key_from_path_str(path.into())?;
         let xpub = ExtendedPubKey::from_priv(&Secp256k1::new(), &xprv);
         Ok(xpub)
+    }
+
+    pub fn derive_seed_at_path(&self, path: &str) -> RgResult<[u8; 32]> {
+        let xprv = self.key_from_path_str(path)?;
+
+        // Extract the 32-byte seed from the extended private key
+        let seed = xprv.private_key.secret_bytes();
+
+        Ok(seed)
     }
 
     pub fn xpub_str(&self, path: impl Into<String>) -> RgResult<String> {

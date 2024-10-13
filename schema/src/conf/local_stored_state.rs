@@ -14,6 +14,12 @@ pub enum XPubRequestType {
     QR
 }
 
+impl Default for XPubRequestType {
+    fn default() -> Self {
+        XPubRequestType::Hot
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct NamedXpub {
     pub name: String,
@@ -26,13 +32,22 @@ pub struct NamedXpub {
     // Maybe should be same as 'name' but right now name references a hot key
     pub key_nickname_source: Option<String>,
     pub request_type: Option<XPubRequestType>,
-    pub skip_persist: Option<bool>
+    pub skip_persist: Option<bool>,
+    pub preferred_address: Option<Address>,
+    pub all_address: Option<Vec<Address>>,
+    pub public_key: Option<PublicKey>
+}
+
+impl NamedXpub {
+    pub fn definitely_not_hot(&self) -> bool {
+        self.request_type != Some(XPubRequestType::Hot) && self.request_type.is_some()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct SavedAddress {
-    name: String,
-    address: Address,
+    pub name: String,
+    pub address: Address,
     contact_name: String
 }
 

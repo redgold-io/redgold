@@ -184,10 +184,16 @@ pub struct NodeConfig {
     pub node_info: NodeInfoConfig,
     pub default_timeout: Duration,
     pub disable_metrics: bool,
-    pub args: Arc<Vec<String>>
+    pub args: Arc<Vec<String>>,
+    pub abort: bool,
+    pub is_gui: bool
 }
 
 impl NodeConfig {
+
+    pub fn offline(&self) -> bool {
+        self.config_data.offline.unwrap_or(false)
+    }
 
     pub fn seed_peer_addresses(&self) -> Vec<Address> {
         self.seeds_now().iter()
@@ -462,6 +468,8 @@ impl NodeConfig {
             default_timeout: Duration::from_secs(150),
             disable_metrics: false,
             args: Arc::new(vec![]),
+            abort: false,
+            is_gui: false,
         }
     }
 

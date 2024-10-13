@@ -34,6 +34,9 @@ pub fn apply_args_initial(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<
 }
 pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<ConfigData> {
     let mut config = config.clone();
+    if rg_args.offline {
+        config.offline = Some(true);
+    }
 
     config
 }
