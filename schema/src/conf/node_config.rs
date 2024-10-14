@@ -3,6 +3,7 @@ use std::time::Duration;
 use tracing::info;
 use std::path::PathBuf;
 use std::fs;
+use std::sync::Arc;
 use itertools::Itertools;
 use crate::config_data::ConfigData;
 use crate::seeds::get_seeds_by_env_time;
@@ -174,7 +175,7 @@ pub struct NodeConfig {
     pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
-    pub opts: RgArgs,
+    pub opts: Arc<RgArgs>,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
@@ -183,9 +184,16 @@ pub struct NodeConfig {
     pub node_info: NodeInfoConfig,
     pub default_timeout: Duration,
     pub disable_metrics: bool,
+    pub args: Arc<Vec<String>>,
+    pub abort: bool,
+    pub is_gui: bool
 }
 
 impl NodeConfig {
+
+    pub fn offline(&self) -> bool {
+        self.config_data.offline.unwrap_or(false)
+    }
 
     pub fn seed_peer_addresses(&self) -> Vec<Address> {
         self.seeds_now().iter()
@@ -450,7 +458,7 @@ impl NodeConfig {
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
-            opts: RgArgs::default(),
+            opts: Arc::new(RgArgs::default()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),
@@ -458,7 +466,10 @@ impl NodeConfig {
             contract: Default::default(),
             contention: Default::default(),
             default_timeout: Duration::from_secs(150),
-            disable_metrics: false
+            disable_metrics: false,
+            args: Arc::new(vec![]),
+            abort: false,
+            is_gui: false,
         }
     }
 

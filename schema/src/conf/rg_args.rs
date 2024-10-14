@@ -32,6 +32,7 @@ pub fn empty_args() -> RgArgs {
         enable_party_mode: false,
         secure_data_path: None,
         secure_data_config_path: None,
+        offline: false,
     }
 }
 
@@ -71,6 +72,9 @@ pub struct RgArgs {
     #[clap(long)]
     /// Log level for redgold logs, i.e. DEBUG, INFO, WARN, ERROR, default INFO
     pub log_level: Option<String>,
+    #[clap(long)]
+    /// Disable all network requests, only use local data for offline signing or other purposes.
+    pub offline: bool,
 
     // Below need organization.
 

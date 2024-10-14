@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::explorer::DetailedAddress;
+use redgold_schema::explorer::{BriefTransaction, DetailedAddress};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
@@ -11,7 +11,7 @@ use crate::components::currency_input::supported_wallet_currencies;
 use crate::dependencies::gui_depends::GuiDepends;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
+pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + 'static {
     pub external: T,
     pub address_infos: Arc<Mutex<HashMap<PublicKey, AddressInfo>>>,
     pub metrics: Arc<Mutex<Vec<(String, String)>>>,
@@ -25,33 +25,78 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     pub external_balances: Arc<Mutex<HashMap<(PublicKey, NetworkEnvironment, SupportedCurrency), CurrencyAmount>>>,
     pub external_tx: Arc<Mutex<HashMap<(PublicKey, NetworkEnvironment), Vec<ExternalTimedTransaction>>>>,
     pub detailed_address: Arc<Mutex<HashMap<PublicKey, Vec<DetailedAddress>>>>,
+    pub total_incoming: Arc<Mutex<HashMap<PublicKey, i64>>>,
+    pub total_outgoing: Arc<Mutex<HashMap<PublicKey, i64>>>,
+    pub total_utxos: Arc<Mutex<HashMap<PublicKey, i64>>>,
+    pub total_transactions: Arc<Mutex<HashMap<PublicKey, i64>>>,
+    pub delta_24hr_external: HashMap<SupportedCurrency, f64>,
+    // not yet used, would require a channel update on completion or collecting all the async in
+    // future.
+    pub recent_tx_sorted: Arc<Mutex<Vec<BriefTransaction>>>,
+    pub party_nav: Arc<Mutex<f64>>
 }
 
 
 impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
 
-    pub fn nav_usd(&self, nett: &NetworkEnvironment) -> f64 {
+
+    pub fn recent_tx(&self, pubkey_filter: Option<&PublicKey>, limit: Option<usize>, include_ext: bool, currency_filter: Option<SupportedCurrency>) -> Vec<BriefTransaction> {
+        let addrs = self.detailed_address.lock().unwrap().clone();
+        let mut brief = addrs.iter()
+            .filter(|(pk, _)| pubkey_filter.map(|f| f == *pk).unwrap_or(true))
+            .flat_map(|x| x.1.iter())
+            .flat_map(|x| x.recent_transactions.clone())
+            .collect::<Vec<BriefTransaction>>();
+        let mut all = vec![];
+        all.extend(brief);
+        if include_ext {
+            for ett in self.external_tx.lock().unwrap().iter()
+                .filter(|((pk, _), _)| pubkey_filter.map(|f| f == pk).unwrap_or(true))
+                .flat_map(|x| x.1.iter())
+            {
+                let transaction = ett.to_brief();
+                all.push(transaction);
+            }
+        }
+        all.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        let limited: Vec<BriefTransaction> = all.iter().take(limit.unwrap_or(5)).map(|x| x.clone()).collect();
+
+        limited
+    }
+
+    pub fn nav_usd(&self, nett: &NetworkEnvironment, filter_pk: Option<&PublicKey>) -> f64 {
         let mut nav = 0.0;
         if let Some(b) = self.external_balances.lock().ok() {
             for ((pk, net, cur), amt) in b.iter() {
                 if *net != *nett {
                     continue
                 }
+                if let Some(filter_pk) = filter_pk {
+                    if filter_pk != pk {
+                        continue
+                    }
+                }
                 if let Some(price) = self.price_map_usd_pair_incl_rdg.get(&cur) {
                     nav += amt.to_fractional() * price;
                 }
             }
         }
-
+        let rdg_nav = self.rdg_nav_usd(filter_pk);
+        nav += rdg_nav;
         nav
     }
 
-    pub fn nav_usd_by_currency(&self, nett: &NetworkEnvironment) -> HashMap<SupportedCurrency, f64> {
+    pub fn nav_usd_by_currency(&self, nett: &NetworkEnvironment, filter_pk: Option<&PublicKey>) -> HashMap<SupportedCurrency, f64> {
         let mut hm = HashMap::new();
         if let Some(b) = self.external_balances.lock().ok() {
             for ((pk, net, cur), amt) in b.iter() {
                 if *net != *nett {
                     continue
+                }
+                if let Some(filter_pk) = filter_pk {
+                    if filter_pk != pk {
+                        continue
+                    }
                 }
                 if let Some(price) = self.price_map_usd_pair_incl_rdg.get(&cur) {
                     let usd_amt = amt.to_fractional() * price;
@@ -60,16 +105,39 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                 }
             }
         }
-
+        let rdg_nav = self.rdg_nav_usd(filter_pk);
+        hm.insert(SupportedCurrency::Redgold, rdg_nav);
         hm
     }
 
-    pub fn balance_totals(&self, nett: &NetworkEnvironment) -> HashMap<SupportedCurrency, f64> {
+    fn rdg_nav_usd(&self, filter_pk: Option<&PublicKey>) -> f64 {
+        let mut total = 0i64;
+        let rdg_price = self.price_map_usd_pair_incl_rdg.get(&SupportedCurrency::Redgold).unwrap_or(&100.0);
+        if let Some(ai) = self.address_infos.lock().ok() {
+            for (pk, info) in ai.iter() {
+                if let Some(filter_pk) = filter_pk {
+                    if filter_pk != pk {
+                        continue
+                    }
+                }
+                total += info.balance
+            }
+        }
+        let rdg_nav = CurrencyAmount::from(total).to_fractional() * rdg_price;
+        rdg_nav
+    }
+
+    pub fn balance_totals(&self, nett: &NetworkEnvironment, filter_pk: Option<&PublicKey>) -> HashMap<SupportedCurrency, f64> {
         let mut totals = HashMap::new();
         if let Some(b) = self.external_balances.lock().ok() {
             for ((pk, net, cur), amt) in b.iter() {
                 if *net != *nett {
                     continue
+                }
+                if let Some(filter_pk) = filter_pk {
+                    if filter_pk != pk {
+                        continue
+                    }
                 }
                 totals
                     .entry(cur.clone())
@@ -79,6 +147,11 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         let mut total = 0i64;
         if let Some(ai) = self.address_infos.lock().ok() {
             for (pk, info) in ai.iter() {
+                if let Some(filter_pk) = filter_pk {
+                    if filter_pk != pk {
+                        continue
+                    }
+                }
                 total += info.balance;
             }
         }
@@ -101,7 +174,21 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
             external_balances: Arc::new(Mutex::new(Default::default())),
             external_tx: Arc::new(Mutex::new(Default::default())),
             detailed_address: Arc::new(Mutex::new(Default::default())),
+            total_incoming: Arc::new(Mutex::new(Default::default())),
+            total_outgoing: Arc::new(Mutex::new(Default::default())),
+            total_utxos: Arc::new(Mutex::new(Default::default())),
+            total_transactions: Arc::new(Mutex::new(Default::default())),
+            delta_24hr_external: Default::default(),
+            recent_tx_sorted: Arc::new(Mutex::new(vec![])),
+            party_nav: Arc::new(Mutex::new(0.0)),
         }
+    }
+
+    pub fn refresh_all_pk<G>(&self, pk: &PublicKey, g: &G) where G: GuiDepends + Send + Clone + 'static  {
+        self.refresh_pks(vec![pk], g);
+        self.refresh_external_tts(vec![pk], g);
+        self.refresh_detailed_address_pks(vec![pk], g);
+        self.refresh_external_balances(vec![pk], g, &self.external, &g.get_network());
     }
 
     pub fn refresh_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
@@ -116,7 +203,60 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                     ai.insert(pk, address_info);
                 }
             });
+        }
+    }
 
+
+    pub fn refresh_external_tts<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
+        for pk in pks {
+            let arc = self.external_tx.clone();
+            let pk = pk.clone();
+            let mut g2 = g.clone();
+            g.spawn(async move {
+                let mut txs = g2.get_external_tx(&pk, SupportedCurrency::Bitcoin).await.log_error().unwrap_or_default();
+                let tx_eth = g2.get_external_tx(&pk, SupportedCurrency::Ethereum).await.log_error().unwrap_or(vec![]);
+                txs.extend(tx_eth);
+
+                arc.lock().unwrap().insert((pk, g2.get_network().clone()), txs);
+            });
+        }
+    }
+
+
+    pub fn refresh_detailed_address_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
+        for pk in pks {
+            let arc = self.detailed_address.clone();
+            let total_incoming = self.total_incoming.clone();
+            let total_outgoing = self.total_outgoing.clone();
+            let total_utxos = self.total_utxos.clone();
+            let total_transactions = self.total_transactions.clone();
+            let pk = pk.clone();
+            let g2 = g.clone();
+            g.spawn(async move {
+                let address_info = g2.get_detailed_address(&pk).await.log_error();
+                if let Ok(address_info) = address_info {
+                    let mut inc = total_incoming.lock().unwrap();
+                    inc.insert(pk.clone(), 0);
+                    let mut out = total_outgoing.lock().unwrap();
+                    out.insert(pk.clone(), 0);
+                    let mut utxos = total_utxos.lock().unwrap();
+                    utxos.insert(pk.clone(), 0);
+                    let mut total = total_transactions.lock().unwrap();
+                    total.insert(pk.clone(), 0);
+                    for ai in &address_info {
+                        let updated = inc.get(&pk).map(|v| v.clone() + ai.incoming_count).unwrap_or(ai.incoming_count);
+                        inc.insert(pk.clone(), updated);
+                        let updated = out.get(&pk).map(|v| v.clone() + ai.outgoing_count).unwrap_or(ai.outgoing_count);
+                        out.insert(pk.clone(), updated);
+                        let updated = utxos.get(&pk).map(|v| v.clone() + ai.total_utxos).unwrap_or(ai.total_utxos);
+                        utxos.insert(pk.clone(), updated);
+                        let updated = total.get(&pk).map(|v| v.clone() + ai.total_count).unwrap_or(ai.total_count);
+                        total.insert(pk.clone(), updated);
+                    }
+                    let mut ai = arc.lock().unwrap();
+                    ai.insert(pk, address_info);
+                }
+            });
         }
     }
 
@@ -147,13 +287,28 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     {
         let arc = self.party_data.clone();
         let arc2 = self.first_party.clone();
+        let nav = self.party_nav.clone();
+        let pm = self.price_map_usd_pair_incl_rdg.clone();
         let g2 = g.clone();
         g.spawn(async move {
             let party_data = g2.party_data().await.log_error();
             if let Ok(party_data) = party_data {
                 if let Some(pd) = party_data.iter().next().clone() {
                     let mut a2 = arc2.lock().unwrap();
-                    *a2 = pd.1.clone();
+                    let data = pd.1.clone();
+                    let mut total = 0.0;
+                    if let Some(bm) = data.party_events.as_ref()
+                        .map(|pev| pev.balance_map.clone()) {
+                        for (k, v) in bm.iter() {
+                            if k != &SupportedCurrency::Redgold {
+                                pm.get(&k).map(|price| {
+                                    total += v.to_fractional() * price;
+                                });
+                            }
+                        }
+                    }
+                    *nav.lock().unwrap() = total;
+                    *a2 = data;
                 }
                 let mut ai = arc.lock().unwrap();
                 *ai = party_data;

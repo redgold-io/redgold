@@ -1,9 +1,12 @@
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 use clap::Parser;
 use config::{Config, Environment};
+use itertools::Itertools;
 use log::info;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgArgs;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -11,13 +14,28 @@ use redgold_schema::structs::NetworkEnvironment;
 use crate::util::cli::apply_args_to_config::{apply_args_final, apply_args_initial};
 
 
-pub fn load_full_config() -> Box<ConfigData> {
-    let rg_args = RgArgs::parse();
+pub fn main_config() -> Box<NodeConfig> {
+    let (opts, cfg) = load_full_config(false);
+    let mut node_config = NodeConfig::default();
+    let args = std::env::args().collect_vec();
+    node_config.config_data = *cfg.clone();
+    node_config.opts = Arc::new(*opts.clone());
+    node_config.args = Arc::new(args.clone());
+    Box::new(node_config)
+}
+
+pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {
+    let rg_args = if allow_no_args {
+        RgArgs::try_parse().unwrap_or(RgArgs::default())
+    } else {
+        RgArgs::parse()
+    };
     let default = environment_only_builder();
     let args = Box::new(rg_args);
     let init = apply_args_initial(args.clone(), default);
     let config = load_config(init);
-    apply_args_final(args, config)
+    let config_after_final_args = apply_args_final(args.clone(), config);
+    (args, config_after_final_args)
 }
 
 pub fn process_data_folder_with_env(df: Option<&String>, network: Option<String>) -> Vec<PathBuf> {
@@ -66,7 +84,7 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
         let path = sd.path.as_ref()
             .map(|p| PathBuf::from_str(p).unwrap().join(".rg")
                 .to_str().unwrap().to_string());
-        process_data_folder_with_env(path.as_ref(), init.network.clone());
+        paths.extend(process_data_folder_with_env(path.as_ref(), init.network.clone()));
         // Next process a user-specified override.
         if let Some(cp) = sd.config.as_ref() {
             paths.push(PathBuf::from_str(cp).unwrap());
@@ -80,13 +98,13 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
         let mut home = PathBuf::from_str(h).unwrap();
         let home_df = home.join(".rg");
         let home_df = home_df.to_str().unwrap().to_string();
-        process_data_folder_with_env(Some(&home_df), init.network.clone());
+        paths.extend(process_data_folder_with_env(Some(&home_df), init.network.clone()));
     }
 
     // Next to last if a data folder was specified we repeat
     // above data folder process for non-secure data folder.
     if let Some(df) = init.data.as_ref() {
-        process_data_folder_with_env(Some(df), init.network.clone());
+        paths.extend(process_data_folder_with_env(Some(df), init.network.clone()));
     }
 
     // This was specified to override all others by the user, hence last
@@ -97,7 +115,9 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
     let mut builder = Config::builder();
 
     for p in paths.into_iter() {
+        // println!("Checking if path exists: {:?}", p);
         if p.exists() {
+            // println!("Loading config from: {:?}", p);
             builder = builder.add_source(config::File::from(p));
         }
     }
@@ -112,7 +132,7 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
     Box::new(config.try_deserialize::<ConfigData>().unwrap())
 }
 
-#[ignore]
+// #[ignore]
 #[test]
 fn debug_config_load() {
     let cfg = environment_only_builder();
@@ -153,4 +173,12 @@ fn debug_config_load2() {
     // env::remove_var("REDGOLD_NETWORK");
     // env::remove_var("REDGOLD_HOME");
     // env::remove_var("REDGOLD_SECURE_DATA_SALT_MNEMONIC");
+}
+
+#[test]
+fn test_load_full_config() {
+    let (args, cfg) = load_full_config(true);
+    println!("Args: {:?}", args);
+    println!("Config: {}", cfg.json_or());
+
 }

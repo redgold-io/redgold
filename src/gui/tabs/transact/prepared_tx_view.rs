@@ -58,7 +58,7 @@ pub fn prepared_view(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: b
                 }
             }
         }
-        if ls.wallet.send_receive == Some(SendReceiveTabs::CustomTx) {
+        if ls.wallet.send_receive == SendReceiveTabs::Custom {
             ls.wallet.prepared_transaction = Some(
                 ls.wallet.custom_tx_json.json_from::<Transaction>()
             )

@@ -46,7 +46,11 @@ num-bigint = "0.4"
 num-traits = "0.2"
 log = "0.4.20"
 #elliptic-curve = "0.13.5"
-
+ed25519-dalek = "2.1.1"
+sha2 = "0.10.8"
+hmac = "0.12.1"
+pbkdf2 = "0.12.2"
+rand_core = "0.6.4"
 #[dependencies.bitcoin]
 #version = "0.21"
 #features = ["serde", "bitcoinconsensus"]

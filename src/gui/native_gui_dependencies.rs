@@ -1,35 +1,59 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
+use flume::Sender;
 use futures::future::join_all;
 use rand::Rng;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
+use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::local_stored_state::NamedXpub;
+use redgold_schema::explorer::DetailedAddress;
+use redgold_schema::conf::local_stored_state::NamedXpub;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::RgResult;
-use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
+use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::relay::Relay;
+use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::ApiNodeConfig;
+use crate::scrape::get_24hr_delta_change_pct;
 use crate::util;
 
 #[derive(Clone)]
 pub struct NativeGuiDepends {
-    nc: NodeConfig
+    nc: NodeConfig,
+    wallet_nw: HashMap<NetworkEnvironment, ExternalNetworkResourcesImpl>
 }
 
 impl NativeGuiDepends {
     pub fn new(nc: NodeConfig) -> Self {
         Self {
-            nc
+            nc,
+            wallet_nw: Default::default(),
         }
+    }
+
+    fn external_res(&mut self) -> Result<ExternalNetworkResourcesImpl, ErrorInfo> {
+        let eee = if let Some(e) = self.wallet_nw.get(&self.nc.network) {
+            e
+        } else {
+            let e = ExternalNetworkResourcesImpl::new(&self.nc, None)?;
+            self.wallet_nw.insert(self.nc.network.clone(), e);
+            self.wallet_nw.get(&self.nc.network).unwrap()
+        };
+        Ok(eee.clone())
     }
 }
 
@@ -75,12 +99,32 @@ impl GuiDepends for NativeGuiDepends {
         TransactionBuilder::new(&self.nc)
     }
 
+    fn sign_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()> {
+        let mut ext = self.external_res()?.clone();
+        let p = tx.clone();
+        self.spawn(async move {
+            let res = p.sign(ext).await;
+            results.send(res).unwrap();
+        });
+        Ok(())
+    }
+
+    fn broadcast_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()> {
+        let mut ext = self.external_res()?.clone();
+        let p = tx.clone();
+        self.spawn(async move {
+            let res = p.broadcast(ext).await;
+            results.send(res).unwrap();
+        });
+        Ok(())
+    }
+
     fn sign_transaction(&self, tx: &Transaction, sign_info: &TransactionSignInfo) -> RgResult<Transaction> {
         match sign_info {
             TransactionSignInfo::PrivateKey(str) => {
                 let mut tx = tx.clone();
-                let signed = tx.sign(&KeyPair::from_private_hex(str.clone())?);
-                signed
+                let mut signed = tx.sign(&KeyPair::from_private_hex(str.clone())?)?;
+                Ok(signed.with_hashes().clone())
             }
             _ => "Unimplemented".to_error()
             // TransactionSignInfo::ColdHardwareWallet(_) => {}
@@ -125,5 +169,38 @@ impl GuiDepends for NativeGuiDepends {
 
     fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey> {
         XpubWrapper::new(xpub).public_at_dp(&path)
+    }
+
+    async fn get_24hr_delta(&self, currency: SupportedCurrency) -> f64 {
+        get_24hr_delta_change_pct(currency).await.unwrap_or(0.0)
+    }
+
+    async fn get_detailed_address(&self, pk: &PublicKey) -> RgResult<Vec<DetailedAddress>> {
+        self.nc.api_rg_client().explorer_public_address(pk).await
+    }
+
+    async fn get_external_tx(&mut self, pk: &PublicKey, currency: SupportedCurrency) -> RgResult<Vec<ExternalTimedTransaction>> {
+        let eee = self.external_res()?;
+        eee.get_all_tx_for_pk(pk, currency, None).await
+    }
+
+    fn get_network(&self) -> &NetworkEnvironment {
+        &self.nc.network
+    }
+
+    fn parse_address(&self, address: impl Into<String>) -> RgResult<Address> {
+        address.into().parse_address()
+    }
+
+    fn to_all_address(&self, pk: &PublicKey) -> Vec<Address> {
+        pk.to_all_addresses_for_network(&self.nc.network).unwrap_or_default()
+    }
+
+    fn spawn_blocking<T: Send + 'static>(&self, f: impl Future<Output=RgResult<T>> + Send + 'static) -> RgResult<T> {
+        tokio::runtime::Handle::current().block_on(f)
+    }
+
+    fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address> {
+        pk.to_ethereum_address_typed()
     }
 }

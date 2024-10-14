@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
+use redgold_gui::dependencies::gui_depends::TransactionSignInfo;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{RgResult, SafeOption};
@@ -35,29 +36,53 @@ impl TxSignerProgress for PreparedTransaction {
 
     async fn sign<T>(
         &self,
-        mut external_resources: T,
+        external_resources: T,
     ) -> RgResult<PreparedTransaction>  where T: ExternalNetworkResources + Send {
         let mut updated = self.clone();
         match self.currency {
             SupportedCurrency::Redgold => {
                 let mut tx = self.tx.safe_get_msg("Missing transaction")?.clone();
-                let secret = self.secret.safe_get_msg("Missing secret")?;
-                let kp = KeyPair::from_private_hex(secret.clone())?;
-                let transaction = tx.sign(&kp)?;
-                updated.signed_hash = transaction.signed_hash().hex();
-                updated.tx = Some(transaction);
-            }
-            SupportedCurrency::Bitcoin => {
-                // let (txid, tx_ser) = external_resources.send(
-                //     &self.to, &self.amount, false, Some(self.from.clone()), self.secret.clone()
-                // ).await?;
-                updated.signed_hash = updated.unsigned_hash.clone();
-            }
-            SupportedCurrency::Ethereum => {
-                updated.signed_hash = updated.unsigned_hash.clone();
+                match self.tsi.clone() {
+                    TransactionSignInfo::PrivateKey(secret) => {
+                        let kp = KeyPair::from_private_hex(secret.clone())?;
+                        let transaction = tx.sign(&kp)?;
+                        updated.signed_hash = transaction.signed_hash().hex();
+                        updated.tx = Some(transaction);
+                    }
+                    TransactionSignInfo::ColdHardwareWallet(h) => {
+                        external_resources.trezor_sign(
+                            self.from.clone(), h.path, tx.clone()
+                        ).await?;
+                    }
+                    TransactionSignInfo::Qr(q) => {}
+                }
             }
             _ => {}
         }
+
+
+        match self.tsi.clone() {
+            TransactionSignInfo::PrivateKey(_) => {
+                updated.signed_hash = updated.unsigned_hash.clone();
+            }
+            TransactionSignInfo::ColdHardwareWallet(h) => {
+                let ser = updated.ser_tx.clone().ok_msg("Missing transaction")?;
+                match self.currency {
+                    SupportedCurrency::Bitcoin => {
+
+                    }
+                    SupportedCurrency::Ethereum => {
+
+                    }
+                    _ => {}
+                }
+            }
+            TransactionSignInfo::Qr(_) => {}
+                // let (txid, tx_ser) = external_resources.send(
+                //     &self.to, &self.amount, false, Some(self.from.clone()), self.secret.clone()
+                // ).await?;
+        }
+
         Ok(updated.clone())
     }
 
@@ -73,21 +98,16 @@ impl TxBroadcastProgress for PreparedTransaction {
         match self.currency.clone() {
             SupportedCurrency::Redgold => {
                 let mut tx = self.tx.safe_get_msg("Missing transaction")?.clone();
-                let secret = self.secret.safe_get_msg("Missing secret")?;
-                let kp = KeyPair::from_private_hex(secret.clone())?;
-                let transaction = tx.sign(&kp)?;
-                updated.signed_hash = transaction.signed_hash().hex();
-                updated.tx = Some(transaction);
                 updated.broadcast_response = tx.broadcast().await.json_or();
             }
             SupportedCurrency::Bitcoin => {
                 updated.broadcast_response = external_resources.send(
-                    &self.to, &self.amount, true, Some(self.from.clone()), self.secret.clone()
+                    &self.to, &self.amount, true, Some(self.from.clone()), self.tsi.secret().clone()
                 ).await.json_or();
             }
             SupportedCurrency::Ethereum => {
                 updated.broadcast_response = external_resources.send(
-                    &self.to, &self.amount, true, Some(self.from.clone()), self.secret.clone()
+                    &self.to, &self.amount, true, Some(self.from.clone()), self.tsi.secret().clone()
                 ).await.json_or();
             }
             _ => {}

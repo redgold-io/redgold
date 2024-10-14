@@ -27,6 +27,8 @@ pub trait ExternalNetworkResources {
 
     async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey) -> RgResult<CurrencyAmount>;
 
+    async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: structs::Transaction) -> RgResult<structs::Transaction>;
+
 }
 
 pub struct NetworkDataFilter {

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::local_stored_state::LocalStoredState;
+use crate::conf::local_stored_state::LocalStoredState;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 #[serde(default)] // This allows fields to be omitted in TOML
@@ -44,7 +44,7 @@ pub struct NodeData {
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 #[serde(default)]
 pub struct SecureData {
-    pub salt_mnemonic: Option<String>,
+    pub salt: Option<String>,
     pub session_salt: Option<String>,
     pub session_hashed_password: Option<String>,
     pub config: Option<String>,
@@ -66,6 +66,7 @@ pub struct ConfigData {
     pub local: Option<LocalStoredState>,
     pub portfolio: Option<PortfolioFulfillmentConfigData>,
     pub secure: Option<SecureData>,
+    pub offline: Option<bool>
 }
 
 use std::env;
@@ -106,6 +107,7 @@ impl Default for ConfigData {
             local: Default::default(),
             portfolio: Default::default(),
             secure: Default::default(),
+            offline: None,
         }
     }
 }

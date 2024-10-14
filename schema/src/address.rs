@@ -42,6 +42,12 @@ impl Address {
         }
     }
 
+    pub fn as_external(&self) -> Address {
+        let mut address = self.clone();
+        address.mark_external();
+        address.clone()
+    }
+
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
         let mut new = Self::from_bytes(Self::hash(input.as_ref()))?;
         new.address_type = AddressType::ScriptHash as i32;

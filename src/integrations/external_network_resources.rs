@@ -20,13 +20,14 @@ use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::core::relay::Relay;
-use crate::scrape::okx_point;
+use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
+use crate::scrape::{crypto_compare_point_query, okx_point};
 use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;
 
@@ -131,6 +132,9 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         }
     }
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
+        if currency == SupportedCurrency::Monero {
+            return crypto_compare_point_query(currency, time).await
+        };
         let price = okx_point(time, currency).await?.close;
         Ok(price)
     }
@@ -249,6 +253,11 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
             }
             _ => "Unsupported currency".to_error()
         }
+    }
+
+    async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: Transaction) -> RgResult<Transaction> {
+        let mut t = t.clone();
+        gui_trezor_sign(public, derivation_path, &mut t).await
     }
 }
 
@@ -512,6 +521,10 @@ impl ExternalNetworkResources for MockExternalResources {
 
     async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey) -> RgResult<CurrencyAmount> {
         self.inner.get_balance_no_cache(network, currency, pk).await
+    }
+
+    async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: Transaction) -> RgResult<Transaction> {
+        "Not implemented".to_error()
     }
 }
 

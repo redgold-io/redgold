@@ -4,3 +4,4 @@ pub mod xpub_req;
 pub mod key_info;
 pub mod swap;
 pub mod tx_signer;
+pub mod explorer_links;

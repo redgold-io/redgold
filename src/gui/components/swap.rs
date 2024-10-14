@@ -42,7 +42,6 @@ impl Default for SwapState {
             active: false,
             output_currency: SupportedCurrency::Redgold,
             stage: SwapStage::StartPreparing,
-
             tx_progress: Default::default(),
             currency_input_box: CurrencyInputBox::from_currency(SupportedCurrency::Ethereum, "Input".to_string()),
             changing_stages: false,
@@ -52,7 +51,7 @@ impl Default for SwapState {
 impl SwapState {
 
     pub fn view(ui: &mut Ui, ls: &mut LocalState) {
-        ls.swap_state.active = ls.wallet.send_receive == Some(SendReceiveTabs::Swap);
+        ls.swap_state.active = ls.wallet.send_receive == SendReceiveTabs::Swap;
         // if ui.button("Refresh Rates").clicked() {
         //     ls.price_map_usd_pair
         // }

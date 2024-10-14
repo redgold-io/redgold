@@ -24,17 +24,19 @@ pub struct BriefTransaction {
     pub timestamp: i64,
     pub first_amount: f64,
     pub is_test: bool,
-    pub fee: i64
+    pub fee: i64,
+    pub incoming: Option<bool>,
+    pub currency: Option<String>
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PeerSignerDetailed {
     pub peer_id: String,
     pub nodes: Vec<NodeSignerDetailed>,
     pub trust: f64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NodeSignerDetailed {
     pub signature: String,
     pub node_id: String,
@@ -47,7 +49,7 @@ pub struct NodeSignerDetailed {
     pub validation_confidence_score: f64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct DetailedInput {
     pub transaction_hash: String,
     pub output_index: i64,
@@ -55,14 +57,14 @@ pub struct DetailedInput {
     pub input_amount: Option<f64>
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct UtxoChild {
     pub used_by_tx: String,
     pub used_by_tx_input_index: i32,
     pub status: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct DetailedOutput {
     pub output_index: i32,
     pub address: String,
@@ -73,13 +75,13 @@ pub struct DetailedOutput {
     pub is_liquidity: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PartyRelatedInfo {
     pub party_address: String,
     pub event: Option<DetailedPartyEvent>
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct DetailedTransaction {
     pub info: BriefTransaction,
     /// Normalized to mimic conventional confirmations, i.e. number of stacked observations

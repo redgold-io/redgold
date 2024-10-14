@@ -2,7 +2,7 @@ use eframe::egui;
 use eframe::egui::{ScrollArea, Ui, Widget};
 use tracing::info;
 use itertools::Itertools;
-use redgold_schema::local_stored_state::NamedXpub;
+use redgold_schema::conf::local_stored_state::NamedXpub;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
@@ -62,12 +62,14 @@ pub fn window_xpub_loader(
                             let rows2 = rows.clone();
                             info!("Parsed Xpub rows: {:?}", rows2.json_or());
                             let names = rows2.iter().map(|n| n.name.clone()).collect_vec();
-                            let has_existing = lss.local_stored_state.xpubs.iter().find(|n| names.contains(&n.name)).is_some();
+                            let has_existing = lss.local_stored_state.xpubs
+                                .as_ref()
+                                .map(|x| x.iter().find(|n| names.contains(&n.name)).is_some()).unwrap_or(false);
                             if has_existing && !lss.wallet.allow_xpub_name_overwrite {
                                 lss.wallet.xpub_loader_error_message = "Existing xpubs found, please enable overwrite".to_string();
                             } else {
                                 if lss.wallet.purge_existing_xpubs_on_save {
-                                    lss.local_stored_state.xpubs = vec![];
+                                    lss.local_stored_state.xpubs = Some(vec![]);
                                 }
                                 // TODO: Render error msg
                                 lss.add_named_xpubs(lss.wallet.allow_xpub_name_overwrite, rows2, false).ok();

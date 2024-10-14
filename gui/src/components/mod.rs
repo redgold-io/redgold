@@ -5,3 +5,7 @@ pub mod derivation_path_sel;
 pub mod passphrase_input;
 pub mod lock_screen;
 pub mod tables;
+pub mod transaction_table;
+pub mod balance_table;
+pub mod address_input_box;
+pub mod combo_box;

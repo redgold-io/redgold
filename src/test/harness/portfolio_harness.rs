@@ -19,7 +19,7 @@ impl PartyTestHarness {
         let redgold_to_party_payment_amount = CurrencyAmount::from_fractional(1.01).expect("works");
         self.tx_builder().
             await
-            .with_portfolio_request(weights, &redgold_to_party_payment_amount, &self.amm_rdg_address())
+            .with_portfolio_request(weights, &redgold_to_party_payment_amount, &self.amm_rdg_address(), &"halfnhalf".to_string())
             .build().unwrap()
             .sign(&self.keypair)
             .unwrap().broadcast_from(&self.node_config).await.unwrap();

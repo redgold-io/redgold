@@ -3,14 +3,17 @@ use eframe::egui;
 use eframe::egui::{Color32, RichText, Ui};
 use egui_extras::{Column, TableBuilder};
 
-
 #[derive(Clone)]
 pub struct TextTableEvent {
     pub delete_row_id: Option<usize>,
 }
 
+pub fn table_nonetype() -> Option<fn(&mut Ui, usize, usize, &String) -> bool> {
+    None::<fn(&mut Ui, usize, usize, &String) -> bool>
+}
+
 pub fn text_table(ui: &mut Ui, data: Vec<Vec<String>>) {
-    text_table_advanced(ui, data, false, false, None, vec![]);
+    text_table_advanced(ui, data, false, false, None, vec![], table_nonetype());
 }
 
 pub fn text_table_advanced(
@@ -19,8 +22,10 @@ pub fn text_table_advanced(
     delete_button: bool,
     show_empty_headers: bool,
     link_column_and_replacement_text: Option<(usize, Vec<String>)>,
-    green_fields: Vec<(usize, usize)>
-) -> TextTableEvent {
+    green_fields: Vec<(usize, usize)>,
+    opt_fn: Option<impl Fn(&mut Ui, usize, usize, &String) -> bool>
+) -> TextTableEvent where
+    {
 
     let mut event = TextTableEvent {
         delete_row_id: None,
@@ -77,11 +82,24 @@ pub fn text_table_advanced(
                             *ridx == row_index && column_idx == *column_index
                         });
                         row.col(|ui| {
-                            if is_green {
-                                ui.label(RichText::new(cell).color(Color32::GREEN));
-                            } else {
-                                ui.label(cell);
+
+                            // here's the main one
+                            let mut skip_normal = false;
+
+                            if let Some(f) = &opt_fn {
+                                if f(ui, row_index, column_idx, cell) {
+                                    skip_normal = true;
+                                }
                             }
+                            if !skip_normal {
+                                if is_green {
+                                    ui.label(RichText::new(cell).color(Color32::GREEN));
+                                } else {
+                                    ui.label(cell);
+                                }
+                            }
+
+
                             ui.spacing();
                         });
                     }

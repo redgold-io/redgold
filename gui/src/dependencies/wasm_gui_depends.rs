@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use std::future::Future;
+use flume::Sender;
 use redgold_schema::config_data::ConfigData;
+use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
-use redgold_schema::structs::{AboutNodeResponse, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, Transaction};
+use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::times::current_time_millis;
+use crate::components::tx_progress::PreparedTransaction;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 
 pub struct WasmGuiDepends {
@@ -13,7 +17,16 @@ pub struct WasmGuiDepends {
 }
 
 impl GuiDepends for WasmGuiDepends {
+    fn parse_address(&self, address: impl Into<String>) -> RgResult<Address> {
+        todo!()
+    }
+
     fn set_network(&mut self, network: &NetworkEnvironment) {
+        todo!()
+    }
+
+
+    fn get_network(&self) -> &NetworkEnvironment {
         todo!()
     }
 
@@ -59,7 +72,17 @@ impl GuiDepends for WasmGuiDepends {
         todo!()
     }
 
+    fn sign_prepared_transaction(&mut self, tx: &PreparedTransaction, results: Sender<RgResult<PreparedTransaction>>) -> RgResult<()> {
+        todo!()
+    }
+    fn broadcast_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()> {
+        todo!()
+    }
     fn spawn(&self, f: impl Future<Output=()> + Send + 'static) {
+        todo!()
+    }
+
+    fn spawn_blocking<T: Send + 'static>(&self, f: impl Future<Output=RgResult<T>> + Send + 'static) -> RgResult<T> {
         todo!()
     }
 
@@ -84,6 +107,26 @@ impl GuiDepends for WasmGuiDepends {
     }
 
     fn xpub_public(&self, xpub: String, path: String) -> RgResult<PublicKey> {
+        todo!()
+    }
+
+    async fn get_24hr_delta(&self, currency: SupportedCurrency) -> f64 {
+        todo!()
+    }
+
+    async fn get_detailed_address(&self, pk: &PublicKey) -> RgResult<Vec<DetailedAddress>> {
+        todo!()
+    }
+
+    async fn get_external_tx(&mut self, pk: &PublicKey, currency: SupportedCurrency) -> RgResult<Vec<ExternalTimedTransaction>> {
+        todo!()
+    }
+
+    fn to_all_address(&self, pk: &PublicKey) -> Vec<Address> {
+        todo!()
+    }
+
+    fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address> {
         todo!()
     }
 }

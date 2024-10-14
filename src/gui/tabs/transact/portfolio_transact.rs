@@ -15,7 +15,7 @@ use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PublicKey, SupportedCur
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::components::tables;
-use redgold_gui::components::tables::text_table_advanced;
+use redgold_gui::components::tables::{table_nonetype, text_table_advanced};
 use crate::gui::tabs::transact::wallet_tab::{SendReceiveTabs};
 
 #[derive(Clone, Default)]
@@ -81,10 +81,12 @@ pub fn portfolio_view<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, depen
     ui.heading(format!("{:?}", ls.wallet.port.tab));
     ui.separator();
     match ls.wallet.port.tab {
-        PortfolioTransactSubTab::View => {}
+        PortfolioTransactSubTab::View => {
+
+        }
         PortfolioTransactSubTab::Update => {}
         PortfolioTransactSubTab::Create => {
-            create_portfolio(ui, ls, pk, depends.clone(), ls.keysign_info(depends))
+            create_portfolio(ui, ls, pk, depends, ls.keysign_info(depends))
         }
         PortfolioTransactSubTab::Liquidate => {}
     }
@@ -124,7 +126,7 @@ impl PortfolioRow {
 
 }
 
-fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G, ksi: TransactionSignInfo) where G: GuiDepends + Clone + Send + 'static {
+fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G, ksi: TransactionSignInfo) where G: GuiDepends + Clone + Send + 'static {
     let locked = ls.wallet.port.tx.locked();
     ui.horizontal(|ui| {
         ui.label("Portfolio Name:");
@@ -169,14 +171,14 @@ fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G, k
         });
     }
     ls.wallet.port.tx.info_box_view(ui);
-    let event = ls.wallet.port.tx.progress_buttons(ui, g.clone(), &ksi);
+    let event = ls.wallet.port.tx.progress_buttons(ui, g, &ksi);
     if event.reset {
         ls.wallet.port.portfolio_input_name = "".to_string();
     }
     if event.next_stage {
         match ls.wallet.port.tx.stage {
             TransactionStage::Created => {
-                create_portfolio_tx(ls, &pk, g).unwrap();
+                create_portfolio_tx(ls, &pk, g, &ls.wallet.port.portfolio_input_name.clone()).unwrap();
             }
             _ => {
 
@@ -199,7 +201,7 @@ fn create_portfolio<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: G, k
 
 }
 
-fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &PublicKey, g: G) -> RgResult<()> where G: GuiDepends + Clone + Send {
+fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &PublicKey, g: &G, x: &String) -> RgResult<()> where G: GuiDepends + Clone + Send + 'static {
     if let Some(ai) = ls.wallet.address_info.as_ref() {
         if let Some(fp) = ls.first_party.as_ref() {
             if let Some(pa) = fp.party_info.party_key.as_ref().and_then(|pk| pk.address().ok()) {
@@ -212,7 +214,7 @@ fn create_portfolio_tx<G>(ls: &mut LocalState, pk: &PublicKey, g: G) -> RgResult
                     .with_input_address(&pk.address().unwrap())
                     .with_utxos(ai.utxo_entries.as_ref())
                     .unwrap()
-                    .with_portfolio_request(ports, &CurrencyAmount::from_rdg(100_000), &pa)
+                    .with_portfolio_request(ports, &CurrencyAmount::from_rdg(100_000), &pa, x)
                     .build()
                     .unwrap();
                 let prepared = TransactionProgressFlow::rdg_only_prepared_tx(tx);
@@ -244,7 +246,7 @@ pub fn portfolio_table(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             format!("{:.2}", row.fulfillment_imbalance_pair),
         ]);
     };
-    let event = text_table_advanced(ui, data_str, true, false, None, vec![]);
+    let event = text_table_advanced(ui, data_str, true, false, None, vec![], table_nonetype());
     if let Some(index) = event.delete_row_id.as_ref() {
         ls.wallet.port.port.rows.remove(index.clone());
         ls.wallet.port.port.normalize_weight_update();

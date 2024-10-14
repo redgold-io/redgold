@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 #[repr(i32)]
 pub enum Tab {
     Home,
-    Keys,
     Transact,
     Portfolio,
-    Identity,
-    Contacts,
+    Keys,
     Address,
+    Contacts,
     Servers,
-    Ratings,
     Settings,
+    Ratings,
+    Identity,
     OTP,
 }

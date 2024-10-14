@@ -8,13 +8,14 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::Instrument;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
 use redgold_gui::components::account_deriv_sel::AccountDerivationPathInputState;
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_schema::structs::PublicKey;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
 use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
 use crate::gui::components::save_key_window;
@@ -73,11 +74,10 @@ impl Default for KeyTabState {
 
 pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static  {
     ui.add_space(10.0);
-    ui.heading("Add");
-    ui.separator();
 
     // Add New Stuff buttons
     ui.horizontal(|ui| {
+        ui.heading("Add");
         add_new_key_button(ls, ui);
         add_xpub_csv_button(ls, ui, ctx);
         ls.keytab_state.request_xpub.view(ui, ctx, &ls.updates, ls.wallet.device_list_status.device_output.clone(), g);
@@ -93,37 +93,38 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
     show_private_key_window(ctx, ls);
 
     // ui.label("".to_string());
-    ui.add_space(10.0);
-    ui.heading("View");
+    // ui.add_space(10.0);
     ui.separator();
+    // ui.spacing();
     ui.spacing();
-    ui.spacing();
+    //
+    // ui.horizontal(|ui| {
+    //     ui.heading("View");
+    //
+    // for subsubtab in KeygenSubSubTab::iter() {
+    //     if ui.button(format!("View {:?}", subsubtab)).clicked() {
+    //         ls.keytab_state.subsubtab = subsubtab;
+    //     }
+    // }
+    // });
+    // ui.separator();
+    // ui.spacing();
+    // ui.spacing();
+    //
+    // match ls.keytab_state.subsubtab {
+    //     KeygenSubSubTab::Keys => {
+    //         ui.spacing();
 
-    ui.horizontal(|ui| {
+    internal_stored_keys(ui, ls, first_init, g);
 
-    for subsubtab in KeygenSubSubTab::iter() {
-        if ui.button(format!("View {:?}", subsubtab)).clicked() {
-            ls.keytab_state.subsubtab = subsubtab;
-        }
-    }
-    });
     ui.separator();
-    ui.spacing();
-    ui.spacing();
-
-    match ls.keytab_state.subsubtab {
-        KeygenSubSubTab::Keys => {
-            ui.label("Internal Stored Keys");
-            ui.spacing();
-            internal_stored_keys(ui, ls, first_init, g);
-
-        }
-        KeygenSubSubTab::XPubs => {
-            ui.label("Internal Stored XPubs");
-            ui.spacing();
-            internal_stored_xpubs(ls, ui, ctx, first_init, g);
-        }
-    }
+        //
+        // }
+        // KeygenSubSubTab::XPubs => {
+        //     ui.spacing();
+            internal_stored_xpubs(ls, ui, ctx, first_init, g, Some("Internal Stored XPubs".to_string()), None, false);
+    //     }
+    // }
     // TODO: Sub-subtabs for these two
 
 
@@ -133,6 +134,7 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
 fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static {
     let mut need_keys_update = false;
     ui.horizontal(|ui| {
+        ui.heading("Internal Stored Keys");
         let has_changed_key = key_source(ui, ls);
         need_keys_update = has_changed_key;
         medium_data_item(ui,"Checksum: ", &ls.wallet.mnemonic_or_key_checksum);
@@ -165,7 +167,7 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
         medium_data_item(ui,"Seed Checksum: ", ls.wallet.seed_checksum.as_ref().unwrap_or(&"".to_string()));
     }
 
-    ls.keytab_state.keys_key_info.view(ui);
+    ls.keytab_state.keys_key_info.view(ui, None, ls.node_config.network.clone());
 
     if ls.wallet.active_hot_private_key_hex.is_none() {
         ui.horizontal(|ui| {
@@ -177,14 +179,16 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
                     if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
                         let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
                         let check = m.checksum().unwrap_or("".to_string());
-                        let words_public = m.public_at(&dp2).expect("Public at failed").hex();
+                        let pk = m.public_at(&dp2).expect("Public at failed");
+                        let all = g.to_all_address(&pk);
+                        let words_public = pk.hex();
                         let xpub_w = XpubWrapper::new(xpub.clone());
                         let xpub_public = xpub_w.public_at_dp(&dp2).expect("Public at DP failed").hex();
                         let equal = words_public == xpub_public;
                         info!("Adding xpub to local state from keys tab with words pass \
                         checksum: {check} equal {equal} words public: {words_public} xpub public: {xpub_public}");
                         let ho = Some(ls.wallet.hot_offset.clone()).filter(|x| !x.is_empty());
-                        ls.add_named_xpubs(true,  vec![NamedXpub {
+                        ls.add_named_xpubs(true, vec![NamedXpub {
                             name: ls.keytab_state.save_xpub_account_name.clone(),
                             xpub,
                             derivation_path: derivation_account_path,
@@ -195,6 +199,9 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
                             key_nickname_source: None,
                             request_type: Some(XPubRequestType::Hot),
                             skip_persist: None,
+                            preferred_address: None,
+                            all_address: Some(all),
+                            public_key: Some(pk),
                         }], false).ok();
                     }
                 }
@@ -205,16 +212,17 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
 
 
 pub fn keys_tab<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static  {
-    ui.heading("Keys");
-    ui.separator();
 
     ui.horizontal(|ui| {
-    KeygenSubTab::iter().for_each(|subtab| {
+        ui.heading("Keys");
+        KeygenSubTab::iter().for_each(|subtab| {
         if ui.button(format!("{:?}", subtab)).clicked() {
             local_state.keytab_state.keygen_subtab = subtab;
         }
     })
     });
+    ui.separator();
+
     match local_state.keytab_state.keygen_subtab {
         KeygenSubTab::Manage => {
             manage_view(ui, ctx, local_state, first_init, g);
@@ -251,7 +259,15 @@ pub(crate) fn show_private_key_window(
 
 
 
-pub fn internal_stored_xpubs<G>(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context, first_init: bool, g: &G) -> (bool, Option<NamedXpub>) where G: GuiDepends + Clone + Send + 'static  {
+pub fn internal_stored_xpubs<G>(
+    ls: &mut LocalState,
+    ui: &mut Ui,
+    ctx: &egui::Context,
+    first_init: bool, g: &G,
+    heading_override: Option<String>,
+    option: Option<PublicKey>,
+    show_balance_checkbox: bool,
+) -> (bool, Option<NamedXpub>) where G: GuiDepends + Clone + Send + 'static  {
 
 
     let mut xpub : Option<NamedXpub> = None;
@@ -260,20 +276,21 @@ pub fn internal_stored_xpubs<G>(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Co
 
 
     ui.horizontal(|ui| {
-        ui.heading("Transact");
+        ui.heading(heading_override.unwrap_or("Transact".to_string()));
         ui.label("Select XPub");
         ComboBox::from_label("".to_string())
             .width(125.0)
             .selected_text(ls.wallet.selected_xpub_name.clone())
             .show_ui(ui, |ui| {
-                for style in ls.local_stored_state.xpubs.iter().map(|x| x.name.clone()) {
+                let option = ls.local_stored_state.xpubs.clone().unwrap_or(vec![]);
+                for style in option.iter().map(|x| x.name.clone()) {
                     ui.selectable_value(&mut ls.wallet.selected_xpub_name, style.clone(), style.to_string());
                 }
                 ui.selectable_value(&mut ls.wallet.selected_xpub_name,
                                     "Select Xpub".to_string(), "Select Xpub".to_string());
             });
-        xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
-                .cloned();
+        xpub = ls.local_stored_state.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
+                .cloned());
         if let Some(xp) = &xpub {
             let i = xp.xpub.len();
             if let Some(slice) = xp.xpub.get((i -8)..i) {
@@ -283,6 +300,9 @@ pub fn internal_stored_xpubs<G>(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Co
                 ls.keytab_state.show_xpub = true;
             }
             ui.checkbox(&mut ls.wallet.view_additional_xpub_details, "Show Key Details");
+            if show_balance_checkbox {
+                ui.checkbox(&mut ls.wallet.show_xpub_balance_info, "Show Balance Info");
+            }
         }
 
     });
@@ -328,7 +348,7 @@ pub fn internal_stored_xpubs<G>(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Co
             update_xpub_key_info(ls);
         }
 
-        ls.keytab_state.xpub_key_info.view(ui);
+        ls.keytab_state.xpub_key_info.view(ui, option, ls.node_config.network.clone());
     }
 
     (update, xpub)

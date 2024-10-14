@@ -5,13 +5,15 @@ use eframe::egui;
 use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
 use flume::Sender;
 use itertools::{Either, Itertools};
+use rocket::form::validate::Contains;
 use serde::Deserialize;
-use crate::gui::app_loop::LocalState;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 
 use strum::IntoEnumIterator;
 // 0.17.1
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::address_support::AddressSupport;
@@ -29,22 +31,31 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::core::internal_message::{Channel, new_channel, SendErrorInfo};
+use crate::core::internal_message::{Channel, new_channel, SendErrorInfo, RecvAsyncErrorInfo};
 use redgold_gui::common;
 use redgold_gui::common::{bounded_text_area, data_item, data_item_multiline_fixed, editable_text_input_copy, medium_data_item, valid_label};
-use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::components::address_input_box::AddressInputBox;
+use redgold_gui::components::balance_table::balance_table;
+use redgold_gui::components::currency_input::CurrencyInputBox;
+use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_gui::components::passphrase_input::PassphraseInput;
+use redgold_gui::components::transaction_table::TransactionTable;
+use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow, TransactionStage};
+use redgold_gui::data_query::data_query::DataQueryInfo;
+use redgold_gui::state::lss_addon::LssAddon;
+use redgold_gui::tab::receive::ReceiveData;
+use crate::gui::components::explorer_links::rdg_explorer;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
 use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardware_signing, hot_wallet, portfolio_transact, prepare_tx, prepared_tx_view};
 use crate::gui::tabs::transact::portfolio_transact::{PortfolioState, PortfolioTransactSubTab};
-
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
 #[derive(Debug, EnumIter, EnumString, PartialEq, Clone)]
 #[repr(i32)]
@@ -79,9 +90,16 @@ pub enum SendReceiveTabs {
     Home,
     Send,
     Receive,
-    CustomTx,
     Swap,
-    Portfolio
+    Stake,
+    Portfolio,
+    Custom,
+}
+
+impl Default for SendReceiveTabs {
+    fn default() -> Self {
+        SendReceiveTabs::Home
+    }
 }
 
 #[derive(Clone, PartialEq, EnumString)]
@@ -92,13 +110,14 @@ pub enum CustomTransactionType {
 
 
 pub struct WalletState {
+    pub last_query: Option<i64>,
     pub tab: WalletTab,
     pub(crate) device_list_status: DeviceListStatus,
     pub(crate) public_key: Option<PublicKey>,
     pub(crate) public_key_msg: Option<String>,
     // futs: Vec<impl Future>
     pub(crate) updates: Channel<StateUpdate>,
-    pub send_receive: Option<SendReceiveTabs>,
+    pub send_receive: SendReceiveTabs,
     pub destination_address: String,
     pub amount_input: String,
     faucet_success: String,
@@ -160,10 +179,119 @@ pub struct WalletState {
     pub passphrase_input: PassphraseInput,
     pub hot_secret_key: Option<String>,
     pub port: PortfolioState,
-    pub view_additional_xpub_details: bool
+    pub view_additional_xpub_details: bool,
+    pub show_xpub_balance_info: bool,
+    pub send_currency_input: CurrencyInputBox,
+    pub send_address_input_box: AddressInputBox,
+    pub send_tx_progress: TransactionProgressFlow,
+    pub address_labels: Vec<(String, Address)>,
+    pub receive_data: Option<ReceiveData>,
 }
 
 impl WalletState {
+
+
+    pub fn send_view_top<G, E>(
+        &mut self,
+        ui: &mut Ui,
+        pk: &PublicKey,
+        g: &G,
+        d: &DataQueryInfo<E>,
+        labels: Vec<(String, Address)>,
+        tsi: &TransactionSignInfo,
+        nc: &NodeConfig
+    )
+    where G: GuiDepends + Clone + Send + 'static,
+          E: ExternalNetworkResources + Clone + Send + 'static {
+
+
+        let labels = labels.into_iter().filter(|(l, v)|
+            l.contains(self.send_currency_input.input_currency.abbreviated().as_str())
+        ).collect_vec();
+        //         .selected_text(format!("{:?}", ls.wallet.send_currency_type))
+        //             let string = &mut ls.wallet.destination_address;
+        self.send_currency_input.view(ui, &d.price_map_usd_pair_incl_rdg);
+        self.send_currency_type = self.send_currency_input.input_currency.clone();
+        self.send_address_input_box.view(ui, labels, g);
+        self.send_tx_progress.info_box_view(ui);
+        ui.separator();
+
+        if self.send_address_input_box.valid {
+            let event = self.send_tx_progress.progress_buttons(ui, g, tsi);
+
+            if event.reset {
+                self.send_tx_progress.reset();
+                self.send_address_input_box.reset();
+                self.send_currency_input.reset();
+            }
+            if event.next_stage {
+                match self.send_tx_progress.stage {
+                    TransactionStage::Created => {
+                        let mut e = d.external.clone();
+                        let address = self.send_address_input_box.address.clone();
+                        let currency = self.send_currency_input.input_currency.clone();
+                        let amount = self.send_currency_input.input_currency_amount(&d.price_map_usd_pair_incl_rdg);
+                        let option = {
+                            let guard = d.address_infos.lock().unwrap();
+                            let ai = guard.get(pk).cloned();
+                            ai
+                        };
+                        let pk_inner = pk.clone();
+                        let option1 = g.form_eth_address(pk).ok();
+                        let tsii = tsi.clone();
+                        let ncc = nc.clone();
+                        let c = Channel::new();
+                        let sender = c.clone();
+                        let tx = async move {
+                            sender.send(TransactionProgressFlow::make_transaction(
+                                &ncc,
+                                &mut e,
+                                &currency,
+                                &pk_inner,
+                                &address,
+                                &amount,
+                                option.as_ref(),
+                                None,
+                                None,
+                                option1,
+                                &tsii
+                            ).await).await.ok();
+                        };
+                        let res = g.spawn(tx);
+                        let res = c.receiver.recv_err().unwrap();
+                        self.send_tx_progress.created(res.clone().ok(), res.err().map(|e| e.json_or()));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // currency_selection_box(ui, labels);
+        // ui.horizontal(|ui| {
+        //     ui.label("To:");
+        //     let string = &mut ls.wallet.destination_address;
+        //     ui.add(egui::TextEdit::singleline(string).desired_width(460.0));
+        //     common::copy_to_clipboard(ui, string.clone());
+        //     let valid_addr = string.parse_address().is_ok();
+        //     if valid_addr {
+        //         ui.label(RichText::new("Valid").color(Color32::GREEN));
+        //     } else {
+        //         ui.label(RichText::new("Invalid").color(Color32::RED));
+        //     }
+        // });
+        // // TODO: Amount USD and conversions etc.
+        // ui.horizontal(|ui| {
+        //     ui.label("Amount");
+        //     let string = &mut ls.wallet.amount_input;
+        //     ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
+        //     // ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
+        //     // ui.checkbox(&mut ls.wallet_state.mark_output_as_swap, "Mark as Swap");
+        //     // if ls.wallet_state.mark_output_as_stake {
+        //     //     ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
+        //     // }
+        // });
+
+    }
     pub(crate) fn update_hot_mnemonic_or_key_info(&mut self) {
         self.mnemonic_or_key_checksum = self.checksum_key();
         if let Some((pkhex, key_pair)) = self.active_hot_private_key_hex.as_ref()
@@ -209,7 +337,7 @@ impl WalletState {
         self.destination_address = "".to_string();
         self.address_info = None;
         self.public_key = None;
-        self.send_receive = None;
+        self.send_receive = Default::default();
     }
 
     pub fn update_signed_tx(&mut self, tx_o: Option<RgResult<Transaction>>) {
@@ -249,12 +377,13 @@ impl WalletState {
 
     pub fn new(hot_mnemonic: String, option: Option<&NamedXpub>) -> Self {
         Self {
+            last_query: None,
             tab: WalletTab::Hardware,
             device_list_status: DeviceListStatus::poll(),
             public_key: None,
             public_key_msg: None,
             updates: new_channel(),
-            send_receive: None,
+            send_receive: Default::default(),
             destination_address: "".to_string(),
             amount_input: "".to_string(),
             faucet_success: "".to_string(),
@@ -317,6 +446,12 @@ impl WalletState {
             hot_secret_key: None,
             port: Default::default(),
             view_additional_xpub_details: true,
+            show_xpub_balance_info: true,
+            send_currency_input: Default::default(),
+            send_address_input_box: AddressInputBox::default(),
+            send_tx_progress: Default::default(),
+            address_labels: vec![],
+            receive_data: None,
         }
     }
     pub fn update_hardware(&mut self) {
@@ -326,7 +461,7 @@ impl WalletState {
     }
 }
 
-pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &G)
+pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
     where G: GuiDepends + Clone + Send + 'static {
     match local_state.wallet.updates.recv_while() {
         Ok(updates) => {
@@ -341,13 +476,17 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
     local_state.wallet.update_hardware();
     ui.style_mut().spacing.item_spacing.y = 2f32;
 
-    ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state, has_changed_tab, depends));
+    ScrollArea::vertical().show(ui, |ui| wallet_screen_scrolled(ui, ctx, local_state, has_changed_tab, depends, d));
 }
 
 
-pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: &G)
+pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
     where G: GuiDepends + Clone + Send + 'static {
-    let (mut update, xpub) = internal_stored_xpubs(ls, ui, ctx, has_changed_tab, depends);
+
+    let (mut update, xpub) =
+        internal_stored_xpubs(
+            ls, ui, ctx, has_changed_tab, depends, None, ls.wallet.public_key.clone(), true
+        );
     let mut is_hot = false;
     if has_changed_tab {
         update = true;
@@ -390,14 +529,16 @@ pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut Loca
         ls.wallet.passphrase_input.err_msg = None;
         if update || (ls.wallet.address_info.is_none() && has_changed_tab) {
             ls.wallet.address_info = None;
-            refresh_balance(ls);
+            refresh_balance(ls, depends);
+            ls.wallet.address_labels = ls.local_stored_state.address_labels(depends);
+            ls.wallet.receive_data = Some(ReceiveData::from_public_key(&pk, depends));
         }
         if update {
             // let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.wallet_state.derivation_path.clone()).expect("kp");
 
 
         }
-        proceed_from_pk(ui, ls, &pk, is_hot, depends);
+        proceed_from_pk(ui, ls, &pk, is_hot, depends, d);
     }
 
 }
@@ -483,8 +624,9 @@ pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
     update_clicked
 }
 
-fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, depends: &G)
-    where G: GuiDepends + Clone + Send + 'static {
+fn proceed_from_pk<G, E>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, depends: &G, d: &DataQueryInfo<E>)
+    where G: GuiDepends + Clone + Send + 'static,
+    E: ExternalNetworkResources + Clone + Send + 'static {
     // data_item(ui, "Public Key:", pk.hex_or());
     // let address_str = pk.address()
     //     .and_then(|a| a.render_string())
@@ -494,116 +636,78 @@ fn proceed_from_pk<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: 
     // TODO: Include bitcoin address / ETH address for path 0 here for verification.
     ui.separator();
 
-    let mut balance_str = format!("Balance RDG: {} ", ls.wallet.balance.clone());
-    if let Some(b) = ls.wallet.balance_btc.as_ref() {
-        balance_str = format!("{} BTC: {}", balance_str, b);
-    };
-    if let Some(b) = ls.wallet.balance_eth.as_ref() {
-        balance_str = format!("{} ETH: {}", balance_str, b);
-    };
-
-    if ls.wallet.address_info.is_none() {
-        balance_str = "loading address info".to_string();
-    }
-
-    rdg_explorer(ui, ls, pk);
-
-    ui.heading(RichText::new(balance_str).color(Color32::LIGHT_GREEN));
+    balance_table(ui, &ls.data, &ls.node_config, None, Some(pk));
+    //
+    // let mut balance_str = format!("Balance RDG: {} ", ls.wallet.balance.clone());
+    // if let Some(b) = ls.wallet.balance_btc.as_ref() {
+    //     balance_str = format!("{} BTC: {}", balance_str, b);
+    // };
+    // if let Some(b) = ls.wallet.balance_eth.as_ref() {
+    //     balance_str = format!("{} ETH: {}", balance_str, b);
+    // };
+    //
+    // if ls.wallet.address_info.is_none() {
+    //     balance_str = "loading address info".to_string();
+    // }
+    //
+    // // rdg_explorer(ui, &ls.node_config.network, pk);
+    //
+    // ui.heading(RichText::new(balance_str).color(Color32::LIGHT_GREEN));
 
     // ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
     // if ls.wallet_state.show_btc_info {
     //     data_item(ui, "BTC Address", pk.to_bitcoin_address(&ls.node_config.network).unwrap_or("".to_string()));
     // }
 
-    send_receive_bar(ui, ls, pk);
+    send_receive_bar(ui, ls, pk, depends);
 
     ui.separator();
     ui.spacing();
 
-    if let Some(srt) = &ls.wallet.send_receive.clone() {
-        let mut show_prepared = false;
-        match srt {
-            SendReceiveTabs::Send => {
-                show_prepared = true;
-                send_view(ui, ls, pk);
-            }
-            SendReceiveTabs::Receive => {
-            }
-            SendReceiveTabs::CustomTx => {
-                show_prepared = true;
-                ui.label("Enter custom transaction JSON:");
-                ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet.custom_tx_json));
-            }
-            SendReceiveTabs::Swap => {
-                SwapState::view(ui, ls)
-            }
-            SendReceiveTabs::Home => {
-            }
-            SendReceiveTabs::Portfolio => {
-                portfolio_transact::portfolio_view(ui, ls, pk, depends);
+    let mut show_prepared = false;
+    match ls.wallet.send_receive {
+        SendReceiveTabs::Send => {
+            show_prepared = true;
+            ls.wallet.send_view_top(
+                ui, pk, depends, d,
+                ls.wallet.address_labels.clone(), &ls.keysign_info(&depends), &ls.node_config);
+        }
+        SendReceiveTabs::Receive => {
+            if let Some(rd) = ls.wallet.receive_data.as_ref() {
+                rd.view(ui);
             }
         }
-        if show_prepared {
-            prepared_tx_view::prepared_view(ui, ls, pk, is_hot);
+        SendReceiveTabs::Custom => {
+            show_prepared = true;
+            ui.label("Enter custom transaction JSON:");
+            ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet.custom_tx_json));
         }
+        SendReceiveTabs::Swap => {
+            SwapState::view(ui, ls)
+        }
+        SendReceiveTabs::Home => {
+
+            let rows = d.recent_tx(Some(pk), None, false, None);
+            let mut tx_table = TransactionTable::default();
+            tx_table.rows = rows;
+            tx_table.full_view::<E>(ui, &depends.get_network(), d, Some(pk));
+            ui.separator();
+
+        }
+        SendReceiveTabs::Portfolio => {
+            portfolio_transact::portfolio_view(ui, ls, pk, depends);
+        }
+        SendReceiveTabs::Stake => {
+            ui.label("Stake");
+        }
+
     }
-}
-
-
-fn rdg_explorer(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
-    let mut explorer_prefix = ls.node_config.network.to_std_string();
-    let is_main = explorer_prefix == "main".to_string();
-    if is_main {
-        explorer_prefix = "".to_string();
-    } else {
-        explorer_prefix = format!("{}.", explorer_prefix);
+    if show_prepared {
+        // prepared_tx_view::prepared_view(ui, ls, pk, is_hot);
     }
-    ui.horizontal(|ui| {
-        let rdg_address = pk.address().unwrap().render_string().unwrap();
-        ui.hyperlink_to("RDG Explorer", format!("https://{}explorer.redgold.io/hash/{}", explorer_prefix, rdg_address));
-        let btc_address = pk.to_bitcoin_address_typed(&ls.node_config.network).unwrap().render_string().unwrap();
-        let mut net = "testnet/";
-        if is_main {
-            net = "";
-        }
-        let eth_url = if is_main {
-            "https://etherscan.io/address/"
-        } else {
-            "https://sepolia.etherscan.io/address/"
-        };
-        let eth_address = pk.to_ethereum_address().unwrap();
-        ui.hyperlink_to("BTC Explorer", format!("https://blockstream.info/{net}address/{btc_address}"));
-        ui.hyperlink_to("ETH Explorer", format!("{}{}", eth_url, eth_address));
-    });
-}
-
-fn send_view(ui: &mut Ui, ls: &mut LocalState, _pk: &PublicKey) {
-    currency_selection_box(ui, ls);
-    ui.horizontal(|ui| {
-        ui.label("To:");
-        let string = &mut ls.wallet.destination_address;
-        ui.add(egui::TextEdit::singleline(string).desired_width(460.0));
-        common::copy_to_clipboard(ui, string.clone());
-        let valid_addr = string.parse_address().is_ok();
-        if valid_addr {
-            ui.label(RichText::new("Valid").color(Color32::GREEN));
-        } else {
-            ui.label(RichText::new("Invalid").color(Color32::RED));
-        }
-    });
-    // TODO: Amount USD and conversions etc.
-    ui.horizontal(|ui| {
-        ui.label("Amount");
-        let string = &mut ls.wallet.amount_input;
-        ui.add(egui::TextEdit::singleline(string).desired_width(200.0));
-        // ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
-        // ui.checkbox(&mut ls.wallet_state.mark_output_as_swap, "Mark as Swap");
-        // if ls.wallet_state.mark_output_as_stake {
-        //     ui.checkbox(&mut ls.wallet_state.mark_output_as_stake, "Mark as Stake");
-        // }
-    });
 
 }
+
 
 fn currency_selection_box(ui: &mut Ui, ls: &mut LocalState) {
     ComboBox::from_label("Currency")
@@ -646,19 +750,14 @@ fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {
     // });
 }
 
-fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
+fn send_receive_bar<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G) where G: GuiDepends + Clone + Send + 'static  {
     ui.horizontal(|ui| {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Heading);
 
         for t in SendReceiveTabs::iter() {
             if ui.button(format!("{:?}", t)).clicked() {
-                let some = Some(t.clone());
-                if ls.wallet.send_receive == some {
-                    ls.wallet.send_receive = Some(SendReceiveTabs::Home);
-                } else {
-                    ls.wallet.send_receive = some;
-                }
+                ls.wallet.send_receive = t.clone();
             }
         }
         let layout = egui::Layout::right_to_left(egui::Align::RIGHT);
@@ -675,15 +774,17 @@ fn send_receive_bar(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey) {
             ui.hyperlink_to("Faucet", env_formatted_faucet);
             ui.label(ls.wallet.faucet_success.clone());
             if ui.button("Refresh Balance").clicked() {
-                refresh_balance(ls);
+                refresh_balance(ls, g);
             };
         });
     });
 }
 
-fn refresh_balance(ls: &mut LocalState) {
+fn refresh_balance<G>(ls: &mut LocalState, g: &G) where G: GuiDepends + Clone + Send + 'static {
+    let pk = ls.wallet.public_key.clone().expect("pk");
+    ls.data.refresh_all_pk(&pk, g);
     address_query::get_address_info(&ls.node_config.clone(),
-                                    ls.wallet.public_key.clone().expect("pk"),
+                                    pk,
                                     ls.wallet.updates.sender.clone(),
     );
 }

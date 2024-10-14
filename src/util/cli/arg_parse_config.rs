@@ -53,32 +53,30 @@ pub fn get_default_data_top_folder() -> PathBuf {
 }
 
 pub struct ArgTranslate {
-    // runtime: Arc<Runtime>,
-    pub opts: RgArgs,
-    pub node_config: NodeConfig,
-    pub args: Vec<String>,
+    pub node_config: Box<NodeConfig>,
+    pub determined_subcommand: Option<RgTopLevelSubcommand>,
     pub abort: bool,
 }
 
 impl ArgTranslate {
 
     pub fn new(
-        // runtime: Arc<Runtime>,
-        opts: &RgArgs, node_config: &NodeConfig) -> Self {
-        let args = std::env::args().collect_vec();
-        let mut config = node_config.clone();
-        config.opts = opts.clone();
+        node_config: Box<NodeConfig>
+    ) -> Self {
+        
         ArgTranslate {
-            // runtime,
-            opts: opts.clone(),
-            node_config: config,
-            args,
+            node_config,
+            determined_subcommand: None,
             abort: false
         }
     }
+    
+    pub fn opts(&self) -> &RgArgs {
+        self.node_config.opts.as_ref()
+    }
 
     pub fn is_gui(&self) -> bool {
-        if let Some(sc) = &self.opts.subcmd {
+        if let Some(sc) = self.get_subcommand() {
             match sc {
                 RgTopLevelSubcommand::GUI(_) => {
                     return true;
@@ -89,8 +87,12 @@ impl ArgTranslate {
         false
     }
 
+    fn get_subcommand(&self) -> Option<&RgTopLevelSubcommand> {
+        self.determined_subcommand.as_ref().or(self.opts().subcmd.as_ref())
+    }
+
     pub fn is_node(&self) -> bool {
-        if let Some(sc) = &self.opts.subcmd {
+        if let Some(sc) = self.get_subcommand() {
             match sc {
                 RgTopLevelSubcommand::Node(_) => {
                     return true;
@@ -138,7 +140,7 @@ impl ArgTranslate {
         Ok(result)
     }
 
-    pub async fn translate_args(&mut self) -> Result<(), ErrorInfo> {
+    pub async fn translate_args(mut self) -> Result<Box<NodeConfig>, ErrorInfo> {
         self.immediate_debug();
         self.set_gui_on_empty();
         self.check_load_logger()?;
@@ -165,23 +167,25 @@ impl ArgTranslate {
         self.alias();
 
         if self.is_gui() {
-            return Ok(());
+            self.node_config.is_gui = true;
+            return Ok(self.node_config);
         }
 
-        self.abort = immediate_commands(&self.opts.clone(), &self.node_config.clone(), self.args()).await;
+        self.abort = immediate_commands(&self.opts().clone(), &self.node_config.clone(), self.args()).await;
         if self.abort {
-            return Ok(());
+            self.node_config.abort = true;
+            return Ok(self.node_config);
         }
 
         // Unnecessary for CLI commands, hence after immediate commands
         self.lookup_ip().await;
 
         tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
-        tracing::info!("Parsed args successfully with args: {:?}", self.args);
-        tracing::info!("RgArgs options parsed: {:?}", self.opts.clear_sensitive());
-        // info!("Development mode: {}", self.opts.development_mode);
+        tracing::info!("Parsed args successfully with args: {:?}", self.args());
+        tracing::info!("RgArgs options parsed: {:?}", self.opts().clear_sensitive());
+        // info!("Development mode: {}", self.opts().development_mode);
 
-        Ok(())
+        Ok(self.node_config)
     }
 
     fn set_discovery_interval(&mut self) {
@@ -297,12 +301,12 @@ impl ArgTranslate {
 
 
         // Then override with command line
-        if let Some(words) = &self.opts.words {
+        if let Some(words) = &self.opts().words {
             self.node_config.mnemonic_words = words.clone();
         }
 
         // Then override with a file from the command line (more secure than passing directly)
-        if let Some(words) = &self.opts
+        if let Some(words) = &self.opts()
             .mnemonic_path
             .clone()
             .map(fs::read_to_string)
@@ -314,7 +318,7 @@ impl ArgTranslate {
 
         // If empty, generate a new mnemonic;
         if self.node_config.mnemonic_words.is_empty() {
-            if let Some(dbg_id) = self.opts.debug_id.as_ref() {
+            if let Some(dbg_id) = self.opts().debug_id.as_ref() {
                 self.node_config.mnemonic_words = WordsPass::from_str_hashed(dbg_id.to_string()).words;
             } else {
                 tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
@@ -345,14 +349,14 @@ impl ArgTranslate {
         // TODO: From environment variable too?
         // TODO: write merkle tree to disk
 
-        if let Some(path) = &self.opts.peer_id_path {
+        if let Some(path) = &self.opts().peer_id_path {
             let p = fs::read_to_string(path)
                 .error_info("Failed to read peer_id_path file")?;
             self.node_config.peer_id = PeerId::from_hex(p)?;
         }
 
         // TODO: This will have to change to read the whole merkle tree really, lets just remove this maybe?
-        if let Some(p) = &self.opts.peer_id {
+        if let Some(p) = &self.opts().peer_id {
             self.node_config.peer_id = PeerId::from_hex(p)?;
         }
 
@@ -376,13 +380,13 @@ impl ArgTranslate {
 
     fn data_folder(&mut self) -> Result<(), ErrorInfo> {
 
-        let mut data_folder_path =  self.opts.data_path.clone()
+        let mut data_folder_path =  self.opts().data_path.clone()
             .map(|p| PathBuf::from(p))
             .unwrap_or(get_default_data_top_folder());
 
         // Testing only modification, could potentially do this in a separate function to
         // unify this with other debug mods.
-        if let Some(id) = self.opts.debug_id {
+        if let Some(id) = self.opts().debug_id {
             data_folder_path = data_folder_path.join("local_test");
             data_folder_path = data_folder_path.join(format!("id_{}", id));
         }
@@ -398,7 +402,7 @@ impl ArgTranslate {
         self.node_config.port_offset = self.node_config.network.default_port_offset();
 
         // Unify with other debug id stuff?
-        if let Some(dbg_id) = self.opts.debug_id {
+        if let Some(dbg_id) = self.opts().debug_id {
             self.node_config.port_offset = Self::debug_id_port_offset(
                 self.node_config.network.default_port_offset(),
                 dbg_id
@@ -411,9 +415,9 @@ impl ArgTranslate {
     }
 
     // pub fn parse_seed(&mut self) {
-    //     if let Some(a) = &self.opts.seed_address {
+    //     if let Some(a) = &self.opts().seed_address {
     //         let default_port = self.node_config.network.default_port_offset();
-    //         let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+    //         let port = self.opts().seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
     //         self.node_config.seeds.push(SeedNode {
     //             peer_id: vec![],
     //             trust: 1.0,
@@ -424,13 +428,13 @@ impl ArgTranslate {
     //     }
     // }
     fn check_load_logger(&mut self) -> Result<(), ErrorInfo> {
-        let log_level = &self.opts.log_level
+        let log_level = &self.opts().log_level
             .clone()
             .and(std::env::var("REDGOLD_LOG_LEVEL").ok())
             .unwrap_or("DEBUG".to_string());
         let mut enable_logger = false;
 
-        if let Some(sc) = &self.opts.subcmd {
+        if let Some(sc) = self.get_subcommand() {
             enable_logger = match sc {
                 RgTopLevelSubcommand::GUI(_) => { true }
                 RgTopLevelSubcommand::Node(_) => { true }
@@ -451,7 +455,7 @@ impl ArgTranslate {
         if let Some(n) = std::env::var("REDGOLD_NETWORK").ok() {
             NetworkEnvironment::parse_safe(n)?;
         }
-        self.node_config.network = match &self.opts.network {
+        self.node_config.network = match &self.opts().network {
             None => {
                 if util::local_debug_mode() {
                     NetworkEnvironment::Debug
@@ -465,7 +469,7 @@ impl ArgTranslate {
         };
 
         if self.is_gui() && self.node_config.network == NetworkEnvironment::Local {
-            if self.opts.development_mode {
+            if self.opts().development_mode {
                 self.node_config.network = NetworkEnvironment::Dev;
             } else {
                 self.node_config.network = NetworkEnvironment::Main;
@@ -480,13 +484,13 @@ impl ArgTranslate {
     }
 
     fn e2e_enable(&mut self) {
-        if self.opts.enable_live_e2e {
+        if self.opts().enable_live_e2e {
             self.node_config.e2e_enabled = true;
         }
         // std::env::var("REDGOLD_ENABLE_E2E").ok().map(|b| {
         //     self.node_config.e2e_enable = true;
         // }
-        // self.opts.enable_e2e.map(|_| {
+        // self.opts().enable_e2e.map(|_| {
         //     self.node_config.e2e_enable = true;
         // });
     }
@@ -502,9 +506,9 @@ impl ArgTranslate {
 
         let port = self.node_config.public_port();
 
-        if let Some(a) = &self.opts.seed_address {
+        if let Some(a) = &self.opts().seed_address {
             let default_port = self.node_config.network.default_port_offset();
-            let port = self.opts.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            let port = self.opts().seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
             info!("Adding seed from command line arguments {a}:{port}");
             // TODO: replace this with the other seed class.
             let cli_seed_arg = Seed {
@@ -557,7 +561,7 @@ impl ArgTranslate {
 
     }
     fn apply_node_opts(&mut self) {
-        match &self.opts.subcmd {
+        match self.get_subcommand() {
             Some(RgTopLevelSubcommand::Node(node_cli)) => {
                 if let Some(i) = &node_cli.live_e2e_interval {
                     self.node_config.live_e2e_interval = Duration::from_secs(i.clone());
@@ -572,7 +576,7 @@ impl ArgTranslate {
                 self.node_config.genesis = b;
             }
         }
-        if self.opts.genesis {
+        if self.opts().genesis {
             self.node_config.genesis = true;
         }
         if self.node_config.genesis {
@@ -585,14 +589,14 @@ impl ArgTranslate {
 
     fn args(&self) -> Vec<&String> {
         // First argument is the executable path
-        self.args.iter().dropping(1).collect_vec()
+        self.node_config.args.iter().dropping(1).collect_vec()
     }
 
     fn set_gui_on_empty(&mut self) {
         // println!("args: {:?}", self.args.clone());
 
-        if self.args.len() == 1 || self.opts.subcmd.is_none() {
-            self.opts.subcmd = Some(RgTopLevelSubcommand::GUI(GUI{}));
+        if self.node_config.args.len() == 1 || self.get_subcommand().is_none() {
+            self.determined_subcommand = Some(RgTopLevelSubcommand::GUI(GUI{}));
         }
 
     }
@@ -615,7 +619,7 @@ impl ArgTranslate {
         }
     }
     fn immediate_debug(&self) {
-        if let Some(cmd) = &self.opts.subcmd {
+        if let Some(cmd) = self.get_subcommand() {
             match cmd {
                 RgTopLevelSubcommand::TestCapture(t) => {
                     println!("Attempting test capture");

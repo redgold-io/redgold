@@ -7,6 +7,7 @@ use std::time::Duration;
 use clap::Parser;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use itertools::Itertools;
 use tracing::{error, info};
 use metrics::{counter, gauge};
 use tokio::sync::Mutex;
@@ -16,7 +17,7 @@ use redgold::gui::native_gui_dependencies::NativeGuiDepends;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
-use redgold::util::cli::load_config::load_full_config;
+use redgold::util::cli::load_config::{load_full_config, main_config};
 use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
@@ -24,30 +25,32 @@ use redgold_schema::structs::ErrorInfo;
 
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgArgs;
+use std::panic;
+use backtrace::Backtrace;
 
 #[tokio::main]
 async fn main() {
+    panic::set_hook(Box::new(|panic_info| {
+        let backtrace = Backtrace::new();
+        println!("Panic occurred: {:?}", panic_info);
+        println!("Backtrace: {:?}", backtrace);
+    }));
+    let nc = main_config();
 
-    let cfg = load_full_config();
+    let mut arg_translate = Box::new(ArgTranslate::new(nc));
+    let node_config = arg_translate.translate_args().await.expect("arg translation");
+    let node_config = *node_config;
 
-    let opts = RgArgs::parse();
     info!("Starting node main method");
     counter!("redgold.node.main_started").increment(1);
 
-    let mut node_config = NodeConfig::default();
-    node_config.config_data = *cfg.clone();
-
-    let mut arg_translate = ArgTranslate::new(&opts, &node_config.clone());
-    let _ = &arg_translate.translate_args().await.expect("arg translation");
-    node_config = arg_translate.node_config.clone();
-
     tracing::trace!("Starting network environment: {}", node_config.clone().network.to_std_string());
 
-    if arg_translate.abort {
+    if node_config.abort {
         return;
     }
 
-    if arg_translate.is_gui() {
+    if node_config.is_gui {
         let res = ExternalNetworkResourcesImpl::new(&node_config, None).expect("works");
         let g = NativeGuiDepends::new(node_config.clone());
         gui::initialize::attempt_start(node_config.clone(), res, g).await.expect("GUI to start");
@@ -56,7 +59,7 @@ async fn main() {
     gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);
     gauge!("redgold_start_fail", &node_config.gauge_id()).set(0);
 
-    let mut relay = Relay::new(node_config.clone()).await;
+    let relay = Relay::new(node_config.clone()).await;
 
 
     Node::prelim_setup(relay.clone()).await.expect("prelim");

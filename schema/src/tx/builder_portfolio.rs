@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use crate::RgResult;
+use crate::{structs, RgResult};
 use crate::structs::{Address, CurrencyAmount, DepositRequest, Output, PortfolioFulfillmentParams, PortfolioRequest, PortfolioWeighting, StakeDeposit, StakeRequest, StandardData, StandardRequest, SupportedCurrency, Weighting};
 use crate::tx::tx_builder::TransactionBuilder;
 
@@ -9,7 +9,8 @@ impl TransactionBuilder {
         &mut self,
         weights: Vec<(SupportedCurrency, f64)>,
         redgold_to_party_payment_amount: &CurrencyAmount,
-        party_address: &Address
+        party_address: &Address,
+        name: &String
     ) -> Self {
         let updated = self.with_output(party_address, redgold_to_party_payment_amount);
         let mut pr = PortfolioRequest::default();
@@ -27,6 +28,10 @@ impl TransactionBuilder {
         o.address = updated.input_addresses.clone().get(0).cloned();
         let mut data = StandardData::default();
         let mut req = StandardRequest::default();
+
+        let mut pid = structs::PortfolioId::default();
+        pid.name = Some(name.clone());
+        pr.portfolio_id = Some(pid);
         req.portfolio_request = Some(pr);
         data.standard_request = Some(req);
         o.data = Some(data);
