@@ -109,16 +109,19 @@ pub fn big_button<S: Into<String>>(ui: &mut Ui, lb: S) -> bool {
     changed
 }
 
-pub fn bounded_text_area(ui: &mut Ui, string1: &mut String) {
+pub fn bounded_text_area(ui: &mut Ui, string1: &mut String) -> bool {
+    let mut changed = false;
     ui.horizontal(|ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
-            egui::TextEdit::multiline(string1)
+            let res = egui::TextEdit::multiline(string1)
                 .desired_width(600.0)
                 .desired_rows(2)
                 .clip_text(true)
                 .ui(ui);
+            changed = res.changed()
         });
     });
+    changed
 }
 
 pub fn bounded_text_area_size(ui: &mut Ui, string1: &mut String, width: f32, height: usize) {

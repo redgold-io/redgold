@@ -162,12 +162,6 @@ impl RgArgs {
     }
 }
 
-impl Default for RgArgs {
-    fn default() -> RgArgs {
-        empty_args()
-    }
-}
-
 #[derive(Subcommand, Debug, Clone)]
 pub enum RgTopLevelSubcommand {
     #[clap(version = "1.3", author = "Redgold")]

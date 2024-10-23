@@ -30,9 +30,9 @@ impl AwsBackup {
     }
 
     pub async fn can_do_backup(&self) -> bool {
-        if let (Some(bucket), Some(server_index)) =
-            (self.relay.node_config.opts.s3_backup_bucket.as_ref(),
-             self.relay.node_config.opts.server_index.as_ref()) {
+        if let (Some(bucket), server_index) =
+            (self.relay.node_config.s3_backup(),
+             self.relay.node_config.server_index()) {
             return Self::s3_ls(bucket, "".to_string()).await.is_ok()
         }
         false
@@ -41,9 +41,9 @@ impl AwsBackup {
     pub async fn backup_s3(&self) -> RgResult<()> {
         let ct = util::current_time_unix() as i64;
 
-        if let (Some(bucket), Some(server_index)) =
-            (self.relay.node_config.opts.s3_backup_bucket.as_ref(),
-             self.relay.node_config.opts.server_index.as_ref()){
+        if let (Some(bucket), server_index) =
+            (self.relay.node_config.s3_backup(),
+             self.relay.node_config.server_index()){
 
             let daily_prefix = format!("daily/{}", server_index);
             // let weekly_prefix = format!("weekly/{}", server_index);

@@ -438,7 +438,7 @@ impl ArgTranslate {
             enable_logger = match sc {
                 RgTopLevelSubcommand::GUI(_) => { true }
                 RgTopLevelSubcommand::Node(_) => { true }
-                RgTopLevelSubcommand::TestTransaction(_) => {true}
+                // RgTopLevelSubcommand::TestTransaction(_) => {true}
                 _ => { false }
             }
         }
@@ -621,16 +621,16 @@ impl ArgTranslate {
     fn immediate_debug(&self) {
         if let Some(cmd) = self.get_subcommand() {
             match cmd {
-                RgTopLevelSubcommand::TestCapture(t) => {
-                    println!("Attempting test capture");
-                    #[cfg(target_os = "linux")] {
-                        use redgold_gui::image_capture_openpnp::debug_capture;
-                        debug_capture(t.cam);
-                        unsafe {
-                            exit(0)
-                        }
-                    }
-                }
+                // RgTopLevelSubcommand::TestCapture(t) => {
+                //     println!("Attempting test capture");
+                //     #[cfg(target_os = "linux")] {
+                //         use redgold_gui::image_capture_openpnp::debug_capture;
+                //         debug_capture(t.cam);
+                //         unsafe {
+                //             exit(0)
+                //         }
+                //     }
+                // }
                 _ => {}
             }
         }
@@ -723,49 +723,49 @@ pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
         Some(c) => {
             abort = true;
             match c {
-                RgTopLevelSubcommand::GenerateWords(m) => {
-                    commands::generate_mnemonic(&m);
-                    Ok(())
-                },
-                RgTopLevelSubcommand::Address(a) => {
-                    commands::generate_address(a.clone(), &config).map(|_| ())
-                }
-                RgTopLevelSubcommand::Send(a) => {
-                    commands::send(&a, &config).await
-                }
-                RgTopLevelSubcommand::Query(a) => {
-                    commands::query(&a, &config).await
-                }
-                RgTopLevelSubcommand::Faucet(a) => {
-                    commands::faucet(&a, &config).await
-                }
-                RgTopLevelSubcommand::AddServer(a) => {
-                    commands::add_server(a, &config).await
-                }
-                RgTopLevelSubcommand::Balance(a) => {
-                    commands::balance_lookup(a, &config).await
-                }
-                RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
-                    commands::test_transaction(&test_transaction_cli, &config).await
-                }
-                RgTopLevelSubcommand::Deploy(d) => {
-                    commands::deploy(d, &config).await.unwrap().abort();
-                    Ok(())
-                }
-                RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
-                    commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
-                    Ok(())
-                }
-                RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
-                    commands::convert_metadata_xpub(&b.metadata_file).await
-                }
-                RgTopLevelSubcommand::DebugCommand(d) => {
-                    commands::debug_commands(d, &config).await
-                }
-                RgTopLevelSubcommand::GenerateConfig(d) => {
-                    println!("Not implemented");
-                    Ok(())
-                }
+                // RgTopLevelSubcommand::GenerateWords(m) => {
+                //     commands::generate_mnemonic(&m);
+                //     Ok(())
+                // },
+                // RgTopLevelSubcommand::Address(a) => {
+                //     commands::generate_address(a.clone(), &config).map(|_| ())
+                // }
+                // RgTopLevelSubcommand::Send(a) => {
+                //     commands::send(&a, &config).await
+                // }
+                // RgTopLevelSubcommand::Query(a) => {
+                //     commands::query(&a, &config).await
+                // }
+                // RgTopLevelSubcommand::Faucet(a) => {
+                //     commands::faucet(&a, &config).await
+                // }
+                // RgTopLevelSubcommand::AddServer(a) => {
+                //     commands::add_server(a, &config).await
+                // }
+                // RgTopLevelSubcommand::Balance(a) => {
+                //     commands::balance_lookup(a, &config).await
+                // }
+                // RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
+                //     commands::test_transaction(&test_transaction_cli, &config).await
+                // }
+                // RgTopLevelSubcommand::Deploy(d) => {
+                //     commands::deploy(d, &config).await.unwrap().abort();
+                //     Ok(())
+                // }
+                // RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
+                //     commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
+                //     Ok(())
+                // }
+                // RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
+                //     commands::convert_metadata_xpub(&b.metadata_file).await
+                // }
+                // RgTopLevelSubcommand::DebugCommand(d) => {
+                //     commands::debug_commands(d, &config).await
+                // }
+                // RgTopLevelSubcommand::GenerateConfig(d) => {
+                //     println!("Not implemented");
+                //     Ok(())
+                // }
                 _ => {
                     abort = false;
                     Ok(())

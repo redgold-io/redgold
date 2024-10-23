@@ -51,6 +51,54 @@ pub struct PartyEvents where {
 
 impl PartyEvents {
 
+    pub fn address_for_currency(&self, cur: &SupportedCurrency) -> Option<Address> {
+        self.party_pk_all_address.iter().find_map(|a| {
+            if a.as_external().currency_or() == *cur {
+                Some(a.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn staking_balances(&self,
+                            addrs: &Vec<Address>,
+                            include_amm: Option<bool>,
+                            include_portfolio: Option<bool>,
+    ) -> HashMap<SupportedCurrency, CurrencyAmount> {
+        let include_amm = include_amm.unwrap_or(true);
+        let include_portfolio = include_portfolio.unwrap_or(true);
+        let str_addrs = addrs.iter().map(|a| a.render_string().unwrap()).collect::<HashSet<String>>();
+        let port_events = self.portfolio_request_events.stake_utxos.iter().map(|e| e.1.clone()).collect::<Vec<ConfirmedExternalStakeEvent>>();
+        let mut map = HashMap::new();
+        for e in self.external_staking_events.iter() {
+            if !str_addrs.contains(&e.ett.other_address) {
+                continue
+            }
+            if port_events.contains(e) && !include_portfolio {
+                continue
+            }
+
+            let amt = e.ett.currency_amount();
+            let cur = map.get(&e.ett.currency).cloned().unwrap_or(CurrencyAmount::zero(e.ett.currency.clone()));
+            let new = cur + amt;
+            map.insert(e.ett.currency.clone(), new);
+        }
+        if include_amm {
+            for e in self.internal_staking_events.iter() {
+                if !addrs.contains(&e.withdrawal_address) {
+                    continue
+                }
+                let amt = e.amount.clone();
+                let cur = map.get(&e.amount.currency_or()).cloned().unwrap_or(CurrencyAmount::zero(e.amount.currency_or()));
+                let new = cur + amt;
+                map.insert(e.amount.currency_or(), new);
+            }
+        }
+
+        map
+    }
+
     pub fn balances_with_deltas_sub_portfolio(&self) -> HashMap<SupportedCurrency, CurrencyAmount> {
         let mut map = self.balance_with_deltas_applied.clone();
         for (amt, v) in self.portfolio_request_events.external_stake_balance_deltas.iter() {
@@ -273,18 +321,18 @@ impl PartyEvents {
                 //     info!("debug");
                 // }
                 if let Some(dest) = swap_dest_str {
-                        let matching_receipt = this_dest == dest;
-                        if matching_receipt {
-                            return false
-                        }
-                    }
-                    if let Some(sw) = t2.tx.stake_withdrawal_request().and_then(|sr| sr.destination.as_ref()).and_then(|a| a.render_string().ok()) {
-                        let matching_receipt = this_dest == sw;
-                        if matching_receipt {
-                            return false
-                        }
+                    let matching_receipt = this_dest == dest;
+                    if matching_receipt {
+                        return false
                     }
                 }
+                if let Some(sw) = t2.tx.stake_withdrawal_request().and_then(|sr| sr.destination.as_ref()).and_then(|a| a.render_string().ok()) {
+                    let matching_receipt = this_dest == sw;
+                    if matching_receipt {
+                        return false
+                    }
+                }
+            }
             _ => {}
         }
         true

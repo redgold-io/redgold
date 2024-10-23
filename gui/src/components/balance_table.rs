@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use eframe::egui::{Color32, RichText, Ui};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::structs::{PublicKey, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
 use redgold_schema::util::dollar_formatter::format_dollar_amount;
 use crate::components::tables::text_table_advanced;
 use crate::data_query::data_query::DataQueryInfo;
@@ -11,7 +12,9 @@ pub fn balance_table<E>(
     d: &DataQueryInfo<E>,
     nc: &NodeConfig,
     balances: Option<Vec<SupportedCurrency>>,
-    pk_filter: Option<&PublicKey>
+    pk_filter: Option<&PublicKey>,
+    balance_map: Option<HashMap<SupportedCurrency, f64>>,
+    id_opt: Option<String>
 ) where E: ExternalNetworkResources + Send + Clone + 'static {
     let balance_currencies = balances.unwrap_or(queryable_balances());
     let mut headers = vec!["Denomination".to_string()];
@@ -20,7 +23,7 @@ pub fn balance_table<E>(
     }
     let mut table_data: Vec<Vec<String>> = vec![];
     table_data.push(headers.clone());
-    let balances = d.balance_totals(&nc.network, pk_filter);
+    let balances = balance_map.unwrap_or(d.balance_totals(&nc.network, pk_filter));
     let mut row = vec!["NAV".to_string()];
     let ordered_cur = balance_currencies;
     for c in ordered_cur.iter() {
@@ -65,7 +68,8 @@ pub fn balance_table<E>(
     table_data.push(row);
 
     let mut row = vec!["NAV USD".to_string()];
-    let nav_totals = d.nav_usd_by_currency(&nc.network, pk_filter);
+    let nav_totals = balances.iter().map(|(k, v)| (k.clone(), v * price_map.get(k).cloned().unwrap_or(0.0))).collect::<HashMap<SupportedCurrency, f64>>();
+        //d.nav_usd_by_currency(&nc.network, pk_filter);
     let row_idx = 2;
     let mut green_fields = (1..8).map(|x| (row_idx, x)).collect::<Vec<(usize, usize)>>();
     for (idx, c) in ordered_cur.iter().enumerate() {
@@ -78,7 +82,11 @@ pub fn balance_table<E>(
         row.push(format!("${}", dollar_amount));
     }
     table_data.push(row);
-    text_table_advanced(ui, table_data, false, false, None, green_fields, Some(func));
+
+    let id = id_opt.unwrap_or("balance_table".to_string());
+    ui.push_id(id, |ui| {
+        text_table_advanced(ui, table_data, false, false, None, green_fields, Some(func));
+    });
 }
 
 pub fn queryable_balances() -> Vec<SupportedCurrency> {

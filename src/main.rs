@@ -25,21 +25,18 @@ use redgold_schema::structs::ErrorInfo;
 
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgArgs;
-use std::panic;
-use backtrace::Backtrace;
+
+
+async fn load_configs() -> Box<NodeConfig> {
+    let nc = main_config();
+    let mut arg_translate = Box::new(ArgTranslate::new(nc));
+    arg_translate.translate_args().await.expect("arg translation")
+}
 
 #[tokio::main]
 async fn main() {
-    panic::set_hook(Box::new(|panic_info| {
-        let backtrace = Backtrace::new();
-        println!("Panic occurred: {:?}", panic_info);
-        println!("Backtrace: {:?}", backtrace);
-    }));
-    let nc = main_config();
 
-    let mut arg_translate = Box::new(ArgTranslate::new(nc));
-    let node_config = arg_translate.translate_args().await.expect("arg translation");
-    let node_config = *node_config;
+    let node_config = *load_configs().await;
 
     info!("Starting node main method");
     counter!("redgold.node.main_started").increment(1);

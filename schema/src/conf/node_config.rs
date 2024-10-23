@@ -9,7 +9,7 @@ use crate::config_data::ConfigData;
 use crate::seeds::get_seeds_by_env_time;
 use crate::servers::ServerOldFormat;
 use crate::{structs, ErrorInfoContext, RgResult, ShortString};
-use crate::conf::rg_args::RgArgs;
+use crate::conf::rg_args::{empty_args, RgArgs};
 use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
@@ -190,6 +190,24 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn portfolio_fulfillment_agent_duration(&self) -> Duration {
+        let default = 3600 * 12;
+        Duration::from_secs(
+            self.config_data.node.as_ref()
+                .and_then(|x| x.service_intervals.as_ref())
+                .and_then(|x| x.portfolio_fulfillment_agent_seconds)
+                .unwrap_or(default)
+        )
+    }
+
+    pub fn s3_backup(&self) -> Option<&String> {
+        self.config_data.external.as_ref().and_then(|e| e.s3_backup_bucket.as_ref())
+    }
+
+    pub fn server_index(&self) -> i64 {
+        self.config_data.node.as_ref().and_then(|n| n.server_index).unwrap_or(0)
+    }
 
     pub fn offline(&self) -> bool {
         self.config_data.offline.unwrap_or(false)
@@ -458,7 +476,7 @@ impl NodeConfig {
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
-            opts: Arc::new(RgArgs::default()),
+            opts: Arc::new(empty_args()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),

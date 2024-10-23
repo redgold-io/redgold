@@ -143,7 +143,7 @@ pub fn qr_show_window(
                     i.show_scaled(ui, 1.0);
                 }
                 if let Some(t) = &mut state.qr_show_state.qr_text.clone() {
-                    bounded_text_area(ui, t)
+                    bounded_text_area(ui, t);
                 }
             });
         });

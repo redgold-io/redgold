@@ -21,7 +21,7 @@ use crate::util;
 use rand::Rng;
 use rocket::form::validate::Contains;
 use serde::{Deserialize, Serialize};
-use redgold_gui::dependencies::gui_depends::TransactionSignInfo;
+use redgold_gui::dependencies::gui_depends::{HardwareSigningInfo, TransactionSignInfo};
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
@@ -84,12 +84,13 @@ pub trait LocalStateAddons {
     fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> ();
     fn process_updates(&mut self);
     fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64>;
-    fn keysign_info<G>(&self, g: &G) -> TransactionSignInfo;
+    fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo;
     // fn encrypt(&self, str: String) -> Vec<u8>;
     // fn decrypt(&self, data: &[u8]) -> Vec<u8>;
     // fn accept_passphrase(&mut self, pass: String);
     // fn hash_password(&mut self) -> [u8; 32];
     // fn store_password(&mut self);
+    fn cold_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo;
 }
 
 impl LocalStateAddons for LocalState {
@@ -211,12 +212,21 @@ impl LocalStateAddons for LocalState {
         price_map
     }
 
-    fn keysign_info<G>(&self, g: &G) -> TransactionSignInfo {
+    fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
         // TODO: Need to migrate WordsPass to schema for trait impls.
         let kp = self.wallet.hot_mnemonic().keypair_at(self.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
         let hex = kp.to_private_hex();
         TransactionSignInfo::PrivateKey(hex)
     }
+
+    fn cold_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
+        // TODO: Need to migrate WordsPass to schema for trait impls.
+        let path = self.keytab_state.derivation_path_xpub_input_account.derivation_path();
+        let mut info = HardwareSigningInfo::default();
+        info.path = path;
+        TransactionSignInfo::ColdOrAirgap(info)
+    }
+
     //
     // fn encrypt(&self, str: String) -> Vec<u8> {
     //     return sym_crypt::encrypt(
@@ -272,7 +282,7 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{new_channel, Channel};
 use redgold_gui::tab::home::HomeState;
-use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::{SwapStage, SwapState};
@@ -430,7 +440,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn debug() {
     let nc = NodeConfig::dev_default().await;
@@ -438,7 +448,7 @@ async fn debug() {
     let p = party_data.into_iter().next().unwrap().1;
     let p = p.party_events.unwrap().central_prices.get(&SupportedCurrency::Ethereum).cloned().unwrap();
     let amt = (0.04143206 * 1e8) as u64;
-    let result = p.dummy_fulfill(amt, true, &nc.network);
+    let result = p.dummy_fulfill(amt, false, &nc.network, SupportedCurrency::Ethereum);
     println!("Result: {:?}", result);
 }
 

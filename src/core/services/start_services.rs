@@ -46,13 +46,10 @@ impl Node {
 
         let agent = PortfolioFullfillmentAgent::new(
             &relay, external_network_resources.clone());
-        let agent_duration = Duration::from_secs(node_config.config_data.clone().node
-            .unwrap()
-            .service_intervals
-            .unwrap()
-            .portfolio_fulfillment_agent_seconds
-            .unwrap());
-        sjh.add("PortfolioFulfillmentAgent", run_interval_fold(agent, agent_duration, false));
+
+        sjh.add("PortfolioFulfillmentAgent",
+                run_interval_fold(agent, node_config.portfolio_fulfillment_agent_duration(),
+                                  false));
 
         let udp = UdpServer::new(
             relay.peer_message_rx.clone(),

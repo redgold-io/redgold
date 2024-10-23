@@ -20,8 +20,7 @@ pub struct HardwareSigningInfo {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TransactionSignInfo {
     PrivateKey(String),
-    ColdHardwareWallet(HardwareSigningInfo),
-    Qr(QrMessage)
+    ColdOrAirgap(HardwareSigningInfo)
 }
 
 impl Default for TransactionSignInfo {
@@ -34,12 +33,6 @@ impl TransactionSignInfo {
     pub fn is_hot(&self) -> bool {
         match self {
             TransactionSignInfo::PrivateKey(_) => true,
-            _ => false
-        }
-    }
-    pub fn airgap(&self) -> bool {
-        match self {
-            TransactionSignInfo::Qr(_) => true,
             _ => false
         }
     }
@@ -64,17 +57,32 @@ pub struct SignExternal {
     pub currency: SupportedCurrency
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+pub struct SignInternal {
+    pub path: String,
+    pub key_name: Option<String>,
+    pub txs: Vec<Transaction>
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, EnumString)]
-pub enum QrMessage {
-    SignTransaction(Transaction),
-    SignTransactions(Vec<Transaction>),
+pub enum AirgapMessage {
+    SignInternal(SignInternal),
     GetXPubLike(GetXPubLikeRequest),
     SignExternal(SignExternal)
 }
 
-impl Default for QrMessage {
+impl AirgapMessage {
+    pub fn sign(path: String, tx: Transaction) -> Self {
+        let mut internal = SignInternal::default();
+        internal.path = path;
+        internal.txs.push(tx);
+        AirgapMessage::SignInternal(internal)
+    }
+}
+
+impl Default for AirgapMessage {
     fn default() -> Self {
-        QrMessage::SignTransaction(Transaction::default())
+        AirgapMessage::SignInternal(SignInternal::default())
     }
 }
 

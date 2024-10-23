@@ -41,14 +41,16 @@ use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::conf::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_gui::components::passphrase_input::PassphraseInput;
 use redgold_gui::components::transaction_table::TransactionTable;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow, TransactionStage};
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::state::lss_addon::LssAddon;
+use redgold_gui::tab::custom_tx::CustomTxState;
 use redgold_gui::tab::receive::ReceiveData;
+use redgold_gui::tab::stake::StakeState;
 use crate::gui::components::explorer_links::rdg_explorer;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
@@ -186,6 +188,8 @@ pub struct WalletState {
     pub send_tx_progress: TransactionProgressFlow,
     pub address_labels: Vec<(String, Address)>,
     pub receive_data: Option<ReceiveData>,
+    pub stake: StakeState,
+    pub custom_tx: CustomTxState,
 }
 
 impl WalletState {
@@ -199,7 +203,7 @@ impl WalletState {
         d: &DataQueryInfo<E>,
         labels: Vec<(String, Address)>,
         tsi: &TransactionSignInfo,
-        nc: &NodeConfig
+        nc: &NodeConfig, csi: &TransactionSignInfo, allowed: &Vec<XPubLikeRequestType>
     )
     where G: GuiDepends + Clone + Send + 'static,
           E: ExternalNetworkResources + Clone + Send + 'static {
@@ -213,11 +217,11 @@ impl WalletState {
         self.send_currency_input.view(ui, &d.price_map_usd_pair_incl_rdg);
         self.send_currency_type = self.send_currency_input.input_currency.clone();
         self.send_address_input_box.view(ui, labels, g);
-        self.send_tx_progress.info_box_view(ui);
+        self.send_tx_progress.info_box_view(ui, allowed);
         ui.separator();
 
         if self.send_address_input_box.valid {
-            let event = self.send_tx_progress.progress_buttons(ui, g, tsi);
+            let event = self.send_tx_progress.progress_buttons(ui, g, tsi, csi );
 
             if event.reset {
                 self.send_tx_progress.reset();
@@ -452,6 +456,8 @@ impl WalletState {
             send_tx_progress: Default::default(),
             address_labels: vec![],
             receive_data: None,
+            stake: Default::default(),
+            custom_tx: Default::default(),
         }
     }
     pub fn update_hardware(&mut self) {
@@ -480,12 +486,12 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
 }
 
 
-pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, depends: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
+pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, g: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
     where G: GuiDepends + Clone + Send + 'static {
 
     let (mut update, xpub) =
         internal_stored_xpubs(
-            ls, ui, ctx, has_changed_tab, depends, None, ls.wallet.public_key.clone(), true
+            ls, ui, ctx, has_changed_tab, g, None, ls.wallet.public_key.clone(), true
         );
     let mut is_hot = false;
     if has_changed_tab {
@@ -496,7 +502,7 @@ pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut Loca
 
         let mut passphrase_changed = false;
 
-        if x.request_type != Some(XPubRequestType::Hot) {
+        if x.request_type != Some(XPubLikeRequestType::Hot) {
             cold_wallet::hardware_connected(ui, &mut ls.wallet);
         } else {
             is_hot = true;
@@ -529,16 +535,23 @@ pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut Loca
         ls.wallet.passphrase_input.err_msg = None;
         if update || (ls.wallet.address_info.is_none() && has_changed_tab) {
             ls.wallet.address_info = None;
-            refresh_balance(ls, depends);
-            ls.wallet.address_labels = ls.local_stored_state.address_labels(depends);
-            ls.wallet.receive_data = Some(ReceiveData::from_public_key(&pk, depends));
+            refresh_balance(ls, g);
+            ls.wallet.address_labels = ls.local_stored_state.address_labels(g);
+            ls.wallet.receive_data = Some(ReceiveData::from_public_key(&pk, g));
         }
         if update {
             // let kp = ls.wallet_state.hot_mnemonic().keypair_at(ls.wallet_state.derivation_path.clone()).expect("kp");
 
 
         }
-        proceed_from_pk(ui, ls, &pk, is_hot, depends, d);
+        let allowed = if !is_hot {
+            vec![XPubLikeRequestType::Cold, XPubLikeRequestType::File, XPubLikeRequestType::QR]
+        } else {
+            vec![XPubLikeRequestType::Hot]
+        };
+
+        let mut hot_tsi = ls.hot_transaction_sign_info(g);
+        proceed_from_pk(ui, ls, &pk, is_hot, g, d, &allowed, &hot_tsi, &ls.cold_transaction_sign_info(g));
     }
 
 }
@@ -624,42 +637,22 @@ pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
     update_clicked
 }
 
-fn proceed_from_pk<G, E>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, depends: &G, d: &DataQueryInfo<E>)
+fn proceed_from_pk<G, E>(
+    ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, g: &G, d: &DataQueryInfo<E>,
+    allowed: &Vec<XPubLikeRequestType>, hot_tsi: &TransactionSignInfo, csi: &TransactionSignInfo
+)
     where G: GuiDepends + Clone + Send + 'static,
     E: ExternalNetworkResources + Clone + Send + 'static {
-    // data_item(ui, "Public Key:", pk.hex_or());
-    // let address_str = pk.address()
-    //     .and_then(|a| a.render_string())
-    //     .unwrap_or("Address failure".to_string());
-    // data_item(ui, "Address", address_str);
 
     // TODO: Include bitcoin address / ETH address for path 0 here for verification.
     ui.separator();
 
-    balance_table(ui, &ls.data, &ls.node_config, None, Some(pk));
-    //
-    // let mut balance_str = format!("Balance RDG: {} ", ls.wallet.balance.clone());
-    // if let Some(b) = ls.wallet.balance_btc.as_ref() {
-    //     balance_str = format!("{} BTC: {}", balance_str, b);
-    // };
-    // if let Some(b) = ls.wallet.balance_eth.as_ref() {
-    //     balance_str = format!("{} ETH: {}", balance_str, b);
-    // };
-    //
-    // if ls.wallet.address_info.is_none() {
-    //     balance_str = "loading address info".to_string();
-    // }
-    //
-    // // rdg_explorer(ui, &ls.node_config.network, pk);
-    //
-    // ui.heading(RichText::new(balance_str).color(Color32::LIGHT_GREEN));
+    if ls.wallet.show_xpub_balance_info {
+        balance_table(ui, &ls.data, &ls.node_config, None, Some(pk), None, Some("wallet_balance".to_string()));
+    }
 
-    // ui.checkbox(&mut ls.wallet_state.show_btc_info, "Show BTC Info / Enable BTC");
-    // if ls.wallet_state.show_btc_info {
-    //     data_item(ui, "BTC Address", pk.to_bitcoin_address(&ls.node_config.network).unwrap_or("".to_string()));
-    // }
 
-    send_receive_bar(ui, ls, pk, depends);
+    send_receive_bar(ui, ls, pk, g);
 
     ui.separator();
     ui.spacing();
@@ -669,8 +662,13 @@ fn proceed_from_pk<G, E>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_ho
         SendReceiveTabs::Send => {
             show_prepared = true;
             ls.wallet.send_view_top(
-                ui, pk, depends, d,
-                ls.wallet.address_labels.clone(), &ls.keysign_info(&depends), &ls.node_config);
+                ui, pk, g, d,
+                ls.wallet.address_labels.clone(),
+                hot_tsi,
+                &ls.node_config,
+                csi,
+                allowed
+            );
         }
         SendReceiveTabs::Receive => {
             if let Some(rd) = ls.wallet.receive_data.as_ref() {
@@ -678,27 +676,23 @@ fn proceed_from_pk<G, E>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_ho
             }
         }
         SendReceiveTabs::Custom => {
-            show_prepared = true;
-            ui.label("Enter custom transaction JSON:");
-            ui.horizontal(|ui| bounded_text_area(ui, &mut ls.wallet.custom_tx_json));
+            ls.wallet.custom_tx.view::<E, G>(ui, g, hot_tsi, csi, allowed);
         }
         SendReceiveTabs::Swap => {
-            SwapState::view(ui, ls)
+            SwapState::view(ui, ls, g, pk, allowed, csi, hot_tsi);
         }
         SendReceiveTabs::Home => {
-
             let rows = d.recent_tx(Some(pk), None, false, None);
             let mut tx_table = TransactionTable::default();
             tx_table.rows = rows;
-            tx_table.full_view::<E>(ui, &depends.get_network(), d, Some(pk));
+            tx_table.full_view::<E>(ui, &g.get_network(), d, Some(pk));
             ui.separator();
-
         }
         SendReceiveTabs::Portfolio => {
-            portfolio_transact::portfolio_view(ui, ls, pk, depends);
+            ls.wallet.port.view(ui, pk, g, hot_tsi, &ls.node_config, d, csi, allowed);
         }
         SendReceiveTabs::Stake => {
-            ui.label("Stake");
+            ls.wallet.stake.view(ui, d, g, pk, hot_tsi, &ls.node_config, allowed, csi);
         }
 
     }

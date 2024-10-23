@@ -510,6 +510,7 @@ pub(crate) fn mnemonic_window(
         ls.keygen_state.mnemonic_window_state.set_hot_mnemonic = false;
     }
 
+    let salt = &mut ls.keygen_state.generate_mnemonic_state.salt_words;
     let state = &mut ls.keygen_state.mnemonic_window_state;
 
 
@@ -613,6 +614,9 @@ pub(crate) fn mnemonic_window(
                         ui.checkbox(&mut state.persist_disk, "Persist Disk");
                         if ui.button("Set As Hot Mnemonic").clicked() {
                             state.set_hot_mnemonic = true;
+                        }
+                        if ui.button("Use As Salt").clicked() {
+                            *salt = state.words.clone();
                         }
                     });
             });

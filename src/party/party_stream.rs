@@ -182,7 +182,8 @@ impl PartyEventBuilder for PartyEvents {
         if incoming {
             amount = t.tx.output_rdg_amount_of_pk(&self.party_public_key)?;
             // Is Swap
-            if let Some(swap_destination) = t.tx.swap_destination() {
+            let dest = t.tx.swap_destination();
+            if let Some(swap_destination) = dest {
                 // Represents a withdrawal from network / swap initiation event
                 self.fulfill_order(
                     amount.clone(), false, time, None, &swap_destination, false, e, None, swap_destination.currency_or(),

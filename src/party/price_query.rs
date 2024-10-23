@@ -68,11 +68,14 @@ impl PriceDataPointQueryImpl for PriceDataPointUsdQuery {
                     let time = txo.tx.time()?.clone();
                     let currency = txo.tx.external_destination_currency();
                     if let Some(c) = currency {
-                        if let Ok(price) = self.query_price(time, c, ds, external_network_resources).await
-                            .with_detail("tx", txo.tx.json_or())
-                            .with_detail("destination_currency", c.json_or())
-                            .log_error() {
-                            txo.price_usd = Some(price);
+                        if c != SupportedCurrency::Redgold {
+                            if let Ok(price) = self.query_price(time, c, ds, external_network_resources).await
+                                .with_detail("tx", txo.tx.json_or())
+                                .with_detail("destination_currency", c.json_or())
+                                .log_error()
+                            {
+                                txo.price_usd = Some(price);
+                            }
                         }
                     }
                     if let Some(pr) = txo.tx.portfolio_request() {

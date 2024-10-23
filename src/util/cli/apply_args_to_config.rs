@@ -37,6 +37,11 @@ pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<Co
     if rg_args.offline {
         config.offline = Some(true);
     }
+    if rg_args.s3_backup_bucket.is_some() {
+        let mut er = config.external.unwrap_or(Default::default());
+        er.s3_backup_bucket = rg_args.s3_backup_bucket.clone();
+        config.external = Some(er);
+    }
 
     config
 }

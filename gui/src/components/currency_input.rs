@@ -27,7 +27,7 @@ pub fn currency_combo_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency
 }
 
 pub fn supported_wallet_currencies() -> Vec<SupportedCurrency> {
-    vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
+    vec![SupportedCurrency::Redgold, SupportedCurrency::Bitcoin, SupportedCurrency::Ethereum]
 }
 
 

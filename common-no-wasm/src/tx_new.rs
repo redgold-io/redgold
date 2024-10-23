@@ -37,6 +37,7 @@ impl TransactionBuilderSupport for TransactionBuilder {
             transaction: tx,
             utxos: vec![],
             used_utxos: vec![],
+            used_utxo_ids: vec![],
             network: Some(network.clone()),
             nc: Some(config.clone()),
             fee_addrs,
