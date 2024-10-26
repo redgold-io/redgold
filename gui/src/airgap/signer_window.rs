@@ -65,26 +65,29 @@ impl AirgapSignerWindow {
             .default_width(500.0)
             .show(ui.ctx(), |ui| {
                 ui.vertical(|ui| {
-                    match &self.mode {
-                        AirgapWindowMode::DisplayingMessage => {
-                            ui.label("Displaying Message");
+                    match &self.transport {
+                        AirgapTransport::Qr(pref_capture) => {
+                            match &self.mode {
+                                AirgapWindowMode::DisplayingMessage => {
+                                    ui.label("Displaying Message");
+                                }
+                                AirgapWindowMode::AwaitingDataReceipt => {
+                                    ui.label("Awaiting Data Receipt");
+                                }
+                            }
                         }
-                        AirgapWindowMode::AwaitingDataReceipt => {
-                            ui.label("Awaiting Data Receipt");
+                        AirgapTransport::File(file_out_dir) => {
+                            match &self.mode {
+                                AirgapWindowMode::DisplayingMessage => {
+                                    ui.label("Displaying Message");
+                                }
+                                AirgapWindowMode::AwaitingDataReceipt => {
+                                    ui.label("Awaiting Data Receipt");
+                                }
+                            }
                         }
                     }
-                    match (&self.transport, &self.mode) {
-                        (AirgapTransport::Qr(pref), AirgapWindowMode::DisplayingMessage) => {
 
-                        }
-                        AirgapTransport::File(_) => {}
-                    }
-                    // if let Some(i) = state.qr_show_state.qr_image.as_ref() {
-                    //     i.show_scaled(ui, 1.0);
-                    // }
-                    // if let Some(t) = &mut state.qr_show_state.qr_text.clone() {
-                    //     bounded_text_area(ui, t);
-                    // }
                 });
             });
     }

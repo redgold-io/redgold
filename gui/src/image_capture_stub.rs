@@ -4,19 +4,13 @@ use rqrr::MetaData;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::functionality::capture::CaptureLike;
-use crate::image_capture_openpnp::{convert_to_image, get_devices, get_stream, qr_parse_capture, read_stream};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CaptureStream {
 
 }
 
 impl CaptureLike for CaptureStream {
-
-}
-
-
-impl CaptureLike for crate::image_capture::CaptureStream {
     fn read_qr(&mut self) -> RgResult<(DynamicImage, RgResult<(MetaData, String)>)> {
         Err(error_info("Not implemented"))
     }
