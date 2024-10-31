@@ -1,0 +1,50 @@
+services:
+  ethereum-node:
+    image: ethereum/client-go
+    container_name: ethereum-sepolia
+    restart: unless-stopped
+    volumes:
+      - /disk/ethereum-sepolia:/root
+    ports:
+      - "8555:8545"  # Changed from 8545
+      - "30304:30303"  # Changed from 30303
+      - "8556:8546"  # Changed from 8546
+      - "8552:8551"  # Changed from 8551
+    command:
+      - --sepolia
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.api=eth,net,web3
+      - --http.corsdomain=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.api=eth,net,web3
+      - --syncmode=snap
+      - --db.engine=leveldb
+      - --cache=1024
+      - --maxpeers=50
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=8551
+      - --authrpc.vhosts=*
+      - --authrpc.jwtsecret=/root/jwt.hex
+  beacon-chain:
+    image: gcr.io/prysmaticlabs/prysm/beacon-chain:stable
+    container_name: beacon-chain-sepolia
+    restart: unless-stopped
+    volumes:
+      - /disk/ethereum-sepolia/beacon-chain:/beacon-data
+      - /disk/ethereum-sepolia/jwt.hex:/data/jwt.hex
+    ports:
+      - "4001:4000"  # Changed from 4000
+      - "13001:13000"  # Changed from 13000
+    command:
+      - --accept-terms-of-use
+      - --sepolia
+      - --datadir=/beacon-data
+      - --rpc-host=0.0.0.0
+      - --grpc-gateway-host=0.0.0.0
+      - --monitoring-host=0.0.0.0
+      - --execution-endpoint=http://ethereum-node:8551
+      - --jwt-secret=/data/jwt.hex
+      - --checkpoint-sync-url=https://sepolia.beaconstate.info
+      - --genesis-beacon-api-url=https://sepolia.beaconstate.info
