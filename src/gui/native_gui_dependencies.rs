@@ -102,8 +102,9 @@ impl GuiDepends for NativeGuiDepends {
     fn sign_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()> {
         let mut ext = self.external_res()?.clone();
         let p = tx.clone();
+        let self_clone = self.clone();
         self.spawn(async move {
-            let res = p.sign(ext).await;
+            let res = p.sign(ext, self_clone).await;
             results.send(res).unwrap();
         });
         Ok(())

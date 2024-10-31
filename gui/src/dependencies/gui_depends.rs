@@ -17,8 +17,16 @@ pub struct HardwareSigningInfo {
     pub device_id: Option<String>
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+pub struct MnemonicWordsAndPassphrasePath {
+    pub words: String,
+    pub passphrase: Option<String>,
+    pub path: Option<String>
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TransactionSignInfo {
+    Mnemonic(MnemonicWordsAndPassphrasePath),
     PrivateKey(String),
     ColdOrAirgap(HardwareSigningInfo)
 }
@@ -45,47 +53,6 @@ impl TransactionSignInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
-pub struct GetXPubLikeRequest {
-    pub path: String,
-    pub currency: Option<SupportedCurrency>
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
-pub struct SignExternal {
-    pub serialized_tx: String,
-    pub currency: SupportedCurrency
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
-pub struct SignInternal {
-    pub path: String,
-    pub key_name: Option<String>,
-    pub txs: Vec<Transaction>
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, EnumString)]
-pub enum AirgapMessage {
-    SignInternal(SignInternal),
-    GetXPubLike(GetXPubLikeRequest),
-    SignExternal(SignExternal)
-}
-
-impl AirgapMessage {
-    pub fn sign(path: String, tx: Transaction) -> Self {
-        let mut internal = SignInternal::default();
-        internal.path = path;
-        internal.txs.push(tx);
-        AirgapMessage::SignInternal(internal)
-    }
-}
-
-impl Default for AirgapMessage {
-    fn default() -> Self {
-        AirgapMessage::SignInternal(SignInternal::default())
-    }
-}
-
 pub trait GuiDepends {
 
     fn parse_address(&self, address: impl Into<String>) -> RgResult<Address>;
@@ -104,7 +71,10 @@ pub trait GuiDepends {
     fn tx_builder(&self) -> TransactionBuilder;
 
     fn sign_transaction(&self, tx: &Transaction, sign_info: &TransactionSignInfo) -> RgResult<Transaction>;
-    fn sign_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()>;
+    fn sign_prepared_transaction(&mut self,
+                                 tx: &PreparedTransaction,
+                                 results: flume::Sender<RgResult<PreparedTransaction>>,
+    ) -> RgResult<()>;
     fn broadcast_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()>;
     fn spawn(&self, f: impl std::future::Future<Output = ()> + Send + 'static);
 

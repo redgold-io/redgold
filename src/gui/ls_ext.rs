@@ -293,34 +293,34 @@ pub fn create_swap_tx(ls: &mut LocalState) {
         });
     });
 }
-pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-    let ups = ls.updates.sender.clone();
-    let res = ls.external_network_resources.clone();
-    tokio::spawn(async move {
-        let res = tx.sign(res).await;
-        send_update_sender(&ups, move |lss| {
-            let (err, tx) = match &res {
-                Ok(tx) => (None, Some(tx)),
-                Err(e) => (Some(e.json_or()), None)
-            };
-            lss.swap_state.tx_progress.signed(tx.cloned(), err);
-            lss.swap_state.changing_stages = false;
-        });
-    });
-}
-
-pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-    let ups = ls.updates.sender.clone();
-    let res = ls.external_network_resources.clone();
-    tokio::spawn(async move {
-        let res = tx.broadcast(res).await;
-        send_update_sender(&ups, move |lss| {
-            let (err, tx) = match &res {
-                Ok(tx) => (None, Some(tx)),
-                Err(e) => (Some(e.json_or()), None)
-            };
-            lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
-            lss.swap_state.changing_stages = false;
-        });
-    });
-}
+// pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
+//     let ups = ls.updates.sender.clone();
+//     let res = ls.external_network_resources.clone();
+//     tokio::spawn(async move {
+//         let res = tx.sign(res).await;
+//         send_update_sender(&ups, move |lss| {
+//             let (err, tx) = match &res {
+//                 Ok(tx) => (None, Some(tx)),
+//                 Err(e) => (Some(e.json_or()), None)
+//             };
+//             lss.swap_state.tx_progress.signed(tx.cloned(), err);
+//             lss.swap_state.changing_stages = false;
+//         });
+//     });
+// }
+//
+// pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
+//     let ups = ls.updates.sender.clone();
+//     let res = ls.external_network_resources.clone();
+//     tokio::spawn(async move {
+//         let res = tx.broadcast(res).await;
+//         send_update_sender(&ups, move |lss| {
+//             let (err, tx) = match &res {
+//                 Ok(tx) => (None, Some(tx)),
+//                 Err(e) => (Some(e.json_or()), None)
+//             };
+//             lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
+//             lss.swap_state.changing_stages = false;
+//         });
+//     });
+// }

@@ -125,15 +125,9 @@ impl Default for NodeInfoConfig {
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
-    pub config_data: ConfigData,
-    // User supplied params
-    // TODO: Should this be a class Peer_ID with a multihash of the top level?
-    // TODO: Review all schemas to see if we can switch to multiformats types.
-    // pub self_peer_id: Vec<u8>,
-    // Remove above and rename to peer_id -- this field is not in use yet.
+    pub config_data: Arc<ConfigData>,
     pub peer_id: PeerId,
-    // This field is not used yet; it is a placeholder for future use.
-    pub public_key: structs::PublicKey,
+    pub public_key: PublicKey,
     // TODO: Change to Seed class? or maybe not leave it as it's own
     pub mnemonic_words: String,
     // Sometimes adjusted user params
@@ -190,6 +184,23 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn party_poll_interval(&self) -> Duration {
+        Duration::from_millis(self.config_data.party.as_ref().and_then(|n| Some(n.poll_interval)).unwrap_or(300_000) as u64)
+    }
+
+    pub fn nat_traversal_required(&self) -> bool {
+        self.config_data.node.as_ref()
+            .and_then(|x| x.nat_traversal_required)
+            .unwrap_or(false)
+    }
+
+    pub fn udp_keepalive(&self) -> Duration {
+        self.config_data.node.as_ref()
+            .and_then(|x| x.udp_keepalive_seconds)
+            .map(|x| Duration::from_secs(x))
+            .unwrap_or(Duration::from_secs(60))
+    }
 
     pub fn portfolio_fulfillment_agent_duration(&self) -> Duration {
         let default = 3600 * 12;

@@ -170,8 +170,7 @@ impl StakeState {
                         combo_box(ui, &mut self.deposit_mode, "Deposit Mode", DepositMode::iter().collect::<Vec<DepositMode>>(), self.deposit.locked(), 100.0, None);
                         self.currency_input.view(ui, &d.price_map_usd_pair_incl_rdg);
                     });
-                    self.deposit.info_box_view(ui, allowed_signing_methods);
-                    let ev = self.deposit.progress_buttons(ui, g, tsi, csi);
+                    let ev = self.deposit.view(ui,  g, tsi, csi, allowed_signing_methods);
                     if ev.next_stage {
                         if self.deposit.stage == TransactionStage::Created {
                             let mut b = g.tx_builder();
@@ -229,8 +228,7 @@ impl StakeState {
                               None
                     );
 
-                    self.withdrawal.info_box_view(ui, allowed_signing_methods);
-                    let ev = self.withdrawal.progress_buttons(ui, g, tsi, csi);
+                    let ev = self.withdrawal.view(ui, g, tsi, csi, allowed_signing_methods);
                     if ev.next_stage {
                         if self.withdrawal.stage == TransactionStage::Created {
                             let mut b = g.tx_builder();
@@ -279,8 +277,7 @@ impl StakeState {
                     );
 
                     if let Some(event) = pending_label_map.get(&self.complete_label) {
-                        self.complete.info_box_view(ui, allowed_signing_methods);
-                        let ev = self.complete.progress_buttons(ui, g, tsi, csi);
+                        let ev = self.complete.view(ui, g, tsi, csi, allowed_signing_methods);
                         if ev.next_stage {
                             if self.complete.stage == TransactionStage::Created {
                                 let (s, r) = flume::bounded(1);

@@ -1,3 +1,3 @@
 pub mod gap_message;
-mod signer_window;
-mod receiver_tab;
+pub mod signer_window;
+pub mod receiver_tab;

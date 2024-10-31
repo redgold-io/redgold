@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 use async_trait::async_trait;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::airgap::signer_window::AirgapTransport;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
-use redgold_gui::dependencies::gui_depends::{AirgapMessage, TransactionSignInfo};
+use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::airgap::AirgapMessage;
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -16,11 +18,12 @@ use crate::util::current_time_unix;
 #[async_trait]
 pub trait TxSignerProgress {
 
-    async fn sign<T>(
+    async fn sign<T, G>(
         &self,
         external_resources: T,
-    ) -> RgResult<PreparedTransaction> where T: ExternalNetworkResources + Send ;
-
+        g: G
+    ) -> RgResult<PreparedTransaction>
+    where T: ExternalNetworkResources + Send, G: GuiDepends + Send + Clone;
 }
 
 
@@ -38,10 +41,12 @@ pub trait TxBroadcastProgress {
 #[async_trait]
 impl TxSignerProgress for PreparedTransaction {
 
-    async fn sign<T>(
+    async fn sign<T, G>(
         &self,
         external_resources: T,
-    ) -> RgResult<PreparedTransaction>  where T: ExternalNetworkResources + Send {
+        g: G
+    ) -> RgResult<PreparedTransaction>
+    where T: ExternalNetworkResources + Send, G: GuiDepends + Send + Clone {
         let mut updated = self.clone();
         match self.currency {
             SupportedCurrency::Redgold => {
@@ -55,8 +60,10 @@ impl TxSignerProgress for PreparedTransaction {
                         updated.tx = Some(transaction);
                     }
                     TransactionSignInfo::ColdOrAirgap(h) => {
-                        let msg = AirgapMessage::sign(h.path.clone(), tx);
-                        match self.signing_method {
+                        let msg = AirgapMessage::sign(h.path.clone(), tx.clone());
+                        let mut transport = AirgapTransport::default();
+                        let mut await_airgap = false;
+                        match &self.signing_method {
                             XPubLikeRequestType::Cold => {
                                 let tx = external_resources.trezor_sign(
                                     self.from.clone(), h.path, tx.clone()
@@ -65,17 +72,18 @@ impl TxSignerProgress for PreparedTransaction {
                             }
                             XPubLikeRequestType::Hot => { panic!("Hot signing not supported for Redgold within cold sign workflow") }
                             XPubLikeRequestType::QR => {
-                                updated.qr_message = Some(msg);
+                                let stored_capture = g.get_config().secure.and_then(|s| s.capture_device_name);
+                                transport = AirgapTransport::Qr(stored_capture);
                             }
                             XPubLikeRequestType::File => {
                                 let file = updated.file_input.clone();
-                                let p = PathBuf::from(file);
-                                let t = current_time_unix();
-                                let joined = p.join(format!("{}_signed_tx.json", t));
-                                msg.write_json(joined.to_str().unwrap())?;
+                                transport = AirgapTransport::File(file);
                             }
                         }
+                        updated.airgap_signer_window.initialize_with(msg, transport);
+
                     }
+                    TransactionSignInfo::Mnemonic(_) => {}
                 }
             }
             SupportedCurrency::Bitcoin => {

@@ -8,10 +8,11 @@ use rqrr::MetaData;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureStream {
     #[serde(skip)]
     pub stream: Option<Arc<Mutex<Stream>>>,
+    pub active_device: Option<String>,
 }
 
 impl CaptureLike for CaptureStream {
@@ -36,7 +37,9 @@ impl CaptureLike for CaptureStream {
     }
     fn change(&mut self, device_name: String) -> RgResult<()> {
         let new = Self::new(Some(device_name))?;
-        self.stream = new.stream;
+        self.stream = new.stream.clone();
+        self.active_device = new.active_device.clone();
+        Ok(())
     }
     fn new(device_name: Option<String>) -> RgResult<Self> {
         let devices = get_devices()?;
@@ -53,6 +56,7 @@ impl CaptureLike for CaptureStream {
         let s = get_stream(dev, f)?;
         let s = CaptureStream {
             stream: Some(Arc::new(Mutex::new(s))),
+            active_device: Some(dev.name.clone()),
         };
         Ok(s)
     }

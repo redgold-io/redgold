@@ -57,13 +57,10 @@ impl Node {
             Some(node_config.udp_port()));
         sjh.add("UdpServer", tokio::spawn(udp));
 
-        if node_config.config_data.clone().node.unwrap().nat_traversal_required.unwrap_or(false) ||
+        if node_config.nat_traversal_required() ||
             relay.node_metadata().await.map(|n| n.nat_traversal_required()).unwrap_or(false) {
             let alive = UdpKeepAlive::new(&relay.peer_message_tx,
-                                          node_config.config_data.clone().node
-                                              .unwrap()
-                                              .udp_keepalive_seconds
-                                              .map(Duration::from_secs),
+                                          node_config.udp_keepalive(),
                                           vec![],
                                           &relay
             );
@@ -133,7 +130,7 @@ impl Node {
 
         let watcher = PartyWatcher::new(&relay, external_network_resources);
         sjh.add("PartyWatcher", run_interval_fold(
-            watcher, Duration::from_millis(relay.node_config.config_data.clone().party.unwrap().poll_interval as u64), false
+            watcher, relay.node_config.party_poll_interval(), false
         ));
 
         sjh.add("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone())));

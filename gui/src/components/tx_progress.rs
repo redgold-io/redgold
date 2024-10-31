@@ -10,16 +10,18 @@ use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::airgap::{AirgapMessage, AirgapResponse};
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
+use crate::airgap::signer_window::{AirgapSignerWindow, AirgapWindowMode};
 use crate::common;
 use crate::common::{big_button, data_item, editable_text_input_copy};
 use crate::components::combo_box::combo_box;
 use crate::components::currency_input::currency_combo_box;
-use crate::dependencies::gui_depends::{GuiDepends, AirgapMessage, TransactionSignInfo};
+use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 
 
 
@@ -114,7 +116,7 @@ impl Default for TransactionProgressFlow {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct PreparedTransaction {
     pub currency: SupportedCurrency,
     pub from: PublicKey,
@@ -135,10 +137,25 @@ pub struct PreparedTransaction {
     pub tsi: TransactionSignInfo,
     pub signing_in_progress: bool,
     pub signing_method: XPubLikeRequestType,
-    pub qr_message: Option<AirgapMessage>,
     pub error: Option<ErrorInfo>,
     pub file_input: String,
     pub airgap_signer_window: AirgapSignerWindow,
+}
+
+impl PreparedTransaction {
+    pub fn apply_airgap_response(&mut self, msg: AirgapResponse) {
+        if let Some(t) = self.tx.as_mut() {
+            if let Some(s) = msg.sign_internal.as_ref() {
+                if let Some(zero) = s.signed_txs.get(0) {
+                    for sig in zero.signatures.iter() {
+                        if let Some(i) = t.inputs.get_mut(sig.index as usize) {
+                            i.proof = sig.proof.clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -431,6 +448,23 @@ impl TransactionProgressFlow {
         }
 
         if self.stage == TransactionStage::AwaitingSignatures {
+            if self.signing_method == XPubLikeRequestType::QR || self.signing_method == XPubLikeRequestType::File {
+                let mut applied = false;
+                if let Some(p) = self.prepared_tx.as_mut() {
+                    p.airgap_signer_window.window_view(ui, g);
+                    if p.airgap_signer_window.mode == AirgapWindowMode::CompletedDataReceipt {
+                        if let Some(msg) = p.airgap_signer_window.message_response.as_ref() {
+                            p.apply_airgap_response(msg.clone());
+                            applied = true;
+                        } else {
+                            self.unsigned_info_box = "Failed to decode message response".to_string();
+                        }
+                    }
+                }
+                if applied {
+                    self.signed(self.prepared_tx.clone(), None);
+                }
+            }
             if let Some(r) = self.receiver.as_ref() {
                 if let Ok(res) = r.try_recv() {
                     if let Ok(res) = res {
@@ -442,11 +476,8 @@ impl TransactionProgressFlow {
                             prepped.signed_hash = res.hash_hex();
                             self.signed(Some(prepped.clone()), None);
                         } else {
-                            if self.signing_method = XPubLikeRequestType::QR {
-                                let res = res.qr_message.unwrap();
-                                let mut prepped = self.prepared_tx.clone().unwrap();
-                                prepped.qr_message = Some(res.clone());
-                                self.signed(Some(prepped.clone()), None);
+                            if self.signing_method == XPubLikeRequestType::QR || self.signing_method == XPubLikeRequestType::File {
+                                self.prepared_tx = Some(res.clone());
                             }
                         }
                     } else if let Err(e) = res {

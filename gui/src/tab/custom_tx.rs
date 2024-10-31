@@ -53,8 +53,7 @@ impl CustomTxState {
         }
 
         if self.valid {
-            self.tx.info_box_view(ui, allowed);
-            let ev = self.tx.progress_buttons(ui, g, tsi, csi);
+            let ev = self.tx.view(ui, g, tsi, csi, allowed);
             if ev.next_stage_create {
                 if let Some(txx) = self.tx_input.clone() {
                     self.tx.with_built_rdg_tx(Ok(txx));

@@ -18,7 +18,7 @@ use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::util::dollar_formatter::{format_dollar_amount, format_dollar_amount_with_prefix, format_dollar_amount_with_prefix_and_suffix};
-use crate::gui::ls_ext::{broadcast_swap, create_swap_tx, sign_swap};
+use crate::gui::ls_ext::{create_swap_tx};
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs;
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs::Swap;
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
@@ -167,7 +167,10 @@ impl SwapState {
                 }
             }
 
-            ls.swap_state.tx_progress.info_box_view(ui, allowed);
+            let ev = ls.swap_state.tx_progress.view(ui,depends, tsi, csi, allowed);
+            if ev.next_stage_create {
+                create_swap_tx(ls);
+            }
 
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
@@ -203,28 +206,28 @@ impl SwapState {
                     ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));
                     ui.label(RichText::new(ls.swap_state.invalid_reason.clone()).color(Color32::RED));
                 } else {
-                    if ls.swap_state.stage != SwapStage::CompleteShowTrackProgress {
-                        if ls.swap_state.tx_progress.stage_err.is_none() {
-                            if !ls.swap_state.changing_stages {
-                                let changed = Self::big_proceed_button(ui, ls, next_stage, button_text);
-                                if changed {
-                                    // All these stages are off by one because they've just "changed" already.
-                                    match ls.swap_state.stage {
-                                        SwapStage::StartPreparing => {}
-                                        SwapStage::ShowAmountsPromptSigning => {
-                                            create_swap_tx(ls);
-                                        }
-                                        SwapStage::ViewSignedAllowBroadcast => {
-                                            sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
-                                        }
-                                        SwapStage::CompleteShowTrackProgress => {
-                                            broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // if ls.swap_state.stage != SwapStage::CompleteShowTrackProgress {
+                    //     if ls.swap_state.tx_progress.stage_err.is_none() {
+                    //         if !ls.swap_state.changing_stages {
+                    //             let changed = Self::big_proceed_button(ui, ls, next_stage, button_text);
+                    //             if changed {
+                    //                 // All these stages are off by one because they've just "changed" already.
+                    //                 match ls.swap_state.stage {
+                    //                     SwapStage::StartPreparing => {}
+                    //                     SwapStage::ShowAmountsPromptSigning => {
+                    //                         // create_swap_tx(ls);
+                    //                     }
+                    //                     SwapStage::ViewSignedAllowBroadcast => {
+                    //                         // sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                    //                     }
+                    //                     SwapStage::CompleteShowTrackProgress => {
+                    //                         // broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                    //                     }
+                    //                 }
+                    //             }
+                    //         }
+                    //     }
+                    // }
                 }
             });
 

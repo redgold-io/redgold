@@ -205,8 +205,7 @@ impl PortfolioState {
                         400.0,
                         Some("liquidation".to_string())
                     );
-                    self.liquidation_tx.info_box_view(ui, allowed);
-                    let event = self.liquidation_tx.progress_buttons(ui, g, &tsi, csi);
+                    let event = self.liquidation_tx.view(ui, g, &tsi, csi, allowed);
                     if let Some(TransactionStage::NotCreated) = event.next_stage_transition_from {
                         let p = label_to_instance.get(&selected).unwrap();
                         // let ports = p.portfolio_request.portfolio_id.as_ref().unwrap().clone();
@@ -330,8 +329,8 @@ impl PortfolioState {
                 }
             });
         }
-        self.tx.info_box_view(ui, allowed);
-        let event = self.tx.progress_buttons(ui, g, &ksi, csi);
+
+        let event = self.tx.view(ui, g, &ksi, csi, allowed);
         if event.reset {
             self.portfolio_input_name = "".to_string();
         }

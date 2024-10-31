@@ -217,11 +217,10 @@ impl WalletState {
         self.send_currency_input.view(ui, &d.price_map_usd_pair_incl_rdg);
         self.send_currency_type = self.send_currency_input.input_currency.clone();
         self.send_address_input_box.view(ui, labels, g);
-        self.send_tx_progress.info_box_view(ui, allowed);
         ui.separator();
 
         if self.send_address_input_box.valid {
-            let event = self.send_tx_progress.progress_buttons(ui, g, tsi, csi );
+            let event = self.send_tx_progress.view(ui, g, tsi, csi, allowed);
 
             if event.reset {
                 self.send_tx_progress.reset();

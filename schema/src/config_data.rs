@@ -39,7 +39,9 @@ pub struct NodeData {
     pub nat_traversal_required: Option<bool>,
     pub udp_keepalive_seconds: Option<u64>,
     pub service_intervals: Option<ServiceIntervals>,
-    pub server_index: Option<i64>
+    pub server_index: Option<i64>,
+    pub port_offset: Option<i64>,
+    pub passive: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -64,6 +66,7 @@ pub struct ExternalResources {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 #[serde(default)] // This allows fields to be omitted in TOML
 pub struct Keys {
+    words: Option<String>,
     aws_access: Option<String>,
     aws_secret: Option<String>
 }

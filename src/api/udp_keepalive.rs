@@ -19,7 +19,7 @@ pub struct UdpKeepAlive {
 impl UdpKeepAlive {
     pub fn new(
         peer_outgoing: &Channel<PeerMessage>,
-        duration: Option<Duration>,
+        duration: Duration,
         keep_alive_peers: Vec<PublicKey>,
         relay: &Relay
     ) -> JoinHandle<RgResult<()>> {
@@ -28,7 +28,7 @@ impl UdpKeepAlive {
             keep_alive_peers,
             relay: relay.clone(),
         };
-        run_interval_fold(s, duration.unwrap_or(Duration::from_secs(60)), false)
+        run_interval_fold(s, duration, false)
     }
 }
 
