@@ -52,6 +52,7 @@ hmac = "0.12.1"
 pbkdf2 = "0.12.2"
 rand_core = "0.6.4"
 monero = "0.21.0"
+sequoia-openpgp = "1.21.2"
 #[dependencies.bitcoin]
 #version = "0.21"
 #features = ["serde", "bitcoinconsensus"]
