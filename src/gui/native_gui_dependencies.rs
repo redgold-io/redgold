@@ -13,6 +13,7 @@ use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
@@ -20,7 +21,7 @@ use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::conf::local_stored_state::NamedXpub;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
@@ -127,9 +128,15 @@ impl GuiDepends for NativeGuiDepends {
                 let mut signed = tx.sign(&KeyPair::from_private_hex(str.clone())?)?;
                 Ok(signed.with_hashes().clone())
             }
+            TransactionSignInfo::Mnemonic(m) => {
+                let str = WordsPass::new(m.words.clone(), m.passphrase.clone())
+                    .private_at(m.clone().path.ok_msg("Path not provided")?)?;
+                let mut tx = tx.clone();
+                let mut signed = tx.sign(&KeyPair::from_private_hex(str.clone())?)?;
+                Ok(signed.with_hashes().clone())
+            }
             _ => "Unimplemented".to_error()
             // TransactionSignInfo::ColdHardwareWallet(_) => {}
-            // TransactionSignInfo::Qr(_) => {}
         }
     }
 

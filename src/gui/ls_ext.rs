@@ -122,7 +122,19 @@ where G: Send + Clone + GuiDepends {
         price_map_usd_pair: price_map,
         party_data,
         first_party,
+        airgap_signer: Default::default(),
     };
+
+    ls.wallet.send_tx_progress.with_config(&node_config);
+    ls.wallet.stake.complete.with_config(&node_config);
+    ls.wallet.stake.deposit.with_config(&node_config);
+    ls.wallet.stake.withdrawal.with_config(&node_config);
+    ls.swap_state.tx_progress.with_config(&node_config);
+    ls.wallet.custom_tx.tx.with_config(&node_config);
+    ls.wallet.port.tx.with_config(&node_config);
+    ls.wallet.port.liquidation_tx.with_config(&node_config);
+    // ls.airgap_signer.interior_view()
+
 
     ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
     info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
@@ -197,6 +209,10 @@ where G: Send + Clone + GuiDepends {
         let first_xpub = new_xpubs.get(0).unwrap().clone();
         ls.wallet.selected_xpub_name = first_xpub.name.clone();
         ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
+    }
+
+    if ls.local_stored_state.xpubs.clone().unwrap_or_default().len() > 2 {
+        ls.wallet.send_address_input_box.address_input_mode = redgold_gui::components::address_input_box::AddressInputMode::Saved;
     }
 
     // TODO: Add from environment

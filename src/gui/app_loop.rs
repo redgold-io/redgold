@@ -21,7 +21,7 @@ use crate::util;
 use rand::Rng;
 use rocket::form::validate::Contains;
 use serde::{Deserialize, Serialize};
-use redgold_gui::dependencies::gui_depends::{HardwareSigningInfo, TransactionSignInfo};
+use redgold_gui::dependencies::gui_depends::{HardwareSigningInfo, MnemonicWordsAndPassphrasePath, TransactionSignInfo};
 // impl NetworkStatusInfo {
 //     pub fn default_vec() -> Vec<Self> {
 //         NetworkEnvironment::status_networks().iter().enumerate().map()
@@ -71,11 +71,13 @@ pub struct LocalState {
     pub price_map_usd_pair: HashMap<SupportedCurrency, f64>,
     pub party_data: HashMap<PublicKey, PartyInternalData>,
     pub first_party: Option<PartyInternalData>,
+    pub airgap_signer: AirgapSignerWindow,
 }
 
 pub trait LocalStateAddons {
     fn process_tab_change(&mut self, p0: Tab);
     fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool);
+    fn add_with_pass_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool, passphrase: Option<String>);
     fn secure_or(&self) -> DataStore;
     fn persist_local_state_store(&self);
     fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()>;
@@ -120,8 +122,24 @@ impl LocalStateAddons for LocalState {
                     lss.upsert_mnemonic(StoredMnemonic {
                         name: name.clone(),
                         mnemonic: mnemonic.clone(),
+                        passphrase: None,
                         persist_disk: Some(persist_disk),
                     });
+                })
+        }).unwrap();
+    }
+    fn add_with_pass_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool, passphrase: Option<String>) {
+        let pass = passphrase.clone();
+        self.updates.sender.send(StateUpdate {
+            update: Box::new(
+                move |lss: &mut LocalState| {
+                    let mut m = StoredMnemonic {
+                        name: name.clone(),
+                        mnemonic: mnemonic.clone(),
+                        passphrase: pass.clone(),
+                        persist_disk: Some(persist_disk),
+                    };
+                    lss.upsert_mnemonic(m);
                 })
         }).unwrap();
     }
@@ -267,6 +285,7 @@ use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
 
 
 use redgold_data::data_store::DataStore;
+use redgold_gui::airgap::signer_window::AirgapSignerWindow;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
@@ -301,6 +320,7 @@ use crate::infra::deploy::is_windows;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::structs::HashType::Transaction;
 
 static INIT: Once = Once::new();
 
@@ -426,6 +446,16 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
             },
             Tab::OTP => {
                 otp_tab(ui, ctx, local_state);
+            }
+            Tab::Airgap => {
+                // local_state.wallet.active_hot_mnemonic
+                let x = MnemonicWordsAndPassphrasePath{
+                    words: local_state.keygen_state.mnemonic_window_state.words.clone(),
+                    passphrase: local_state.keygen_state.mnemonic_window_state.passphrase.clone(),
+                    path: None,
+                };
+                let info = TransactionSignInfo::Mnemonic(x);
+                local_state.airgap_signer.interior_view(ui, &g, Some(&info));
             }
             _ => {}
         }

@@ -1,5 +1,6 @@
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use futures_util::{SinkExt, StreamExt};
+use metrics::counter;
 use url::Url;
 use serde_json::json;
 use redgold_schema::{ErrorInfoContext, RgResult};
@@ -10,6 +11,7 @@ async fn run_websocket_stream_inf(
     url: String, initial_subscribe_message: String, messages: flume::Sender<String>
 ) -> RgResult<()> {
     loop {
+        counter!("redgold_ws_stream_init").increment(1);
         run_websocket_stream(url.clone(), initial_subscribe_message.clone(), messages.clone()).await.log_error().ok();
     }
 }
@@ -24,6 +26,7 @@ async fn run_websocket_stream(url: String, initial_subscribe_message: String, me
     write.send(Message::Text(initial_subscribe_message.to_string())).await.error_info("Initial subscribe failure")?;
     // Handle incoming messages
     while let Some(message) = read.next().await {
+        counter!("redgold_ws_stream_message").increment(1);
         let message = message.error_info("Websocket read failure")?;
         match message {
             Message::Text(text) => {

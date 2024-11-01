@@ -81,19 +81,29 @@ impl TxSignerProgress for PreparedTransaction {
                             }
                         }
                         updated.airgap_signer_window.initialize_with(msg, transport);
-
                     }
                     TransactionSignInfo::Mnemonic(_) => {}
                 }
             }
-            SupportedCurrency::Bitcoin => {
-                "No support for Bitcoin cold signing yet".to_error()?;
-            },
-            SupportedCurrency::Ethereum => {
-                "No support for Ethereum cold signing yet".to_error()?;
-            },
-            c => {
-                format!("Unsupported currency: {} for cold signing", c.json_or()).to_error()?;
+            _ => {
+                match &self.tsi {
+                    TransactionSignInfo::PrivateKey(_) => {
+                        updated.signed_hash = updated.unsigned_hash.clone();
+                    }
+                    _ => {
+                        match self.currency {
+                            SupportedCurrency::Bitcoin => {
+                                "No support for Bitcoin cold signing yet".to_error()?;
+                            },
+                            SupportedCurrency::Ethereum => {
+                                "No support for Ethereum cold signing yet".to_error()?;
+                            },
+                            c => {
+                                format!("Unsupported currency: {} for cold signing", c.json_or()).to_error()?;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -101,6 +111,7 @@ impl TxSignerProgress for PreparedTransaction {
 
         if let Some(updated_tx) = updated.tx.clone() {
             updated.signed_hash = updated_tx.signed_hash().hex();
+            updated.ser_tx = Some(updated_tx.json_or());
         }
         Ok(updated.clone())
     }

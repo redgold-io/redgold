@@ -176,13 +176,23 @@ impl AirgapSignerWindow {
 
     fn completed_data_receipt<G>(&mut self, g: &G, sign_info: Option<&TransactionSignInfo>, ui: &mut Ui) where G: GuiDepends + Clone + Send {
         ui.label("Data Received");
-        if let Some(tsi) = sign_info {
+        let mut sign_info = sign_info.cloned();
+
+        if let Some(mut tsi) = sign_info {
             bounded_text_area(ui, &mut self.rx_message.json_or());
             self.transport_selector_and_file_input_box(ui, true);
             if ui.button("Sign & Render").clicked() {
                 if let Some(si) = self.rx_message.as_ref().and_then(|m| m.sign_internal.as_ref()) {
+                    match tsi {
+                        TransactionSignInfo::Mnemonic(ref mut h) => {
+                            h.path = Some(si.path.clone());
+                        }
+                        _ => {
+                            return
+                        }
+                    }
                     let processed = si.txs.iter().filter_map(|tx| {
-                        let res = g.sign_transaction(tx, tsi);
+                        let res = g.sign_transaction(tx, &tsi);
                         let post_signed = res.ok().and_then(|r| {
                             let sigs = r.inputs.iter().enumerate().filter_map(|(i, inp)| {
                                 let p = inp.proof.clone();
@@ -243,9 +253,8 @@ impl AirgapSignerWindow {
 
         egui::Window::new("Airgap Send")
             .open(&mut is_visible)
-            .resizable(false)
-            .default_pos(egui::Pos2::new(0.0, 0.0))
-            .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(0.0, 0.0))
+            // .default_pos(egui::Pos2::new(0.0, 0.0))
+            // .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(0.0, 0.0))
             .collapsible(false)
             .min_width(500.0)
             .default_width(500.0)

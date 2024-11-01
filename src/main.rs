@@ -38,7 +38,7 @@ async fn main() {
 
     let node_config = *load_configs().await;
 
-    info!("Starting node main method");
+    // info!("Starting node main method");
     counter!("redgold.node.main_started").increment(1);
 
     tracing::trace!("Starting network environment: {}", node_config.clone().network.to_std_string());

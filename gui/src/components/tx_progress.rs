@@ -55,6 +55,13 @@ pub struct TransactionProgressFlow {
     pub receiver: Option<flume::Receiver<RgResult<PreparedTransaction>>>
 }
 
+impl TransactionProgressFlow {
+    pub fn with_config(&mut self, node_config: &NodeConfig) -> &mut Self {
+        self.file_input = node_config.usb_paths_exist().get(0).cloned().unwrap_or("".to_string());
+        self
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString, Eq, Hash)]
 pub enum TransactionStage {
@@ -209,6 +216,7 @@ impl TransactionProgressFlow {
             SupportedCurrency::Redgold => {
                 let is_swap = party_address.is_some();
                 let mut builder = TransactionBuilder::new(&nc);
+                info!("Builder fee addrs: {}", builder.fee_addrs.json_or());
                 let mut tx_b = builder.with_utxos(&address_info.unwrap().utxo_entries)?;
                 if is_swap {
                     let default = CurrencyAmount::from_rdg(100_000);
@@ -357,6 +365,11 @@ impl TransactionProgressFlow {
                         editable_text_input_copy(ui, "", &mut self.file_input, 200.0);
                     };
                 };
+                if self.stage == TransactionStage::AwaitingSignatures {
+                    if self.signing_method == XPubLikeRequestType::QR {
+                        ui.checkbox(&mut self.prepared_tx.as_mut().unwrap().airgap_signer_window.visible, "Show QR Window");
+                    }
+                }
                 // ui.label(extra_label);
                 data_item(ui, "TXID:", txid.clone());
             });
@@ -469,12 +482,7 @@ impl TransactionProgressFlow {
                 if let Ok(res) = r.try_recv() {
                     if let Ok(res) = res {
                         if self.signing_method == XPubLikeRequestType::Hot || self.signing_method == XPubLikeRequestType::Cold {
-                            let res = res.tx.unwrap();
-                            let mut prepped = self.prepared_tx.clone().unwrap();
-                            prepped.tx = Some(res.clone());
-                            prepped.ser_tx = Some(res.json_or());
-                            prepped.signed_hash = res.hash_hex();
-                            self.signed(Some(prepped.clone()), None);
+                            self.signed(Some(res.clone()), None);
                         } else {
                             if self.signing_method == XPubLikeRequestType::QR || self.signing_method == XPubLikeRequestType::File {
                                 self.prepared_tx = Some(res.clone());

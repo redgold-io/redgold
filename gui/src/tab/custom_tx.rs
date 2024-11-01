@@ -11,7 +11,7 @@ use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 
 #[derive(Clone)]
 pub struct CustomTxState {
-    tx: TransactionProgressFlow,
+    pub tx: TransactionProgressFlow,
     input: String,
     valid: bool,
     invalidation_reason: String,

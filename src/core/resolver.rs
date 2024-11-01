@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use redgold_schema::structs::{ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, Request, ResolveHashRequest, Response, Transaction};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, Request, ResolveHashRequest, Response, Transaction};
 use crate::core::relay::Relay;
 
 use async_trait::async_trait;
@@ -12,6 +12,8 @@ use tracing::info;
 use tokio::runtime::Runtime;
 use redgold_keys::transaction_support::InputSupport;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::fee_validator::ResolvedTransactionFeeValidator;
 use crate::core::resolve::resolve_output::ResolvedOutputChild;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -309,6 +311,11 @@ pub struct ResolvedTransaction {
 
 impl ResolvedTransaction {
 
+    pub fn max_parent_time(&self) -> i64 {
+        self.fixed_resolutions.iter().flat_map(|r| r.parent_transaction.time().ok())
+            .max().cloned().unwrap_or(0)
+    }
+
     pub fn with_enriched_inputs(&self) -> RgResult<Transaction> {
         let mut t = self.transaction.clone();
         for (idx, ri) in self.fixed_resolutions.iter().enumerate() {
@@ -337,6 +344,19 @@ impl ResolvedTransaction {
             return Err(ErrorInfo::error_info("Balance mismatch"));
         }
         Ok(())
+    }
+
+    pub fn validate_resolved_fees(&self, fee_addrs: &Vec<Address>) -> RgResult<()> {
+        let max_parent_time = self.max_parent_time();
+        if !self.transaction.validate_resolved_fee(fee_addrs, max_parent_time) {
+            "Transaction fee is too low or to unsupported fee address"
+                .to_error()
+                .with_detail("transaction", self.transaction.json_or())
+                .with_detail("fee_addrs", fee_addrs.json_or())
+                .with_detail("max_parent_time", max_parent_time.to_string())
+        } else {
+            Ok(())
+        }
     }
 }
 

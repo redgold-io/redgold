@@ -52,7 +52,7 @@ pub struct SecureData {
     pub session_hashed_password: Option<String>,
     pub config: Option<String>,
     pub path: Option<String>,
-    pub usb: Option<String>,
+    pub usb_paths: Option<Vec<String>>,
     pub capture_device_name: Option<String>
 }
 

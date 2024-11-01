@@ -354,6 +354,9 @@ impl Transaction {
                 )
             )
     }
+    pub fn output_amount_total(&self) -> CurrencyAmount {
+        self.output_amounts_opt().cloned().sum::<CurrencyAmount>()
+    }
 
     pub fn output_amounts_opt(&self) -> impl Iterator<Item = &CurrencyAmount> {
         self.outputs

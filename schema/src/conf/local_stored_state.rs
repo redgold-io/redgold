@@ -85,7 +85,7 @@ pub struct Contact {
 pub struct StoredMnemonic {
     pub name: String,
     pub mnemonic: String,
-    // pub passphrase: Option<String>,
+    pub passphrase: Option<String>,
     pub persist_disk: Option<bool>,
 }
 

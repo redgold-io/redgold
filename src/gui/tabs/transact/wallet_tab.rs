@@ -203,7 +203,9 @@ impl WalletState {
         d: &DataQueryInfo<E>,
         labels: Vec<(String, Address)>,
         tsi: &TransactionSignInfo,
-        nc: &NodeConfig, csi: &TransactionSignInfo, allowed: &Vec<XPubLikeRequestType>
+        nc: &NodeConfig,
+        csi: &TransactionSignInfo,
+        allowed: &Vec<XPubLikeRequestType>
     )
     where G: GuiDepends + Clone + Send + 'static,
           E: ExternalNetworkResources + Clone + Send + 'static {

@@ -24,7 +24,7 @@ pub fn balance_table<E>(
     let mut table_data: Vec<Vec<String>> = vec![];
     table_data.push(headers.clone());
     let balances = balance_map.unwrap_or(d.balance_totals(&nc.network, pk_filter));
-    let mut row = vec!["NAV".to_string()];
+    let mut row = vec!["Balance".to_string()];
     let ordered_cur = balance_currencies;
     for c in ordered_cur.iter() {
         let bal = balances.get(&c).cloned().unwrap_or(0.0);

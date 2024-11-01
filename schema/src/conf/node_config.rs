@@ -185,6 +185,16 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
+    pub fn usb_paths_exist(&self) -> Vec<String> {
+        let mut res = vec![];
+        for path in self.config_data.secure.as_ref().and_then(|s| s.usb_paths.as_ref()).unwrap_or(&vec![]) {
+            if PathBuf::from(path).exists() {
+                res.push(path.clone());
+            }
+        }
+        res
+    }
+
     pub fn party_poll_interval(&self) -> Duration {
         Duration::from_millis(self.config_data.party.as_ref().and_then(|n| Some(n.poll_interval)).unwrap_or(300_000) as u64)
     }

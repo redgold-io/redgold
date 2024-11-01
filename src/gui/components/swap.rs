@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use bdk::Utxo::Local;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
+use log::info;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use tracing_subscriber::fmt::format;
@@ -78,9 +79,12 @@ impl SwapState {
 
         if self.currency_input_box.input_has_changed {
             let balances = data.balance_totals(&network, Some(pk));
-            let bal = balances.get(&self.currency_input_box.input_currency).cloned().unwrap_or(0.0);
-            let input = self.currency_input_box.input_amount_value();
+            let cur = self.currency_input_box.input_currency;
+            let bal = balances.get(&cur).cloned().unwrap_or(0.0);
+            let input = self.currency_input_box.input_currency_amount(&data.price_map_usd_pair_incl_rdg).to_fractional();
             if input > bal {
+                info!("Insufficient balance: balance: {} < input: {}: balances: {}, cur: {}", bal, input, balances.json_or(), cur.json_or()
+                );
                 self.invalid_reason = "Insufficient Balance".to_string();
                 self.swap_valid = false;
                 return

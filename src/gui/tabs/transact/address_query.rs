@@ -42,9 +42,9 @@ pub fn get_address_info(
             .address_info_for_pk(&public_key).await;
         let fun: Box<dyn FnMut(&mut LocalState) + Send> = match response {
             Ok(ai) => {
-                info!("balance success: {}", ai.json_or());
+                // info!("balance success: {}", ai.json_or());
                 Box::new(move |ls: &mut LocalState| {
-                    info!("Applied update function inside closure for balance thing");
+                    // info!("Applied update function inside closure for balance thing");
                     let o = rounded_balance_i64(ai.balance.clone());
                     ls.wallet.address_info = Some(ai.clone());
                     ls.wallet.balance = o.to_string();

@@ -16,6 +16,7 @@ categories.workspace = true
 redgold-schema = {workspace = true}
 redgold-common = {workspace = true}
 redgold-crawler = { workspace = true}
+metrics = { workspace = true }
 flume = { workspace = true}
 tokio = { workspace = true }
 tokio-tungstenite = { version = "0.24.0", features = ["native-tls"] }

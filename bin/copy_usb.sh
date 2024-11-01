@@ -8,7 +8,7 @@ chmod +x redgold
 prefix_paths=("/Volumes/" "/media/$USER/")
 
 # List of possible USB drive names (suffix paths)
-suffix_paths=("Samsung USB" "NO NAME" "USB_DRIVE" "KINGSTON")
+suffix_paths=("Samsung USB" "NO NAME" "USB_DRIVE" "KINGSTON", "B2CF-75D8")
 
 # Function to copy file to USB drive
 copy_to_usb() {

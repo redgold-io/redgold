@@ -457,7 +457,7 @@ impl TransactionBuilder {
             self.with_remainder();
         }
 
-        if !self.transaction.validate_fee(&self.fee_addrs) {
+        if !self.transaction.validate_fee_only(&self.fee_addrs) {
             let mut found_fee = false;
             for o in self.transaction.outputs.iter_mut().rev() {
                 if let Some(a) = o.data.as_mut().and_then(|data| data.amount.as_mut()) {
@@ -472,7 +472,7 @@ impl TransactionBuilder {
             if found_fee {
                 self.with_default_fee()?;
             }
-            if !self.transaction.validate_fee(&self.fee_addrs) && !self.allow_bypass_fee {
+            if !self.transaction.validate_fee_only(&self.fee_addrs) && !self.allow_bypass_fee {
                 return Err(ErrorInfo::error_info("Insufficient fee")).add(self.transaction.json_or())
                     .add("Valid Fee Addresses:")
                     .add(self.fee_addrs.iter().map(|a| a.render_string().expect("works")).join(", "));

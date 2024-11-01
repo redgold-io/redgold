@@ -199,6 +199,8 @@ opt-level = 3
 
 [profile.dev]
 overflow-checks = true
+#lto = "thin"  # Use thin LTO
+#rustc-args = ["-C", "link-arg=-fuse-ld=lld"]  # Only affects dev profile
 
 #
 [profile.ci]
