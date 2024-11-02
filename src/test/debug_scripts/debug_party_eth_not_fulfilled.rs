@@ -9,7 +9,7 @@ use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::party::party_stream::PartyEventBuilder;
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_event_stream2() {
     debug_events2().await.unwrap();
