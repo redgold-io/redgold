@@ -9,7 +9,7 @@ use crate::config_data::ConfigData;
 use crate::seeds::get_seeds_by_env_time;
 use crate::servers::ServerOldFormat;
 use crate::{structs, ErrorInfoContext, RgResult, ShortString};
-use crate::conf::rg_args::RgArgs;
+use crate::conf::rg_args::{empty_args, RgArgs};
 use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
@@ -125,15 +125,9 @@ impl Default for NodeInfoConfig {
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
-    pub config_data: ConfigData,
-    // User supplied params
-    // TODO: Should this be a class Peer_ID with a multihash of the top level?
-    // TODO: Review all schemas to see if we can switch to multiformats types.
-    // pub self_peer_id: Vec<u8>,
-    // Remove above and rename to peer_id -- this field is not in use yet.
+    pub config_data: Arc<ConfigData>,
     pub peer_id: PeerId,
-    // This field is not used yet; it is a placeholder for future use.
-    pub public_key: structs::PublicKey,
+    pub public_key: PublicKey,
     // TODO: Change to Seed class? or maybe not leave it as it's own
     pub mnemonic_words: String,
     // Sometimes adjusted user params
@@ -190,6 +184,51 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn usb_paths_exist(&self) -> Vec<String> {
+        let mut res = vec![];
+        for path in self.config_data.secure.as_ref().and_then(|s| s.usb_paths.as_ref()).unwrap_or(&vec![]) {
+            if PathBuf::from(path).exists() {
+                res.push(path.clone());
+            }
+        }
+        res
+    }
+
+    pub fn party_poll_interval(&self) -> Duration {
+        Duration::from_millis(self.config_data.party.as_ref().and_then(|n| Some(n.poll_interval)).unwrap_or(300_000) as u64)
+    }
+
+    pub fn nat_traversal_required(&self) -> bool {
+        self.config_data.node.as_ref()
+            .and_then(|x| x.nat_traversal_required)
+            .unwrap_or(false)
+    }
+
+    pub fn udp_keepalive(&self) -> Duration {
+        self.config_data.node.as_ref()
+            .and_then(|x| x.udp_keepalive_seconds)
+            .map(|x| Duration::from_secs(x))
+            .unwrap_or(Duration::from_secs(60))
+    }
+
+    pub fn portfolio_fulfillment_agent_duration(&self) -> Duration {
+        let default = 3600 * 12;
+        Duration::from_secs(
+            self.config_data.node.as_ref()
+                .and_then(|x| x.service_intervals.as_ref())
+                .and_then(|x| x.portfolio_fulfillment_agent_seconds)
+                .unwrap_or(default)
+        )
+    }
+
+    pub fn s3_backup(&self) -> Option<&String> {
+        self.config_data.external.as_ref().and_then(|e| e.s3_backup_bucket.as_ref())
+    }
+
+    pub fn server_index(&self) -> i64 {
+        self.config_data.node.as_ref().and_then(|n| n.server_index).unwrap_or(0)
+    }
 
     pub fn offline(&self) -> bool {
         self.config_data.offline.unwrap_or(false)
@@ -458,7 +497,7 @@ impl NodeConfig {
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
-            opts: Arc::new(RgArgs::default()),
+            opts: Arc::new(empty_args()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),

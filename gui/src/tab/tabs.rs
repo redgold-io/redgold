@@ -15,4 +15,5 @@ pub enum Tab {
     Ratings,
     Identity,
     OTP,
+    Airgap
 }

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
@@ -127,7 +127,7 @@ impl WordsPass {
             named.name = format!("{}0", key_into);
             named.xpub = xpub;
             named.key_name_source = Some(key_into);
-            named.request_type = Some(XPubRequestType::Hot);
+            named.request_type = Some(XPubLikeRequestType::Hot);
             named.skip_persist = Some(skip_persist);
             named.derivation_path = Self::default_rg_path(0);
             named.public_key = self.public_at(&named.derivation_path).ok();

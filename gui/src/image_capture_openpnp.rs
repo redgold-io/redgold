@@ -1,4 +1,5 @@
 use std::io::Cursor;
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 use image::{DynamicImage, ImageBuffer};
@@ -192,7 +193,7 @@ pub fn default_stream(i: i64) -> RgResult<CaptureStream> {
     let formats = d.formats();
     let f = formats.get(0).expect("format 0");
     let mut s = get_stream(d, f)?;
-    Ok(CaptureStream{ stream: s })
+    Ok(CaptureStream{ stream: Some(Arc::new(Mutex::new(s))), active_device: Some(d.name.clone()) })
 }
 
 pub fn test_pnp2(option: Option<i64>) -> RgResult<()> {
@@ -201,9 +202,12 @@ pub fn test_pnp2(option: Option<i64>) -> RgResult<()> {
     sleep(Duration::from_secs(2));
     let mut last_bytes = vec![];
     let mut iter = 0;
+    let arc = s.stream.unwrap();
+    let result = arc.lock();
+    let mut s = result.unwrap();
     loop {
-        last_bytes = read_stream(&mut s.stream)?;
-        let image = convert_to_image(last_bytes.clone(), &s.stream.format())?;
+        last_bytes = read_stream(&mut s)?;
+        let image = convert_to_image(last_bytes.clone(), &s.format())?;
         match qr_parse_capture(&image) {
             Ok((md, s)) => {
                 println!("Found QR metadata: {:?}", md);

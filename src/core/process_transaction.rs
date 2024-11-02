@@ -359,6 +359,7 @@ impl TransactionProcessContext {
                                                 // self.tx_process.clone()
         ).await?;
         resolver_data.validate_input_output_amounts_match()?;
+        resolver_data.validate_resolved_fees(&self.relay.default_fee_addrs())?;
         transaction = resolver_data.with_enriched_inputs()?;
 
         let fixed_utxo_ids = transaction.fixed_utxo_ids_of_inputs()?;

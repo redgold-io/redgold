@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::explorer::{BriefTransaction, DetailedAddress};
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::party::central_price::CentralPricePair;
+use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
@@ -39,6 +41,24 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + '
 
 impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
 
+    pub fn party_keys(&self) -> Vec<PublicKey> {
+        self.party_data.lock().unwrap().keys().cloned().collect::<Vec<PublicKey>>()
+    }
+
+    pub fn party(&self, party: Option<&PublicKey>) -> Option<PartyInternalData> {
+        if let Some(p) = party {
+            self.party_data.lock().unwrap().get(p).cloned()
+        } else {
+            Some(self.first_party.lock().unwrap().clone())
+        }
+    }
+    pub fn party_events(&self, party: Option<&PublicKey>) -> Option<PartyEvents> {
+        self.party(party)
+            .and_then(|p| p.party_events.clone())
+    }
+    pub fn central_price_pair(&self, party: Option<&PublicKey>, cur: SupportedCurrency) -> Option<CentralPricePair> {
+        self.party_events(party).and_then(|ev| ev.central_prices.get(&cur).cloned())
+    }
 
     pub fn recent_tx(&self, pubkey_filter: Option<&PublicKey>, limit: Option<usize>, include_ext: bool, currency_filter: Option<SupportedCurrency>) -> Vec<BriefTransaction> {
         let addrs = self.detailed_address.lock().unwrap().clone();
@@ -291,11 +311,18 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         let pm = self.price_map_usd_pair_incl_rdg.clone();
         let g2 = g.clone();
         g.spawn(async move {
-            let party_data = g2.party_data().await.log_error();
+            let party_data = g2.party_data().await.log_error().map(|mut r| {
+                r.iter_mut().for_each(|(k, v)| {
+                    v.party_events.as_mut().map(|pev| {
+                        pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
+                    });
+                });
+                r
+            });
             if let Ok(party_data) = party_data {
                 if let Some(pd) = party_data.iter().next().clone() {
                     let mut a2 = arc2.lock().unwrap();
-                    let data = pd.1.clone();
+                    let mut data = pd.1.clone();
                     let mut total = 0.0;
                     if let Some(bm) = data.party_events.as_ref()
                         .map(|pev| pev.balance_map.clone()) {

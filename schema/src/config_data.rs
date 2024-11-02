@@ -38,7 +38,10 @@ pub struct NodeData {
     pub disable_control_api: Option<bool>,
     pub nat_traversal_required: Option<bool>,
     pub udp_keepalive_seconds: Option<u64>,
-    pub service_intervals: Option<ServiceIntervals>
+    pub service_intervals: Option<ServiceIntervals>,
+    pub server_index: Option<i64>,
+    pub port_offset: Option<i64>,
+    pub passive: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -48,8 +51,26 @@ pub struct SecureData {
     pub session_salt: Option<String>,
     pub session_hashed_password: Option<String>,
     pub config: Option<String>,
-    pub path: Option<String>
+    pub path: Option<String>,
+    pub usb_paths: Option<Vec<String>>,
+    pub capture_device_name: Option<String>
 }
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[serde(default)] // This allows fields to be omitted in TOML
+pub struct ExternalResources {
+    pub s3_backup_bucket: Option<String>
+}
+
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[serde(default)] // This allows fields to be omitted in TOML
+pub struct Keys {
+    words: Option<String>,
+    aws_access: Option<String>,
+    aws_secret: Option<String>
+}
+
 
 // Migrate node_config stuff here
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -66,7 +87,9 @@ pub struct ConfigData {
     pub local: Option<LocalStoredState>,
     pub portfolio: Option<PortfolioFulfillmentConfigData>,
     pub secure: Option<SecureData>,
-    pub offline: Option<bool>
+    pub offline: Option<bool>,
+    pub external: Option<ExternalResources>,
+    pub keys: Option<Keys>
 }
 
 use std::env;
@@ -84,17 +107,7 @@ impl Default for ConfigData {
             config: None,
             data: None,
             bulk: None,
-            node: Some(NodeData {
-                words: None,
-                peer_id: None,
-                network: None,
-                disable_control_api: None,
-                nat_traversal_required: None,
-                udp_keepalive_seconds: None,
-                service_intervals: Some(ServiceIntervals {
-                    portfolio_fulfillment_agent_seconds: Some(3600*12),
-                }),
-            }),
+            node: None,
             party: Some(PartyConfigData {
                 enable_party_mode: false,
                 order_cutoff_delay_time: 300_000,
@@ -108,6 +121,8 @@ impl Default for ConfigData {
             portfolio: Default::default(),
             secure: Default::default(),
             offline: None,
+            external: None,
+            keys: None,
         }
     }
 }

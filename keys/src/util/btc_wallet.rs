@@ -24,6 +24,7 @@ use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Pro
 use serde::{Deserialize, Serialize};
 // use crate::util::cli::commands::send;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::{KeyPair, TestConstants};
@@ -324,9 +325,23 @@ impl SingleKeyBitcoinWallet<Tree> {
         let client = ElectrumBlockchain::from(client);
         // KeyValueDatabase
         // Create a database (using default sled type) to store wallet data
-        let database = sled::open(database_path).error_info("Sled database open error")?;
+        let mut database = sled::open(database_path.clone()).error_info("Sled database open error");
+        if database.is_err() {
+            if database_path.exists() {
+                std::fs::remove_dir_all(&database_path)
+                    .error_info("Failed to remove old sled directory")
+                    .with_detail("database_path", database_path.to_str().unwrap().to_string())?;
+            }
+            std::fs::create_dir_all(&database_path)
+                .error_info("Failed to create new sled directory")
+                .with_detail("database_path", database_path.to_str().unwrap().to_string())?;
+
+            database = sled::open(database_path.clone())
+                .error_info("Sled database open error")
+                .with_detail("database_path", database_path.to_str().unwrap().to_string());
+        }
         let wallet_name = public_key.hex();
-        let database = database.open_tree(wallet_name.clone()).error_info("Database open tree error")?;
+        let database = database?.open_tree(wallet_name.clone()).error_info("Database open tree error")?;
         // let database = MemoryDatabase::default();
         let hex = public_key.to_hex_direct_ecdsa()?;
         let descr = format!("wpkh({})", hex);

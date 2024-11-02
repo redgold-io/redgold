@@ -46,6 +46,7 @@ pub fn save_key_window(
                                         lss.upsert_mnemonic(StoredMnemonic {
                                             name: name.clone(),
                                             mnemonic: data.clone(),
+                                            passphrase: None,
                                             persist_disk: None,
                                         });
                                     } else {

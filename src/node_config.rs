@@ -13,7 +13,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::structs::{NodeMetadata, PeerId, PeerMetadata};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::conf::rg_args::RgArgs;
+use redgold_schema::conf::rg_args::{empty_args, RgArgs};
 use redgold_schema::constants::DEBUG_FINALIZATION_INTERVAL_MILLIS;
 use redgold_schema::data_folder::DataFolder;
 use redgold_schema::RgResult;
@@ -89,7 +89,7 @@ impl EnvDefaultNodeConfig for NodeConfig {
     }
 
     async fn default_env(network_environment: NetworkEnvironment) -> Self {
-        let mut opts = RgArgs::default();
+        let mut opts = empty_args();
         opts.network = Some(network_environment.to_std_string());
         let mut node_config = NodeConfig::default();
         node_config.opts = Arc::new(opts.clone());
