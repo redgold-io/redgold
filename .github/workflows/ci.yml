@@ -671,5 +671,6 @@ jobs:
           export SMTP_HOST='email-smtp.us-east-1.amazonaws.com:587';
           export SMTP_FROM_ADDRESS='info@redgold.io';
           export SMTP_FROM_NAME='redgold';
+          export RUST_MIN_STACK=327772160; export RUSTFLAGS="-C link-arg=-fuse-ld=lld -A warnings";
           ./redgold_linux debug-command grafana-public-deploy
 

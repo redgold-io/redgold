@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.1"
+   width="220"
+   height="220"
+   viewBox="0 0 220 220"
+   preserveAspectRatio="xMidYMid meet"
+   id="svg_document"
+   sodipodi:docname="logo_original_bold_r.svg"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <sodipodi:namedview
+     id="namedview486"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     showgrid="false"
+     inkscape:zoom="1.7291667"
+     inkscape:cx="90.506024"
+     inkscape:cy="214.26506"
+     inkscape:window-width="2617"
+     inkscape:window-height="1513"
+     inkscape:window-x="742"
+     inkscape:window-y="1087"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg_document"
+     showguides="true"
+     inkscape:guide-bbox="true">
+    <sodipodi:guide
+       position="425.5911,832.65647"
+       orientation="0,-1"
+       id="guide1627" />
+  </sodipodi:namedview>
+  <!-- Created with macSVG - https://macsvg.org/ - https://github.com/dsward2/macsvg/ -->
+  <title
+     id="svg_document_title">Untitled.svg</title>
+  <defs
+     id="svg_document_defs" />
+  <g
+     id="main_group">
+    <circle
+       stroke="#000000"
+       stroke-width="10px"
+       cy="110"
+       fill="#660000"
+       r="100"
+       cx="110"
+       id="circle3" />
+    <rect
+       x="0"
+       height="360"
+       y="4"
+       id="background_rect"
+       width="480"
+       fill="#90ee90"
+       visibility="hidden"
+       style="fill:#90ee90;fill-opacity:0" />
+  </g>
+  <polyline
+     points="110,10 30,160 190,160 110,10"
+     stroke="#000000"
+     id="polyline1"
+     stroke-width="10px"
+     fill="#daa520" />
+  <rect
+     stroke="#000000"
+     x="73"
+     height="75"
+     y="85"
+     id="rect1"
+     stroke-width="10px"
+     width="75"
+     fill="#c80000" />
+  <line
+     stroke="#000000"
+     y1="20"
+     id="line1"
+     x1="110"
+     stroke-width="3px"
+     y2="20"
+     x2="110" />
+  <circle
+     stroke="#000000"
+     id="circle2"
+     stroke-width="10px"
+     cy="123"
+     fill="#daa520"
+     cx="110"
+     r="33" />
+  <text
+     id="sample_text_element"
+     xml:space="preserve"
+     x="110"
+     text-rendering="geometricPrecision"
+     font-family="Helvetica"
+     y="137"
+     fill="#000000"
+     font-size="45px"
+     text-anchor="middle"><tspan
+       style="font-weight:bold"
+       id="tspan18722">R</tspan></text>
+  <circle
+     stroke="#000000"
+     id="circle1"
+     stroke-width="10px"
+     cy="110"
+     fill="none"
+     cx="110"
+     r="100" />
+  <metadata
+     id="metadata1629">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>Untitled.svg</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+</svg>
