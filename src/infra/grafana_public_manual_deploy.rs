@@ -23,7 +23,7 @@ pub async fn manual_deploy_grafana_public() -> RgResult<()> {
     // ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port_o), p).await.expect("");
     // ssh.exes("sudo ufw reload", p).await.expect("");
     let mut d = DeployMachine::new(&s, None, output_handler.clone());
-    d.install_docker(&output_handler).await.expect("works");
+    d.install_docker(&output_handler).await?;
 
 
     deploy_ops_services(
@@ -39,7 +39,7 @@ pub async fn manual_deploy_grafana_public() -> RgResult<()> {
         true,
         false,
         true
-    ).await.expect("works");
+    ).await?;
 
     Ok(())
 
