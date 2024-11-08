@@ -38,13 +38,13 @@ enum Rounds {
 #[derive(Clone)]
 pub struct MnemonicWindowState {
     pub open: bool,
-    words: String,
+    pub words: String,
     label: String,
     bitcoin_p2wpkh_84: String,
     ethereum_address_44: String,
     words_checksum: String,
     seed_checksum: Option<String>,
-    passphrase: Option<String>,
+    pub passphrase: Option<String>,
     redgold_node_address: String,
     redgold_hardware_default_address: String,
     passphrase_input: String,
@@ -504,12 +504,15 @@ pub(crate) fn mnemonic_window(
 ) {
 
     if ls.keygen_state.mnemonic_window_state.set_hot_mnemonic {
-        ls.add_mnemonic(ls.keygen_state.mnemonic_window_state.save_name.clone(),
+        ls.add_with_pass_mnemonic(ls.keygen_state.mnemonic_window_state.save_name.clone(),
                         ls.keygen_state.mnemonic_window_state.words.clone(),
-                        ls.keygen_state.mnemonic_window_state.persist_disk);
+                        ls.keygen_state.mnemonic_window_state.persist_disk,
+                        ls.keygen_state.mnemonic_window_state.passphrase.clone()
+        );
         ls.keygen_state.mnemonic_window_state.set_hot_mnemonic = false;
     }
 
+    let salt = &mut ls.keygen_state.generate_mnemonic_state.salt_words;
     let state = &mut ls.keygen_state.mnemonic_window_state;
 
 
@@ -613,6 +616,9 @@ pub(crate) fn mnemonic_window(
                         ui.checkbox(&mut state.persist_disk, "Persist Disk");
                         if ui.button("Set As Hot Mnemonic").clicked() {
                             state.set_hot_mnemonic = true;
+                        }
+                        if ui.button("Use As Salt").clicked() {
+                            *salt = state.words.clone();
                         }
                     });
             });

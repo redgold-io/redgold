@@ -8,15 +8,16 @@ use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
 
 
 #[derive(Clone, Debug, EnumIter, EnumString, PartialEq, Serialize, Deserialize, Eq)]
-pub enum XPubRequestType {
+pub enum XPubLikeRequestType {
     Cold,
     Hot,
-    QR
+    QR,
+    File
 }
 
-impl Default for XPubRequestType {
+impl Default for XPubLikeRequestType {
     fn default() -> Self {
-        XPubRequestType::Hot
+        XPubLikeRequestType::Hot
     }
 }
 
@@ -31,7 +32,7 @@ pub struct NamedXpub {
     pub key_reference_source: Option<String>,
     // Maybe should be same as 'name' but right now name references a hot key
     pub key_nickname_source: Option<String>,
-    pub request_type: Option<XPubRequestType>,
+    pub request_type: Option<XPubLikeRequestType>,
     pub skip_persist: Option<bool>,
     pub preferred_address: Option<Address>,
     pub all_address: Option<Vec<Address>>,
@@ -40,7 +41,7 @@ pub struct NamedXpub {
 
 impl NamedXpub {
     pub fn definitely_not_hot(&self) -> bool {
-        self.request_type != Some(XPubRequestType::Hot) && self.request_type.is_some()
+        self.request_type != Some(XPubLikeRequestType::Hot) && self.request_type.is_some()
     }
 }
 
@@ -84,7 +85,7 @@ pub struct Contact {
 pub struct StoredMnemonic {
     pub name: String,
     pub mnemonic: String,
-    // pub passphrase: Option<String>,
+    pub passphrase: Option<String>,
     pub persist_disk: Option<bool>,
 }
 

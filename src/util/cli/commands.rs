@@ -33,6 +33,7 @@ use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_common_no_wasm::cmd::run_cmd;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_schema::observability::errors::Loggable;
 use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -529,7 +530,8 @@ pub(crate) async fn debug_commands(p0: &DebugCommand, p1: &&NodeConfig) -> RgRes
     if let Some(cmd) = &p0.subcmd {
         match cmd {
             RgDebugCommand::GrafanaPublicDeploy(_) => {
-                manual_deploy_grafana_public().await
+                manual_deploy_grafana_public().await.log_error().ok();
+                Ok(())
             }
             _ => {
                 Ok(())

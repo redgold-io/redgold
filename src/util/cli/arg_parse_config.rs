@@ -159,7 +159,7 @@ impl ArgTranslate {
         self.calculate_executable_checksum_hash();
         self.guard_faucet();
         self.e2e_enable();
-        info!("E2e enabled");
+        // info!("E2e enabled");
         self.configure_seeds().await;
         self.set_discovery_interval();
         self.apply_node_opts();
@@ -438,7 +438,7 @@ impl ArgTranslate {
             enable_logger = match sc {
                 RgTopLevelSubcommand::GUI(_) => { true }
                 RgTopLevelSubcommand::Node(_) => { true }
-                RgTopLevelSubcommand::TestTransaction(_) => {true}
+                // RgTopLevelSubcommand::TestTransaction(_) => {true}
                 _ => { false }
             }
         }
@@ -523,7 +523,7 @@ impl ArgTranslate {
             self.node_config.manually_added_seeds.push(cli_seed_arg);
         }
 
-        info!("self is node");
+        // info!("self is node");
         // Enrich keys for missing seed info
         if self.is_node() {
             for seed in self.node_config.seeds.iter_mut() {
@@ -553,7 +553,7 @@ impl ArgTranslate {
                 }
             }
         }
-        info!("Seeds: {:?}", self.node_config.seeds.json_or());
+        // info!("Seeds: {:?}", self.node_config.seeds.json_or());
         // We should enrich this too
         // TODO: Test config should pass ids so we get ids for local_test
 
@@ -621,16 +621,16 @@ impl ArgTranslate {
     fn immediate_debug(&self) {
         if let Some(cmd) = self.get_subcommand() {
             match cmd {
-                RgTopLevelSubcommand::TestCapture(t) => {
-                    println!("Attempting test capture");
-                    #[cfg(target_os = "linux")] {
-                        use redgold_gui::image_capture_openpnp::debug_capture;
-                        debug_capture(t.cam);
-                        unsafe {
-                            exit(0)
-                        }
-                    }
-                }
+                // RgTopLevelSubcommand::TestCapture(t) => {
+                //     println!("Attempting test capture");
+                //     #[cfg(target_os = "linux")] {
+                //         use redgold_gui::image_capture_openpnp::debug_capture;
+                //         debug_capture(t.cam);
+                //         unsafe {
+                //             exit(0)
+                //         }
+                //     }
+                // }
                 _ => {}
             }
         }

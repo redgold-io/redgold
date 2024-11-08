@@ -421,7 +421,7 @@ pub async fn initiate_mp_keysign_authed(
 
     let address = "127.0.0.1".to_string();
     let port = relay.node_config.mparty_port();
-    let timeout = Duration::from_secs(100 as u64);
+    let timeout = Duration::from_secs(200 as u64);
     let init_keygen_req_room_id_typed = ident.room_id.safe_get()?;
     let init_keygen_req_room_id = ident.room_id.safe_get()?.uuid.safe_get()?.clone();
     let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {

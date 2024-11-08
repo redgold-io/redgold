@@ -8,7 +8,7 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::Instrument;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
@@ -197,7 +197,7 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
                             device_id: None,
                             key_reference_source: None,
                             key_nickname_source: None,
-                            request_type: Some(XPubRequestType::Hot),
+                            request_type: Some(XPubLikeRequestType::Hot),
                             skip_persist: None,
                             preferred_address: None,
                             all_address: Some(all),

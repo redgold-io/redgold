@@ -16,7 +16,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{ErrorInfo, SupportedCurrency};
 use crate::core::internal_message::{new_channel, Channel};
@@ -74,7 +74,14 @@ where G: Send + Clone + GuiDepends {
         price_map.insert(c, price);
     }
 
-    let party_data = node_config.api_rg_client().party_data().await.log_error();
+    let party_data = node_config.api_rg_client().party_data().await.log_error().map(|mut r| {
+        r.iter_mut().for_each(|(k, v)| {
+            v.party_events.as_mut().map(|pev| {
+                pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
+            });
+        });
+        r.clone()
+    });
     let first_party = party_data.clone().ok().and_then(|pd| pd.into_values().next());
     // info!("Party data {}", first_party.json_or());
     let party_data = party_data.unwrap_or_default();
@@ -115,7 +122,19 @@ where G: Send + Clone + GuiDepends {
         price_map_usd_pair: price_map,
         party_data,
         first_party,
+        airgap_signer: Default::default(),
     };
+
+    ls.wallet.send_tx_progress.with_config(&node_config);
+    ls.wallet.stake.complete.with_config(&node_config);
+    ls.wallet.stake.deposit.with_config(&node_config);
+    ls.wallet.stake.withdrawal.with_config(&node_config);
+    ls.swap_state.tx_progress.with_config(&node_config);
+    ls.wallet.custom_tx.tx.with_config(&node_config);
+    ls.wallet.port.tx.with_config(&node_config);
+    ls.wallet.port.liquidation_tx.with_config(&node_config);
+    // ls.airgap_signer.interior_view()
+
 
     ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
     info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
@@ -178,7 +197,7 @@ where G: Send + Clone + GuiDepends {
                 named.xpub = xpub;
                 named.public_key = Some(pk);
                 named.key_name_source = Some(key_into);
-                named.request_type = Some(XPubRequestType::Hot);
+                named.request_type = Some(XPubLikeRequestType::Hot);
                 named.skip_persist = Some(true);
                 named.derivation_path = dp_btc_faucet.clone();
                 new_xpubs.push(named);
@@ -190,6 +209,10 @@ where G: Send + Clone + GuiDepends {
         let first_xpub = new_xpubs.get(0).unwrap().clone();
         ls.wallet.selected_xpub_name = first_xpub.name.clone();
         ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
+    }
+
+    if ls.local_stored_state.xpubs.clone().unwrap_or_default().len() > 2 {
+        ls.wallet.send_address_input_box.address_input_mode = redgold_gui::components::address_input_box::AddressInputMode::Saved;
     }
 
     // TODO: Add from environment
@@ -205,20 +228,6 @@ pub fn send_update_sender<F: FnMut(&mut LocalState) + Send + 'static>(updates: &
 }
 pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
     updates.sender.send(StateUpdate { update: Box::new(p0) }).unwrap();
-}
-
-
-pub fn spawn_update_party_data(ls: &mut LocalState) {
-    let ups = ls.updates.sender.clone();
-    let config = ls.node_config.clone();
-    tokio::spawn(async move {
-        let party_data = config.api_rg_client().party_data().await.log_error().unwrap_or_default();
-        let first_party = party_data.clone().into_values().next();
-        send_update_sender(&ups, move |lss| {
-            lss.party_data = party_data.clone();
-            lss.first_party = first_party.clone();
-        });
-    });
 }
 
 pub fn create_swap_tx(ls: &mut LocalState) {
@@ -300,34 +309,34 @@ pub fn create_swap_tx(ls: &mut LocalState) {
         });
     });
 }
-pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-    let ups = ls.updates.sender.clone();
-    let res = ls.external_network_resources.clone();
-    tokio::spawn(async move {
-        let res = tx.sign(res).await;
-        send_update_sender(&ups, move |lss| {
-            let (err, tx) = match &res {
-                Ok(tx) => (None, Some(tx)),
-                Err(e) => (Some(e.json_or()), None)
-            };
-            lss.swap_state.tx_progress.signed(tx.cloned(), err);
-            lss.swap_state.changing_stages = false;
-        });
-    });
-}
-
-pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-    let ups = ls.updates.sender.clone();
-    let res = ls.external_network_resources.clone();
-    tokio::spawn(async move {
-        let res = tx.broadcast(res).await;
-        send_update_sender(&ups, move |lss| {
-            let (err, tx) = match &res {
-                Ok(tx) => (None, Some(tx)),
-                Err(e) => (Some(e.json_or()), None)
-            };
-            lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
-            lss.swap_state.changing_stages = false;
-        });
-    });
-}
+// pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
+//     let ups = ls.updates.sender.clone();
+//     let res = ls.external_network_resources.clone();
+//     tokio::spawn(async move {
+//         let res = tx.sign(res).await;
+//         send_update_sender(&ups, move |lss| {
+//             let (err, tx) = match &res {
+//                 Ok(tx) => (None, Some(tx)),
+//                 Err(e) => (Some(e.json_or()), None)
+//             };
+//             lss.swap_state.tx_progress.signed(tx.cloned(), err);
+//             lss.swap_state.changing_stages = false;
+//         });
+//     });
+// }
+//
+// pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
+//     let ups = ls.updates.sender.clone();
+//     let res = ls.external_network_resources.clone();
+//     tokio::spawn(async move {
+//         let res = tx.broadcast(res).await;
+//         send_update_sender(&ups, move |lss| {
+//             let (err, tx) = match &res {
+//                 Ok(tx) => (None, Some(tx)),
+//                 Err(e) => (Some(e.json_or()), None)
+//             };
+//             lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
+//             lss.swap_state.changing_stages = false;
+//         });
+//     });
+// }

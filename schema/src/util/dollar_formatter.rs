@@ -34,3 +34,7 @@ pub fn format_dollar_amount(amount: f64) -> String {
 pub fn format_dollar_amount_with_prefix(amount: f64) -> String {
     format!("${}", format_dollar_amount(amount))
 }
+
+pub fn format_dollar_amount_with_prefix_and_suffix(amount: f64) -> String {
+    format!("${} USD", format_dollar_amount(amount))
+}

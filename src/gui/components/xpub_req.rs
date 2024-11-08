@@ -6,7 +6,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
 use crate::core::internal_message::Channel;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
@@ -21,7 +21,7 @@ use crate::gui::ls_ext::send_update;
 pub struct RequestXpubState {
     save_name: String,
     result: Option<RgResult<String>>,
-    xpub_type: XPubRequestType,
+    xpub_type: XPubLikeRequestType,
     message: String,
     derivation_path: DerivationPathInputState,
     show_window: bool
@@ -38,7 +38,7 @@ impl RequestXpubState {
         let mut s = Self {
             save_name: "".to_string(),
             result: None,
-            xpub_type: XPubRequestType::Cold,
+            xpub_type: XPubLikeRequestType::Cold,
             message: "".to_string(),
             derivation_path: Default::default(),
             show_window: false,
@@ -77,9 +77,9 @@ impl RequestXpubState {
                         .width(125.0)
                         .selected_text(format!("{:?}", request_type))
                         .show_ui(ui, |ui| {
-                            for style in XPubRequestType::iter()
+                            for style in XPubLikeRequestType::iter()
                             {
-                                if style != XPubRequestType::Hot {
+                                if style != XPubLikeRequestType::Hot {
                                     ui.selectable_value(&mut self.xpub_type,
                                                         style.clone(),
                                                         format!("{:?}", style)
@@ -90,7 +90,7 @@ impl RequestXpubState {
 
                     self.derivation_path.view(ui, g.clone());
 
-                    if request_type == XPubRequestType::Cold {
+                    if request_type == XPubLikeRequestType::Cold {
                         send_update(&updates, |lss| {
                             lss.wallet.update_hardware();
                         });
@@ -107,18 +107,18 @@ impl RequestXpubState {
                         ui.label(device_list.unwrap_or("".to_string()));
                     }
 
-                    if request_type == XPubRequestType::QR {
+                    if request_type == XPubLikeRequestType::QR {
                         ui.label("QR code not yet supported");
                     }
 
                     if ui.button("Request XPub").clicked() {
 
                         let xpub = match self.xpub_type {
-                            XPubRequestType::Cold => {
+                            XPubLikeRequestType::Cold => {
                                 self.message = "Awaiting input on device...".to_string();
                                 get_cold_xpub(self.derivation_path.derivation_path.clone())
                             }
-                            XPubRequestType::QR => {
+                            XPubLikeRequestType::QR => {
                                 Err(error_info("QR code not yet supported"))
                             }
                             _ => {Err(error_info("Not yet supported"))}

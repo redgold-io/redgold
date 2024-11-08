@@ -2,19 +2,27 @@ use std::collections::HashMap;
 use bdk::Utxo::Local;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
+use log::info;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use tracing_subscriber::fmt::format;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common;
 use redgold_gui::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
 use redgold_gui::components::tx_progress::TransactionProgressFlow;
+use redgold_gui::data_query::data_query::DataQueryInfo;
+use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_keys::address_external::ToBitcoinAddress;
-use crate::gui::ls_ext::{broadcast_swap, create_swap_tx, sign_swap};
+use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::util::dollar_formatter::{format_dollar_amount, format_dollar_amount_with_prefix, format_dollar_amount_with_prefix_and_suffix};
+use crate::gui::ls_ext::{create_swap_tx};
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs;
 use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs::Swap;
+use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {
@@ -33,7 +41,9 @@ pub struct SwapState {
     pub stage: SwapStage,
     pub tx_progress: TransactionProgressFlow,
     pub currency_input_box: CurrencyInputBox,
-    pub changing_stages: bool
+    pub changing_stages: bool,
+    pub swap_valid: bool,
+    pub invalid_reason: String,
 }
 
 impl Default for SwapState {
@@ -45,20 +55,89 @@ impl Default for SwapState {
             tx_progress: Default::default(),
             currency_input_box: CurrencyInputBox::from_currency(SupportedCurrency::Ethereum, "Input".to_string()),
             changing_stages: false,
+            swap_valid: false,
+            invalid_reason: "".to_string(),
         }
     }
 }
 impl SwapState {
 
-    pub fn view(ui: &mut Ui, ls: &mut LocalState) {
+    pub fn other_currency(&self) -> SupportedCurrency {
+        if self.currency_input_box.input_currency == SupportedCurrency::Redgold {
+            self.output_currency
+        } else {
+            self.currency_input_box.input_currency.clone()
+        }
+    }
+
+    pub fn check_valid<E>(
+        &mut self,
+        data: &DataQueryInfo<E>,
+        network: &NetworkEnvironment,
+        pk: &PublicKey
+    ) where E: ExternalNetworkResources + Send + Clone {
+
+        if self.currency_input_box.input_has_changed {
+            let balances = data.balance_totals(&network, Some(pk));
+            let cur = self.currency_input_box.input_currency;
+            let bal = balances.get(&cur).cloned().unwrap_or(0.0);
+            let input = self.currency_input_box.input_currency_amount(&data.price_map_usd_pair_incl_rdg).to_fractional();
+            if input > bal {
+                info!("Insufficient balance: balance: {} < input: {}: balances: {}, cur: {}", bal, input, balances.json_or(), cur.json_or()
+                );
+                self.invalid_reason = "Insufficient Balance".to_string();
+                self.swap_valid = false;
+                return
+            }
+            let fp = {
+                let r = data.first_party.lock().unwrap();
+                r.clone().party_events
+            };
+            if let Some(cpp) = data.central_price_pair(None, self.other_currency()) {
+                // cpp.fulfill_taker_order()
+            } else {
+                self.invalid_reason = "Missing party network data".to_string();
+                self.swap_valid = false;
+                return
+            }
+
+            self.swap_valid = self.currency_input_box.input_amount_value() > 0.0;
+        }
+
+    }
+
+    pub fn view<G>(
+        ui: &mut Ui,
+        ls: &mut LocalState,
+        depends: &G,
+        pk: &PublicKey,
+        allowed: &Vec<XPubLikeRequestType>,
+        csi: &TransactionSignInfo,
+        tsi: &TransactionSignInfo
+    ) where G: GuiDepends + Clone + Send + 'static {
         ls.swap_state.active = ls.wallet.send_receive == SendReceiveTabs::Swap;
         // if ui.button("Refresh Rates").clicked() {
         //     ls.price_map_usd_pair
         // }
         if ls.swap_state.active {
+
+            ls.swap_state.check_valid(&ls.data, &depends.get_network(), pk);
+
             ui.horizontal(|ui| {
                 ui.heading("Swap");
                 Self::party_explorer_link(ui, &ls);
+                if ls.swap_state.currency_input_box.input_currency == SupportedCurrency::Redgold {
+                    let output = ls.swap_state.output_currency.clone();
+                    let cpp = ls.data.central_price_pair(None, output);
+                    if let Some(c) = cpp {
+                        ui.label("Pair Balance:");
+                        let vol = c.pair_quote_volume.to_fractional();
+                        let b = format!("{:.8} {} ", vol, output.abbreviated());
+                        ui.label(b);
+                        let usd_vol = c.pair_quote_price_estimate * vol;
+                        ui.label(format_dollar_amount_with_prefix_and_suffix(usd_vol));
+                    }
+                }
             });
             // ui.separator();
             let mut next_stage = SwapStage::ShowAmountsPromptSigning;;
@@ -92,17 +171,20 @@ impl SwapState {
                 }
             }
 
-            ls.swap_state.tx_progress.info_box_view(ui);
+            let ev = ls.swap_state.tx_progress.view(ui,depends, tsi, csi, allowed);
+            if ev.next_stage_create {
+                create_swap_tx(ls);
+            }
 
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
-                let style = ui.style_mut();
-                style.override_text_style = Some(TextStyle::Heading);
-                if ui.button("Reset").clicked() {
-                    ls.swap_state.tx_progress.reset();
-                    ls.swap_state.currency_input_box.input_box_str = "".to_string();
-                    ls.swap_state.stage = SwapStage::StartPreparing;
-                }
+                    let style = ui.style_mut();
+                    style.override_text_style = Some(TextStyle::Heading);
+                    if ui.button("Reset").clicked() {
+                        ls.swap_state.tx_progress.reset();
+                        ls.swap_state.currency_input_box.input_box_str = "".to_string();
+                        ls.swap_state.stage = SwapStage::StartPreparing;
+                    }
                 });
                 if ls.swap_state.stage != SwapStage::StartPreparing {
                     ui.horizontal(|ui| {
@@ -124,28 +206,33 @@ impl SwapState {
                     });
                 }
 
-            if ls.swap_state.stage != SwapStage::CompleteShowTrackProgress {
-                if ls.swap_state.tx_progress.stage_err.is_none() {
-                    if !ls.swap_state.changing_stages {
-                        let changed = Self::big_proceed_button(ui, ls, next_stage, button_text);
-                        if changed {
-                            // All these stages are off by one because they've just "changed" already.
-                            match ls.swap_state.stage {
-                                SwapStage::StartPreparing => {}
-                                SwapStage::ShowAmountsPromptSigning => {
-                                    create_swap_tx(ls);
-                                }
-                                SwapStage::ViewSignedAllowBroadcast => {
-                                    sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
-                                }
-                                SwapStage::CompleteShowTrackProgress => {
-                                    broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
-                                }
-                            }
-                        }
-                    }
+                if !ls.swap_state.swap_valid {
+                    ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));
+                    ui.label(RichText::new(ls.swap_state.invalid_reason.clone()).color(Color32::RED));
+                } else {
+                    // if ls.swap_state.stage != SwapStage::CompleteShowTrackProgress {
+                    //     if ls.swap_state.tx_progress.stage_err.is_none() {
+                    //         if !ls.swap_state.changing_stages {
+                    //             let changed = Self::big_proceed_button(ui, ls, next_stage, button_text);
+                    //             if changed {
+                    //                 // All these stages are off by one because they've just "changed" already.
+                    //                 match ls.swap_state.stage {
+                    //                     SwapStage::StartPreparing => {}
+                    //                     SwapStage::ShowAmountsPromptSigning => {
+                    //                         // create_swap_tx(ls);
+                    //                     }
+                    //                     SwapStage::ViewSignedAllowBroadcast => {
+                    //                         // sign_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                    //                     }
+                    //                     SwapStage::CompleteShowTrackProgress => {
+                    //                         // broadcast_swap(ls, ls.swap_state.tx_progress.prepared_tx.clone().unwrap())
+                    //                     }
+                    //                 }
+                    //             }
+                    //         }
+                    //     }
+                    // }
                 }
-            }
             });
 
             if SwapStage::CompleteShowTrackProgress == ls.swap_state.stage {
@@ -236,7 +323,11 @@ impl SwapState {
                 };
 
                 let x = pair_value * 1e8;
-                let fulfilled_amt = cp.dummy_fulfill(x as u64, is_ask, &ls.node_config.network);
+                let fulfilled_amt = cp.dummy_fulfill(x as u64, is_ask, &ls.node_config.network, get_prices_of_currency);
+                if fulfilled_amt == 0.0 {
+                    ls.swap_state.swap_valid = false;
+                    ls.swap_state.invalid_reason = "Order below minimum amount, or insufficient party liquidity".to_string();
+                }
                 let mut fulfilled_value_usd = fulfilled_amt * price_usd_est_inverse;
                 let mut fulfilled_str = format!("{:?} fulfilled", ls.swap_state.output_currency);
                 ui.label(fulfilled_str);
@@ -272,4 +363,15 @@ impl SwapState {
             remaining
         }
     }
+}
+
+
+#[tokio::test]
+async fn debug_fulfill() {
+    let nc = NodeConfig::default_env(NetworkEnvironment::Dev).await;
+    let pev = nc.api_rg_client().party_data().await.unwrap().into_values().next().unwrap().party_events.unwrap();
+    let cpp = pev.central_prices.get(&SupportedCurrency::Ethereum).unwrap();
+    let f = cpp.dummy_fulfill(16500000 as u64, false, &nc.network, SupportedCurrency::Ethereum);
+    println!("{}", f);
+    println!("{}", cpp.json_or());
 }

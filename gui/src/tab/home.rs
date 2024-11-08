@@ -88,7 +88,7 @@ impl HomeState {
 
         ui.separator();
 
-        balance_table(ui, d, &nc, None, None);
+        balance_table(ui, d, &nc, None, None, None, Some("home_balance".to_string()));
 
         self.recent_tx.rows = d.recent_tx(None, None, false, None);
         ui.separator();

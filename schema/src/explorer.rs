@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 use std::collections::HashMap;
+use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::central_price::CentralPricePair;
 use crate::party::party_internal_data::PartyInternalData;
 use crate::party::price_volume::PriceVolume;
-use crate::structs::{ErrorInfo, Transaction};
+use crate::{RgResult, SafeOption};
+use crate::proto_serde::ProtoSerde;
+use crate::structs::{ErrorInfo, SupportedCurrency, Transaction};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct HashResponse {
@@ -285,4 +288,24 @@ pub struct ExplorerPoolInfoResponse {
     pub balance_eth: f64,
     pub members: Vec<PoolMember>,
     pub threshold: f64,
+}
+
+// TODO Make trait implicit
+pub fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgResult<BriefTransaction> {
+    let from_str = tx.first_input_address()
+        .and_then(|a| a.render_string().ok())
+        .unwrap_or("".to_string());
+    Ok(BriefTransaction {
+        hash: tx.hash_or().hex(),
+        from: from_str.clone(),
+        to: tx.first_output_address_non_input_or_fee().safe_get_msg("Missing output address")?.render_string()?,
+        amount: tx.total_output_amount_float(),
+        fee: tx.fee_amount(),
+        bytes: tx.proto_serialize().len() as i64,
+        timestamp: tx.struct_metadata.clone().and_then(|s| s.time).safe_get_msg("Missing tx timestamp")?.clone(),
+        first_amount: tx.first_output_amount().safe_get_msg("Missing first output amount")?.clone(),
+        is_test: tx.is_test(),
+        incoming: outgoing_from.map(|i| i != from_str),
+        currency: Some(SupportedCurrency::Redgold.to_display_string()),
+    })
 }

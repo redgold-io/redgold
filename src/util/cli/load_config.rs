@@ -7,7 +7,7 @@ use config::{Config, Environment};
 use itertools::Itertools;
 use log::info;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::conf::rg_args::RgArgs;
+use redgold_schema::conf::rg_args::{empty_args, RgArgs};
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::NetworkEnvironment;
@@ -18,7 +18,7 @@ pub fn main_config() -> Box<NodeConfig> {
     let (opts, cfg) = load_full_config(false);
     let mut node_config = NodeConfig::default();
     let args = std::env::args().collect_vec();
-    node_config.config_data = *cfg.clone();
+    node_config.config_data = Arc::new(*cfg.clone());
     node_config.opts = Arc::new(*opts.clone());
     node_config.args = Arc::new(args.clone());
     Box::new(node_config)
@@ -26,7 +26,7 @@ pub fn main_config() -> Box<NodeConfig> {
 
 pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {
     let rg_args = if allow_no_args {
-        RgArgs::try_parse().unwrap_or(RgArgs::default())
+        RgArgs::try_parse().unwrap_or(empty_args())
     } else {
         RgArgs::parse()
     };

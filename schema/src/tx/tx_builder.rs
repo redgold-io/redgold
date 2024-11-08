@@ -15,6 +15,7 @@ pub struct TransactionBuilder {
     pub transaction: Transaction,
     pub utxos: Vec<UtxoEntry>,
     pub used_utxos: Vec<UtxoEntry>,
+    pub used_utxo_ids: Vec<UtxoId>,
     pub network: Option<NetworkEnvironment>,
     pub nc: Option<NodeConfig>,
     pub fee_addrs: Vec<Address>,
@@ -387,9 +388,9 @@ impl TransactionBuilder {
                                  destination: &Address,
                                  party_address: &Address,
                                  party_fee: &CurrencyAmount,
-        original_utxo: UtxoEntry
+        original_utxo: &UtxoId
     ) -> &mut Self {
-        self.with_unsigned_input(original_utxo).expect("works");
+        self.with_direct_input(original_utxo);
         let mut o = Output::default();
         o.address = Some(party_address.clone());
         let mut d = StandardData::default();
@@ -422,6 +423,13 @@ impl TransactionBuilder {
         Ok(self)
     }
 
+    pub fn with_direct_input(&mut self, utxo_id: &UtxoId) -> &mut Self {
+        let mut input = Input::default();
+        input.utxo_id = Some(utxo_id.clone());
+        self.transaction.inputs.push(input);
+        self
+    }
+
     pub fn balance(&self) -> i64 {
         self.transaction.total_input_amount() - self.transaction.total_output_amount()
     }
@@ -449,7 +457,7 @@ impl TransactionBuilder {
             self.with_remainder();
         }
 
-        if !self.transaction.validate_fee(&self.fee_addrs) {
+        if !self.transaction.validate_fee_only(&self.fee_addrs) {
             let mut found_fee = false;
             for o in self.transaction.outputs.iter_mut().rev() {
                 if let Some(a) = o.data.as_mut().and_then(|data| data.amount.as_mut()) {
@@ -464,7 +472,7 @@ impl TransactionBuilder {
             if found_fee {
                 self.with_default_fee()?;
             }
-            if !self.transaction.validate_fee(&self.fee_addrs) && !self.allow_bypass_fee {
+            if !self.transaction.validate_fee_only(&self.fee_addrs) && !self.allow_bypass_fee {
                 return Err(ErrorInfo::error_info("Insufficient fee")).add(self.transaction.json_or())
                     .add("Valid Fee Addresses:")
                     .add(self.fee_addrs.iter().map(|a| a.render_string().expect("works")).join(", "));

@@ -95,14 +95,17 @@ impl CentralPricePair {
         &self,
         order_amount: u64,
         is_ask: bool,
-        network: &NetworkEnvironment
+        network: &NetworkEnvironment,
+        currency: SupportedCurrency
     ) -> f64 {
+        let mut address = Address::default();
+        address.currency = currency as i32;
         self.fulfill_taker_order(
             order_amount,
             is_ask,
             0,
             None,
-            &Address::default(),
+            &address,
             AddressEvent::External(ExternalTimedTransaction::default()),
             network
         ).map(|f| f.fulfilled_currency_amount().to_fractional()).unwrap_or(0.0)

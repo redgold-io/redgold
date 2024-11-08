@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::sled::Tree;
 use bdk::bitcoin::EcdsaSighashType;
-use bdk::database::MemoryDatabase;
+use bdk::database::{BatchDatabase, MemoryDatabase};
 use itertools::Itertools;
 use tracing::info;
 use tokio::sync::Mutex;
@@ -68,6 +68,7 @@ impl ExternalNetworkResourcesImpl {
                     self.node_config.env_data_folder().bdk_sled_path(),
                     None
                 )?;
+                println!("New wallet created");
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
                 guard.insert(pk.clone(), w.clone());
                 w

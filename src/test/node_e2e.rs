@@ -533,7 +533,7 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
                 &dev_ci_eth_addr,
                 &party_rdg_address,
                 &party_fee_amount,
-                stake_external_utxo_for_withdrawal
+                &stake_external_utxo_for_withdrawal.utxo_id.unwrap()
             ).build().expect("works").sign(&kp).expect("works");
 
         info!("Sending eth withdrawal {}", eth_withdrawal.json_or());
@@ -568,7 +568,7 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
                 &dev_ci_rdg_address,
                 &party_rdg_address,
                 &party_fee_amount,
-                stake_internal_utxo_for_withdrawal
+                &stake_internal_utxo_for_withdrawal.utxo_id.unwrap()
             ).build().expect("works").sign(&kp).expect("works");
 
         let res = submit.send_tx(&rdg_withdrawal).await.expect("works");

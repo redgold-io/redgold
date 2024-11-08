@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::config_data::Keys;
 use crate::structs::NetworkEnvironment;
 
 
@@ -33,11 +34,14 @@ pub struct NodeInstance {
     pub peer_id_index: i64,
     pub network_environment: NetworkEnvironment,
     pub host_port_offset: Option<i64>,
+    pub docker_swarm_proxy: Option<String>,
+    pub keys: Option<Keys>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct ServerData {
     pub ssh_host: Option<String>,
+    pub ssh_user: Option<String>,
     pub is_localhost: Option<bool>,
     pub external_ipv4: Option<String>,
     pub external_hostname: Option<String>,
