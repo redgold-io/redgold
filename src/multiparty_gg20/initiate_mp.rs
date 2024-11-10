@@ -154,7 +154,7 @@ pub async fn initiate_mp_keygen_authed(
     let address = "127.0.0.1".to_string();
     let port = relay.node_config.mparty_port();
     // TODO: From nodeconfig?
-    let timeout = Duration::from_secs(100u64);
+    let timeout = relay.node_config.multiparty_timeout();
 
     // TODO: First query all peers to determine if they are online.
     let self_key = relay.node_config.public_key();
@@ -181,7 +181,7 @@ pub async fn initiate_mp_keygen_authed(
         .collect_vec();
     // info!("Sending initiate keygen request to peers: {} message: {}", peers.json_or(), req.json_or());
 
-    let results = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(100))).await?;
+    let results = relay.broadcast_async(peers.clone(), req, Some(relay.node_config.multiparty_timeout())).await?;
 
     let mut successful = 0;
 
@@ -264,7 +264,7 @@ pub async fn initiate_mp_keygen_follower(
     let address = metadata.external_address()?;
     let port = metadata.port_or(relay.node_config.network) + 4u16;
 
-    let timeout = Duration::from_secs(100); // mp_req.timeout_seconds.unwrap_or(100) as u64);
+    let timeout = relay.node_config.multiparty_timeout();
 
     // info!("Initiating mp keygen follower for room: {} with index: {} num_parties: {}, threshold: {}, port: {}",
     //     room_id, index.to_string(), number_of_parties.to_string(), threshold.to_string(), port.to_string());
@@ -467,7 +467,7 @@ pub async fn initiate_mp_keysign_authed(
     info!("Sending initiate keysign request to peers: {} message: {} self_port: {} signing_room_id: {} index: {}",
         peers.json_or(), req.json_or(), port, signing_room_id.clone().and_then(|x| x.uuid).unwrap_or("".to_string()), index.json_or());
 
-    let results = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(100))).await?;
+    let results = relay.broadcast_async(peers.clone(), req, Some(relay.node_config.multiparty_timeout())).await?;
 
     let mut successful = 0;
 
@@ -539,7 +539,7 @@ pub async fn initiate_mp_keysign_follower(
     let address = metadata.external_address()?;
     let port = metadata.port_or(relay.node_config.network) + 4u16;
 
-    let timeout = Duration::from_secs(100);
+    let timeout = relay.node_config.multiparty_timeout()
 
     //TODO: This should be returned as immediate failure on the response level instead of going
     // thru process, maybe done as part of health check?

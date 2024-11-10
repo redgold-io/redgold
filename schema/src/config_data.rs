@@ -15,6 +15,7 @@ pub struct PartyConfigData {
     pub enable_party_mode: bool,
     pub order_cutoff_delay_time: i64,
     pub poll_interval: i64,
+    pub peer_timeout_seconds: Option<i64>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]

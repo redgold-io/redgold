@@ -17,3 +17,6 @@ sudo apt-get install -y libgmp3-dev lld
 
 # fuse support
 sudo apt-get install -y fuse3 libfuse3-dev libfuse-dev pkg-config
+
+# openpgp support, only required for airgap linux
+sudo apt install -y clang llvm pkg-config nettle-dev
