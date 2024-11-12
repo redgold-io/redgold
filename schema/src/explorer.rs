@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
+use strum_macros::{EnumIter, EnumString};
 use std::collections::HashMap;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::central_price::CentralPricePair;
@@ -103,8 +103,43 @@ pub struct DetailedTransaction {
     pub raw_transaction: Transaction,
     // pub first_amount: f64,
     pub remainder_amount: f64,
-    pub party_related_info: Option<PartyRelatedInfo>
+    pub party_related_info: Option<PartyRelatedInfo>,
+    pub swap_info: Option<TransactionSwapInfo>,
     // pub fee_amount: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, EnumString, EnumIter)]
+pub enum SwapStatus {
+    Pending,
+    Delayed,
+    Rejected,
+    Complete,
+    Refund
+}
+
+impl Default for SwapStatus {
+    fn default() -> Self {
+        SwapStatus::Pending
+    }
+}
+
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
+pub struct TransactionSwapInfo {
+    pub party_address: String,
+    pub swap_destination_address: String,
+    pub input_currency: SupportedCurrency,
+    pub output_currency: SupportedCurrency,
+    pub swap_input_amount: String,
+    pub swap_output_amount: Option<String>,
+    pub swap_fee: Option<f64>,
+    pub swap_input_amount_usd: String,
+    pub swap_output_amount_usd: String,
+    pub swap_status: SwapStatus,
+    pub is_request: bool,
+    pub is_fulfillment: bool,
+    pub request_tx_hash: Option<String>,
+    pub fulfillment_tx_hash: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, EnumString)]

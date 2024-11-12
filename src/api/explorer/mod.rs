@@ -42,7 +42,7 @@ use redgold_schema::structs::PartyInfoAbridged;
 use redgold_schema::util::times::ToTimeString;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::explorer::{AddressPoolInfo, BriefTransaction, BriefUtxoEntry, DetailedAddress, DetailedInput, DetailedObservation, DetailedObservationMetadata, DetailedOutput, DetailedPartyEvent, DetailedPeer, DetailedPeerNode, DetailedTransaction, DetailedTrust, ExplorerFaucetResponse, ExplorerHashSearchResponse, ExplorerPoolInfoResponse, ExplorerPoolsResponse, ExternalTxidInfo, NodeSignerDetailed, PartyRelatedInfo, PeerSignerDetailed, PoolMember, RecentDashboardResponse, UtxoChild};
+use redgold_schema::explorer::{AddressPoolInfo, BriefTransaction, BriefUtxoEntry, DetailedAddress, DetailedInput, DetailedObservation, DetailedObservationMetadata, DetailedOutput, DetailedPartyEvent, DetailedPeer, DetailedPeerNode, DetailedTransaction, DetailedTrust, ExplorerFaucetResponse, ExplorerHashSearchResponse, ExplorerPoolInfoResponse, ExplorerPoolsResponse, ExternalTxidInfo, NodeSignerDetailed, PartyRelatedInfo, PeerSignerDetailed, PoolMember, RecentDashboardResponse, TransactionSwapInfo, UtxoChild};
 use crate::node_config::ApiNodeConfig;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::central_price::CentralPricePair;
@@ -685,6 +685,7 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
         raw_transaction: tx.clone(),
         remainder_amount: CurrencyAmount::from(tx.remainder_amount()).to_fractional(),
         party_related_info: None,
+        swap_info: None,
     };
 
 
@@ -704,6 +705,17 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
     }
 
     Ok(detailed)
+}
+
+pub async fn derive_tx_swap_info(tx: &Transaction, r: &Relay) -> Option<TransactionSwapInfo> {
+    let mut tsi = TransactionSwapInfo::default();
+    if let Some(r) = tx.swap_request() {
+        None
+    } else if let Some(f) = tx.swap_fulfillment() {
+        None
+    } else {
+        None
+    }
 }
 
 
