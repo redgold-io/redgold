@@ -539,7 +539,7 @@ pub async fn initiate_mp_keysign_follower(
     let address = metadata.external_address()?;
     let port = metadata.port_or(relay.node_config.network) + 4u16;
 
-    let timeout = relay.node_config.multiparty_timeout()
+    let timeout = relay.node_config.multiparty_timeout();
 
     //TODO: This should be returned as immediate failure on the response level instead of going
     // thru process, maybe done as part of health check?

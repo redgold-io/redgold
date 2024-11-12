@@ -113,6 +113,7 @@ impl Default for ConfigData {
                 enable_party_mode: false,
                 order_cutoff_delay_time: 300_000,
                 poll_interval: 300_000,
+                peer_timeout_seconds: None
             }),
             debug: Some(DebugSettings {
                 use_e2e_external_resource_mocks: false,
