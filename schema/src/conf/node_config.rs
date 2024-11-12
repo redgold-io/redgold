@@ -185,6 +185,14 @@ pub struct NodeConfig {
 
 impl NodeConfig {
 
+    pub fn multiparty_timeout(&self) -> Duration {
+        Duration::from_secs(
+            self.config_data.party.as_ref()
+                .and_then(|n| n.peer_timeout_seconds)
+                .unwrap_or(200) as u64
+        )
+    }
+
     pub fn usb_paths_exist(&self) -> Vec<String> {
         let mut res = vec![];
         for path in self.config_data.secure.as_ref().and_then(|s| s.usb_paths.as_ref()).unwrap_or(&vec![]) {

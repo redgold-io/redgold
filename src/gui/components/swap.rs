@@ -147,19 +147,19 @@ impl SwapState {
             match ls.swap_state.stage {
                 SwapStage::StartPreparing => {
                     Self::swap_details(ui, ls, false);
-                    ui.heading("Lock Swap Details");
+                    // ui.heading("Lock Swap Details");
                     next_stage = SwapStage::ShowAmountsPromptSigning;
                     button_text = "Start Swap";
                 }
                 SwapStage::ShowAmountsPromptSigning => {
                     Self::swap_details(ui, ls, true);
-                    ui.heading("Swap Values Locked: Prepare to Sign");
+                    // ui.heading("Swap Values Locked: Prepare to Sign");
                     next_stage = SwapStage::ViewSignedAllowBroadcast;
                     button_text = "Sign Transaction";
                 }
                 SwapStage::ViewSignedAllowBroadcast => {
                     Self::swap_details(ui, ls, true);
-                    ui.heading("Swap Signed: Prepare to Broadcast");
+                    // ui.heading("Swap Signed: Prepare to Broadcast");
                     previous_stage = SwapStage::ShowAmountsPromptSigning;
                     next_stage = SwapStage::CompleteShowTrackProgress;
                     button_text = "Broadcast Transaction";
@@ -167,7 +167,7 @@ impl SwapState {
                 SwapStage::CompleteShowTrackProgress => {
                     Self::swap_details(ui, ls, true);
                     previous_stage = SwapStage::StartPreparing;
-                    ui.heading("Swap Complete");
+                    // ui.heading("Swap Complete");
                 }
             }
 
@@ -177,34 +177,34 @@ impl SwapState {
             }
 
             ui.horizontal(|ui| {
-                ui.horizontal(|ui| {
-                    let style = ui.style_mut();
-                    style.override_text_style = Some(TextStyle::Heading);
-                    if ui.button("Reset").clicked() {
-                        ls.swap_state.tx_progress.reset();
-                        ls.swap_state.currency_input_box.input_box_str = "".to_string();
-                        ls.swap_state.stage = SwapStage::StartPreparing;
-                    }
-                });
-                if ls.swap_state.stage != SwapStage::StartPreparing {
-                    ui.horizontal(|ui| {
-                        let style = ui.style_mut();
-                        style.override_text_style = Some(TextStyle::Heading);
-                        let mut text = "Back";
-                        if ls.swap_state.stage == SwapStage::CompleteShowTrackProgress {
-                            text = "Start New Swap";
-                        }
-                        if ui.button(text).clicked() {
-                            ls.swap_state.stage = previous_stage;
-
-                            if ls.swap_state.stage == SwapStage::CompleteShowTrackProgress {
-                                ls.swap_state.tx_progress.reset();
-                                ls.swap_state.currency_input_box.input_box_str = "".to_string();
-                                ls.swap_state.stage = SwapStage::StartPreparing;
-                            }
-                        }
-                    });
-                }
+                // ui.horizontal(|ui| {
+                //     let style = ui.style_mut();
+                //     style.override_text_style = Some(TextStyle::Heading);
+                //     if ui.button("Reset").clicked() {
+                //         ls.swap_state.tx_progress.reset();
+                //         ls.swap_state.currency_input_box.input_box_str = "".to_string();
+                //         ls.swap_state.stage = SwapStage::StartPreparing;
+                //     }
+                // });
+                // if ls.swap_state.stage != SwapStage::StartPreparing {
+                //     ui.horizontal(|ui| {
+                //         let style = ui.style_mut();
+                //         style.override_text_style = Some(TextStyle::Heading);
+                //         let mut text = "Back";
+                //         if ls.swap_state.stage == SwapStage::CompleteShowTrackProgress {
+                //             text = "Start New Swap";
+                //         }
+                //         if ui.button(text).clicked() {
+                //             ls.swap_state.stage = previous_stage;
+                //
+                //             if ls.swap_state.stage == SwapStage::CompleteShowTrackProgress {
+                //                 ls.swap_state.tx_progress.reset();
+                //                 ls.swap_state.currency_input_box.input_box_str = "".to_string();
+                //                 ls.swap_state.stage = SwapStage::StartPreparing;
+                //             }
+                //         }
+                //     });
+                // }
 
                 if !ls.swap_state.swap_valid {
                     ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));

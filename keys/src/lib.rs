@@ -23,6 +23,8 @@ pub mod tx_proof_validate;
 pub mod public_key_parse_support;
 pub mod external_tx_support;
 pub mod solana;
+pub mod monero;
+pub mod gpg;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,

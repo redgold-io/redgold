@@ -1,0 +1,20 @@
+services:
+  monerod-testnet:
+    container_name: monerod-testnet
+    user: 1000:1000
+    image: ghcr.io/sethforprivacy/simple-monerod:latest
+    volumes:
+      - /disk/bitmonero-testnet:/home/monero
+    restart: unless-stopped
+    stop_grace_period: 15m30s
+    ports:
+      - "28080:28080"  # Testnet p2p port
+      - "28089:28089"  # Testnet RPC port
+    command:
+      - --testnet
+      - --rpc-restricted-bind-ip=0.0.0.0
+      - --rpc-restricted-bind-port=28089
+      - --p2p-bind-port=28080
+      - --no-igd
+      - --no-zmq
+      - --enable-dns-blocklist
