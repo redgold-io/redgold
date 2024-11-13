@@ -71,7 +71,7 @@ impl SmClient {
     pub fn new(address: surf::Url, room_id: &str, relay: &Relay) -> Result<Self> {
         let config = surf::Config::new()
             .set_base_url(address.join(&format!("rooms/{}/", room_id))?)
-            .set_timeout(None);
+            .set_timeout(Some(relay.node_config.multiparty_gg20_timeout()));
         Ok(Self {
             http_client: config.try_into()?,
             relay: relay.clone(),
