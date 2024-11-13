@@ -184,6 +184,15 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+    pub fn multiparty_gg20_timeout(&self) -> Duration {
+        Duration::from_secs(
+            self.config_data.party.as_ref()
+                .and_then(|n| n.gg20_peer_timeout_seconds)
+                .unwrap_or(100) as u64
+        )    }
+}
+
+impl NodeConfig {
 
     pub fn multiparty_timeout(&self) -> Duration {
         Duration::from_secs(

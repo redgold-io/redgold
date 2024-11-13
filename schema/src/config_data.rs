@@ -15,7 +15,8 @@ pub struct PartyConfigData {
     pub enable_party_mode: bool,
     pub order_cutoff_delay_time: i64,
     pub poll_interval: i64,
-    pub peer_timeout_seconds: Option<i64>
+    pub peer_timeout_seconds: Option<i64>,
+    pub gg20_peer_timeout_seconds: Option<i64>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -113,7 +114,8 @@ impl Default for ConfigData {
                 enable_party_mode: false,
                 order_cutoff_delay_time: 300_000,
                 poll_interval: 300_000,
-                peer_timeout_seconds: None
+                peer_timeout_seconds: None,
+                gg20_peer_timeout_seconds: None,
             }),
             debug: Some(DebugSettings {
                 use_e2e_external_resource_mocks: false,
