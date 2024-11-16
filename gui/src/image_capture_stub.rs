@@ -1,13 +1,14 @@
 use std::sync::{Arc, Mutex};
 use image::DynamicImage;
 use rqrr::MetaData;
+use serde::{Deserialize, Serialize};
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::functionality::capture::CaptureLike;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureStream {
-
+    pub active_device: Option<String>
 }
 
 impl CaptureLike for CaptureStream {
