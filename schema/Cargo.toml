@@ -15,6 +15,7 @@ categories = ["cryptography::cryptocurrencies"]
 
 [dependencies]
 toml = {workspace = true}
+parquet_derive = {workspace = true}
 sha3 = "0.10.8"
 prost = "0.11.9"
 prost-helper = "0.7.0"

@@ -35,6 +35,7 @@ async fn run_websocket_stream(url: String, initial_subscribe_message: String, me
             Message::Close(..) => {
                 return "WebSocket closed".to_error();
             }
+            _ => {}
         }
     }
     Ok(())

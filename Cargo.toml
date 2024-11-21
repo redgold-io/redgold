@@ -59,6 +59,7 @@ redgold-crawler-native = { path = "./crawler-native"}
 redgold-gui = { path = "./gui"}
 redgold-common = { path = "./common"}
 redgold-common-no-wasm = { path = "./common-no-wasm"}
+parquet_derive = "53.3.0"
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"
