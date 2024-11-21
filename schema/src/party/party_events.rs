@@ -39,7 +39,7 @@ pub struct PartyEvents where {
     // pub pending_stake_withdrawals: Vec<WithdrawalStakingEvent>,
     pub rejected_stake_withdrawals: Vec<AddressEvent>,
     pub central_prices: HashMap<SupportedCurrency, CentralPricePair>,
-    pub central_price_history: Vec<(i64, HashMap<SupportedCurrency, CentralPricePair>)>,
+    pub central_price_history: Option<Vec<(i64, HashMap<SupportedCurrency, CentralPricePair>)>>,
     // This needs to be populated if deserializing.
     // #[serde(skip)]
     // pub relay: Option<Relay>,
@@ -53,7 +53,7 @@ pub struct PartyEvents where {
 impl PartyEvents {
 
     pub fn get_rdg_max_bid_usd_estimate_at(&self, time: i64) -> Option<f64> {
-        self.central_price_history.iter().filter(|(t, _)| *t <= time).last().and_then(|(_, cp)| {
+        self.central_price_history.clone().unwrap_or_default().iter().filter(|(t, _)| *t <= time).last().and_then(|(_, cp)| {
             let max = cp.iter().map(|(c, p)| {
                 p.min_bid_estimated
             }).reduce(|a, b| if a > b { a } else { b });
@@ -247,7 +247,14 @@ impl PartyEvents {
             time
         )?;
         if self.central_prices != prior {
-            self.central_price_history.push((time, self.central_prices.clone()));
+            match self.central_price_history.as_mut() {
+                None => {
+                    self.central_price_history = Some(vec![(time, self.central_prices.clone())]);
+                }
+                Some(a) => {
+                    a.push((time, self.central_prices.clone()));
+                }
+            }
         }
 
         Ok(())
