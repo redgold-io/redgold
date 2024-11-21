@@ -76,6 +76,12 @@
             <div>{{ hashData.outputs.length }}</div>
 
           </div>
+
+          <div v-if="hashData.swap_info">
+            <h3 class="detail-group">Swap Info</h3>
+            <TransactionSwapInfo :swapInfo="hashData.swap_info" />
+          </div>
+
           <h3 class="detail-group">Inputs</h3>
           <div v-for="(input, index) in hashData.inputs" :key="index">
             <div class="grid-container">
@@ -217,11 +223,13 @@
 import HashLink from "@/components/util/HashLink.vue";
 import CopyClipboard from "@/components/util/CopyClipboard.vue";
 import RenderTime from "@/components/RenderTime.vue";
+import TransactionSwapInfo from "@/components/TransactionSwapInfo.vue";
 
 export default {
   name: 'TransactionDetail',
   props: ['hashDataInitial'],
   components: {
+    TransactionSwapInfo,
     RenderTime,
     HashLink,
     CopyClipboard

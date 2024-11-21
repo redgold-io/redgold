@@ -470,7 +470,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug() {
     let nc = NodeConfig::dev_default().await;

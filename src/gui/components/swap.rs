@@ -366,6 +366,7 @@ impl SwapState {
 }
 
 
+#[ignore]
 #[tokio::test]
 async fn debug_fulfill() {
     let nc = NodeConfig::default_env(NetworkEnvironment::Dev).await;

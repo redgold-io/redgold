@@ -11,7 +11,7 @@ use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::party::central_price::CentralPricePair;
 use crate::party::portfolio::PortfolioRequestEvents;
-use crate::structs::{Address, CurrencyAmount, DepositRequest, ErrorInfo, ExternalTransactionId, NetworkEnvironment, PublicKey, StakeDeposit, SupportedCurrency, Transaction, UtxoId};
+use crate::structs::{Address, CurrencyAmount, DepositRequest, ErrorInfo, ExternalTransactionId, Hash, NetworkEnvironment, PublicKey, StakeDeposit, SupportedCurrency, Transaction, UtxoId};
 use crate::tx::external_tx::ExternalTimedTransaction;
 use crate::util::times::current_time_millis;
 
@@ -39,6 +39,7 @@ pub struct PartyEvents where {
     // pub pending_stake_withdrawals: Vec<WithdrawalStakingEvent>,
     pub rejected_stake_withdrawals: Vec<AddressEvent>,
     pub central_prices: HashMap<SupportedCurrency, CentralPricePair>,
+    pub central_price_history: Option<Vec<(i64, HashMap<SupportedCurrency, CentralPricePair>)>>,
     // This needs to be populated if deserializing.
     // #[serde(skip)]
     // pub relay: Option<Relay>,
@@ -50,6 +51,35 @@ pub struct PartyEvents where {
 }
 
 impl PartyEvents {
+
+    pub fn get_rdg_max_bid_usd_estimate_at(&self, time: i64) -> Option<f64> {
+        self.central_price_history.clone().unwrap_or_default().iter().filter(|(t, _)| *t <= time).last().and_then(|(_, cp)| {
+            let max = cp.iter().map(|(c, p)| {
+                p.min_bid_estimated
+            }).reduce(|a, b| if a > b { a } else { b });
+            max
+        })
+    }
+
+    pub fn find_fulfillment_of(&self, identifier: String) -> Option<(OrderFulfillment, AddressEvent, AddressEvent)> {
+        self.fulfillment_history.iter().find_map(|(of, e, e2)| {
+            if e.identifier() == identifier {
+                Some((of.clone(), e.clone(), e2.clone()))
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn find_request_fulfilled_by(&self, identifier: String) -> Option<(OrderFulfillment, AddressEvent, AddressEvent)> {
+        self.fulfillment_history.iter().find_map(|(of, e, e2)| {
+            if e2.identifier() == identifier {
+                Some((of.clone(), e.clone(), e2.clone()))
+            } else {
+                None
+            }
+        })
+    }
 
     pub fn address_for_currency(&self, cur: &SupportedCurrency) -> Option<Address> {
         self.party_pk_all_address.iter().find_map(|a| {
@@ -209,11 +239,24 @@ impl PartyEvents {
 
 
     pub fn recalculate_prices(&mut self, time: i64) -> RgResult<()> {
+
+        let prior = self.central_prices.clone();
         self.central_prices = CentralPricePair::recalculate_no_quote_price_change(
             self.central_prices.clone(),
             self.balances_with_deltas_sub_portfolio(),
             time
         )?;
+        if self.central_prices != prior {
+            match self.central_price_history.as_mut() {
+                None => {
+                    self.central_price_history = Some(vec![(time, self.central_prices.clone())]);
+                }
+                Some(a) => {
+                    a.push((time, self.central_prices.clone()));
+                }
+            }
+        }
+
         Ok(())
     }
 

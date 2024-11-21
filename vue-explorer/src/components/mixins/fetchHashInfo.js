@@ -97,6 +97,10 @@ export default {
                 this.hashData = data.peer_node;
                 this.componentToRender = 'PeerNodeDetail';
                 console.log("Loading PeerNodeDetail detail");
+            } else if (data.external_txid_info != null) {
+                this.hashData = data.peer_node;
+                this.componentToRender = 'ExternalTxid';
+                console.log("Loading ExternalTxid detail");
             } else {
                 this.hashData = hash;
                 this.componentToRender = 'NotFound';

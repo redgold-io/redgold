@@ -21,6 +21,7 @@ import ObservationDetail from "@/components/hash_types/ObservationDetail.vue";
 import PeerInfo from "@/components/hash_types/PeerInfo.vue";
 // import PeerNodeInfo from "@/components/hash_types/PeerNodeInfo.vue";
 import PeerNodeDetail from "@/components/hash_types/PeerNodeDetail.vue";
+import ExternalTxid from "@/components/hash_types/ExternalTxid.vue";
 export default {
   name: 'HashDetails',
   data() {
@@ -37,6 +38,7 @@ export default {
     PeerInfo,
     PeerNodeDetail,
     NotFound,
+    ExternalTxid,
   },
   mixins: [fetchHashInfo],
   async created() {
