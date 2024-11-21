@@ -8,7 +8,29 @@ use crate::{ErrorInfoContext, RgResult};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
 use crate::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 
+
+
+pub trait RenderCurrencyAmountDecimals {
+    fn render_currency_amount_8_decimals(&self) -> String;
+    fn render_currency_amount_2_decimals(&self) -> String;
+}
+
+impl RenderCurrencyAmountDecimals for f64 {
+    fn render_currency_amount_8_decimals(&self) -> String {
+        format!("{:.8}", self)
+    }
+
+    fn render_currency_amount_2_decimals(&self) -> String {
+        format!("{:.2}", self)
+    }
+}
+
+
 impl CurrencyAmount {
+
+    pub fn render_8_decimals(&self) -> String {
+        self.to_fractional().render_currency_amount_8_decimals()
+    }
 
     pub fn amount_i64(&self) -> i64 {
         self.amount

@@ -40,6 +40,7 @@ use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
@@ -105,6 +106,7 @@ pub struct ObservationMetadataInternalSigning {
 }
 
 
+// TODO: Change this to ArcSwap
 // TODO: There's a better pattern here than mutex, but wrapping this here for clarity
 // for a future change.
 #[derive(Clone, Default)]
@@ -211,6 +213,17 @@ impl Default for PeerInfo {
 
 impl Relay {
 
+    pub async fn get_party_by_address(&self, party_addr: &Address) -> Option<PartyInternalData> {
+        let d = self.external_network_shared_data.clone_read().await;
+        d.iter().filter(|(k, v)| {
+            k.to_all_addresses().unwrap_or_default().iter().filter(|a| a == &party_addr).next().is_some()
+        }).map(|(_, v)| v.clone()).next()
+    }
+
+    pub async fn get_party_events_by_address(&self, party_addr: &Address) -> Option<PartyEvents> {
+        self.get_party_by_address(party_addr).await.and_then(|p| p.party_events)
+    }
+
     // pub async fn public_party_data(&self) -> HashMap<PublicKey, PartyInternalData> {
     //     let data = self.external_network_shared_data.clone_read().await;
     //     data.into_iter().map(|(k, v)| {
@@ -244,11 +257,17 @@ impl Relay {
         None
     }
 
-    pub async fn party_event_for_txid(&self, txid: &String) -> Option<AddressEvent> {
-        let p = self.active_party().await?;
-        p.address_events.iter().filter(|ae| {
-            &ae.identifier() == txid
-        }).next().cloned()
+    pub async fn party_event_for_txid(&self, txid: &String) -> Option<(AddressEvent, PartyInternalData)> {
+        let parties = self.external_network_shared_data.clone_read().await;
+        for (pk, p) in parties.iter() {
+            let ev = p.address_events.iter().filter(|ae| {
+                &ae.identifier() == txid
+            }).next().cloned();
+            if let Some(ae) = ev {
+                return Some((ae, p.clone()))
+            }
+        }
+        None
     }
 
     pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {

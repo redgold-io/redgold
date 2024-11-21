@@ -390,6 +390,7 @@ impl PartyEventBuilder for PartyEvents {
             rejected_stake_withdrawals: vec![],
             central_prices: Default::default(),
             // relay: Some(relay.clone()),
+            central_price_history: vec![],
             locally_fulfilled_orders: vec![],
             portfolio_request_events: Default::default(),
             default_fee_addrs: relay.default_fee_addrs(),

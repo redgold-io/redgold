@@ -111,7 +111,7 @@ pub struct DetailedTransaction {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, EnumString, EnumIter)]
 pub enum SwapStatus {
     Pending,
-    Delayed,
+    Processing,
     Rejected,
     Complete,
     Refund
@@ -134,12 +134,15 @@ pub struct TransactionSwapInfo {
     pub swap_output_amount: Option<String>,
     pub swap_fee: Option<f64>,
     pub swap_input_amount_usd: String,
-    pub swap_output_amount_usd: String,
+    pub swap_input_amount_usd_now: String,
+    pub swap_output_amount_usd: Option<String>,
+    pub swap_output_amount_usd_now: Option<String>,
     pub swap_status: SwapStatus,
     pub is_request: bool,
     pub is_fulfillment: bool,
     pub request_tx_hash: Option<String>,
     pub fulfillment_tx_hash: Option<String>,
+    pub exchange_rate: Option<String>
 }
 
 #[derive(Serialize, Deserialize, EnumString)]
@@ -264,7 +267,8 @@ pub struct DetailedPeerNode {
 pub struct ExternalTxidInfo {
     pub external_explorer_link: String,
     pub party_address: String,
-    pub event: DetailedPartyEvent
+    pub event: DetailedPartyEvent,
+    pub swap_info: Option<TransactionSwapInfo>
 }
 
 #[derive(Serialize, Deserialize, Clone)]

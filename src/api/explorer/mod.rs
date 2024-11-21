@@ -30,6 +30,7 @@ use crate::api::public_api::{Pagination, TokenParam};
 use crate::util;
 use redgold_keys::address_external::ToBitcoinAddress;
 use redgold_keys::address_support::AddressSupport;
+use redgold_keys::external_tx_support::ExternalTxSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -42,12 +43,14 @@ use redgold_schema::structs::PartyInfoAbridged;
 use redgold_schema::util::times::ToTimeString;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::explorer::{AddressPoolInfo, BriefTransaction, BriefUtxoEntry, DetailedAddress, DetailedInput, DetailedObservation, DetailedObservationMetadata, DetailedOutput, DetailedPartyEvent, DetailedPeer, DetailedPeerNode, DetailedTransaction, DetailedTrust, ExplorerFaucetResponse, ExplorerHashSearchResponse, ExplorerPoolInfoResponse, ExplorerPoolsResponse, ExternalTxidInfo, NodeSignerDetailed, PartyRelatedInfo, PeerSignerDetailed, PoolMember, RecentDashboardResponse, TransactionSwapInfo, UtxoChild};
+use redgold_schema::explorer::{AddressPoolInfo, BriefTransaction, BriefUtxoEntry, DetailedAddress, DetailedInput, DetailedObservation, DetailedObservationMetadata, DetailedOutput, DetailedPartyEvent, DetailedPeer, DetailedPeerNode, DetailedTransaction, DetailedTrust, ExplorerFaucetResponse, ExplorerHashSearchResponse, ExplorerPoolInfoResponse, ExplorerPoolsResponse, ExternalTxidInfo, NodeSignerDetailed, PartyRelatedInfo, PeerSignerDetailed, PoolMember, RecentDashboardResponse, SwapStatus, TransactionSwapInfo, UtxoChild};
 use crate::node_config::ApiNodeConfig;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::central_price::CentralPricePair;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::price_volume::PriceVolume;
+use redgold_schema::tx::currency_amount::RenderCurrencyAmountDecimals;
+use crate::party::price_query::PriceDataPointQueryImpl;
 // use crate::party::bid_ask::BidAsk;
 
 
@@ -497,18 +500,19 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
         has_response = true;
     }
     if !has_response {
-        if r.party_event_for_txid(&hash_input).await.is_some() {
-            if let Some(pid) = r.active_party().await {
-                if let Ok(ev) = convert_events(&pid, &r.node_config) {
-                    if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == hash_input).next() {
-                        h.external_txid_info = Some(ExternalTxidInfo {
-                            external_explorer_link: "".to_string(),
-                            party_address: pid.party_info.party_key.as_ref()
-                                .and_then(|k| k.address().ok())
-                                .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
-                            event: ev.clone(),
-                        });
-                    }
+        if let Some((ae, pid)) = r.party_event_for_txid(&hash_input).await {
+            if let Ok(ev) = convert_events(&pid, &r.node_config) {
+                if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == hash_input).next() {
+                    let mut external_txid_info = ExternalTxidInfo {
+                        external_explorer_link: "".to_string(),
+                        party_address: pid.party_info.party_key.as_ref()
+                            .and_then(|k| k.address().ok())
+                            .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
+                        event: ev.clone(),
+                        swap_info: None,
+                    };
+                    external_txid_info.swap_info = check_for_external_network_swap_info(None, Some(external_txid_info.clone()), &r).await?;
+                    h.external_txid_info = Some(external_txid_info);
                 }
             }
         }
@@ -689,30 +693,119 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
     };
 
 
-    if r.party_event_for_txid(&detailed.info.hash).await.is_some() {
-        if let Some(pid) = r.active_party().await {
-            if let Ok(ev) = convert_events(&pid, &r.node_config) {
-                if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == detailed.info.hash).next() {
-                    detailed.party_related_info = Some(PartyRelatedInfo {
-                        party_address: pid.party_info.party_key.as_ref()
-                            .and_then(|k| k.address().ok())
-                            .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
-                        event: Some(ev.clone()),
-                    });
-                }
+    if let Some((ae, pid)) = r.party_event_for_txid(&detailed.info.hash).await {
+        if let Ok(ev) = convert_events(&pid, &r.node_config) {
+            if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == detailed.info.hash).next() {
+                detailed.party_related_info = Some(PartyRelatedInfo {
+                    party_address: pid.party_info.party_key.as_ref()
+                        .and_then(|k| k.address().ok())
+                        .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
+                    event: Some(ev.clone()),
+                });
             }
         }
+        derive_tx_swap_info(&tx, r).await.map(|tsi| {
+            detailed.swap_info = Some(tsi);
+        });
     }
 
     Ok(detailed)
 }
 
+pub async fn check_for_external_network_swap_info(a: Option<Address>, opt_ext: Option<ExternalTxidInfo>, r: &Relay) -> RgResult<Option<TransactionSwapInfo>> {
+    let mut tsi = TransactionSwapInfo::default();
+    let mut address = "".to_string();
+    if let Some(opt_ext) = opt_ext.as_ref() {
+        address = opt_ext.event.other_address.clone();
+    } else if let Some(a) = a.as_ref() {
+        address = a.render_string()?;
+    }
+    for (k, v) in r.external_network_shared_data.clone_read().await.iter() {
+        if let Some(pev) = v.party_events.as_ref() {
+            for (of, init, end) in pev.fulfillment_history.iter() {
+                match init {
+                    AddressEvent::External(e) => {
+                        if opt_ext.clone().map(|o| o.event.tx_hash == e.tx_id)
+                            .unwrap_or(false) ||
+                        a.clone().map(|aa| aa == e.other_address_typed().unwrap()).unwrap_or(false) {
+                            let amount = e.currency_amount();
+                            if let Some(p) = e.price_usd {
+                                tsi.swap_input_amount_usd = (amount.to_fractional() * p).render_currency_amount_2_decimals();
+                            }
+                            if let Ok(Some(p)) = r.ds.price_time
+                                .max_time_price_by(e.currency, current_time_millis_i64()).await {
+                                tsi.swap_input_amount_usd_now = (amount.to_fractional() * p).render_currency_amount_2_decimals();
+                            }
+                            tsi.swap_input_amount = amount.render_8_decimals();
+                            tsi.swap_status = SwapStatus::Complete;
+                            tsi.is_fulfillment = false;
+                            tsi.party_address = k.address().ok()
+                                .and_then(|a| a.render_string().ok()).unwrap_or_default();
+                            tsi.output_currency = SupportedCurrency::Redgold;
+                            tsi.swap_destination_address = address.clone();
+                            match end {
+                                AddressEvent::Internal(txo) => {
+                                    tsi.fulfillment_tx_hash = Some(txo.tx.hash_hex());
+                                    tsi.is_request = true;
+                                    tsi.swap_output_amount = Some(of.fulfilled_currency_amount().render_8_decimals());
+                                    if let Some(p) = pev.get_rdg_max_bid_usd_estimate_at(current_time_millis_i64()) {
+                                        tsi.swap_input_amount_usd_now = (amount.to_fractional() * p).render_currency_amount_2_decimals();
+                                    }
+                                    if let Some(p) = pev.get_rdg_max_bid_usd_estimate_at(of.event_time) {
+                                        tsi.swap_output_amount_usd = Some((
+                                            of.fulfilled_currency_amount().to_fractional() * p).render_currency_amount_2_decimals());
+                                    }
+                                }
+                                _ => {
+
+                                }
+                            }
+                            return Ok(Some(tsi))
+                        }
+                    }
+                    AddressEvent::Internal(_) => {}
+                }
+            }
+        }
+    };
+    Ok(None)
+}
+
 pub async fn derive_tx_swap_info(tx: &Transaction, r: &Relay) -> Option<TransactionSwapInfo> {
     let mut tsi = TransactionSwapInfo::default();
-    if let Some(r) = tx.swap_request() {
-        None
-    } else if let Some(f) = tx.swap_fulfillment() {
-        None
+    if let Some((sr, sa, party)) = tx.swap_request_and_amount_and_party_address() {
+        tsi.swap_destination_address = sr.destination.as_ref().and_then(|d| d.render_string().ok()).unwrap_or_default();
+        tsi.is_request = true;
+        tsi.is_fulfillment = false;
+        tsi.input_currency = SupportedCurrency::Redgold;
+        if let Some(c) = sr.destination.as_ref()
+            .map(|d| d.currency_or()) {
+            tsi.output_currency = c;
+        }
+        tsi.party_address = party.render_string().unwrap_or_default();
+        tsi.swap_input_amount = format!("{:8}", sa.to_fractional().to_string());
+
+        if let Some(p) = r.get_party_by_address(party).await {
+
+            if let Some(pev) = p.party_events.as_ref() {
+                pev.central_prices.get(&tsi.output_currency).map(|cp| {
+                    tsi.swap_output_amount = Some((cp.min_bid * sa.to_fractional()).render_currency_amount_8_decimals());
+                    tsi.swap_output_amount_usd = Some((cp.min_bid_estimated * sa.to_fractional()).render_currency_amount_2_decimals());
+                });
+                tsi.swap_input_amount_usd = sa.to_fractional().to_string();
+
+                if let Some((off, init, end)) = pev.find_fulfillment_of(tx.hash_hex()) {
+                    tsi.fulfillment_tx_hash = Some(end.identifier());
+                    tsi.swap_status = SwapStatus::Complete;
+                };
+            }
+        }
+        Some(tsi)
+    } else if let Some((f, a, party)) = tx.swap_fulfillment_amount_party() {
+        if let Some(p) = r.get_party_events_by_address(party).await {
+
+        }
+        Some(tsi)
     } else {
         None
     }
