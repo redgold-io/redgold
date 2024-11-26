@@ -44,9 +44,11 @@ impl LocalTestNodeContext {
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;
-            let mut opts = (&*node_config.opts.clone()).clone();
-            opts.enable_party_mode = true;
-            node_config.opts = Arc::new(opts);
+            let mut opts = (&*node_config.config_data.clone()).clone();
+            let mut p = opts.party.clone().unwrap_or_default();
+            p.enable = Some(true);
+            opts.party = Some(p);
+            node_config.config_data = Arc::new(opts);
         }
 
         node_config.seeds = seed.clone();

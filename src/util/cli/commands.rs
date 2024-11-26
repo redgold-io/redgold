@@ -252,8 +252,8 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
     } else {
-        if node_config.opts.network.is_none() {
-            if node_config.opts.development_mode {
+        if node_config.config_data.network.is_none() {
+            if node_config.development_mode() {
                 net = NetworkEnvironment::Dev;
             } else {
                 net = NetworkEnvironment::Main;

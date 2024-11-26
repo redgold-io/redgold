@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use eframe::{egui};
 use eframe::egui::Image;
@@ -5,11 +6,13 @@ use crate::gui::egui::IconData;
 use egui_extras::RetainedImage;
 use tokio::runtime::Runtime;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::{error_info, ErrorInfoContext};
+use redgold_schema::{error_info, structs, ErrorInfoContext};
 use redgold_schema::structs::ErrorInfo;
 use crate::gui;
 use crate::gui::ClientApp;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use crate::api::rosetta::models::PublicKey;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
 pub(crate) fn load_icon() -> IconData {
@@ -31,17 +34,17 @@ pub(crate) fn load_icon() -> IconData {
     }
 }
 
-pub async fn attempt_start<G>(nc: NodeConfig
-                           // , rt: Arc<Runtime>
-                           ,
-                           res: ExternalNetworkResourcesImpl,
-                          gui_depends: G
+pub async fn attempt_start<G>(
+    nc: Box<NodeConfig>,
+    res: Box<ExternalNetworkResourcesImpl>,
+    gui_depends: Box<G>,
+    party_data: HashMap<structs::PublicKey, PartyInternalData>
 ) -> Result<(), ErrorInfo> where G: Send + Clone + GuiDepends + 'static {
-    let resources = crate::resources::Resources::default();
-    let bytes = resources.logo_bytes;
-    let logo_img = Image::from_bytes("bytes://logo", bytes);
+    // let resources = crate::resources::Resources::default();
+    // let bytes = resources.logo_bytes;
+    // let logo_img = Image::from_bytes("bytes://logo", bytes);
     // let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
-    let app = gui::ClientApp::from(logo_img, nc, res, gui_depends).await?;
+    let app = gui::ClientApp::from(nc, res, gui_depends, party_data).await?;
 
     let mut x = 1400.0;
     let mut y = 1000.0;

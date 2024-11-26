@@ -34,7 +34,7 @@ use crate::util::current_time_millis_i64;
 #[derive(Clone)]
 pub struct ExternalNetworkResourcesImpl {
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
-    pub node_config: NodeConfig,
+    pub node_config: Arc<NodeConfig>,
     pub self_secret_key: String,
     pub dummy_secret_key: String,
     pub self_public: PublicKey,
@@ -48,7 +48,7 @@ impl ExternalNetworkResourcesImpl {
         let dummy_secret_key = "25474115328e46e8e636edf6b6f1c90cbd997ae24f5a043fd8ecf2381118e22f".to_string();
         Ok(ExternalNetworkResourcesImpl {
             btc_wallets,
-            node_config: node_config.clone(),
+            node_config: Arc::new(node_config.clone()),
             self_secret_key: node_config.keypair().to_private_hex(),
             dummy_secret_key,
             self_public: node_config.keypair().public_key(),

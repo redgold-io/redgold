@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.26"
+version = "0.1.27"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -48,11 +48,11 @@ categories = ["cryptography::cryptocurrencies"]
 
 
 [workspace.dependencies]
-redgold-schema = { path = "schema", version = "0.1.26"}
-redgold-data = { path = "data", version = "0.1.26"}
-redgold-keys = { path = "keys", version = "0.1.26"}
-redgold-executor = { path = "executor", version = "0.1.26"}
-redgold-sdk-client = { path = "sdk-client", version = "0.1.26"}
+redgold-schema = { path = "schema", version = "0.1.27"}
+redgold-data = { path = "data", version = "0.1.27"}
+redgold-keys = { path = "keys", version = "0.1.27"}
+redgold-executor = { path = "executor", version = "0.1.27"}
+redgold-sdk-client = { path = "sdk-client", version = "0.1.27"}
 redgold-fs = { path = "./fs"}
 redgold-crawler = { path = "./crawler"}
 redgold-crawler-native = { path = "./crawler-native"}
@@ -199,6 +199,10 @@ assert_cmd = "2.0.11"
 opt-level = 3
 
 [profile.dev]
+opt-level = 0
+debug = true
+# Increase stack size to 8MB (default is often 2MB)
+codegen-units = 1
 overflow-checks = true
 #lto = "thin"  # Use thin LTO
 #rustc-args = ["-C", "link-arg=-fuse-ld=lld"]  # Only affects dev profile

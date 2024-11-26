@@ -10,3 +10,4 @@ mod connection_refused_test;
 mod database_table_size;
 mod double_spend_it;
 mod debug_party_eth_not_fulfilled;
+mod mac_stackover_partydata;

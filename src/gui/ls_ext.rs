@@ -18,12 +18,13 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::structs::{ErrorInfo, SupportedCurrency};
+use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use crate::core::internal_message::{new_channel, Channel};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use crate::gui::components::swap::SwapStage;
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
 use redgold_gui::tab::home::HomeState;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::keys::keygen_subtab::KeygenState;
 use crate::gui::tabs::settings_tab::SettingsState;
@@ -33,7 +34,12 @@ use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
 use crate::util;
 use crate::util::sym_crypt;
 
-pub async fn local_state_from<G>(node_config: NodeConfig, res: ExternalNetworkResourcesImpl, gui_depends: G) -> Result<LocalState, ErrorInfo>
+pub async fn local_state_from<G>(
+    node_config: Box<NodeConfig>,
+    res: ExternalNetworkResourcesImpl,
+    gui_depends: G,
+    party_data: HashMap<PublicKey, PartyInternalData>
+) -> Result<LocalState, ErrorInfo>
 where G: Send + Clone + GuiDepends {
     let mut node_config = node_config.clone();
     node_config.load_balancer_url = "lb.redgold.io".to_string();
@@ -74,23 +80,13 @@ where G: Send + Clone + GuiDepends {
         price_map.insert(c, price);
     }
 
-    let party_data = node_config.api_rg_client().party_data().await.log_error().map(|mut r| {
-        r.iter_mut().for_each(|(k, v)| {
-            v.party_events.as_mut().map(|pev| {
-                pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
-            });
-        });
-        r.clone()
-    });
-    let first_party = party_data.clone().ok().and_then(|pd| pd.into_values().next());
-    // info!("Party data {}", first_party.json_or());
-    let party_data = party_data.unwrap_or_default();
+    let first_party = party_data.clone().into_values().next();
 
     // ss.genesis = node_config.opts.development_mode;
     let mut ls = LocalState {
         active_tab: Tab::Home,
         data: DataQueryInfo::new(&res),
-        node_config: node_config.clone(),
+        node_config: *node_config.clone(),
         // runtime,
         home_state: HomeState::default(),
         server_state: ss,
@@ -147,7 +143,7 @@ where G: Send + Clone + GuiDepends {
     }
     info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
 
-    if node_config.opts.development_mode {
+    if node_config.development_mode() {
         ls.server_state.ops = false;
         ls.server_state.system = false;
         if node_config.network.is_main()  {

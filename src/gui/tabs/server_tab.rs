@@ -182,7 +182,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.checkbox(&mut local_state.server_state.skip_logs, "Skip Logging");
     });
 
-    if local_state.node_config.opts.development_mode {
+    if local_state.node_config.development_mode() {
         ui.horizontal(|ui| {
             ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
             ui.checkbox(&mut local_state.server_state.genesis, "Genesis");

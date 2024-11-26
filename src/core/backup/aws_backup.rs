@@ -216,7 +216,7 @@ impl AwsBackup {
 #[async_trait]
 impl IntervalFold for AwsBackup {
     async fn interval_fold(&mut self) -> RgResult<()> {
-        if self.relay.node_config.opts.aws_access_key_id.is_some() {
+        if self.relay.node_config.aws_access().is_some() {
             self.do_backup().await.log_error().ok();
         }
         Ok(())

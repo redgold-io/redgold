@@ -45,7 +45,7 @@ pub async fn email_cfg(
     body: impl Into<String>,
     nc: &NodeConfig
 ) -> RgResult<()> {
-    if let (Some(from), Some(to)) = (nc.opts.from_email.as_ref(), nc.opts.to_email.as_ref()) {
+    if let (Some(from), Some(to)) = (nc.from_email(), nc.to_email()) {
         email_from_to(subject, body, from, to).await
     } else {
         return Ok(())
