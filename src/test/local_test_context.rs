@@ -47,6 +47,7 @@ impl LocalTestNodeContext {
             let mut opts = (&*node_config.config_data.clone()).clone();
             let mut p = opts.party.clone().unwrap_or_default();
             p.enable = Some(true);
+            opts.party = Some(p);
             node_config.config_data = Arc::new(opts);
         }
 
