@@ -5,14 +5,19 @@ use crate::conf::local_stored_state::LocalStoredState;
 #[serde(default)] // This allows fields to be omitted in TOML
 pub struct DebugSettings {
     pub use_e2e_external_resource_mocks: bool,
-    pub test: Option<String>
+    pub test: Option<String>,
+    // dev mode
+    pub develop: Option<bool>,
+    // main developer
+    pub developer: Option<bool>,
+    pub id: Option<i32>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 #[serde(default)] // This allows fields to be omitted in TOML
 pub struct PartyConfigData {
     // Enable multiparty support, requires API keys and additional setup for oracle pricing info.
-    pub enable_party_mode: bool,
+    pub enable: Option<bool>,
     pub order_cutoff_delay_time: i64,
     pub poll_interval: i64,
     pub peer_timeout_seconds: Option<i64>,
@@ -43,7 +48,7 @@ pub struct NodeData {
     pub service_intervals: Option<ServiceIntervals>,
     pub server_index: Option<i64>,
     pub port_offset: Option<i64>,
-    pub passive: Option<bool>,
+    pub passive: Option<bool>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -68,11 +73,18 @@ pub struct ExternalResources {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 #[serde(default)] // This allows fields to be omitted in TOML
 pub struct Keys {
-    words: Option<String>,
-    aws_access: Option<String>,
-    aws_secret: Option<String>
+    pub words: Option<String>,
+    pub aws_access: Option<String>,
+    pub aws_secret: Option<String>
 }
 
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[serde(default)] // This allows fields to be omitted in TOML
+pub struct EmailSettings {
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
 
 // Migrate node_config stuff here
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -91,7 +103,8 @@ pub struct ConfigData {
     pub secure: Option<SecureData>,
     pub offline: Option<bool>,
     pub external: Option<ExternalResources>,
-    pub keys: Option<Keys>
+    pub keys: Option<Keys>,
+    pub email: Option<EmailSettings>
 }
 
 use std::env;
@@ -111,7 +124,7 @@ impl Default for ConfigData {
             bulk: None,
             node: None,
             party: Some(PartyConfigData {
-                enable_party_mode: false,
+                enable: None,
                 order_cutoff_delay_time: 300_000,
                 poll_interval: 300_000,
                 peer_timeout_seconds: None,
@@ -120,6 +133,9 @@ impl Default for ConfigData {
             debug: Some(DebugSettings {
                 use_e2e_external_resource_mocks: false,
                 test: None,
+                develop: None,
+                developer: None,
+                id: None,
             }),
             local: Default::default(),
             portfolio: Default::default(),
@@ -127,6 +143,7 @@ impl Default for ConfigData {
             offline: None,
             external: None,
             keys: None,
+            email: None,
         }
     }
 }

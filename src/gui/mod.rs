@@ -1,14 +1,16 @@
+use std::collections::HashMap;
 use eframe::{egui, Frame};
 use eframe::egui::Image;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::structs::ErrorInfo;
-// 0.17.1
-// 0.8
+use redgold_schema::structs::{ErrorInfo, PublicKey};
+use redgold_schema::structs;
 use crate::gui::app_loop::LocalState;
-// use crate::gui::image_load::Image;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::observability::errors::Loggable;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::ls_ext::local_state_from;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use crate::node_config::ApiNodeConfig;
 
 pub mod app_loop;
 pub mod image_load;
@@ -28,7 +30,7 @@ pub mod ls_ext;
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     #[cfg_attr(feature = "persistence", serde(skip))]
-    logo: Image<'static>,
+    // logo: Image<'static>,
     #[cfg_attr(feature = "persistence", serde(skip))]
     local_state: LocalState,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -36,15 +38,18 @@ pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
 }
 
 impl<G> ClientApp<G> where G: GuiDepends + Clone + Send + 'static{
-    pub async fn from(logo: Image<'static>,
-                      nc: NodeConfig,
-                      res: ExternalNetworkResourcesImpl,
-                      gui_depends: G
+    pub async fn from(
+        // logo: Image<'static>,
+        nc: Box<NodeConfig>,
+        res: Box<ExternalNetworkResourcesImpl>,
+        gui_depends: Box<G>,
+        party_data: HashMap<structs::PublicKey, PartyInternalData>
     ) -> Result<Self, ErrorInfo> where G: Send + Clone + GuiDepends {
+
         Ok(Self {
-            logo,
-            local_state: local_state_from(nc, res, gui_depends.clone()).await?,
-            gui_depends,
+            // logo,
+            local_state: local_state_from(nc, *res, *gui_depends.clone(), party_data).await?,
+            gui_depends: *gui_depends,
         })
     }
 }

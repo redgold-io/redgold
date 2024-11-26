@@ -56,23 +56,26 @@ pub struct ArgTranslate {
     pub node_config: Box<NodeConfig>,
     pub determined_subcommand: Option<RgTopLevelSubcommand>,
     pub abort: bool,
+    pub opts: RgArgs,
 }
 
 impl ArgTranslate {
 
     pub fn new(
-        node_config: Box<NodeConfig>
+        node_config: Box<NodeConfig>,
+        opts: RgArgs
     ) -> Self {
         
         ArgTranslate {
             node_config,
             determined_subcommand: None,
-            abort: false
+            abort: false,
+            opts
         }
     }
     
     pub fn opts(&self) -> &RgArgs {
-        self.node_config.opts.as_ref()
+        &self.opts
     }
 
     pub fn is_gui(&self) -> bool {
@@ -496,7 +499,7 @@ impl ArgTranslate {
     }
     async fn configure_seeds(&mut self) {
 
-        info!("configure seeds");
+        // info!("configure seeds");
         let seeds = get_seeds_by_env_time(&self.node_config.network, util::current_time_millis_i64());
         for seed in seeds {
             if !self.node_config.ignore_default_seeds {

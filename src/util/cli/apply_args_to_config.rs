@@ -38,9 +38,50 @@ pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<Co
         config.offline = Some(true);
     }
     if rg_args.s3_backup_bucket.is_some() {
-        let mut er = config.external.unwrap_or(Default::default());
+        let mut er = config.external.clone().unwrap_or(Default::default());
         er.s3_backup_bucket = rg_args.s3_backup_bucket.clone();
         config.external = Some(er);
+    }
+    if rg_args.aws_access_key_id.is_some() {
+        let mut er = config.keys.clone().unwrap_or(Default::default());
+        er.aws_access = rg_args.aws_access_key_id.clone();
+        config.keys = Some(er);
+    }
+    if rg_args.aws_secret_access_key.is_some() {
+        let mut er = config.keys.clone().unwrap_or(Default::default());
+        er.aws_secret = rg_args.aws_secret_access_key.clone();
+        config.keys = Some(er);
+    }
+    if rg_args.development_mode {
+        let mut dbg = config.debug.clone().unwrap_or(Default::default());
+        dbg.develop = Some(true);
+        config.debug = Some(dbg);
+    }
+    if rg_args.development_mode_main {
+        let mut dbg = config.debug.clone().unwrap_or(Default::default());
+        dbg.developer = Some(true);
+        config.debug = Some(dbg);
+    }
+    if rg_args.debug_id.is_some() {
+        let mut dbg = config.debug.clone().unwrap_or(Default::default());
+        dbg.id = rg_args.debug_id.clone();
+        config.debug = Some(dbg);
+    }
+    if rg_args.from_email.is_some() {
+        let mut dbg = config.email.clone().unwrap_or(Default::default());
+        dbg.from = rg_args.from_email.clone();
+        config.email = Some(dbg);
+    }
+    if rg_args.to_email.is_some() {
+        let mut dbg = config.email.clone().unwrap_or(Default::default());
+        dbg.to = rg_args.to_email.clone();
+        config.email = Some(dbg);
+    }
+
+    if rg_args.enable_party_mode {
+        let mut dbg = config.party.clone().unwrap_or(Default::default());
+        dbg.enable = Some(true);
+        config.party = Some(dbg);
     }
 
     config

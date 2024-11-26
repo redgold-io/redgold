@@ -169,7 +169,7 @@ pub struct NodeConfig {
     pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
-    pub opts: Arc<RgArgs>,
+    // pub opts: Arc<RgArgs>,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
@@ -184,15 +184,45 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn enable_party_mode(&self) -> bool {
+        self.config_data.party.as_ref().and_then(|p| p.enable).unwrap_or(false)
+    }
+
+    pub fn from_email(&self) -> Option<String> {
+        self.config_data.email.as_ref().and_then(|n| n.from.clone())
+    }
+
+    pub fn to_email(&self) -> Option<String> {
+        self.config_data.email.as_ref().and_then(|n| n.to.clone())
+    }
     pub fn multiparty_gg20_timeout(&self) -> Duration {
         Duration::from_secs(
             self.config_data.party.as_ref()
                 .and_then(|n| n.gg20_peer_timeout_seconds)
                 .unwrap_or(100) as u64
-        )    }
-}
+        )
+    }
 
-impl NodeConfig {
+    pub fn debug_id(&self) -> Option<i32> {
+        self.config_data.debug.as_ref().and_then(|d| d.id)
+    }
+
+    pub fn development_mode(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.develop).unwrap_or(false)
+    }
+
+    pub fn development_mode_main(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.developer).unwrap_or(false)
+    }
+
+    pub fn aws_access(&self) -> Option<String> {
+        self.config_data.keys.as_ref().and_then(|k| k.aws_access.clone())
+    }
+
+    pub fn aws_secret(&self) -> Option<String> {
+        self.config_data.keys.as_ref().and_then(|k| k.aws_secret.clone())
+    }
 
     pub fn multiparty_timeout(&self) -> Duration {
         Duration::from_secs(
@@ -514,7 +544,7 @@ impl NodeConfig {
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
-            opts: Arc::new(empty_args()),
+            // opts: Arc::new(empty_args()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),

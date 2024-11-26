@@ -332,7 +332,7 @@ static INIT: Once = Once::new();
 // }
 
 pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
-    let logo = app.logo.clone();
+    // let logo = app.logo.clone();
     let mut g = app.gui_depends.clone();
     let local_state = &mut app.local_state;
     g.set_network(&local_state.node_config.network);
@@ -372,7 +372,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
 
     top_panel::render_top(ctx, local_state);
 
-    let img = logo;
+    // let img = logo;
     // let texture_id = img.texture_id(ctx);
 
     let mut changed_tab: Option<Tab> = None;

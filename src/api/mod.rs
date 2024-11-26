@@ -20,7 +20,7 @@ use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_schema::{empty_public_request, error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, CurrencyAmount, GetActivePartyKeyRequest, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Seed, Transaction, UtxoId};
 use redgold_schema::transaction::rounded_balance_i64;
@@ -298,6 +298,16 @@ impl RgHttpClient {
             }
         }
         Ok(hm)
+    }
+    pub async fn enriched_party_data(&self) -> HashMap<PublicKey, PartyInternalData> {
+        self.party_data().await.log_error().map(|mut r| {
+            r.iter_mut().for_each(|(k, v)| {
+                v.party_events.as_mut().map(|pev| {
+                    pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
+                });
+            });
+            r.clone()
+        }).unwrap_or_default()
     }
 
     pub async fn executable_checksum(&self) -> RgResult<String> {
