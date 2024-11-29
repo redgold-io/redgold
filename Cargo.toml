@@ -90,9 +90,6 @@ csscolorparser = "0.6.2"
 redgold-crawler = {workspace = true}
 redgold-schema = {workspace = true}
 
-[target.'cfg(target_os = "linux")'.dependencies]
-redgold-fs = {workspace = true}
-
 redgold-gui = {workspace = true}
 redgold-common = {workspace = true}
 redgold-common-no-wasm = {workspace = true}
@@ -252,3 +249,7 @@ dns-lookup = "2.0.2" #Dependencies for email sending
 
 [target.'cfg(target_os = "macos")']
 rustflags = ["-C", "link-arg=-Wl,-stack_size,81920000"]
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+redgold-fs = {workspace = true}
