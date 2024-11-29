@@ -37,6 +37,7 @@ message Signature {
 enum PublicKeyType {
   // ECDSA Standard key type matching ECDSA signature type above
   secp256k1 = 0;
+  ed25519 = 1;
 }
 
 // Compressed public key byte data (33 bytes for standard ECDSA)
@@ -44,7 +45,11 @@ message PublicKey {
   // Encoded data form of the public key, requires a library for decoding to appropriate key instance
   BytesData bytes = 1;
   // The type of public key, used to determine how to decode the bytes into a key instance
+  // For instance, ecdsa variant or ed25519
   PublicKeyType key_type = 2;
+  // Used for Monero ed25519 which requires a secondary public key to derive an address, kept here
+  // for consistency with other PK -> Address derivation patterns.
+  BytesData aux_data = 3;
 }
 
 // Witness data for a particular signing event, does not include the hash required to re-verify the information.
@@ -1209,6 +1214,8 @@ enum AddressType {
   SCRIPT_HASH = 6;
   // Direct Ethereum string hash reference with embedded string upper/lower checksum.
   Ethereum_External_String = 7;
+  Monero_External_String = 8;
+  Solana_External_String = 9;
 }
 
 message Address {
@@ -1463,14 +1470,6 @@ enum NodeState {
   Synchronizing = 5;
   ShuttingDown = 6;
 }
-
-enum KeyType {
-  Transport = 0;
-  ObservationMerkle = 2;
-  Deposit = 3;
-  Reward = 4;
-}
-
 
 message UdpMessage {
   BytesData bytes = 1;

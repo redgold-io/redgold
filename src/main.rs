@@ -37,23 +37,23 @@ async fn load_configs() -> Box<NodeConfig> {
 }
 
 // Stack debugging here.
-//
-// fn main() {
-//     let runtime = Builder::new_multi_thread()
-//         .thread_stack_size(2048 * 1024 * 1024) // 2048MB stack
-//         .worker_threads(4)
-//         .enable_all()
-//         .enable_time()
-//         .build()
-//         .unwrap();
-//
-//     runtime.block_on(main_dbg());
-//
-// }
 
-#[tokio::main]
-async fn main() {
-// async fn main_dbg() {
+fn main() {
+    let runtime = Builder::new_multi_thread()
+        .thread_stack_size(1024 * 1024 * 1024) // 1024 stack
+        .worker_threads(num_cpus::get())  // Use all available logical cores
+        .enable_all()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    runtime.block_on(main_dbg());
+
+}
+
+// #[tokio::main]
+// async fn main() {
+async fn main_dbg() {
 
     let node_config = load_configs().await;
 
