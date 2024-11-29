@@ -102,6 +102,7 @@ pub fn public_key_ser(public_key: &PublicKey) -> Option<structs::PublicKey> {
     Some(structs::PublicKey {
         bytes: bytes_data(public_key.serialize().to_vec()),
         key_type: structs::PublicKeyType::Secp256k1 as i32,
+        aux_data: None,
     })
 }
 

@@ -80,6 +80,28 @@ impl Address {
         }
     }
 
+    pub fn from_monero(address: &String) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: AddressType::MoneroExternalString as i32,
+            currency: Redgold as i32,
+        }
+    }
+
+    pub fn from_type(address: &String, t: AddressType) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: t as i32,
+            currency: Redgold as i32,
+        }
+    }
+
+    pub fn from_monero_external(address: &String) -> Address {
+        let mut ret = Self::from_monero(address);
+        ret.currency = SupportedCurrency::Monero as i32;
+        ret
+    }
+
     pub fn from_eth_external(address: &String) -> Address {
         let mut ret = Self::from_eth(address);
         ret.currency = SupportedCurrency::Ethereum as i32;

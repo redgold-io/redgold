@@ -14,7 +14,7 @@ use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
 use crate::proto_serde::ProtoSerde;
-use crate::structs::{Address, DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerId, PeerMetadata, PublicKey, Seed, Transaction, TransportInfo, TrustData, VersionInfo};
+use crate::structs::{Address, DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerId, PeerMetadata, PublicKey, Seed, SupportedCurrency, Transaction, TransportInfo, TrustData, VersionInfo};
 use crate::util::times::current_time_millis;
 
 pub struct CanaryConfig {}
@@ -184,6 +184,21 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn rpc_url(&self, cur: SupportedCurrency) -> Option<String> {
+        if let Some(external) = self.config_data.external.as_ref() {
+            if let Some(r) = external.rpcs.as_ref() {
+                for rr in r.iter() {
+                    if let Some(n) = NetworkEnvironment::from_std_string(&rr.network).ok() {
+                        if rr.currency == cur && self.network == n {
+                            return Some(rr.url.clone());
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
 
     pub fn enable_party_mode(&self) -> bool {
         self.config_data.party.as_ref().and_then(|p| p.enable).unwrap_or(false)

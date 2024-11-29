@@ -18,3 +18,4 @@ services:
       - --no-igd
       - --no-zmq
       - --enable-dns-blocklist
+      - --wallet-dir=/home/monero/wallets

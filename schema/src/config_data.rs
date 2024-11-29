@@ -63,10 +63,20 @@ pub struct SecureData {
     pub capture_device_name: Option<String>
 }
 
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
+#[serde(default)] // This allows fields to be omitted in TOML
+pub struct RpcUrl {
+    pub currency: SupportedCurrency,
+    pub url: String,
+    pub network: String,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 #[serde(default)] // This allows fields to be omitted in TOML
 pub struct ExternalResources {
-    pub s3_backup_bucket: Option<String>
+    pub s3_backup_bucket: Option<String>,
+    pub rpcs: Option<Vec<RpcUrl>>,
 }
 
 
@@ -108,7 +118,7 @@ pub struct ConfigData {
 }
 
 use std::env;
-use crate::structs::NetworkEnvironment;
+use crate::structs::{NetworkEnvironment, SupportedCurrency};
 
 fn get_home_dir() -> Option<String> {
     env::var("HOME").or_else(|_| env::var("USERPROFILE")).ok()

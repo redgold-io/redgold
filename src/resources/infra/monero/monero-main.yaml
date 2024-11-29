@@ -16,6 +16,7 @@ services:
       - --no-igd
       - --no-zmq
       - --enable-dns-blocklist
+      - --wallet-dir=/home/monero/wallets
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower-monerod
