@@ -113,10 +113,13 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
 
     let mut builder = Config::builder();
 
+    let mut working_config_path = None;
+
     for p in paths.into_iter() {
         // println!("Checking if path exists: {:?}", p);
         if p.exists() {
             // println!("Loading config from: {:?}", p);
+            working_config_path = Some(p.to_str().unwrap().to_string());
             builder = builder.add_source(config::File::from(p));
         }
     }
@@ -128,7 +131,15 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
         .build()
         .unwrap();
 
-    Box::new(config.try_deserialize::<ConfigData>().unwrap())
+    // Final env override, matches config load order.
+    if let Some(c) = std::env::var("REDGOLD_CONFIG").ok() {
+        working_config_path = Some(c);
+    }
+
+    let mut data = config.try_deserialize::<ConfigData>().unwrap();
+    // Ensure loaded config path is stored
+    data.config = working_config_path;
+    Box::new(data)
 }
 
 // #[ignore]
