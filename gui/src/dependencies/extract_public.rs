@@ -9,7 +9,7 @@ pub trait ExtractorPublicKey {
 impl ExtractorPublicKey for LocalStoredState {
     fn extract<G>(&self, g: &G) -> Vec<PublicKey> where G: GuiDepends + Send + Clone {
         let mut res = vec![];
-        for x in self.xpubs.clone().unwrap_or(vec![]).iter() {
+        for x in self.keys.clone().unwrap_or(vec![]).iter() {
             if let Ok(p) = g.xpub_public(x.xpub.clone(), x.derivation_path.clone()) {
                 res.push(p)
             }

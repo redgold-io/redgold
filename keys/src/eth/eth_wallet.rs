@@ -6,7 +6,7 @@ use ethers::prelude::{Bytes, LocalWallet, maybe, Provider, Signature, Signer, to
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::providers;
 use ethers::providers::Http;
-use log::kv::Key;
+// use log::kv::Key;
 use num_bigint::{BigInt, Sign};
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};

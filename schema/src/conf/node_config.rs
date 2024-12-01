@@ -8,13 +8,13 @@ use itertools::Itertools;
 use crate::config_data::ConfigData;
 use crate::seeds::get_seeds_by_env_time;
 use crate::servers::ServerOldFormat;
-use crate::{structs, ErrorInfoContext, RgResult, ShortString};
-use crate::conf::rg_args::{empty_args, RgArgs};
+use crate::{structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
+use crate::conf::rg_args::{empty_args, RgArgs, RgTopLevelSubcommand};
 use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
 use crate::proto_serde::ProtoSerde;
-use crate::structs::{Address, DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerId, PeerMetadata, PublicKey, Seed, Transaction, TransportInfo, TrustData, VersionInfo};
+use crate::structs::{Address, DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerId, PeerMetadata, PublicKey, Seed, SupportedCurrency, Transaction, TransportInfo, TrustData, VersionInfo};
 use crate::util::times::current_time_millis;
 
 pub struct CanaryConfig {}
@@ -169,7 +169,7 @@ pub struct NodeConfig {
     pub shuffle_interval: Duration,
     pub live_e2e_interval: Duration,
     pub genesis: bool,
-    pub opts: Arc<RgArgs>,
+    // pub opts: Arc<RgArgs>,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
@@ -180,19 +180,91 @@ pub struct NodeConfig {
     pub disable_metrics: bool,
     pub args: Arc<Vec<String>>,
     pub abort: bool,
-    pub is_gui: bool
+    pub is_gui: bool,
+    pub top_level_subcommand: Option<Box<RgTopLevelSubcommand>>
 }
 
 impl NodeConfig {
+
+    pub fn args(&self) -> Vec<&String> {
+        self.args.iter().dropping(1).collect()
+    }
+
+    pub fn arg_at(&self, index: impl Into<i32>) -> RgResult<&String> {
+        self.args().get(index.into() as usize).ok_msg("arg not found").cloned()
+    }
+
+    pub fn use_e2e_external_resource_mocks(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.use_e2e_external_resource_mocks).unwrap_or(false)
+    }
+
+    pub fn order_cutoff_delay_time(&self) -> Duration {
+        let option = self.config_data.party.as_ref()
+            .and_then(|p| p.order_cutoff_delay_time)
+            .unwrap_or(300_000i64);
+        Duration::from_millis(option as u64)
+    }
+
+    pub fn poll_interval(&self) -> Duration {
+        let option = self.config_data.party.as_ref()
+            .and_then(|p| p.poll_interval)
+            .unwrap_or(300_000i64);
+        Duration::from_millis(option as u64)
+    }
+
+    pub fn rpc_url(&self, cur: SupportedCurrency) -> Option<String> {
+        if let Some(external) = self.config_data.external.as_ref() {
+            if let Some(r) = external.rpcs.as_ref() {
+                for rr in r.iter() {
+                    if let Some(n) = NetworkEnvironment::from_std_string(&rr.network).ok() {
+                        if rr.currency == cur && self.network == n {
+                            return Some(rr.url.clone());
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn enable_party_mode(&self) -> bool {
+        self.config_data.party.as_ref().and_then(|p| p.enable).unwrap_or(false)
+    }
+
+    pub fn from_email(&self) -> Option<String> {
+        self.config_data.email.as_ref().and_then(|n| n.from.clone())
+    }
+
+    pub fn to_email(&self) -> Option<String> {
+        self.config_data.email.as_ref().and_then(|n| n.to.clone())
+    }
     pub fn multiparty_gg20_timeout(&self) -> Duration {
         Duration::from_secs(
             self.config_data.party.as_ref()
                 .and_then(|n| n.gg20_peer_timeout_seconds)
                 .unwrap_or(100) as u64
-        )    }
-}
+        )
+    }
 
-impl NodeConfig {
+    pub fn debug_id(&self) -> Option<i32> {
+        self.config_data.debug.as_ref().and_then(|d| d.id)
+    }
+
+    pub fn development_mode(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.develop).unwrap_or(false)
+    }
+
+    pub fn development_mode_main(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.developer).unwrap_or(false)
+    }
+
+    pub fn aws_access(&self) -> Option<String> {
+        self.config_data.keys.as_ref().and_then(|k| k.aws_access.clone())
+    }
+
+    pub fn aws_secret(&self) -> Option<String> {
+        self.config_data.keys.as_ref().and_then(|k| k.aws_secret.clone())
+    }
 
     pub fn multiparty_timeout(&self) -> Duration {
         Duration::from_secs(
@@ -213,7 +285,12 @@ impl NodeConfig {
     }
 
     pub fn party_poll_interval(&self) -> Duration {
-        Duration::from_millis(self.config_data.party.as_ref().and_then(|n| Some(n.poll_interval)).unwrap_or(300_000) as u64)
+        let option = self.config_data.party.as_ref().and_then(|n| n.poll_interval);
+        let opt = option
+            .unwrap_or(300_000i64);
+        Duration::from_millis(
+             opt as u64
+        )
     }
 
     pub fn nat_traversal_required(&self) -> bool {
@@ -514,7 +591,7 @@ impl NodeConfig {
             shuffle_interval: Duration::from_secs(600),
             live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
             genesis: false,
-            opts: Arc::new(empty_args()),
+            // opts: Arc::new(empty_args()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),
@@ -526,6 +603,7 @@ impl NodeConfig {
             args: Arc::new(vec![]),
             abort: false,
             is_gui: false,
+            top_level_subcommand: None,
         }
     }
 

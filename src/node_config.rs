@@ -92,9 +92,9 @@ impl EnvDefaultNodeConfig for NodeConfig {
         let mut opts = empty_args();
         opts.network = Some(network_environment.to_std_string());
         let mut node_config = NodeConfig::default();
-        node_config.opts = Arc::new(opts.clone());
+        // node_config.opts = Arc::new(opts.clone());
         node_config.disable_metrics = true;
-        let mut arg_translate = ArgTranslate::new(Box::new(node_config.clone()));
+        let mut arg_translate = ArgTranslate::new(Box::new(node_config.clone()), opts);
         let mut nc = arg_translate.translate_args().await.unwrap();
         nc.network = network_environment.clone();
         *nc

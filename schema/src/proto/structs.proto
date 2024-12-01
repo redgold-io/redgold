@@ -37,6 +37,7 @@ message Signature {
 enum PublicKeyType {
   // ECDSA Standard key type matching ECDSA signature type above
   secp256k1 = 0;
+  ed25519 = 1;
 }
 
 // Compressed public key byte data (33 bytes for standard ECDSA)
@@ -44,7 +45,11 @@ message PublicKey {
   // Encoded data form of the public key, requires a library for decoding to appropriate key instance
   BytesData bytes = 1;
   // The type of public key, used to determine how to decode the bytes into a key instance
+  // For instance, ecdsa variant or ed25519
   PublicKeyType key_type = 2;
+  // Used for Monero ed25519 which requires a secondary public key to derive an address, kept here
+  // for consistency with other PK -> Address derivation patterns.
+  BytesData aux_data = 3;
 }
 
 // Witness data for a particular signing event, does not include the hash required to re-verify the information.
@@ -135,15 +140,15 @@ enum RatingType {
 message TrustData {
   // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
   // Otherwise equivalent to a rounded float
-  optional int64 label_rating = 2;
+  Weighting label_rating = 2;
   // Confidence level associated with the label, how certain is this value?
-  optional int64 confidence = 3;
+  Weighting confidence = 3;
   // Variance associated with the confidence estimate, sigma / stddev
-  optional int64 hardness = 5;
+  Weighting hardness = 5;
   // Additional unstructured or otherwise custom label data
-  optional StandardData data = 6;
-  bool allow_model_override = 7;
-  optional RatingType rating_type = 8;
+  StandardData data = 6;
+  optional bool allow_model_override = 7;
+  RatingType rating_type = 8;
 }
 
 message TrustRatingLabel {
@@ -1209,6 +1214,8 @@ enum AddressType {
   SCRIPT_HASH = 6;
   // Direct Ethereum string hash reference with embedded string upper/lower checksum.
   Ethereum_External_String = 7;
+  Monero_External_String = 8;
+  Solana_External_String = 9;
 }
 
 message Address {
@@ -1463,14 +1470,6 @@ enum NodeState {
   Synchronizing = 5;
   ShuttingDown = 6;
 }
-
-enum KeyType {
-  Transport = 0;
-  ObservationMerkle = 2;
-  Deposit = 3;
-  Reward = 4;
-}
-
 
 message UdpMessage {
   BytesData bytes = 1;

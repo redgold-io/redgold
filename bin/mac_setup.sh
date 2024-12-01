@@ -1,4 +1,7 @@
 brew install openssl@1.1
+brew install --cask macfuse
+brew install pkg-config
+
 
 
 

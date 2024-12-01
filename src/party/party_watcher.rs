@@ -35,7 +35,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         let mut shared_data = self.enrich_prepare_data(active.clone()).await?;
         // TODO: self.merge_child_events
         self.calculate_party_stream_events(&mut shared_data).await?;
-        if self.relay.node_config.opts.enable_party_mode {
+        if self.relay.node_config.enable_party_mode() {
             self.handle_order_fulfillment(&mut shared_data).await?;
         }
         self.handle_key_rotations(&mut shared_data).await?;
@@ -45,7 +45,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             self.relay.ds.multiparty_store.update_party_data(&pk, pid.to_party_data()).await?;
         }
         self.relay.external_network_shared_data.write(shared_data.clone()).await;
-        if self.relay.node_config.opts.enable_party_mode {
+        if self.relay.node_config.enable_party_mode() {
             // info!("Party watcher tick num parties total {} active {}", parties.len(), active.len());
             self.tick_formations(&shared_data).await?;
             // info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));

@@ -6,7 +6,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use crate::core::internal_message::Channel;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
@@ -149,7 +149,7 @@ impl RequestXpubState {
                                 let dp = self.derivation_path.derivation_path.clone();
                                 let pk = g.xpub_public(xpub.clone(), dp.clone()).log_error().ok();
                                 let all = pk.as_ref().map(|p| g.to_all_address(&p));
-                                let named = NamedXpub{
+                                let named = AccountKeySource {
                                     name: self.save_name.clone(),
                                     derivation_path: dp,
                                     xpub: string2.clone(),

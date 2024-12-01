@@ -37,16 +37,18 @@ impl LocalTestNodeContext {
         let mut node_config = NodeConfig::from_test_id(&id);
         let mut pd = (*node_config.config_data).clone();
         let mut party_data = pd.party.unwrap_or_default();
-        party_data.order_cutoff_delay_time = 5_000;
-        party_data.poll_interval = 20_000;
+        party_data.order_cutoff_delay_time = Some(5_000);
+        party_data.poll_interval = Some(20_000);
         pd.party = Some(party_data);
         node_config.config_data = Arc::new(pd);
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;
-            let mut opts = (&*node_config.opts.clone()).clone();
-            opts.enable_party_mode = true;
-            node_config.opts = Arc::new(opts);
+            let mut opts = (&*node_config.config_data.clone()).clone();
+            let mut p = opts.party.clone().unwrap_or_default();
+            p.enable = Some(true);
+            opts.party = Some(p);
+            node_config.config_data = Arc::new(opts);
         }
 
         node_config.seeds = seed.clone();

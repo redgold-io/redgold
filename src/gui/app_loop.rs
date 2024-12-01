@@ -35,7 +35,7 @@ pub trait PublicKeyStoredState {
 
 impl PublicKeyStoredState for LocalStoredState {
     fn public_key(&self, xpub_name: String) -> Option<PublicKey> {
-        let pk = self.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == xpub_name)
+        let pk = self.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == xpub_name)
             .and_then(|g| XpubWrapper::new(g.xpub.clone()).public_at(0, 0).ok()));
         pk
     }
@@ -80,7 +80,7 @@ pub trait LocalStateAddons {
     fn add_with_pass_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool, passphrase: Option<String>);
     fn secure_or(&self) -> DataStore;
     fn persist_local_state_store(&self);
-    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()>;
+    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<AccountKeySource>, prepend: bool) -> RgResult<()>;
     fn upsert_identity(&mut self, new_named: Identity) -> ();
     fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> ();
     fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> ();
@@ -157,10 +157,10 @@ impl LocalStateAddons for LocalState {
             store.config_store.update_stored_state(state).await
         });
     }
-    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()> {
+    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<AccountKeySource>, prepend: bool) -> RgResult<()> {
         let new_names = new_named.iter().map(|x| x.name.clone())
             .collect_vec();
-        let existing = self.local_stored_state.xpubs.clone().unwrap_or(vec![]);
+        let existing = self.local_stored_state.keys.clone().unwrap_or(vec![]);
         let mut filtered = existing.iter().filter(|x| {
             !new_names.contains(&x.name)
         }).map(|x| x.clone()).collect_vec();
@@ -170,10 +170,10 @@ impl LocalStateAddons for LocalState {
         let mut new_named2 = new_named.clone();
         if !prepend {
             filtered.extend(new_named);
-            self.local_stored_state.xpubs = Some(filtered);
+            self.local_stored_state.keys = Some(filtered);
         } else {
             new_named2.extend(filtered);
-            self.local_stored_state.xpubs = Some(new_named2);
+            self.local_stored_state.keys = Some(new_named2);
         }
         self.persist_local_state_store();
         Ok(())
@@ -301,7 +301,7 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{new_channel, Channel};
 use redgold_gui::tab::home::HomeState;
-use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, AccountKeySource, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::{SwapStage, SwapState};
@@ -332,7 +332,7 @@ static INIT: Once = Once::new();
 // }
 
 pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
-    let logo = app.logo.clone();
+    // let logo = app.logo.clone();
     let mut g = app.gui_depends.clone();
     let local_state = &mut app.local_state;
     g.set_network(&local_state.node_config.network);
@@ -372,7 +372,7 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
 
     top_panel::render_top(ctx, local_state);
 
-    let img = logo;
+    // let img = logo;
     // let texture_id = img.texture_id(ctx);
 
     let mut changed_tab: Option<Tab> = None;

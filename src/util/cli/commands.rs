@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::str::FromStr;
 use flume::Sender;
 use itertools::Itertools;
 
@@ -103,9 +104,10 @@ pub async fn list_servers(config: &NodeConfig) -> Result<Vec<ServerOldFormat>, E
     Ok(servers)
 }
 
-pub fn generate_mnemonic(_generate_mnemonic: &GenerateMnemonic) {
+pub fn generate_mnemonic(_generate_mnemonic: &GenerateMnemonic) -> RgResult<()> {
     let wp = WordsPass::generate().expect("works");
     println!("{}", wp.words);
+    Ok(())
 }
 
 pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfig) -> Result<String, ErrorInfo> {
@@ -126,7 +128,9 @@ pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfi
 
 
 pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
-    let destination = p0.to.clone().parse_address()?;
+    let destination = p1.arg_at(0)?.parse_address()?;
+    let amount = f64::from_str(&*p1.arg_at(1)?).error_info("amount parsing")?;
+    let amount = CurrencyAmount::from_fractional(amount)?;
     let mut query_addresses = vec![];
     let mut hm: HashMap<Vec<u8>, KeyPair> = HashMap::new();
     // for x in p0.from {
@@ -159,7 +163,7 @@ pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
     let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new(&p1)
         .with_utxo(&utxo)?
-        .with_output(&destination, &CurrencyAmount::from_fractional(p0.amount)?)
+        .with_output(&destination, &amount)
         .build()?
         .sign(&kp)?;
 
@@ -178,16 +182,24 @@ pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
     Ok(())
 }
 
-pub async fn balance_lookup(request: &BalanceCli, nc: &NodeConfig) -> Result<(), ErrorInfo> {
-    let response = nc.api_client().query_hash(request.address.clone()).await?;
+pub async fn balance_lookup(request: &BalanceCli, nc: &Box<NodeConfig>) -> Result<(), ErrorInfo> {
+    // TODO: Get keypair from prior cli steps.
+    let w = nc.words().keypair_at_change(0).expect("works");
+    let addr = if let Some(a) = request.address.as_ref() {
+        a.parse_address()?
+    } else {
+        w.address_typed()
+    };
+    let response = nc.api_client().query_hash(addr.render_string()?).await?;
     let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
     println!("{}", rounded.to_string());
     Ok(())
 }
 
 
-pub async fn query(p0: &QueryCli, p1: &NodeConfig) -> Result<(), ErrorInfo> {
-    let response = p1.api_client().query_hash(p0.hash.clone()).await?;
+pub async fn query(p0: &QueryCli, p1: &Box<NodeConfig>) -> Result<(), ErrorInfo> {
+    let h = p1.arg_at(0)?;
+    let response = p1.api_client().query_hash(h.clone()).await?;
     println!("{}", json(&response)?);
     Ok(())
 }
@@ -239,10 +251,10 @@ pub fn add_server_prompt() -> ServerOldFormat {
 
 pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinHandle<()>> {
     let mut deploy = deploy.clone();
-    if deploy.wizard {
-        deploy_wizard(&deploy, node_config).await?;
-        return Ok(tokio::spawn(async move {()}));
-    }
+    // if deploy.wizard {
+    //     deploy_wizard(&deploy, node_config).await?;
+    //     return Ok(tokio::spawn(async move {()}));
+    // }
 
     if std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok() {
         deploy.genesis = true;
@@ -252,8 +264,8 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
     } else {
-        if node_config.opts.network.is_none() {
-            if node_config.opts.development_mode {
+        if node_config.config_data.network.is_none() {
+            if node_config.development_mode() {
                 net = NetworkEnvironment::Dev;
             } else {
                 net = NetworkEnvironment::Main;
@@ -526,7 +538,7 @@ pub async fn convert_metadata_xpub(path: &String) -> RgResult<()> {
     Ok(())
 }
 
-pub(crate) async fn debug_commands(p0: &DebugCommand, p1: &&NodeConfig) -> RgResult<()> {
+pub(crate) async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult<()> {
     if let Some(cmd) = &p0.subcmd {
         match cmd {
             RgDebugCommand::GrafanaPublicDeploy(_) => {

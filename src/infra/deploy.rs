@@ -927,14 +927,14 @@ pub async fn default_deploy(
 
             let mut this_hm = hm.clone();
             // TODO: Change to _main
-            if ss.index == 0 && node_config.opts.development_mode {
-                if node_config.opts.development_mode_main {
+            if ss.index == 0 && node_config.development_mode() {
+                if node_config.development_mode_main() {
                     this_hm.insert("REDGOLD_ENABLE_PARTY_MODE".to_string(), "true".to_string());
                     this_hm.insert("REDGOLD_LIVE_E2E_ENABLED".to_string(), "true".to_string());
                 };
                 this_hm.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
             }
-            if node_config.opts.development_mode_main {
+            if node_config.development_mode_main() {
                 // REDGOLD_MAIN_DEVELOPMENT_MODE
                 this_hm.insert("REDGOLD_MAIN_DEVELOPMENT_MODE".to_string(), "true".to_string());
                 this_hm.insert("REDGOLD_S3_BACKUP_BUCKET".to_string(), "redgold-backups".to_string());

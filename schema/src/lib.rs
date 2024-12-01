@@ -573,6 +573,10 @@ impl NetworkEnvironment {
         NetworkEnvironment::from_str(&*string2).error_info("error parsing network environment")
     }
 
+    pub fn from_std_string(s: impl Into<String>) -> RgResult<Self> {
+        Self::parse_safe(s.into())
+    }
+
     pub fn status_networks() -> Vec<NetworkEnvironment> {
         vec![
             NetworkEnvironment::Main,

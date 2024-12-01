@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.25"
+version = "0.1.27"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -48,17 +48,19 @@ categories = ["cryptography::cryptocurrencies"]
 
 
 [workspace.dependencies]
-redgold-schema = { path = "schema", version = "0.1.25"}
-redgold-data = { path = "data", version = "0.1.25"}
-redgold-keys = { path = "keys", version = "0.1.25"}
-redgold-executor = { path = "executor", version = "0.1.25"}
-redgold-sdk-client = { path = "sdk-client", version = "0.1.25"}
-redgold-fs = { path = "./fs"}
+redgold-schema = { path = "schema", version = "0.1.27"}
+redgold-data = { path = "data", version = "0.1.27"}
+redgold-keys = { path = "keys", version = "0.1.27"}
+redgold-executor = { path = "executor", version = "0.1.27"}
+redgold-sdk-client = { path = "sdk-client", version = "0.1.27"}
+
 redgold-crawler = { path = "./crawler"}
 redgold-crawler-native = { path = "./crawler-native"}
 redgold-gui = { path = "./gui"}
 redgold-common = { path = "./common"}
 redgold-common-no-wasm = { path = "./common-no-wasm"}
+redgold-fs = { path = "./fs"}
+
 parquet_derive = "53.3.0"
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
@@ -85,9 +87,11 @@ csscolorparser = "0.6.2"
 
 
 [dependencies]
+
+dhat = "0.3.3"
 redgold-crawler = {workspace = true}
 redgold-schema = {workspace = true}
-redgold-fs = {workspace = true}
+
 redgold-gui = {workspace = true}
 redgold-common = {workspace = true}
 redgold-common-no-wasm = {workspace = true}
@@ -122,7 +126,7 @@ rqrr = "0.6.0"
 
 #zxcvbn = '2.1.1'
 rand = { workspace = true}
-clap = { version = "4.5.20", features = ["derive", "env"] }
+clap = { version = "4.5.21", features = ["derive", "env"] }
 log = "0.4.14"
 hex = "0.4.3"
 #void = "1.0.2"
@@ -184,6 +188,7 @@ csscolorparser = {workspace = true}
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
 derivative = "2.2.0"
 backtrace = "0.3.72"
+num_cpus = "1.16.0"
 
 [dependencies.getrandom]
 version = "0.2.12"
@@ -199,6 +204,10 @@ assert_cmd = "2.0.11"
 opt-level = 3
 
 [profile.dev]
+opt-level = 0
+debug = true
+# Increase stack size to 8MB (default is often 2MB)
+codegen-units = 1
 overflow-checks = true
 #lto = "thin"  # Use thin LTO
 #rustc-args = ["-C", "link-arg=-fuse-ld=lld"]  # Only affects dev profile
@@ -242,3 +251,7 @@ dns-lookup = "2.0.2" #Dependencies for email sending
 
 [target.'cfg(target_os = "macos")']
 rustflags = ["-C", "link-arg=-Wl,-stack_size,81920000"]
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+redgold-fs = {workspace = true}

@@ -22,7 +22,7 @@ impl Default for XPubLikeRequestType {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
-pub struct NamedXpub {
+pub struct AccountKeySource {
     pub name: String,
     pub derivation_path: String,
     pub xpub: String,
@@ -39,7 +39,7 @@ pub struct NamedXpub {
     pub public_key: Option<PublicKey>
 }
 
-impl NamedXpub {
+impl AccountKeySource {
     pub fn definitely_not_hot(&self) -> bool {
         self.request_type != Some(XPubLikeRequestType::Hot) && self.request_type.is_some()
     }
@@ -101,8 +101,9 @@ pub struct StoredPrivateKey {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct LocalStoredState {
     pub deploy: Option<Deployment>,
+    #[deprecated]
     pub servers: Option<Vec<ServerOldFormat>>,
-    pub xpubs: Option<Vec<NamedXpub>>,
+    pub keys: Option<Vec<AccountKeySource>>,
     pub trust: Option<Vec<ServerTrustRatingLabels>>,
     pub saved_addresses: Option<Vec<SavedAddress>>,
     pub contacts: Option<Vec<Contact>>,
@@ -121,7 +122,7 @@ impl LocalStoredState {
                 mnemonic.persist_disk.unwrap_or(true)
             }).map(|d| d.clone()).collect_vec()
         });
-        self.xpubs = self.xpubs.clone().map(|x| {
+        self.keys = self.keys.clone().map(|x| {
             let vec = x.iter().filter(|xpubs| {
                 !xpubs.skip_persist.unwrap_or(false)
             }).map(|d| d.clone()).collect_vec();

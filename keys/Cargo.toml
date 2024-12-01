@@ -1,6 +1,6 @@
 [package]
 name = "redgold-keys"
-version = "0.1.25"
+version = "0.1.27"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -25,7 +25,7 @@ categories = ["cryptography::cryptocurrencies"]
 
 [dependencies]
 # workspace = true caused an error here? maybe
-redgold-schema = { path = "../schema", version = "0.1.25"}
+redgold-schema = { path = "../schema", version = "0.1.27"}
 
 # Make all the non-WASM dependencies optional
 tokio = { version = "1.36.0", features = ["rt"]}
@@ -51,7 +51,10 @@ sha2 = "0.10.8"
 hmac = "0.12.1"
 pbkdf2 = "0.12.2"
 rand_core = "0.6.4"
-monero = "0.21.0"
+monero = "0.19.0"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+monero-rpc = "0.4.0"
+
 chrono = "0.4.38"
 #sequoia-openpgp = "1.21.2"
 #[dependencies.bitcoin]
