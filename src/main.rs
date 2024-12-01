@@ -30,19 +30,23 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgArgs;
 use redgold_schema::observability::errors::Loggable;
 
-async fn load_configs() -> Box<NodeConfig> {
+async fn load_configs() -> (Box<NodeConfig>, bool) {
     let nc = main_config();
     let opts = RgArgs::parse();
+    let cmd = opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
     let mut arg_translate = Box::new(ArgTranslate::new(nc, opts));
-    arg_translate.translate_args().await.expect("arg translation")
+    let nc = arg_translate.translate_args().await.expect("arg translation");
+    let abort = immediate_commands::immediate_commands(
+        &nc, cmd).await;
+    (nc, abort)
 }
 
 // Stack debugging here.
-#[global_allocator]
-static ALLOC: dhat::Alloc = dhat::Alloc;
+// #[global_allocator]
+// static ALLOC: dhat::Alloc = dhat::Alloc;
 
 fn main() {
-    let _profiler = dhat::Profiler::new_heap();
+    // let _profiler = dhat::Profiler::new_heap();
 
     let runtime = Builder::new_multi_thread()
         .thread_stack_size(1024 * 1024 * 1024) // 1024 stack
@@ -60,10 +64,9 @@ fn main() {
 // async fn main() {
 async fn main_dbg() {
 
-    let node_config = load_configs().await;
-
-    if immediate_commands::immediate_commands(&node_config).await {
-        return;
+    let (node_config, abort) = load_configs().await;
+    if abort {
+        return
     }
 
     // info!("Starting node main method");

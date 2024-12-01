@@ -3,10 +3,14 @@ use serde::{Deserialize, Serialize};
 
 pub fn empty_args() -> RgArgs {
     RgArgs {
-        home: None,
-        config_path: None,
-        data_path: None,
-        bulk_data_path: None,
+        config_paths: CorePaths {
+            home: None,
+            config_path: None,
+            data_path: None,
+            bulk_data_path: None,
+            secure_data_config_path: None,
+            secure_data_path: None,
+        },
         words: None,
         mnemonic_path: None,
         peer_id: None,
@@ -36,17 +40,14 @@ pub fn empty_args() -> RgArgs {
         from_email: None,
         to_email: None,
         enable_party_mode: false,
-        secure_data_path: None,
-        secure_data_config_path: None,
         offline: false,
         verbose: false,
     }
 }
 
-/// Welcome to Redgold CLI -- here you can run a GUI, node, or use wallet or other CLI commands.
 #[derive(Parser, Debug, Clone)]
 #[clap(author, version, about, long_about = None)]
-pub struct RgArgs {
+pub struct CorePaths {
 
     // Main loader paths for configs / data
 
@@ -72,6 +73,15 @@ pub struct RgArgs {
     #[clap(long, env = "REDGOLD_SECURE_PATH")]
     pub secure_data_path: Option<String>,
 
+}
+/// Welcome to Redgold CLI -- here you can run a GUI, node, or use wallet or other CLI commands.
+#[derive(Parser, Debug, Clone)]
+#[clap(author, version, about, long_about = None)]
+pub struct RgArgs {
+
+    #[command(flatten)]
+    pub config_paths: CorePaths,
+
     // Most important configs first:
     /// Network environment to connect to, e.g. main or test
     #[clap(long)]
@@ -91,12 +101,16 @@ pub struct RgArgs {
     /// Path to file containing string of mnemonic words for controlling node identity
     #[clap(long)]
     pub mnemonic_path: Option<String>,
+
+    // TODO: Move this to node configuration configdata
     /// Hex encoded peer id
     #[clap(short, long)]
     pub peer_id: Option<String>,
     /// Path to file containing hex encoded peer id
     #[clap(long)]
     pub peer_id_path: Option<String>,
+
+
     /// Specific subcommands for different functionalities
     #[clap(subcommand)]
     pub subcmd: Option<RgTopLevelSubcommand>,

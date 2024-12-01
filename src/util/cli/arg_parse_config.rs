@@ -397,7 +397,7 @@ impl ArgTranslate {
 
     fn data_folder(&mut self) -> Result<(), ErrorInfo> {
 
-        let mut data_folder_path =  self.opts().data_path.clone()
+        let mut data_folder_path =  self.opts().config_paths.data_path.clone()
             .map(|p| PathBuf::from(p))
             .unwrap_or(get_default_data_top_folder());
 

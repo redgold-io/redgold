@@ -7,16 +7,7 @@ use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::structs::ErrorInfo;
 use crate::util::cli::commands;
 
-pub fn get_subcmd() -> Option<Box<String>> {
-    let args = RgArgs::parse();
-    let ret = args.subcmd.as_ref().map(|x| Box::new(x.json_or()));
-    drop(args);
-    ret
-}
-
-pub fn check_run(b: Box<String>) -> bool {
-    let b =
-        Box::new(b.json_from::<RgTopLevelSubcommand>().expect("Failed to parse subcommand"));
+pub fn check_run(b: Box<RgTopLevelSubcommand>) -> bool {
     if let RgTopLevelSubcommand::Node(_) = *b {
         false
     } else if let RgTopLevelSubcommand::GUI(_) = *b {
@@ -28,9 +19,8 @@ pub fn check_run(b: Box<String>) -> bool {
 
 // returns if aborting remainder.
 pub async fn immediate_commands(
-    config: &Box<NodeConfig>
+    config: &Box<NodeConfig>, subcmd: Option<Box<RgTopLevelSubcommand>>
 ) -> bool {
-    let subcmd = get_subcmd();
     match subcmd {
         Some(subcmd) => {
             if check_run(subcmd.clone()) {
@@ -46,10 +36,8 @@ pub async fn immediate_commands(
 
 // Pre logger commands
 pub async fn immediate_commands_inner(
-    subcmd: Box<String>, config: &Box<NodeConfig>
+    subcmd: Box<RgTopLevelSubcommand>, config: &Box<NodeConfig>
 ) {
-    let subcmd =
-        Box::new(subcmd.json_from::<RgTopLevelSubcommand>().expect("Failed to parse subcommand"));
     let ret = {
         // Use references to avoid cloning
         match &*subcmd {
@@ -64,6 +52,9 @@ pub async fn immediate_commands_inner(
                 drop(a);
                 result
             }
+            RgTopLevelSubcommand::Balance(a) => {
+                commands::balance_lookup(&a, config).await
+            }
             _ => Ok(())
         }
     };
@@ -76,9 +67,7 @@ pub async fn immediate_commands_inner(
     //     RgTopLevelSubcommand::Query(a) => {
     //         commands::query(&a, &config).await
     //     }
-    //     RgTopLevelSubcommand::Balance(a) => {
-    //         commands::balance_lookup(&a, config).await
-    //     }
+
     //     RgTopLevelSubcommand::Deploy(d) => {
     //         commands::deploy(&d, &config).await.unwrap().abort();
     //         Ok(())
