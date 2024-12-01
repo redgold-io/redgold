@@ -19,6 +19,7 @@ use redgold::integrations::external_network_resources::{ExternalNetworkResources
 use redgold::node::Node;
 use redgold::node_config::ApiNodeConfig;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
+use redgold::util::cli::immediate_commands;
 use redgold::util::cli::load_config::{load_full_config, main_config};
 use redgold_schema::SafeOption;
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
@@ -79,6 +80,15 @@ async fn main_dbg() {
         gui::initialize::attempt_start(node_config, res, g, party_data).await.expect("GUI to start");
         return;
     }
+
+    if let Some(cmd) = node_config.top_level_subcommand.as_ref() {
+        let abort = immediate_commands::immediate_commands(cmd.clone(), &node_config).await.unwrap_or(true);
+        if abort {
+            return;
+        }
+    }
+
+
     gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);
     gauge!("redgold_start_fail", &node_config.gauge_id()).set(0);
 

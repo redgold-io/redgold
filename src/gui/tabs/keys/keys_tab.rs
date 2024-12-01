@@ -8,7 +8,7 @@ use strum_macros::{EnumIter, EnumString};
 use tracing::Instrument;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
@@ -188,7 +188,7 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
                         info!("Adding xpub to local state from keys tab with words pass \
                         checksum: {check} equal {equal} words public: {words_public} xpub public: {xpub_public}");
                         let ho = Some(ls.wallet.hot_offset.clone()).filter(|x| !x.is_empty());
-                        ls.add_named_xpubs(true, vec![NamedXpub {
+                        ls.add_named_xpubs(true, vec![AccountKeySource {
                             name: ls.keytab_state.save_xpub_account_name.clone(),
                             xpub,
                             derivation_path: derivation_account_path,
@@ -267,10 +267,10 @@ pub fn internal_stored_xpubs<G>(
     heading_override: Option<String>,
     option: Option<PublicKey>,
     show_balance_checkbox: bool,
-) -> (bool, Option<NamedXpub>) where G: GuiDepends + Clone + Send + 'static  {
+) -> (bool, Option<AccountKeySource>) where G: GuiDepends + Clone + Send + 'static  {
 
 
-    let mut xpub : Option<NamedXpub> = None;
+    let mut xpub : Option<AccountKeySource> = None;
 
     let mut update = false;
 
@@ -282,14 +282,14 @@ pub fn internal_stored_xpubs<G>(
             .width(125.0)
             .selected_text(ls.wallet.selected_xpub_name.clone())
             .show_ui(ui, |ui| {
-                let option = ls.local_stored_state.xpubs.clone().unwrap_or(vec![]);
+                let option = ls.local_stored_state.keys.clone().unwrap_or(vec![]);
                 for style in option.iter().map(|x| x.name.clone()) {
                     ui.selectable_value(&mut ls.wallet.selected_xpub_name, style.clone(), style.to_string());
                 }
                 ui.selectable_value(&mut ls.wallet.selected_xpub_name,
                                     "Select Xpub".to_string(), "Select Xpub".to_string());
             });
-        xpub = ls.local_stored_state.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
+        xpub = ls.local_stored_state.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
                 .cloned());
         if let Some(xp) = &xpub {
             let i = xp.xpub.len();

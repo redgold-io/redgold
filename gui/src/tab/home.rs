@@ -106,7 +106,7 @@ impl HomeState {
             lss.servers.as_ref().map(|x| x.len()).unwrap_or(0).to_string(),
             loaded_pks.len().to_string(),
             // lss.xpubs.len().to_string(),
-            lss.xpubs.as_ref().map(|m| m.len()).unwrap_or(0).to_string(),
+            lss.keys.as_ref().map(|m| m.len()).unwrap_or(0).to_string(),
             lss.mnemonics.as_ref().map(|m| m.len()).unwrap_or(0).to_string(),
             lss.private_keys.as_ref().map(|m| m.len()).unwrap_or(0).to_string(),
             // lss.contacts.len().to_string(),

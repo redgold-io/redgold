@@ -474,7 +474,7 @@ impl Relay {
             let peer_id: Option<PeerId> = label.peer_id;
             if let Some(peer_id) = peer_id {
                 for d in label.trust_data {
-                    if !d.allow_model_override {
+                    if !d.allow_model_override.unwrap_or(false) {
                         if let Some(r) = d.maybe_label() {
                             hm.insert(peer_id.clone(), r);
                         }

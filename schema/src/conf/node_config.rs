@@ -8,8 +8,8 @@ use itertools::Itertools;
 use crate::config_data::ConfigData;
 use crate::seeds::get_seeds_by_env_time;
 use crate::servers::ServerOldFormat;
-use crate::{structs, ErrorInfoContext, RgResult, ShortString};
-use crate::conf::rg_args::{empty_args, RgArgs};
+use crate::{structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
+use crate::conf::rg_args::{empty_args, RgArgs, RgTopLevelSubcommand};
 use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
@@ -180,10 +180,37 @@ pub struct NodeConfig {
     pub disable_metrics: bool,
     pub args: Arc<Vec<String>>,
     pub abort: bool,
-    pub is_gui: bool
+    pub is_gui: bool,
+    pub top_level_subcommand: Option<Box<RgTopLevelSubcommand>>
 }
 
 impl NodeConfig {
+
+    pub fn args(&self) -> Vec<&String> {
+        self.args.iter().dropping(1).collect()
+    }
+
+    pub fn arg_at(&self, index: impl Into<i32>) -> RgResult<&String> {
+        self.args().get(index.into() as usize).ok_msg("arg not found").cloned()
+    }
+
+    pub fn use_e2e_external_resource_mocks(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.use_e2e_external_resource_mocks).unwrap_or(false)
+    }
+
+    pub fn order_cutoff_delay_time(&self) -> Duration {
+        let option = self.config_data.party.as_ref()
+            .and_then(|p| p.order_cutoff_delay_time)
+            .unwrap_or(300_000i64);
+        Duration::from_millis(option as u64)
+    }
+
+    pub fn poll_interval(&self) -> Duration {
+        let option = self.config_data.party.as_ref()
+            .and_then(|p| p.poll_interval)
+            .unwrap_or(300_000i64);
+        Duration::from_millis(option as u64)
+    }
 
     pub fn rpc_url(&self, cur: SupportedCurrency) -> Option<String> {
         if let Some(external) = self.config_data.external.as_ref() {
@@ -258,7 +285,12 @@ impl NodeConfig {
     }
 
     pub fn party_poll_interval(&self) -> Duration {
-        Duration::from_millis(self.config_data.party.as_ref().and_then(|n| Some(n.poll_interval)).unwrap_or(300_000) as u64)
+        let option = self.config_data.party.as_ref().and_then(|n| n.poll_interval);
+        let opt = option
+            .unwrap_or(300_000i64);
+        Duration::from_millis(
+             opt as u64
+        )
     }
 
     pub fn nat_traversal_required(&self) -> bool {
@@ -571,6 +603,7 @@ impl NodeConfig {
             args: Arc::new(vec![]),
             abort: false,
             is_gui: false,
+            top_level_subcommand: None,
         }
     }
 

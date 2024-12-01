@@ -19,7 +19,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::explorer::DetailedAddress;
-use redgold_schema::conf::local_stored_state::NamedXpub;
+use redgold_schema::conf::local_stored_state::AccountKeySource;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};

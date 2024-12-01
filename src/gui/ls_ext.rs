@@ -16,7 +16,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use crate::core::internal_message::{new_channel, Channel};
@@ -94,7 +94,7 @@ where G: Send + Clone + GuiDepends {
         keygen_state: KeygenState::new(
             node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
         ),
-        wallet: WalletState::new(hot_mnemonic, local_stored_state.xpubs.as_ref().and_then(|x| x.first())),
+        wallet: WalletState::new(hot_mnemonic, local_stored_state.keys.as_ref().and_then(|x| x.first())),
         qr_state: Default::default(),
         qr_show_state: Default::default(),
         identity_state: IdentityState::new(),
@@ -186,7 +186,7 @@ where G: Send + Clone + GuiDepends {
             let dp_btc_faucet = "m/84'/0'/0'/0/0".to_string();
             if let Ok(xpub) = w.xpub_str(&dp_btc_faucet.as_account_path().expect("acc")) {
                 let pk = XpubWrapper::new(xpub.clone()).public_at(0, 0).unwrap();
-                let mut named = NamedXpub::default();
+                let mut named = AccountKeySource::default();
                 named.all_address = Some(gui_depends.to_all_address(&pk));
                 let key_into = key_name.clone();
                 named.name = format!("{}_840", key_into);
@@ -207,7 +207,7 @@ where G: Send + Clone + GuiDepends {
         ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
     }
 
-    if ls.local_stored_state.xpubs.clone().unwrap_or_default().len() > 2 {
+    if ls.local_stored_state.keys.clone().unwrap_or_default().len() > 2 {
         ls.wallet.send_address_input_box.address_input_mode = redgold_gui::components::address_input_box::AddressInputMode::Saved;
     }
 

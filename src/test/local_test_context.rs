@@ -37,8 +37,8 @@ impl LocalTestNodeContext {
         let mut node_config = NodeConfig::from_test_id(&id);
         let mut pd = (*node_config.config_data).clone();
         let mut party_data = pd.party.unwrap_or_default();
-        party_data.order_cutoff_delay_time = 5_000;
-        party_data.poll_interval = 20_000;
+        party_data.order_cutoff_delay_time = Some(5_000);
+        party_data.poll_interval = Some(20_000);
         pd.party = Some(party_data);
         node_config.config_data = Arc::new(pd);
         node_config.port_offset = random_port_offset;

@@ -33,13 +33,14 @@ use crate::{e2e, gui, util};
 use crate::api::RgHttpClient;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::{NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli, GUI};
+use redgold_schema::config_data::ConfigData;
 // use crate::gui::image_capture::debug_capture;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::observability::metrics_registry;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
-use crate::util::cli::{args, commands};
+use crate::util::cli::{args, commands, immediate_commands};
 use redgold_schema::data_folder::DataFolder;
 use crate::node_config::WordsPassNodeConfig;
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
@@ -144,6 +145,15 @@ impl ArgTranslate {
     }
 
     pub async fn translate_args(mut self) -> Result<Box<NodeConfig>, ErrorInfo> {
+
+        let skip_slow_stuff = self.determined_subcommand.clone().map(|x|
+            match x {
+                RgTopLevelSubcommand::GUI(_) => false,
+                RgTopLevelSubcommand::Node(_) => false,
+                _ => true
+            }
+        ).unwrap_or(false);
+
         self.immediate_debug();
         self.set_gui_on_empty();
         self.check_load_logger()?;
@@ -159,11 +169,15 @@ impl ArgTranslate {
         self.load_peer_tx()?;
         self.set_public_key();
         self.load_internal_servers()?;
-        self.calculate_executable_checksum_hash();
+        if !skip_slow_stuff {
+            self.calculate_executable_checksum_hash();
+        }
         self.guard_faucet();
         self.e2e_enable();
         // info!("E2e enabled");
-        self.configure_seeds().await;
+        if !skip_slow_stuff {
+            self.configure_seeds().await;
+        }
         self.set_discovery_interval();
         self.apply_node_opts();
         self.genesis();
@@ -174,14 +188,14 @@ impl ArgTranslate {
             return Ok(self.node_config);
         }
 
-        self.abort = immediate_commands(&self.opts().clone(), &self.node_config.clone(), self.args()).await;
-        if self.abort {
-            self.node_config.abort = true;
-            return Ok(self.node_config);
-        }
+        let subcmd = self.opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
+        self.node_config.top_level_subcommand = subcmd.clone();
 
+        if !skip_slow_stuff {
+            self.lookup_ip().await;
+        }
         // Unnecessary for CLI commands, hence after immediate commands
-        self.lookup_ip().await;
+        // self.lookup_ip().await;
 
         tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
         tracing::info!("Parsed args successfully with args: {:?}", self.args());
@@ -703,82 +717,3 @@ fn load_ds_path() {
     // println!("{}", res.data_store_path());
 }
 
-// TODO: Settings from config if necessary
-/*    let mut settings = config::Config::default();
-    let mut settings2 = settings.clone();
-    settings
-        // Add in `./Settings.toml`
-        .merge(config::File::with_name("Settings"))
-        .unwrap_or(&mut settings2)
-        // Add in settings from the environment (with a prefix of APP)
-        // Eg.. `APP_DEBUG=1 ./target/app` would set the `debug` key
-        .merge(config::Environment::with_prefix("REDGOLD"))
-        .unwrap();
-*/
-// Pre logger commands
-pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
-                                // , simple_runtime: Arc<Runtime>
-                                args: Vec<&String>
-) -> bool {
-    let mut abort = false;
-    let res: Result<(), ErrorInfo> = match &opts.subcmd {
-        None => {Ok(())}
-        Some(c) => {
-            abort = true;
-            match c {
-                RgTopLevelSubcommand::GenerateWords(m) => {
-                    commands::generate_mnemonic(&m);
-                    Ok(())
-                },
-                RgTopLevelSubcommand::Address(a) => {
-                    commands::generate_address(a.clone(), &config).map(|_| ())
-                }
-                RgTopLevelSubcommand::Send(a) => {
-                    commands::send(&a, &config).await
-                }
-                RgTopLevelSubcommand::Query(a) => {
-                    commands::query(&a, &config).await
-                }
-                RgTopLevelSubcommand::Faucet(a) => {
-                    commands::faucet(&a, &config).await
-                }
-                RgTopLevelSubcommand::AddServer(a) => {
-                    commands::add_server(a, &config).await
-                }
-                RgTopLevelSubcommand::Balance(a) => {
-                    commands::balance_lookup(a, &config).await
-                }
-                RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
-                    commands::test_transaction(&test_transaction_cli, &config).await
-                }
-                RgTopLevelSubcommand::Deploy(d) => {
-                    commands::deploy(d, &config).await.unwrap().abort();
-                    Ok(())
-                }
-                RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
-                    commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
-                    Ok(())
-                }
-                RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
-                    commands::convert_metadata_xpub(&b.metadata_file).await
-                }
-                RgTopLevelSubcommand::DebugCommand(d) => {
-                    commands::debug_commands(d, &config).await
-                }
-                RgTopLevelSubcommand::GenerateConfig(d) => {
-                    println!("Not implemented");
-                    Ok(())
-                }
-                _ => {
-                    abort = false;
-                    Ok(())
-                }
-            }
-        }
-    };
-    if res.is_err() {
-        println!("{}", serde_json::to_string(&res.err().unwrap()).expect("json"));
-        abort = true;
-    }
-    abort
-}

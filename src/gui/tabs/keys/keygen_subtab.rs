@@ -1,7 +1,7 @@
 use eframe::egui;
 use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
-
+use strum_macros::EnumString;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_builder;
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -16,7 +16,7 @@ use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
 
-#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone, EnumString)]
 // #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum KeyDerivation {
     DoubleSha256,
@@ -24,7 +24,7 @@ enum KeyDerivation {
 }
 
 
-#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
+#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone, EnumString)]
 enum Rounds {
     TenK,
     OneM,

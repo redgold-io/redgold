@@ -83,6 +83,24 @@ pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<Co
         dbg.enable = Some(true);
         config.party = Some(dbg);
     }
+    if rg_args.cold {
+        config.cli.as_mut().get_or_insert(&mut Default::default()).cold = Some(true);
+    }
+    if rg_args.airgap {
+        config.cli.as_mut().get_or_insert(&mut Default::default()).airgap = Some(true);
+    }
+    if rg_args.account.is_some() {
+        config.cli.as_mut().get_or_insert(&mut Default::default()).account = rg_args.account.clone();
+    }
+    if rg_args.currency.is_some() {
+        config.cli.as_mut().get_or_insert(&mut Default::default()).currency = rg_args.currency.clone();
+    }
+    if rg_args.path.is_some() {
+        config.cli.as_mut().get_or_insert(&mut Default::default()).path = rg_args.path.clone();
+    }
+    if rg_args.verbose {
+        config.cli.as_mut().get_or_insert(&mut Default::default()).verbose = Some(true);
+    }
 
     config
 }
