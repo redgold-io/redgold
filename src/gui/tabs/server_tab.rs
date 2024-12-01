@@ -258,6 +258,12 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             ()
         });
 
+        let deployment = local_state.local_stored_state
+            .deploy.clone().map(|d| d.fill_params());
+
+        let servers = deployment.clone().map(|d| d.as_old_servers())
+            .or(local_state.local_stored_state.servers.clone());
+
         let output_handler = Some(c.sender.clone());
         let arc = local_state.server_state.deployment_result.clone();
         let deploy_join = tokio::spawn(async move {
@@ -267,12 +273,14 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             let mut d2 = d.clone();
             let mut d3 = d2.clone();
             let nc = config.clone();
-            let _res = default_deploy(&mut d2, &nc, f, None).await;
+            let s = servers.clone();
+            let dpl = deployment.clone();
+            let _res = default_deploy(&mut d2, &nc, f, s, dpl.clone()).await;
             info!("Deploy complete {}", _res.json_or());
             *arc.lock().expect("") = Either::Left(Some(_res));
             if hard {
                 d3.debug_skip_start = false;
-                let _res = default_deploy(&mut d3, &nc, f2, None).await;
+                let _res = default_deploy(&mut d3, &nc, f2, None, dpl).await;
             }
             default_fun.abort();
             // Update final deploy result here.
@@ -323,7 +331,10 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
             let config1 = local_state.node_config.clone();
-            let option = local_state.local_stored_state.servers.clone().unwrap_or(vec![]);
+            let option =
+                local_state.local_stored_state.deploy.clone()
+                    .map(|d| d.as_old_servers())
+                    .or(local_state.local_stored_state.servers.clone()).unwrap_or(vec![]);
             tokio::spawn(deploy::offline_generate_keys_servers(
                 config1,
                 option,

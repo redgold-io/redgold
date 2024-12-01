@@ -7,6 +7,7 @@ use std::time::Duration;
 use flume::Sender;
 
 use std::io::prelude::*;
+use std::sync::Arc;
 use async_trait::async_trait;
 use itertools::Itertools;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
@@ -20,7 +21,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
-use redgold_common_no_wasm::cmd::{run_bash_async, run_powershell_async};
+use redgold_common_no_wasm::cmd::{run_bash_async, run_command_os, run_powershell_async};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
@@ -32,6 +33,8 @@ use redgold_schema::conf::node_config::NodeConfig;
 use crate::resources::Resources;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use redgold_schema::conf::rg_args::Deploy;
+use redgold_schema::conf::server_config::{Deployment, NodeInstance, ServerData};
+use redgold_schema::config_data::ConfigData;
 use redgold_schema::data_folder::DataFolder;
 
 #[async_trait]
@@ -49,6 +52,7 @@ pub struct SSHProcessInvoke {
     strict_host_key_checking: bool,
     output_handler: Option<Sender<String>>
 }
+
 
 #[async_trait]
 impl SSHLike for SSHProcessInvoke {
@@ -88,10 +92,6 @@ impl SSHLike for SSHProcessInvoke {
     }
 }
 
-pub fn is_windows() -> bool {
-    env::consts::OS == "windows"
-}
-
 impl SSHProcessInvoke {
 
     pub(crate) fn new(host: impl Into<String>, output_handler: Option<Sender<String>>) -> Self {
@@ -125,18 +125,68 @@ impl SSHProcessInvoke {
                output_handler: Option<Sender<String>>,
                cmd: String
     ) -> RgResult<String> {
-        let (stdout, stderr) = if !is_windows() {
-            run_bash_async(cmd).await?
-        } else {
-            run_powershell_async(cmd).await?
-        };
+        let (stdout, stderr) = run_command_os(cmd).await?;
         if let Some(s) = output_handler {
             self.output(stdout.clone())?;
             self.output(stderr.clone())?;
         }
         Ok(format!("{}\n{}", stdout, stderr).to_string())
     }
+
 }
+
+
+pub struct LocalSSHLike {
+    pub(crate) output_handler: Option<Sender<String>>
+}
+
+impl LocalSSHLike {
+    pub fn new(output_handler: Option<Sender<String>>) -> Self {
+        Self {
+            output_handler
+        }
+    }
+
+    async fn run_cmd(&self,
+                     output_handler: Option<Sender<String>>,
+                     cmd: String
+    ) -> RgResult<String> {
+        let (stdout, stderr) = run_command_os(cmd).await?;
+        if let Some(s) = output_handler {
+            self.output(stdout.clone())?;
+            self.output(stderr.clone())?;
+        }
+        Ok(format!("{}\n{}", stdout, stderr).to_string())
+    }
+
+}
+
+impl SSHLike for LocalSSHLike {
+    async fn execute(&self, command: impl Into<String> + Send, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        self.run_cmd(output_handler, command.into()).await
+    }
+
+
+    async fn scp(&self, local_file: impl Into<String> + Send, remote_file: impl Into<String> + Send, to_dest: bool, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        let lf = local_file.into();
+        let rf = remote_file.into();
+        let first_arg = if to_dest { lf.clone() } else { rf.clone() };
+        let last_arg = if to_dest { rf } else { lf };
+        let cmd = format!(
+            "cp {} {}",
+            first_arg, last_arg
+        );
+        self.run_cmd(output_handler, cmd).await
+    }
+
+    fn output(&self, o: impl Into<String>) -> RgResult<()> {
+        if let Some(s) = self.output_handler.clone() {
+            s.send_rg_err(o.into())?;
+        };
+        Ok(())
+    }
+}
+
 
 #[ignore]
 #[tokio::test]
@@ -267,23 +317,23 @@ impl<S: SSHLike> DeployMachine<S> {
 /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
 They must be manually deployed.
-
- This whole thing should really have a streaming output for the lines and stuff.
  */
-pub async fn deploy_redgold(
-     mut ssh: DeployMachine<SSHProcessInvoke>,
-     network: NetworkEnvironment,
-     is_genesis: bool,
-     additional_env: Option<HashMap<String, String>>,
-     purge_data: bool,
-     words: Option<String>,
-     peer_id_hex: Option<String>,
-     start_node: bool,
-     alias: Option<String>,
-     ser_pid_tx: Option<String>,
-     p: &Option<Sender<String>>,
-     disable_system: bool
- ) -> Result<(), ErrorInfo> {
+pub async fn deploy_redgold<T: SSHLike>(
+    mut ssh: DeployMachine<T>,
+    network: NetworkEnvironment,
+    is_genesis: bool,
+    additional_env: Option<HashMap<String, String>>,
+    purge_data: bool,
+    words: Option<String>,
+    peer_id_hex: Option<String>,
+    start_node: bool,
+    alias: Option<String>,
+    ser_pid_tx: Option<String>,
+    p: &Option<Sender<String>>,
+    disable_system: bool,
+    config_data: Arc<ConfigData>,
+    dpl_tuple: Option<(Deployment, ServerData, NodeInstance)>
+) -> Result<(), ErrorInfo> {
 
     ssh.verify().await?;
 
@@ -319,7 +369,7 @@ pub async fn deploy_redgold(
     ssh.exes(format!("mkdir -p {}", path), p).await?;;
     ssh.exes(format!("mkdir -p {}", all_path), p).await?;;
      // Copy mnemonic / peer_id
-     if let Some(words) = words {
+     if let Some(words) = words.clone() {
          if network != NetworkEnvironment::Main {
              let env_remote = format!("{}/mnemonic", path);
              ssh.exes(format!("rm {}", env_remote), p).await?;
@@ -378,6 +428,14 @@ pub async fn deploy_redgold(
         }
     }
 
+    // TODO: Env vars should all be migrated here, secure should be erased
+    // Prepare config data
+    let mut config = (*config_data).clone();
+    config.secure = None;
+    config.network = Some(network.to_std_string());
+    config.node.get_or_insert(Default::default()).words = words.clone();
+    let toml_config = toml::to_string(&config).error_info("toml config")?;
+
     if !disable_system {
         // TODO: Lol not this
         let port_range: Vec<i64> = vec![-1, 0, 1, 4, 5, 6];
@@ -392,6 +450,7 @@ pub async fn deploy_redgold(
     }).join("\n");
     ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
     ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
+    ssh.copy_p(toml_config, format!("{}/config.toml", path), p).await?;
 
     sleep(Duration::from_secs(4));
 
@@ -713,8 +772,11 @@ pub async fn default_deploy(
     deploy: &mut Deploy,
     node_config: &NodeConfig,
     output_handler: Option<Sender<String>>,
-    servers_opt: Option<Vec<ServerOldFormat>>
+    servers_opt: Option<Vec<ServerOldFormat>>,
+    deployment: Option<Deployment>
 ) -> RgResult<()> {
+
+    let deployment = deployment.map(|d| d.fill_params());
 
     // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
     // if node_config.opts.development_mode {
@@ -804,6 +866,8 @@ pub async fn default_deploy(
                 continue;
             }
         }
+        let dpl_tuple = deployment.as_ref()
+            .and_then(|d| d.by_index(ii as i64));
 
         let opt_peer_id: Option<String> = peer_id_index.get(&ss.peer_id_index).cloned();
         let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
@@ -860,6 +924,7 @@ pub async fn default_deploy(
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None, output_handler.clone());
         if !deploy.skip_redgold_process {
+
             let mut this_hm = hm.clone();
             // TODO: Change to _main
             if ss.index == 0 && node_config.opts.development_mode {
@@ -874,6 +939,25 @@ pub async fn default_deploy(
                 this_hm.insert("REDGOLD_MAIN_DEVELOPMENT_MODE".to_string(), "true".to_string());
                 this_hm.insert("REDGOLD_S3_BACKUP_BUCKET".to_string(), "redgold-backups".to_string());
             }
+            if ss.host == "".to_string() {
+                let ssh_local = LocalSSHLike::new(output_handler.clone());
+                let ssh = DeployMachine {
+                    server: ss.clone(),
+                    ssh: ssh_local,
+                };
+                let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
+                    ssh, net, gen, Some(this_hm), purge,
+                    words_opt,
+                    peer_id_hex_opt,
+                    !deploy.debug_skip_start,
+                    ss.node_name.clone(),
+                    peer_tx_opt.map(|p| p.json_or()),
+                    &output_handler,
+                    true,
+                    node_config.config_data.clone(),
+                    dpl_tuple
+                )).await.error_info("Timeout")??;
+            }
             let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
                 ssh, net, gen, Some(this_hm), purge,
                 words_opt,
@@ -882,7 +966,9 @@ pub async fn default_deploy(
                 ss.node_name.clone(),
                 peer_tx_opt.map(|p| p.json_or()),
                 &output_handler,
-                deploy.disable_apt_system_init
+                deploy.disable_apt_system_init,
+                node_config.config_data.clone(),
+                dpl_tuple
             )).await.error_info("Timeout")??;
         }
         gen = false;

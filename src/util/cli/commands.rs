@@ -268,7 +268,7 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
 
     let (default_fun, output_handler) = log_handler();
 
-    default_deploy(&mut deploy, &nc, output_handler, None).await?;
+    default_deploy(&mut deploy, &nc, output_handler, None, None).await?;
 
     Ok(default_fun)
 }

@@ -1,6 +1,8 @@
+use std::env;
 use std::process::Command;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::structs::ErrorInfo;
 
 pub fn run_cmd(cmd: impl Into<String>, args: Vec<impl Into<String>>) -> (String, String) {
     let mut echo_hello = Command::new(cmd.into());
@@ -57,4 +59,17 @@ pub async fn run_bash_async(cmd: impl Into<String>) -> RgResult<(String, String)
 
 pub async fn run_powershell_async(cmd: impl Into<String>) -> RgResult<(String, String)> {
     run_cmd_safe_async("powershell", vec!["-Command", &cmd.into()]).await
+}
+
+pub fn is_windows() -> bool {
+    env::consts::OS == "windows"
+}
+
+
+pub async fn run_command_os(cmd: String) -> Result<(String, String), ErrorInfo> {
+    Ok(if !is_windows() {
+        run_bash_async(cmd).await?
+    } else {
+        run_powershell_async(cmd).await?
+    })
 }
