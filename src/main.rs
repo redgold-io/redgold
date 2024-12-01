@@ -38,8 +38,12 @@ async fn load_configs() -> Box<NodeConfig> {
 }
 
 // Stack debugging here.
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
 
 fn main() {
+    let _profiler = dhat::Profiler::new_heap();
+
     let runtime = Builder::new_multi_thread()
         .thread_stack_size(1024 * 1024 * 1024) // 1024 stack
         .worker_threads(num_cpus::get())  // Use all available logical cores
@@ -57,6 +61,10 @@ fn main() {
 async fn main_dbg() {
 
     let node_config = load_configs().await;
+
+    if immediate_commands::immediate_commands(&node_config).await {
+        return;
+    }
 
     // info!("Starting node main method");
     counter!("redgold.node.main_started").increment(1);
@@ -79,13 +87,6 @@ async fn main_dbg() {
         let g = Box::new(NativeGuiDepends::new(*node_config.clone()));
         gui::initialize::attempt_start(node_config, res, g, party_data).await.expect("GUI to start");
         return;
-    }
-
-    if let Some(cmd) = node_config.top_level_subcommand.as_ref() {
-        let abort = immediate_commands::immediate_commands(cmd.clone(), &node_config).await.unwrap_or(true);
-        if abort {
-            return;
-        }
     }
 
 

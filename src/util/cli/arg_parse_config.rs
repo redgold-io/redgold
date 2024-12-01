@@ -188,8 +188,8 @@ impl ArgTranslate {
             return Ok(self.node_config);
         }
 
-        let subcmd = self.opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
-        self.node_config.top_level_subcommand = subcmd.clone();
+        // let subcmd = self.opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
+        // self.node_config.top_level_subcommand = subcmd.clone();
 
         if !skip_slow_stuff {
             self.lookup_ip().await;

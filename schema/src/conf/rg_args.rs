@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 
 pub fn empty_args() -> RgArgs {
     RgArgs {
@@ -200,7 +201,7 @@ impl RgArgs {
     }
 }
 
-#[derive(Subcommand, Debug, Clone)]
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize)]
 pub enum RgTopLevelSubcommand {
     #[clap(version = "1.3", author = "Redgold")]
     GUI(GUI),
@@ -227,11 +228,11 @@ pub enum RgTopLevelSubcommand {
 /// Run a native gui client, this is the default command if no args are supplied
 /// This runs a local EGUI native interface which allows use of wallet / cold wallet /
 /// deploy commands / airgap commands.
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct GUI {}
 
 /// Run a peer to peer node
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct NodeCli {
     /// Force enable faucet
     #[clap(long)]
@@ -288,7 +289,7 @@ pub struct RemoveServer {
 /// WARNING: The gui is actually more tested than this, but it re-uses the same code path.
 /// This is still experimental through CLI.
 /// You can always manually deploy as well through a direct docker compose script.
-#[derive(Args, Debug, Clone, Default)]
+#[derive(Args, Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Deploy {
     /// Purge stored data, WARNING: this will erase ALL data associated with the node, including
     /// node keys and multiparty key shares, ensure if you run this that you have them backed up.
@@ -377,7 +378,7 @@ pub struct Deploy {
 /// expects arguments <destination> <amount>
 /// Destination should be a parseable address (will waterfall parse between types.)
 /// Amount should be a fractional amount, i.e. 0.1 for one tenth of a RDG
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct WalletSend {
     /// Optional derivation path to use for deriving the key source (for the local transaction)
     #[clap(short, long)]
@@ -402,7 +403,7 @@ pub struct Swap {
 }
 
 /// Generate an address from an existing wallet or key store
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct WalletAddress {
     /// Choose a particular offset for the key from the mnemonic (last field in path)
     #[clap(short, long)]
@@ -413,7 +414,7 @@ pub struct WalletAddress {
 }
 
 /// Query the network for information on a particular hash, query <hash> as first arg
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct QueryCli {
     // #[clap(long)]
     // pub hash: String,
@@ -431,7 +432,7 @@ pub struct FaucetCli {
 }
 
 /// Check the balance of an address
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct BalanceCli {
     /// Address to check balance of, defaults to current active word address
     #[clap(short, long)]
@@ -451,21 +452,21 @@ pub struct TestCaptureCli {
     pub cam: Option<i64>
 }
 
-#[derive(Subcommand, Debug, Clone)]
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize)]
 pub enum RgDebugCommand {
     #[clap(version = "1.3", author = "Redgold")]
     GrafanaPublicDeploy(GrafanaPublicDeploy),
-    TestTransaction(TestTransactionCli),
-    TestCapture(TestCaptureCli),
-    TestBitcoinBalance(TestBitcoinBalanceCli),
-    ConvertMetadataXpub(ConvertMetadataXpub),
+    // TestTransaction(TestTransactionCli),
+    // TestCapture(TestCaptureCli),
+    // TestBitcoinBalance(TestBitcoinBalanceCli),
+    // ConvertMetadataXpub(ConvertMetadataXpub),
 }
 
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct GrafanaPublicDeploy {}
 
 /// Debug Commands
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct DebugCommand {
     #[clap(subcommand)]
     pub subcmd: Option<RgDebugCommand>
@@ -485,7 +486,7 @@ pub struct ConvertMetadataXpub {
 }
 
 /// Generate a config with all values filled in
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateConfig {
 }
 
@@ -504,7 +505,7 @@ pub struct GenerateMnemonic {
 }
 
 /// Generate a mnemonic word list from random entropy
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateRandomWords {
     /// Source for hardware randomness, hex encoded matching word entropy, not required
     /// unless advanced user
