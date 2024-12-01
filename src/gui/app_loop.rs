@@ -316,7 +316,6 @@ use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{wallet_screen, StateUpdate, WalletState};
 use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
-use crate::infra::deploy::is_windows;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use redgold_schema::party::party_internal_data::PartyInternalData;

@@ -49,7 +49,7 @@ pub struct ServerData {
     pub external_ipv4: Option<String>,
     pub external_hostname: Option<String>,
     pub instances: Option<Vec<NodeInstance>>,
-    // pub deploy_metrics_instance: Option<bool>
+    pub deploy_metrics_instance: Option<bool>
 }
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct DeploymentDefaultParams {

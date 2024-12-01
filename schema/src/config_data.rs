@@ -185,19 +185,26 @@ impl ConfigData {
                         external_hostname: Some("only_necessary_if_using_dns".to_string()),
                         instances: Some(vec![
                             NodeInstance {
-                                name: "your_node_name".to_string(),
-                                index: 0,
-                                peer_id_index: 0,
-                                network_environment: NetworkEnvironment::Main,
+                                name: Some("your_node_name".to_string()),
+                                index: Some(0),
+                                peer_id_index: Some(0),
+                                network_environment: Some("main".to_string()),
                                 host_port_offset: None,
                                 docker_swarm_proxy: None,
                                 keys: None,
+                                reward_address: None,
+                                use_id_ds_prefix: None,
                             }
                         ]
                         ),
                         deploy_metrics_instance: Some(true),
                     }]),
                     docker_swarm_proxies: None,
+                    default_params: Some(DeploymentDefaultParams{
+                        reward_address: None,
+                        keys: None,
+                        network_environment: None,
+                    }),
                 }),
                 servers: None,
                 keys: Some(
@@ -264,7 +271,7 @@ impl ConfigData {
 }
 
 use std::env;
-use crate::conf::server_config::{Deployment, NodeInstance, ServerData};
+use crate::conf::server_config::{Deployment, DeploymentDefaultParams, NodeInstance, ServerData};
 use crate::proto_serde::ProtoSerde;
 use crate::RgResult;
 use crate::structs::{NetworkEnvironment, PeerId, RatingType, SupportedCurrency, TrustData, TrustRatingLabel};
