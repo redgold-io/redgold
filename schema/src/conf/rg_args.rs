@@ -21,6 +21,7 @@ pub fn empty_args() -> RgArgs {
             currency: None,
             path: None,
             verbose: false,
+            quiet: false    ,
         },
         debug_args: DebugArgs {
             debug_id: None,
@@ -111,6 +112,10 @@ pub struct CliSettings {
     /// Include verbose / debug output for CLI commands instance of compact outputs.
     #[clap(long, env = "REDGOLD_CLI_VERBOSE")]
     pub verbose: bool,
+    /// Quiet outputs
+    #[clap(long, env = "REDGOLD_CLI_QUIET")]
+    pub quiet: bool,
+
 }
 
 
