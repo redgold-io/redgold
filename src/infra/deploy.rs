@@ -31,7 +31,7 @@ use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
 use redgold_schema::conf::node_config::NodeConfig;
 use crate::resources::Resources;
-use crate::util::cli::arg_parse_config::ArgTranslate;
+use crate::util::cli::arg_parse_config::{get_default_data_top_folder, ArgTranslate};
 use redgold_schema::conf::rg_args::Deploy;
 use redgold_schema::conf::server_config::{Deployment, NodeInstance, ServerData};
 use redgold_schema::config_data::ConfigData;
@@ -337,6 +337,24 @@ pub async fn deploy_redgold<T: SSHLike>(
     nc: &Box<NodeConfig>
 ) -> Result<(), ErrorInfo> {
 
+    let data_folder = if ssh.server.host.is_empty() {
+        // home directory
+        let mut home = get_default_data_top_folder();
+        if let Some((_, _, ni)) = dpl_tuple.as_ref() {
+            if ni.use_id_ds_prefix.unwrap_or(false) {
+                home = home.join("id_index");
+                home = home.join(ni.index.unwrap_or(0).to_string());
+            }
+        }
+        home.to_str().unwrap().to_string()
+    } else {
+        if let Some(u) = ssh.server.username.as_ref() {
+            format!("/home/{}/.rg", u)
+        } else {
+            "/root/.rg".to_string()
+        }
+    };
+
     ssh.verify().await?;
 
     let _host = ssh.server.host.clone();
@@ -360,8 +378,8 @@ pub async fn deploy_redgold<T: SSHLike>(
     }
     let r = Resources::default();
 
-    let path = format!("/root/.rg/{}", network.to_std_string());
-    let all_path = format!("/root/.rg/{}", NetworkEnvironment::All.to_std_string());
+    let path = format!("{}/{}", data_folder, network.to_std_string());
+    let all_path = format!("{}/{}",data_folder, NetworkEnvironment::All.to_std_string());
      let maybe_main_path = if network == NetworkEnvironment::Main {
          path.clone()
      } else {
@@ -406,6 +424,7 @@ pub async fn deploy_redgold<T: SSHLike>(
     // env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
     // env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
     env.insert("RUST_BACKTRACE".to_string(), "full".to_string());
+    env.insert("RUST_LOG".to_string(), "debug".to_string());
     // env.insert("REDGOLD_SERVER_INDEX".to_string(), ssh.server.index.to_string());
     // env.insert("REDGOLD_SERVER_PEER_INDEX".to_string(), ssh.server.peer_id_index.to_string());
     // env.insert("REDGOLD_SERVER_NODE_NAME".to_string(), ssh.server.node_name.clone().unwrap_or("anon".to_string()));
@@ -436,6 +455,8 @@ pub async fn deploy_redgold<T: SSHLike>(
     let mut config = (*config_data).clone();
     config.secure = None;
     config.network = Some(network.to_std_string());
+    // TODO: Support other users here.
+    config.data = Some("/root/.rg".to_string());
     let node = config.node.get_or_insert(Default::default());
     node.words = words.clone();
     node.server_index = Some(ssh.server.index);

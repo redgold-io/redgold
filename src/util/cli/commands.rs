@@ -538,7 +538,7 @@ pub async fn convert_metadata_xpub(path: &String) -> RgResult<()> {
     Ok(())
 }
 
-pub(crate) async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult<()> {
+pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult<()> {
     if let Some(cmd) = &p0.subcmd {
         match cmd {
             RgDebugCommand::GrafanaPublicDeploy(_) => {

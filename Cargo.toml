@@ -248,18 +248,28 @@ dns-lookup = "2.0.2" #Dependencies for email sending
 # Re-enable later
 #openpnp_capture = "0.2.4"
 #openpnp_capture_sys = "0.4.0"
+#
+#[target.'cfg(unix)'.rustflags]
+## Linux systems
+#rustflags = ["-C", "link-args=-Wl,-z,stack-size=128000000"]
+#
+#[target.'cfg(windows)'.rustflags]
+## Windows systems
+#rustflags = ["-C", "link-args=/STACK:128000000"]
+#
+#[target.'cfg(target_os = "macos")'.rustflags]
+## macOS systems
+#rustflags = ["-C", "link-args=-Wl,-stack_size,128000000"]
 
-[target.'cfg(unix)'.rustflags]
-# Linux systems
+[target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-args=-Wl,-z,stack-size=128000000"]
 
-[target.'cfg(windows)'.rustflags]
-# Windows systems
+[target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "link-args=/STACK:128000000"]
 
-[target.'cfg(target_os = "macos")'.rustflags]
-# macOS systems
+[target.x86_64-apple-darwin]
 rustflags = ["-C", "link-args=-Wl,-stack_size,128000000"]
+
 
 #[target.'cfg(target_os = "macos")']
 #rustflags = ["-C", "link-arg=-Wl,-stack_size,81920000"]

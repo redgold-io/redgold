@@ -19,15 +19,16 @@ use redgold::integrations::external_network_resources::{ExternalNetworkResources
 use redgold::node::Node;
 use redgold::node_config::ApiNodeConfig;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
-use redgold::util::cli::immediate_commands;
+use redgold::util::cli::{commands, immediate_commands};
 use redgold::util::cli::load_config::{load_full_config, main_config};
-use redgold_schema::SafeOption;
+use redgold_schema::{ErrorInfoContext, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
 use redgold_schema::structs::ErrorInfo;
 
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::conf::rg_args::RgArgs;
+use redgold_schema::conf::rg_args::{RgArgs, RgTopLevelSubcommand};
+use redgold_schema::config_data::ConfigData;
 use redgold_schema::observability::errors::Loggable;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
@@ -36,8 +37,50 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
     let cmd = opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
     let mut arg_translate = Box::new(ArgTranslate::new(nc, opts));
     let nc = arg_translate.translate_args().await.expect("arg translation");
-    let abort = immediate_commands::immediate_commands(
-        &nc, cmd).await;
+    let mut abort = false;
+    if let Some(cmd) = cmd {
+        match *cmd {
+            RgTopLevelSubcommand::Node(_) => {}
+            RgTopLevelSubcommand::GUI(_) => {}
+            _ => {
+                abort = true;
+            }
+        }
+        match *cmd {
+            RgTopLevelSubcommand::Balance(a) => {
+                commands::balance_lookup(&a, &nc).await.unwrap();
+            }
+            RgTopLevelSubcommand::Address(a) => {
+                commands::generate_address(a.clone(), &nc).map(|_| ()).unwrap();
+
+            }
+            RgTopLevelSubcommand::Send(a) => {
+                commands::send(&a, &nc).await.unwrap();
+            }
+            RgTopLevelSubcommand::Query(a) => {
+                commands::query(&a, &nc).await.unwrap();
+            }
+            RgTopLevelSubcommand::Deploy(d) => {
+                commands::deploy(&d, &nc).await.unwrap().abort();
+            }
+            RgTopLevelSubcommand::DebugCommand(d) => {
+                commands::debug_commands(&d, &nc).await.unwrap();
+            }
+            RgTopLevelSubcommand::GenerateConfig(d) => {
+                let c = ConfigData::generate_user_sample_config();
+                toml::to_string(&c)
+                    .error_info("Failed to serialize config")
+                    .map(|x| println!("{}", x))
+                    .unwrap();
+            }
+            RgTopLevelSubcommand::GenerateRandomWords(a) => {
+                // todo; from hardware entropy.
+                let w = commands::generate_random_mnemonic().words;
+                println!("{}", w);
+            }
+            _ => {}
+        }
+    }
     (nc, abort)
 }
 //
