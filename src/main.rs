@@ -40,7 +40,7 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
         &nc, cmd).await;
     (nc, abort)
 }
-
+//
 // Stack debugging here.
 // #[global_allocator]
 // static ALLOC: dhat::Alloc = dhat::Alloc;
@@ -49,7 +49,7 @@ fn main() {
     // let _profiler = dhat::Profiler::new_heap();
 
     let runtime = Builder::new_multi_thread()
-        .thread_stack_size(1024 * 1024 * 1024) // 1024 stack
+        .thread_stack_size(128 * 1024 * 1024) // 128 MB stack
         .worker_threads(num_cpus::get())  // Use all available logical cores
         .enable_all()
         .enable_time()

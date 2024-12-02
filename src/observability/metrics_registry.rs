@@ -211,11 +211,11 @@ pub fn init_prometheus(port_offset: u16) {
     let socket = SocketAddrV4::new(addr_all, port_offset - 1);
     if let Err(e) = install_prometheus(socket) {
         let socket_fallback = SocketAddrV4::new(addr_all, socket.port() - 1);
-        error!(
-            "Failed to install Prometheus exporter, falling back to {} {}",
-            socket_fallback,
-            e.json_or()
-        );
+        // error!(
+        //     "Failed to install Prometheus exporter, falling back to {} {}",
+        //     socket_fallback,
+        //     e.json_or()
+        // );
         install_prometheus(socket_fallback)
             .expect("failed to install recorder/exporter on fallback socket");
     }

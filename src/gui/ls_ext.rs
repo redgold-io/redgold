@@ -47,10 +47,10 @@ where G: Send + Clone + GuiDepends {
     let ds_env = node_config.data_store_all().await;
     let ds_env_secure = node_config.data_store_all_secure().await;
     let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
-    info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
+    // info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
     let string = ds_or.ctx.connection_path.clone().replace("file:", "");
-    info!("ds_or connection path {}", string);
-    info!("starting environment {}", node_config.network.to_std_string());
+    // info!("ds_or connection path {}", string);
+    // info!("starting environment {}", node_config.network.to_std_string());
     ds_or.run_migrations_fallback_delete(
         true,
         PathBuf::from(string)
@@ -133,7 +133,7 @@ where G: Send + Clone + GuiDepends {
 
 
     ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
-    info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
+    // info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
 
     for cur in vec![
         SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::Usdt, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::Usdc
@@ -141,7 +141,7 @@ where G: Send + Clone + GuiDepends {
         let delta = gui_depends.get_24hr_delta(cur.clone()).await;
         ls.data.delta_24hr_external.insert(cur.clone(), delta);
     }
-    info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
+    // info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
 
     if node_config.development_mode() {
         ls.server_state.ops = false;
