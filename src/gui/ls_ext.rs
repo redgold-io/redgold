@@ -56,7 +56,7 @@ where G: Send + Clone + GuiDepends {
         PathBuf::from(string)
     ).await.expect("migrations");
     // DataStore::run_migrations(&ds_or).await.expect("");
-    let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
+    let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words().clone());
     let local_stored_state = ds_or.config_store.get_stored_state().await?;
 
     // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();

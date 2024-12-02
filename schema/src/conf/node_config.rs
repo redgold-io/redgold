@@ -109,28 +109,12 @@ pub struct ContentionConfig {
     pub interval: Duration
 }
 
-#[derive(Clone, Debug)]
-pub struct NodeInfoConfig {
-    pub alias: Option<String>,
-}
-
-impl Default for NodeInfoConfig {
-    fn default() -> Self {
-        Self {
-            alias: None,
-        }
-    }
-}
-
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
     pub config_data: Arc<ConfigData>,
     pub peer_id: PeerId,
     pub public_key: PublicKey,
-    // TODO: Change to Seed class? or maybe not leave it as it's own
-    pub mnemonic_words: String,
-    // Sometimes adjusted user params
     pub port_offset: u16,
     pub p2p_port: Option<u16>,
     pub control_port: Option<u16>,
@@ -154,9 +138,6 @@ pub struct NodeConfig {
     pub disable_auto_update: bool,
     pub auto_update_poll_interval: Duration,
     pub block_formation_interval: Duration,
-    pub genesis_config: GenesisConfig,
-    pub faucet_enabled: bool,
-    pub e2e_enabled: bool,
     pub load_balancer_url: String,
     pub external_ip: String,
     pub external_host: String,
@@ -167,15 +148,12 @@ pub struct NodeConfig {
     pub enable_logging: bool,
     pub discovery_interval: Duration,
     pub shuffle_interval: Duration,
-    pub live_e2e_interval: Duration,
-    pub genesis: bool,
     // pub opts: Arc<RgArgs>,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
     pub contract: ContractConfig,
     pub contention: ContentionConfig,
-    pub node_info: NodeInfoConfig,
     pub default_timeout: Duration,
     pub disable_metrics: bool,
     pub args: Arc<Vec<String>>,
@@ -185,6 +163,16 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+
+    pub fn mnemonic_words(&self) -> String {
+        self.config_data.node.as_ref().and_then(|n| n.words.clone()).expect("mnemonic words")
+    }
+    pub fn e2e_enabled(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.enable_live_e2e).unwrap_or(false)
+    }
+    pub fn genesis(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.genesis).unwrap_or(false)
+    }
 
     pub fn args(&self) -> Vec<&String> {
         self.args.iter().dropping(1).collect()
@@ -551,7 +539,6 @@ impl NodeConfig {
             config_data: Default::default(),
             peer_id: Default::default(),
             public_key: structs::PublicKey::default(),
-            mnemonic_words: "".to_string(),
             port_offset: NetworkEnvironment::Debug.default_port_offset(),
             p2p_port: None,
             control_port: None,
@@ -575,10 +562,6 @@ impl NodeConfig {
             disable_auto_update: false,
             auto_update_poll_interval: Duration::from_secs(60),
             block_formation_interval: Duration::from_secs(10),
-            genesis_config: GenesisConfig{
-            },
-            faucet_enabled: true,
-            e2e_enabled: false,
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string(),
             external_host: "localhost".to_string(),
@@ -589,13 +572,9 @@ impl NodeConfig {
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
             shuffle_interval: Duration::from_secs(600),
-            live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
-            genesis: false,
-            // opts: Arc::new(empty_args()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),
-            node_info: NodeInfoConfig::default(),
             contract: Default::default(),
             contention: Default::default(),
             default_timeout: Duration::from_secs(150),
@@ -605,6 +584,12 @@ impl NodeConfig {
             is_gui: false,
             top_level_subcommand: None,
         }
+    }
+
+    pub fn live_e2e_interval(&self) -> Duration {
+        let t = self.config_data.debug.as_ref().and_then(|d| d.live_e2e_interval_seconds)
+            .unwrap_or(60 * 10);
+        Duration::from_secs(t as u64)
     }
 
     pub fn memdb_path(seed_id: &u16) -> String {

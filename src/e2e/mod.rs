@@ -291,7 +291,7 @@ pub async fn run_wrapper(relay: Relay) -> Result<(), ErrorInfo> {
     // See if we should start at all, but with a retry for genesis stuff
     // c.build_tx().await?;
 
-    let interval1 = tokio::time::interval(relay.node_config.clone().live_e2e_interval.clone());
+    let interval1 = tokio::time::interval(relay.node_config.clone().live_e2e_interval());
     use futures::TryStreamExt;
     IntervalStream::new(interval1)
         .map(|x| Ok(x))

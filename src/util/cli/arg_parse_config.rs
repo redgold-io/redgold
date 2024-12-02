@@ -172,16 +172,12 @@ impl ArgTranslate {
         if !skip_slow_stuff {
             self.calculate_executable_checksum_hash();
         }
-        self.guard_faucet();
-        self.e2e_enable();
         // info!("E2e enabled");
         if !skip_slow_stuff {
             self.configure_seeds().await;
         }
         self.set_discovery_interval();
-        self.apply_node_opts();
         self.genesis();
-        self.alias();
 
         if self.is_gui() {
             self.node_config.is_gui = true;
@@ -211,12 +207,6 @@ impl ArgTranslate {
         }
     }
 
-    fn guard_faucet(&mut self) {
-        // Only enable on main if CLI flag with additional precautions
-        if self.node_config.network == NetworkEnvironment::Main {
-            self.node_config.faucet_enabled = false;
-        }
-    }
 
     async fn lookup_ip(&mut self) {
 
@@ -297,85 +287,55 @@ impl ArgTranslate {
 
     fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
 
+        // this step probably removable?
+        let mut config_data = (*self.node_config.config_data).clone();
+        let node = config_data.node.get_or_insert(Default::default());
         // Remove any defaults; we want to be explicit
-        self.node_config.mnemonic_words = "".to_string();
+        node.words = Some("".to_string());
 
         // First try to load from the all environment data folder for re-use across environments
         if let Ok(words) = self.node_config.data_folder.all().mnemonic_no_tokio() {
-            self.node_config.mnemonic_words = words;
+            node.words = Some(words);
         };
 
         // Then override with environment specific mnemonic;
         if let Ok(words) = self.node_config.env_data_folder().mnemonic_no_tokio() {
-            self.node_config.mnemonic_words = words;
-        };
-
-        // TODO: Merge this with CLI
-        // Then override with environment variable
-        if let Some(words) = std::env::var("REDGOLD_WORDS").ok() {
-            self.node_config.mnemonic_words = words;
+            node.words = Some(words);
         };
 
 
-        // Then override with command line
-        if let Some(words) = &self.opts().words {
-            self.node_config.mnemonic_words = words.clone();
-        }
-
-        // Then override with a file from the command line (more secure than passing directly)
-        if let Some(words) = &self.opts()
-            .mnemonic_path
-            .clone()
-            .map(fs::read_to_string)
-            .map(|x| x.expect("Something went wrong reading the mnemonic_path file")) {
-            self.node_config.mnemonic_words = words.clone();
-        };
-
-
+        // TODO: Change this to write to the config
 
         // If empty, generate a new mnemonic;
-        if self.node_config.mnemonic_words.is_empty() {
-            if let Some(dbg_id) = self.opts().debug_id.as_ref() {
-                self.node_config.mnemonic_words = WordsPass::from_str_hashed(dbg_id.to_string()).words;
+        if node.words.as_ref().expect("w").is_empty() {
+            if let Some(dbg_id) = self.node_config.debug_id().as_ref() {
+                node.words = Some(WordsPass::from_str_hashed(dbg_id.to_string()).words);
             } else {
                 tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
                 tracing::info!("Generating with entropy for 24 words, process may halt if insufficient entropy on system");
                 let mnem = WordsPass::generate()?.words;
                 tracing::info!("Successfully generated new mnemonic");
-                self.node_config.mnemonic_words = mnem.clone();
+                node.words = Some(mnem.clone());
                 let buf = self.node_config.env_data_folder().mnemonic_path();
                 fs::write(
                     buf.clone(),
-                    self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
+                    mnem.clone()
+                ).expect("Unable to write mnemonic to file");
 
                 info!("Wrote mnemonic to path: {}", buf.to_str().expect("Path format failure"));
             }
         };
 
+        self.node_config.config_data = Arc::new(config_data);
+
         // Validate that this is loadable
-        let _ = WordsPass::words(self.node_config.mnemonic_words.clone()).mnemonic()?;
+        let _ = WordsPass::words(self.node_config.mnemonic_words().clone()).mnemonic()?;
 
         Ok(())
     }
 
     // TODO: Load merkle tree of this
     fn load_peer_id(&mut self) -> Result<(), ErrorInfo> {
-        // // TODO: Use this
-        // let _peer_id_from_store: Option<String> = None; // mnemonic_store.get(0).map(|x| x.peer_id.clone());
-
-        // TODO: From environment variable too?
-        // TODO: write merkle tree to disk
-
-        if let Some(path) = &self.opts().peer_id_path {
-            let p = fs::read_to_string(path)
-                .error_info("Failed to read peer_id_path file")?;
-            self.node_config.peer_id = PeerId::from_hex(p)?;
-        }
-
-        // TODO: This will have to change to read the whole merkle tree really, lets just remove this maybe?
-        if let Some(p) = &self.opts().peer_id {
-            self.node_config.peer_id = PeerId::from_hex(p)?;
-        }
 
         if let Some(p) = fs::read_to_string(self.node_config.env_data_folder().peer_id_path()).ok() {
             self.node_config.peer_id = PeerId::from_hex(p)?;
@@ -397,13 +357,13 @@ impl ArgTranslate {
 
     fn data_folder(&mut self) -> Result<(), ErrorInfo> {
 
-        let mut data_folder_path =  self.opts().config_paths.data_path.clone()
+        let mut data_folder_path =  self.node_config.config_data.data.clone()
             .map(|p| PathBuf::from(p))
             .unwrap_or(get_default_data_top_folder());
 
         // Testing only modification, could potentially do this in a separate function to
         // unify this with other debug mods.
-        if let Some(id) = self.opts().debug_id {
+        if let Some(id) = self.opts().debug_args.debug_id {
             data_folder_path = data_folder_path.join("local_test");
             data_folder_path = data_folder_path.join(format!("id_{}", id));
         }
@@ -419,7 +379,7 @@ impl ArgTranslate {
         self.node_config.port_offset = self.node_config.network.default_port_offset();
 
         // Unify with other debug id stuff?
-        if let Some(dbg_id) = self.opts().debug_id {
+        if let Some(dbg_id) = self.opts().debug_args.debug_id {
             self.node_config.port_offset = Self::debug_id_port_offset(
                 self.node_config.network.default_port_offset(),
                 dbg_id
@@ -445,7 +405,7 @@ impl ArgTranslate {
     //     }
     // }
     fn check_load_logger(&mut self) -> Result<(), ErrorInfo> {
-        let log_level = &self.opts().log_level
+        let log_level = &self.opts().global_settings.log_level
             .clone()
             .and(std::env::var("REDGOLD_LOG_LEVEL").ok())
             .unwrap_or("DEBUG".to_string());
@@ -472,7 +432,7 @@ impl ArgTranslate {
         if let Some(n) = std::env::var("REDGOLD_NETWORK").ok() {
             NetworkEnvironment::parse_safe(n)?;
         }
-        self.node_config.network = match &self.opts().network {
+        self.node_config.network = match &self.opts().global_settings.network {
             None => {
                 if util::local_debug_mode() {
                     NetworkEnvironment::Debug
@@ -486,7 +446,7 @@ impl ArgTranslate {
         };
 
         if self.is_gui() && self.node_config.network == NetworkEnvironment::Local {
-            if self.opts().development_mode {
+            if self.node_config.development_mode() {
                 self.node_config.network = NetworkEnvironment::Dev;
             } else {
                 self.node_config.network = NetworkEnvironment::Main;
@@ -500,17 +460,6 @@ impl ArgTranslate {
         Ok(())
     }
 
-    fn e2e_enable(&mut self) {
-        if self.opts().enable_live_e2e {
-            self.node_config.e2e_enabled = true;
-        }
-        // std::env::var("REDGOLD_ENABLE_E2E").ok().map(|b| {
-        //     self.node_config.e2e_enable = true;
-        // }
-        // self.opts().enable_e2e.map(|_| {
-        //     self.node_config.e2e_enable = true;
-        // });
-    }
     async fn configure_seeds(&mut self) {
 
         // info!("configure seeds");
@@ -523,9 +472,9 @@ impl ArgTranslate {
 
         let port = self.node_config.public_port();
 
-        if let Some(a) = &self.opts().seed_address {
+        if let Some(a) = &self.opts().debug_args.seed_address {
             let default_port = self.node_config.network.default_port_offset();
-            let port = self.opts().seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            let port = self.opts().debug_args.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
             info!("Adding seed from command line arguments {a}:{port}");
             // TODO: replace this with the other seed class.
             let cli_seed_arg = Seed {
@@ -577,30 +526,10 @@ impl ArgTranslate {
 
 
     }
-    fn apply_node_opts(&mut self) {
-        match self.get_subcommand() {
-            Some(RgTopLevelSubcommand::Node(node_cli)) => {
-                if let Some(i) = &node_cli.live_e2e_interval {
-                    self.node_config.live_e2e_interval = Duration::from_secs(i.clone());
-                }
-            }
-            _ => {}
-        }
-    }
+
     fn genesis(&mut self) {
-        if let Some(o) = std::env::var("REDGOLD_GENESIS").ok() {
-            if let Ok(b) = o.parse::<bool>() {
-                self.node_config.genesis = b;
-            }
-        }
-        if self.opts().genesis {
-            self.node_config.genesis = true;
-        }
-        if self.node_config.genesis {
+        if self.node_config.genesis() {
             self.node_config.seeds.push(self.node_config.self_seed())
-        }
-        if self.node_config.genesis {
-            // info!("Starting node as genesis node");
         }
     }
 
@@ -626,13 +555,6 @@ impl ArgTranslate {
         if let Some(pb) = Self::secure_data_path_buf() {
             let pb_joined = pb.join(".rg");
             self.node_config.secure_data_folder = Some(DataFolder::from_path(pb_joined));
-        }
-    }
-    fn alias(&mut self) {
-        if let Ok(a) = std::env::var("REDGOLD_ALIAS") {
-            if !a.trim().is_empty() {
-                self.node_config.node_info.alias = Some(a.trim().to_string());
-            }
         }
     }
     fn immediate_debug(&self) {

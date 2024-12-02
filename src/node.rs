@@ -178,7 +178,7 @@ impl Node {
 
         gauge!("redgold_peer_id", &relay.gauge_labels().await?).set(1.0);
 
-        if node_config.genesis {
+        if node_config.genesis() {
             Self::genesis_start(&relay, &node_config).await?;
         } else {
 

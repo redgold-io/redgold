@@ -6,42 +6,28 @@ pub fn empty_args() -> RgArgs {
         config_paths: CorePaths {
             home: None,
             config_path: None,
-            data_path: None,
-            bulk_data_path: None,
-            secure_data_config_path: None,
-            secure_data_path: None,
         },
-        words: None,
-        mnemonic_path: None,
-        peer_id: None,
-        peer_id_path: None,
-        // Is this the right thing to do here? Good question
-        network: Some("local".to_string()),
-        debug_id: None,
-        disable_auto_update: false,
+        global_settings: GlobalSettings {
+            network: Some("local".to_string()),
+            log_level: None,
+            offline: false,
+            words: None,
+            mnemonic_path: None,
+        },
+        cli_settings: CliSettings {
+            cold: false,
+            airgap: false,
+            account: None,
+            currency: None,
+            path: None,
+            verbose: false,
+        },
+        debug_args: DebugArgs {
+            debug_id: None,
+            seed_address: None,
+            seed_port_offset: None,
+        },
         subcmd: None,
-        cold: false,
-        airgap: false,
-        account: None,
-        currency: None,
-        path: None,
-        genesis: false,
-        seed_address: None,
-        seed_port_offset: None,
-        enable_live_e2e: false,
-        log_level: None,
-        development_mode: false,
-        development_mode_main: false,
-        aws_access_key_id: None,
-        aws_secret_access_key: None,
-        s3_backup_bucket: None,
-        server_index: None,
-        etherscan_api_key: None,
-        from_email: None,
-        to_email: None,
-        enable_party_mode: false,
-        offline: false,
-        verbose: false,
     }
 }
 
@@ -57,30 +43,30 @@ pub struct CorePaths {
     /// Load configs from a specified path instead of standard path ~/.rg/config or ~/.rg/env/config
     #[clap(long, env = "REDGOLD_CONFIG")]
     pub config_path: Option<String>,
-    /// Default directory, relative to home, to store all data. Defaults to ~/.rg/
-    #[clap(long, env = "REDGOLD_DATA")]
-    pub data_path: Option<String>,
-    /// Bulk data directory, used for slow / non-SSD storage -- rarely required to configure
-    #[clap(long, env = "REDGOLD_BULK")]
-    pub bulk_data_path: Option<String>,
 
-    // Secure config loaders, priority order ahead during config merge
-
-    /// Load secure configs from a specified path instead of the standard data/config or data/env/config
-    #[clap(long, env = "REDGOLD_SECURE_CONFIG")]
-    pub secure_data_config_path: Option<String>,
-    /// Load secure data from a specified path instead of the standard data/config or data/env/config
-    #[clap(long, env = "REDGOLD_SECURE_PATH")]
-    pub secure_data_path: Option<String>,
+    // TODO: maybe re-add these if necessary, otherwise rely on them in config.
+    // /// Default directory, relative to home, to store all data. Defaults to ~/.rg/
+    // #[clap(long, env = "REDGOLD_DATA")]
+    // pub data_path: Option<String>,
+    // /// Bulk data directory, used for slow / non-SSD storage -- rarely required to configure
+    // #[clap(long, env = "REDGOLD_BULK")]
+    // pub bulk_data_path: Option<String>,
+    //
+    // // Secure config loaders, priority order ahead during config merge
+    //
+    // /// Load secure configs from a specified path instead of the standard data/config or data/env/config
+    // #[clap(long, env = "REDGOLD_SECURE_CONFIG")]
+    // pub secure_data_config_path: Option<String>,
+    // /// Load secure data from a specified path instead of the standard data/config or data/env/config
+    // #[clap(long, env = "REDGOLD_SECURE_PATH")]
+    // pub secure_data_path: Option<String>,
 
 }
-/// Welcome to Redgold CLI -- here you can run a GUI, node, or use wallet or other CLI commands.
+
+
 #[derive(Parser, Debug, Clone)]
 #[clap(author, version, about, long_about = None)]
-pub struct RgArgs {
-
-    #[command(flatten)]
-    pub config_paths: CorePaths,
+pub struct GlobalSettings {
 
     // Most important configs first:
     /// Network environment to connect to, e.g. main or test
@@ -102,18 +88,11 @@ pub struct RgArgs {
     #[clap(long)]
     pub mnemonic_path: Option<String>,
 
-    // TODO: Move this to node configuration configdata
-    /// Hex encoded peer id
-    #[clap(short, long)]
-    pub peer_id: Option<String>,
-    /// Path to file containing hex encoded peer id
-    #[clap(long)]
-    pub peer_id_path: Option<String>,
+}
 
-
-    /// Specific subcommands for different functionalities
-    #[clap(subcommand)]
-    pub subcmd: Option<RgTopLevelSubcommand>,
+#[derive(Parser, Debug, Clone)]
+#[clap(author, version, about, long_about = None)]
+pub struct CliSettings {
     /// Require CLI commands to use a cold hardware wallet
     #[clap(long, env = "REDGOLD_CLI_COLD")]
     pub cold: bool,
@@ -132,85 +111,52 @@ pub struct RgArgs {
     /// Include verbose / debug output for CLI commands instance of compact outputs.
     #[clap(long, env = "REDGOLD_CLI_VERBOSE")]
     pub verbose: bool,
+}
 
 
-
-
-
-    // TODO: Deprecate all values below, no longer necessary or can be moved to debug commands
-
+#[derive(Parser, Debug, Clone)]
+#[clap(author, version, about, long_about = None)]
+pub struct DebugArgs {
     /// DEBUG ONLY PARAMETER for local testing, automatically generates keys based on index
     #[clap(long)]
     pub debug_id: Option<i32>,
-    /// Disable automatic node updates based on standard release channel
-    #[clap(long)]
-    pub disable_auto_update: bool,
-    /// Used to indicate the node is starting from genesis, only used for manual network
-    /// initialization
-    #[clap(long)]
-    pub genesis: bool,
     #[clap(long)]
     /// Seed network address, only used for local testing and manually connecting to a specific
     /// network
     pub seed_address: Option<String>,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
     #[clap(long)]
     /// Seed network port offset, only used for local testing and manually connecting to a specific
     /// network
     pub seed_port_offset: Option<i32>,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
-    #[clap(long, env = "REDGOLD_LIVE_E2E_ENABLED")]
-    /// Debug only option to enable an internal continuous E2E test sending transactions
-    pub enable_live_e2e: bool,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
-    // TODO: File logger path
-    /// Use development mode defaults -- only for use by developers, sets defaults to DEV
-    /// Instead of Main for network for instance.
-    #[clap(long, env = "REDGOLD_DEVELOPMENT_MODE")]
-    pub development_mode: bool,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
-    /// Only for use by main developers
-    #[clap(long, env = "REDGOLD_MAIN_DEVELOPMENT_MODE")]
-    pub development_mode_main: bool,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
-    /// Used for AWS email / backups
-    #[clap(long, env = "AWS_ACCESS_KEY_ID")]
-    pub aws_access_key_id: Option<String>,
-    /// Used for AWS email / backups
-    #[clap(long, env = "AWS_SECRET_ACCESS_KEY")]
-    pub aws_secret_access_key: Option<String>,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
-    /// Used for AWS email / backups
-    #[clap(long, env = "REDGOLD_S3_BACKUP_BUCKET")]
-    pub s3_backup_bucket: Option<String>,
-    // TODO: Deprecate this value from the docker script / local testing, load it from config
-    /// Used for backups
-    #[clap(long, env = "REDGOLD_SERVER_INDEX")]
-    pub server_index: Option<String>,
-    /// Price oracles
-    #[clap(long, env = "ETHERSCAN_API_KEY")]
-    pub etherscan_api_key: Option<String>,
-    /// Alerts / watched data emails
-    #[clap(long, env = "REDGOLD_FROM_EMAIL")]
-    pub from_email: Option<String>,
-    /// Alerts / watched data emails
-    #[clap(long, env = "REDGOLD_TO_EMAIL")]
-    pub to_email: Option<String>,
-    /// Multiparty mode enabled
-    #[clap(long, env = "REDGOLD_ENABLE_PARTY_MODE")]
-    pub enable_party_mode: bool,
-    
-    
+}
+
+/// Welcome to Redgold CLI -- here you can run a GUI, node, or use wallet or other CLI commands.
+#[derive(Parser, Debug, Clone)]
+#[clap(author, version, about, long_about = None)]
+pub struct RgArgs {
+
+    #[command(flatten)]
+    pub config_paths: CorePaths,
+
+    #[command(flatten)]
+    pub global_settings: GlobalSettings,
+
+    #[command(flatten)]
+    pub cli_settings: CliSettings,
+
+    #[command(flatten)]
+    pub debug_args: DebugArgs,
+
+    /// Specific subcommands for different functionalities
+    #[clap(subcommand)]
+    pub subcmd: Option<RgTopLevelSubcommand>,
     
 }
 
 impl RgArgs {
     pub fn clear_sensitive(&self) -> Self {
         let mut c = self.clone();
-        c.words = None;
-        c.aws_access_key_id = None;
-        c.aws_secret_access_key = None;
-        c.etherscan_api_key = None;
+        c.global_settings.words = None;
         c
     }
 }
@@ -248,12 +194,7 @@ pub struct GUI {}
 /// Run a peer to peer node
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct NodeCli {
-    /// Force enable faucet
-    #[clap(long)]
-    pub debug_enable_faucet: bool,
-    /// E2E test interval
-    #[clap(long)]
-    pub live_e2e_interval: Option<u64>
+
 }
 
 /// Add a new server by hostname and key used
@@ -394,12 +335,6 @@ pub struct Deploy {
 /// Amount should be a fractional amount, i.e. 0.1 for one tenth of a RDG
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct WalletSend {
-    /// Optional derivation path to use for deriving the key source (for the local transaction)
-    #[clap(short, long)]
-    pub path: Option<String>,
-    // /// Currency to send, default is RDG
-    // #[clap(short, long)]
-    // pub currency: Option<String>
 }
 
 /// Send a transaction from current (default or active) wallet to a destination address

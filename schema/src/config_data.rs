@@ -10,7 +10,11 @@ pub struct DebugSettings {
     pub develop: Option<bool>,
     // main developer
     pub developer: Option<bool>,
-    pub id: Option<i32>
+    pub id: Option<i32>,
+    pub genesis: Option<bool>,
+    pub enable_live_e2e: Option<bool>,
+    pub grafana_writer: Option<bool>,
+    pub live_e2e_interval_seconds: Option<i64>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -47,8 +51,10 @@ pub struct NodeData {
     pub udp_keepalive_seconds: Option<u64>,
     pub service_intervals: Option<ServiceIntervals>,
     pub server_index: Option<i64>,
+    pub peer_id_index: Option<i64>,
     pub port_offset: Option<i64>,
-    pub passive: Option<bool>
+    pub passive: Option<bool>,
+    pub name: Option<String>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -85,7 +91,9 @@ pub struct ExternalResources {
 pub struct Keys {
     pub words: Option<String>,
     pub aws_access: Option<String>,
-    pub aws_secret: Option<String>
+    pub aws_secret: Option<String>,
+    pub etherscan: Option<String>,
+    pub recaptcha: Option<String>,
 }
 
 
@@ -164,8 +172,10 @@ impl ConfigData {
                 udp_keepalive_seconds: None,
                 service_intervals: None,
                 server_index: None,
+                peer_id_index: None,
                 port_offset: None,
                 passive: Some(false),
+                name: None,
             }),
             party: Some(PartyConfigData {
                 enable: Some(false),
