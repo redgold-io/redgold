@@ -1,20 +1,19 @@
-use std::time::Duration;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_keys::xpub_wrapper::XpubWrapper;
-use redgold_schema::SafeOption;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::local_stored_state::NamedXpub;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey};
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use crate::node_config::NodeConfig;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use crate::node_config::{EnvDefaultNodeConfig, ToTransactionBuilder};
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
+use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 // Use this for testing AMM transactions.
 
 pub fn amm_btc_address(network_environment: NetworkEnvironment) -> String {
@@ -181,7 +180,8 @@ pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
     let rdg_address = pk.address().expect("address");
     let amm_rdg_address = amm_public_key(&network).address().expect("address");
     let internal_stake_tx = TransactionBuilder::new(&nc)
-        .with_input_address(&rdg_address)
+        .with_input_address(&rdg_address).clone()
+        .into_api_wrapper()
         .with_auto_utxos().await.expect("utxos")
         .with_internal_stake_usd_bounds(
             None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
@@ -195,41 +195,6 @@ pub async fn send_internal_stake(amt: f64, network: &NetworkEnvironment) {
 
 }
 
-struct AMMTestHarness {
-    network: NetworkEnvironment,
-    private_key: String,
-    keypair: KeyPair,
-    amm_public_key: PublicKey,
-    node_config: NodeConfig
-}
-
-impl AMMTestHarness {
-
-    pub async fn from(
-        network: &NetworkEnvironment,
-        public_key: &PublicKey,
-        private_key: impl Into<String>,
-        keypair: KeyPair
-    ) -> Self {
-        let private_key = private_key.into();
-        let amm_public_key = public_key.clone();
-        Self {
-            network: network.clone(),
-            private_key,
-            keypair,
-            amm_public_key,
-            node_config: NodeConfig::default_env(network.clone()).await,
-        }
-    }
-}
-
-#[test]
-pub fn fs_test() {
-    let a = 2;
-    let b = 2;
-    let c = redgold_fs::add(a, b);
-    assert_eq!(c, 4);
-}
 
 #[ignore]
 #[tokio::test]
@@ -278,7 +243,7 @@ pub async fn amm_flow() {
         // send_btc(btc_stake_amt, &network).await;
         //
         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
-        let exact_eth_stake_amount = EthWalletWrapper::stake_test_amount_typed();
+        let exact_eth_stake_amount = CurrencyAmount::stake_test_amount_typed();
         let party_fee_amount = CurrencyAmount::from_rdg(100000);
 
         // let stake_tx = TransactionBuilder::new(&nc)
@@ -347,6 +312,8 @@ async fn internal_to_external_swap(nc: NodeConfig, amm_rdg_address: &Address, kp
                                    rdg_address: &Address, btc_address: &Address, dev_ci_eth_addr: &Address) {
     // test rdg->btc swap
     nc.tx_builder().with_input_address(&rdg_address)
+        .clone()
+        .into_api_wrapper()
         .with_auto_utxos().await.expect("utxos")
         .with_swap(&btc_address, &CurrencyAmount::from_fractional(0.05551).unwrap(), &amm_rdg_address)
         .unwrap()
@@ -358,6 +325,8 @@ async fn internal_to_external_swap(nc: NodeConfig, amm_rdg_address: &Address, kp
 
     // test rdg->eth swap
     nc.tx_builder().with_input_address(&rdg_address)
+        .clone()
+        .into_api_wrapper()
         .with_auto_utxos().await.expect("utxos")
         .with_swap(&dev_ci_eth_addr, &CurrencyAmount::from_fractional(0.05552).unwrap(), &amm_rdg_address)
         .unwrap()

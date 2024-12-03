@@ -14,3 +14,6 @@ pub mod stake_event_stream;
 pub mod central_price;
 pub mod pool_initiated_sell;
 pub mod event_validator;
+pub mod portfolio_request;
+pub mod portfolio_fulfillment_agent;
+pub mod party_wallet_validator;

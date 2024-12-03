@@ -8,13 +8,13 @@ use futures::{stream, StreamExt};
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
 
-use log::info;
+use tracing::info;
 use metrics::{counter, gauge};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use redgold_schema::constants::REWARD_AMOUNT;
-use redgold_schema::{bytes_data, error_info, ErrorInfoContext, RgResult, SafeOption, ShortString, structs};
+use redgold_schema::{bytes_data, error_info, structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
 use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
 use crate::core::transact::tx_writer::TxWriter;
 use crate::api::control_api::ControlClient;
@@ -33,7 +33,7 @@ use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use crate::data::download;
 use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::{ControlRequest, ErrorInfo, NodeState};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 // use crate::trust::rewards::Rewards;
@@ -47,7 +47,8 @@ use crate::util::{auto_update, keys};
 use crate::schema::constants::EARLIEST_TIME;
 use redgold_keys::TestConstants;
 use tokio::task::spawn_blocking;
-use tracing::{Span, trace};
+use tracing::{trace, Span};
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
@@ -58,7 +59,7 @@ use crate::core::discover::data_discovery::DataDiscovery;
 use crate::core::discover::peer_discovery::{Discovery, DiscoveryMessage};
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::recent_download::RecentDownload;
-use crate::core::stream_handlers::{IntervalFold, run_recv_single};
+use crate::core::stream_handlers::{run_recv_single, IntervalFold};
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::infra::multiparty_backup::check_updated_multiparty_csv;
 use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
@@ -69,7 +70,9 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
-use crate::integrations::external_network_resources::{ExternalNetworkResources, ExternalNetworkResourcesImpl, MockExternalResources};
+use crate::core::services::service_join_handles::{NamedHandle, ServiceJoinHandles};
+use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
+use crate::node_config::WordsPassNodeConfig;
 use crate::party::party_watcher::PartyWatcher;
 use crate::sanity::{historical_parity, migrations};
 use crate::sanity::recent_parity::RecentParityCheck;
@@ -85,164 +88,7 @@ use crate::sanity::recent_parity::RecentParityCheck;
 pub struct Node {
     pub relay: Relay,
 }
-
-pub struct NamedHandle {
-    pub name: String,
-    pub handle: JoinHandle<RgResult<()>>
-}
-
-impl NamedHandle {
-    pub fn new(name: impl Into<String>, handle: JoinHandle<RgResult<()>>) -> Self {
-        Self {
-            name: name.into(),
-            handle,
-        }
-    }
-
-    pub async fn result(self) -> RgResult<String> {
-        self.handle.await.error_info("Join error")??;
-        Ok(self.name)
-    }
-}
-
 impl Node {
-
-    /**
-    * Start all background thread application services. REST APIs, event processors, transaction process, etc.
-    * Each of these application background services communicates via channels instantiated by the relay
-    TODO: Refactor this into multiple start routines, or otherwise delay service start until after preliminary setup.
-    */
-    #[tracing::instrument(skip(relay, external_network_resources), fields(node_id = %relay.node_config.public_key().short_id()))]
-    pub async fn start_services<T>(relay: Relay, external_network_resources: T) -> Vec<NamedHandle>
-    where T: ExternalNetworkResources + Send + 'static + Sync {
-
-        let node_config = relay.node_config.clone();
-
-        let mut join_handles = vec![
-            // Internal RPC control equivalent, used for issuing commands to node
-            // Disabled in high security mode
-            // Only needs to run on certain environments?
-            NamedHandle::new("ControlServer", control_api::ControlServer {
-            relay: relay.clone(),
-            }.start()),
-            // Stream processor for sending external peer messages
-            // Negotiates appropriate protocol depending on peer
-            NamedHandle::new("PeerOutgoingEventHandler", PeerOutgoingEventHandler::new(relay.clone())),
-            // Main transaction processing loop, watches over lifecycle of a given transaction
-            // as it's drawn from the mem-pool
-            NamedHandle::new("TransactionProcessContext", TransactionProcessContext::new(relay.clone())),
-            NamedHandle::new("TxWriter", run_recv_single(TxWriter::new(&relay), relay.tx_writer.receiver.clone()).await),
-        ];
-        // TODO: Filter out any join handles that have terminated immediately with success due to disabled services.
-
-        // TODO: Re-enable auto-update process for installed service as opposed to watchtower docker usage.
-        // runtimes
-        //     .auxiliary
-        //     .spawn(auto_update::from_node_config(node_config.clone()));
-        //
-
-        // Components for download now initialized.
-        // relay.clone().node_state.store(NodeState::Downloading);
-        info!("Starting obs buffer");
-
-        let ojh = ObservationBuffer::new(relay.clone()).await;
-        join_handles.push(NamedHandle::new("ObservationBuffer", ojh));
-
-        join_handles.push(NamedHandle::new("PeerRxEventHandler", PeerRxEventHandler::new(
-            relay.clone(),
-        )));
-
-        join_handles.push(NamedHandle::new("public_api", public_api::start_server(relay.clone(),
-                                                   // runtimes.public_api.clone()
-        )));
-
-        join_handles.push(NamedHandle::new("explorer", explorer::server::start_server(relay.clone(),
-                                                   // runtimes.public_api.clone()
-        )));
-
-        let obs_handler = ObservationHandler{relay: relay.clone()};
-        join_handles.push(NamedHandle::new("obs_handler", tokio::spawn(async move { obs_handler.run().await })));
-
-        let sm_port = relay.node_config.mparty_port();
-        let sm_relay = relay.clone();
-        join_handles.push(NamedHandle::new("gg20_sm_manager", tokio::spawn(async move { gg20_sm_manager::run_server(sm_port, sm_relay)
-                .await.map_err(|e| error_info(e.to_string())) })));
-
-        let c_config = relay.clone();
-        if node_config.e2e_enabled {
-            // TODO: Distinguish errors here
-            let cwh = tokio::spawn(e2e::run(c_config));
-            join_handles.push(NamedHandle::new("e2e", cwh));
-        }
-
-        join_handles.push(NamedHandle::new("update_prometheus_configs", update_prometheus_configs(relay.clone()).await));
-
-        let discovery = Discovery::new(relay.clone()).await;
-        join_handles.push(NamedHandle::new("discovery.interval", stream_handlers::run_interval_fold(
-            discovery.clone(), relay.node_config.discovery_interval, false
-        ).await));
-
-
-        join_handles.push(NamedHandle::new("discovery.receiver", stream_handlers::run_recv_concurrent(
-            discovery, relay.discovery.receiver.clone(), 100
-        ).await));
-
-        let watcher = PartyWatcher::new(&relay, external_network_resources);
-        join_handles.push(NamedHandle::new("PartyWatcher", stream_handlers::run_interval_fold(
-            watcher, Duration::from_millis(relay.node_config.config_data.party_config_data.poll_interval as u64), false
-        ).await));
-
-        join_handles.push(NamedHandle::new("rosetta", tokio::spawn(api::rosetta::server::run_server(relay.clone()))));
-
-        join_handles.push(NamedHandle::new("Shuffle", stream_handlers::run_interval_fold(
-            Shuffle::new(&relay), relay.node_config.shuffle_interval, false
-        ).await));
-
-        join_handles.push(NamedHandle::new("Mempool", stream_handlers::run_interval_fold(
-            crate::core::mempool::Mempool::new(&relay), relay.node_config.mempool.interval.clone(), false
-        ).await));
-
-        for i in 0..relay.node_config.contract.bucket_parallelism {
-            let opt_c = relay.contract_state_manager_channels.get(i);
-            let c = opt_c.expect("bucket partition creation error");
-            let handle = stream_handlers::run_interval_fold_or_recv(
-                ContractStateManager::new(relay.clone()),
-                relay.node_config.contract.interval.clone(),
-                false,
-                c.receiver.clone()
-            ).await;
-            join_handles.push(NamedHandle::new("ContractStateManager", handle));
-
-            let opt_c = relay.contention.get(i);
-            let c = opt_c.expect("bucket partition creation error");
-            let handle = stream_handlers::run_interval_fold_or_recv(
-                ContentionConflictManager::new(relay.clone()),
-                relay.node_config.contention.interval.clone(),
-                false,
-                c.receiver.clone()
-            ).await;
-            join_handles.push(NamedHandle::new("ContentionConflictManager", handle));
-
-        }
-
-        join_handles.push(NamedHandle::new("DataDiscovery", stream_handlers::run_interval_fold(
-            DataDiscovery {
-                relay: relay.clone(),
-            }, Duration::from_secs(300), false
-        ).await));
-
-        join_handles.push(NamedHandle::new("MiscPeriodic", stream_handlers::run_interval_fold(
-            MiscPeriodic::new(&relay), Duration::from_secs(300), false
-        ).await));
-        join_handles.push(NamedHandle::new("AwsBackup", stream_handlers::run_interval_fold(
-            crate::core::backup::aws_backup::AwsBackup::new(&relay), Duration::from_secs(86400), false
-        ).await));
-        join_handles.push(NamedHandle::new("RecentParityCheck", stream_handlers::run_interval_fold(
-            RecentParityCheck::new(&relay), Duration::from_secs(3600), false
-        ).await));
-
-        join_handles
-    }
 
     pub async fn prelim_setup(
         relay2: Relay,

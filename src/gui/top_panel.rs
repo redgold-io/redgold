@@ -1,7 +1,13 @@
 use eframe::egui;
-use eframe::egui::{ComboBox, Context};
+use eframe::egui::{ComboBox, Context, RichText};
+use redgold_gui::common::copy_button;
 use redgold_schema::structs::NetworkEnvironment;
+use redgold_schema::util::times::ToTimeString;
 use crate::gui::app_loop::LocalState;
+
+fn round_down_to_minute(time_millis: i64) -> i64 {
+    time_millis - (time_millis % 60000)
+}
 
 pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
     egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -29,6 +35,25 @@ pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
                         ui.selectable_value(&mut local_state.node_config.network, style.clone(), style.to_std_string());
                     }
                 });
+            ui.label("Network Health:");
+            match local_state.home_state.network_healthy {
+                true => {
+                    ui.label(RichText::new("Healthy").color(egui::Color32::GREEN));
+                }
+                false => {
+                    ui.label(RichText::new("Unhealthy").color(egui::Color32::RED));
+                }
+            }
+            ui.label("Int Time:");
+            let current_time = local_state.current_time.to_string();
+            let rounded = (round_down_to_minute(local_state.current_time)/1000).to_string();
+            ui.label(RichText::new(rounded).color(egui::Color32::KHAKI));
+            copy_button(ui, current_time);
+            ui.label("Date:");
+            let time_str = local_state.current_time.to_time_string_shorter_no_seconds_am_pm();
+            ui.label(RichText::new(time_str.clone()).color(egui::Color32::LIGHT_BLUE));
+            copy_button(ui, local_state.current_time.to_time_string_shorter());
+            ui.hyperlink_to("Explorer Link", local_state.node_config.network.explorer_link());
         });
 
 

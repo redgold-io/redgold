@@ -37,6 +37,7 @@ message Signature {
 enum PublicKeyType {
   // ECDSA Standard key type matching ECDSA signature type above
   secp256k1 = 0;
+  ed25519 = 1;
 }
 
 // Compressed public key byte data (33 bytes for standard ECDSA)
@@ -44,7 +45,11 @@ message PublicKey {
   // Encoded data form of the public key, requires a library for decoding to appropriate key instance
   BytesData bytes = 1;
   // The type of public key, used to determine how to decode the bytes into a key instance
+  // For instance, ecdsa variant or ed25519
   PublicKeyType key_type = 2;
+  // Used for Monero ed25519 which requires a secondary public key to derive an address, kept here
+  // for consistency with other PK -> Address derivation patterns.
+  BytesData aux_data = 3;
 }
 
 // Witness data for a particular signing event, does not include the hash required to re-verify the information.
@@ -296,8 +301,13 @@ message AbridgedNodeMetadata {
   PartitionInfo partition_info = 2;
 }
 
+message PortfolioId {
+  optional string name = 1;
+}
+
 message PortfolioRequest {
   PortfolioInfo portfolio_info = 1;
+  PortfolioId portfolio_id = 2;
 }
 
 
@@ -449,13 +459,19 @@ message StakeWithdrawal {
   Address destination = 1;
 }
 
+message PortfolioFulfillmentParams {
+
+}
+
 // Pre-claim deposit operation designating native multiparty groups to watch address for native deposits
 // Requires that the address on this network match the address of the external network, so that the private
 // key used for both is the same.
 message StakeDeposit {
-  // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within
+  // Each value should be a uniquely defined, non-overlapping range of liquidity to provide within for AMM-like activity
   repeated LiquidityRange liquidity_ranges = 1;
   DepositRequest deposit = 2;
+  // Indicates the stake may be used to fulfill portfolio target requests.
+  PortfolioFulfillmentParams portfolio_fulfillment_params = 3;
 }
 
 // Request to update external liquidity to a native pool
@@ -991,6 +1007,25 @@ message GetActivePartyKeyRequest {
 
 }
 
+message GetSeedsRequest {
+
+}
+
+message KeepAliveRequest {
+
+}
+
+enum TransportBackend {
+  REST = 0;
+  UDP = 1;
+}
+
+message PortOpenRequest {
+  string ip = 1;
+  int64 port = 2;
+  TransportBackend transport = 3;
+}
+
 message Request {
   optional GossipTransactionRequest gossip_transaction_request = 1;
   optional GossipObservationRequest gossip_observation_request = 2;
@@ -1026,6 +1061,11 @@ message Request {
   BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
   PublicKey get_address_info_public_key_request = 34;
   GetActivePartyKeyRequest get_active_party_key_request = 35;
+  GetSeedsRequest get_seeds_request = 36;
+  PublicKey get_public_key_balance_request = 37;
+  KeepAliveRequest keep_alive_request = 38;
+  Response response = 39;
+  PortOpenRequest port_open_request = 40;
 }
 
 message HealthResponse {
@@ -1044,6 +1084,9 @@ message UtxoValidResponse {
   optional int64 child_transaction_input = 3;
 }
 
+message PortOpenResponse {
+  bool open = 1;
+}
 
 message Response {
   ResponseMetadata response_metadata = 1;
@@ -1075,8 +1118,16 @@ message Response {
   BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
   AddressInfo get_address_info_public_key_response = 25;
   PublicKey get_active_party_key_response = 26;
+  repeated Seed get_seeds_response = 27;
+  CurrencyAmount get_public_key_balance_response = 28;
+  KeepAliveResponse keep_alive_response = 29;
+  PortOpenResponse port_open_response = 30;
 }
 
+message KeepAliveResponse {
+  string ip = 1;
+  int64 port = 2;
+}
 
 message PartyMember {
   PublicKey public_key = 1;
@@ -1163,6 +1214,8 @@ enum AddressType {
   SCRIPT_HASH = 6;
   // Direct Ethereum string hash reference with embedded string upper/lower checksum.
   Ethereum_External_String = 7;
+  Monero_External_String = 8;
+  Solana_External_String = 9;
 }
 
 message Address {
@@ -1222,6 +1275,7 @@ message AddressInfo {
   repeated UtxoEntry utxo_entries = 2;
   int64 balance = 3;
   repeated Transaction recent_transactions = 4;
+  repeated CurrencyAmount balances = 5;
 }
 
 message HashSearchResponse {
@@ -1417,14 +1471,6 @@ enum NodeState {
   ShuttingDown = 6;
 }
 
-enum KeyType {
-  Transport = 0;
-  ObservationMerkle = 2;
-  Deposit = 3;
-  Reward = 4;
-}
-
-
 message UdpMessage {
   BytesData bytes = 1;
   int64 part = 2;
@@ -1470,6 +1516,9 @@ enum SupportedCurrency {
   Usd = 3;
   Usdc = 4;
   Usdt = 5;
+  Solana = 6;
+  Monero = 7;
+  Cardano = 8;
 }
 
 

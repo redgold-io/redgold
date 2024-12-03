@@ -1,0 +1,26 @@
+services:
+  monerod:
+    container_name: monerod
+    user: 1000:1000
+    image: ghcr.io/sethforprivacy/simple-monerod:latest
+    volumes:
+      - /disk/bitmonero:/home/monero
+    restart: unless-stopped
+    stop_grace_period: 15m30s
+    ports:
+      - "18080:18080"
+      - "18089:18089"
+    command:
+      - --rpc-restricted-bind-ip=0.0.0.0
+      - --rpc-restricted-bind-port=18089
+      - --no-igd
+      - --no-zmq
+      - --enable-dns-blocklist
+      - --wallet-dir=/home/monero/wallets
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower-monerod
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup monerod tor

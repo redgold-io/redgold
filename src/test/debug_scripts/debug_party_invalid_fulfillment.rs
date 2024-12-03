@@ -1,22 +1,20 @@
 use std::collections::HashSet;
 use itertools::Itertools;
-use log::info;
-use num_bigint::BigInt;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::{RgResult, structs};
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
+use redgold_schema::RgResult;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{CurrencyAmount, Hash, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{Hash, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
-use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use crate::node_config::NodeConfig;
-use crate::party::data_enrichment::PartyInternalData;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::tx::tx_builder::{TransactionBuilder};
+use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::party::party_events::PartyEvents;
+use crate::party::party_stream::PartyEventBuilder;
 
 #[ignore]
 #[tokio::test]
@@ -137,8 +135,8 @@ async fn debug_events2() -> RgResult<()> {
     let dest = order.destination.clone();
     let fulfilled_currency = order.fulfilled_currency_amount();
     let mut tb = TransactionBuilder::new(&relay.node_config);
-    tb.with_input_address(&key.address().expect("works"));
-    tb.with_auto_utxos().await?;
+    tb = tb.with_input_address(&key.address().expect("works"))
+    .clone().into_api_wrapper().with_auto_utxos().await?.clone();
 
     let orig_orders = hn_pev.orders();
     let orders = orig_orders.iter()
@@ -155,7 +153,7 @@ async fn debug_events2() -> RgResult<()> {
     }
 
     let tx = tb.build().expect("build");
-    pev.relay = Some(relay.clone());
+    // pev.relay = Some(relay.clone());
     pev.validate_rdg_swap_fulfillment_transaction(&tx).expect("");
 
     //

@@ -1,36 +1,36 @@
 use std::collections::HashMap;
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use std::sync::{Arc, Mutex};
 use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
 use itertools::{Either, Itertools};
-use log::{error, info};
+use tracing::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
 use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::api::RgHttpClient;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
-use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
-use crate::gui::tables;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
+use redgold_gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
+use redgold_gui::components::tables;
 use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};
-use crate::util::cli::args::Deploy;
+use redgold_schema::conf::rg_args::Deploy;
 
 pub trait ServerClient {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient;
 }
 
-impl ServerClient for Server {
+impl ServerClient for ServerOldFormat {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient {
         RgHttpClient::from_env(self.host.clone(), network_environment)
     }
 }
 
 pub async fn update_server_status(
-    servers: Vec<Server>, status: Arc<Mutex<Vec<ServerStatus>>>,
+    servers: Vec<ServerOldFormat>, status: Arc<Mutex<Vec<ServerStatus>>>,
     network_environment: NetworkEnvironment
 ) {
 
@@ -146,9 +146,9 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         );
         if ui.button("Load").clicked() {
             let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
-            let res = Server::parse_from_file(buf);
+            let res = ServerOldFormat::parse_from_file(buf);
             if let Ok(res) = res {
-                local_state.local_stored_state.servers = res;
+                local_state.local_stored_state.servers = Some(res);
                 local_state.persist_local_state_store();
                 local_state.server_state.parse_success = Some(true);
             } else {
@@ -159,7 +159,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
     if let Some(p) = local_state.server_state.parse_success {
         ui.horizontal(|ui| {
             ui.label("Parse result: ");
-            valid_label(ui, p);
+            valid_label(ui, p, );
         });
 
     }
@@ -182,7 +182,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.checkbox(&mut local_state.server_state.skip_logs, "Skip Logging");
     });
 
-    if local_state.node_config.opts.development_mode {
+    if local_state.node_config.development_mode() {
         ui.horizontal(|ui| {
             ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
             ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
@@ -323,20 +323,22 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
             let config1 = local_state.node_config.clone();
+            let option = local_state.local_stored_state.servers.clone().unwrap_or(vec![]);
             tokio::spawn(deploy::offline_generate_keys_servers(
                 config1,
-                local_state.local_stored_state.servers.clone(),
+                option,
                 PathBuf::from(local_state.server_state.generate_offline_path.clone()),
-                local_state.wallet_state.hot_mnemonic().words.clone(),
-                local_state.wallet_state.hot_mnemonic().passphrase.clone(),
+                local_state.wallet.hot_mnemonic().words.clone(),
+                local_state.wallet.hot_mnemonic().passphrase.clone(),
             ));
         }
     });
 
     if ui.button("Backup Multiparty Local Shares").clicked() {
+        let option1 = local_state.local_stored_state.servers.clone().unwrap_or(vec![]);
         tokio::spawn(multiparty_backup::backup_multiparty_local_shares(
             local_state.node_config.clone(),
-            local_state.local_stored_state.servers.clone(),
+            option1,
         ));
     }
 

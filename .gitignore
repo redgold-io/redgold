@@ -28,6 +28,7 @@ git-filter-repo
 log0
 log1
 log2
+log_test
 ignore
 redgold_linux
 redgold_mac

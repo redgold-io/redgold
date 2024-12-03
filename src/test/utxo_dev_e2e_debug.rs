@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use bdk::bitcoin::hashes::hex::ToHex;
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -18,7 +18,8 @@ use crate::core::relay::Relay;
 use crate::core::resolver::resolve_input;
 use crate::e2e::LiveE2E;
 use crate::e2e::tx_gen::SpendableUTXO;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::ApiNodeConfig;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 
 

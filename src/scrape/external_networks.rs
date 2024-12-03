@@ -1,27 +1,13 @@
 use async_trait::async_trait;
-use bdk::bitcoin::PublicKey;
-use serde::{Deserialize, Serialize};
-use redgold_keys::util::btc_wallet::{ExternalTimedTransaction, SingleKeyBitcoinWallet};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::{RgResult, structs};
-use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
+use redgold_schema::RgResult;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::{IntervalFold, IntervalFoldOrReceive};
+use crate::core::stream_handlers::IntervalFold;
 
 // TODO: Future event streaming solution here
 
 pub struct ExternalNetworkScraper {
     relay: Relay
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ExternalNetworkData {
-    pub pk: structs::PublicKey,
-    pub transactions: Vec<ExternalTimedTransaction>,
-    pub balance: CurrencyAmount,
-    pub currency: SupportedCurrency,
-    pub max_ts: Option<u64>,
-    pub max_block: Option<u64>
 }
 
 // Fut streaming impl here, unused now.

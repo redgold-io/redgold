@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.25"
+version = "0.1.27"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -22,8 +22,14 @@ members = [
     "sdk",
     "executor",
     "keys",
-    "sdk-client"
-, "fs"]
+    "sdk-client",
+    "fs",
+    "gui",
+    "common",
+    "common-no-wasm",
+    "crawler",
+    "crawler-native",
+]
 exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"] #, "sdk", "sdk/*"]
 
 
@@ -42,12 +48,20 @@ categories = ["cryptography::cryptocurrencies"]
 
 
 [workspace.dependencies]
-redgold-schema = { path = "schema", version = "0.1.25"}
-redgold-data = { path = "data", version = "0.1.25"}
-redgold-keys = { path = "keys", version = "0.1.25"}
-redgold-executor = { path = "executor", version = "0.1.25"}
-redgold-sdk-client = { path = "sdk-client", version = "0.1.25"}
+redgold-schema = { path = "schema", version = "0.1.27"}
+redgold-data = { path = "data", version = "0.1.27"}
+redgold-keys = { path = "keys", version = "0.1.27"}
+redgold-executor = { path = "executor", version = "0.1.27"}
+redgold-sdk-client = { path = "sdk-client", version = "0.1.27"}
+
+redgold-crawler = { path = "./crawler"}
+redgold-crawler-native = { path = "./crawler-native"}
+redgold-gui = { path = "./gui"}
+redgold-common = { path = "./common"}
+redgold-common-no-wasm = { path = "./common-no-wasm"}
 redgold-fs = { path = "./fs"}
+
+parquet_derive = "53.3.0"
 hex = "0.4.3"
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"
@@ -66,20 +80,28 @@ async-trait = "0.1.56"
 num-bigint = "0.4"
 toml = "0.8.12"
 arc-swap = "1.7.1"
+flume = { version = "0.11.0", features = ["futures-core", "futures-sink", "default"] }
+qrencode = "0.14.0"
+csscolorparser = "0.6.2"
+
 
 
 [dependencies]
+redgold-crawler = {workspace = true}
 redgold-schema = {workspace = true}
-redgold-fs = {workspace = true}
+
+redgold-gui = {workspace = true}
+redgold-common = {workspace = true}
+redgold-common-no-wasm = {workspace = true}
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
+flume = {workspace = true}
 #redgold-sdk-client = {workspace = true}
 tempfile = "3.3.0"
 argon2 = "0.5.0"
 dirs = "5.0.1"
 #backtrace = "0.3.65"
 num-bigint = { workspace = true }
-flume = { version = "0.10.12", features = ["futures-core", "futures-sink", "default"] }
 dotenv = "0.15.0"
 futures = {workspace = true}
 # Used for Sha256 but can be deprecated
@@ -98,9 +120,11 @@ egui_extras = {version = "0.25.0", features = ["default", "image", "all_loaders"
 strum = "0.25"
 strum_macros = "0.25"
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
+rqrr = "0.6.0"
+
 #zxcvbn = '2.1.1'
 rand = { workspace = true}
-clap = { version = "4.3.21", features = ["derive", "env"] }
+clap = { version = "4.5.20", features = ["derive", "env"] }
 log = "0.4.14"
 hex = "0.4.3"
 #void = "1.0.2"
@@ -156,17 +180,13 @@ rpassword = "7.2.0"
 
 nix = { version = "0.26.4", features = ["user"] }
 
-qrencode = "0.14.0"
-rqrr = "0.6.0"
-csscolorparser = "0.6.2"
-
-# Broken on mac CI builds, but works in local tests for QR image code captures.
-# Re-enable later
-#openpnp_capture = "0.2.4"
-#openpnp_capture_sys = "0.4.0"
+qrencode = {workspace = true}
+csscolorparser = {workspace = true}
 
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39"]}
-
+derivative = "2.2.0"
+backtrace = "0.3.72"
+num_cpus = "1.16.0"
 
 [dependencies.getrandom]
 version = "0.2.12"
@@ -180,6 +200,15 @@ assert_cmd = "2.0.11"
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
+
+[profile.dev]
+opt-level = 0
+debug = true
+# Increase stack size to 8MB (default is often 2MB)
+codegen-units = 1
+overflow-checks = true
+#lto = "thin"  # Use thin LTO
+#rustc-args = ["-C", "link-arg=-fuse-ld=lld"]  # Only affects dev profile
 
 #
 [profile.ci]
@@ -212,3 +241,15 @@ aws-config = "0.55.1" #Dependencies for email sending
 aws-sdk-sesv2 = "0.28.0" #Dependencies for email sending
 aws-sdk-s3 = "0.28.0" #Dependencies for email sending
 dns-lookup = "2.0.2" #Dependencies for email sending
+
+# Broken on mac CI builds, but works in local tests for QR image code captures.
+# Re-enable later
+#openpnp_capture = "0.2.4"
+#openpnp_capture_sys = "0.4.0"
+
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-Wl,-stack_size,81920000"]
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+redgold-fs = {workspace = true}

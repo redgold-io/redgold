@@ -42,6 +42,12 @@ impl Address {
         }
     }
 
+    pub fn as_external(&self) -> Address {
+        let mut address = self.clone();
+        address.mark_external();
+        address.clone()
+    }
+
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
         let mut new = Self::from_bytes(Self::hash(input.as_ref()))?;
         new.address_type = AddressType::ScriptHash as i32;
@@ -72,6 +78,28 @@ impl Address {
             address_type: AddressType::EthereumExternalString as i32,
             currency: Redgold as i32,
         }
+    }
+
+    pub fn from_monero(address: &String) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: AddressType::MoneroExternalString as i32,
+            currency: Redgold as i32,
+        }
+    }
+
+    pub fn from_type(address: &String, t: AddressType) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: t as i32,
+            currency: Redgold as i32,
+        }
+    }
+
+    pub fn from_monero_external(address: &String) -> Address {
+        let mut ret = Self::from_monero(address);
+        ret.currency = SupportedCurrency::Monero as i32;
+        ret
     }
 
     pub fn from_eth_external(address: &String) -> Address {
@@ -213,7 +241,8 @@ impl AddressInfo {
             address: Some(address.clone()),
             utxo_entries: entries,
             balance: bal,
-            recent_transactions: vec![]
+            recent_transactions: vec![],
+            balances: vec![]
         }
     }
 }

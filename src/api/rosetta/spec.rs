@@ -284,11 +284,13 @@ impl Rosetta {
         })
     }
 
+    // TODO: Translate to hex/proto decoder.
     pub(crate) fn translate_public_key(public_key: PublicKey) -> Result<structs::PublicKey, ErrorInfo> {
         let pub_bytes = from_hex(public_key.hex_bytes)?;
         Ok(structs::PublicKey {
             bytes: bytes_data(pub_bytes),
             key_type: structs::PublicKeyType::Secp256k1 as i32,
+            aux_data: None,
         })
     }
 

@@ -1,9 +1,9 @@
 use eframe::egui;
 use eframe::egui::Context;
 use redgold_keys::xpub_wrapper::ValidateDerivationPath;
-use redgold_schema::local_stored_state::NamedXpub;
+use redgold_schema::conf::local_stored_state::NamedXpub;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size, copy_to_clipboard, medium_data_item};
+use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, medium_data_item};
 
 pub(crate) fn show_xpub_window(
     ctx: &Context, ls: &mut LocalState, xpub: NamedXpub

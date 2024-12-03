@@ -1,48 +1,60 @@
+use std::collections::HashMap;
 use eframe::{egui, Frame};
-use egui_extras::RetainedImage;
-use redgold_schema::structs::ErrorInfo;
-// 0.17.1
-// 0.8
+use eframe::egui::Image;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_schema::structs::{ErrorInfo, PublicKey};
+use redgold_schema::structs;
 use crate::gui::app_loop::LocalState;
-// use crate::gui::image_load::Image;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::observability::errors::Loggable;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use crate::gui::ls_ext::local_state_from;
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use crate::node_config::ApiNodeConfig;
 
 pub mod app_loop;
 pub mod image_load;
 pub mod initialize;
-pub mod tables;
-pub mod home;
-pub mod common;
 pub mod tabs;
 pub mod top_panel;
 pub mod webcam;
-pub mod image_capture;
 pub mod qr_render;
 pub mod components;
-pub mod airgap;
+pub mod qr_window;
+pub mod native_gui_dependencies;
+pub mod lock_screen;
+pub mod ls_ext;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
-pub struct ClientApp {
+pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     #[cfg_attr(feature = "persistence", serde(skip))]
-    logo: RetainedImage,
+    // logo: Image<'static>,
     #[cfg_attr(feature = "persistence", serde(skip))]
     local_state: LocalState,
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    gui_depends: G,
 }
 
-impl ClientApp {
-    pub async fn from(logo: RetainedImage, nc: NodeConfig
-                // , rt: Arc<Runtime>
-    ) -> Result<Self, ErrorInfo> {
+impl<G> ClientApp<G> where G: GuiDepends + Clone + Send + 'static{
+    pub async fn from(
+        // logo: Image<'static>,
+        nc: Box<NodeConfig>,
+        res: Box<ExternalNetworkResourcesImpl>,
+        gui_depends: Box<G>,
+        party_data: HashMap<structs::PublicKey, PartyInternalData>
+    ) -> Result<Self, ErrorInfo> where G: Send + Clone + GuiDepends {
+
         Ok(Self {
-            logo,
-            local_state: LocalState::from(nc).await?,
+            // logo,
+            local_state: local_state_from(nc, *res, *gui_depends.clone(), party_data).await?,
+            gui_depends: *gui_depends,
         })
     }
 }
 
-impl eframe::App for ClientApp {
+impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut Frame) {

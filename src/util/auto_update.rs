@@ -1,9 +1,9 @@
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::NetworkEnvironment;
-use redgold_schema::util::cmd::run_cmd;
+use redgold_common_no_wasm::cmd::run_cmd;
 // use crate::util::init_logger;
 use redgold_schema::util::lang_util::remove_whitespace;
-use log::{error, info};
+use tracing::{error, info};
 use std::time::Duration;
 use reqwest::ClientBuilder;
 use tokio::time;

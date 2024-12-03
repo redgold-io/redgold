@@ -5,7 +5,7 @@
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
-use log::{debug, info, trace};
+use tracing::{debug, info, trace};
 use metrics::{counter, gauge};
 use tokio::task::JoinHandle;
 // use futures::stream::StreamExt;
@@ -14,20 +14,20 @@ use tokio::time::Interval;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::either::Either;
-
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Hash, ObservationProof, Transaction};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::observability::errors::Loggable;
+use crate::node_config::WordsPassNodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;

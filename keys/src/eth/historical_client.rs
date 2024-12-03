@@ -13,7 +13,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::address_external::ToEthereumAddress;
 use crate::eth::example;
-use crate::util::btc_wallet::ExternalTimedTransaction;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 
 pub struct EthHistoricalClient {
     client: Client,

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use flume::Sender;
 use itertools::Itertools;
 
-use log::{error, info};
+use tracing::{error, info};
 use rocket::form::FromForm;
 use tokio::task::JoinHandle;
 
@@ -15,35 +15,37 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::conf::rg_args::{AddServer, BalanceCli, DebugCommand, Deploy, FaucetCli, GenerateMnemonic, QueryCli, RgDebugCommand, TestTransactionCli, WalletAddress, WalletSend};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::{json, json_from, json_pretty};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
 use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
-use crate::node_config::NodeConfig;
-use crate::util::cli::args::{AddServer, BalanceCli, DebugCommand, Deploy, FaucetCli, GenerateMnemonic, QueryCli, RgDebugCommand, TestTransactionCli, WalletAddress, WalletSend};
-use redgold_schema::util::cmd::run_cmd;
+use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, WordsPassNodeConfig};
+use redgold_common_no_wasm::cmd::run_cmd;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_schema::observability::errors::Loggable;
 use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
     let ds = config.data_store().await;
     let config = ds.config_store.select_config("servers".to_string()).await?;
-    let mut servers: Vec<Server> = vec![];
+    let mut servers: Vec<ServerOldFormat> = vec![];
     if let Some(s) = config {
-        servers = json_from::<Vec<Server>>(&*s)?;
+        servers = json_from::<Vec<ServerOldFormat>>(&*s)?;
     }
     let max_index = servers.iter().map(|s| s.index).max().unwrap_or(-1);
     let this_index = add_server.index.unwrap_or(max_index + 1);
-    servers.push(Server{
+    servers.push(ServerOldFormat {
         name: "".to_string(),
         host: add_server.ssh_host.clone(),
         username: add_server.user.clone(),
@@ -91,12 +93,12 @@ async fn metrics_debug() {
 
 }
 
-pub async fn list_servers(config: &NodeConfig) -> Result<Vec<Server>, ErrorInfo>  {
+pub async fn list_servers(config: &NodeConfig) -> Result<Vec<ServerOldFormat>, ErrorInfo>  {
     let ds = config.data_store().await;
     let config = ds.config_store.select_config("servers".to_string()).await?;
-    let mut servers: Vec<Server> = vec![];
+    let mut servers: Vec<ServerOldFormat> = vec![];
     if let Some(s) = config {
-        servers = json_from::<Vec<Server>>(&*s)?;
+        servers = json_from::<Vec<ServerOldFormat>>(&*s)?;
     }
     Ok(servers)
 }
@@ -201,7 +203,7 @@ pub fn mnemonic_generate_test() {
     assert_eq!(generate_random_mnemonic().words.split(" ").count(), 24);
 }
 
-pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_DATA_PATH";
+pub const REDGOLD_SECURE_DATA_PATH: &str = "REDGOLD_SECURE_PATH";
 
 pub fn default_path() -> PathBuf {
     dirs::home_dir().expect("home directory not found").join(".rg")
@@ -211,7 +213,7 @@ pub fn default_all_path() -> String {
     default_path().join("all").to_str().expect("all").to_string()
 }
 
-pub fn add_server_prompt() -> Server {
+pub fn add_server_prompt() -> ServerOldFormat {
     println!("Enter hostname or IP address of server");
     let mut host = String::new();
     std::io::stdin().read_line(&mut host).expect("Failed to read line");
@@ -221,7 +223,7 @@ pub fn add_server_prompt() -> Server {
     println!("Enter SSH key path, or press enter to use default of ~/.ssh/id_rsa");
     let mut key_path = dirs::home_dir().expect("Home").join(".ssh/id_rsa").to_str().expect("str").to_string();
     std::io::stdin().read_line(&mut key_path).expect("Failed to read line");
-    Server{
+    ServerOldFormat {
         name: "".to_string(),
         host,
         index: 0,
@@ -250,8 +252,8 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
     if net == NetworkEnvironment::Local {
         net = NetworkEnvironment::Dev;
     } else {
-        if node_config.opts.network.is_none() {
-            if node_config.opts.development_mode {
+        if node_config.config_data.network.is_none() {
+            if node_config.development_mode() {
                 net = NetworkEnvironment::Dev;
             } else {
                 net = NetworkEnvironment::Main;
@@ -337,7 +339,7 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
                     if answer.trim().to_lowercase() == "y" {
                         println!("Adding path to ~/.bash_profile");
                         let (stdout, stderr) = run_cmd(
-                            "echo", vec![&format!("'export REDGOLD_SECURE_DATA_PATH={}'", path), ">>", "~/.bash_profile"]);
+                            "echo", vec![&*format!("'export REDGOLD_SECURE_PATH={}'", path), ">>", "~/.bash_profile"]);
                         println!("{} {}", stdout, stderr);
                     }
                     data_dir = PathBuf::from(path).join("all");
@@ -371,7 +373,7 @@ pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(),
         };
         println!("Random mnemonic fingerprint: {}", mnemonic.checksum().expect("checksum"));
 
-        let mut servers: Vec<Server> = vec![]; // ds.server_store.servers().await?;
+        let mut servers: Vec<ServerOldFormat> = vec![]; // ds.server_store.servers().await?;
 
         if servers.is_empty() {
             println!("No deployment server found, please add a new server");
@@ -528,7 +530,8 @@ pub(crate) async fn debug_commands(p0: &DebugCommand, p1: &&NodeConfig) -> RgRes
     if let Some(cmd) = &p0.subcmd {
         match cmd {
             RgDebugCommand::GrafanaPublicDeploy(_) => {
-                manual_deploy_grafana_public().await
+                manual_deploy_grafana_public().await.log_error().ok();
+                Ok(())
             }
             _ => {
                 Ok(())

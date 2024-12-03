@@ -1,19 +1,20 @@
 use std::path::PathBuf;
 use std::time::Duration;
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::servers::Server;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{InitiateMultipartyKeygenRequest, PartyInfo, PublicKey};
 use crate::core::relay::Relay;
 use crate::infra::deploy::DeployMachine;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::util;
 use crate::util::cli::commands::log_handler;
 
-pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Server>) {
+pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
 
     let net_str = p0.network.to_std_string();
     let time = util::current_time_unix();
@@ -40,7 +41,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
         ssh.exes(cmd, &output_handler).await.expect("");
         tokio::time::sleep(Duration::from_secs(1)).await;
         let user = s.username.unwrap_or("root".to_string());
-        let res = redgold_schema::util::cmd::run_bash_async(
+        let res = redgold_common_no_wasm::cmd::run_bash_async(
             format!(
                 "scp {}@{}:~/.rg/{}/{} {}",
                 user, s.host.clone(), net_str, fnm_export, fnm_export)
@@ -52,7 +53,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
     }
 }
 
-pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: Server) -> RgResult<()> {
+pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: ServerOldFormat) -> RgResult<()> {
     let net_str = p0.network.to_std_string();
 
     let latest = get_backup_latest_path(p0).await?;

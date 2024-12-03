@@ -9,8 +9,8 @@ use crate::helpers::easy_json::json_pretty;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{Address, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PublicKey, TransportInfo, VersionInfo};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Server {
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct ServerOldFormat {
     pub name: String,
     pub host: String,
     pub index: i64,
@@ -23,7 +23,7 @@ pub struct Server {
     pub reward_address: Option<String>
 }
 
-impl Server {
+impl ServerOldFormat {
     pub fn network_environment(&self) -> NetworkEnvironment {
         NetworkEnvironment::parse(self.network_environment.clone())
     }
@@ -44,7 +44,7 @@ impl Server {
     }
 
     pub fn peer_data(
-        servers: Vec<Server>,
+        servers: Vec<ServerOldFormat>,
         peer_data: &mut PeerMetadata,
         peer_id_index: i64,
         pk: HashMap<i64, PublicKey>,
@@ -75,19 +75,19 @@ impl Server {
     }
 }
 
-fn parse_servers(str: &str) -> RgResult<Vec<Server>> {
+fn parse_servers(str: &str) -> RgResult<Vec<ServerOldFormat>> {
     let mut rdr = csv::Reader::from_reader(str.as_bytes());
     let mut res = vec![];
     for result in rdr.deserialize() {
         // Notice that we need to provide a type hint for automatic
         // deserialization.
-        let record: Server = result.error_info("server line parse failure")?;
+        let record: ServerOldFormat = result.error_info("server line parse failure")?;
         res.push(record);
     }
     Ok(res)
 }
 
-impl Server {
+impl ServerOldFormat {
     pub fn new(host: impl Into<String>) -> Self {
         let host_str = host.into();
         Self {
@@ -118,6 +118,6 @@ impl Server {
 #[test]
 fn parse_server_example() {
     let str = include_str!("./resources/example_servers");
-    let servers = Server::parse(str.to_string()).unwrap();
+    let servers = ServerOldFormat::parse(str.to_string()).unwrap();
     println!("{}", json_pretty(&servers).expect(""))
 }

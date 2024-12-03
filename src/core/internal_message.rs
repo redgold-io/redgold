@@ -19,6 +19,12 @@ use tokio::task::JoinError;
 //     };
 // }
 
+#[derive(Clone)]
+pub enum MessageOrigin {
+    Udp,
+    Rest
+}
+
 /// Bidirectional message type
 #[derive(Clone)]
 pub struct PeerMessage {
@@ -30,7 +36,15 @@ pub struct PeerMessage {
     pub destinations: Vec<PublicKey>,
     pub node_metadata: Option<NodeMetadata>,
     pub dynamic_node_metadata: Option<DynamicNodeMetadata>,
-    pub send_timeout: Duration
+    pub send_timeout: Duration,
+    pub origin: MessageOrigin,
+    pub requested_transport: Option<TransportBackend>
+}
+
+impl Default for PeerMessage {
+    fn default() -> Self {
+        Self::empty()
+    }
 }
 
 impl PeerMessage {
@@ -44,6 +58,8 @@ impl PeerMessage {
             node_metadata: None,
             dynamic_node_metadata: None,
             send_timeout: Duration::from_secs(150),
+            origin: MessageOrigin::Rest,
+            requested_transport: None,
         }
     }
 
@@ -84,15 +100,16 @@ use flume::TryRecvError;
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::select;
 use tokio::task::JoinHandle;
-use redgold_schema::{error_info, ErrorInfoContext, structs};
-use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata};
+use redgold_schema::{error_info, ErrorInfoContext, structs, RgResult};
+use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata, TransportBackend};
 use crate::api::rosetta::models::Peer;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 #[async_trait]
 pub trait RecvAsyncErrorInfo<T> {
     async fn recv_async_err(&self) -> Result<T, ErrorInfo>;
     async fn recv_async_err_timeout(&self, timeout: Duration) -> Result<T, ErrorInfo>;
+    fn recv_err(&self) -> RgResult<T>;
 }
 
 #[async_trait]
@@ -105,6 +122,12 @@ where
             .await
             .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
     }
+
+    fn recv_err(&self) -> RgResult<T> {
+        self.recv()
+            .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
+    }
+
     async fn recv_async_err_timeout(&self, duration: Duration) -> Result<T, ErrorInfo> {
         tokio::time::timeout(duration, self.recv_async_err())
             .await

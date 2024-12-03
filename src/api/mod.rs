@@ -17,14 +17,19 @@ use uuid::Uuid;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use redgold_schema::{empty_public_request, error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{empty_public_request, error_info, structs, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, GetActivePartyKeyRequest, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Transaction, UtxoId};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, CurrencyAmount, GetActivePartyKeyRequest, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Seed, Transaction, UtxoId};
+use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfig;
+use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::explorer::DetailedAddress;
 
 pub mod control_api;
 pub mod public_api;
@@ -35,7 +40,7 @@ pub mod udp_api;
 pub mod about;
 pub mod explorer;
 pub mod v1;
-
+pub mod udp_keepalive;
 
 #[derive(Clone)]
 pub struct RgHttpClient {
@@ -63,6 +68,23 @@ impl RgHttpClient {
             relay,
         }
     }
+
+
+
+    pub async fn balance(
+        &self,
+        address: &Address,
+    ) -> Result<i64, ErrorInfo> {
+        let response = self.query_hash(address.render_string().expect("")).await?;
+        let ai = response.address_info.safe_get_msg("missing address_info")?;
+        Ok(ai.balance)
+    }
+
+
+    pub fn url(&self) -> String {
+        format!("{}:{}", self.url, self.port)
+    }
+
     pub fn from_env(url: String, network_environment: &NetworkEnvironment) -> Self {
         Self {
             url,
@@ -102,6 +124,10 @@ impl RgHttpClient {
 
     pub async fn table_sizes(&self) -> RgResult<Vec<(String, i64)>> {
         self.json_get("v1/tables").await
+    }
+
+    pub async fn explorer_public_address(&self, pk: &PublicKey) -> RgResult<Vec<DetailedAddress>> {
+        self.json_get(format!("v1/explorer/public/address/{}", pk.hex())).await
     }
 
     pub async fn table_sizes_map(&self) -> RgResult<HashMap<String, i64>> {
@@ -174,7 +200,9 @@ impl RgHttpClient {
             .body(r.encode_to_vec())
             .send();
         let response = sent.await.map_err(|e| ErrorInfo::error_info(
-            format!("Proto request failure: {}", e.to_string())))?;
+            format!("Proto request failure: {}", e.to_string())))
+            .with_detail("url", self.url.clone())
+            .with_detail("port", self.port.clone().to_string())?;
         let bytes = response.bytes().await.map_err(|e| ErrorInfo::error_info(
             format!("Proto request bytes decode failure: {}", e.to_string())))?;
         let vec = bytes.to_vec();
@@ -240,11 +268,46 @@ impl RgHttpClient {
         Ok(response.about_node_response.ok_or(error_info("Missing about node response"))?)
     }
 
+    pub async fn seeds(&self) -> RgResult<Vec<Seed>> {
+        let mut req = Request::default();
+        req.get_seeds_request = Some(structs::GetSeedsRequest::default());
+        let response = self.proto_post_request(req, None, None).await?;
+        Ok(response.get_seeds_response.clone())
+    }
+
     pub async fn active_party_key(&self) -> RgResult<PublicKey> {
         let mut req = Request::default();
         req.get_active_party_key_request = Some(GetActivePartyKeyRequest::default());
         let response = self.proto_post_request(req, None, None).await?;
-        Ok(response.get_active_party_key_response.ok_or(error_info("Missing about node response"))?)
+        Ok(response.get_active_party_key_response.ok_or(error_info("Missing get_active_party_key_response response"))?)
+    }
+
+    pub async fn balance_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
+        let mut req = Request::default();
+        req.get_public_key_balance_request = Some(pk.clone());
+        let response = self.proto_post_request(req, None, None).await?;
+        Ok(response.get_public_key_balance_response.ok_or(error_info("Missing get_public_key_balance_response response"))?)
+    }
+
+    pub async fn party_data(&self) -> RgResult<HashMap<PublicKey, PartyInternalData>> {
+        let pid = self.json_get::<Vec<PartyInternalData>>("v1/party/data").await?;
+        let mut hm = HashMap::new();
+        for pd in pid {
+            if let Some(k) = pd.party_info.party_key.as_ref() {
+                hm.insert(k.clone(), pd);
+            }
+        }
+        Ok(hm)
+    }
+    pub async fn enriched_party_data(&self) -> HashMap<PublicKey, PartyInternalData> {
+        self.party_data().await.log_error().map(|mut r| {
+            r.iter_mut().for_each(|(k, v)| {
+                v.party_events.as_mut().map(|pev| {
+                    pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
+                });
+            });
+            r.clone()
+        }).unwrap_or_default()
     }
 
     pub async fn executable_checksum(&self) -> RgResult<String> {

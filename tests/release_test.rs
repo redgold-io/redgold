@@ -1,10 +1,12 @@
-use redgold::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
-use redgold::e2e::tx_submit::TransactionSubmitter;
-use redgold::node_config::NodeConfig;
+use redgold_schema::tx::tx_builder::{TransactionBuilder};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_keys::eth::example::dev_ci_kp;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment};
 use redgold::core::transact::tx_broadcast_support::TxBroadcastSupport;
+use redgold::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
+use redgold::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 
 #[tokio::test]
 async fn release_it() -> Result<(), ErrorInfo> {
@@ -46,7 +48,8 @@ async fn release_it() -> Result<(), ErrorInfo> {
 
     let mut txb = TransactionBuilder::new(&nc);
     let res = txb.with_input_address(&kp.address_typed())
-        .with_auto_utxos().await.unwrap()
+        .into_api_wrapper()
+        .with_auto_utxos().await.unwrap().clone()
         .with_output(&party_key.address().unwrap(), &CurrencyAmount::from_fractional(0.01).unwrap())
         .build()
         .unwrap()

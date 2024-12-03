@@ -1,6 +1,6 @@
 
 use bdk::bitcoin::{Address, Network};
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey, SupportedCurrency};
 use bdk::bitcoin::util::key;
 use redgold_schema::{ErrorInfoContext, structs};
 use sha3::{Digest, Keccak256};
@@ -16,6 +16,20 @@ pub trait ToEthereumAddress {
     fn to_ethereum_address_typed(&self) -> Result<structs::Address, ErrorInfo>;
 }
 
+pub trait ToCurrencyAddress {
+    fn to_currency_address(&self, currency: &SupportedCurrency, network: &NetworkEnvironment) -> Result<structs::Address, ErrorInfo>;
+}
+
+impl ToCurrencyAddress for PublicKey {
+    fn to_currency_address(&self, currency: &SupportedCurrency, network: &NetworkEnvironment) -> Result<structs::Address, ErrorInfo> {
+        match currency {
+            SupportedCurrency::Bitcoin => self.to_bitcoin_address_typed(network),
+            SupportedCurrency::Ethereum => self.to_ethereum_address_typed(),
+            SupportedCurrency::Redgold => self.address(),
+            _ => Err(ErrorInfo::new("Unsupported network"))
+        }
+    }
+}
 
 impl ToBitcoinAddress for PublicKey {
     fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo> {

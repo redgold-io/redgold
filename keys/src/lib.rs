@@ -21,6 +21,10 @@ pub mod address_support;
 pub mod hw_wallet_wrapper;
 pub mod tx_proof_validate;
 pub mod public_key_parse_support;
+pub mod external_tx_support;
+pub mod solana;
+pub mod monero;
+pub mod gpg;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,
@@ -72,6 +76,7 @@ pub struct KeyPair {
     pub secret_key: bdk::bitcoin::secp256k1::SecretKey,
     pub public_key: bdk::bitcoin::secp256k1::PublicKey,
 }
+
 
 impl KeyPair {
     pub fn new(

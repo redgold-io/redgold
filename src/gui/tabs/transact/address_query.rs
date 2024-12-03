@@ -8,8 +8,9 @@ use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::internal_message::SendErrorInfo;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::observability::errors::Loggable;
+use crate::node_config::ApiNodeConfig;
 
 pub fn get_address_info(
     node_config: &NodeConfig,
@@ -41,23 +42,23 @@ pub fn get_address_info(
             .address_info_for_pk(&public_key).await;
         let fun: Box<dyn FnMut(&mut LocalState) + Send> = match response {
             Ok(ai) => {
-                info!("balance success: {}", ai.json_or());
+                // info!("balance success: {}", ai.json_or());
                 Box::new(move |ls: &mut LocalState| {
-                    info!("Applied update function inside closure for balance thing");
+                    // info!("Applied update function inside closure for balance thing");
                     let o = rounded_balance_i64(ai.balance.clone());
-                    ls.wallet_state.address_info = Some(ai.clone());
-                    ls.wallet_state.balance = o.to_string();
-                    ls.wallet_state.balance_f64 = Some(o.clone());
-                    ls.wallet_state.balance_btc_f64 = btc_bal.clone();
-                    ls.wallet_state.balance_btc = btc_bal.clone().map(|b| b.to_string());
-                    ls.wallet_state.balance_eth_f64 = eth_bal.clone();
-                    ls.wallet_state.balance_eth = eth_bal.clone().map(|b| b.to_string());
+                    ls.wallet.address_info = Some(ai.clone());
+                    ls.wallet.balance = o.to_string();
+                    ls.wallet.balance_f64 = Some(o.clone());
+                    ls.wallet.balance_btc_f64 = btc_bal.clone();
+                    ls.wallet.balance_btc = btc_bal.clone().map(|b| b.to_string());
+                    ls.wallet.balance_eth_f64 = eth_bal.clone();
+                    ls.wallet.balance_eth = eth_bal.clone().map(|b| b.to_string());
                 })
             }
             Err(e) => {
                 error!("balance error: {}", e.json_or());
                 Box::new(move |ls: &mut LocalState| {
-                    ls.wallet_state.balance = "error".to_string();
+                    ls.wallet.balance = "error".to_string();
                 })
             }
         };

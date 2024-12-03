@@ -1,59 +1,15 @@
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, PartyData, PartyInfo, PublicKey, SupportedCurrency, Transaction};
-use rocket::serde::{Deserialize, Serialize};
+use redgold_schema::structs::{ErrorInfo, PartyInfo, PublicKey, SupportedCurrency};
 use std::collections::HashMap;
-use tracing::info;
-use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
-use redgold_schema::{RgResult, SafeOption, structs};
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::integrations::external_network_resources::ExternalNetworkResources;
-use crate::party::address_event::AddressEvent;
-use crate::party::order_fulfillment::OrderFulfillment;
-use crate::party::party_stream::{PartyEvents, TransactionWithObservationsAndPrice};
+use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
 use crate::party::party_watcher::PartyWatcher;
-use crate::party::price_query::PriceDataPointUsdQuery;
-use crate::scrape::external_networks::ExternalNetworkData;
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct PartyInternalData {
-    pub party_info: PartyInfo,
-    pub network_data: HashMap<SupportedCurrency, ExternalNetworkData>,
-    pub internal_data: Vec<Transaction>,
-    // Technically network data / internal data above transactions are redundant in light of the
-    // below field, can remove maybe later, but this is easy to use for now
-    pub address_events: Vec<AddressEvent>,
-    pub price_data: PriceDataPointUsdQuery,
-    pub party_events: Option<PartyEvents>,
-    pub locally_fulfilled_orders: Option<Vec<OrderFulfillment>>
-}
-
-impl PartyInternalData {
-
-    pub fn clear_sensitive(&mut self) -> &mut Self {
-        self.party_info.clear_sensitive();
-        self
-    }
-    pub fn to_party_data(&self) -> PartyData {
-        PartyData {
-            json_party_internal_data: Some(self.json_or())
-        }
-    }
-
-    pub fn not_debug(&self) -> bool {
-        self.party_info.not_debug()
-    }
-
-    pub fn self_initiated_not_debug(&self) -> bool {
-        self.party_info.not_debug() && self.party_info.self_initiated.unwrap_or(false)
-    }
-
-    pub fn active_self(&self) -> bool {
-        self.party_info.active() && self.party_info.self_initiated.unwrap_or(false)
-    }
-
-
-}
+use redgold_schema::party::external_data::PriceDataPointUsdQuery;
+use redgold_schema::party::external_data::ExternalNetworkData;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use crate::party::price_query::PriceDataPointQueryImpl;
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
@@ -71,8 +27,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 .map(|pd| pd.price_data.clone()).unwrap_or(PriceDataPointUsdQuery::new());
 
             let prior_local_fulfilled = prior_data.as_ref()
-                .and_then(|pd| pd.party_events.as_ref())
-                .map(|pd| pd.locally_fulfilled_orders.clone());
+                .and_then(|pd| pd.locally_fulfilled_orders.clone());
 
             // No filter is required here
             let btc = self.get_public_key_btc_data(&pk).await?;
@@ -84,7 +39,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             hm.insert(SupportedCurrency::Bitcoin, btc.clone());
             hm.insert(SupportedCurrency::Ethereum, eth.clone());
             // Change to time filter query to get prior data.
-            let mut txs = self.relay.ds.transaction_store.get_all_tx_for_address(&pk.address()?, 1e9 as i64, 0).await?;
+            let mut txs = self.relay.ds.transaction_store.get_all_tx_for_address(&pk.address()?, 1e9 as i64, 0)
+                .await?;
             txs.sort_by_key(|t| t.time().expect("time missing").clone());
             let mut address_events = vec![];
             for t in &txs {
@@ -94,6 +50,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     tx: t.clone(),
                     observations: obs,
                     price_usd: None,
+                    all_relevant_prices_usd: Default::default(),
                 };
                 let ae = AddressEvent::Internal(txo);
                 address_events.push(ae);
@@ -120,10 +77,15 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             // info!("enrich data Address events len after filter: {}", address_events.len());
 
             // info!("enrich data eth: {}", eth.json_or());
+            // if btc.transactions.len() > 2 {
+            //     info!("btc transactions exceed bp");
+            //     info!("btc transactions exceed bp");
+            // }
 
-            price_data.enrich_address_events(&mut address_events, &self.relay.ds).await?;
+            price_data.enrich_address_events(&mut address_events, &self.relay.ds, &self.external_network_resources).await?;
 
             // info!("events with prices: {}", address_events.json_or());
+            price_data.daily_enrichment(&self.external_network_resources, &self.relay.ds).await?;
 
             let pid = PartyInternalData {
                 party_info: party.clone(),
@@ -142,15 +104,16 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
     // This is backed by a database, so the query parameter isn't really necessary here
     pub async fn get_public_key_btc_data(&self, pk: &PublicKey) -> RgResult<ExternalNetworkData> {
-        let arc = self.relay.btc_wallet(pk).await?;
-        let btc = arc.lock().await;
-        let all_tx = btc.get_all_tx()?;
-        let raw_balance = btc.get_wallet_balance()?.confirmed;
-        let amount = CurrencyAmount::from_btc(raw_balance as i64);
+        // let arc = self.relay.btc_wallet(pk).await?;
+        // let btc = arc.lock().await;
+        // let all_tx = btc.get_all_tx()?;
+        let all_tx = self.external_network_resources.get_all_tx_for_pk(pk, SupportedCurrency::Bitcoin, None).await?;
+        // let raw_balance = btc.get_wallet_balance()?.confirmed;
+        // let amount = CurrencyAmount::from_btc(raw_balance as i64);
         let end = ExternalNetworkData {
             pk: pk.clone(),
             transactions: all_tx.clone(),
-            balance: amount,
+            // balance: amount,
             currency: SupportedCurrency::Bitcoin,
             max_ts: all_tx.iter().flat_map(|t| t.timestamp).max(),
             max_block: None,
@@ -159,19 +122,20 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     }
 
     pub async fn get_public_key_eth_data(&self, pk: &PublicKey, start_block: Option<u64>) -> RgResult<ExternalNetworkData> {
-        let eth = EthHistoricalClient::new(&self.relay.node_config.network).ok_msg("eth client creation")??;
-        let eth_addr = pk.to_ethereum_address_typed()?;
-        let amount = eth.get_balance_typed(&eth_addr).await?;
-        let eth_addr_str = eth_addr.render_string()?;
+        // let eth = EthHistoricalClient::new(&self.relay.node_config.network).ok_msg("eth client creation")??;
+        // let eth_addr = pk.to_ethereum_address_typed()?;
+        // let amount = eth.get_balance_typed(&eth_addr).await?;
+        // let eth_addr_str = eth_addr.render_string()?;
 
         // Ignoring for now to debug
-        let start_block_arg = None;
+        // let start_block_arg = None;
         // let start_block_arg = start_block;
-        let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
+        // let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
+        let all_tx = self.external_network_resources.get_all_tx_for_pk(pk, SupportedCurrency::Ethereum, None).await?;
         let end = ExternalNetworkData {
             pk: pk.clone(),
             transactions: all_tx.clone(),
-            balance: amount,
+            // balance: amount,
             currency: SupportedCurrency::Ethereum,
             max_ts: None,
             max_block: all_tx.iter().flat_map(|t| t.block_number).max()

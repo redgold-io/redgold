@@ -1,21 +1,32 @@
-use redgold_schema::structs::{Address, CurrencyAmount, DepositRequest, NetworkEnvironment, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
+use redgold_schema::structs::{CurrencyAmount, DepositRequest, NetworkEnvironment, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
 use redgold_schema::RgResult;
-use num_bigint::BigInt;
 use itertools::Itertools;
-use rocket::form::validate::{Contains, with};
+use rocket::form::validate::Contains;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::proof_support::PublicKeySupport;
-use rocket::serde::{Deserialize, Serialize};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
-use redgold_keys::util::btc_wallet::ExternalTimedTransaction;
-use crate::party::address_event::AddressEvent;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::address_event::AddressEvent;
+use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalStakeEvent, PartyEvents, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
+use redgold_keys::external_tx_support::ExternalTxSupport;
+use crate::party::portfolio_request::PortfolioEventMethods;
 
-impl PartyEvents {
+pub trait StakeMethods {
+    fn check_external_event_pending_stake(&mut self, event_o: &AddressEvent) -> bool;
+    fn meets_minimum_stake_amount(amt: &CurrencyAmount) -> bool;
+    fn minimum_stake_amount_total(currency: SupportedCurrency) -> Option<CurrencyAmount>;
+    fn handle_external_liquidity_deposit(
+        &mut self, event: &AddressEvent, tx: &Transaction, deposit_inner: &DepositRequest, liquidity_deposit: &StakeDeposit,
+        utxo_id: UtxoId);
+    fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()>;
+    fn process_stake_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal, time: i64, id: UtxoId) -> RgResult<()>;
+    fn retain_external_stake(&mut self, utxo_ids: &Vec<&UtxoId>, w_currency: SupportedCurrency) -> Option<CurrencyAmount>;
+    fn internal_liquidity_stake(&mut self, event: &AddressEvent, tx: &Transaction, amt: Option<CurrencyAmount>, deposit: &StakeDeposit, utxo_id: UtxoId);
+}
+
+impl StakeMethods for PartyEvents {
     //
 
-    pub fn check_external_event_pending_stake(&mut self, event_o: &AddressEvent) -> bool {
+    fn check_external_event_pending_stake(&mut self, event_o: &AddressEvent) -> bool {
         if let AddressEvent::External(event) = event_o {
             let amt = event.currency_amount();
             let oa = event.other_address_typed();
@@ -29,8 +40,10 @@ impl PartyEvents {
                     let ev = ConfirmedExternalStakeEvent {
                         pending_event: m,
                         event: event_o.clone(),
+                        ett: event.clone()
                     };
-                    self.external_staking_events.push(ev);
+                    self.external_staking_events.push(ev.clone());
+                    self.handle_maybe_portfolio_stake_event(ev);
                     return true;
                 }
             }
@@ -38,13 +51,13 @@ impl PartyEvents {
         false
     }
 
-    pub fn meets_minimum_stake_amount(amt: &CurrencyAmount) -> bool {
+    fn meets_minimum_stake_amount(amt: &CurrencyAmount) -> bool {
         Self::minimum_stake_amount_total(amt.currency_or())
             .map(|min| amt.clone() >= min)
             .unwrap_or(false)
     }
 
-    pub fn minimum_stake_amount_total(currency: SupportedCurrency) -> Option<CurrencyAmount> {
+    fn minimum_stake_amount_total(currency: SupportedCurrency) -> Option<CurrencyAmount> {
         match currency {
             SupportedCurrency::Redgold => {
                 Some(CurrencyAmount::from_fractional(1.0).unwrap())
@@ -59,25 +72,6 @@ impl PartyEvents {
         }
     }
 
-    pub fn expected_fee_amount(currency: SupportedCurrency, env: &NetworkEnvironment) -> Option<CurrencyAmount> {
-        match currency {
-            SupportedCurrency::Redgold => {
-                Some(CurrencyAmount::from_fractional(0.0001).unwrap())
-            }
-            SupportedCurrency::Bitcoin => {
-                let btc = if env.is_main() {
-                    850
-                } else {
-                    2_000
-                };
-                Some(CurrencyAmount::from_btc(btc))
-            }
-            SupportedCurrency::Ethereum => {
-                Some(EthWalletWrapper::fee_fixed_normal_by_env(env))
-            }
-            _ => None
-        }
-    }
 
     fn handle_external_liquidity_deposit(
         &mut self, event: &AddressEvent, tx: &Transaction, deposit_inner: &DepositRequest, liquidity_deposit: &StakeDeposit,
@@ -109,7 +103,7 @@ impl PartyEvents {
         }
     }
 
-    pub fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
+    fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
         let addrs = self.party_public_key.to_all_addresses()?;
         let amt = Some(addrs.iter().map(|a| tx.output_rdg_amount_of(a)).sum::<i64>())
             .filter(|a| *a > 0)
@@ -133,7 +127,7 @@ impl PartyEvents {
         Ok(())
     }
 
-    pub fn process_stake_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal, time: i64, id: UtxoId) -> RgResult<()> {
+    fn process_stake_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal, time: i64, id: UtxoId) -> RgResult<()> {
         let input_utxo_ids = tx.input_utxo_ids().collect_vec();
         // Find inputs corresponding to staking events.
         // This represents a withdrawal, either external or internal
@@ -156,8 +150,7 @@ impl PartyEvents {
             };
             if let Some(amt) = amount {
                 if let Some(existing) = self.balance_map.get(&amt.currency_or()) {
-                    let minimum_amt = Self::minimum_stake_amount_total(
-                        amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
+                    let minimum_amt = Self::minimum_stake_amount_total(amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
                     );
                     if let Some(fee) = Self::expected_fee_amount(amt.currency_or(), &self.network) {
                         let expected_fee = fee.clone();
@@ -239,42 +232,4 @@ impl PartyEvents {
             }
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct InternalStakeEvent {
-    pub event: AddressEvent,
-    pub tx: Transaction,
-    pub amount: CurrencyAmount,
-    pub withdrawal_address: Address,
-    pub liquidity_deposit: StakeDeposit,
-    pub utxo_id: UtxoId,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct PendingExternalStakeEvent {
-    pub event: AddressEvent,
-    pub tx: Transaction,
-    pub amount: CurrencyAmount,
-    pub external_address: Address,
-    pub external_currency: SupportedCurrency,
-    pub liquidity_deposit: StakeDeposit,
-    pub deposit_inner: DepositRequest,
-    pub utxo_id: UtxoId,
-}
-
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConfirmedExternalStakeEvent {
-    pub pending_event: PendingExternalStakeEvent,
-    pub event: AddressEvent
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PendingWithdrawalStakeEvent {
-    pub address: Address,
-    pub amount: CurrencyAmount,
-    pub initiating_event: AddressEvent,
-    pub is_external: bool,
-    pub utxo_id: UtxoId,
 }

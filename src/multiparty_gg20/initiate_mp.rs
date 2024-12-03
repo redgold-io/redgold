@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
-use log::{error, info};
+use tracing::{error, info};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
@@ -22,7 +22,8 @@ fn debug() {
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::json_pretty;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::party::event_validator::PartyEventValidator;
 use crate::util::current_time_millis_i64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -153,7 +154,7 @@ pub async fn initiate_mp_keygen_authed(
     let address = "127.0.0.1".to_string();
     let port = relay.node_config.mparty_port();
     // TODO: From nodeconfig?
-    let timeout = Duration::from_secs(100u64);
+    let timeout = relay.node_config.multiparty_timeout();
 
     // TODO: First query all peers to determine if they are online.
     let self_key = relay.node_config.public_key();
@@ -180,7 +181,7 @@ pub async fn initiate_mp_keygen_authed(
         .collect_vec();
     // info!("Sending initiate keygen request to peers: {} message: {}", peers.json_or(), req.json_or());
 
-    let results = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(100))).await?;
+    let results = relay.broadcast_async(peers.clone(), req, Some(relay.node_config.multiparty_timeout())).await?;
 
     let mut successful = 0;
 
@@ -263,7 +264,7 @@ pub async fn initiate_mp_keygen_follower(
     let address = metadata.external_address()?;
     let port = metadata.port_or(relay.node_config.network) + 4u16;
 
-    let timeout = Duration::from_secs(100); // mp_req.timeout_seconds.unwrap_or(100) as u64);
+    let timeout = relay.node_config.multiparty_timeout();
 
     // info!("Initiating mp keygen follower for room: {} with index: {} num_parties: {}, threshold: {}, port: {}",
     //     room_id, index.to_string(), number_of_parties.to_string(), threshold.to_string(), port.to_string());
@@ -420,7 +421,7 @@ pub async fn initiate_mp_keysign_authed(
 
     let address = "127.0.0.1".to_string();
     let port = relay.node_config.mparty_port();
-    let timeout = Duration::from_secs(100 as u64);
+    let timeout = Duration::from_secs(200 as u64);
     let init_keygen_req_room_id_typed = ident.room_id.safe_get()?;
     let init_keygen_req_room_id = ident.room_id.safe_get()?.uuid.safe_get()?.clone();
     let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {
@@ -466,7 +467,7 @@ pub async fn initiate_mp_keysign_authed(
     info!("Sending initiate keysign request to peers: {} message: {} self_port: {} signing_room_id: {} index: {}",
         peers.json_or(), req.json_or(), port, signing_room_id.clone().and_then(|x| x.uuid).unwrap_or("".to_string()), index.json_or());
 
-    let results = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(100))).await?;
+    let results = relay.broadcast_async(peers.clone(), req, Some(relay.node_config.multiparty_timeout())).await?;
 
     let mut successful = 0;
 
@@ -538,7 +539,7 @@ pub async fn initiate_mp_keysign_follower(
     let address = metadata.external_address()?;
     let port = metadata.port_or(relay.node_config.network) + 4u16;
 
-    let timeout = Duration::from_secs(100);
+    let timeout = relay.node_config.multiparty_timeout();
 
     //TODO: This should be returned as immediate failure on the response level instead of going
     // thru process, maybe done as part of health check?

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::NetworkEnvironment;

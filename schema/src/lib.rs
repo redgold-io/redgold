@@ -1,6 +1,5 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::future::Future;
 use std::str::FromStr;
@@ -10,8 +9,6 @@ use backtrace::Backtrace;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
 use serde::Serialize;
-use tokio::task::futures::TaskLocalFuture;
-use tokio::task_local;
 
 use structs::{
     Address, BytesData, ErrorCode, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
@@ -20,7 +17,8 @@ use structs::{
 use observability::errors::EnhanceErrorInfo;
 use proto_serde::{ProtoHashable, ProtoSerde};
 use util::{lang_util, times};
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, ErrorDetails, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
+use crate::util::task_local::task_local_impl::task_local_error_details;
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -61,7 +59,6 @@ pub mod debug_version;
 pub mod transaction_info;
 pub mod exec;
 pub mod contract;
-pub mod local_stored_state;
 pub mod weighting;
 pub mod pow;
 pub mod tx_schema_validate;
@@ -72,8 +69,14 @@ pub mod helpers;
 pub mod party;
 pub mod tx;
 pub mod config_data;
-mod server_config;
-
+pub mod portfolio;
+pub mod conf;
+pub mod data_folder;
+pub mod errors;
+pub mod peer;
+pub mod explorer;
+pub mod supported_currency;
+pub mod airgap_msg;
 
 impl BytesData {
     pub fn from(data: Vec<u8>) -> Self {
@@ -378,54 +381,13 @@ pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
     ret
 }
 
-// TODO: This feature is only available in tokio RT, need to substitute this for a
-// standard local key implementation depending on the features available for WASM crate.
-task_local! {
-
-    pub static TASK_LOCAL: HashMap<String, String>;
-    // pub static TASK_LOCAL: String;
-    // pub static ONE: u32;
-    //
-    // #[allow(unused)]
-    // static TWO: f32;
-    //
-    // static NUMBER: u32;
-}
-
-pub fn get_task_local() -> HashMap<String, String> {
-    TASK_LOCAL.try_with(|local| { local.clone() })
-        .unwrap_or(HashMap::new())
-}
-
-pub fn task_local<K: Into<String>, V: Into<String>, F>(k: K, v: V, f: F) -> TaskLocalFuture<HashMap<String, String>, F>
-where F : Future{
-    let mut current = get_task_local();
-    current.insert(k.into(), v.into());
-    TASK_LOCAL.scope(current, f)
-}
-
-pub fn task_local_map<F>(kv: HashMap<String, String>, f: F) -> TaskLocalFuture<HashMap<String, String>, F>
-where F : Future{
-    let mut current = get_task_local();
-    for (k, v) in kv {
-        current.insert(k, v);
-    }
-    TASK_LOCAL.scope(current, f)
-}
-
-
 pub fn error_msg<S: Into<String>, P: Into<String>>(code: ErrorCode, message: S, lib_message: P) -> ErrorInfo {
     let stacktrace = format!("{:?}", Backtrace::new());
     let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
     // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
     let stack = slice_vec_eager(stacktrace_abridged, 0, 50).join("\n").to_string();
 
-    let details = get_task_local().iter().map(|(k, v)| {
-        ErrorDetails {
-            detail_name: k.clone(),
-            detail: v.clone(),
-        }
-    }).collect_vec();
+    let details = task_local_error_details();
 
     ErrorInfo {
         code: code as i32,
@@ -547,6 +509,56 @@ mod tests {
 }
 
 impl NetworkEnvironment {
+
+    pub fn btc_explorer_link(&self) -> String {
+        let mut net = "testnet/";
+        if self.is_main() {
+            net = "";
+        }
+        format!("https://blockstream.info/{net}")
+    }
+
+    pub fn btc_address_link(&self, address: String) -> String {
+        format!("{}address/{}", self.btc_explorer_link(), address)
+    }
+
+
+    pub fn btc_tx_link(&self, address: String) -> String {
+        format!("{}tx/{}", self.btc_explorer_link(), address)
+    }
+
+    pub fn eth_explorer_link(&self) -> String {
+        let eth_url = if self.is_main() {
+            "https://etherscan.io"
+        } else {
+            "https://sepolia.etherscan.io"
+        };
+        eth_url.to_string()
+    }
+
+    pub fn eth_address_link(&self, eth_address: String) -> String {
+        format!("{}/address/{}", self.eth_explorer_link(), eth_address)
+    }
+
+    pub fn eth_tx_link(&self, txid: String) -> String {
+        format!("{}/tx/{}", self.eth_explorer_link(), txid)
+    }
+
+
+    pub fn explorer_link(&self) -> String {
+        let self_str = self.to_std_string();
+        let pfx = if self.is_main() {
+            "".to_string()
+        } else {
+            format!("{}.", self_str)
+        };
+      format!("https://{}explorer.redgold.io", pfx)
+    }
+
+    pub fn explorer_hash_link(&self, hash: String) -> String {
+        format!("{}/hash/{}", self.explorer_link(), hash)
+    }
+
     pub fn to_std_string(&self) -> String {
         format!("{:?}", &self).to_lowercase()
     }
@@ -559,6 +571,10 @@ impl NetworkEnvironment {
         let mut n = from_str.clone();
         let string2 = lang_util::make_ascii_titlecase(&mut *n);
         NetworkEnvironment::from_str(&*string2).error_info("error parsing network environment")
+    }
+
+    pub fn from_std_string(s: impl Into<String>) -> RgResult<Self> {
+        Self::parse_safe(s.into())
     }
 
     pub fn status_networks() -> Vec<NetworkEnvironment> {
@@ -686,12 +702,28 @@ impl StructMetadata {
 
 pub trait ShortString {
     fn short_string(&self) -> Result<String, ErrorInfo>;
+    fn first_four_last_four_ellipses(&self) -> Result<String, ErrorInfo>;
     fn last_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo>;
+    fn first_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo>;
 }
 
 impl ShortString for String {
     fn short_string(&self) -> Result<String, ErrorInfo> {
         self.last_n(6)
+    }
+
+    fn first_four_last_four_ellipses(&self) -> Result<String, ErrorInfo> {
+        let exclude_prefixes = ["0a220a20", "0a230a2103", "0a230a2102"];
+        let stripped = {
+            exclude_prefixes.iter()
+                .find(|&prefix| self.starts_with(prefix))
+                .map(|prefix| self[prefix.len()..].to_string())
+                .unwrap_or_else(|| self.clone())
+        };
+
+        let first_4 = stripped.first_n(4)?;
+        let last_4 = self.last_n(4)?;
+        Ok(format!("{}...{}", first_4, last_4))
     }
 
     fn last_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo> {
@@ -704,6 +736,19 @@ impl ShortString for String {
         let x = &self[start..len];
         Ok(x.to_string())
     }
+
+    fn first_n(&self, n: impl Into<i32>) -> Result<String, ErrorInfo> {
+        let len = self.len();
+        let start = 0i32;
+        let end = n.into() as usize;
+        if len < end {
+            return Err(error_info("string too short to short_string"));
+        }
+        let start = start as usize;
+        let x = &self[start..end];
+        Ok(x.to_string())
+    }
+
 }
 
 pub type RgResult<T> = Result<T, ErrorInfo>;

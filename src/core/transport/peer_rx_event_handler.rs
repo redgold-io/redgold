@@ -8,13 +8,13 @@ use futures::prelude::*;
 use itertools::Itertools;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
-use log::{debug, error, info, trace};
+use tracing::{debug, error, info, trace};
 use metrics::{counter, histogram};
 // use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use redgold_schema::{error_info, RgResult, SafeOption, structs};
+use redgold_schema::{error_info, structs, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
@@ -26,11 +26,12 @@ use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::json_or;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::data::download::process_download_request;
 use crate::multiparty_gg20::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
-use crate::node_config::NodeConfig;
+use crate::node_config::NodeConfigKeyPair;
 use redgold_schema::helpers::easy_json::json;
 use crate::schema::response_metadata;
 use crate::schema::structs::{Response, ResponseMetadata};
@@ -152,6 +153,14 @@ impl PeerRxEventHandler {
         let mut response = Response::empty_success();
 
         let auth_required = request.auth_required();
+
+        if let Some(r) = &request.get_public_key_balance_request {
+            response.get_public_key_balance_response = Some(relay.ds.utxo.get_balance_for_public_key(&r).await?);
+        }
+
+        if let Some(r) = &request.get_seeds_request {
+            response.get_seeds_response = relay.node_config.seeds_now()
+        }
 
         if let Some(r) = &request.get_active_party_key_request {
             response.get_active_party_key_response = relay.active_party_key().await;

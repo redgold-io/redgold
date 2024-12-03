@@ -3,7 +3,7 @@ use std::ops::Sub;
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use redgold_keys::transaction_support::TransactionSupport;
@@ -16,7 +16,7 @@ use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnviron
 
 use crate::api::public_api::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::{ErrorCode, PublicResponse, ResponseMetadata, Transaction};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;

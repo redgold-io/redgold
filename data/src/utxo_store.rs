@@ -2,8 +2,9 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use metrics::gauge;
 use sqlx::Sqlite;
+use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::TestConstants;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Output, Transaction, TransactionEntry, UtxoEntry, UtxoId};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, Output, PublicKey, SupportedCurrency, Transaction, TransactionEntry, UtxoEntry, UtxoId};
 use redgold_schema::{from_hex, RgResult, structs};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
@@ -266,6 +267,28 @@ impl UtxoStore {
         )
             .fetch_all(&mut *self.ctx.pool().await?)
             .await)?.into_iter().map(|row| row.output_index as i32).collect_vec())
+    }
+
+    pub async fn get_balance_for_addresses(&self, addresses: Vec<Address>) -> RgResult<CurrencyAmount> {
+        let mut bal = CurrencyAmount::zero(SupportedCurrency::Redgold);
+        for addr in addresses {
+            let utxos = self.utxo_for_address(&addr).await?;
+            for utxo in utxos {
+                let output = utxo.output.safe_get_msg("missing output")?;
+                let amount = output.opt_amount_typed_ref();
+                if let Some(amount) = amount {
+                    if amount.is_rdg() {
+                        bal = bal + amount.clone();
+                    }
+                }
+            }
+        }
+        Ok(bal)
+    }
+
+    pub async fn get_balance_for_public_key(&self, key: &PublicKey) -> RgResult<CurrencyAmount> {
+        let addresses = key.to_all_addresses()?;
+        self.get_balance_for_addresses(addresses).await
     }
 
 

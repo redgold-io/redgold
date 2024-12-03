@@ -1,30 +1,46 @@
-use rocket::serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use redgold_data::data_store::DataStore;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::RgResult;
 use redgold_schema::structs::SupportedCurrency;
-use crate::party::address_event::AddressEvent;
-use crate::scrape::okx_point;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::party::address_event::AddressEvent;
+use redgold_schema::party::external_data::{PriceDataPointUsdQuery, UsdPrice};
+use crate::party::portfolio_request::get_most_recent_day_millis;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct UsdPrice {
-    currency: SupportedCurrency,
-    price: f64,
+
+
+pub trait PriceDataPointQueryImpl {
+    async fn daily_enrichment<T: ExternalNetworkResources + Send>(&mut self, t: &T, ds: &DataStore) -> RgResult<()>;
+    fn new() -> Self;
+    async fn query_price<T: ExternalNetworkResources + Send>(
+        &mut self, time: i64, currency: SupportedCurrency, ds: &DataStore, external_network_resources: &T
+    ) -> RgResult<f64>;
+    async fn enrich_address_events<T: ExternalNetworkResources + Send>(
+        &mut self, events: &mut Vec<AddressEvent>, ds: &DataStore, external_network_resources: &T
+    ) -> RgResult<()>;
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct PriceDataPointUsdQuery {
-    inner: HashMap<i64, UsdPrice>,
-}
+impl PriceDataPointQueryImpl for PriceDataPointUsdQuery {
 
-impl PriceDataPointUsdQuery {
-    pub fn new() -> Self {
+    async fn daily_enrichment<T: ExternalNetworkResources + Send>(&mut self, t: &T, ds: &DataStore) -> RgResult<()> {
+        let recent = get_most_recent_day_millis();
+
+        self.query_price(recent, SupportedCurrency::Bitcoin, ds, t).await?;
+        self.query_price(recent, SupportedCurrency::Ethereum, ds, t).await?;
+        Ok(())
+    }
+
+    fn new() -> Self {
         Self {
             inner: HashMap::new()
         }
     }
-    pub async fn query_price(&mut self, time: i64, currency: SupportedCurrency, ds: &DataStore) -> RgResult<f64> {
+    async fn query_price<T: ExternalNetworkResources + Send>(
+        &mut self, time: i64, currency: SupportedCurrency, ds: &DataStore, external_network_resources: &T
+    ) -> RgResult<f64> {
         let price = self.inner.get(&time);
         if let Some(p) = price {
             return Ok(p.price);
@@ -33,7 +49,8 @@ impl PriceDataPointUsdQuery {
         if let Some(price) = price {
             return Ok(price);
         }
-        let price = okx_point(time, currency).await?.close;
+        // let price = okx_point(time, currency).await?.close;
+        let price = external_network_resources.query_price(time, currency).await?;
         self.inner.insert(time, UsdPrice {
             currency,
             price
@@ -42,21 +59,47 @@ impl PriceDataPointUsdQuery {
         Ok(price)
     }
 
-    pub async fn enrich_address_events(&mut self, events: &mut Vec<AddressEvent>, ds: &DataStore) -> RgResult<()> {
+    async fn enrich_address_events<T: ExternalNetworkResources + Send>(
+        &mut self, events: &mut Vec<AddressEvent>, ds: &DataStore, external_network_resources: &T
+    ) -> RgResult<()> {
         for event in events.iter_mut() {
             match event {
                 AddressEvent::Internal(txo) => {
                     let time = txo.tx.time()?.clone();
                     let currency = txo.tx.external_destination_currency();
                     if let Some(c) = currency {
-                        let price = self.query_price(time, c, ds).await?;
-                        txo.price_usd = Some(price);
+                        if c != SupportedCurrency::Redgold {
+                            if let Ok(price) = self.query_price(time, c, ds, external_network_resources).await
+                                .with_detail("tx", txo.tx.json_or())
+                                .with_detail("destination_currency", c.json_or())
+                                .log_error()
+                            {
+                                txo.price_usd = Some(price);
+                            }
+                        }
+                    }
+                    if let Some(pr) = txo.tx.portfolio_request() {
+                        let mut hs = HashSet::new();
+                        if let Some(pi) = pr.portfolio_info.as_ref() {
+                            for pw in pi.portfolio_weightings.iter() {
+                                if let Some(c) = pw.currency.as_ref() {
+                                    if let Some(c) = SupportedCurrency::from_i32(*c) {
+                                        hs.insert(c);
+                                    }
+                                }
+                                hs.insert(pw.currency());
+                            }
+                        }
+                        for c in hs {
+                            let price = self.query_price(time, c, ds, external_network_resources).await?;
+                            txo.all_relevant_prices_usd.insert(c, price);
+                        }
                     }
                 }
                 AddressEvent::External(e) => {
                     if e.incoming {
                         if let Some(t) = e.timestamp {
-                            let price = self.query_price(t as i64, e.currency, ds).await?;
+                            let price = self.query_price(t as i64, e.currency, ds, external_network_resources).await?;
                             e.price_usd = Some(price);
                         }
                     }

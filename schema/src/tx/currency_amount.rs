@@ -3,12 +3,34 @@ use std::ops::{Add, Div, Mul, Sub};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::str::FromStr;
-use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
+use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, PICO_DECIMAL_MULTIPLIER};
 use crate::{ErrorInfoContext, RgResult};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
-use crate::structs::{CurrencyAmount, ErrorInfo, SupportedCurrency};
+use crate::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
+
+
+
+pub trait RenderCurrencyAmountDecimals {
+    fn render_currency_amount_8_decimals(&self) -> String;
+    fn render_currency_amount_2_decimals(&self) -> String;
+}
+
+impl RenderCurrencyAmountDecimals for f64 {
+    fn render_currency_amount_8_decimals(&self) -> String {
+        format!("{:.8}", self)
+    }
+
+    fn render_currency_amount_2_decimals(&self) -> String {
+        format!("{:.2}", self)
+    }
+}
+
 
 impl CurrencyAmount {
+
+    pub fn render_8_decimals(&self) -> String {
+        self.to_fractional().render_currency_amount_8_decimals()
+    }
 
     pub fn amount_i64(&self) -> i64 {
         self.amount
@@ -25,6 +47,18 @@ impl CurrencyAmount {
         let mut a = CurrencyAmount::default();
         a.amount = amount;
         Ok(a)
+    }
+
+    pub fn from_fractional_cur(a: impl Into<f64>, cur: SupportedCurrency) -> RgResult<Self> {
+        let into = a.into();
+        let mut res = match cur {
+            SupportedCurrency::Redgold => {Self::from_fractional(into)}
+            SupportedCurrency::Bitcoin => {Self::from_fractional(into)}
+            SupportedCurrency::Ethereum => {Ok(Self::from_eth_fractional(into))}
+            _ => Err(ErrorInfo::error_info("Invalid currency"))
+        }?;
+        res.currency = Some(cur as i32);
+        Ok(res)
     }
 
     pub fn from_usd(a: impl Into<f64>) -> RgResult<Self> {
@@ -77,6 +111,10 @@ impl CurrencyAmount {
             .unwrap_or(SupportedCurrency::Redgold)
     }
 
+    pub fn is_rdg(&self) -> bool {
+        self.currency_or() == SupportedCurrency::Redgold
+    }
+
     pub fn min_fee() -> Self {
         Self::from(MIN_RDG_SATS_FEE)
     }
@@ -88,6 +126,8 @@ impl CurrencyAmount {
         let curr = self.currency_or();
         if curr == SupportedCurrency::Ethereum {
             self.bigint_fractional().unwrap_or(0f64)
+        } else if curr == SupportedCurrency::Monero {
+            (self.amount as f64) / (PICO_DECIMAL_MULTIPLIER as f64)
         } else {
             self.to_fractional_std()
         }
@@ -277,4 +317,71 @@ impl Ord for CurrencyAmount {
             self.amount.cmp(&other.amount)
         }
     }
+}
+
+
+impl CurrencyAmount {
+
+    pub fn test_send_amount_typed() -> CurrencyAmount {
+        // 0.000108594791676 originally as a fee from a testnet transaction (earlier)
+        // 0.00128623 originally as a fee from a testnet transaction (current)
+        let fee = 0.0005;
+        CurrencyAmount::from_eth_fractional(fee)
+    }
+
+    pub fn stake_test_amount_typed() -> CurrencyAmount {
+        // 0.000108594791676 originally as a fee from a testnet transaction
+        let fee = 0.0300;
+        CurrencyAmount::from_eth_fractional(fee)
+    }
+
+    // TODO: Set by environment.
+    pub fn gas_price_fixed_normal_testnet() -> CurrencyAmount {
+        // Fee: 0.000171425329026 for 21k gas used * below value
+        // 8163110906 for ^
+        // Higher seen:
+        // 13531134318
+        // 23531134318
+        // 43531134318
+        // 112793670539 -> 0.00236
+        // 212793670539 -> 0.0046
+        // 412793670539 -> 0.008
+        CurrencyAmount::from_eth_bigint_string("412793670539")
+    }
+
+    pub fn gas_price_fixed_normal_mainnet() -> CurrencyAmount {
+        CurrencyAmount::from_eth_bigint_string("4127936705")
+    }
+
+    pub fn gas_price_fixed_normal_by_env(env: &NetworkEnvironment) -> CurrencyAmount {
+        if env.is_main() {
+            Self::gas_price_fixed_normal_mainnet()
+        } else {
+            Self::gas_price_fixed_normal_testnet()
+        }
+    }
+
+    pub fn gas_cost_fixed_normal() -> CurrencyAmount {
+        // Fee: 0.000171425329026 for 21k gas used * below value
+        CurrencyAmount::from_eth_bigint_string("21000")
+    }
+
+    pub fn fee_fixed_normal_testnet() -> CurrencyAmount {
+        // Fee: 0.000171425329026 for 21k gas used * below value
+        Self::gas_cost_fixed_normal() * Self::gas_price_fixed_normal_testnet()
+    }
+
+    pub fn fee_fixed_normal_mainnet() -> CurrencyAmount {
+        // Fee: 0.000171425329026 for 21k gas used * below value
+        Self::gas_cost_fixed_normal() * Self::gas_price_fixed_normal_mainnet()
+    }
+
+    pub fn fee_fixed_normal_by_env(env: &NetworkEnvironment) -> CurrencyAmount {
+        if env.is_main() {
+            Self::fee_fixed_normal_mainnet()
+        } else {
+            Self::fee_fixed_normal_testnet()
+        }
+    }
+
 }

@@ -1,14 +1,15 @@
 use itertools::Itertools;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_support::AddressSupport;
 use crate::schema::structs::Transaction;
 use redgold_keys::TestConstants;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::constants::{DECIMAL_MULTIPLIER, EARLIEST_TIME, MAX_COIN_SUPPLY};
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::constants::{EARLIEST_TIME, MAX_COIN_SUPPLY};
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, Seed};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::node_config::NodeConfig;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use crate::node_config::EnvDefaultNodeConfig;
+use crate::test::external_amm_integration::dev_ci_kp;
 
 pub struct GenesisDistribution{
     pub address: Address,
@@ -100,12 +101,21 @@ fn lower_distribution(_network: &NetworkEnvironment, words_pass: &WordsPass, see
         }
     }
 
-    let res = pks.iter().map(|o| {
-        GenesisDistribution {
+    let mut res = pks.iter().map(|o| {
+        let distribution = GenesisDistribution {
             address: Address::from_struct_public(o).expect("works"),
             amount: CurrencyAmount::from_fractional((1.0 / pks.len() as f64) * (MAX_COIN_SUPPLY as f64)).expect("works"),
-        }
+        };
+        distribution
     }).collect_vec();
+
+    if let Some((_, kp)) = dev_ci_kp() {
+        add_entry_mutate_first(&mut res, &kp.address_typed(), 1000.0);
+    }
+
+    let addr = WordsPass::test_words().keypair_at_change(0).expect("works").public_key().address().expect("works");
+    add_entry_mutate_first(&mut res, &addr, 1000.0);
+
     res
 }
 

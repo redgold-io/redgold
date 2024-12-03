@@ -6,7 +6,7 @@ use crate::schema::SafeOption;
 use redgold_schema::helpers::easy_json::json;
 use serde::{Deserialize, Serialize};
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use redgold_schema::local_stored_state::LocalStoredState;
+use redgold_schema::conf::local_stored_state::LocalStoredState;
 use redgold_schema::proto_serde::ProtoSerde;
 
 #[derive(Clone)]

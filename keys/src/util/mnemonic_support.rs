@@ -13,13 +13,14 @@ use serde::{Deserialize, Serialize};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
-use redgold_schema::local_stored_state::{NamedXpub, XPubRequestType};
+use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
+use crate::proof_support::PublicKeySupport;
 use crate::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::xpub_wrapper::ValidateDerivationPath;
 
@@ -80,7 +81,7 @@ impl WordsPass {
             let pk = self.public_at(path.clone())?;
             res.push(WordsPassBtcMessageAccountMetadata {
                 derivation_path: path.clone(),
-                account: account.clone(),
+                account,
                 rdg_address: pk.address()?.render_string()?,
                 rdg_btc_main_address: pk.to_bitcoin_address(&NetworkEnvironment::Main)?,
                 rdg_btc_test_address: pk.to_bitcoin_address(&NetworkEnvironment::Test)?,
@@ -119,16 +120,18 @@ impl WordsPass {
         self.xpub_str(account_path)
     }
 
-    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool) -> RgResult<NamedXpub> {
+    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<NamedXpub> {
         self.default_xpub().map(|xpub| {
             let mut named = NamedXpub::default();
             let key_into = key_name.into();
             named.name = format!("{}0", key_into);
             named.xpub = xpub;
             named.key_name_source = Some(key_into);
-            named.request_type = Some(XPubRequestType::Hot);
+            named.request_type = Some(XPubLikeRequestType::Hot);
             named.skip_persist = Some(skip_persist);
             named.derivation_path = Self::default_rg_path(0);
+            named.public_key = self.public_at(&named.derivation_path).ok();
+            named.all_address = Some(named.public_key.as_ref().unwrap().to_all_addresses_for_network(n).unwrap());
             named
         })
     }
@@ -253,6 +256,15 @@ impl WordsPass {
         Ok(xpub)
     }
 
+    pub fn derive_seed_at_path(&self, path: &str) -> RgResult<[u8; 32]> {
+        let xprv = self.key_from_path_str(path)?;
+
+        // Extract the 32-byte seed from the extended private key
+        let seed = xprv.private_key.secret_bytes();
+
+        Ok(seed)
+    }
+
     pub fn xpub_str(&self, path: impl Into<String>) -> RgResult<String> {
         Ok(self.xpub(path)?.to_string())
     }
@@ -307,6 +319,10 @@ impl WordsPass {
     println!("Pkhex2 {}", pkhex2.clone());
     assert_eq!(pkhex, pkhex2);
      */
+
+    pub fn test_words() -> Self {
+        WordsPass::new("abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string(), None)
+    }
 }
 
 #[test]

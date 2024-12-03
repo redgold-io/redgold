@@ -1,11 +1,18 @@
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::structs::{PartySigningValidation, SupportedCurrency};
 use crate::core::relay::Relay;
-use crate::party::party_stream::PartyEvents;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::party::party_events::PartyEvents;
+use crate::party::party_stream::PartyEventBuilder;
+use crate::party::party_wallet_validator::PartyWalletMethods;
 
-impl PartyEvents {
 
-    pub async fn validate_event(&self, validator: PartySigningValidation, hash_to_sign: Vec<u8>, r: &Relay) -> RgResult<()> {
+pub trait PartyEventValidator {
+    async fn validate_event(&self, validator: PartySigningValidation, hash_to_sign: Vec<u8>, r: &Relay) -> RgResult<()>;
+}
+impl PartyEventValidator for PartyEvents {
+
+    async fn validate_event(&self, validator: PartySigningValidation, hash_to_sign: Vec<u8>, r: &Relay) -> RgResult<()> {
         let c = validator.currency();
         if c == SupportedCurrency::Redgold {
             let tx = validator.transaction.safe_get_msg("Missing transaction")?;

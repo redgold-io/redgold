@@ -1,7 +1,7 @@
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::util::{self};
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -21,11 +21,11 @@ use redgold_keys::transaction_support::TransactionSupport;
 pub mod tx_gen;
 pub mod tx_submit;
 pub mod alert;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::transaction::amount_to_raw_amount;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::observability::errors::Loggable;
 // i think this is the one currently in use?
 
@@ -139,7 +139,8 @@ pub struct LiveE2E {
 
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_keys::util::mnemonic_support::WordsPass;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
+use crate::node_config::WordsPassNodeConfig;
 use crate::observability::send_email;
 
 impl LiveE2E {

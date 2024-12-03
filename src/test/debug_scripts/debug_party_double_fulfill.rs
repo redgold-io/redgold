@@ -5,8 +5,9 @@ use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::explorer::convert_events;
 use crate::core::relay::Relay;
-use crate::party::data_enrichment::PartyInternalData;
-use crate::party::party_stream::PartyEvents;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::party::party_events::PartyEvents;
+use crate::party::party_stream::PartyEventBuilder;
 
 #[ignore]
 #[tokio::test]
@@ -31,7 +32,7 @@ async fn debug_events2() -> RgResult<()> {
     let ev = pev.events.clone();
 
     let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
-    convert_events(data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    convert_events(&data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
 
     // this matches
     for e in &ev {

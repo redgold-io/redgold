@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use itertools::Itertools;
-use log::info;
+use tracing::info;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 // use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
@@ -11,9 +12,8 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, OutputType, Te
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::node_config::NodeConfig;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::conf::node_config::NodeConfig;
 
 #[derive(Clone, PartialEq)]
 pub struct SpendableUTXO {

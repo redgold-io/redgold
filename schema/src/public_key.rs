@@ -15,7 +15,22 @@ impl PublicKey {
     pub fn from_bytes_direct_ecdsa(bytes: Vec<u8>) -> Self {
         Self {
             bytes: bytes_data(bytes),
-            key_type: PublicKeyType::Secp256k1 as i32
+            key_type: PublicKeyType::Secp256k1 as i32,
+            aux_data: None
+        }
+    }
+    pub fn from_bytes_direct_ed25519(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes: bytes_data(bytes),
+            key_type: PublicKeyType::Ed25519 as i32,
+            aux_data: None
+        }
+    }
+    pub fn from_bytes_direct_ed25519_aux(bytes: Vec<u8>, aux: Vec<u8>) -> Self {
+        Self {
+            bytes: bytes_data(bytes),
+            key_type: PublicKeyType::Ed25519 as i32,
+            aux_data: bytes_data(aux)
         }
     }
 

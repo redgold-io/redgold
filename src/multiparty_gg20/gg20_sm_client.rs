@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use anyhow::{Context, Result};
 use futures::{Sink, Stream, StreamExt, TryStreamExt};
-use log::info;
+use tracing::info;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // use structopt::StructOpt;
 
@@ -12,7 +12,7 @@ use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Request, RoomId};
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::MultipartyAuthenticationRequest;
 
 pub async fn join_computation<M>(
@@ -71,7 +71,7 @@ impl SmClient {
     pub fn new(address: surf::Url, room_id: &str, relay: &Relay) -> Result<Self> {
         let config = surf::Config::new()
             .set_base_url(address.join(&format!("rooms/{}/", room_id))?)
-            .set_timeout(None);
+            .set_timeout(Some(relay.node_config.multiparty_gg20_timeout()));
         Ok(Self {
             http_client: config.try_into()?,
             relay: relay.clone(),

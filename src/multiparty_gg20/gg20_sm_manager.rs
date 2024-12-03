@@ -7,7 +7,7 @@ use std::sync::{
 use config::Environment;
 
 use futures::Stream;
-use log::info;
+use tracing::info;
 use rocket::data::ToByteUnit;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Request};

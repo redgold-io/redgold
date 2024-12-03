@@ -1,5 +1,12 @@
 pub mod party_info;
 pub mod all_parties;
+pub mod external_data;
+pub mod address_event;
+pub mod party_events;
+pub mod central_price;
+pub mod price_volume;
+pub mod portfolio;
+pub mod party_internal_data;
 
 use crate::structs::RoomId;
 

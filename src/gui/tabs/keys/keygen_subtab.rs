@@ -8,9 +8,9 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::NetworkEnvironment;
 
-use crate::gui::app_loop::LocalState;
-use crate::gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
-use crate::gui::tables::text_table;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
+use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
+use redgold_gui::components::tables::text_table;
 use crate::util;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
@@ -38,13 +38,13 @@ enum Rounds {
 #[derive(Clone)]
 pub struct MnemonicWindowState {
     pub open: bool,
-    words: String,
+    pub words: String,
     label: String,
     bitcoin_p2wpkh_84: String,
     ethereum_address_44: String,
     words_checksum: String,
     seed_checksum: Option<String>,
-    passphrase: Option<String>,
+    pub passphrase: Option<String>,
     redgold_node_address: String,
     redgold_hardware_default_address: String,
     passphrase_input: String,
@@ -282,7 +282,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.label("Salt Words");
-            valid_label(ui, WordsPass::new(&key.generate_mnemonic_state.salt_words, None).mnemonic().is_ok());
+            valid_label(ui, WordsPass::new(&key.generate_mnemonic_state.salt_words, None).mnemonic().is_ok(), );
         });
         TextEdit::multiline(&mut key.generate_mnemonic_state.salt_words)
             .desired_width(500f32)
@@ -406,7 +406,7 @@ fn password_derivation(key: &mut KeygenState, ui: &mut Ui) {
                             .desired_width(80f32)
                         );
                         let num_rounds = key.generate_mnemonic_state.num_rounds.parse::<u32>();
-                        valid_label(ui, num_rounds.is_ok());
+                        valid_label(ui, num_rounds.is_ok(), );
                     }
                 }
             });
@@ -504,12 +504,15 @@ pub(crate) fn mnemonic_window(
 ) {
 
     if ls.keygen_state.mnemonic_window_state.set_hot_mnemonic {
-        ls.add_mnemonic(ls.keygen_state.mnemonic_window_state.save_name.clone(),
+        ls.add_with_pass_mnemonic(ls.keygen_state.mnemonic_window_state.save_name.clone(),
                         ls.keygen_state.mnemonic_window_state.words.clone(),
-                        ls.keygen_state.mnemonic_window_state.persist_disk);
+                        ls.keygen_state.mnemonic_window_state.persist_disk,
+                        ls.keygen_state.mnemonic_window_state.passphrase.clone()
+        );
         ls.keygen_state.mnemonic_window_state.set_hot_mnemonic = false;
     }
 
+    let salt = &mut ls.keygen_state.generate_mnemonic_state.salt_words;
     let state = &mut ls.keygen_state.mnemonic_window_state;
 
 
@@ -613,6 +616,9 @@ pub(crate) fn mnemonic_window(
                         ui.checkbox(&mut state.persist_disk, "Persist Disk");
                         if ui.button("Set As Hot Mnemonic").clicked() {
                             state.set_hot_mnemonic = true;
+                        }
+                        if ui.button("Use As Salt").clicked() {
+                            *salt = state.words.clone();
                         }
                     });
             });

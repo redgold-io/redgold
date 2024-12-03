@@ -2,7 +2,7 @@ use std::future::Future;
 use std::time::Duration;
 use bytes::Bytes;
 use futures::TryFutureExt;
-use log::{error, info};
+use tracing::{error, info};
 use warp::{Filter, Rejection};
 use redgold_schema::structs::ErrorInfo;
 use warp::reply::{Json, WithStatus};

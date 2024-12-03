@@ -8,6 +8,8 @@ pub mod local_test_context;
 mod internal_e2e;
 mod debug_scripts;
 mod manual_it;
+pub mod harness;
+mod debug_id_mnemonics;
 
 fn asdf() {
 

@@ -1,7 +1,9 @@
 # <img src="src/resources/svg_rg_2_crop.png" width="9%" height="9%"> Redgold
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Dev](https://github.com/redgold-io/redgold/actions/workflows/ci.yml/badge.svg?branch=dev) | 
+![Dev](https://github.com/redgold-io/redgold/actions/workflows/ci.yml/badge.svg?branch=dev)
+
+
 [Website](https://redgold.io) |
 [Contributing](https://dev.docs.redgold.io/contribute/guide) | 
 [Dev Setup](https://dev.docs.redgold.io/contribute/dev-setup) | 
@@ -9,11 +11,9 @@
 [Run A Node](https://dev.docs.redgold.io/guides/node-setup) | 
 [Security Procedures](https://dev.docs.redgold.io/introduction/security-procedures)
 
-Redgold or "philosophical gold", is intended as an ideological opposite of BlackRock. It is a 
-decentralized, open-source, peer-to-peer platform 
-designed to act as a financial data and computation layer for the cryptocurrency ecosystem. The primary product 
-intention is focused around ETFs & Portfolio target models, and finance, but the platform is designed to be general purpose 
-as a decentralized data lake and SQL compute engine for crypto related contracts. 
+Redgold is a fully peer-to-peer decentralized portfolio contract platform. 
+It is designed to act as a financial data and computation layer for the cryptocurrency ecosystem, specifically as 
+a data-lake and execution layer for multiparty portfolio contracts. The primary use case is focused around ETFs & Portfolio target models, but the platform is designed to be general purpose as a decentralized data lake and SQL compute engine for crypto related contracts.
 
 It is inspired heavily by Spark and pandas like data transformations on conventional 
 parquet data lakes, with the key distinguishing factor being the ability to support multi-tenant compute with 

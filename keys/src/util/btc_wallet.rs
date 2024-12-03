@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
-use bdk::{Balance, FeeRate, KeychainKind, SignOptions, sled, SyncOptions, TransactionDetails, Wallet};
-use bdk::bitcoin::{Address, ecdsa, EcdsaSighashType, Network, Script, Sighash, TxIn, TxOut};
+use bdk::{sled, Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
+use bdk::bitcoin::{ecdsa, Address, EcdsaSighashType, Network, Script, Sighash, TxIn, TxOut};
 use bdk::bitcoin::blockdata::opcodes;
 use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bdk::bitcoin::hashes::Hash;
@@ -19,19 +19,20 @@ use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId, SignerOrderi
 use bdk::sled::Tree;
 use itertools::Itertools;
 // use crate::util::cli::commands::send;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
 use serde::{Deserialize, Serialize};
 // use crate::util::cli::commands::send;
-use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::{KeyPair, TestConstants};
 use crate::address_external::ToBitcoinAddress;
-use crate::address_support::AddressSupport;
 use crate::eth::example::dev_ci_kp;
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk, WordsPass};
 
 
 #[test]
@@ -231,52 +232,6 @@ pub struct RawTransaction {
     pub transaction_details: Option<TransactionDetails>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
-pub struct ExternalTimedTransaction {
-    pub tx_id: String,
-    pub timestamp: Option<u64>,
-    pub other_address: String,
-    pub other_output_addresses: Vec<String>,
-    pub amount: u64,
-    pub bigint_amount: Option<String>,
-    pub incoming: bool,
-    pub currency: SupportedCurrency,
-    pub block_number: Option<u64>,
-    pub price_usd: Option<f64>,
-    pub fee: Option<CurrencyAmount>,
-}
-
-impl ExternalTimedTransaction {
-
-    pub fn balance_change(&self) -> CurrencyAmount {
-        let fee = self.fee.clone().unwrap_or(CurrencyAmount::zero(self.currency));
-        if self.incoming {
-            self.currency_amount()
-        } else {
-            self.currency_amount() - fee
-        }
-    }
-
-    pub fn other_address_typed(&self) -> RgResult<structs::Address> {
-        let mut addr = self.other_address.parse_address()?;
-        Ok(addr)
-    }
-
-    pub fn currency_amount(&self) -> CurrencyAmount {
-        let mut ca = if let Some(ba) = self.bigint_amount.as_ref() {
-            CurrencyAmount::from_eth_bigint_string(ba.clone())
-        } else {
-            CurrencyAmount::from(self.amount as i64)
-        };
-        ca.currency = Some(self.currency as i32);
-        ca
-    }
-    pub fn confirmed(&self) -> bool {
-        self.timestamp.is_some()
-    }
-
-}
-
 
 pub fn electrum_mainnet_backends() -> Vec<String> {
     vec![
@@ -292,6 +247,7 @@ pub fn electrum_testnet_backends() -> Vec<String> {
 }
 
 impl SingleKeyBitcoinWallet<MemoryDatabase> {
+
 
     pub fn new_wallet(
         public_key: PublicKey,
@@ -369,9 +325,23 @@ impl SingleKeyBitcoinWallet<Tree> {
         let client = ElectrumBlockchain::from(client);
         // KeyValueDatabase
         // Create a database (using default sled type) to store wallet data
-        let database = sled::open(database_path).error_info("Sled database open error")?;
+        let mut database = sled::open(database_path.clone()).error_info("Sled database open error");
+        if database.is_err() {
+            if database_path.exists() {
+                std::fs::remove_dir_all(&database_path)
+                    .error_info("Failed to remove old sled directory")
+                    .with_detail("database_path", database_path.to_str().unwrap().to_string())?;
+            }
+            std::fs::create_dir_all(&database_path)
+                .error_info("Failed to create new sled directory")
+                .with_detail("database_path", database_path.to_str().unwrap().to_string())?;
+
+            database = sled::open(database_path.clone())
+                .error_info("Sled database open error")
+                .with_detail("database_path", database_path.to_str().unwrap().to_string());
+        }
         let wallet_name = public_key.hex();
-        let database = database.open_tree(wallet_name.clone()).error_info("Database open tree error")?;
+        let database = database?.open_tree(wallet_name.clone()).error_info("Database open tree error")?;
         // let database = MemoryDatabase::default();
         let hex = public_key.to_hex_direct_ecdsa()?;
         let descr = format!("wpkh({})", hex);
@@ -406,6 +376,7 @@ impl SingleKeyBitcoinWallet<Tree> {
     }
 }
 impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
+
 
     //
     // pub fn new_hardware_wallet(
@@ -546,10 +517,29 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(res)
     }
 
+    pub fn convert_network(network_environment: &NetworkEnvironment) -> Network {
+        if *network_environment == NetworkEnvironment::Main {
+            Network::Bitcoin
+        } else {
+            Network::Testnet
+        }
+    }
+
     pub fn outputs_convert(&self, outs: &Vec<TxOut>) -> Vec<(String, u64)> {
         let mut res = vec![];
         for o in outs {
             let a = Address::from_script(&o.script_pubkey, self.network).ok();
+            if let Some(a) = a {
+                res.push((a.to_string(), o.value))
+            }
+        }
+        res
+    }
+
+    pub fn outputs_convert_static(outs: &Vec<TxOut>, network: NetworkEnvironment) -> Vec<(String, u64)> {
+        let mut res = vec![];
+        for o in outs {
+            let a = Address::from_script(&o.script_pubkey, Self::convert_network(&network)).ok();
             if let Some(a) = a {
                 res.push((a.to_string(), o.value))
             }
@@ -647,6 +637,11 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         self.sync()?;
         let balance = self.wallet.get_balance().error_info("Error getting BDK wallet balance")?;
         Ok(balance)
+    }
+
+    pub fn balance(&self) -> RgResult<CurrencyAmount> {
+        let c = self.get_wallet_balance()?.confirmed;
+        Ok(CurrencyAmount::from_btc(c as i64))
     }
 
     pub fn create_transaction(&mut self, destination: Option<structs::PublicKey>, destination_str: Option<String>, amount: u64) -> Result<(), ErrorInfo> {
@@ -764,6 +759,14 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         self.client.broadcast(&transaction).error_info("Error broadcasting transaction")?;
         Ok(())
     }
+    pub fn broadcast_tx_static(psbt: String, network: &NetworkEnvironment) -> RgResult<String> {
+        let psbt = psbt.json_from::<PartiallySignedTransaction>()?;
+        let key = WordsPass::test_words().default_public_key()?;
+        let mut w = SingleKeyBitcoinWallet::new_wallet(key, network.clone(), false)?;
+        w.psbt = Some(psbt.clone());
+        w.broadcast_tx()?;
+        Ok(psbt.extract_tx().txid().to_string())
+    }
 
     // TODO: How to implement this check native to BDK?
     pub fn verify(&mut self) -> Result<(), ErrorInfo> {
@@ -840,6 +843,29 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
 
         self.broadcast_tx()?;
 
+        let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid.to_string();
+        // let txid = w.broadcast_tx().expect("txid");
+        // println!("txid: {:?}", txid);
+        Ok(txid)
+    }
+
+    pub fn send(&mut self, destination: &structs::Address, amount: &CurrencyAmount, pkey_hex: String, broadcast: bool) -> RgResult<String> {
+        self.create_transaction_output_batch(vec![(destination.render_string()?, amount.amount as u64)])?;
+        let kp = KeyPair::from_private_hex(pkey_hex)?;
+        let signables = self.signable_hashes()?;
+        for (i, (hash, sighashtype)) in signables.iter().enumerate() {
+            // println!("signable {}: {}", i, hex::encode(hash));
+            let prf = Proof::from_keypair(hash, kp);
+            self.affix_input_signature(i, &prf, sighashtype);
+        }
+        let finalized = self.sign()?;
+        if !finalized {
+            return Err(error_info("Not finalized"));
+        }
+
+        if broadcast {
+            self.broadcast_tx()?;
+        }
         let txid = self.transaction_details.safe_get_msg("No psbt found")?.txid.to_string();
         // let txid = w.broadcast_tx().expect("txid");
         // println!("txid: {:?}", txid);

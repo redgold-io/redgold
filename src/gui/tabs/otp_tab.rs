@@ -3,7 +3,7 @@ use eframe::egui::{Context, Ui};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{bounded_text_area_size_id, editable_text_input_copy};
+use redgold_gui::common::{bounded_text_area_size_id, editable_text_input_copy};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtpMetadata {
@@ -280,7 +280,7 @@ fn use_hot_mnemonic(ui: &mut Ui, ls: &mut LocalState) {
     if ls.otp_state.use_hot_mnemonic {
         ui.horizontal(|ui| {
             ui.label("Mnemonic checksum");
-            ui.label(ls.wallet_state.hot_mnemonic().checksum().expect("ok"));
+            ui.label(ls.wallet.hot_mnemonic().checksum().expect("ok"));
         });
     }
 }

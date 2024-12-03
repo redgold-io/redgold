@@ -5,8 +5,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use redgold_schema::structs::SupportedCurrency;
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::editable_text_input_copy;
-use crate::gui::tables::text_table;
+use redgold_gui::common::editable_text_input_copy;
+use redgold_gui::components::tables::text_table;
 
 #[derive(Clone, Debug)]
 pub struct RecoveryState {

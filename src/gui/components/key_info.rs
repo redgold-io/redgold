@@ -1,5 +1,5 @@
 use eframe::egui::{Color32, RichText, Ui};
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
@@ -8,10 +8,10 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{NetworkEnvironment, PublicKey};
+use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
 use crate::gui::app_loop::LocalState;
-use crate::gui::common::{data_item, editable_text_input_copy, valid_label};
-
+use redgold_gui::common::{data_item, data_item_hyperlink, editable_text_input_copy, valid_label};
+use crate::gui::components::explorer_links::{rdg_explorer, rdg_explorer_links};
 
 const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
 
@@ -30,7 +30,8 @@ pub struct KeyInfo {
     pub btc_address: String,
     pub eth_address: String,
     pub network: NetworkEnvironment,
-    pub derivation_path: String
+    pub derivation_path: String,
+    pub secret_key: Option<String>,
 }
 
 
@@ -50,6 +51,7 @@ impl KeyInfo {
             eth_address: "".to_string(),
             network: NetworkEnvironment::Dev,
             derivation_path: DEFAULT_DP.to_string(),
+            secret_key: None,
         };
         ki.update_public_key_info();
         ki
@@ -102,12 +104,32 @@ impl KeyInfo {
         self.update_public_key_info();
     }
 
-    pub fn view(&mut self, ui: &mut Ui) {
+    pub fn view(&mut self, ui: &mut Ui, option: Option<PublicKey>, environment: NetworkEnvironment) {
+
+        let links = option.map(|pk| rdg_explorer_links(&environment, &pk)).unwrap_or_default();
+        let rdg_link = links.get(&SupportedCurrency::Redgold);
+        let btc_link = links.get(&SupportedCurrency::Bitcoin);
+        let eth_link = links.get(&SupportedCurrency::Ethereum);
+
         if self.key.is_some() {
             data_item(ui, "Public Key Hex", self.public_key.clone());
-            data_item(ui, "RDG Address", self.address.clone());
-            data_item(ui, "BTC Address", self.btc_address.clone());
-            data_item(ui, "ETH Address", self.eth_address.clone());
+            if let Some(r) = rdg_link {
+                data_item_hyperlink(ui, "RDG Address", self.address.clone(), r.clone());
+            } else {
+                data_item(ui, "RDG Address", self.address.clone());
+            }
+            ui.horizontal(|ui| {
+                if let Some(b) = btc_link {
+                    data_item_hyperlink(ui, "BTC Address", self.btc_address.clone(), b.clone());
+                } else {
+                    data_item(ui, "BTC Address", self.btc_address.clone());
+                }
+                if let Some(e) = eth_link {
+                    data_item_hyperlink(ui, "ETH Address", self.eth_address.clone(), e.clone());
+                } else {
+                    data_item(ui, "ETH Address", self.eth_address.clone());
+                }
+            });
         }
     }
 
@@ -115,9 +137,9 @@ impl KeyInfo {
 
 
 pub fn extract_gui_key(ls: &mut LocalState) -> GuiKey {
-    ls.wallet_state.active_hot_private_key_hex
+    ls.wallet.active_hot_private_key_hex
         .as_ref().map(|x| GuiKey::DirectPrivateKey(x.clone()))
-        .unwrap_or(GuiKey::Mnemonic(ls.wallet_state.hot_mnemonic()))
+        .unwrap_or(GuiKey::Mnemonic(ls.wallet.hot_mnemonic()))
 }
 
 
@@ -131,7 +153,7 @@ pub fn update_keys_key_info(ls: &mut LocalState) {
 }
 
 pub fn update_xpub_key_info(ls: &mut LocalState) {
-    let xpub = ls.local_stored_state.xpubs.iter().find(|x| x.name == ls.wallet_state.selected_xpub_name);
+    let xpub = ls.local_stored_state.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name));
     if let Some(xpub) = xpub {
         let gui_key = GuiKey::XPub(xpub.xpub.clone());
         ls.keytab_state.xpub_key_info.update_fields(

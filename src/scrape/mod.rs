@@ -3,7 +3,9 @@ pub mod external_networks;
 use std::time::Duration;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::SupportedCurrency;
@@ -323,8 +325,20 @@ fn translate_currency(supported_currency: SupportedCurrency) -> RgResult<String>
         SupportedCurrency::Ethereum => {
             "ETH-USD"
         },
+        SupportedCurrency::Usdt => {
+            "USDT-USD"
+        },
+        // SupportedCurrency::Monero => {
+        //     "XMR-USD"
+        // }
+        SupportedCurrency::Solana => {
+            "SOL-USD"
+        }
+        SupportedCurrency::Usdc => {
+            "USDC-USD"
+        }
         _ => {
-            return Err(error_info("Unsupported currency for coinbase historical data".to_string()));
+            return Err(error_info("Unsupported currency for translate_currency historical data".to_string()));
         }
     };
     Ok(product.to_string())
@@ -392,6 +406,171 @@ pub async fn okx_historical_test(before: Option<i64>, after: i64, currency: Supp
 
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct XMRResponse {
+    USD: f64
+}
+
+pub async fn xmr_lookup() -> RgResult<f64> {
+    let url = "https://min-api.cryptocompare.com/data/price?fsym=XMR&tsyms=USD";
+
+    use reqwest::ClientBuilder;
+    let client = ClientBuilder::new().timeout(Duration::from_secs(10)).build().unwrap();
+    let sent = client
+        .get(url)
+        .send();
+    let response = sent.await.error_info("Failed to get response")?;
+    let text = response.text().await.error_info("Failed to get response text")?;
+    // println!("Response text: {}", text.clone());
+    let res = text.json_from::<XMRResponse>()?;
+    Ok(res.USD)
+
+}
+
+pub async fn min_api_crypto_compare_lookup(symbol: String, quote: String, limit: i64, ts: i64) -> RgResult<CcDailyMinApiResponse> {
+    let url = format!("https://min-api.cryptocompare.com/data/v2/histominute?fsym={symbol}&tsym={quote}&limit={limit}&toTs={ts}");
+
+    use reqwest::ClientBuilder;
+    let client = ClientBuilder::new().timeout(Duration::from_secs(10)).build().unwrap();
+    let sent = client
+        .get(url)
+        .send();
+    let response = sent.await.error_info("Failed to get response")?;
+    let text = response.text().await.error_info("Failed to get response text")?;
+    // println!("Response text: {}", text.clone());
+    let res = text.json_from::<CcDailyMinApiResponse>()?;
+    Ok(res)
+}
+
+pub async fn crypto_compare_point_query(currency: SupportedCurrency, millis: i64) -> RgResult<f64> {
+    let cur = translate_currency_short(currency);
+    let data = min_api_crypto_compare_lookup(cur?, "USD".to_string(), 1, millis/1000).await?;
+    let close = data.Data.Data.last().ok_msg("Failed to get data")?.close;
+    Ok(close)
+}
+
+fn translate_currency_short(currency: SupportedCurrency) -> RgResult<String>  {
+    let res = match currency {
+        SupportedCurrency::Bitcoin => { "BTC" }
+        SupportedCurrency::Ethereum => { "ETH" }
+        SupportedCurrency::Usdc => { "USDC" }
+        SupportedCurrency::Usdt => { "USDT" }
+        SupportedCurrency::Monero => { "XMR" }
+        SupportedCurrency::Solana => { "SOL" }
+        _ => return "Unsupported currency translation".to_error()
+    };
+    Ok(res.to_string())
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct RateLimit {
+}
+
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct CcDailyMinDataItem {
+    time: i64,
+    close: f64,
+    high: f64,
+    low: f64,
+    open: f64,
+    volumefrom: f64,
+    volumeto: f64,
+    conversionType: String,
+    conversionSymbol: String
+}
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct CcDailyMinData {
+    Aggregated: bool,
+    TimeFrom: i64,
+    TimeTo: i64,
+    Data: Vec<CcDailyMinDataItem>
+}
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct CcDailyMinApiResponse {
+    Response: String,
+    Message: String,
+    HasWarning: bool,
+    Type: i64,
+    RateLimit: RateLimit,
+    Data: CcDailyMinData
+}
+
+pub async fn xmr_lookup_dailies_delta() -> RgResult<f64> {
+    let url = "https://min-api.cryptocompare.com/data/v2/histoday?fsym=XMR&tsym=USD&limit=1";
+
+    use reqwest::ClientBuilder;
+    let client = ClientBuilder::new().timeout(Duration::from_secs(10)).build().unwrap();
+    let sent = client
+        .get(url)
+        .send();
+    let response = sent.await.error_info("Failed to get response")?;
+    let text = response.text().await.error_info("Failed to get response text")?;
+    // println!("Response text: {}", text.clone());
+    let res = text.json_from::<CcDailyMinApiResponse>()?;
+    let yesterday = res.Data.Data.get(0).ok_or(error_info("Failed to get data"))?;
+    let today = res.Data.Data.get(1).ok_or(error_info("Failed to get data"))?;
+    Ok((today.close - yesterday.close) / yesterday.close)
+
+}
+
+/*
+Get index candlesticks history
+Retrieve the candlestick charts of the index from recent years.
+
+Rate Limit: 10 requests per 2 seconds
+Rate limit rule: IP
+HTTP Request
+GET /api/v5/market/history-index-candles
+
+Request Example
+
+GET /api/v5/market/history-index-candles?instId=BTC-USD
+Request Parameters
+Parameter	Type	Required	Description
+instId	String	Yes	Index, e.g. BTC-USD
+after	String	No	Pagination of data to return records earlier than the requested ts
+before	String	No	Pagination of data to return records newer than the requested ts. The latest data will be returned when using before individually
+bar	String	No	Bar size, the default is 1m
+e.g. [1m/3m/5m/15m/30m/1H/2H/4H]
+Hong Kong time opening price k-line: [6H/12H/1D/1W/1M]
+UTC time opening price k-line: [/6Hutc/12Hutc/1Dutc/1Wutc/1Mutc]
+limit	String	No	Number of results per request. The maximum is 100; The default is 100
+Response Example
+
+{
+    "code":"0",
+    "msg":"",
+    "data":[
+     [
+        "1597026383085",
+        "3.721",
+        "3.743",
+        "3.677",
+        "3.708",
+        "1"
+    ],
+    [
+        "1597026383085",
+        "3.731",
+        "3.799",
+        "3.494",
+        "3.72",
+        "1"
+    ]
+    ]
+}
+Response Parameters
+Parameter	Type	Description
+ts	String	Opening time of the candlestick, Unix timestamp format in milliseconds, e.g. 1597026383085
+o	String	Open price
+h	String	highest price
+l	String	Lowest price
+c	String	Close price
+confirm	String	The state of candlesticks.
+0 represents that it is uncompleted, 1 represents that it is completed.
+The data returned will be arranged in an array like this: [ts,o,h,l,c,confirm].
+ */
 
 
 /**
@@ -413,6 +592,22 @@ pub async fn okx_point(time: i64, supported_currency: SupportedCurrency) -> RgRe
         .min_by(|a, b| a.0.cmp(&b.0))
         .map(|a| a.1).cloned().ok_msg("No data found")
 
+}
+
+pub async fn get_24hr_delta_change_pct(supported_currency: SupportedCurrency) -> RgResult<f64> {
+    if supported_currency == SupportedCurrency::Monero {
+        return xmr_lookup_dailies_delta().await;
+    }
+    let now = current_time_millis_i64();
+    let minus_24 = now - 1000*60*60*24;
+    let now = okx_point(now, supported_currency).await?;
+    let past = okx_point(minus_24, supported_currency).await?;
+    let now_close = now.close;
+    let past_close = past.close;
+    let delta = (now_close - past_close);
+    let pct_change = delta / past_close;
+    info!("{} {} {} {}", now_close, past_close, delta, pct_change);
+    Ok(pct_change)
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -494,4 +689,10 @@ async fn debug_routes() {
         println!("{} {} {}", t, delta, price);
 
     }
+}
+
+#[tokio::test]
+async fn debug_okx() {
+    let c = get_24hr_delta_change_pct(SupportedCurrency::Bitcoin).await.unwrap();
+    println!("{}", c);
 }

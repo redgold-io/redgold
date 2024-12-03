@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddrV4;
-use log::{error, info};
+use tracing::{error, info};
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};

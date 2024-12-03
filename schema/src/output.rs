@@ -1,5 +1,5 @@
 
-use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData, StandardRequest, StandardResponse, SwapFulfillment, StakeRequest};
+use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData, StandardRequest, StandardResponse, SwapFulfillment, StakeRequest, SwapRequest};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, RgResult, SafeOption};
 
@@ -127,6 +127,10 @@ impl Output {
 
     pub fn swap_fulfillment(&self) -> Option<&SwapFulfillment> {
         self.response().and_then(|r| r.swap_fulfillment.as_ref())
+    }
+
+    pub fn swap_request(&self) -> Option<&SwapRequest> {
+        self.request().and_then(|r| r.swap_request.as_ref())
     }
 
     pub fn is_stake(&self) -> bool {

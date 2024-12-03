@@ -4,11 +4,12 @@ use std::pin::pin;
 use crossbeam::atomic::AtomicCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bdk::sled::Tree;
 
 use crate::core::internal_message;
-use crate::core::internal_message::{Channel, new_channel};
+use crate::core::internal_message::{new_channel, Channel};
 use crate::schema::structs::{
     ErrorCode, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
@@ -18,17 +19,18 @@ use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
 use itertools::Itertools;
-use log::{error, info};
+use tracing::{error, info};
 use metrics::counter;
 use rocket::form::FromForm;
 use rocket::http::ext::IntoCollection;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, struct_metadata_new, structs};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TrustData, UtxoEntry, UtxoId, ValidationType};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
@@ -38,21 +40,22 @@ use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::transaction::{amount_to_raw_amount, TransactionMaybeError};
 use redgold_schema::util::lang_util::WithMaxLengthString;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use crate::core::contract::contract_state_manager::ContractStateMessage;
-use crate::node_config::NodeConfig;
+use crate::node_config::{DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, ToTransactionBuilder, WordsPassNodeConfig};
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::SafeOption;
-use crate::scrape::external_networks::ExternalNetworkData;
+use redgold_schema::party::external_data::ExternalNetworkData;
 use crate::util;
 use crate::util::keys::ToPublicKey;
 
@@ -103,6 +106,7 @@ pub struct ObservationMetadataInternalSigning {
 }
 
 
+// TODO: Change this to ArcSwap
 // TODO: There's a better pattern here than mutex, but wrapping this here for clarity
 // for a future change.
 #[derive(Clone, Default)]
@@ -182,9 +186,52 @@ pub struct Relay {
     pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
+    pub peer_info: PeerInfo
+}
+
+#[derive(Clone)]
+pub struct PeerInfo {
+    pub dynamic: Arc<DashMap<PublicKey, DynamicNodeMetadata>>
+}
+
+impl PeerInfo {
+    pub fn write_dynamic(&self, pk: &PublicKey, d: &DynamicNodeMetadata) {
+        self.dynamic.insert(pk.clone(), d.clone());
+    }
+    pub fn read_dynamic(&self, pk: &PublicKey) -> Option<DynamicNodeMetadata> {
+        self.dynamic.get(pk).map(|v| v.clone())
+    }
+}
+
+impl Default for PeerInfo {
+    fn default() -> Self {
+        Self {
+            dynamic: Arc::new(DashMap::new())
+        }
+    }
 }
 
 impl Relay {
+
+    pub async fn get_party_by_address(&self, party_addr: &Address) -> Option<PartyInternalData> {
+        let d = self.external_network_shared_data.clone_read().await;
+        d.iter().filter(|(k, v)| {
+            k.to_all_addresses().unwrap_or_default().iter().filter(|a| a == &party_addr).next().is_some()
+        }).map(|(_, v)| v.clone()).next()
+    }
+
+    pub async fn get_party_events_by_address(&self, party_addr: &Address) -> Option<PartyEvents> {
+        self.get_party_by_address(party_addr).await.and_then(|p| p.party_events)
+    }
+
+    // pub async fn public_party_data(&self) -> HashMap<PublicKey, PartyInternalData> {
+    //     let data = self.external_network_shared_data.clone_read().await;
+    //     data.into_iter().map(|(k, v)| {
+    //         let mut v = v.clone();
+    //         v.clear_sensitive();
+    //         (k, v)
+    //     }).collect()
+    // }
 
     pub async fn active_party_key(&self) -> Option<PublicKey> {
         let data = self.external_network_shared_data.clone_read().await;
@@ -193,6 +240,34 @@ impl Relay {
         }).flat_map(|(k, v)| v.party_info.party_key.clone())
             .next();
         cleared
+    }
+    pub async fn active_party(&self) -> Option<PartyInternalData> {
+        if let Some(pk) = self.active_party_key().await {
+            let data = self.external_network_shared_data.clone_read().await;
+            if let Some(pid) = data.get(&pk) {
+                return Some(pid.clone())
+            }
+        }
+        None
+    }
+    pub async fn active_party_events(&self) -> Option<PartyEvents> {
+        if let Some(p) = self.active_party().await {
+            return p.party_events.clone()
+        }
+        None
+    }
+
+    pub async fn party_event_for_txid(&self, txid: &String) -> Option<(AddressEvent, PartyInternalData)> {
+        let parties = self.external_network_shared_data.clone_read().await;
+        for (pk, p) in parties.iter() {
+            let ev = p.address_events.iter().filter(|ae| {
+                &ae.identifier() == txid
+            }).next().cloned();
+            if let Some(ae) = ev {
+                return Some((ae, p.clone()))
+            }
+        }
+        None
     }
 
     pub async fn btc_wallet(&self, pk: &PublicKey) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
@@ -205,7 +280,7 @@ impl Relay {
             None => {
                 let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
                     pk.clone(), self.node_config.network.clone(), true,
-                    self.node_config.env_data_folder().bdk_sled_path(),
+                    self.node_config.env_data_folder().bdk_sled_path2(),
                     None
                 )?;
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
@@ -360,11 +435,13 @@ are instantiated by the node
 
 use crate::core::internal_message::SendErrorInfo;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::core::resolver::{resolve_input, ResolvedInput, validate_single_result};
+use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
 use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
 use crate::e2e::tx_gen::SpendableUTXO;
-use crate::party::data_enrichment::PartyInternalData;
+use redgold_schema::party::address_event::AddressEvent;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::party::party_events::PartyEvents;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data
@@ -592,9 +669,17 @@ impl Relay {
 
 
     pub async fn update_dynamic_node_metadata(&self, d: &DynamicNodeMetadata) -> RgResult<()> {
-        let d2 = d.clone();
+        let mut d2 = d.clone();
+        d2.sequence += 1;
         // TODO: Sign here, increment height.
         self.ds.config_store.set_dynamic_md(&d2).await?;
+        Ok(())
+    }
+
+    pub async fn update_dynamic_node_metadata_active_udp_port(&self, port: i64) -> RgResult<()> {
+        let mut d = self.dynamic_node_metadata().await?;
+        d.udp_port = Some(port);
+        self.update_dynamic_node_metadata(&d).await?;
         Ok(())
     }
 
@@ -785,7 +870,7 @@ impl Relay {
     }
 
     // TODO: add timeout
-    pub async fn send_message_await_response(&self, request: Request, node: structs::PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
+    pub async fn send_message_await_response(&self, request: Request, node: PublicKey, timeout: Option<Duration>) -> Result<Response, ErrorInfo> {
         let timeout = timeout.unwrap_or(Duration::from_secs(60));
         let (s, r) = flume::unbounded::<Response>();
         let mut pm = PeerMessage::from_pk(&request, &node.clone());
@@ -1018,6 +1103,14 @@ impl Relay {
         r.recv_async_err().await
     }
 
+    pub async fn send_udp(&self, pk: &PublicKey, req: &Request, timeout: Option<Duration>) -> RgResult<Response> {
+        let mut pm = PeerMessage::default();
+        pm.public_key = Some(pk.clone());
+        pm.requested_transport = Some(TransportBackend::Udp);
+        pm.request = req.clone();
+        self.send_message_sync_pm(pm, None).await
+    }
+
 
     pub async fn submit_transaction_sync(
         &self,
@@ -1122,6 +1215,7 @@ impl Relay {
             peer_send_failures: Arc::new(Default::default()),
             external_network_shared_data: Default::default(),
             btc_wallets: Arc::new(Default::default()),
+            peer_info: Default::default(),
         }
     }
 }

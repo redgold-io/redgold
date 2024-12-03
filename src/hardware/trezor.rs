@@ -13,10 +13,10 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
-use crate::node_config::NodeConfig;
-use redgold_schema::util::cmd::{run_cmd, run_cmd_safe};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_common_no_wasm::cmd::{run_cmd, run_cmd_safe};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use crate::util::init_logger_once;
 
@@ -80,6 +80,57 @@ pub fn run_trezor_cmd(args: Vec<&str>) -> Result<(HashMap<String, String>, Vec<(
     println!("Parsed output: {:?}", map.clone());
     Ok(map)
 }
+
+/*
+
+#[derive(Debug)]
+pub struct SignTxResponse {
+    pub serialized_tx: Vec<u8>,
+    pub signatures: Vec<Vec<u8>>,
+}
+
+pub fn sign_tx(json_file_path: &PathBuf) -> Result<SignTxResponse, Box<dyn std::error::Error>> {
+    // Check if the file exists
+    if !Path::new(json_file_path).exists() {
+        return Err(format!("File not found: {}", json_file_path).into());
+    }
+
+    // Run trezorctl command
+    let output = Command::new("trezorctl")
+        .args(&["btc", "sign-tx", json_file_path])
+        .output()?;
+
+    if !output.status.success() {
+        return Err(format!("trezorctl command failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+
+    // Parse the output
+    let output_str = String::from_utf8(output.stdout)?;
+    let lines: Vec<&str> = output_str.lines().collect();
+
+    // Extract serialized transaction and signatures
+    let mut serialized_tx = Vec::new();
+    let mut signatures = Vec::new();
+
+    for line in lines {
+        if line.starts_with("Serialized tx:") {
+            serialized_tx = hex::decode(line.trim_start_matches("Serialized tx: "))?;
+        } else if line.starts_with("Signature ") {
+            let sig = hex::decode(line.split(": ").nth(1).ok_or("Invalid signature format")?)?;
+            signatures.push(sig);
+        }
+    }
+
+    if serialized_tx.is_empty() {
+        return Err("Serialized transaction not found in output".into());
+    }
+
+    Ok(SignTxResponse {
+        serialized_tx,
+        signatures,
+    })
+}
+ */
 
 
 /*
@@ -347,7 +398,8 @@ async fn debug_sign_tx () {
         address: None,
         utxo_entries: vec![utxo],
         balance: 0,
-        recent_transactions: vec![]
+        recent_transactions: vec![],
+        balances: vec![],
     };
     let nc = NodeConfig::default();
     let mut tb = TransactionBuilder::new(&nc);

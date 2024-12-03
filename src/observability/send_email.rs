@@ -7,7 +7,7 @@ use redgold_schema::{error_info, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::ErrorInfo;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 
 
 const DEFAULT_EMAIL: &str = "info@redgold.io";
@@ -45,7 +45,7 @@ pub async fn email_cfg(
     body: impl Into<String>,
     nc: &NodeConfig
 ) -> RgResult<()> {
-    if let (Some(from), Some(to)) = (nc.opts.from_email.as_ref(), nc.opts.to_email.as_ref()) {
+    if let (Some(from), Some(to)) = (nc.from_email(), nc.to_email()) {
         email_from_to(subject, body, from, to).await
     } else {
         return Ok(())

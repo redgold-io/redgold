@@ -113,10 +113,10 @@ async fn signing_original(
     Ok(signature)
 }
 use curv::elliptic::curves::ECScalar;
-use log::info;
+use tracing::info;
 use redgold_schema::helpers::easy_json::{json, json_from};
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::RsvSignature;
 
 pub async fn signing(

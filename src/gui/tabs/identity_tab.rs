@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use eframe::egui::{ComboBox, Context, Ui};
 use itertools::Itertools;
-use crate::core::transact::tx_builder_supports::TransactionBuilderSupport;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::local_stored_state::Identity;
-use redgold_schema::servers::Server;
+use redgold_schema::conf::local_stored_state::Identity;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{PeerMetadata, Transaction};
-use crate::core::transact::tx_builder_supports::TransactionBuilder;
-use crate::gui::app_loop::{LocalState, PublicKeyStoredState};
-use crate::gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use crate::gui::app_loop::{LocalState, LocalStateAddons, PublicKeyStoredState};
+use redgold_gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
-
+use crate::node_config::ApiNodeConfig;
 
 #[derive(Clone)]
 pub struct IdentityState {
@@ -51,14 +51,15 @@ pub fn identity_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     ComboBox::from_label("Choose Identity")
         .selected_text(ls.identity_state.selected_name.clone())
         .show_ui(ui, |ui| {
-            for style in ls.local_stored_state.identities.iter().map(|x| x.name.clone()) {
+            let option1 = ls.local_stored_state.identities.clone().unwrap_or(vec![]);
+            for style in option1.iter().map(|x| x.name.clone()) {
                 ui.selectable_value(&mut ls.identity_state.selected_name, style.clone(), style.to_string());
             }
         });
     if ls.identity_state.last_selected_name != ls.identity_state.selected_name {
-        ls.local_stored_state.identities.iter().find(|p| p.name == ls.identity_state.selected_name).map(|x| {
+        ls.local_stored_state.identities.as_ref().map(|x| x.iter().find(|p| p.name == ls.identity_state.selected_name).map(|x| {
             ls.identity_state.selected_identity = Some(x.clone());
-        });
+        }));
         ls.identity_state.last_selected_name = ls.identity_state.selected_name.clone();
         if let Some(is) = &ls.identity_state.selected_identity {
             ls.identity_state.identity_name_edit = is.name.clone();
@@ -147,12 +148,13 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
     let mut tb = TransactionBuilder::new(&ls.node_config);
     let mut pkmap = HashMap::default();
     pkmap.insert(i.peer_id_index, p);
-    let s = ls.local_stored_state.servers.iter()
+    let iter = ls.local_stored_state.servers.clone().unwrap_or(vec![]);
+    let s = iter.iter()
         .filter(|s| s.peer_id_index == i.peer_id_index)
         .map(|c| c.clone())
         .collect_vec();
     let mut peer_data = PeerMetadata::default();
-    Server::peer_data(
+    ServerOldFormat::peer_data(
         s,
         &mut peer_data,
         i.peer_id_index,
@@ -161,7 +163,8 @@ fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
         ls.node_config.network.clone(),
         None
     );
-    let t = ls.local_stored_state.trust
+    let option = ls.local_stored_state.trust.clone().unwrap_or(vec![]);
+    let t = option
         .iter().filter(|p| p.peer_id_index == i.peer_id_index)
         .map(|p| p.labels.clone())
         .flatten()

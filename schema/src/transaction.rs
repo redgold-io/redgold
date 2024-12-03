@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof, SwapFulfillment};
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof, SwapFulfillment, PortfolioRequest};
 use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
 use itertools::Itertools;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 use crate::proto_serde::ProtoHashable;
@@ -142,17 +141,6 @@ impl Transaction {
         Ok(net.clone())
     }
 
-    pub fn new_blank() -> Self {
-        let mut rng = rand::thread_rng();
-        let mut tx = Self::default();
-        tx.struct_metadata = struct_metadata_new();
-
-        let mut opts = TransactionOptions::default();
-        opts.salt = Some(rng.gen::<i64>());
-        opts.transaction_type = TransactionType::Standard as i32;
-        tx.options = Some(opts);
-        tx
-    }
     pub fn is_test(&self) -> bool {
         self.options.as_ref().and_then(|o| o.is_test).unwrap_or(false)
     }
@@ -174,6 +162,16 @@ impl Transaction {
         self.outputs.iter().filter_map(|o| o.swap_fulfillment()).next()
     }
 
+    pub fn swap_fulfillment_amount_party(&self) -> Option<(&SwapFulfillment, &CurrencyAmount, &Address)> {
+        self.outputs.iter().filter_map(|o| {
+            o.swap_fulfillment().and_then(|f| {
+                o.opt_amount_typed_ref().and_then(|a|
+                    o.address.as_ref().map(|addr| (f, a, addr))
+                )
+            })
+        }).next()
+    }
+
     pub fn output_data(&self) -> impl Iterator<Item=&StandardData> {
         self.outputs.iter().filter_map(|o| o.data.as_ref())
     }
@@ -188,6 +186,17 @@ impl Transaction {
 
     pub fn swap_request(&self) -> Option<&SwapRequest> {
         self.output_request().filter_map(|d| d.swap_request.as_ref()).next()
+    }
+
+    pub fn swap_request_and_amount_and_party_address(&self) -> Option<(&SwapRequest, &CurrencyAmount, &Address)> {
+        self.outputs.iter().filter_map(|o| {
+            o.opt_amount_typed_ref()
+                .and_then(|a|
+                    o.address.as_ref()
+                        .and_then(|addr| o.swap_request()
+                            .map(|r| (r, a, addr))
+                ))
+        }).next()
     }
 
     pub fn swap_destination(&self) -> Option<&Address> {
@@ -231,12 +240,26 @@ impl Transaction {
 
     pub fn external_destination_currency(&self) -> Option<SupportedCurrency> {
         self.swap_destination().or(self.stake_destination())
+            .map(|d| d.clone().mark_external().clone())
             .map(|a| a.currency_or())
     }
 
     pub fn is_stake(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_stake()).count() > 0
     }
+
+    pub fn has_portfolio_request(&self) -> bool {
+        self.portfolio_request().is_some()
+    }
+
+    pub fn portfolio_request(&self) -> Option<&PortfolioRequest> {
+        self.outputs.iter()
+            .filter_map(|o| o.request())
+            .filter_map(|r| r.portfolio_request.as_ref())
+            .next()
+    }
+
+
     pub fn is_metadata(&self) -> bool {
         self.outputs.iter().filter(|o| o.is_metadata()).count() > 0
     }
@@ -351,6 +374,9 @@ impl Transaction {
                     })
                 )
             )
+    }
+    pub fn output_amount_total(&self) -> CurrencyAmount {
+        self.output_amounts_opt().cloned().sum::<CurrencyAmount>()
     }
 
     pub fn output_amounts_opt(&self) -> impl Iterator<Item = &CurrencyAmount> {

@@ -8,13 +8,13 @@ use bdk::bitcoin::hashes::Hash;
 use bdk::bitcoin::hashes::hex::ToHex;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
-use log::info;
+use tracing::info;
 use rand::{Rng, RngCore};
 use rand::rngs::OsRng;
 
 use redgold_keys::util::dhash_str;
 
-use crate::node_config::NodeConfig;
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::observability::trace_setup::init_tracing;
 
 pub mod auto_update;
@@ -102,10 +102,10 @@ pub fn current_time_unix() -> u64 {
 }
 //
 // pub fn init_logger_with_config(node_config: NodeConfig) -> Result<Handle, SetLoggerError> {
-//     use log::LevelFilter;
-//     use log4rs::append::console::ConsoleAppender;
-//     use log4rs::append::file::FileAppender;
-//     use log4rs::config::{Appender, Config, Root};
+//     use tracing::LevelFilter;
+//     use tracing4rs::append::console::ConsoleAppender;
+//     use tracing4rs::append::file::FileAppender;
+//     use tracing4rs::config::{Appender, Config, Root};
 //
 //     let stdout = ConsoleAppender::builder().build();
 //
@@ -159,10 +159,10 @@ pub fn init_logger_main(log_level: String) {
 }
 
 pub fn init_logger() {
-    // use log::LevelFilter;
-    // use log4rs::append::console::ConsoleAppender;
-    // use log4rs::append::file::FileAppender;
-    // use log4rs::config::{Appender, Config, Root};
+    // use tracing::LevelFilter;
+    // use tracing4rs::append::console::ConsoleAppender;
+    // use tracing4rs::append::file::FileAppender;
+    // use tracing4rs::config::{Appender, Config, Root};
     //
     // let stdout = ConsoleAppender::builder().build();
     //
