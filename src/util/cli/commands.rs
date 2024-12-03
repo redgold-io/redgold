@@ -35,6 +35,8 @@ use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfi
 use redgold_common_no_wasm::cmd::run_cmd;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::observability::errors::Loggable;
+use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
+use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -111,7 +113,7 @@ pub fn generate_mnemonic(_generate_mnemonic: &GenerateMnemonic) -> RgResult<()> 
 }
 
 pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfig) -> Result<String, ErrorInfo> {
-    let wallet = node_config.words();
+    let wallet = node_config.secure_words_or();
     let address = if let Some(path) = generate_address.path {
         wallet.keypair_at(path).expect("works").address_typed()
     } else if let Some(index) = generate_address.index {
@@ -128,46 +130,48 @@ pub fn generate_address(generate_address: WalletAddress, node_config: &NodeConfi
 
 
 pub async fn send(p0: &WalletSend, p1: &NodeConfig) -> Result<(), ErrorInfo> {
-    let destination = p1.arg_at(0)?.parse_address()?;
-    let amount = f64::from_str(&*p1.arg_at(1)?).error_info("amount parsing")?;
+    let destination = p0.destination.parse_address()?;
+    let amount = p0.amount;
     let amount = CurrencyAmount::from_fractional(amount)?;
-    let mut query_addresses = vec![];
-    let mut hm: HashMap<Vec<u8>, KeyPair> = HashMap::new();
+    // let mut query_addresses = vec![];
+    // let mut hm: HashMap<Vec<u8>, KeyPair> = HashMap::new();
     // for x in p0.from {
     //     let address = Address::parse(x)?;
     //     query_addresses.push(address);
     // }
-
-    for i in 0..10 {
-        let kp = p1.words().keypair_at_change(i as i64).expect("works");
-        let x1 = kp.address_typed();
-        let x: Vec<u8> = x1.vec();
-        query_addresses.push(x1);
-        hm.insert(x, kp.clone());
-    }
-
+    let kp = p1.secure_words_or().keypair_at_change(0 as i64).expect("works");
+    //
+    // for i in 0..10 {
+    //     let x1 = kp.address_typed();
+    //     let x: Vec<u8> = x1.vec();
+    //     query_addresses.push(x1);
+    //     hm.insert(x, kp.clone());
+    // }
+    //
     let client = p1.api_client();
-    let result = client.query_address(query_addresses).await?.as_error()?;
-    let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response")?
-        .utxo_entries.clone();
-    // TODO ^ Balance check here
-    if utxos.len() == 0 {
-        return Err(ErrorInfo::error_info("No UTXOs found for this address"));
-    }
-    let option1 = utxos.get(0);
-    let first_uto = option1.safe_get_msg("first")?;
-    let first_addr = first_uto.address()?;
-    let option = hm.get(&first_addr.vec());
-    let kp = option.safe_get_msg("keypair")?.clone().clone();
-
-    let utxo = utxos.get(0).expect("first").clone();
+    // let result = client.query_address(query_addresses).await?.as_error()?;
+    // let utxos = result.query_addresses_response.safe_get_msg("missing query_addresses_response")?
+    //     .utxo_entries.clone();
+    // // TODO ^ Balance check here
+    // if utxos.len() == 0 {
+    //     return Err(ErrorInfo::error_info("No UTXOs found for this address"));
+    // }
+    // let option1 = utxos.get(0);
+    // let first_uto = option1.safe_get_msg("first")?;
+    // let first_addr = first_uto.address()?;
+    // let option = hm.get(&first_addr.vec());
+    // let kp = option.safe_get_msg("keypair")?.clone().clone();
+    //
+    // let utxo = utxos.get(0).expect("first").clone();
     let b = TransactionBuilder::new(&p1)
-        .with_utxo(&utxo)?
+        .with_input_address(&kp.address_typed())
+        .into_api_wrapper()
+        .with_auto_utxos().await?
         .with_output(&destination, &amount)
         .build()?
         .sign(&kp)?;
 
-    let response = client.send_transaction(&b, false).await?;
+    let response = client.send_transaction(&b, true).await?;
     let tx_hex = response.transaction_hash.safe_get()?.hex();
     println!("{}", tx_hex);
     Ok(())
@@ -184,12 +188,13 @@ pub async fn faucet(p0: &FaucetCli, p1: &NodeConfig) -> Result<(), ErrorInfo>  {
 
 pub async fn balance_lookup(request: &BalanceCli, nc: &Box<NodeConfig>) -> Result<(), ErrorInfo> {
     // TODO: Get keypair from prior cli steps.
-    let w = nc.words().keypair_at_change(0).expect("works");
+    let w = nc.secure_words_or().keypair_at_change(0).expect("works");
     let addr = if let Some(a) = request.address.as_ref() {
         a.parse_address()?
     } else {
         w.address_typed()
     };
+    // println!("about to query");
     let response = nc.api_client().query_hash(addr.render_string()?).await?;
     let rounded = rounded_balance_i64(response.address_info.safe_get_msg("missing address_info")?.balance);
     println!("{}", rounded.to_string());
@@ -198,7 +203,7 @@ pub async fn balance_lookup(request: &BalanceCli, nc: &Box<NodeConfig>) -> Resul
 
 
 pub async fn query(p0: &QueryCli, p1: &Box<NodeConfig>) -> Result<(), ErrorInfo> {
-    let h = p1.arg_at(0)?;
+    let h = p0.hash.clone();
     let response = p1.api_client().query_hash(h.clone()).await?;
     println!("{}", json(&response)?);
     Ok(())

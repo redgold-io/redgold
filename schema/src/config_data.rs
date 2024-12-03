@@ -294,7 +294,7 @@ fn get_home_dir() -> Option<String> {
 impl Default for ConfigData {
     fn default() -> Self {
         Self {
-            network: Some(NetworkEnvironment::Main.to_std_string()),
+            network: None,
             home: get_home_dir(),
             config: None,
             data: None,

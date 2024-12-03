@@ -6,7 +6,7 @@ use crate::gui::egui::IconData;
 use egui_extras::RetainedImage;
 use tokio::runtime::Runtime;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::{error_info, structs, ErrorInfoContext};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult};
 use redgold_schema::structs::ErrorInfo;
 use crate::gui;
 use crate::gui::ClientApp;
@@ -34,17 +34,22 @@ pub(crate) fn load_icon() -> IconData {
     }
 }
 
-pub async fn attempt_start<G>(
+pub async fn prepare_start<G>(
     nc: Box<NodeConfig>,
     res: Box<ExternalNetworkResourcesImpl>,
     gui_depends: Box<G>,
     party_data: HashMap<structs::PublicKey, PartyInternalData>
-) -> Result<(), ErrorInfo> where G: Send + Clone + GuiDepends + 'static {
+) -> Result<ClientApp<G>, ErrorInfo> where G: Send + Clone + GuiDepends + 'static
+{
     // let resources = crate::resources::Resources::default();
     // let bytes = resources.logo_bytes;
     // let logo_img = Image::from_bytes("bytes://logo", bytes);
     // let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
     let app = gui::ClientApp::from(nc, res, gui_depends, party_data).await?;
+    Ok(app)
+}
+
+pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Send + Clone + GuiDepends + 'static  {
 
     let mut x = 1400.0;
     let mut y = 1000.0;

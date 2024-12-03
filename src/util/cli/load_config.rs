@@ -22,13 +22,26 @@ pub fn main_config() -> (Box<NodeConfig>, Box<RgArgs>) {
     node_config.args = Arc::new(args.clone());
     (Box::new(node_config), opts)
 }
+//
+// pub fn config_post_processing(config: Box<ConfigData>) -> Box<ConfigData> {
+//     let mut config = config.clone();
+//     let node = config.node.get_or_insert(Default::default());
+//     if node.words.is_none() {
+//         if let Some(s) = config.secure.as_ref().and_then(|sd| sd.salt.clone() {
+//             node.words = Some(s);
+//         }
+//     }
+//     config
+// }
 
 pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {
+    // println!("parsing args");
     let rg_args = if allow_no_args {
         RgArgs::try_parse().unwrap_or(empty_args())
     } else {
         RgArgs::parse()
     };
+    // println!("parsed args");
     let default = environment_only_builder();
     let args = Box::new(rg_args);
     let init = apply_args_initial(args.clone(), default);

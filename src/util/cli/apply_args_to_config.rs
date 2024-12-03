@@ -23,6 +23,7 @@ pub fn apply_args_initial(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<
     config
 }
 pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<ConfigData> {
+    let config = apply_args_initial(rg_args.clone(), config);
     let mut config = config.clone();
     let node = config.node.get_or_insert(Default::default());
     let debug = config.debug.get_or_insert(Default::default());

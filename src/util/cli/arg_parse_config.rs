@@ -69,7 +69,7 @@ impl ArgTranslate {
         
         ArgTranslate {
             node_config,
-            determined_subcommand: None,
+            determined_subcommand: opts.subcmd.clone(),
             abort: false,
             opts: opts.clone()
         }
@@ -121,17 +121,6 @@ impl ArgTranslate {
         ).unwrap_or(std::env::current_dir().ok().expect("Can't get current dir"))
     }
 
-    pub fn load_internal_servers(&mut self) -> Result<(), ErrorInfo> {
-        // TODO: From better data folder options
-        let data_folder = Self::secure_data_or_cwd();
-        let rg = data_folder.join(".rg");
-        let df = DataFolder::from_path(rg);
-        if let Some(servers) = df.all().servers().ok() {
-            self.node_config.servers = servers;
-        }
-        Ok(())
-    }
-
     pub fn read_servers_file(servers: PathBuf) -> Result<Vec<ServerOldFormat>, ErrorInfo> {
         let result = if servers.is_file() {
             let contents = fs::read_to_string(servers)
@@ -145,6 +134,7 @@ impl ArgTranslate {
     }
 
     pub async fn translate_args(mut self) -> Result<Box<NodeConfig>, ErrorInfo> {
+        self.set_gui_on_empty();
 
         let skip_slow_stuff = self.determined_subcommand.clone().map(|x|
             match x {
@@ -154,29 +144,46 @@ impl ArgTranslate {
             }
         ).unwrap_or(false);
 
+        // println!("skip slow stuff: {}", skip_slow_stuff);
+
         self.immediate_debug();
-        self.set_gui_on_empty();
+        // println!("immediate debug: ");
+
         self.check_load_logger()?;
+        // println!("check load logger : ");
         self.determine_network()?;
         self.ports();
-        if !self.node_config.disable_metrics {
+        if !self.node_config.disable_metrics && !skip_slow_stuff {
             metrics_registry::register_metrics(self.node_config.port_offset);
         }
+        // println!("metrics registered: ");
         self.data_folder()?;
+        // println!("data folder: ");
         self.secure_data_folder();
-        self.load_mnemonic()?;
+        // println!("secure data folder: ");
+        self.load_mnemonic().await?;
+        // println!("mnemonic loaded: ");
         self.load_peer_id()?;
+        // println!("peer id loaded: ");
         self.load_peer_tx()?;
-        self.set_public_key();
-        self.load_internal_servers()?;
+        // println!("peer tx loaded: ");
+        if !skip_slow_stuff && !self.is_gui() {
+            self.set_public_key();
+        }
+        // println!("set pk: ");
+
         if !skip_slow_stuff {
+            // println!("slow stuff calc exe: ");
             self.calculate_executable_checksum_hash();
         }
         // info!("E2e enabled");
         if !skip_slow_stuff {
+            // println!("configuring seeds: ");
             self.configure_seeds().await;
         }
+        // println!("setting discovery interval");
         self.set_discovery_interval();
+        // println!("discovery interval set");
         self.genesis();
 
         if self.is_gui() {
@@ -193,9 +200,9 @@ impl ArgTranslate {
         // Unnecessary for CLI commands, hence after immediate commands
         // self.lookup_ip().await;
 
-        tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
-        tracing::info!("Parsed args successfully with args: {:?}", self.args());
-        tracing::info!("RgArgs options parsed: {:?}", self.opts().clear_sensitive());
+        // tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
+        // tracing::info!("Parsed args successfully with args: {:?}", self.args());
+        // tracing::info!("RgArgs options parsed: {:?}", self.opts().clear_sensitive());
         // info!("Development mode: {}", self.opts().development_mode);
 
         Ok(self.node_config)
@@ -285,29 +292,25 @@ impl ArgTranslate {
         gauge!("redgold.node.executable_checksum_last_8", &labels).set(1.0);
     }
 
-    fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
+    async fn load_mnemonic(&mut self) -> RgResult<()> {
 
-        // this step probably removable?
+
+        if self.node_config.config_data.node.as_ref().and_then(|n| n.words.as_ref()).is_some() {
+            return Ok(())
+        }
+
+        // TODO: Rather than mutating configuration, we should populate 'words' directly into NodeConfig
+        // as class instance from generation, and then re-write the changes to the config.
         let mut config_data = (*self.node_config.config_data).clone();
         let node = config_data.node.get_or_insert(Default::default());
-        // Remove any defaults; we want to be explicit
-        node.words = Some("".to_string());
 
-        // First try to load from the all environment data folder for re-use across environments
-        if let Ok(words) = self.node_config.data_folder.all().mnemonic_no_tokio() {
+        // First attempt environment specific mnemonic;
+        if let Ok(words) = self.node_config.env_data_folder().mnemonic().await {
             node.words = Some(words);
-        };
-
-        // Then override with environment specific mnemonic;
-        if let Ok(words) = self.node_config.env_data_folder().mnemonic_no_tokio() {
+        } else if let Ok(words) = self.node_config.data_folder.all().mnemonic().await {
+            // Then any mnemonic
             node.words = Some(words);
-        };
-
-
-        // TODO: Change this to write to the config
-
-        // If empty, generate a new mnemonic;
-        if node.words.as_ref().expect("w").is_empty() {
+        } else {
             if let Some(dbg_id) = self.node_config.debug_id().as_ref() {
                 node.words = Some(WordsPass::from_str_hashed(dbg_id.to_string()).words);
             } else {
@@ -317,11 +320,10 @@ impl ArgTranslate {
                 tracing::info!("Successfully generated new mnemonic");
                 node.words = Some(mnem.clone());
                 let buf = self.node_config.env_data_folder().mnemonic_path();
-                fs::write(
+                tokio::fs::write(
                     buf.clone(),
                     mnem.clone()
-                ).expect("Unable to write mnemonic to file");
-
+                ).await.expect("Unable to write mnemonic to file");
                 info!("Wrote mnemonic to path: {}", buf.to_str().expect("Path format failure"));
             }
         };
@@ -429,29 +431,15 @@ impl ArgTranslate {
         Ok(())
     }
     fn determine_network(&mut self) -> Result<(), ErrorInfo> {
-        if let Some(n) = std::env::var("REDGOLD_NETWORK").ok() {
-            NetworkEnvironment::parse_safe(n)?;
-        }
-        self.node_config.network = match &self.opts().global_settings.network {
+
+        self.node_config.network = match self.node_config.config_data.network.as_ref() {
             None => {
-                if util::local_debug_mode() {
-                    NetworkEnvironment::Debug
-                } else {
-                    NetworkEnvironment::Local
-                }
+                NetworkEnvironment::Main
             }
             Some(n) => {
-                NetworkEnvironment::parse_safe(n.clone())?
+                NetworkEnvironment::from_std_string(n.clone()).unwrap()
             }
         };
-
-        if self.is_gui() && self.node_config.network == NetworkEnvironment::Local {
-            if self.node_config.development_mode() {
-                self.node_config.network = NetworkEnvironment::Dev;
-            } else {
-                self.node_config.network = NetworkEnvironment::Main;
-            }
-        }
 
         if self.node_config.network == NetworkEnvironment::Local || self.node_config.network == NetworkEnvironment::Debug {
             self.node_config.disable_auto_update = true;
@@ -553,7 +541,8 @@ impl ArgTranslate {
         info!("Public key: {}", pk.hex());
     }
     fn secure_data_folder(&mut self) {
-        if let Some(pb) = Self::secure_data_path_buf() {
+        if let Some(pb) = self.node_config.config_data.secure.as_ref().and_then(|sd| sd.path.clone()) {
+            let pb = PathBuf::from(pb);
             let pb_joined = pb.join(".rg");
             self.node_config.secure_data_folder = Some(DataFolder::from_path(pb_joined));
         }

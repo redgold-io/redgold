@@ -340,6 +340,10 @@ pub struct Deploy {
 /// Amount should be a fractional amount, i.e. 0.1 for one tenth of a RDG
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct WalletSend {
+    /// Destination to send funds to, sohould be a parseable address
+    pub destination: String,
+    /// Amount to send, should be a fractional amount, i.e. 0.1 for one tenth of a RDG
+    pub amount: f64,
 }
 
 /// Send a transaction from current (default or active) wallet to a destination address
@@ -370,8 +374,7 @@ pub struct WalletAddress {
 /// Query the network for information on a particular hash, query <hash> as first arg
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct QueryCli {
-    // #[clap(long)]
-    // pub hash: String,
+    pub hash: String,
 }
 
 /// Request funds from the faucet, returns transaction hash associated with faucet transfer.

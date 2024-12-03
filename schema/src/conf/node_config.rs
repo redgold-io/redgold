@@ -141,7 +141,6 @@ pub struct NodeConfig {
     pub load_balancer_url: String,
     pub external_ip: String,
     pub external_host: String,
-    pub servers: Vec<ServerOldFormat>,
     pub log_level: String,
     pub data_folder: DataFolder,
     pub secure_data_folder: Option<DataFolder>,
@@ -167,6 +166,15 @@ impl NodeConfig {
     pub fn mnemonic_words(&self) -> String {
         self.config_data.node.as_ref().and_then(|n| n.words.clone()).expect("mnemonic words")
     }
+
+    pub fn secure_mnemonic_words(&self) -> Option<String> {
+        self.config_data.secure.as_ref().and_then(|n| n.salt.clone())
+    }
+
+    pub fn secure_mnemonic_words_or(&self) -> String {
+        self.secure_mnemonic_words().unwrap_or(self.mnemonic_words())
+    }
+
     pub fn e2e_enabled(&self) -> bool {
         self.config_data.debug.as_ref().and_then(|d| d.enable_live_e2e).unwrap_or(false)
     }
@@ -310,6 +318,12 @@ impl NodeConfig {
 
     pub fn server_index(&self) -> i64 {
         self.config_data.node.as_ref().and_then(|n| n.server_index).unwrap_or(0)
+    }
+
+    pub fn servers_old(&self) -> Vec<ServerOldFormat> {
+        self.config_data.local.as_ref().and_then(|l| l.deploy.as_ref())
+            .map(|d| d.as_old_servers())
+            .unwrap_or_default()
     }
 
     pub fn offline(&self) -> bool {
@@ -565,7 +579,6 @@ impl NodeConfig {
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string(),
             external_host: "localhost".to_string(),
-            servers: vec![],
             log_level: "DEBUG".to_string(),
             data_folder: DataFolder::target(0),
             secure_data_folder: None,

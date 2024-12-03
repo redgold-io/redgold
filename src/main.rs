@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::env;
+use std::{env, thread};
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
@@ -14,6 +14,8 @@ use tokio::runtime::Builder;
 use tokio::sync::Mutex;
 use redgold::core::relay::Relay;
 use redgold::gui;
+use redgold::gui::ClientApp;
+use redgold::gui::initialize::start_native_gui;
 use redgold::gui::native_gui_dependencies::NativeGuiDepends;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
@@ -21,7 +23,8 @@ use redgold::node_config::ApiNodeConfig;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
 use redgold::util::cli::{commands, immediate_commands};
 use redgold::util::cli::load_config::{load_full_config, main_config};
-use redgold_schema::{ErrorInfoContext, SafeOption};
+use redgold::util::runtimes::build_simple_runtime;
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
 use redgold_schema::structs::ErrorInfo;
@@ -33,10 +36,12 @@ use redgold_schema::observability::errors::Loggable;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
     let (nc, opts) = main_config();
+    // println!("loaded main config");
     let cmd = opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
     let mut arg_translate = Box::new(ArgTranslate::new(nc, &opts));
     let nc = arg_translate.translate_args().await.expect("arg translation");
-    info!("Loaded config: {}", nc.config_data.json_or());
+    // println!("translated args");
+    // info!("Loaded config: {}", nc.config_data.json_or());
     let mut abort = false;
     if let Some(cmd) = cmd {
         match *cmd {
@@ -89,51 +94,79 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
 // static ALLOC: dhat::Alloc = dhat::Alloc;
 
 fn main() {
+    // println!("main");
     // let _profiler = dhat::Profiler::new_heap();
 
-    let runtime = Builder::new_multi_thread()
-        .thread_stack_size(32 * 1024 * 1024) // 128 MB stack
-        .worker_threads(num_cpus::get())  // Use all available logical cores
-        .enable_all()
-        .enable_time()
-        .build()
-        .unwrap();
+    // This is a workaround for the stack size issue inherit in clap opt parser
+    // + large config classes.
+    // All of these runtimes are just immediately discarded and only really
+    // used for the CLI + gui issues
+    // None of this is used for main node thread
 
-    runtime.block_on(main_dbg());
+    let (node_config, abort) = big_thread().spawn(|| {
+        let runtime = build_simple_runtime(num_cpus::get(), "config");
+        let ret = runtime.block_on(load_configs());
+        runtime.shutdown_background();
+        ret
+    }).unwrap().join().unwrap();
 
-}
-
-// #[tokio::main]
-// async fn main() {
-async fn main_dbg() {
-
-    let (node_config, abort) = load_configs().await;
     if abort {
         return
     }
 
-    // info!("Starting node main method");
-    counter!("redgold.node.main_started").increment(1);
-
-    tracing::trace!("Starting network environment: {}", node_config.clone().network.to_std_string());
-
-    if node_config.abort {
-        return;
-    }
-
-
     if node_config.is_gui {
-        // this is a lot of data, only reason it's being preloaded here is due to stack.
-        let party_data = if node_config.offline() {
-            Default::default()
-        } else {
-            node_config.api_rg_client().enriched_party_data().await
-        };
-        let res = Box::new(ExternalNetworkResourcesImpl::new(&node_config, None).expect("works"));
-        let g = Box::new(NativeGuiDepends::new(*node_config.clone()));
-        gui::initialize::attempt_start(node_config, res, g, party_data).await.expect("GUI to start");
-        return;
+        let gui = big_thread().spawn(|| {
+            let runtime = build_simple_runtime(num_cpus::get(), "gui");
+            let ret = runtime.block_on(gui_init(node_config));
+            runtime.shutdown_background();
+            ret
+        }).unwrap().join().unwrap();
+        let runtime = build_simple_runtime(num_cpus::get(), "gui");
+        let ret = runtime.block_on(start_native_gui(gui)).expect("GUI to start");
+        return
     }
+
+    let ret = big_thread().spawn(|| {
+        let runtime = build_simple_runtime(num_cpus::get(), "main");
+        let ret = runtime.block_on(main_dbg(node_config));
+        runtime.shutdown_background();
+        ret
+    }).unwrap().join().unwrap();
+
+
+}
+
+fn big_thread() -> std::thread::Builder {
+    thread::Builder::new()
+        .stack_size(512 * 1024 * 1024)
+}
+
+async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends> {
+    // this is a lot of data, only reason it's being preloaded here is due to stack.
+    let party_data = if node_config.offline() {
+        Default::default()
+    } else {
+        node_config.api_rg_client().enriched_party_data().await
+    };
+    let res = Box::new(ExternalNetworkResourcesImpl::new(&node_config, None).expect("works"));
+    let g = Box::new(NativeGuiDepends::new(*node_config.clone()));
+    let ret = gui::initialize::prepare_start(node_config, res, g, party_data).await.expect("GUI to start");
+    ret
+}
+
+// #[tokio::main]
+// async fn main() {
+async fn main_dbg(node_config: Box<NodeConfig>) {
+    //
+    // let (node_config, abort) = load_configs().await;
+    // if abort {
+    //     return
+    // }
+    //
+    // // info!("Starting node main method");
+    // counter!("redgold.node.main_started").increment(1);
+    //
+    // tracing::trace!("Starting network environment: {}", node_config.clone().network.to_std_string());
 
 
     gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);

@@ -156,6 +156,7 @@ pub trait WordsPassNodeConfig {
     fn default_debug() -> Self;
 
     fn default_peer_id(&self) -> RgResult<PeerId>;
+    fn secure_words_or(&self) -> WordsPass;
 }
 
 impl WordsPassNodeConfig for NodeConfig {
@@ -172,6 +173,12 @@ impl WordsPassNodeConfig for NodeConfig {
     fn words(&self) -> WordsPass {
         WordsPass::new(self.mnemonic_words().clone(), None)
     }
+
+    fn secure_words_or(&self) -> WordsPass {
+        WordsPass::new(self.secure_mnemonic_words_or(), None)
+    }
+
+
 
     fn from_test_id(seed_id: &u16) -> Self {
         let words = WordsPass::from_str_hashed(seed_id.to_string()).words;

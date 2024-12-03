@@ -59,7 +59,7 @@ pub async fn update_server_status(
 
 pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
 
-    let servers = local_state.node_config.servers.clone();
+    let servers = local_state.node_config.servers_old().clone();
 
     if local_state.server_state.needs_update {
         local_state.server_state.needs_update = false;
