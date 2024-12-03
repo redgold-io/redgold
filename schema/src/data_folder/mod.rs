@@ -16,10 +16,6 @@ impl EnvDataFolder {
         std::fs::read_to_string(self.mnemonic_path()).error_info("Bad mnemonic read")
     }
 
-    pub async fn mnemonic(&self) -> RgResult<String> {
-        tokio::fs::read_to_string(self.mnemonic_path()).await.error_info("Bad mnemonic read")
-    }
-
     pub fn backups(&self) -> PathBuf {
         self.path.join("backups")
     }
