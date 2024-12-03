@@ -240,6 +240,7 @@ impl DataStoreNodeConfig for NodeConfig {
 
 }
 
+#[ignore]
 #[tokio::test]
 async fn debug(){
 

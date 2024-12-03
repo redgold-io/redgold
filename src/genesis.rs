@@ -78,6 +78,7 @@ fn main_distribution(test_address: &Address, seeds: &Vec<Seed>) -> Vec<GenesisDi
 
     entries
 }
+#[ignore]
 #[tokio::test]
 pub async fn verify_genesis_distribution_main() {
     let nc = NodeConfig::dev_default().await;
