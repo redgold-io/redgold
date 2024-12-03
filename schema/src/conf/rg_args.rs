@@ -21,7 +21,7 @@ pub fn empty_args() -> RgArgs {
             currency: None,
             path: None,
             verbose: false,
-            quiet: false    ,
+            quiet: false,
         },
         debug_args: DebugArgs {
             debug_id: None,
