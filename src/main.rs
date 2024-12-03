@@ -32,11 +32,11 @@ use redgold_schema::config_data::ConfigData;
 use redgold_schema::observability::errors::Loggable;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
-    let nc = main_config();
-    let opts = RgArgs::parse();
+    let (nc, opts) = main_config();
     let cmd = opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
-    let mut arg_translate = Box::new(ArgTranslate::new(nc, opts));
+    let mut arg_translate = Box::new(ArgTranslate::new(nc, &opts));
     let nc = arg_translate.translate_args().await.expect("arg translation");
+    info!("Loaded config: {}", nc.config_data.json_or());
     let mut abort = false;
     if let Some(cmd) = cmd {
         match *cmd {
@@ -92,7 +92,7 @@ fn main() {
     // let _profiler = dhat::Profiler::new_heap();
 
     let runtime = Builder::new_multi_thread()
-        .thread_stack_size(128 * 1024 * 1024) // 128 MB stack
+        .thread_stack_size(32 * 1024 * 1024) // 128 MB stack
         .worker_threads(num_cpus::get())  // Use all available logical cores
         .enable_all()
         .enable_time()

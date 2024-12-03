@@ -19,6 +19,7 @@ pub fn apply_args_initial(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<
     if config.network.is_none() && config.debug.as_ref().and_then(|x| x.develop).unwrap_or(false) {
         config.network = Some(NetworkEnvironment::Dev.to_std_string());
     }
+
     config
 }
 pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<ConfigData> {
@@ -27,6 +28,9 @@ pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<Co
     let debug = config.debug.get_or_insert(Default::default());
     let cli = config.cli.get_or_insert(Default::default());
 
+    if let Some(n) = rg_args.global_settings.network.as_ref() {
+        config.network = Some(n.clone());
+    }
 
     if let Some(w) = rg_args.global_settings.words.as_ref() {
         node.words = Some(w.clone());

@@ -57,21 +57,21 @@ pub struct ArgTranslate {
     pub node_config: Box<NodeConfig>,
     pub determined_subcommand: Option<RgTopLevelSubcommand>,
     pub abort: bool,
-    pub opts: RgArgs,
+    pub opts: Box<RgArgs>,
 }
 
 impl ArgTranslate {
 
     pub fn new(
         node_config: Box<NodeConfig>,
-        opts: RgArgs
+        opts: &Box<RgArgs>
     ) -> Self {
         
         ArgTranslate {
             node_config,
             determined_subcommand: None,
             abort: false,
-            opts
+            opts: opts.clone()
         }
     }
     
@@ -416,7 +416,7 @@ impl ArgTranslate {
                 RgTopLevelSubcommand::GUI(_) => { true }
                 RgTopLevelSubcommand::Node(_) => { true }
                 // RgTopLevelSubcommand::TestTransaction(_) => {true}
-                _ => { false }
+                _ => { true }
             }
         }
         if enable_logger {
@@ -455,6 +455,7 @@ impl ArgTranslate {
 
         if self.node_config.network == NetworkEnvironment::Local || self.node_config.network == NetworkEnvironment::Debug {
             self.node_config.disable_auto_update = true;
+            info!("Setting load balancer url to localhost due to Local / Debug network configuration");
             self.node_config.load_balancer_url = "127.0.0.1".to_string();
         }
         Ok(())

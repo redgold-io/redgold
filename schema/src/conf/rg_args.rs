@@ -111,6 +111,10 @@ pub struct CliSettings {
     /// Include verbose / debug output for CLI commands instance of compact outputs.
     #[clap(long, env = "REDGOLD_CLI_VERBOSE")]
     pub verbose: bool,
+    /// Remove CLI command outputs in favor of less info, ideally parse-able
+    #[clap(long, env = "REDGOLD_CLI_QUIET")]
+    pub quiet: bool,
+
 }
 
 

@@ -115,6 +115,7 @@ pub struct CliSettings {
     pub currency: Option<String>,
     pub path: Option<String>,
     pub verbose: Option<bool>,
+    pub quiet: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]

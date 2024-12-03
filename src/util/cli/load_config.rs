@@ -14,14 +14,13 @@ use redgold_schema::structs::NetworkEnvironment;
 use crate::util::cli::apply_args_to_config::{apply_args_final, apply_args_initial};
 
 
-pub fn main_config() -> Box<NodeConfig> {
+pub fn main_config() -> (Box<NodeConfig>, Box<RgArgs>) {
     let (opts, cfg) = load_full_config(false);
-    drop(*opts);
     let mut node_config = NodeConfig::default();
     let args = std::env::args().collect_vec();
     node_config.config_data = Arc::new(*cfg.clone());
     node_config.args = Arc::new(args.clone());
-    Box::new(node_config)
+    (Box::new(node_config), opts)
 }
 
 pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {

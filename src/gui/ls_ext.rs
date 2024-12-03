@@ -42,8 +42,8 @@ pub async fn local_state_from<G>(
 ) -> Result<LocalState, ErrorInfo>
 where G: Send + Clone + GuiDepends {
     let mut node_config = node_config.clone();
-    node_config.load_balancer_url = "lb.redgold.io".to_string();
-    let iv = sym_crypt::get_iv();
+    // node_config.load_balancer_url = "lb.redgold.io".to_string();
+    // let iv = sym_crypt::get_iv();
     let ds_env = node_config.data_store_all().await;
     let ds_env_secure = node_config.data_store_all_secure().await;
     let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
@@ -57,6 +57,8 @@ where G: Send + Clone + GuiDepends {
     ).await.expect("migrations");
     // DataStore::run_migrations(&ds_or).await.expect("");
     let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words().clone());
+
+    let config = gui_depends.get_config();
     let local_stored_state = ds_or.config_store.get_stored_state().await?;
 
     // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
