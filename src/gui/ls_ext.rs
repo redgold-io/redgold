@@ -26,7 +26,7 @@ use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
 use redgold_gui::tab::home::HomeState;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::tabs::identity_tab::IdentityState;
-use crate::gui::tabs::keys::keygen_subtab::KeygenState;
+use redgold_gui::tab::keys::keygen::KeygenState;
 use crate::gui::tabs::settings_tab::SettingsState;
 use crate::gui::tabs::transact::wallet_tab::{StateUpdate, WalletState};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
@@ -42,31 +42,13 @@ pub async fn local_state_from<G>(
 ) -> Result<LocalState, ErrorInfo>
 where G: Send + Clone + GuiDepends {
     let mut node_config = node_config.clone();
-    // node_config.load_balancer_url = "lb.redgold.io".to_string();
-    // let iv = sym_crypt::get_iv();
-    let ds_env = node_config.data_store_all().await;
-    let ds_env_secure = node_config.data_store_all_secure().await;
-    let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
-    // info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
-    let string = ds_or.ctx.connection_path.clone().replace("file:", "");
-    // info!("ds_or connection path {}", string);
-    // info!("starting environment {}", node_config.network.to_std_string());
-    ds_or.run_migrations_fallback_delete(
-        true,
-        PathBuf::from(string)
-    ).await.expect("migrations");
-    // DataStore::run_migrations(&ds_or).await.expect("");
+
     let hot_mnemonic = node_config.secure_mnemonic_words_or();
 
     let config = gui_depends.get_config();
-    let local_stored_state = ds_or.config_store.get_stored_state().await?;
-
-    // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
+    let local_stored_state = config.local.unwrap_or_default();
 
     let mut ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
-
-    ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
-        .all().servers_path().to_str().expect("").to_string();
 
     let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
     for c in queryable_balances() {
@@ -107,8 +89,6 @@ where G: Send + Clone + GuiDepends {
         ),
         address_state: Default::default(),
         otp_state: Default::default(),
-        ds_env,
-        ds_env_secure,
         local_stored_state,
         updates: new_channel(),
         keytab_state: Default::default(),
@@ -121,6 +101,7 @@ where G: Send + Clone + GuiDepends {
         party_data,
         first_party,
         airgap_signer: Default::default(),
+        persist_requested: false,
     };
 
     ls.wallet.send_tx_progress.with_config(&node_config);

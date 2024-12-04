@@ -43,7 +43,7 @@ impl GuiDepends for WasmGuiDepends {
         todo!()
     }
 
-    fn set_config(&self, config: &ConfigData) {
+    fn set_config(&mut self, config: &ConfigData) {
         todo!()
     }
 

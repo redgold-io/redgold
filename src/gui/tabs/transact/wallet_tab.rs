@@ -473,7 +473,7 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
     match local_state.wallet.updates.recv_while() {
         Ok(updates) => {
             for mut update in updates {
-                info!("Received item of update, applying");
+                // info!("Received item of update, applying");
                 (update.update)(local_state);
                 // info!("New wallet state faucet message: {}", local_state.wallet_state.faucet_success.clone());
             }

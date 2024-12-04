@@ -72,7 +72,10 @@ impl GuiDepends for NativeGuiDepends {
         self.nc.secure_or().config().unwrap().unwrap()
     }
 
-    fn set_config(&self, config: &ConfigData) {
+    fn set_config(&mut self, config: &ConfigData) {
+        let mut nc = (*self.nc).clone();
+        nc.config_data = Arc::new(config.clone());
+        self.nc = Arc::new(nc);
         self.nc.secure_or().write_config(config).unwrap();
     }
 
@@ -219,7 +222,7 @@ impl GuiDepends for NativeGuiDepends {
             let mut result = tokio::spawn(f);
             tokio::select! {
             _ = &mut result => {},
-            _ = interrupt => {
+            _ = interrupt.into_recv_async() => {
                     result.abort();
                 },
             }

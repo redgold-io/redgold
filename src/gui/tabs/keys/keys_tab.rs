@@ -21,6 +21,7 @@ use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
 use crate::gui::components::save_key_window;
 use crate::gui::components::xpub_req::RequestXpubState;
 use crate::gui::tabs::keys::keygen_subtab;
+use crate::gui::tabs::keys::keygen_subtab::MnemonicWindowStateWordSupport;
 use crate::gui::tabs::keys::show_xpub_window::show_xpub_window;
 use crate::gui::tabs::keys::xpub_csv_loader::window_xpub_loader;
 use crate::gui::tabs::transact::wallet_tab::{hot_passphrase_section};
@@ -340,7 +341,7 @@ pub fn internal_stored_xpubs<G>(
 
         if ls.wallet.last_selected_xpub_name != ls.wallet.selected_xpub_name {
             ls.wallet.last_selected_xpub_name = ls.wallet.selected_xpub_name.clone();
-            info!("Selected xpub changed to {} returning {}", ls.wallet.selected_xpub_name.clone(), xpub.json_or());
+            // info!("Selected xpub changed to {} returning {}", ls.wallet.selected_xpub_name.clone(), xpub.json_or());
             update = true;
         }
 

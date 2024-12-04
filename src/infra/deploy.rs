@@ -21,7 +21,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
-use redgold_common_no_wasm::cmd::{run_bash_async, run_command_os, run_powershell_async};
+use redgold_common_no_wasm::cmd::{run_bash_async, run_cmd_safe, run_command_os, run_powershell_async};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
@@ -336,7 +336,9 @@ pub async fn deploy_redgold<T: SSHLike>(
     dpl_tuple: Option<(Deployment, ServerData, NodeInstance)>,
     nc: &Box<NodeConfig>
 ) -> Result<(), ErrorInfo> {
-
+    let is_local = dpl_tuple.as_ref().and_then(|(_, s, n)| {
+        s.is_localhost
+    }).unwrap_or(false);
     let data_folder = if ssh.server.host.is_empty() {
         // home directory
         let mut home = get_default_data_top_folder();
@@ -371,6 +373,7 @@ pub async fn deploy_redgold<T: SSHLike>(
         ssh.exes("echo 'y' | sudo ufw enable", p).await?;
 
         let compose = ssh.exes("docker-compose", p).await?;
+        ssh.exes("sudo apt-get install docker-compose-plugin", p).await?;
         if !(compose.contains("applications")) {
             ssh.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
             ssh.exes("sudo apt install -y docker-compose", p).await?;
@@ -413,9 +416,29 @@ pub async fn deploy_redgold<T: SSHLike>(
     // TODO: Also wget from github directly depending on security concerns -- not verified from checksum hash
     // Only should be done to override if the given exe is outdated.
     ssh.exes(format!("mkdir -p {}", path), p).await?;
-    ssh.copy_p(r.redgold_docker_compose, format!("{}/redgold-only.yml", path), p).await?;
-
+    let mut compose_str = r.redgold_docker_compose;
     let port = network.default_port_offset();
+
+    let all_open_ports = vec![-1, 0, 1, 4, 5, 6].iter().map(|p| ((port as i64) + p) as u16)
+        .collect_vec();
+
+    if is_local {
+
+        let hostname = run_command_os("hostname".to_string()).await?.0;
+        let mut replace_str = r#"ports:
+      {{PORTS}}
+    deploy:
+      placement:
+        constraints:
+          - "node.hostname=={{your-node-name}}"#.to_string();
+        replace_str = replace_str.replace("{{your-node-name}}", &hostname);
+        let ports = all_open_ports.iter().map(|p| format!("- '{}':'{}'", p, p)).join("\n    ");
+        replace_str = replace_str.replace("{{PORTS}}", &ports);
+        compose_str.replace("network_mode: host", &*replace_str);
+    }
+
+    ssh.copy_p(compose_str, format!("{}/redgold-only.yml", path), p).await?;
+
     let mut env = additional_env.unwrap_or(Default::default());
     // env.insert("REDGOLD_NETWORK".to_string(), network.to_std_string());
     // env.insert("REDGOLD_GENESIS".to_string(), is_genesis.to_string());
@@ -499,7 +522,6 @@ pub async fn deploy_redgold<T: SSHLike>(
     let mut config2 = cloned.clone();
     let toml_config = toml::to_string(&cloned).error_info("toml config")?;
 
-
     if !disable_system {
         // TODO: Lol not this
         let port_range: Vec<i64> = vec![-1, 0, 1, 4, 5, 6];
@@ -530,7 +552,14 @@ pub async fn deploy_redgold<T: SSHLike>(
     }
     ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
     if start_node {
-        ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+
+        if is_local {
+            // swarm init before hand if system level
+            // docker stack deploy -c docker-compose.yml your-stack-name.
+            ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+        } else {
+            ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+        }
         if is_genesis {
             // After starting node for the first time, mark the environment file as not genesis
             // for the next time.
@@ -888,12 +917,12 @@ pub async fn default_deploy(
         servers_preload
     } else {
         let buf = df.all().servers_path();
-        println!("Reading servers file: {:?}", buf);
+        // println!("Reading servers file: {:?}", buf);
         ArgTranslate::read_servers_file(buf)?
     };
 
     // TODO: Filter servers by environment, also optionally pass them from the GUI?
-    println!("Setting up servers: {:?}", servers_original);
+    // println!("Setting up servers: {:?}", servers_original);
     // let mut gen = true;
     let purge = deploy.purge;
     let mut gen = deploy.genesis;
@@ -924,7 +953,7 @@ pub async fn default_deploy(
 
     let mut peer_id_index: HashMap<i64, String> = HashMap::default();
 
-    let mut pid_tx: HashMap<String, structs::Transaction> = HashMap::default();
+    let mut pid_tx: HashMap<String, Transaction> = HashMap::default();
     let nc = Box::new(node_config.clone());
 
     for (ii, ss) in servers.iter().enumerate() {
@@ -971,7 +1000,7 @@ pub async fn default_deploy(
         };
         peer_id_index.insert(ss.peer_id_index, peer_id_hex.clone());
         let hm = hm.clone();
-        println!("Setting up server: {}", ss.host.clone());
+        // println!("Setting up server: {}", ss.host.clone());
 
         if let Some(o) = &deploy.server_offline_info {
             let p = PathBuf::from(o);

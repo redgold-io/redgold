@@ -5,6 +5,7 @@ use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
 use itertools::{Either, Itertools};
+use nix::NixPath;
 use tracing::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
@@ -21,6 +22,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};
 use redgold_schema::conf::rg_args::Deploy;
+use redgold_schema::errors::into_error::ToErrorInfo;
 
 pub trait ServerClient {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient;
@@ -28,7 +30,12 @@ pub trait ServerClient {
 
 impl ServerClient for ServerOldFormat {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient {
-        RgHttpClient::from_env(self.host.clone(), network_environment)
+        let h = if self.host.is_empty() {
+            "127.0.0.1".to_string()
+        } else {
+            self.host.clone()
+        };
+        RgHttpClient::from_env(h, network_environment)
     }
 }
 
@@ -38,6 +45,9 @@ pub async fn update_server_status(
 ) {
 
     for server in servers {
+        if server.host.is_empty() {
+            continue;
+        }
         let mut ssh = DeployMachine::new(&server, None, None);
         let reachable = ssh.verify().await.is_ok();
         let docker_ps_online = ssh.verify_docker_running(&network_environment).await.is_ok();
@@ -281,13 +291,14 @@ where G: GuiDepends + Clone + Send + 'static {
 
         let output_handler = Some(c.sender.clone());
         let arc = state.deployment_result.clone();
+        let s2 = servers.clone();
         let deploy_join = g.spawn_interrupt(async move {
             let f = output_handler.clone();
             let f2 = output_handler.clone();
             let mut d2 = d.clone();
             let mut d3 = d2.clone();
             let nc = config.clone();
-            let s = servers.clone();
+            let s = s2.clone();
             let dpl = deployment.clone();
             let _res = default_deploy(&mut d2, &nc, f, Some(s), dpl.clone()).await;
             info!("Deploy complete {}", _res.json_or());

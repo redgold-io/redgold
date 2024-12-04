@@ -17,14 +17,14 @@ impl ReceiveData {
 
     pub fn from_public_key<G>(public_key: &PublicKey, g: &G) -> Self where G: GuiDepends + Send + Clone + 'static {
         let addrs = g.to_all_address(public_key);
-        info!("receive data addrs: {}", addrs.iter().map(|a| a.render_string().unwrap()).collect::<Vec<String>>().join(", "));
-        addrs.iter().map(|a| a.as_external().currency_or().json_or()).for_each(|c| info!("receive data currency: {}", c));
+        // info!("receive data addrs: {}", addrs.iter().map(|a| a.render_string().unwrap()).collect::<Vec<String>>().join(", "));
+        // addrs.iter().map(|a| a.as_external().currency_or().json_or()).for_each(|c| info!("receive data currency: {}", c));
 
         let encode = |supported_currency: SupportedCurrency| {
             let address = addrs.iter()
                 .filter(|a| a.as_external().currency_or() == supported_currency).next().unwrap().clone()
                 .render_string().unwrap();
-            info!("receive data {} address: {}", supported_currency.json_or(), address);
+            // info!("receive data {} address: {}", supported_currency.json_or(), address);
             let mut image = qr_encode_image(address);
             image.fit_to_exact_size(Vec2::new(250.0, 250.0))
         };

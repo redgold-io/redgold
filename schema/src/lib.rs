@@ -741,6 +741,7 @@ impl ShortString for String {
         let len = self.len();
         let start = (len as i32) - n.into();
         if start < 0 {
+            return Ok("".to_string());
             return Err(error_info("string too short to short_string"));
         }
         let start = start as usize;

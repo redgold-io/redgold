@@ -58,8 +58,6 @@ pub struct LocalState {
     pub settings_state: SettingsState,
     pub address_state: AddressState,
     pub otp_state: OtpState,
-    pub ds_env: DataStore,
-    pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
     pub updates: Channel<StateUpdate>,
     pub keytab_state: KeyTabState,
@@ -72,14 +70,14 @@ pub struct LocalState {
     pub party_data: HashMap<PublicKey, PartyInternalData>,
     pub first_party: Option<PartyInternalData>,
     pub airgap_signer: AirgapSignerWindow,
+    pub persist_requested: bool
 }
 
 pub trait LocalStateAddons {
     fn process_tab_change(&mut self, p0: Tab);
     fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool);
     fn add_with_pass_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool, passphrase: Option<String>);
-    fn secure_or(&self) -> DataStore;
-    fn persist_local_state_store(&self);
+    fn persist_local_state_store(&mut self);
     fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<AccountKeySource>, prepend: bool) -> RgResult<()>;
     fn upsert_identity(&mut self, new_named: Identity) -> ();
     fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> ();
@@ -144,18 +142,16 @@ impl LocalStateAddons for LocalState {
         }).unwrap();
     }
 
-    fn secure_or(&self) -> DataStore {
-        self.ds_env_secure.clone().unwrap_or(self.ds_env.clone())
-    }
 
 
-    fn persist_local_state_store(&self) {
-        let store = self.secure_or();
+    fn persist_local_state_store(&mut self) {
+        /*let store = self.secure_or();
         let mut state = self.local_stored_state.clone();
         state.clear_sensitive();
         tokio::spawn(async move {
             store.config_store.update_stored_state(state).await
-        });
+        });*/
+        self.persist_requested = true;
     }
     fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<AccountKeySource>, prepend: bool) -> RgResult<()> {
         let new_names = new_named.iter().map(|x| x.name.clone())
@@ -310,7 +306,7 @@ use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::server_tab;
-use crate::gui::tabs::keys::keygen_subtab::KeygenState;
+use redgold_gui::tab::keys::keygen::KeygenState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
@@ -335,6 +331,12 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
     let mut g = app.gui_depends.clone();
     let local_state = &mut app.local_state;
     g.set_network(&local_state.node_config.network);
+    if local_state.persist_requested {
+        let mut c = g.get_config();
+        c.local = Some(local_state.local_stored_state.clone());
+        g.set_config(&c);
+        local_state.persist_requested = false;
+    }
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
