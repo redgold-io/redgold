@@ -555,8 +555,8 @@ pub async fn deploy_redgold<T: SSHLike>(
 
         if is_local {
             // swarm init before hand if system level
-            // docker stack deploy -c docker-compose.yml your-stack-name.
-            ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+            // .
+            ssh.exes(format!("cd {}; docker stack deploy -c redgold-only.yml redgold-{}", path, network.to_std_string()), p).await?;
         } else {
             ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
         }

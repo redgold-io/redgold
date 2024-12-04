@@ -610,23 +610,8 @@ impl NodeConfig {
     }
 
     pub fn secure_path(&self) -> Option<String> {
-        // TODO: Move to arg translate
-        std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
+        self.config_data.secure.as_ref().and_then(|s| s.path.clone())
     }
 
-    // TODO: this is wrong
-    pub fn secure_all_path(&self) -> Option<String> {
-        // TODO: Move to arg translate
-        std::env::var("REDGOLD_SECURE_DATA_PATH").ok().map(|p| {
-            let buf = PathBuf::from(p);
-            buf.join(NetworkEnvironment::All.to_std_string())
-        }).map(|p| p.to_str().expect("failed to render ds path").to_string())
-    }
-
-    pub fn secure_mnemonic(&self) -> Option<String> {
-        self.secure_all_path().and_then(|p| {
-            fs::read_to_string(p).ok()
-        })
-    }
 
 }
