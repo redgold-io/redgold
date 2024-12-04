@@ -16,7 +16,7 @@ use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use crate::core::internal_message::{new_channel, Channel};
@@ -26,7 +26,7 @@ use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
 use redgold_gui::tab::home::HomeState;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::tabs::identity_tab::IdentityState;
-use crate::gui::tabs::keys::keygen_subtab::KeygenState;
+use redgold_gui::tab::keys::keygen::KeygenState;
 use crate::gui::tabs::settings_tab::SettingsState;
 use crate::gui::tabs::transact::wallet_tab::{StateUpdate, WalletState};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
@@ -42,29 +42,13 @@ pub async fn local_state_from<G>(
 ) -> Result<LocalState, ErrorInfo>
 where G: Send + Clone + GuiDepends {
     let mut node_config = node_config.clone();
-    node_config.load_balancer_url = "lb.redgold.io".to_string();
-    let iv = sym_crypt::get_iv();
-    let ds_env = node_config.data_store_all().await;
-    let ds_env_secure = node_config.data_store_all_secure().await;
-    let ds_or = ds_env_secure.clone().unwrap_or(ds_env.clone());
-    info!("Starting local state with secure_or connection path {}", ds_or.ctx.connection_path.clone());
-    let string = ds_or.ctx.connection_path.clone().replace("file:", "");
-    info!("ds_or connection path {}", string);
-    info!("starting environment {}", node_config.network.to_std_string());
-    ds_or.run_migrations_fallback_delete(
-        true,
-        PathBuf::from(string)
-    ).await.expect("migrations");
-    // DataStore::run_migrations(&ds_or).await.expect("");
-    let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words.clone());
-    let local_stored_state = ds_or.config_store.get_stored_state().await?;
 
-    // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
+    let hot_mnemonic = node_config.secure_mnemonic_words_or();
 
-    let mut ss = crate::gui::tabs::server_tab::ServersState::default();
+    let config = gui_depends.get_config();
+    let local_stored_state = config.local.unwrap_or_default();
 
-    ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
-        .all().servers_path().to_str().expect("").to_string();
+    let mut ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
 
     let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
     for c in queryable_balances() {
@@ -94,7 +78,7 @@ where G: Send + Clone + GuiDepends {
         keygen_state: KeygenState::new(
             node_config.clone().executable_checksum.clone().unwrap_or("".to_string())
         ),
-        wallet: WalletState::new(hot_mnemonic, local_stored_state.xpubs.as_ref().and_then(|x| x.first())),
+        wallet: WalletState::new(hot_mnemonic, local_stored_state.keys.as_ref().and_then(|x| x.first())),
         qr_state: Default::default(),
         qr_show_state: Default::default(),
         identity_state: IdentityState::new(),
@@ -105,8 +89,6 @@ where G: Send + Clone + GuiDepends {
         ),
         address_state: Default::default(),
         otp_state: Default::default(),
-        ds_env,
-        ds_env_secure,
         local_stored_state,
         updates: new_channel(),
         keytab_state: Default::default(),
@@ -119,6 +101,7 @@ where G: Send + Clone + GuiDepends {
         party_data,
         first_party,
         airgap_signer: Default::default(),
+        persist_requested: false,
     };
 
     ls.wallet.send_tx_progress.with_config(&node_config);
@@ -133,7 +116,7 @@ where G: Send + Clone + GuiDepends {
 
 
     ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
-    info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
+    // info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
 
     for cur in vec![
         SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::Usdt, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::Usdc
@@ -141,7 +124,7 @@ where G: Send + Clone + GuiDepends {
         let delta = gui_depends.get_24hr_delta(cur.clone()).await;
         ls.data.delta_24hr_external.insert(cur.clone(), delta);
     }
-    info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
+    // info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
 
     if node_config.development_mode() {
         ls.server_state.ops = false;
@@ -186,7 +169,7 @@ where G: Send + Clone + GuiDepends {
             let dp_btc_faucet = "m/84'/0'/0'/0/0".to_string();
             if let Ok(xpub) = w.xpub_str(&dp_btc_faucet.as_account_path().expect("acc")) {
                 let pk = XpubWrapper::new(xpub.clone()).public_at(0, 0).unwrap();
-                let mut named = NamedXpub::default();
+                let mut named = AccountKeySource::default();
                 named.all_address = Some(gui_depends.to_all_address(&pk));
                 let key_into = key_name.clone();
                 named.name = format!("{}_840", key_into);
@@ -207,7 +190,7 @@ where G: Send + Clone + GuiDepends {
         ls.add_named_xpubs(true, new_xpubs, true).expect("Adding xpubs");
     }
 
-    if ls.local_stored_state.xpubs.clone().unwrap_or_default().len() > 2 {
+    if ls.local_stored_state.keys.clone().unwrap_or_default().len() > 2 {
         ls.wallet.send_address_input_box.address_input_mode = redgold_gui::components::address_input_box::AddressInputMode::Saved;
     }
 

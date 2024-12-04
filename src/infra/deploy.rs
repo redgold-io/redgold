@@ -7,6 +7,7 @@ use std::time::Duration;
 use flume::Sender;
 
 use std::io::prelude::*;
+use std::sync::Arc;
 use async_trait::async_trait;
 use itertools::Itertools;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
@@ -20,7 +21,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
-use redgold_common_no_wasm::cmd::{run_bash_async, run_powershell_async};
+use redgold_common_no_wasm::cmd::{run_bash_async, run_cmd_safe, run_command_os, run_powershell_async};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use crate::api::rosetta::models::Peer;
 use crate::core::internal_message::SendErrorInfo;
@@ -30,8 +31,10 @@ use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
 use redgold_schema::conf::node_config::NodeConfig;
 use crate::resources::Resources;
-use crate::util::cli::arg_parse_config::ArgTranslate;
+use crate::util::cli::arg_parse_config::{get_default_data_top_folder, ArgTranslate};
 use redgold_schema::conf::rg_args::Deploy;
+use redgold_schema::conf::server_config::{Deployment, NodeInstance, ServerData};
+use redgold_schema::config_data::ConfigData;
 use redgold_schema::data_folder::DataFolder;
 
 #[async_trait]
@@ -49,6 +52,7 @@ pub struct SSHProcessInvoke {
     strict_host_key_checking: bool,
     output_handler: Option<Sender<String>>
 }
+
 
 #[async_trait]
 impl SSHLike for SSHProcessInvoke {
@@ -88,10 +92,6 @@ impl SSHLike for SSHProcessInvoke {
     }
 }
 
-pub fn is_windows() -> bool {
-    env::consts::OS == "windows"
-}
-
 impl SSHProcessInvoke {
 
     pub(crate) fn new(host: impl Into<String>, output_handler: Option<Sender<String>>) -> Self {
@@ -125,18 +125,69 @@ impl SSHProcessInvoke {
                output_handler: Option<Sender<String>>,
                cmd: String
     ) -> RgResult<String> {
-        let (stdout, stderr) = if !is_windows() {
-            run_bash_async(cmd).await?
-        } else {
-            run_powershell_async(cmd).await?
-        };
+        let (stdout, stderr) = run_command_os(cmd).await?;
         if let Some(s) = output_handler {
             self.output(stdout.clone())?;
             self.output(stderr.clone())?;
         }
         Ok(format!("{}\n{}", stdout, stderr).to_string())
     }
+
 }
+
+
+pub struct LocalSSHLike {
+    pub(crate) output_handler: Option<Sender<String>>
+}
+
+impl LocalSSHLike {
+    pub fn new(output_handler: Option<Sender<String>>) -> Self {
+        Self {
+            output_handler
+        }
+    }
+
+    async fn run_cmd(&self,
+                     output_handler: Option<Sender<String>>,
+                     cmd: String
+    ) -> RgResult<String> {
+        let (stdout, stderr) = run_command_os(cmd).await?;
+        if let Some(s) = output_handler {
+            self.output(stdout.clone())?;
+            self.output(stderr.clone())?;
+        }
+        Ok(format!("{}\n{}", stdout, stderr).to_string())
+    }
+
+}
+
+#[async_trait]
+impl SSHLike for LocalSSHLike {
+    async fn execute(&self, command: impl Into<String> + Send, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        self.run_cmd(output_handler, command.into()).await
+    }
+
+
+    async fn scp(&self, local_file: impl Into<String> + Send, remote_file: impl Into<String> + Send, to_dest: bool, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        let lf = local_file.into();
+        let rf = remote_file.into();
+        let first_arg = if to_dest { lf.clone() } else { rf.clone() };
+        let last_arg = if to_dest { rf } else { lf };
+        let cmd = format!(
+            "cp {} {}",
+            first_arg, last_arg
+        );
+        self.run_cmd(output_handler, cmd).await
+    }
+
+    fn output(&self, o: impl Into<String>) -> RgResult<()> {
+        if let Some(s) = self.output_handler.clone() {
+            s.send_rg_err(o.into())?;
+        };
+        Ok(())
+    }
+}
+
 
 #[ignore]
 #[tokio::test]
@@ -267,23 +318,44 @@ impl<S: SSHLike> DeployMachine<S> {
 /**
 Updates to this cannot be explicitly watched through docker watchtower for automatic updates
 They must be manually deployed.
-
- This whole thing should really have a streaming output for the lines and stuff.
  */
-pub async fn deploy_redgold(
-     mut ssh: DeployMachine<SSHProcessInvoke>,
-     network: NetworkEnvironment,
-     is_genesis: bool,
-     additional_env: Option<HashMap<String, String>>,
-     purge_data: bool,
-     words: Option<String>,
-     peer_id_hex: Option<String>,
-     start_node: bool,
-     alias: Option<String>,
-     ser_pid_tx: Option<String>,
-     p: &Option<Sender<String>>,
-     disable_system: bool
- ) -> Result<(), ErrorInfo> {
+pub async fn deploy_redgold<T: SSHLike>(
+    mut ssh: DeployMachine<T>,
+    network: NetworkEnvironment,
+    is_genesis: bool,
+    additional_env: Option<HashMap<String, String>>,
+    purge_data: bool,
+    words: Option<String>,
+    peer_id_hex: Option<String>,
+    start_node: bool,
+    alias: Option<String>,
+    ser_pid_tx: Option<String>,
+    p: &Option<Sender<String>>,
+    disable_system: bool,
+    config_data: Arc<ConfigData>,
+    dpl_tuple: Option<(Deployment, ServerData, NodeInstance)>,
+    nc: &Box<NodeConfig>
+) -> Result<(), ErrorInfo> {
+    let is_local = dpl_tuple.as_ref().and_then(|(_, s, n)| {
+        s.is_localhost
+    }).unwrap_or(false);
+    let data_folder = if ssh.server.host.is_empty() {
+        // home directory
+        let mut home = get_default_data_top_folder();
+        if let Some((_, _, ni)) = dpl_tuple.as_ref() {
+            if ni.use_id_ds_prefix.unwrap_or(false) {
+                home = home.join("id_index");
+                home = home.join(ni.index.unwrap_or(0).to_string());
+            }
+        }
+        home.to_str().unwrap().to_string()
+    } else {
+        if let Some(u) = ssh.server.username.as_ref() {
+            format!("/home/{}/.rg", u)
+        } else {
+            "/root/.rg".to_string()
+        }
+    };
 
     ssh.verify().await?;
 
@@ -301,6 +373,7 @@ pub async fn deploy_redgold(
         ssh.exes("echo 'y' | sudo ufw enable", p).await?;
 
         let compose = ssh.exes("docker-compose", p).await?;
+        ssh.exes("sudo apt-get install docker-compose-plugin", p).await?;
         if !(compose.contains("applications")) {
             ssh.exes("curl -fsSL https://get.docker.com -o get-docker.sh; sh ./get-docker.sh", p).await?;
             ssh.exes("sudo apt install -y docker-compose", p).await?;
@@ -308,8 +381,8 @@ pub async fn deploy_redgold(
     }
     let r = Resources::default();
 
-    let path = format!("/root/.rg/{}", network.to_std_string());
-    let all_path = format!("/root/.rg/{}", NetworkEnvironment::All.to_std_string());
+    let path = format!("{}/{}", data_folder, network.to_std_string());
+    let all_path = format!("{}/{}",data_folder, NetworkEnvironment::All.to_std_string());
      let maybe_main_path = if network == NetworkEnvironment::Main {
          path.clone()
      } else {
@@ -319,7 +392,7 @@ pub async fn deploy_redgold(
     ssh.exes(format!("mkdir -p {}", path), p).await?;;
     ssh.exes(format!("mkdir -p {}", all_path), p).await?;;
      // Copy mnemonic / peer_id
-     if let Some(words) = words {
+     if let Some(words) = words.clone() {
          if network != NetworkEnvironment::Main {
              let env_remote = format!("{}/mnemonic", path);
              ssh.exes(format!("rm {}", env_remote), p).await?;
@@ -343,23 +416,45 @@ pub async fn deploy_redgold(
     // TODO: Also wget from github directly depending on security concerns -- not verified from checksum hash
     // Only should be done to override if the given exe is outdated.
     ssh.exes(format!("mkdir -p {}", path), p).await?;
-    ssh.copy_p(r.redgold_docker_compose, format!("{}/redgold-only.yml", path), p).await?;
-
+    let mut compose_str = r.redgold_docker_compose;
     let port = network.default_port_offset();
+
+    let all_open_ports = vec![-1, 0, 1, 4, 5, 6].iter().map(|p| ((port as i64) + p) as u16)
+        .collect_vec();
+
+    if is_local {
+
+        let hostname = run_command_os("hostname".to_string()).await?.0;
+        let mut replace_str = r#"ports:
+      {{PORTS}}
+    deploy:
+      placement:
+        constraints:
+          - "node.hostname=={{your-node-name}}"#.to_string();
+        replace_str = replace_str.replace("{{your-node-name}}", &hostname);
+        let ports = all_open_ports.iter().map(|p| format!("- '{}':'{}'", p, p)).join("\n    ");
+        replace_str = replace_str.replace("{{PORTS}}", &ports);
+        compose_str.replace("network_mode: host", &*replace_str);
+    }
+
+    ssh.copy_p(compose_str, format!("{}/redgold-only.yml", path), p).await?;
+
     let mut env = additional_env.unwrap_or(Default::default());
-    env.insert("REDGOLD_NETWORK".to_string(), network.to_std_string());
-    env.insert("REDGOLD_GENESIS".to_string(), is_genesis.to_string());
-    env.insert("REDGOLD_METRICS_PORT".to_string(), format!("{}", port - 1));
-    env.insert("REDGOLD_P2P_PORT".to_string(), format!("{}", port));
-    env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
-    env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
+    // env.insert("REDGOLD_NETWORK".to_string(), network.to_std_string());
+    // env.insert("REDGOLD_GENESIS".to_string(), is_genesis.to_string());
+    // env.insert("REDGOLD_METRICS_PORT".to_string(), format!("{}", port - 1));
+    // env.insert("REDGOLD_P2P_PORT".to_string(), format!("{}", port));
+    // env.insert("REDGOLD_PUBLIC_PORT".to_string(), format!("{}", port + 1));
+    // env.insert("REDGOLD_CONTROL_PORT".to_string(), format!("{}", port + 2));
     env.insert("RUST_BACKTRACE".to_string(), "full".to_string());
-    env.insert("REDGOLD_SERVER_INDEX".to_string(), ssh.server.index.to_string());
-    env.insert("REDGOLD_SERVER_PEER_INDEX".to_string(), ssh.server.peer_id_index.to_string());
-    env.insert("REDGOLD_SERVER_NODE_NAME".to_string(), ssh.server.node_name.clone().unwrap_or("anon".to_string()));
+    env.insert("RUST_LOG".to_string(), "debug".to_string());
+    // env.insert("REDGOLD_SERVER_INDEX".to_string(), ssh.server.index.to_string());
+    // env.insert("REDGOLD_SERVER_PEER_INDEX".to_string(), ssh.server.peer_id_index.to_string());
+    // env.insert("REDGOLD_SERVER_NODE_NAME".to_string(), ssh.server.node_name.clone().unwrap_or("anon".to_string()));
+    // TODO: Change to _main
 
      if let Some(a) = alias {
-         env.insert("REDGOLD_ALIAS".to_string(), a);
+         // env.insert("REDGOLD_ALIAS".to_string(), a);
      }
     // TODO: Inherit from node_config?
     let copy_env = vec![
@@ -378,6 +473,55 @@ pub async fn deploy_redgold(
         }
     }
 
+    // TODO: Env vars should all be migrated here, secure should be erased
+    // Prepare config data
+    let mut config = (*config_data).clone();
+    config.secure = None;
+    config.network = Some(network.to_std_string());
+    // TODO: Support other users here.
+    config.data = Some("/root/.rg".to_string());
+    let node = config.node.get_or_insert(Default::default());
+    node.words = words.clone();
+    node.server_index = Some(ssh.server.index);
+    node.peer_id_index = Some(ssh.server.peer_id_index);
+    node.name = Some(ssh.server.node_name.clone().unwrap_or("anon".to_string()));
+    let debug = config.debug.get_or_insert(Default::default());
+    debug.genesis = Some(is_genesis);
+    debug.developer = Some(env.get("REDGOLD_MAIN_DEVELOPMENT_MODE").is_some());
+    debug.develop = Some(env.get("REDGOLD_DEVELOPMENT_MODE").is_some());
+    let keys = config.keys.get_or_insert(Default::default());
+    keys.aws_access = env.get("AWS_ACCESS_KEY_ID").cloned();
+    keys.aws_secret = env.get("AWS_SECRET_ACCESS_KEY").cloned();
+    keys.etherscan = env.get("ETHERSCAN_API_KEY").cloned();
+    keys.recaptcha = env.get("RECAPTCHA_SECRET").cloned();
+    let email = config.email.get_or_insert(Default::default());
+    email.to = env.get("REDGOLD_TO_EMAIL").cloned();
+    email.from = env.get("REDGOLD_FROM_EMAIL").cloned();
+    let party = config.party.get_or_insert(Default::default());
+    let external = config.external.get_or_insert(Default::default());
+
+    if ssh.server.index == 0 && nc.development_mode() {
+        if nc.development_mode_main() {
+            party.enable = Some(true);
+            debug.enable_live_e2e = Some(true);
+            // env.insert("REDGOLD_ENABLE_PARTY_MODE".to_string(), "true".to_string());
+            // env.insert("REDGOLD_LIVE_E2E_ENABLED".to_string(), "true".to_string());
+        };
+        debug.grafana_writer = Some(true);
+        // env.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
+    }
+    if nc.development_mode_main() {
+        // REDGOLD_MAIN_DEVELOPMENT_MODE
+        debug.developer = Some(true);
+        // env.insert("REDGOLD_MAIN_DEVELOPMENT_MODE".to_string(), "true".to_string());
+        // env.insert("REDGOLD_S3_BACKUP_BUCKET".to_string(), "redgold-backups".to_string());
+        external.s3_backup_bucket = Some("redgold-backups".to_string());
+    }
+
+    let cloned = config.clone();
+    let mut config2 = cloned.clone();
+    let toml_config = toml::to_string(&cloned).error_info("toml config")?;
+
     if !disable_system {
         // TODO: Lol not this
         let port_range: Vec<i64> = vec![-1, 0, 1, 4, 5, 6];
@@ -392,6 +536,7 @@ pub async fn deploy_redgold(
     }).join("\n");
     ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
     ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
+    ssh.copy_p(toml_config, format!("{}/config.toml", path), p).await?;
 
     sleep(Duration::from_secs(4));
 
@@ -407,19 +552,28 @@ pub async fn deploy_redgold(
     }
     ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml pull", path), p).await?;
     if start_node {
-        ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+
+        if is_local {
+            // swarm init before hand if system level
+            // .
+            ssh.exes(format!("cd {}; docker stack deploy -c redgold-only.yml redgold-{}", path, network.to_std_string()), p).await?;
+        } else {
+            ssh.exes(format!("cd {}; docker-compose -f redgold-only.yml up -d", path), p).await?;
+        }
         if is_genesis {
             // After starting node for the first time, mark the environment file as not genesis
             // for the next time.
-            env.remove("REDGOLD_GENESIS");
-            // TODO: Move this to an Deploy class with an SSHLike trait as an inner.
-            // so it's a repeated function.
-            let env_contents = env.iter().map(|(k, v)| {
-                format!("{}={}", k, format!("{}", v))
-            }).join("\n");
-            ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
-            ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
-
+            // env.remove("REDGOLD_GENESIS");
+            // // TODO: Move this to an Deploy class with an SSHLike trait as an inner.
+            // // so it's a repeated function.
+            // let env_contents = env.iter().map(|(k, v)| {
+            //     format!("{}={}", k, format!("{}", v))
+            // }).join("\n");
+            // ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
+            // ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
+            config2.debug.get_or_insert(Default::default()).genesis = Some(false);
+            let toml_config = toml::to_string(&config2).error_info("toml config")?;
+            ssh.copy_p(toml_config, format!("{}/config.toml", path), p).await?;
         }
     }
 
@@ -713,8 +867,11 @@ pub async fn default_deploy(
     deploy: &mut Deploy,
     node_config: &NodeConfig,
     output_handler: Option<Sender<String>>,
-    servers_opt: Option<Vec<ServerOldFormat>>
+    servers_opt: Option<Vec<ServerOldFormat>>,
+    deployment: Option<Deployment>
 ) -> RgResult<()> {
+
+    let deployment = deployment.map(|d| d.fill_params());
 
     // let primary_gen = std::env::var("REDGOLD_PRIMARY_GENESIS").is_ok();
     // if node_config.opts.development_mode {
@@ -760,12 +917,12 @@ pub async fn default_deploy(
         servers_preload
     } else {
         let buf = df.all().servers_path();
-        println!("Reading servers file: {:?}", buf);
+        // println!("Reading servers file: {:?}", buf);
         ArgTranslate::read_servers_file(buf)?
     };
 
     // TODO: Filter servers by environment, also optionally pass them from the GUI?
-    println!("Setting up servers: {:?}", servers_original);
+    // println!("Setting up servers: {:?}", servers_original);
     // let mut gen = true;
     let purge = deploy.purge;
     let mut gen = deploy.genesis;
@@ -796,7 +953,8 @@ pub async fn default_deploy(
 
     let mut peer_id_index: HashMap<i64, String> = HashMap::default();
 
-    let mut pid_tx: HashMap<String, structs::Transaction> = HashMap::default();
+    let mut pid_tx: HashMap<String, Transaction> = HashMap::default();
+    let nc = Box::new(node_config.clone());
 
     for (ii, ss) in servers.iter().enumerate() {
         if let Some(i) = deploy.exclude_server_index {
@@ -804,6 +962,8 @@ pub async fn default_deploy(
                 continue;
             }
         }
+        let dpl_tuple = deployment.as_ref()
+            .and_then(|d| d.by_index(ii as i64));
 
         let opt_peer_id: Option<String> = peer_id_index.get(&ss.peer_id_index).cloned();
         let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
@@ -840,7 +1000,7 @@ pub async fn default_deploy(
         };
         peer_id_index.insert(ss.peer_id_index, peer_id_hex.clone());
         let hm = hm.clone();
-        println!("Setting up server: {}", ss.host.clone());
+        // println!("Setting up server: {}", ss.host.clone());
 
         if let Some(o) = &deploy.server_offline_info {
             let p = PathBuf::from(o);
@@ -860,29 +1020,41 @@ pub async fn default_deploy(
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None, output_handler.clone());
         if !deploy.skip_redgold_process {
+
             let mut this_hm = hm.clone();
-            // TODO: Change to _main
-            if ss.index == 0 && node_config.development_mode() {
-                if node_config.development_mode_main() {
-                    this_hm.insert("REDGOLD_ENABLE_PARTY_MODE".to_string(), "true".to_string());
-                    this_hm.insert("REDGOLD_LIVE_E2E_ENABLED".to_string(), "true".to_string());
+
+            if ss.host == "".to_string() {
+                let ssh_local = LocalSSHLike::new(output_handler.clone());
+                let ssh = DeployMachine {
+                    server: ss.clone(),
+                    ssh: ssh_local,
                 };
-                this_hm.insert("REDGOLD_GRAFANA_PUBLIC_WRITER".to_string(), "true".to_string());
-            }
-            if node_config.development_mode_main() {
-                // REDGOLD_MAIN_DEVELOPMENT_MODE
-                this_hm.insert("REDGOLD_MAIN_DEVELOPMENT_MODE".to_string(), "true".to_string());
-                this_hm.insert("REDGOLD_S3_BACKUP_BUCKET".to_string(), "redgold-backups".to_string());
+                let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
+                    ssh, net, gen.clone(), Some(this_hm.clone()), purge,
+                    words_opt.clone(),
+                    peer_id_hex_opt.clone(),
+                    !deploy.debug_skip_start,
+                    ss.node_name.clone(),
+                    peer_tx_opt.clone().map(|p| p.json_or()),
+                    &output_handler,
+                    true,
+                    node_config.config_data.clone(),
+                    dpl_tuple.clone(),
+                    &nc
+                )).await.error_info("Timeout")??;
             }
             let _t = tokio::time::timeout(Duration::from_secs(600), deploy_redgold(
-                ssh, net, gen, Some(this_hm), purge,
-                words_opt,
-                peer_id_hex_opt,
+                ssh, net, gen, Some(this_hm.clone()), purge,
+                words_opt.clone(),
+                peer_id_hex_opt.clone(),
                 !deploy.debug_skip_start,
                 ss.node_name.clone(),
-                peer_tx_opt.map(|p| p.json_or()),
+                peer_tx_opt.clone().map(|p| p.json_or()),
                 &output_handler,
-                deploy.disable_apt_system_init
+                deploy.disable_apt_system_init,
+                node_config.config_data.clone(),
+                dpl_tuple,
+                &nc
             )).await.error_info("Timeout")??;
         }
         gen = false;

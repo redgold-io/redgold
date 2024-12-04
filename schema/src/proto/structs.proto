@@ -140,15 +140,15 @@ enum RatingType {
 message TrustData {
   // A score from -1 to 1 normalized to 1e3 (1000) scale for Equality avoidance of floats
   // Otherwise equivalent to a rounded float
-  optional int64 label_rating = 2;
+  Weighting label_rating = 2;
   // Confidence level associated with the label, how certain is this value?
-  optional int64 confidence = 3;
+  Weighting confidence = 3;
   // Variance associated with the confidence estimate, sigma / stddev
-  optional int64 hardness = 5;
+  Weighting hardness = 5;
   // Additional unstructured or otherwise custom label data
-  optional StandardData data = 6;
-  bool allow_model_override = 7;
-  optional RatingType rating_type = 8;
+  StandardData data = 6;
+  optional bool allow_model_override = 7;
+  RatingType rating_type = 8;
 }
 
 message TrustRatingLabel {

@@ -89,12 +89,12 @@ impl EnvDefaultNodeConfig for NodeConfig {
     }
 
     async fn default_env(network_environment: NetworkEnvironment) -> Self {
-        let mut opts = empty_args();
-        opts.network = Some(network_environment.to_std_string());
+        let mut opts = Box::new(empty_args());
+        opts.global_settings.network = Some(network_environment.to_std_string());
         let mut node_config = NodeConfig::default();
         // node_config.opts = Arc::new(opts.clone());
         node_config.disable_metrics = true;
-        let mut arg_translate = ArgTranslate::new(Box::new(node_config.clone()), opts);
+        let mut arg_translate = ArgTranslate::new(Box::new(node_config.clone()), &opts);
         let mut nc = arg_translate.translate_args().await.unwrap();
         nc.network = network_environment.clone();
         *nc
@@ -156,6 +156,7 @@ pub trait WordsPassNodeConfig {
     fn default_debug() -> Self;
 
     fn default_peer_id(&self) -> RgResult<PeerId>;
+    fn secure_words_or(&self) -> WordsPass;
 }
 
 impl WordsPassNodeConfig for NodeConfig {
@@ -170,8 +171,14 @@ impl WordsPassNodeConfig for NodeConfig {
     }
 
     fn words(&self) -> WordsPass {
-        WordsPass::new(self.mnemonic_words.clone(), None)
+        WordsPass::new(self.mnemonic_words().clone(), None)
     }
+
+    fn secure_words_or(&self) -> WordsPass {
+        WordsPass::new(self.secure_mnemonic_words_or(), None)
+    }
+
+
 
     fn from_test_id(seed_id: &u16) -> Self {
         let words = WordsPass::from_str_hashed(seed_id.to_string()).words;
@@ -180,7 +187,11 @@ impl WordsPassNodeConfig for NodeConfig {
         folder.delete().ensure_exists();
         // folder.ensure_exists();
         let mut node_config = NodeConfig::default();
-        node_config.mnemonic_words = words;
+        let mut node = (*node_config.config_data).clone();
+        node.node.get_or_insert(Default::default()).words = Some(words);
+        node.debug.get_or_insert(Default::default()).enable_live_e2e = Some(false);
+        node_config.config_data = Arc::new(node);
+
         node_config.peer_id = node_config.default_peer_id().expect("worx");
         node_config.public_key = node_config.keypair().public_key();
         node_config.port_offset = (node_config.port_offset + (seed_id.clone() * 100)) as u16;
@@ -191,7 +202,6 @@ impl WordsPassNodeConfig for NodeConfig {
         node_config.network = NetworkEnvironment::Debug;
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
-        node_config.e2e_enabled = false;
         node_config
     }
 }
@@ -230,6 +240,7 @@ impl DataStoreNodeConfig for NodeConfig {
 
 }
 
+#[ignore]
 #[tokio::test]
 async fn debug(){
 

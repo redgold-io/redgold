@@ -1,7 +1,7 @@
 use eframe::egui;
 use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
-
+use strum_macros::EnumString;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_builder;
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -11,73 +11,36 @@ use redgold_schema::structs::NetworkEnvironment;
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
 use redgold_gui::components::tables::text_table;
+use redgold_gui::tab::keys::keygen::{GenerateMnemonicState, KeyDerivation, KeygenState, MnemonicWindowState, Rounds};
 use crate::util;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
 
-#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
-// #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-enum KeyDerivation {
-    DoubleSha256,
-    Argon2d,
+
+
+pub trait MnemonicWindowStateWordSupport {
+    fn words_pass(&self) -> WordsPass;
+    fn set_words_from_passphrase(&mut self);
+    fn set_words(&mut self, words: impl Into<String>, label: impl Into<String>);
+    fn get_private_key_hex(&self) -> String;
 }
 
+impl MnemonicWindowStateWordSupport for MnemonicWindowState {
 
-#[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
-enum Rounds {
-    TenK,
-    OneM,
-    TenM,
-    Custom
-}
-
-
-// TODO: implement a passphrase checksum as well.
-// Recalculate these values on change of passphrase
-#[derive(Clone)]
-pub struct MnemonicWindowState {
-    pub open: bool,
-    pub words: String,
-    label: String,
-    bitcoin_p2wpkh_84: String,
-    ethereum_address_44: String,
-    words_checksum: String,
-    seed_checksum: Option<String>,
-    pub passphrase: Option<String>,
-    redgold_node_address: String,
-    redgold_hardware_default_address: String,
-    passphrase_input: String,
-    passphrase_input_show: bool,
-    requires_reset: bool,
-    hd_path: String,
-    private_key_hex: String,
-    calc_private_key_hex: bool,
-    generation_time_seconds: String,
-    exe_checksum: String,
-    save_name: String,
-    persist_disk: bool,
-    set_hot_mnemonic: bool
-}
-
-impl MnemonicWindowState {
-    pub fn get_private_key_hex(&self) -> String {
+    fn get_private_key_hex(&self) -> String {
         // self.mnemonic_words().private_hex(self.hd_path.clone()).unwrap_or("err".to_string())
         self.words_pass().private_at(self.hd_path.clone()).unwrap()
     }
-}
 
-impl MnemonicWindowState {
-
-
-    pub fn words_pass(&self) -> WordsPass {
+    fn words_pass(&self) -> WordsPass {
         let w = WordsPass::new(
             self.words.clone(), self.passphrase.clone()
         );
         w
     }
 
-    pub fn set_words_from_passphrase(&mut self) {
+    fn set_words_from_passphrase(&mut self) {
         let passphrase = self.passphrase.clone();
         let wp = WordsPass::new(
             self.words.clone(), passphrase.clone()
@@ -93,104 +56,11 @@ impl MnemonicWindowState {
         self.redgold_hardware_default_address = hw_addr;
     }
 
-    pub fn set_words(&mut self, words: impl Into<String>, label: impl Into<String>) {
+    fn set_words(&mut self, words: impl Into<String>, label: impl Into<String>) {
         self.open = true;
         self.words = words.into();
         self.label = label.into();
         self.set_words_from_passphrase();
-    }
-}
-#[derive(Clone)]
-pub struct GenerateMnemonicState {
-    random_input_mnemonic: String,
-    random_input_requested: bool,
-    password_input: String,
-    show_password: bool,
-    num_rounds: String,
-    toggle_concat_password: bool,
-    toggle_show_metadata: bool,
-    num_modular_passwords_input: String,
-    num_modular_passwords: u32,
-    modular_passwords: Vec<String>,
-    concat_password: String,
-    metadata_fields: Vec<String>,
-    key_derivation: KeyDerivation,
-    rounds_type: Rounds,
-    salt_words: String,
-    m_cost_input: String,
-    p_cost_input: String,
-    m_cost: Option<u32>,
-    p_cost: Option<u32>,
-    t_cost: Option<u32>,
-    pub t_cost_input: String,
-}
-
-impl GenerateMnemonicState {
-    pub fn compound_passwords(&mut self) {
-        let mod_join = self.modular_passwords.iter().join("");
-        let metadata_join = self.metadata_fields.iter()
-            .map(|s| s.to_uppercase()).join("");
-        self.concat_password = format!("{}{}", mod_join, metadata_join);
-    }
-}
-#[derive(Clone)]
-pub struct KeygenState {
-    pub(crate) mnemonic_window_state: MnemonicWindowState,
-    generate_mnemonic_state: GenerateMnemonicState,
-}
-
-impl KeygenState {
-    pub fn new(exe_checksum: String) -> Self {
-        Self {
-            mnemonic_window_state: MnemonicWindowState {
-                open: false,
-                words: "".to_string(),
-                label: "".to_string(),
-
-                bitcoin_p2wpkh_84: "".to_string(),
-                ethereum_address_44: "".to_string(),
-
-                words_checksum: "".to_string(),
-                seed_checksum: None,
-                passphrase: None,
-                redgold_node_address: "".to_string(),
-                redgold_hardware_default_address: "".to_string(),
-                passphrase_input: "".to_string(),
-                passphrase_input_show: false,
-                requires_reset: false,
-                hd_path: "m/44'/5555'/0'/0/0".to_string(),
-                private_key_hex: "".to_string(),
-                calc_private_key_hex: false,
-                generation_time_seconds: "".to_string(),
-                exe_checksum,
-                save_name: "keygen".to_string(),
-                persist_disk: false,
-                set_hot_mnemonic: false
-            },
-            generate_mnemonic_state: GenerateMnemonicState {
-                random_input_mnemonic: "".to_string(),
-                random_input_requested: false,
-                password_input: "".to_string(),
-                show_password: false,
-                num_rounds: "10000".to_string(),
-                toggle_concat_password: false,
-                toggle_show_metadata: false,
-                num_modular_passwords_input: "6".to_string(),
-                num_modular_passwords: 6,
-                modular_passwords: (0..6).map(|_| "".to_string()).collect_vec(),
-                concat_password: "".to_string(),
-                metadata_fields: (0..4).map(|_| "".to_string()).collect_vec(),
-                key_derivation: KeyDerivation::Argon2d,
-                rounds_type: Rounds::TenK,
-                salt_words: "".to_string(),
-                m_cost_input: "65536".to_string(),
-                p_cost_input: "2".to_string(),
-                t_cost_input: "10".to_string(),
-                m_cost: Some(65536),
-                p_cost: Some(2),
-                t_cost: Some(10),
-            },
-        }
     }
 }
 

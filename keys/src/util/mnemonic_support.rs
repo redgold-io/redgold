@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
-use redgold_schema::conf::local_stored_state::{NamedXpub, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
@@ -120,9 +120,9 @@ impl WordsPass {
         self.xpub_str(account_path)
     }
 
-    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<NamedXpub> {
+    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<AccountKeySource> {
         self.default_xpub().map(|xpub| {
-            let mut named = NamedXpub::default();
+            let mut named = AccountKeySource::default();
             let key_into = key_name.into();
             named.name = format!("{}0", key_into);
             named.xpub = xpub;

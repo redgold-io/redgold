@@ -9,7 +9,7 @@ use crate::helpers::easy_json::json_pretty;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{Address, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PublicKey, TransportInfo, VersionInfo};
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
 pub struct ServerOldFormat {
     pub name: String,
     pub host: String,

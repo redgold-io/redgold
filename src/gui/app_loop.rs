@@ -35,7 +35,7 @@ pub trait PublicKeyStoredState {
 
 impl PublicKeyStoredState for LocalStoredState {
     fn public_key(&self, xpub_name: String) -> Option<PublicKey> {
-        let pk = self.xpubs.as_ref().and_then(|x| x.iter().find(|x| x.name == xpub_name)
+        let pk = self.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == xpub_name)
             .and_then(|g| XpubWrapper::new(g.xpub.clone()).public_at(0, 0).ok()));
         pk
     }
@@ -58,8 +58,6 @@ pub struct LocalState {
     pub settings_state: SettingsState,
     pub address_state: AddressState,
     pub otp_state: OtpState,
-    pub ds_env: DataStore,
-    pub ds_env_secure: Option<DataStore>,
     pub local_stored_state: LocalStoredState,
     pub updates: Channel<StateUpdate>,
     pub keytab_state: KeyTabState,
@@ -72,15 +70,15 @@ pub struct LocalState {
     pub party_data: HashMap<PublicKey, PartyInternalData>,
     pub first_party: Option<PartyInternalData>,
     pub airgap_signer: AirgapSignerWindow,
+    pub persist_requested: bool
 }
 
 pub trait LocalStateAddons {
     fn process_tab_change(&mut self, p0: Tab);
     fn add_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool);
     fn add_with_pass_mnemonic(&mut self, name: String, mnemonic: String, persist_disk: bool, passphrase: Option<String>);
-    fn secure_or(&self) -> DataStore;
-    fn persist_local_state_store(&self);
-    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()>;
+    fn persist_local_state_store(&mut self);
+    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<AccountKeySource>, prepend: bool) -> RgResult<()>;
     fn upsert_identity(&mut self, new_named: Identity) -> ();
     fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> ();
     fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> ();
@@ -107,7 +105,7 @@ impl LocalStateAddons for LocalState {
             Tab::Identity => {}
             Tab::Contacts => {}
             Tab::Address => {}
-            Tab::Servers => {}
+            Tab::Deploy => {}
             Tab::Ratings => {}
             Tab::Settings => {
                 self.settings_state.lss_serialized = self.local_stored_state.json_or();
@@ -144,23 +142,21 @@ impl LocalStateAddons for LocalState {
         }).unwrap();
     }
 
-    fn secure_or(&self) -> DataStore {
-        self.ds_env_secure.clone().unwrap_or(self.ds_env.clone())
-    }
 
 
-    fn persist_local_state_store(&self) {
-        let store = self.secure_or();
+    fn persist_local_state_store(&mut self) {
+        /*let store = self.secure_or();
         let mut state = self.local_stored_state.clone();
         state.clear_sensitive();
         tokio::spawn(async move {
             store.config_store.update_stored_state(state).await
-        });
+        });*/
+        self.persist_requested = true;
     }
-    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<NamedXpub>, prepend: bool) -> RgResult<()> {
+    fn add_named_xpubs(&mut self, overwrite_name: bool, new_named: Vec<AccountKeySource>, prepend: bool) -> RgResult<()> {
         let new_names = new_named.iter().map(|x| x.name.clone())
             .collect_vec();
-        let existing = self.local_stored_state.xpubs.clone().unwrap_or(vec![]);
+        let existing = self.local_stored_state.keys.clone().unwrap_or(vec![]);
         let mut filtered = existing.iter().filter(|x| {
             !new_names.contains(&x.name)
         }).map(|x| x.clone()).collect_vec();
@@ -170,10 +166,10 @@ impl LocalStateAddons for LocalState {
         let mut new_named2 = new_named.clone();
         if !prepend {
             filtered.extend(new_named);
-            self.local_stored_state.xpubs = Some(filtered);
+            self.local_stored_state.keys = Some(filtered);
         } else {
             new_named2.extend(filtered);
-            self.local_stored_state.xpubs = Some(new_named2);
+            self.local_stored_state.keys = Some(new_named2);
         }
         self.persist_local_state_store();
         Ok(())
@@ -290,6 +286,7 @@ use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgr
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::tab::deploy::deploy_state::{ServerStatus, ServersState};
 // 0.8
 // use crate::gui::image_load::TexMngr;
 use redgold_gui::tab::home;
@@ -301,7 +298,7 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{new_channel, Channel};
 use redgold_gui::tab::home::HomeState;
-use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, NamedXpub, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, Identity, LocalStoredState, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::{SwapStage, SwapState};
@@ -309,14 +306,12 @@ use crate::gui::tabs::address_tab::AddressState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::server_tab;
-use crate::gui::tabs::keys::keygen_subtab::KeygenState;
+use redgold_gui::tab::keys::keygen::KeygenState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
-use crate::gui::tabs::server_tab::{ServerStatus, ServersState};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{wallet_screen, StateUpdate, WalletState};
 use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};
-use crate::infra::deploy::is_windows;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use redgold_schema::party::party_internal_data::PartyInternalData;
@@ -336,6 +331,12 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
     let mut g = app.gui_depends.clone();
     let local_state = &mut app.local_state;
     g.set_network(&local_state.node_config.network);
+    if local_state.persist_requested {
+        let mut c = g.get_config();
+        c.local = Some(local_state.local_stored_state.clone());
+        g.set_config(&c);
+        local_state.persist_requested = false;
+    }
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
@@ -430,9 +431,17 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 settings_tab(ui, ctx, local_state);
             }
             Tab::Ratings => {}
-            Tab::Servers => {
+            Tab::Deploy => {
                 ScrollArea::vertical().id_source("wtf").show(ui, |ui| {
-                    server_tab::servers_tab(ui, ctx, local_state);
+                    server_tab::servers_tab(
+                        ui,
+                        ctx,
+                        &mut local_state.server_state,
+                        &g,
+                        &local_state.node_config,
+                        local_state.wallet.hot_mnemonic().words,
+                        local_state.wallet.hot_mnemonic().passphrase,
+                    );
                 });
             }
             Tab::Transact => {

@@ -19,7 +19,6 @@ use crate::observability::trace_setup::init_tracing;
 
 pub mod auto_update;
 pub mod base26;
-pub mod cmd;
 pub mod rg_merkle;
 pub mod runtimes;
 pub mod sym_crypt;

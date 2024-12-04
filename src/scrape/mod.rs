@@ -606,7 +606,7 @@ pub async fn get_24hr_delta_change_pct(supported_currency: SupportedCurrency) ->
     let past_close = past.close;
     let delta = (now_close - past_close);
     let pct_change = delta / past_close;
-    info!("{} {} {} {}", now_close, past_close, delta, pct_change);
+    // info!("{} {} {} {}", now_close, past_close, delta, pct_change);
     Ok(pct_change)
 }
 

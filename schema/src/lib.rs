@@ -3,7 +3,7 @@
 use std::fmt::Display;
 use std::future::Future;
 use std::str::FromStr;
-
+use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::{Context, Result};
 use backtrace::Backtrace;
 use itertools::Itertools;
@@ -382,10 +382,21 @@ pub fn split_to_str(vec: String, splitter: &str) -> Vec<String> {
 }
 
 pub fn error_msg<S: Into<String>, P: Into<String>>(code: ErrorCode, message: S, lib_message: P) -> ErrorInfo {
-    let stacktrace = format!("{:?}", Backtrace::new());
-    let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
-    // 14 is number of lines of prelude, might need to be less here honestly due to invocation.
-    let stack = slice_vec_eager(stacktrace_abridged, 0, 50).join("\n").to_string();
+
+    // TODO: Determine if this helps.
+    static IS_CAPTURING: AtomicBool = AtomicBool::new(false);
+
+    let stack = if !IS_CAPTURING.swap(true, Ordering::SeqCst) {
+
+        let stacktrace = format!("{:?}", Backtrace::new());
+        let stacktrace_abridged: Vec<String> = split_to_str(stacktrace, "\n");
+        let trace = slice_vec_eager(stacktrace_abridged, 0, 50).join("\n").to_string();
+        // let trace = format!("{:?}", Backtrace::new());
+        IS_CAPTURING.store(false, Ordering::SeqCst);
+        trace
+    } else {
+        "Nested error - backtrace skipped".to_string()
+    };
 
     let details = task_local_error_details();
 
@@ -730,6 +741,7 @@ impl ShortString for String {
         let len = self.len();
         let start = (len as i32) - n.into();
         if start < 0 {
+            return Ok("".to_string());
             return Err(error_info("string too short to short_string"));
         }
         let start = start as usize;

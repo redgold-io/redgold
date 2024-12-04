@@ -21,7 +21,7 @@ pub fn get_address_info(
     let address = public_key.address().expect("works");
     let _ = tokio::spawn(async move {
         let environment = node_config.network.clone();
-        info!("Getting balance for environment: {}", environment.to_std_string());
+        // info!("Getting balance for environment: {}", environment.to_std_string());
         let btc_bal = SingleKeyBitcoinWallet::new_wallet(
             public_key.clone(), environment, true)
                 .ok().and_then(|w| w.get_wallet_balance().ok())

@@ -62,7 +62,7 @@ pub trait GuiDepends {
     fn config_df_path_label(&self) -> Option<String>;
     fn get_salt(&self) -> i64;
     fn get_config(&self) -> ConfigData;
-    fn set_config(&self, config: &ConfigData);
+    fn set_config(&mut self, config: &ConfigData);
     fn get_address_info(&self, pk: &PublicKey) -> impl std::future::Future<Output = RgResult<AddressInfo>> + Send;
     fn get_address_info_multi(&self, pk: Vec<&PublicKey>) -> impl std::future::Future<Output = Vec<RgResult<AddressInfo>> > + Send;
 
@@ -77,6 +77,7 @@ pub trait GuiDepends {
     ) -> RgResult<()>;
     fn broadcast_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()>;
     fn spawn(&self, f: impl std::future::Future<Output = ()> + Send + 'static);
+    fn spawn_interrupt(&self, f: impl std::future::Future<Output = ()> + Send + 'static, interrupt: flume::Receiver<()>);
 
     // this doesn't seem to work well with async functions
     fn spawn_blocking<T: Send+ 'static>(&self, f: impl std::future::Future<Output = RgResult<T>> + Send + 'static) -> RgResult<T>;

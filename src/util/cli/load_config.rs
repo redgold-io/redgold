@@ -14,21 +14,34 @@ use redgold_schema::structs::NetworkEnvironment;
 use crate::util::cli::apply_args_to_config::{apply_args_final, apply_args_initial};
 
 
-pub fn main_config() -> Box<NodeConfig> {
+pub fn main_config() -> (Box<NodeConfig>, Box<RgArgs>) {
     let (opts, cfg) = load_full_config(false);
     let mut node_config = NodeConfig::default();
     let args = std::env::args().collect_vec();
     node_config.config_data = Arc::new(*cfg.clone());
     node_config.args = Arc::new(args.clone());
-    Box::new(node_config)
+    (Box::new(node_config), opts)
 }
+//
+// pub fn config_post_processing(config: Box<ConfigData>) -> Box<ConfigData> {
+//     let mut config = config.clone();
+//     let node = config.node.get_or_insert(Default::default());
+//     if node.words.is_none() {
+//         if let Some(s) = config.secure.as_ref().and_then(|sd| sd.salt.clone() {
+//             node.words = Some(s);
+//         }
+//     }
+//     config
+// }
 
 pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {
+    // println!("parsing args");
     let rg_args = if allow_no_args {
         RgArgs::try_parse().unwrap_or(empty_args())
     } else {
         RgArgs::parse()
     };
+    // println!("parsed args");
     let default = environment_only_builder();
     let args = Box::new(rg_args);
     let init = apply_args_initial(args.clone(), default);
@@ -113,10 +126,13 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
 
     let mut builder = Config::builder();
 
+    let mut working_config_path = None;
+
     for p in paths.into_iter() {
         // println!("Checking if path exists: {:?}", p);
         if p.exists() {
             // println!("Loading config from: {:?}", p);
+            working_config_path = Some(p.to_str().unwrap().to_string());
             builder = builder.add_source(config::File::from(p));
         }
     }
@@ -128,7 +144,15 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
         .build()
         .unwrap();
 
-    Box::new(config.try_deserialize::<ConfigData>().unwrap())
+    // Final env override, matches config load order.
+    if let Some(c) = std::env::var("REDGOLD_CONFIG").ok() {
+        working_config_path = Some(c);
+    }
+
+    let mut data = config.try_deserialize::<ConfigData>().unwrap();
+    // Ensure loaded config path is stored
+    data.config = working_config_path;
+    Box::new(data)
 }
 
 // #[ignore]

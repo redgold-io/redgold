@@ -8,8 +8,8 @@ use itertools::Itertools;
 use crate::config_data::ConfigData;
 use crate::seeds::get_seeds_by_env_time;
 use crate::servers::ServerOldFormat;
-use crate::{structs, ErrorInfoContext, RgResult, ShortString};
-use crate::conf::rg_args::{empty_args, RgArgs};
+use crate::{structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
+use crate::conf::rg_args::{empty_args, RgArgs, RgTopLevelSubcommand};
 use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
@@ -109,28 +109,12 @@ pub struct ContentionConfig {
     pub interval: Duration
 }
 
-#[derive(Clone, Debug)]
-pub struct NodeInfoConfig {
-    pub alias: Option<String>,
-}
-
-impl Default for NodeInfoConfig {
-    fn default() -> Self {
-        Self {
-            alias: None,
-        }
-    }
-}
-
 // TODO: put the default node configs here
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
     pub config_data: Arc<ConfigData>,
     pub peer_id: PeerId,
     pub public_key: PublicKey,
-    // TODO: Change to Seed class? or maybe not leave it as it's own
-    pub mnemonic_words: String,
-    // Sometimes adjusted user params
     pub port_offset: u16,
     pub p2p_port: Option<u16>,
     pub control_port: Option<u16>,
@@ -154,36 +138,75 @@ pub struct NodeConfig {
     pub disable_auto_update: bool,
     pub auto_update_poll_interval: Duration,
     pub block_formation_interval: Duration,
-    pub genesis_config: GenesisConfig,
-    pub faucet_enabled: bool,
-    pub e2e_enabled: bool,
     pub load_balancer_url: String,
     pub external_ip: String,
     pub external_host: String,
-    pub servers: Vec<ServerOldFormat>,
     pub log_level: String,
     pub data_folder: DataFolder,
     pub secure_data_folder: Option<DataFolder>,
     pub enable_logging: bool,
     pub discovery_interval: Duration,
     pub shuffle_interval: Duration,
-    pub live_e2e_interval: Duration,
-    pub genesis: bool,
     // pub opts: Arc<RgArgs>,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
     pub contract: ContractConfig,
     pub contention: ContentionConfig,
-    pub node_info: NodeInfoConfig,
     pub default_timeout: Duration,
     pub disable_metrics: bool,
     pub args: Arc<Vec<String>>,
     pub abort: bool,
-    pub is_gui: bool
+    pub is_gui: bool,
+    pub top_level_subcommand: Option<Box<RgTopLevelSubcommand>>
 }
 
 impl NodeConfig {
+
+    pub fn mnemonic_words(&self) -> String {
+        self.config_data.node.as_ref().and_then(|n| n.words.clone()).expect("mnemonic words")
+    }
+
+    pub fn secure_mnemonic_words(&self) -> Option<String> {
+        self.config_data.secure.as_ref().and_then(|n| n.salt.clone())
+    }
+
+    pub fn secure_mnemonic_words_or(&self) -> String {
+        self.secure_mnemonic_words().unwrap_or(self.mnemonic_words())
+    }
+
+    pub fn e2e_enabled(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.enable_live_e2e).unwrap_or(false)
+    }
+    pub fn genesis(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.genesis).unwrap_or(false)
+    }
+
+    pub fn args(&self) -> Vec<&String> {
+        self.args.iter().dropping(1).collect()
+    }
+
+    pub fn arg_at(&self, index: impl Into<i32>) -> RgResult<&String> {
+        self.args().get(index.into() as usize).ok_msg("arg not found").cloned()
+    }
+
+    pub fn use_e2e_external_resource_mocks(&self) -> bool {
+        self.config_data.debug.as_ref().and_then(|d| d.use_e2e_external_resource_mocks).unwrap_or(false)
+    }
+
+    pub fn order_cutoff_delay_time(&self) -> Duration {
+        let option = self.config_data.party.as_ref()
+            .and_then(|p| p.order_cutoff_delay_time)
+            .unwrap_or(300_000i64);
+        Duration::from_millis(option as u64)
+    }
+
+    pub fn poll_interval(&self) -> Duration {
+        let option = self.config_data.party.as_ref()
+            .and_then(|p| p.poll_interval)
+            .unwrap_or(300_000i64);
+        Duration::from_millis(option as u64)
+    }
 
     pub fn rpc_url(&self, cur: SupportedCurrency) -> Option<String> {
         if let Some(external) = self.config_data.external.as_ref() {
@@ -258,7 +281,12 @@ impl NodeConfig {
     }
 
     pub fn party_poll_interval(&self) -> Duration {
-        Duration::from_millis(self.config_data.party.as_ref().and_then(|n| Some(n.poll_interval)).unwrap_or(300_000) as u64)
+        let option = self.config_data.party.as_ref().and_then(|n| n.poll_interval);
+        let opt = option
+            .unwrap_or(300_000i64);
+        Duration::from_millis(
+             opt as u64
+        )
     }
 
     pub fn nat_traversal_required(&self) -> bool {
@@ -290,6 +318,12 @@ impl NodeConfig {
 
     pub fn server_index(&self) -> i64 {
         self.config_data.node.as_ref().and_then(|n| n.server_index).unwrap_or(0)
+    }
+
+    pub fn servers_old(&self) -> Vec<ServerOldFormat> {
+        self.config_data.local.as_ref().and_then(|l| l.deploy.as_ref())
+            .map(|d| d.as_old_servers())
+            .unwrap_or_default()
     }
 
     pub fn offline(&self) -> bool {
@@ -519,7 +553,6 @@ impl NodeConfig {
             config_data: Default::default(),
             peer_id: Default::default(),
             public_key: structs::PublicKey::default(),
-            mnemonic_words: "".to_string(),
             port_offset: NetworkEnvironment::Debug.default_port_offset(),
             p2p_port: None,
             control_port: None,
@@ -543,27 +576,18 @@ impl NodeConfig {
             disable_auto_update: false,
             auto_update_poll_interval: Duration::from_secs(60),
             block_formation_interval: Duration::from_secs(10),
-            genesis_config: GenesisConfig{
-            },
-            faucet_enabled: true,
-            e2e_enabled: false,
             load_balancer_url: "lb.redgold.io".to_string(),
             external_ip: "127.0.0.1".to_string(),
             external_host: "localhost".to_string(),
-            servers: vec![],
             log_level: "DEBUG".to_string(),
             data_folder: DataFolder::target(0),
             secure_data_folder: None,
             enable_logging: true,
             discovery_interval: Duration::from_secs(5),
             shuffle_interval: Duration::from_secs(600),
-            live_e2e_interval: Duration::from_secs(60*10), // every 10 minutes
-            genesis: false,
-            // opts: Arc::new(empty_args()),
             mempool: Default::default(),
             tx_config: Default::default(),
             observation: Default::default(),
-            node_info: NodeInfoConfig::default(),
             contract: Default::default(),
             contention: Default::default(),
             default_timeout: Duration::from_secs(150),
@@ -571,7 +595,14 @@ impl NodeConfig {
             args: Arc::new(vec![]),
             abort: false,
             is_gui: false,
+            top_level_subcommand: None,
         }
+    }
+
+    pub fn live_e2e_interval(&self) -> Duration {
+        let t = self.config_data.debug.as_ref().and_then(|d| d.live_e2e_interval_seconds)
+            .unwrap_or(60 * 10);
+        Duration::from_secs(t as u64)
     }
 
     pub fn memdb_path(seed_id: &u16) -> String {
@@ -579,23 +610,8 @@ impl NodeConfig {
     }
 
     pub fn secure_path(&self) -> Option<String> {
-        // TODO: Move to arg translate
-        std::env::var("REDGOLD_SECURE_DATA_PATH").ok()
+        self.config_data.secure.as_ref().and_then(|s| s.path.clone())
     }
 
-    // TODO: this is wrong
-    pub fn secure_all_path(&self) -> Option<String> {
-        // TODO: Move to arg translate
-        std::env::var("REDGOLD_SECURE_DATA_PATH").ok().map(|p| {
-            let buf = PathBuf::from(p);
-            buf.join(NetworkEnvironment::All.to_std_string())
-        }).map(|p| p.to_str().expect("failed to render ds path").to_string())
-    }
-
-    pub fn secure_mnemonic(&self) -> Option<String> {
-        self.secure_all_path().and_then(|p| {
-            fs::read_to_string(p).ok()
-        })
-    }
 
 }

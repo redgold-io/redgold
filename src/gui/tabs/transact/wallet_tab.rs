@@ -41,7 +41,7 @@ use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::JsonCombineResult;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::conf::local_stored_state::{NamedXpub, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_gui::components::passphrase_input::PassphraseInput;
 use redgold_gui::components::transaction_table::TransactionTable;
@@ -380,7 +380,7 @@ impl WalletState {
         w
     }
 
-    pub fn new(hot_mnemonic: String, option: Option<&NamedXpub>) -> Self {
+    pub fn new(hot_mnemonic: String, option: Option<&AccountKeySource>) -> Self {
         Self {
             last_query: None,
             tab: WalletTab::Hardware,
@@ -473,7 +473,7 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
     match local_state.wallet.updates.recv_while() {
         Ok(updates) => {
             for mut update in updates {
-                info!("Received item of update, applying");
+                // info!("Received item of update, applying");
                 (update.update)(local_state);
                 // info!("New wallet state faucet message: {}", local_state.wallet_state.faucet_success.clone());
             }
@@ -557,7 +557,7 @@ pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut Loca
 
 }
 
-fn check_assign_hot_key(ls: &mut LocalState, x: &NamedXpub, pk: &PublicKey) -> RgResult<()> {
+fn check_assign_hot_key(ls: &mut LocalState, x: &AccountKeySource, pk: &PublicKey) -> RgResult<()> {
     let key_name = x.key_name_source.as_ref().ok_msg("key_name")?;
     let k = ls.local_stored_state.by_key(&key_name).ok_msg("key")?;
 

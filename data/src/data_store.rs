@@ -496,11 +496,16 @@ pub trait EnvDataFolderSupport {
 
     async fn data_store(&self) -> DataStore;
 
+
+    async fn mnemonic(&self) -> RgResult<String>;
 }
 
 #[async_trait]
 impl EnvDataFolderSupport for EnvDataFolder {
 
+    async fn mnemonic(&self) -> RgResult<String> {
+        tokio::fs::read_to_string(self.mnemonic_path()).await.error_info("Bad mnemonic read")
+    }
     async fn data_store(&self) -> DataStore {
         // TODO: From file path
         DataStore::from_file_path(self.data_store_path().to_str().expect("Data store path").to_string()).await

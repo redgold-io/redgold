@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use flume::Sender;
+use flume::{Receiver, Sender};
 use futures::future::join_all;
 use rand::Rng;
 use redgold_common::external_resources::ExternalNetworkResources;
@@ -19,7 +19,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::explorer::DetailedAddress;
-use redgold_schema::conf::local_stored_state::NamedXpub;
+use redgold_schema::conf::local_stored_state::AccountKeySource;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
@@ -72,7 +72,10 @@ impl GuiDepends for NativeGuiDepends {
         self.nc.secure_or().config().unwrap().unwrap()
     }
 
-    fn set_config(&self, config: &ConfigData) {
+    fn set_config(&mut self, config: &ConfigData) {
+        let mut nc = (*self.nc).clone();
+        nc.config_data = Arc::new(config.clone());
+        self.nc = Arc::new(nc);
         self.nc.secure_or().write_config(config).unwrap();
     }
 
@@ -212,5 +215,17 @@ impl GuiDepends for NativeGuiDepends {
 
     fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address> {
         pk.to_ethereum_address_typed()
+    }
+
+    fn spawn_interrupt(&self, f: impl Future<Output=()> + Send + 'static, interrupt: Receiver<()>) {
+        tokio::spawn(async {
+            let mut result = tokio::spawn(f);
+            tokio::select! {
+            _ = &mut result => {},
+            _ = interrupt.into_recv_async() => {
+                    result.abort();
+                },
+            }
+        });
     }
 }

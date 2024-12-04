@@ -10,10 +10,11 @@ pub enum Tab {
     Keys,
     Address,
     Contacts,
-    Servers,
+    Deploy,
     Settings,
     Ratings,
     Identity,
     OTP,
     Airgap
+
 }

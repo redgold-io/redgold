@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
-use flume::Sender;
+use flume::{Receiver, Sender};
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
@@ -43,7 +43,7 @@ impl GuiDepends for WasmGuiDepends {
         todo!()
     }
 
-    fn set_config(&self, config: &ConfigData) {
+    fn set_config(&mut self, config: &ConfigData) {
         todo!()
     }
 
@@ -79,6 +79,10 @@ impl GuiDepends for WasmGuiDepends {
         todo!()
     }
     fn spawn(&self, f: impl Future<Output=()> + Send + 'static) {
+        todo!()
+    }
+
+    fn spawn_interrupt(&self, f: impl Future<Output=()> + Send + 'static, interrupt: Receiver<()>) {
         todo!()
     }
 

@@ -110,7 +110,7 @@ impl Node {
         }));
 
         let c_config = relay.clone();
-        if node_config.e2e_enabled {
+        if node_config.e2e_enabled() {
             // TODO: Distinguish errors here
             let cwh = tokio::spawn(e2e::run(c_config));
             sjh.add("e2e", cwh);

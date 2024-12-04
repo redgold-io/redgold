@@ -33,13 +33,14 @@ use crate::{e2e, gui, util};
 use crate::api::RgHttpClient;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::{NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli, GUI};
+use redgold_schema::config_data::ConfigData;
 // use crate::gui::image_capture::debug_capture;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::observability::metrics_registry;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
-use crate::util::cli::{args, commands};
+use crate::util::cli::{args, commands, immediate_commands};
 use redgold_schema::data_folder::DataFolder;
 use crate::node_config::WordsPassNodeConfig;
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
@@ -56,21 +57,21 @@ pub struct ArgTranslate {
     pub node_config: Box<NodeConfig>,
     pub determined_subcommand: Option<RgTopLevelSubcommand>,
     pub abort: bool,
-    pub opts: RgArgs,
+    pub opts: Box<RgArgs>,
 }
 
 impl ArgTranslate {
 
     pub fn new(
         node_config: Box<NodeConfig>,
-        opts: RgArgs
+        opts: &Box<RgArgs>
     ) -> Self {
         
         ArgTranslate {
             node_config,
-            determined_subcommand: None,
+            determined_subcommand: opts.subcmd.clone(),
             abort: false,
-            opts
+            opts: opts.clone()
         }
     }
     
@@ -120,17 +121,6 @@ impl ArgTranslate {
         ).unwrap_or(std::env::current_dir().ok().expect("Can't get current dir"))
     }
 
-    pub fn load_internal_servers(&mut self) -> Result<(), ErrorInfo> {
-        // TODO: From better data folder options
-        let data_folder = Self::secure_data_or_cwd();
-        let rg = data_folder.join(".rg");
-        let df = DataFolder::from_path(rg);
-        if let Some(servers) = df.all().servers().ok() {
-            self.node_config.servers = servers;
-        }
-        Ok(())
-    }
-
     pub fn read_servers_file(servers: PathBuf) -> Result<Vec<ServerOldFormat>, ErrorInfo> {
         let result = if servers.is_file() {
             let contents = fs::read_to_string(servers)
@@ -144,48 +134,75 @@ impl ArgTranslate {
     }
 
     pub async fn translate_args(mut self) -> Result<Box<NodeConfig>, ErrorInfo> {
-        self.immediate_debug();
         self.set_gui_on_empty();
+
+        let skip_slow_stuff = self.determined_subcommand.clone().map(|x|
+            match x {
+                RgTopLevelSubcommand::GUI(_) => false,
+                RgTopLevelSubcommand::Node(_) => false,
+                _ => true
+            }
+        ).unwrap_or(false);
+
+        // println!("skip slow stuff: {}", skip_slow_stuff);
+
+        self.immediate_debug();
+        // println!("immediate debug: ");
+
         self.check_load_logger()?;
+        // println!("check load logger : ");
         self.determine_network()?;
         self.ports();
-        if !self.node_config.disable_metrics {
+        if !self.node_config.disable_metrics && !skip_slow_stuff {
             metrics_registry::register_metrics(self.node_config.port_offset);
         }
+        // println!("metrics registered: ");
         self.data_folder()?;
+        // println!("data folder: ");
         self.secure_data_folder();
-        self.load_mnemonic()?;
+        // println!("secure data folder: ");
+        self.load_mnemonic().await?;
+        // println!("mnemonic loaded: ");
         self.load_peer_id()?;
+        // println!("peer id loaded: ");
         self.load_peer_tx()?;
-        self.set_public_key();
-        self.load_internal_servers()?;
-        self.calculate_executable_checksum_hash();
-        self.guard_faucet();
-        self.e2e_enable();
+        // println!("peer tx loaded: ");
+        if !skip_slow_stuff && !self.is_gui() {
+            self.set_public_key();
+        }
+        // println!("set pk: ");
+
+        if !skip_slow_stuff {
+            // println!("slow stuff calc exe: ");
+            self.calculate_executable_checksum_hash();
+        }
         // info!("E2e enabled");
-        self.configure_seeds().await;
+        if !skip_slow_stuff {
+            // println!("configuring seeds: ");
+            self.configure_seeds().await;
+        }
+        // println!("setting discovery interval");
         self.set_discovery_interval();
-        self.apply_node_opts();
+        // println!("discovery interval set");
         self.genesis();
-        self.alias();
 
         if self.is_gui() {
             self.node_config.is_gui = true;
             return Ok(self.node_config);
         }
 
-        self.abort = immediate_commands(&self.opts().clone(), &self.node_config.clone(), self.args()).await;
-        if self.abort {
-            self.node_config.abort = true;
-            return Ok(self.node_config);
+        // let subcmd = self.opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
+        // self.node_config.top_level_subcommand = subcmd.clone();
+
+        if !skip_slow_stuff {
+            self.lookup_ip().await;
         }
-
         // Unnecessary for CLI commands, hence after immediate commands
-        self.lookup_ip().await;
+        // self.lookup_ip().await;
 
-        tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
-        tracing::info!("Parsed args successfully with args: {:?}", self.args());
-        tracing::info!("RgArgs options parsed: {:?}", self.opts().clear_sensitive());
+        // tracing::debug!("Starting node with data store path: {}", self.node_config.data_store_path());
+        // tracing::info!("Parsed args successfully with args: {:?}", self.args());
+        // tracing::info!("RgArgs options parsed: {:?}", self.opts().clear_sensitive());
         // info!("Development mode: {}", self.opts().development_mode);
 
         Ok(self.node_config)
@@ -197,12 +214,6 @@ impl ArgTranslate {
         }
     }
 
-    fn guard_faucet(&mut self) {
-        // Only enable on main if CLI flag with additional precautions
-        if self.node_config.network == NetworkEnvironment::Main {
-            self.node_config.faucet_enabled = false;
-        }
-    }
 
     async fn lookup_ip(&mut self) {
 
@@ -281,87 +292,52 @@ impl ArgTranslate {
         gauge!("redgold.node.executable_checksum_last_8", &labels).set(1.0);
     }
 
-    fn load_mnemonic(&mut self) -> Result<(), ErrorInfo> {
-
-        // Remove any defaults; we want to be explicit
-        self.node_config.mnemonic_words = "".to_string();
-
-        // First try to load from the all environment data folder for re-use across environments
-        if let Ok(words) = self.node_config.data_folder.all().mnemonic_no_tokio() {
-            self.node_config.mnemonic_words = words;
-        };
-
-        // Then override with environment specific mnemonic;
-        if let Ok(words) = self.node_config.env_data_folder().mnemonic_no_tokio() {
-            self.node_config.mnemonic_words = words;
-        };
-
-        // TODO: Merge this with CLI
-        // Then override with environment variable
-        if let Some(words) = std::env::var("REDGOLD_WORDS").ok() {
-            self.node_config.mnemonic_words = words;
-        };
+    async fn load_mnemonic(&mut self) -> RgResult<()> {
 
 
-        // Then override with command line
-        if let Some(words) = &self.opts().words {
-            self.node_config.mnemonic_words = words.clone();
+        if self.node_config.config_data.node.as_ref().and_then(|n| n.words.as_ref()).is_some() {
+            return Ok(())
         }
 
-        // Then override with a file from the command line (more secure than passing directly)
-        if let Some(words) = &self.opts()
-            .mnemonic_path
-            .clone()
-            .map(fs::read_to_string)
-            .map(|x| x.expect("Something went wrong reading the mnemonic_path file")) {
-            self.node_config.mnemonic_words = words.clone();
-        };
+        // TODO: Rather than mutating configuration, we should populate 'words' directly into NodeConfig
+        // as class instance from generation, and then re-write the changes to the config.
+        let mut config_data = (*self.node_config.config_data).clone();
+        let node = config_data.node.get_or_insert(Default::default());
 
-
-
-        // If empty, generate a new mnemonic;
-        if self.node_config.mnemonic_words.is_empty() {
-            if let Some(dbg_id) = self.opts().debug_id.as_ref() {
-                self.node_config.mnemonic_words = WordsPass::from_str_hashed(dbg_id.to_string()).words;
+        // First attempt environment specific mnemonic;
+        if let Ok(words) = self.node_config.env_data_folder().mnemonic().await {
+            node.words = Some(words);
+        } else if let Ok(words) = self.node_config.data_folder.all().mnemonic().await {
+            // Then any mnemonic
+            node.words = Some(words);
+        } else {
+            if let Some(dbg_id) = self.node_config.debug_id().as_ref() {
+                node.words = Some(WordsPass::from_str_hashed(dbg_id.to_string()).words);
             } else {
                 tracing::info!("Unable to load mnemonic for wallet / node keys, attempting to generate new one");
                 tracing::info!("Generating with entropy for 24 words, process may halt if insufficient entropy on system");
                 let mnem = WordsPass::generate()?.words;
                 tracing::info!("Successfully generated new mnemonic");
-                self.node_config.mnemonic_words = mnem.clone();
+                node.words = Some(mnem.clone());
                 let buf = self.node_config.env_data_folder().mnemonic_path();
-                fs::write(
+                tokio::fs::write(
                     buf.clone(),
-                    self.node_config.mnemonic_words.clone()).expect("Unable to write mnemonic to file");
-
+                    mnem.clone()
+                ).await.expect("Unable to write mnemonic to file");
                 info!("Wrote mnemonic to path: {}", buf.to_str().expect("Path format failure"));
             }
         };
 
+        self.node_config.config_data = Arc::new(config_data);
+
         // Validate that this is loadable
-        let _ = WordsPass::words(self.node_config.mnemonic_words.clone()).mnemonic()?;
+        let _ = WordsPass::words(self.node_config.mnemonic_words().clone()).mnemonic()?;
 
         Ok(())
     }
 
     // TODO: Load merkle tree of this
     fn load_peer_id(&mut self) -> Result<(), ErrorInfo> {
-        // // TODO: Use this
-        // let _peer_id_from_store: Option<String> = None; // mnemonic_store.get(0).map(|x| x.peer_id.clone());
-
-        // TODO: From environment variable too?
-        // TODO: write merkle tree to disk
-
-        if let Some(path) = &self.opts().peer_id_path {
-            let p = fs::read_to_string(path)
-                .error_info("Failed to read peer_id_path file")?;
-            self.node_config.peer_id = PeerId::from_hex(p)?;
-        }
-
-        // TODO: This will have to change to read the whole merkle tree really, lets just remove this maybe?
-        if let Some(p) = &self.opts().peer_id {
-            self.node_config.peer_id = PeerId::from_hex(p)?;
-        }
 
         if let Some(p) = fs::read_to_string(self.node_config.env_data_folder().peer_id_path()).ok() {
             self.node_config.peer_id = PeerId::from_hex(p)?;
@@ -383,13 +359,13 @@ impl ArgTranslate {
 
     fn data_folder(&mut self) -> Result<(), ErrorInfo> {
 
-        let mut data_folder_path =  self.opts().data_path.clone()
+        let mut data_folder_path =  self.node_config.config_data.data.clone()
             .map(|p| PathBuf::from(p))
             .unwrap_or(get_default_data_top_folder());
 
         // Testing only modification, could potentially do this in a separate function to
         // unify this with other debug mods.
-        if let Some(id) = self.opts().debug_id {
+        if let Some(id) = self.opts().debug_args.debug_id {
             data_folder_path = data_folder_path.join("local_test");
             data_folder_path = data_folder_path.join(format!("id_{}", id));
         }
@@ -405,7 +381,7 @@ impl ArgTranslate {
         self.node_config.port_offset = self.node_config.network.default_port_offset();
 
         // Unify with other debug id stuff?
-        if let Some(dbg_id) = self.opts().debug_id {
+        if let Some(dbg_id) = self.opts().debug_args.debug_id {
             self.node_config.port_offset = Self::debug_id_port_offset(
                 self.node_config.network.default_port_offset(),
                 dbg_id
@@ -431,7 +407,7 @@ impl ArgTranslate {
     //     }
     // }
     fn check_load_logger(&mut self) -> Result<(), ErrorInfo> {
-        let log_level = &self.opts().log_level
+        let log_level = &self.opts().global_settings.log_level
             .clone()
             .and(std::env::var("REDGOLD_LOG_LEVEL").ok())
             .unwrap_or("DEBUG".to_string());
@@ -442,7 +418,7 @@ impl ArgTranslate {
                 RgTopLevelSubcommand::GUI(_) => { true }
                 RgTopLevelSubcommand::Node(_) => { true }
                 // RgTopLevelSubcommand::TestTransaction(_) => {true}
-                _ => { false }
+                _ => { true }
             }
         }
         if enable_logger {
@@ -455,48 +431,24 @@ impl ArgTranslate {
         Ok(())
     }
     fn determine_network(&mut self) -> Result<(), ErrorInfo> {
-        if let Some(n) = std::env::var("REDGOLD_NETWORK").ok() {
-            NetworkEnvironment::parse_safe(n)?;
-        }
-        self.node_config.network = match &self.opts().network {
+
+        self.node_config.network = match self.node_config.config_data.network.as_ref() {
             None => {
-                if util::local_debug_mode() {
-                    NetworkEnvironment::Debug
-                } else {
-                    NetworkEnvironment::Local
-                }
+                NetworkEnvironment::Main
             }
             Some(n) => {
-                NetworkEnvironment::parse_safe(n.clone())?
+                NetworkEnvironment::from_std_string(n.clone()).unwrap()
             }
         };
 
-        if self.is_gui() && self.node_config.network == NetworkEnvironment::Local {
-            if self.opts().development_mode {
-                self.node_config.network = NetworkEnvironment::Dev;
-            } else {
-                self.node_config.network = NetworkEnvironment::Main;
-            }
-        }
-
         if self.node_config.network == NetworkEnvironment::Local || self.node_config.network == NetworkEnvironment::Debug {
             self.node_config.disable_auto_update = true;
+            info!("Setting load balancer url to localhost due to Local / Debug network configuration");
             self.node_config.load_balancer_url = "127.0.0.1".to_string();
         }
         Ok(())
     }
 
-    fn e2e_enable(&mut self) {
-        if self.opts().enable_live_e2e {
-            self.node_config.e2e_enabled = true;
-        }
-        // std::env::var("REDGOLD_ENABLE_E2E").ok().map(|b| {
-        //     self.node_config.e2e_enable = true;
-        // }
-        // self.opts().enable_e2e.map(|_| {
-        //     self.node_config.e2e_enable = true;
-        // });
-    }
     async fn configure_seeds(&mut self) {
 
         // info!("configure seeds");
@@ -509,9 +461,9 @@ impl ArgTranslate {
 
         let port = self.node_config.public_port();
 
-        if let Some(a) = &self.opts().seed_address {
+        if let Some(a) = &self.opts().debug_args.seed_address {
             let default_port = self.node_config.network.default_port_offset();
-            let port = self.opts().seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
+            let port = self.opts().debug_args.seed_port_offset.map(|p| p as u16).unwrap_or(default_port);
             info!("Adding seed from command line arguments {a}:{port}");
             // TODO: replace this with the other seed class.
             let cli_seed_arg = Seed {
@@ -563,30 +515,10 @@ impl ArgTranslate {
 
 
     }
-    fn apply_node_opts(&mut self) {
-        match self.get_subcommand() {
-            Some(RgTopLevelSubcommand::Node(node_cli)) => {
-                if let Some(i) = &node_cli.live_e2e_interval {
-                    self.node_config.live_e2e_interval = Duration::from_secs(i.clone());
-                }
-            }
-            _ => {}
-        }
-    }
+
     fn genesis(&mut self) {
-        if let Some(o) = std::env::var("REDGOLD_GENESIS").ok() {
-            if let Ok(b) = o.parse::<bool>() {
-                self.node_config.genesis = b;
-            }
-        }
-        if self.opts().genesis {
-            self.node_config.genesis = true;
-        }
-        if self.node_config.genesis {
+        if self.node_config.genesis() {
             self.node_config.seeds.push(self.node_config.self_seed())
-        }
-        if self.node_config.genesis {
-            // info!("Starting node as genesis node");
         }
     }
 
@@ -609,16 +541,10 @@ impl ArgTranslate {
         info!("Public key: {}", pk.hex());
     }
     fn secure_data_folder(&mut self) {
-        if let Some(pb) = Self::secure_data_path_buf() {
+        if let Some(pb) = self.node_config.config_data.secure.as_ref().and_then(|sd| sd.path.clone()) {
+            let pb = PathBuf::from(pb);
             let pb_joined = pb.join(".rg");
             self.node_config.secure_data_folder = Some(DataFolder::from_path(pb_joined));
-        }
-    }
-    fn alias(&mut self) {
-        if let Ok(a) = std::env::var("REDGOLD_ALIAS") {
-            if !a.trim().is_empty() {
-                self.node_config.node_info.alias = Some(a.trim().to_string());
-            }
         }
     }
     fn immediate_debug(&self) {
@@ -703,82 +629,3 @@ fn load_ds_path() {
     // println!("{}", res.data_store_path());
 }
 
-// TODO: Settings from config if necessary
-/*    let mut settings = config::Config::default();
-    let mut settings2 = settings.clone();
-    settings
-        // Add in `./Settings.toml`
-        .merge(config::File::with_name("Settings"))
-        .unwrap_or(&mut settings2)
-        // Add in settings from the environment (with a prefix of APP)
-        // Eg.. `APP_DEBUG=1 ./target/app` would set the `debug` key
-        .merge(config::Environment::with_prefix("REDGOLD"))
-        .unwrap();
-*/
-// Pre logger commands
-pub async fn immediate_commands(opts: &RgArgs, config: &NodeConfig,
-                                // , simple_runtime: Arc<Runtime>
-                                args: Vec<&String>
-) -> bool {
-    let mut abort = false;
-    let res: Result<(), ErrorInfo> = match &opts.subcmd {
-        None => {Ok(())}
-        Some(c) => {
-            abort = true;
-            match c {
-                RgTopLevelSubcommand::GenerateWords(m) => {
-                    commands::generate_mnemonic(&m);
-                    Ok(())
-                },
-                RgTopLevelSubcommand::Address(a) => {
-                    commands::generate_address(a.clone(), &config).map(|_| ())
-                }
-                RgTopLevelSubcommand::Send(a) => {
-                    commands::send(&a, &config).await
-                }
-                RgTopLevelSubcommand::Query(a) => {
-                    commands::query(&a, &config).await
-                }
-                RgTopLevelSubcommand::Faucet(a) => {
-                    commands::faucet(&a, &config).await
-                }
-                RgTopLevelSubcommand::AddServer(a) => {
-                    commands::add_server(a, &config).await
-                }
-                RgTopLevelSubcommand::Balance(a) => {
-                    commands::balance_lookup(a, &config).await
-                }
-                RgTopLevelSubcommand::TestTransaction(test_transaction_cli) => {
-                    commands::test_transaction(&test_transaction_cli, &config).await
-                }
-                RgTopLevelSubcommand::Deploy(d) => {
-                    commands::deploy(d, &config).await.unwrap().abort();
-                    Ok(())
-                }
-                RgTopLevelSubcommand::TestBitcoinBalance(_b) => {
-                    commands::test_btc_balance(args.get(0).unwrap(), config.network.clone()).await;
-                    Ok(())
-                }
-                RgTopLevelSubcommand::ConvertMetadataXpub(b) => {
-                    commands::convert_metadata_xpub(&b.metadata_file).await
-                }
-                RgTopLevelSubcommand::DebugCommand(d) => {
-                    commands::debug_commands(d, &config).await
-                }
-                RgTopLevelSubcommand::GenerateConfig(d) => {
-                    println!("Not implemented");
-                    Ok(())
-                }
-                _ => {
-                    abort = false;
-                    Ok(())
-                }
-            }
-        }
-    };
-    if res.is_err() {
-        println!("{}", serde_json::to_string(&res.err().unwrap()).expect("json"));
-        abort = true;
-    }
-    abort
-}

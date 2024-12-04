@@ -3,6 +3,7 @@ use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::NetworkEnvironment;
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 
+#[ignore]
 #[tokio::test]
 async fn debug_query_party_data() {
     let nc = NodeConfig::default_env(NetworkEnvironment::Dev).await;
