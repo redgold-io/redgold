@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use flume::Sender;
+use flume::{Receiver, Sender};
 use futures::future::join_all;
 use rand::Rng;
 use redgold_common::external_resources::ExternalNetworkResources;
@@ -212,5 +212,17 @@ impl GuiDepends for NativeGuiDepends {
 
     fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address> {
         pk.to_ethereum_address_typed()
+    }
+
+    fn spawn_interrupt(&self, f: impl Future<Output=()> + Send + 'static, interrupt: Receiver<()>) {
+        tokio::spawn(async {
+            let mut result = tokio::spawn(f);
+            tokio::select! {
+            _ = &mut result => {},
+            _ = interrupt => {
+                    result.abort();
+                },
+            }
+        });
     }
 }

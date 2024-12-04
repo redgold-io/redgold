@@ -107,7 +107,7 @@ impl LocalStateAddons for LocalState {
             Tab::Identity => {}
             Tab::Contacts => {}
             Tab::Address => {}
-            Tab::Servers => {}
+            Tab::Deploy => {}
             Tab::Ratings => {}
             Tab::Settings => {
                 self.settings_state.lss_serialized = self.local_stored_state.json_or();
@@ -290,6 +290,7 @@ use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgr
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::tab::deploy::deploy_state::{ServerStatus, ServersState};
 // 0.8
 // use crate::gui::image_load::TexMngr;
 use redgold_gui::tab::home;
@@ -301,7 +302,7 @@ use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::core::internal_message::{new_channel, Channel};
 use redgold_gui::tab::home::HomeState;
-use redgold_schema::conf::local_stored_state::{Identity, LocalStoredState, AccountKeySource, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
+use redgold_schema::conf::local_stored_state::{AccountKeySource, Identity, LocalStoredState, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::{SwapStage, SwapState};
@@ -311,7 +312,6 @@ use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::server_tab;
 use crate::gui::tabs::keys::keygen_subtab::KeygenState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
-use crate::gui::tabs::server_tab::{ServerStatus, ServersState};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{wallet_screen, StateUpdate, WalletState};
@@ -429,9 +429,17 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 settings_tab(ui, ctx, local_state);
             }
             Tab::Ratings => {}
-            Tab::Servers => {
+            Tab::Deploy => {
                 ScrollArea::vertical().id_source("wtf").show(ui, |ui| {
-                    server_tab::servers_tab(ui, ctx, local_state);
+                    server_tab::servers_tab(
+                        ui,
+                        ctx,
+                        &mut local_state.server_state,
+                        &g,
+                        &local_state.node_config,
+                        local_state.wallet.hot_mnemonic().words,
+                        local_state.wallet.hot_mnemonic().passphrase,
+                    );
                 });
             }
             Tab::Transact => {

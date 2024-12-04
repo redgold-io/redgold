@@ -56,14 +56,14 @@ where G: Send + Clone + GuiDepends {
         PathBuf::from(string)
     ).await.expect("migrations");
     // DataStore::run_migrations(&ds_or).await.expect("");
-    let hot_mnemonic = node_config.secure_or().all().mnemonic().await.unwrap_or(node_config.mnemonic_words().clone());
+    let hot_mnemonic = node_config.secure_mnemonic_words_or();
 
     let config = gui_depends.get_config();
     let local_stored_state = ds_or.config_store.get_stored_state().await?;
 
     // fs::write("local_stored_state.json", local_stored_state.json_or()).unwrap();
 
-    let mut ss = crate::gui::tabs::server_tab::ServersState::default();
+    let mut ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
 
     ss.csv_edit_path = node_config.clone().secure_data_folder.unwrap_or(node_config.data_folder.clone())
         .all().servers_path().to_str().expect("").to_string();

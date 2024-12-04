@@ -157,6 +157,19 @@ pub struct ConfigData {
 }
 
 impl ConfigData {
+
+    pub fn development_mode(&self) -> bool {
+        self.debug.as_ref().and_then(|x| x.develop).unwrap_or(false)
+    }
+
+    pub fn servers_old(&self) -> Vec<ServerOldFormat> {
+        self.local.as_ref()
+            .and_then(|x|
+                          x.deploy.as_ref()
+                              .map(|x| x.as_old_servers())
+                              .or(x.servers.clone())
+            ).unwrap_or_default()
+    }
     pub fn generate_user_sample_config() -> Self {
         Self {
             network: Some("main".to_string()),
@@ -285,6 +298,7 @@ use std::env;
 use crate::conf::server_config::{Deployment, DeploymentDefaultParams, NodeInstance, ServerData};
 use crate::proto_serde::ProtoSerde;
 use crate::RgResult;
+use crate::servers::ServerOldFormat;
 use crate::structs::{NetworkEnvironment, PeerId, RatingType, SupportedCurrency, TrustData, TrustRatingLabel};
 
 fn get_home_dir() -> Option<String> {

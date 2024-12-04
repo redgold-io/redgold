@@ -77,6 +77,7 @@ pub trait GuiDepends {
     ) -> RgResult<()>;
     fn broadcast_prepared_transaction(&mut self, tx: &PreparedTransaction, results: flume::Sender<RgResult<PreparedTransaction>>) -> RgResult<()>;
     fn spawn(&self, f: impl std::future::Future<Output = ()> + Send + 'static);
+    fn spawn_interrupt(&self, f: impl std::future::Future<Output = ()> + Send + 'static, interrupt: flume::Receiver<()>);
 
     // this doesn't seem to work well with async functions
     fn spawn_blocking<T: Send+ 'static>(&self, f: impl std::future::Future<Output = RgResult<T>> + Send + 'static) -> RgResult<T>;

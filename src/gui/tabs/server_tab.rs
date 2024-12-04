@@ -15,6 +15,9 @@ use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size_focus, editable_text_input_copy, password_single, valid_label};
 use redgold_gui::components::tables;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::tab::deploy::deploy_state::{ServerStatus, ServersState};
+use redgold_schema::conf::node_config::NodeConfig;
 use crate::infra::deploy::{default_deploy, DeployMachine};
 use crate::infra::{deploy, multiparty_backup};
 use redgold_schema::conf::rg_args::Deploy;
@@ -57,21 +60,30 @@ pub async fn update_server_status(
 
 }
 
-pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn servers_tab<G>(
+    ui: &mut Ui,
+    _ctx: &egui::Context,
+    state: &mut ServersState,
+    g: &G,
+    nc: &NodeConfig,
+    words: String,
+    passphrase: Option<String>
+)
+where G: GuiDepends + Clone + Send + 'static {
+    let config_data = g.get_config();
+    let servers = config_data.servers_old();
 
-    let servers = local_state.node_config.servers_old().clone();
-
-    if local_state.server_state.needs_update {
-        local_state.server_state.needs_update = false;
-        tokio::spawn(
+    if state.needs_update {
+        state.needs_update = false;
+        g.spawn(
             update_server_status(
                 servers.clone(),
-                local_state.server_state.info.clone(),
-                local_state.node_config.network.clone()
+                state.info.clone(),
+                g.get_network().clone()
             )
         );
-    }
-    let info = local_state.server_state.info.lock().expect("").to_vec();
+    };
+    let info = state.info.lock().expect("").to_vec();
 
     let mut table_rows: Vec<Vec<String>> = vec![];
     table_rows.push(vec![
@@ -119,7 +131,7 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         ui.separator();
         ui.spacing();
         if ui.button("Refresh").clicked() {
-            local_state.server_state.needs_update = true;
+            state.needs_update = true;
         }
     });
     ui.separator();
@@ -139,104 +151,105 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
         });
 
     });
+    // 
+    // ui.horizontal(|ui| {
+    //     editable_text_input_copy(
+    //         ui,"Server CSV Load Path", &mut state.csv_edit_path, 300.0
+    //     );
+    //     if ui.button("Load").clicked() {
+    //         let buf = PathBuf::from(state.csv_edit_path.clone());
+    //         let res = ServerOldFormat::parse_from_file(buf);
+    //         if let Ok(res) = res {
+    //             local_state.local_stored_state.servers = Some(res);
+    //             local_state.persist_local_state_store();
+    //             state.parse_success = Some(true);
+    //         } else {
+    //             state.parse_success = Some(false);
+    //         }
+    //     }
+    // });
+    // if let Some(p) = state.parse_success {
+    //     ui.horizontal(|ui| {
+    //         ui.label("Parse result: ");
+    //         valid_label(ui, p, );
+    //     });
+    // 
+    // }
 
-    ui.horizontal(|ui| {
-        editable_text_input_copy(
-            ui,"Server CSV Load Path", &mut local_state.server_state.csv_edit_path, 300.0
-        );
-        if ui.button("Load").clicked() {
-            let buf = PathBuf::from(local_state.server_state.csv_edit_path.clone());
-            let res = ServerOldFormat::parse_from_file(buf);
-            if let Ok(res) = res {
-                local_state.local_stored_state.servers = Some(res);
-                local_state.persist_local_state_store();
-                local_state.server_state.parse_success = Some(true);
-            } else {
-                local_state.server_state.parse_success = Some(false);
-            }
-        }
-    });
-    if let Some(p) = local_state.server_state.parse_success {
-        ui.horizontal(|ui| {
-            ui.label("Parse result: ");
-            valid_label(ui, p, );
-        });
-
-    }
-
+    // TODO: Move all this to unification with the deploy args
     ui.label("Deploy Options");
 
     ui.horizontal(|ui| {
-        ui.checkbox(&mut local_state.server_state.redgold_process, "Redgold Process");
-        ui.checkbox(&mut local_state.server_state.words_and_id, "Words/Id");
-        ui.checkbox(&mut local_state.server_state.cold, "Cold");
-        ui.checkbox(&mut local_state.server_state.purge, "Purge");
+        ui.checkbox(&mut state.redgold_process, "Redgold Process");
+        ui.checkbox(&mut state.words_and_id, "Words/Id");
+        ui.checkbox(&mut state.cold, "Cold");
+        ui.checkbox(&mut state.purge, "Purge");
         ui.label("Server Filter:");
-        TextEdit::singleline(&mut local_state.server_state.server_index_edit).desired_width(50.0).show(ui);
+        TextEdit::singleline(&mut state.server_index_edit).desired_width(50.0).show(ui);
     });
 
     ui.horizontal(|ui| {
-        ui.checkbox(&mut local_state.server_state.ops, "Ops");
-        ui.checkbox(&mut local_state.server_state.system, "Apt/System");
-        ui.checkbox(&mut local_state.server_state.purge_ops, "Purge Ops");
-        ui.checkbox(&mut local_state.server_state.skip_logs, "Skip Logging");
+        ui.checkbox(&mut state.ops, "Ops");
+        ui.checkbox(&mut state.system, "Apt/System");
+        ui.checkbox(&mut state.purge_ops, "Purge Ops");
+        ui.checkbox(&mut state.skip_logs, "Skip Logging");
     });
 
-    if local_state.node_config.development_mode() {
+    if config_data.development_mode() {
         ui.horizontal(|ui| {
-            ui.checkbox(&mut local_state.server_state.skip_start, "Skip Start");
-            ui.checkbox(&mut local_state.server_state.genesis, "Genesis");
-            ui.checkbox(&mut local_state.server_state.hard_coord_reset, "Hard Coord Reset");
+            ui.checkbox(&mut state.skip_start, "Skip Start");
+            ui.checkbox(&mut state.genesis, "Genesis");
+            ui.checkbox(&mut state.hard_coord_reset, "Hard Coord Reset");
         });
     }
 
-    password_single(&mut local_state.server_state.mixing_password,"Mixing Password", ui,
-                    &mut local_state.server_state.show_mixing_password);
+    password_single(&mut state.mixing_password,"Mixing Password", ui,
+                    &mut state.show_mixing_password);
 
     ui.horizontal(|ui| {
-        ui.checkbox(&mut local_state.server_state.load_offline_deploy, "Load Offline Deploy");
-        if local_state.server_state.load_offline_deploy {
-            editable_text_input_copy(ui, "Load Offline Path", &mut local_state.server_state.load_offline_path, 250.0);
+        ui.checkbox(&mut state.load_offline_deploy, "Load Offline Deploy");
+        if state.load_offline_deploy {
+            editable_text_input_copy(ui, "Load Offline Path", &mut state.load_offline_path, 250.0);
         }
     });
     ui.horizontal(|ui| {
     if ui.button("Deploy").clicked() {
-        local_state.server_state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
-        local_state.server_state.deployment_result = Arc::new(Mutex::new(Either::Left(None)));
+        state.deployment_result_info_box = Arc::new(Mutex::new("".to_string()));
+        state.deployment_result = Arc::new(Mutex::new(Either::Left(None)));
         info!("Deploying");
         let mut d = Deploy::default();
-        if local_state.server_state.load_offline_deploy {
-            d.server_offline_info = Some(local_state.server_state.load_offline_path.clone());
+        if state.load_offline_deploy {
+            d.server_offline_info = Some(state.load_offline_path.clone());
         }
-        d.ops = local_state.server_state.ops;
+        d.ops = state.ops;
         if d.ops == false {
             d.skip_ops = true;
         }
-        d.disable_apt_system_init = !local_state.server_state.system;
-        d.skip_redgold_process = !local_state.server_state.redgold_process;
-        d.skip_logs = local_state.server_state.skip_logs;
-        d.purge_ops = local_state.server_state.purge_ops;
-        d.debug_skip_start = local_state.server_state.skip_start;
-        d.purge = local_state.server_state.purge;
-        d.server_index = local_state.server_state.server_index_edit.parse::<i32>().ok();
-        d.server_filter = Some(local_state.server_state.server_index_edit.clone());
-        d.genesis = local_state.server_state.genesis;
-        d.mixing_password = Some(local_state.server_state.mixing_password.clone()).filter(|s| !s.is_empty());
-        d.words_and_id = local_state.server_state.words_and_id;
-        d.cold = local_state.server_state.cold;
+        d.disable_apt_system_init = !state.system;
+        d.skip_redgold_process = !state.redgold_process;
+        d.skip_logs = state.skip_logs;
+        d.purge_ops = state.purge_ops;
+        d.debug_skip_start = state.skip_start;
+        d.purge = state.purge;
+        d.server_index = state.server_index_edit.parse::<i32>().ok();
+        d.server_filter = Some(state.server_index_edit.clone());
+        d.genesis = state.genesis;
+        d.mixing_password = Some(state.mixing_password.clone()).filter(|s| !s.is_empty());
+        d.words_and_id = state.words_and_id;
+        d.cold = state.cold;
 
-        let hard = local_state.server_state.hard_coord_reset.clone();
+        let hard = state.hard_coord_reset.clone();
         if hard {
             d.hard_coord_reset = true;
             d.purge = true;
             d.debug_skip_start = true;
         }
-        let config = local_state.node_config.clone();
-        let arc = local_state.server_state.deployment_result_info_box.clone();
+        let config = nc.clone();
+        let arc = state.deployment_result_info_box.clone();
 
         let c: Channel::<String> = Channel::new();
         let r = c.receiver.clone();
-        let default_fun = tokio::spawn(async move {
+        let default_fun = g.spawn(async move {
             loop {
                 let s = match r.recv_async_err().await {
                     Ok(x) => {
@@ -258,38 +271,39 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
             ()
         });
 
-        let deployment = local_state.local_stored_state
-            .deploy.clone().map(|d| d.fill_params());
+        let deployment = config_data.local
+            .and_then(|x| x.deploy.clone())
+            .map(|d| d.fill_params());
 
-        let servers = deployment.clone().map(|d| d.as_old_servers())
-            .or(local_state.local_stored_state.servers.clone());
+        let deploy_interrupt: Channel::<()> = Channel::new();
+        state.interrupt_sender = Some(deploy_interrupt.sender.clone());
+
 
         let output_handler = Some(c.sender.clone());
-        let arc = local_state.server_state.deployment_result.clone();
-        let deploy_join = tokio::spawn(async move {
+        let arc = state.deployment_result.clone();
+        let deploy_join = g.spawn_interrupt(async move {
             let f = output_handler.clone();
             let f2 = output_handler.clone();
-
             let mut d2 = d.clone();
             let mut d3 = d2.clone();
             let nc = config.clone();
             let s = servers.clone();
             let dpl = deployment.clone();
-            let _res = default_deploy(&mut d2, &nc, f, s, dpl.clone()).await;
+            let _res = default_deploy(&mut d2, &nc, f, Some(s), dpl.clone()).await;
             info!("Deploy complete {}", _res.json_or());
             *arc.lock().expect("") = Either::Left(Some(_res));
             if hard {
                 d3.debug_skip_start = false;
                 let _res = default_deploy(&mut d3, &nc, f2, None, dpl).await;
             }
-            default_fun.abort();
+            // default_fun.abort();
             // Update final deploy result here.
-        });
+        }, deploy_interrupt.receiver.clone());
 
-        local_state.server_state.deploy_process = Some(Arc::new(deploy_join));
+        // state.deploy_process = Some(Arc::new(deploy_join));
     };
 
-    match local_state.server_state.deployment_result.lock().expect("").as_ref() {
+    match state.deployment_result.lock().expect("").as_ref() {
         Either::Left(l) => {
             match l {
                 None => {
@@ -310,117 +324,44 @@ pub fn servers_tab(ui: &mut Ui, _ctx: &egui::Context, local_state: &mut LocalSta
 
 
     if ui.button("Abort Deploy").clicked() {
-        if let Some(join) = local_state.server_state.deploy_process.clone() {
-            let j = join.clone();
-            j.abort();
+        if let Some(join) = state.interrupt_sender.clone() {
+            join.send(());
         }
     }
     });
 
-    let mut arc1 = local_state.server_state.deployment_result_info_box.clone().lock().expect("").clone();
+    let mut arc1 = state.deployment_result_info_box.clone().lock().expect("").clone();
     bounded_text_area_size_focus(ui, &mut arc1, 500., 10);
 
-    let last_env = local_state.node_config.network.clone();
+    let last_env = g.get_network().clone();
 
-    if last_env != local_state.server_state.last_env {
-        local_state.server_state.mixing_password = "".to_string();
-        local_state.server_state.last_env = last_env;
+    if last_env != state.last_env {
+        state.mixing_password = "".to_string();
+        state.last_env = last_env;
     }
 
     ui.horizontal(|ui| {
-        editable_text_input_copy(ui, "Generate Offline Path", &mut local_state.server_state.generate_offline_path, 150.0);
+        editable_text_input_copy(ui, "Generate Offline Path", &mut state.generate_offline_path, 150.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
-            let config1 = local_state.node_config.clone();
-            let option =
-                local_state.local_stored_state.deploy.clone()
-                    .map(|d| d.as_old_servers())
-                    .or(local_state.local_stored_state.servers.clone()).unwrap_or(vec![]);
+            let config1 = nc.clone();
+            let option = servers.clone();
             tokio::spawn(deploy::offline_generate_keys_servers(
                 config1,
                 option,
-                PathBuf::from(local_state.server_state.generate_offline_path.clone()),
-                local_state.wallet.hot_mnemonic().words.clone(),
-                local_state.wallet.hot_mnemonic().passphrase.clone(),
+                PathBuf::from(state.generate_offline_path.clone()),
+                words.clone(),
+                passphrase.clone(),
             ));
         }
     });
 
     if ui.button("Backup Multiparty Local Shares").clicked() {
-        let option1 = local_state.local_stored_state.servers.clone().unwrap_or(vec![]);
+        let option1 = servers.clone();
         tokio::spawn(multiparty_backup::backup_multiparty_local_shares(
-            local_state.node_config.clone(),
+            nc.clone(),
             option1,
         ));
     }
 
 }
 
-#[derive(Clone)]
-pub struct ServerStatus {
-    pub server_index: i64,
-    pub ssh_reachable: bool,
-    pub docker_ps_online: bool,
-    pub tables: Option<HashMap<String, i64>>,
-    pub metrics: Option<HashMap<String, String>>
-}
-
-#[derive(Clone)]
-pub struct ServersState {
-    needs_update: bool,
-    info: Arc<Mutex<Vec<ServerStatus>>>,
-    deployment_result_info_box: Arc<Mutex<String>>,
-    pub(crate) csv_edit_path: String,
-    parse_success: Option<bool>,
-    purge: bool,
-    server_index_edit: String,
-    skip_start: bool,
-    pub(crate) genesis: bool,
-    pub ops: bool,
-    pub redgold_process: bool,
-    pub skip_logs: bool,
-    purge_ops: bool,
-    hard_coord_reset: bool,
-    pub words_and_id: bool,
-    cold: bool,
-    deployment_result: Arc<Mutex<Either<Option<RgResult<()>>, ()>>>,
-    deploy_process: Option<Arc<JoinHandle<()>>>,
-    mixing_password: String,
-    generate_offline_path: String,
-    load_offline_path: String,
-    load_offline_deploy: bool,
-    show_mixing_password: bool,
-    last_env: NetworkEnvironment,
-    pub system: bool
-}
-
-impl Default for ServersState {
-    fn default() -> Self {
-        Self {
-            needs_update: true,
-            info: Arc::new(Mutex::new(vec![])),
-            deployment_result_info_box: Arc::new(Mutex::new("".to_string())),
-            csv_edit_path: "".to_string(),
-            parse_success: None,
-            purge: false,
-            server_index_edit: "".to_string(),
-            skip_start: false,
-            genesis: false,
-            ops: true,
-            redgold_process: true,
-            skip_logs: false,
-            purge_ops: false,
-            hard_coord_reset: false,
-            words_and_id: true,
-            cold: false,
-            deployment_result: Arc::new(Mutex::new(Either::Right(()))),
-            deploy_process: None,
-            mixing_password: "".to_string(),
-            generate_offline_path: "./servers".to_string(),
-            load_offline_path: "./servers".to_string(),
-            load_offline_deploy: false,
-            show_mixing_password: false,
-            last_env: NetworkEnvironment::Dev,
-            system: true,
-        }
-    }
-}
