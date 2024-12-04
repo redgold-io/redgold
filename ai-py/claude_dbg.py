@@ -62,6 +62,7 @@ def msg(
 
 
 def main():
+    issue_text = get_one_ai_dev_issue()
 
     settings = {
         # "model": "claude-3-5-sonnet-20240620",
@@ -86,7 +87,7 @@ def main():
     os.makedirs(active_dir, exist_ok=True)
 
     starting_prompt = "The issue you've been assigned to work on is listed below: \n\n"
-    starting_prompt += get_one_ai_dev_issue()
+    starting_prompt += issue_text
     response = msg(starting_prompt, model_settings=settings, active_dir=active_dir)
 
     max_runs = 1000

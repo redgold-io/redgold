@@ -9,6 +9,7 @@ from file_ux.create import create_file
 from file_ux.edit_files import edit_file, edit_file_replace_lines_tooldef
 from file_ux.file_viewer import read_file, read_file_tooldef
 from file_ux.git_add import git_add_file
+from file_ux.git_diffs import get_git_diff
 from ts_ast.ts_functions import find_rust_function_exact
 
 
@@ -52,6 +53,10 @@ def get_tool_responses(response) -> Iterable[ToolResultBlockParam]:
                 elif n == "create_file":
                     res = create_file()[1](block.input)
                     result['content'] = res
+                elif n == "get_git_diff":
+                    res = get_git_diff()[1]()
+                    result['content'] = res
+
                 else:
                     print("Unrecognized tool use", block)
                 tool_responses.append(result)
@@ -66,4 +71,5 @@ def default_tooldefs():
         read_file_tooldef(),
         find_rust_function_exact()[0],
         create_file()[0],
+        get_git_diff()[0]
     ]
