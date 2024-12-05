@@ -54,7 +54,8 @@ pub struct NodeData {
     pub peer_id_index: Option<i64>,
     pub port_offset: Option<i64>,
     pub passive: Option<bool>,
-    pub name: Option<String>
+    pub name: Option<String>,
+    pub ip: Option<String>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -190,6 +191,7 @@ impl ConfigData {
                 port_offset: None,
                 passive: Some(false),
                 name: None,
+                ip: None,
             }),
             party: Some(PartyConfigData {
                 enable: Some(false),
