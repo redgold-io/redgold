@@ -27,6 +27,7 @@ pub fn empty_args() -> RgArgs {
             debug_id: None,
             seed_address: None,
             seed_port_offset: None,
+            genesis: false,
         },
         subcmd: None,
     }
@@ -133,6 +134,11 @@ pub struct DebugArgs {
     /// Seed network port offset, only used for local testing and manually connecting to a specific
     /// network
     pub seed_port_offset: Option<i32>,
+    #[clap(long)]
+    /// Mark as genesis node, only used for local testing and manually starting new chain
+    pub genesis: bool,
+
+
 }
 
 /// Welcome to Redgold CLI -- here you can run a GUI, node, or use wallet or other CLI commands.

@@ -7,12 +7,14 @@
 //! which are documented in detail for the respective macro.
 
 use std::collections::HashMap;
-use std::net::SocketAddrV4;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use tracing::{error, info};
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
 use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 use tracing_subscriber::Registry;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -373,3 +375,12 @@ pub fn register_metrics(port_offset: u16) {
 // histogram!("svc.execution_time", 70.0, "type" => "users", "server" => server_name.clone());
 // histogram!("svc.execution_time", 70.0, common_labels);
 // }
+
+
+#[ignore]
+#[test]
+fn debug_metrics() {
+
+    install_prometheus(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9000)).expect("failed to install recorder/exporter");
+    sleep(Duration::from_secs(1000));
+}

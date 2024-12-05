@@ -153,9 +153,7 @@ impl ArgTranslate {
         // println!("check load logger : ");
         self.determine_network()?;
         self.ports();
-        if !self.node_config.disable_metrics && !skip_slow_stuff {
-            metrics_registry::register_metrics(self.node_config.port_offset);
-        }
+
         // println!("metrics registered: ");
         self.data_folder()?;
         // println!("data folder: ");

@@ -29,6 +29,10 @@ pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<Co
     let debug = config.debug.get_or_insert(Default::default());
     let cli = config.cli.get_or_insert(Default::default());
 
+    if rg_args.debug_args.genesis {
+        debug.genesis = Some(true);
+    }
+
     if let Some(n) = rg_args.global_settings.network.as_ref() {
         config.network = Some(n.clone());
     }

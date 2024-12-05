@@ -23,6 +23,7 @@ use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty_gg20::gg20_sm_manager;
 use crate::node::Node;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
+use crate::observability::metrics_registry;
 use crate::party::party_watcher::PartyWatcher;
 use crate::party::portfolio_fulfillment_agent::PortfolioFullfillmentAgent;
 use crate::sanity::recent_parity::RecentParityCheck;
@@ -41,6 +42,11 @@ impl Node {
         T: ExternalNetworkResources + Send + 'static + Sync + Clone
     {
         let node_config = relay.node_config.clone();
+
+        if !node_config.disable_metrics {
+            metrics_registry::register_metrics(node_config.port_offset);
+        }
+
 
         let mut sjh = ServiceJoinHandles::default();
 
