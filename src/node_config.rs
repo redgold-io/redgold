@@ -202,6 +202,7 @@ impl WordsPassNodeConfig for NodeConfig {
         node_config.network = NetworkEnvironment::Debug;
         node_config.check_observations_done_poll_interval = Duration::from_secs(1);
         node_config.check_observations_done_poll_attempts = 5;
+        node_config.disable_metrics = true;
         node_config
     }
 }
