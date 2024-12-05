@@ -218,6 +218,9 @@ pub fn init_prometheus(port_offset: u16) {
         );
         install_prometheus(socket_fallback)
             .expect("failed to install recorder/exporter on fallback socket");
+        info!("Prometheus exporter installed on {}", socket_fallback);
+    } else {
+        info!("Prometheus exporter installed on {}", socket);
     }
 }
 
@@ -251,6 +254,7 @@ enum MetricType {
 
 pub fn register_metrics(port_offset: u16) {
     if std::env::var("REDGOLD_LOCAL_DEBUG").is_ok() {
+        info!("Running in local debug mode, skipping metrics init");
         // init_print_logger();
     } else {
         init_prometheus(port_offset);
