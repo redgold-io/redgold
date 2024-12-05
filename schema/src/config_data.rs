@@ -191,6 +191,7 @@ impl ConfigData {
                 port_offset: None,
                 passive: Some(false),
                 name: None,
+                ip: None,
             }),
             party: Some(PartyConfigData {
                 enable: Some(false),
