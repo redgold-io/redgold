@@ -380,7 +380,6 @@ pub fn register_metrics(port_offset: u16) {
 #[ignore]
 #[test]
 fn debug_metrics() {
-
     install_prometheus(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9000)).expect("failed to install recorder/exporter");
     sleep(Duration::from_secs(1000));
 }
