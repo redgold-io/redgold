@@ -477,9 +477,10 @@ pub async fn deploy_redgold<T: SSHLike>(
     // Prepare config data
     let mut config = (*config_data).clone();
     config.secure = None;
+    config.local = None;
     config.network = Some(network.to_std_string());
     // TODO: Support other users here.
-    config.data = Some("/root/.rg".to_string());
+    config.data = Some(data_folder.to_string());
     let node = config.node.get_or_insert(Default::default());
     node.words = words.clone();
     node.server_index = Some(ssh.server.index);

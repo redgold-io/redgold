@@ -69,7 +69,7 @@ impl GuiDepends for NativeGuiDepends {
     }
 
     fn get_config(&self) -> ConfigData {
-        self.nc.secure_or().config().unwrap().unwrap()
+        (*self.nc.config_data).clone()
     }
 
     fn set_config(&mut self, config: &ConfigData) {

@@ -24,6 +24,7 @@ use redgold::util::cli::arg_parse_config::ArgTranslate;
 use redgold::util::cli::{commands, immediate_commands};
 use redgold::util::cli::load_config::{load_full_config, main_config};
 use redgold::util::runtimes::build_simple_runtime;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
@@ -150,6 +151,7 @@ async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends> {
     };
     let res = Box::new(ExternalNetworkResourcesImpl::new(&node_config, None).expect("works"));
     let g = Box::new(NativeGuiDepends::new(*node_config.clone()));
+    // let c = g.get_config();
     let ret = gui::initialize::prepare_start(node_config, res, g, party_data).await.expect("GUI to start");
     ret
 }
