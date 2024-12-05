@@ -73,10 +73,14 @@ impl GuiDepends for NativeGuiDepends {
     }
 
     fn set_config(&mut self, config: &ConfigData) {
+        let mut config = config.clone();
+        let mut l = config.local.get_or_insert(Default::default());
+        let mut k = l.keys.get_or_insert(Default::default());
+        k.retain(|k| k.skip_persist.map(|x| !x).unwrap_or(true));
         let mut nc = (*self.nc).clone();
         nc.config_data = Arc::new(config.clone());
         self.nc = Arc::new(nc);
-        self.nc.secure_or().write_config(config).unwrap();
+        self.nc.secure_or().write_config(&config).unwrap();
     }
 
     async fn get_address_info(&self, pk: &PublicKey) -> RgResult<AddressInfo> {
