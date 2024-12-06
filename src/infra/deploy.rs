@@ -440,7 +440,7 @@ pub async fn deploy_redgold<T: SSHLike>(
     ssh.copy_p(compose_str, format!("{}/redgold-only.yml", path), p).await?;
 
     let mut env = additional_env.unwrap_or(Default::default());
-    // env.insert("REDGOLD_NETWORK".to_string(), network.to_std_string());
+    env.insert("REDGOLD_NETWORK".to_string(), network.to_std_string());
     // env.insert("REDGOLD_GENESIS".to_string(), is_genesis.to_string());
     // env.insert("REDGOLD_METRICS_PORT".to_string(), format!("{}", port - 1));
     // env.insert("REDGOLD_P2P_PORT".to_string(), format!("{}", port));

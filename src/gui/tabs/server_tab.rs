@@ -5,7 +5,6 @@ use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use std::path::PathBuf;
 use eframe::egui;
 use itertools::{Either, Itertools};
-use nix::NixPath;
 use tracing::{error, info};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 use tokio::task::JoinHandle;
