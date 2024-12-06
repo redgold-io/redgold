@@ -74,9 +74,15 @@ impl GuiDepends for NativeGuiDepends {
 
     fn set_config(&mut self, config: &ConfigData) {
         let mut config = config.clone();
+        config.network = None;
+        config.home = None;
+        config.config = None;
         let mut l = config.local.get_or_insert(Default::default());
         let mut k = l.keys.get_or_insert(Default::default());
         k.retain(|k| k.skip_persist.map(|x| !x).unwrap_or(true));
+        l.mnemonics.as_mut().map(|m| {
+            m.retain(|m| m.persist_disk.map(|x| x).unwrap_or(true));
+        });
         let mut nc = (*self.nc).clone();
         nc.config_data = Arc::new(config.clone());
         self.nc = Arc::new(nc);
