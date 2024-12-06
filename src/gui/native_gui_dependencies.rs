@@ -83,6 +83,7 @@ impl GuiDepends for NativeGuiDepends {
         l.mnemonics.as_mut().map(|m| {
             m.retain(|m| m.persist_disk.map(|x| x).unwrap_or(true));
         });
+        config.node.get_or_insert(Default::default()).words = None;
         let mut nc = (*self.nc).clone();
         nc.config_data = Arc::new(config.clone());
         self.nc = Arc::new(nc);
