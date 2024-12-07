@@ -1,6 +1,6 @@
 [package]
 name = "redgold-data"
-version = "0.1.28"
+version = "0.1.29"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"

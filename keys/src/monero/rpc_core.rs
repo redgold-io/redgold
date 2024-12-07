@@ -122,3 +122,16 @@ impl MoneroRpcWrapper {
 
 
 }
+
+
+#[ignore]
+#[tokio::test]
+async fn check_rpc_manually() {
+    let rpc = MoneroRpcWrapper::new("http://server:28089".to_string(), NetworkEnvironment::Dev).expect("rpc");
+    let h = monero::Hash::from_str("eb266f3acb2e66c7510b3e2ee48d50ba3c2deba1a8647c36ff1bc72b72b2cbce")
+        .unwrap();
+    let tx = rpc.client.daemon_rpc().get_transactions(
+        vec![h], Some(true), None
+    ).await.expect("works");
+    println!("tx: {:?}", tx);
+}

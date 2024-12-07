@@ -30,5 +30,5 @@ impl ToMoneroAddress for structs::PublicKey {
 fn debug_keygen() {
     let tc = TestConstants::new();
     let wp = tc.words_pass;
-    let mkp = wp.derive_monero_keys().unwrap();
+    // let mkp = wp.derive_monero_keys().unwrap();
 }

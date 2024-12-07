@@ -10,6 +10,7 @@ use std::io::prelude::*;
 use std::sync::Arc;
 use async_trait::async_trait;
 use itertools::Itertools;
+use log::info;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::transaction_support::TransactionSupport;
@@ -476,6 +477,9 @@ pub async fn deploy_redgold<T: SSHLike>(
     // TODO: Env vars should all be migrated here, secure should be erased
     // Prepare config data
     let mut config = (*config_data).clone();
+    // info!("Config on deploy remove this: {:?}", config);
+    config.home = None;
+    config.config = None;
     config.secure = None;
     config.local = None;
     config.network = Some(network.to_std_string());
@@ -522,6 +526,8 @@ pub async fn deploy_redgold<T: SSHLike>(
     let cloned = config.clone();
     let mut config2 = cloned.clone();
     let toml_config = toml::to_string(&cloned).error_info("toml config")?;
+    // info!("Copying toml config {}", toml_config.clone());
+    ssh.copy_p(toml_config, format!("{}/config.toml", path), p).await?;
 
     if !disable_system {
         // TODO: Lol not this
@@ -537,7 +543,6 @@ pub async fn deploy_redgold<T: SSHLike>(
     }).join("\n");
     ssh.copy_p(env_contents.clone(), format!("{}/var.env", path), p).await?;
     ssh.copy_p(env_contents, format!("{}/.env", path), p).await?;
-    ssh.copy_p(toml_config, format!("{}/config.toml", path), p).await?;
 
     sleep(Duration::from_secs(4));
 
