@@ -43,6 +43,7 @@ impl TransactionBuilderSupport for TransactionBuilder {
             fee_addrs,
             allow_bypass_fee: false,
             input_addresses: vec![],
+            zero_fee_requested: false,
         };
         s.with_network(&network);
         s
