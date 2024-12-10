@@ -7,7 +7,7 @@ use std::time::Duration;
 use futures::{stream, StreamExt};
 use futures::stream::FuturesUnordered;
 use itertools::Itertools;
-
+use log::error;
 use tracing::info;
 use metrics::{counter, gauge};
 use tokio::runtime::Runtime;
@@ -192,19 +192,25 @@ impl Node {
 
             let seeds = relay.node_config.non_self_seeds();
 
-            let seed_results = stream::iter(seeds)
-                .then(|seed| {
-                    Self::query_seed(&relay, &node_config, seed)
-                })
-                .filter_map(|x| async {
-                    let res = x.ok();
-                    if res.is_none() {
-                        counter!("redgold_node_seed_startup_query_failure").increment(1);
-                    }
-                    res
-                })
-                .collect::<Vec<PeerNodeInfo>>()
-                .await;
+
+            let seed_results = if node_config.config_data.debug.as_ref().and_then(
+                |c| c.bypass_seed_enrichment.clone()).unwrap_or(false) {
+                vec![]
+            } else{
+                        stream::iter(seeds)
+                            .then(|seed| {
+                                Self::query_seed(&relay, &node_config, seed)
+                            })
+                            .filter_map(|x| async {
+                                let res = x.ok();
+                                if res.is_none() {
+                                    counter!("redgold_node_seed_startup_query_failure").increment(1);
+                                }
+                                res
+                            })
+                            .collect::<Vec<PeerNodeInfo>>()
+                            .await
+                    };
 
             let bootstrap_pks = seed_results.iter().filter_map(|x| {
                 x.nmd_pk()
@@ -214,7 +220,11 @@ impl Node {
 
             // TODO: Allow bypassing this check for testing purposes
             if seed_results.is_empty() {
-                return Err(error_info("No seed nodes found, exiting"));
+                if node_config.is_self_seed() {
+                    error!("No seed nodes found, but this is a self seed node, continuing");
+                } else {
+                    return Err(error_info("No seed nodes found, exiting"));
+                }
             }
 
             for result in &seed_results {
@@ -230,9 +240,23 @@ impl Node {
             tokio::time::sleep(Duration::from_secs(3)).await;
             info!("Now starting download after discovery has run.");
             // TODO Change this invocation to an .into() in a non-schema key module
-            download::download(
-                relay.clone(), bootstrap_pks
-            ).await?;
+            if node_config.config_data.debug.as_ref().and_then(
+                |c| c.bypass_download.clone()).unwrap_or(false) {
+                info!("Bypassing download");
+            } else {
+                match download::download(
+                    relay.clone(), bootstrap_pks
+                ).await.log_error() {
+                    Ok(_) => {}
+                    Err(e) => {
+                        if node_config.is_self_seed() {
+                            error!("Download failed, but this is a self seed node, continuing");
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
 
 
         }

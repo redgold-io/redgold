@@ -1,0 +1,22 @@
+services:
+  wallet-rpc-testnet:
+    container_name: monero-wallet-rpc-testnet
+    user: 1000:1000
+    image: ghcr.io/sethforprivacy/simple-monero-wallet-rpc:latest
+    volumes:
+      - ${WALLET_DATA_DIR:-/disk/monero-wallets-testnet}:/home/monero/wallets
+    restart: unless-stopped
+    network_mode: "host"
+    #    ports:
+    #      - "28088:28088"  # Wallet RPC port
+    environment:
+      - RPC_LOGIN=${RPC_LOGIN:-username:password}
+      - DAEMON_HOST=${DAEMON_HOST:-http://127.0.0.1:28089}
+    command:
+      - --testnet
+      - --daemon-address=${DAEMON_HOST:-http://127.0.0.1:28089}
+      - --rpc-bind-port=28088
+      - --wallet-dir=/home/monero/wallets
+      - --rpc-login=${RPC_LOGIN:-username:password}
+      - --trusted-daemon
+      - --disable-rpc-ban

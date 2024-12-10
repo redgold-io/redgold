@@ -1,11 +1,13 @@
 use monero::util::address::Address;
 use monero_rpc::monero::PrivateKey;
-use monero_rpc::{GenerateFromKeysArgs, GetTransfersCategory, GetTransfersSelector, RpcClient, RpcClientBuilder, TransferHeight, WalletCreation};
+use monero_rpc::{GenerateFromKeysArgs, GetTransfersCategory, GetTransfersSelector, RpcAuthentication, RpcClient, RpcClientBuilder, TransferHeight, WalletCreation};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{ErrorInfoContext, RgResult, ShortString};
 use std::str::FromStr;
+use crate::monero::key_derive::MoneroSeedBytes;
+use crate::util::mnemonic_support::WordsPass;
 
 #[derive(Clone, Debug)]
 pub struct MoneroRpcWrapper {
@@ -17,17 +19,42 @@ pub struct MoneroRpcWrapper {
 impl MoneroRpcWrapper {
 
     pub fn from_config(cfg: &NodeConfig) -> Option<RgResult<Self>> {
-        if let Some(rpc) = cfg.rpc_url(SupportedCurrency::Monero) {
+        let url = cfg.rpc_url(SupportedCurrency::Monero).into_iter()
+            .filter(|r| !r.wallet_only.unwrap_or(false))
+            .next();
+        if let Some(rpc) = url {
             let network = cfg.network.clone();
-            let ret = MoneroRpcWrapper::new(rpc, network);
+            let ret = MoneroRpcWrapper::new(rpc.url.clone(), network, None);
             Some(ret)
         } else {
             None
         }
     }
-    pub fn new(url: String, network: NetworkEnvironment) -> RgResult<Self> {
 
-        let client = RpcClientBuilder::new()
+    pub fn authed_from_config(cfg: &NodeConfig) -> Option<RgResult<Self>> {
+        let url = cfg.rpc_url(SupportedCurrency::Monero).into_iter()
+            .filter(|r| r.wallet_only.unwrap_or(false))
+            .next();
+        if let Some(rpc) = url {
+            let network = cfg.network.clone();
+            let ret = MoneroRpcWrapper::new(rpc.url.clone(), network, rpc.authentication.clone());
+            Some(ret)
+        } else {
+            None
+        }
+    }
+
+    pub fn new(url: String, network: NetworkEnvironment, auth_str: Option<String>) -> RgResult<Self> {
+        let builder = RpcClientBuilder::new();
+        let authed = if let Some(a) = auth_str {
+            let user = a.split(":").next().unwrap_or("").to_string();
+            let pass = a.split(":").last().unwrap_or("").to_string();
+            let auth = RpcAuthentication::Credentials { username: user, password: pass };
+            builder.rpc_authentication(auth)
+        } else {
+            builder
+        };
+        let client = authed
             .build(url.clone())
             .map_err(|e| ErrorInfo::new(format!("Failed to create Monero RPC client {}", e.to_string())))?;
         let ret = MoneroRpcWrapper {
@@ -36,6 +63,33 @@ impl MoneroRpcWrapper {
             client,
         };
         Ok(ret)
+    }
+
+
+    pub fn check_error_message_already_registered(res: &RgResult<WalletCreation>) -> bool {
+        match res {
+            Ok(_) => {}
+            Err(e) => {
+                return e.message.contains("Wallet already exists");
+            }
+        }
+        false
+    }
+
+
+    pub async fn register_dupe_ok(
+        &self,
+        view_key: String,
+        address: String,
+        spend_key: Option<String>,
+        password: Option<String>,
+    ) -> RgResult<()> {
+        let res = self.register_key(view_key, address, spend_key, password).await;
+        if MoneroRpcWrapper::check_error_message_already_registered(&res) {
+            Ok(())
+        } else {
+            res.map(|_| ())
+        }
     }
 
     pub async fn register_key(
@@ -112,10 +166,19 @@ impl MoneroRpcWrapper {
         Ok(results)
     }
 
+    pub async fn activate_wallet(&self, address: String) -> RgResult<()> {
+        let filename = address.last_n(12)?;
+        let res = self.client.clone().wallet().open_wallet(filename, None).await
+            .map_err(|e| ErrorInfo::new(format!("Failed to activate wallet {}", e.to_string())));
+        res
+    }
+
     pub async fn get_balance(&self) -> RgResult<CurrencyAmount> {
+        // self.client.clone().wallet()
         let b = self.client.clone().wallet().get_balance(0, None)
             .await
             .map_err(|e| ErrorInfo::new(format!("Failed to get balance {}", e.to_string())))?;
+        println!("balance: {:?}", b);
         Ok(CurrencyAmount::from_currency(b.balance.as_pico() as i64, SupportedCurrency::Monero))
     }
 
@@ -126,9 +189,68 @@ impl MoneroRpcWrapper {
 
 #[ignore]
 #[tokio::test]
+async fn check_rpc_wallet() {
+
+    // let ci = dev_ci_kp().unwrap();
+    let w = std::env::var("REDGOLD_TEST_WORDS").unwrap();
+    let w = WordsPass::new(w, None);
+    // This is wrong for ethereum, but we just need the secret key to match other
+    // faucet funds for 'same' key.
+    // let path = "m/84'/0'/0'/0/0";
+    let a = w.derive_monero_address(&NetworkEnvironment::Dev).expect("address");
+    println!("address: {}", a.to_string());
+    // address: 9wi5fzpi5uVENtzG1A6fpVQooVkxoXJokJuz1MZzMzVK4XfhULjDEVB8UGpfHhFpgXBkBbUeRdKEZJArLJqR3ZF3UJutgws
+    // Amount sent: 1 XMR
+    // Transaction ID: f501643c8c2d16a7f1abff1cee4cc7b894edcc274b4117bf0b7ca98f3e4fc451
+    let kp = w.derive_monero_keys().expect("keys");
+    println!("view key: {}", kp.view.to_string());
+    let rpc = MoneroRpcWrapper::new(
+        "http://server:28088".to_string(),
+        NetworkEnvironment::Dev,
+        Some("username:password".to_string())
+    ).expect("rpc");
+    let tx = rpc.register_dupe_ok(kp.view.to_string(), a.to_string(), None, None).await.expect("works");
+    rpc.activate_wallet(a.to_string()).await.expect("activate");
+    let sync_info = rpc.client.clone().wallet().get_height().await.expect("height check");
+    println!("sync info: {:?}", sync_info);
+    let refresh = rpc.client.clone().wallet().refresh(None).await.expect("refresh");
+    println!("refresh: {:?}", refresh);
+    //
+    //
+    // // Wait for wallet sync and check status
+    // let mut synced = false;
+    // let mut attempts = 0;
+    // while !synced && attempts < 10 {
+    //     let daemon_height = rpc.client.clone().daemon().get_block_count().await.expect("daemon height");
+    //
+    //     println!("Wallet height: {}, Daemon height: {}", sync_info, daemon_height);
+    //
+    //     if sync_info >= daemon_height {
+    //         synced = true;
+    //     } else {
+    //         println!("Waiting for wallet to sync...");
+    //         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    //         attempts += 1;
+    //     }
+    // }
+    //
+    // if !synced {
+    //     panic!("Wallet failed to sync after multiple attempts");
+    // }
+
+
+    // println!("tx: {:?}", tx.clone());
+    // let already = MoneroRpcWrapper::check_error_message_already_registered(tx);
+    let b=  rpc.get_balance().await.expect("balance");
+    println!("balance: {:?}", b);
+}
+
+#[ignore]
+#[tokio::test]
 async fn check_rpc_manually() {
-    let rpc = MoneroRpcWrapper::new("http://server:28089".to_string(), NetworkEnvironment::Dev).expect("rpc");
-    let h = monero::Hash::from_str("eb266f3acb2e66c7510b3e2ee48d50ba3c2deba1a8647c36ff1bc72b72b2cbce")
+    let rpc = MoneroRpcWrapper::new("http://server:28089".to_string(), NetworkEnvironment::Dev, None).expect("rpc");
+    let h = monero::Hash::from_str("f501643c8c2d16a7f1abff1cee4cc7b894edcc274b4117bf0b7ca98f3e4fc451")
+    // let h = monero::Hash::from_str("eb266f3acb2e66c7510b3e2ee48d50ba3c2deba1a8647c36ff1bc72b72b2cbce")
         .unwrap();
     let tx = rpc.client.daemon_rpc().get_transactions(
         vec![h], Some(true), None

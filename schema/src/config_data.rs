@@ -15,6 +15,8 @@ pub struct DebugSettings {
     pub enable_live_e2e: Option<bool>,
     pub grafana_writer: Option<bool>,
     pub live_e2e_interval_seconds: Option<i64>,
+    pub bypass_seed_enrichment: Option<bool>,
+    pub bypass_download: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -77,6 +79,8 @@ pub struct RpcUrl {
     pub currency: SupportedCurrency,
     pub url: String,
     pub network: String,
+    pub wallet_only: Option<bool>,
+    pub authentication: Option<String>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]

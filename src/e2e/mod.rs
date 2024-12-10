@@ -199,7 +199,8 @@ impl LiveE2E {
         }
         tx_builder.with_output(&destination, &amount)
             .with_is_test();
-        tx_builder.with_default_fee()?;
+        // tx_builder.with_default_fee()?;
+        tx_builder.with_zero_fee_requested()?;
         let mut tx = tx_builder
             .build()?;
 

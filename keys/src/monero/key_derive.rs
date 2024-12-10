@@ -1,3 +1,4 @@
+use curve25519_dalek::Scalar;
 use monero::{Address, KeyPair, Network, PrivateKey, PublicKey};
 use tiny_keccak::{Hasher, Keccak};
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
@@ -26,17 +27,20 @@ impl MoneroSeedBytes for WordsPass {
         keccak.update(&seed);
         keccak.finalize(&mut spend_key);
 
+        // Reduce the spend key modulo the curve order
+        let spend_scalar = Scalar::from_bytes_mod_order(spend_key);
+
         // Create private view key by hashing spend key
         let mut keccak = Keccak::v256();
         let mut view_key = [0u8; 32];
         keccak.update(&spend_key);
         keccak.finalize(&mut view_key);
+        let view_scalar = Scalar::from_bytes_mod_order(view_key);
 
         // Convert to Monero private keys
-        let spend_key = PrivateKey::from_slice(&spend_key)
-            .error_info("Invalid spend key")?;
-        let view_key = PrivateKey::from_slice(&view_key)
-            .error_info("Invalid view key")?;
+        let spend_key = PrivateKey::from_scalar(spend_scalar);
+        let view_key = PrivateKey::from_scalar(view_scalar);
+
 
         let kp = KeyPair {
             view: view_key,
