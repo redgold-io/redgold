@@ -550,6 +550,15 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 manual_deploy_grafana_public().await.log_error().ok();
                 Ok(())
             }
+            RgDebugCommand::BuildReleaseArtifacts(b) => {
+                // TODO: Capture this in rust instead of bash scripts.
+                /*
+                cargo install cargo-bundle
+                cargo bundle --release
+                /target/release/bundle/osx/redgold.app
+                 */
+                Ok(())
+            }
             _ => {
                 Ok(())
             }

@@ -84,9 +84,12 @@ impl GuiDepends for NativeGuiDepends {
             m.retain(|m| m.persist_disk.map(|x| x).unwrap_or(true));
         });
         config.node.get_or_insert(Default::default()).words = None;
+        let sec = config.secure.get_or_insert(Default::default());
+        sec.path = None;
         let mut nc = (*self.nc).clone();
         nc.config_data = Arc::new(config.clone());
         self.nc = Arc::new(nc);
+
         self.nc.secure_or().write_config(&config).unwrap();
     }
 
