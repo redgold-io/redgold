@@ -7,16 +7,22 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{ErrorInfoContext, RgResult, ShortString};
 use std::str::FromStr;
 use crate::monero::key_derive::MoneroSeedBytes;
+use crate::monero::rpc_multisig::MoneroWalletRpcMultisigClient;
 use crate::util::mnemonic_support::WordsPass;
 
 #[derive(Clone, Debug)]
 pub struct MoneroRpcWrapper {
     pub url: String,
     pub network: NetworkEnvironment,
-    pub client: RpcClient
+    pub client: RpcClient,
+    pub auth_str: Option<String>
 }
 
 impl MoneroRpcWrapper {
+
+    pub fn get_multisig(&self) -> RgResult<MoneroWalletRpcMultisigClient> {
+        MoneroWalletRpcMultisigClient::new(self.url.clone(), None)
+    }
 
     pub fn from_config(cfg: &NodeConfig) -> Option<RgResult<Self>> {
         let url = cfg.rpc_url(SupportedCurrency::Monero).into_iter()
@@ -46,7 +52,7 @@ impl MoneroRpcWrapper {
 
     pub fn new(url: String, network: NetworkEnvironment, auth_str: Option<String>) -> RgResult<Self> {
         let builder = RpcClientBuilder::new();
-        let authed = if let Some(a) = auth_str {
+        let authed = if let Some(a) = auth_str.as_ref() {
             let user = a.split(":").next().unwrap_or("").to_string();
             let pass = a.split(":").last().unwrap_or("").to_string();
             let auth = RpcAuthentication::Credentials { username: user, password: pass };
@@ -61,6 +67,7 @@ impl MoneroRpcWrapper {
             url,
             network,
             client,
+            auth_str,
         };
         Ok(ret)
     }
@@ -83,8 +90,9 @@ impl MoneroRpcWrapper {
         address: String,
         spend_key: Option<String>,
         password: Option<String>,
+        wallet_pfx: Option<String>
     ) -> RgResult<()> {
-        let res = self.register_key(view_key, address, spend_key, password).await;
+        let res = self.register_key(view_key, address, spend_key, password, wallet_pfx).await;
         if MoneroRpcWrapper::check_error_message_already_registered(&res) {
             Ok(())
         } else {
@@ -98,9 +106,11 @@ impl MoneroRpcWrapper {
         address: String,
         spend_key: Option<String>,
         password: Option<String>,
+        wallet_pfx: Option<String>
     ) -> RgResult<WalletCreation> {
         let password = password.unwrap_or("".to_string());
         let filename = address.last_n(12)?;
+        let filename = wallet_pfx.map(|p| format!("{}{}", p, filename)).unwrap_or(filename);
         let address = Address::from_str(&address)
             .error_info("Invalid Monero address")?;
         let pk = PrivateKey::from_str(&view_key)
@@ -166,10 +176,18 @@ impl MoneroRpcWrapper {
         Ok(results)
     }
 
-    pub async fn activate_wallet(&self, address: String) -> RgResult<()> {
+    pub async fn activate_wallet(&self, address: String, prefix: Option<String>) -> RgResult<()> {
         let filename = address.last_n(12)?;
-        let res = self.client.clone().wallet().open_wallet(filename, None).await
+        let filename = prefix.map(|p| format!("{}{}", p, filename)).unwrap_or(filename);
+        let res = self.client.clone().wallet()
+            .open_wallet(filename, None).await
             .map_err(|e| ErrorInfo::new(format!("Failed to activate wallet {}", e.to_string())));
+        res
+    }
+
+    pub async fn close_wallet(&self) -> RgResult<()> {
+        let res = self.client.clone().wallet().close_wallet().await
+            .map_err(|e| ErrorInfo::new(format!("Failed to close wallet {}", e.to_string())));
         res
     }
 

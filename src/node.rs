@@ -72,7 +72,7 @@ use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::core::misc_periodic::MiscPeriodic;
 use crate::core::services::service_join_handles::{NamedHandle, ServiceJoinHandles};
 use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::party::party_watcher::PartyWatcher;
 use crate::sanity::{historical_parity, migrations};
 use crate::sanity::recent_parity::RecentParityCheck;

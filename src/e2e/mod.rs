@@ -140,7 +140,7 @@ pub struct LiveE2E {
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::observability::send_email;
 
 impl LiveE2E {
