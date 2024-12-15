@@ -1,10 +1,12 @@
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::data_folder::DataFolder;
 use redgold_schema::RgResult;
-use redgold_schema::structs::{NetworkEnvironment, PeerId};
+use redgold_schema::structs::{NetworkEnvironment, PeerId, SupportedCurrency};
 use std::sync::Arc;
 use std::time::Duration;
+use redgold_schema::config_data::RpcUrl;
 use redgold_schema::constants::DEBUG_FINALIZATION_INTERVAL_MILLIS;
+use crate::KeyPair;
 use crate::util::mnemonic_support::WordsPass;
 
 pub trait WordsPassNodeConfig {
@@ -46,7 +48,18 @@ impl WordsPassNodeConfig for NodeConfig {
         // folder.ensure_exists();
         let mut node_config = NodeConfig::default();
         let mut node = (*node_config.config_data).clone();
-        node.node.get_or_insert(Default::default()).words = Some(words);
+        let node_data = node.node.get_or_insert(Default::default());
+        // This is only for manual testing
+        // let mut ext = node.external.get_or_insert(Default::default());
+        // ext.rpcs = Some(vec![
+        //     RpcUrl{
+        //     currency: SupportedCurrency::Monero,
+        //     url: format!("http://server:28{}88", seed_id),
+        //     network: NetworkEnvironment::Dev.to_std_string(),
+        //     wallet_only: Some(true),
+        //     authentication: Some("username:password".to_string()),
+        // }])
+        node_data.words = Some(words);
         node.debug.get_or_insert(Default::default()).enable_live_e2e = Some(false);
         node_config.config_data = Arc::new(node);
 
@@ -62,5 +75,16 @@ impl WordsPassNodeConfig for NodeConfig {
         node_config.check_observations_done_poll_attempts = 5;
         node_config.disable_metrics = true;
         node_config
+    }
+}
+
+pub trait NodeConfigKeyPair {
+
+    fn keypair(&self) -> KeyPair;
+}
+
+impl NodeConfigKeyPair for NodeConfig {
+    fn keypair(&self) -> KeyPair {
+        self.words().default_kp().expect("")
     }
 }

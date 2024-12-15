@@ -4,7 +4,7 @@ use serde_json::{json, Map, Value};
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use uuid::Uuid;
 
-
+use diqwest::WithDigestAuth;
 
 // https://docs.getmonero.org/rpc-library/wallet-rpc/#introduction
 pub struct MoneroWalletRpcMultisigClient {

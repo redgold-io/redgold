@@ -10,6 +10,7 @@ use crate::schema::structs::{NetworkEnvironment, Transaction};
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use redgold_schema::structs::{NodeMetadata, PeerId, PeerMetadata};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::conf::node_config::NodeConfig;
@@ -71,11 +72,6 @@ pub trait EnvDefaultNodeConfig {
     async fn default_env(network_environment: NetworkEnvironment) -> Self;
 }
 
-pub trait NodeConfigKeyPair {
-
-    fn keypair(&self) -> KeyPair;
-}
-
 pub trait ToTransactionBuilder {
     fn tx_builder(&self) -> TransactionBuilder;
     fn peer_tx_fixed(&self) -> Transaction;
@@ -102,11 +98,6 @@ impl EnvDefaultNodeConfig for NodeConfig {
 
 }
 
-impl NodeConfigKeyPair for NodeConfig {
-    fn keypair(&self) -> KeyPair {
-        self.words().default_kp().expect("")
-    }
-}
 
 impl ToTransactionBuilder for NodeConfig {
     fn tx_builder(&self) -> TransactionBuilder {

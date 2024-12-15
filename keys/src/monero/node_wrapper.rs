@@ -61,6 +61,7 @@ impl MoneroWalletMultisigRpcState {
 }
 
 impl MoneroNodeRpcInterfaceWrapper {
+
     pub fn from_config(nc: &NodeConfig) -> Option<RgResult<Self>> {
         let option = MoneroRpcWrapper::from_config(nc);
         option.map(|rpc| rpc.map(|r|
@@ -156,6 +157,7 @@ impl MoneroNodeRpcInterfaceWrapper {
         amounts: Vec<(Address, CurrencyAmount)>
     ) -> RgResult<ExternalTransactionId> {
 
+        "Not implemented".to_error()
     }
 
     pub async fn make_multisig(&mut self, peer_strings: Vec<String>, threshold: i64) -> RgResult<MakeMultisigResult> {
@@ -178,4 +180,13 @@ impl MoneroNodeRpcInterfaceWrapper {
         Ok(finalized)
     }
 
+}
+
+
+//#[ignore]
+#[tokio::test]
+async fn local_three_node() {
+    let one = NodeConfig::from_test_id(&(0 as u16));
+    let two = NodeConfig::from_test_id(&(1 as u16));
+    let three = NodeConfig::from_test_id(&(2 as u16));
 }

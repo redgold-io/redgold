@@ -23,7 +23,7 @@ use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::node_config::NodeConfigKeyPair;
+use redgold_keys::word_pass_support::NodeConfigKeyPair;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::core::relay::Relay;
 use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
