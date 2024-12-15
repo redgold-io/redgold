@@ -47,6 +47,16 @@ keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
 categories = ["cryptography::cryptocurrencies"]
 
 
+[package.metadata.bundle]
+name = "redgold"
+identifier = "io.redgold"
+icon = ["src/resources/images/historical/design_one/logo_orig_crop.png"]
+# resources # maybe include this later if necessary?
+copyright = "Redgold Labs LLC 2020"
+category = "public.app-category.finance"
+description = "Crypto portfolio/ETF contract network"
+
+
 [workspace.dependencies]
 redgold-schema = { path = "schema", version = "0.1.29"}
 redgold-data = { path = "data", version = "0.1.29"}

@@ -18,7 +18,7 @@ use redgold_schema::proto_serde::ProtoHashable;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::util::lang_util::SameResult;
 use redgold_schema::conf::node_config::NodeConfig;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::util::random_port;
 
 pub mod models;

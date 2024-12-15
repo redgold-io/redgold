@@ -18,7 +18,7 @@ use crate::core::relay::Relay;
 use crate::infra::deploy::{SSHLike, SSHProcessInvoke};
 use crate::node::Node;
 use redgold_schema::conf::node_config::NodeConfig;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 struct PrometheusScrapeConfig {

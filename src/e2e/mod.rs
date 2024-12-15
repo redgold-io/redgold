@@ -140,7 +140,7 @@ pub struct LiveE2E {
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::observability::send_email;
 
 impl LiveE2E {
@@ -199,7 +199,8 @@ impl LiveE2E {
         }
         tx_builder.with_output(&destination, &amount)
             .with_is_test();
-        tx_builder.with_default_fee()?;
+        // tx_builder.with_default_fee()?;
+        tx_builder.with_zero_fee_requested();
         let mut tx = tx_builder
             .build()?;
 

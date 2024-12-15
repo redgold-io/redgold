@@ -35,7 +35,7 @@ use crate::api::udp_api::UdpOperation::Outgoing;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::proto_serde::ProtoHashable;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]

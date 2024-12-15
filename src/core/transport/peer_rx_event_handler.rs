@@ -31,7 +31,7 @@ use redgold_schema::helpers::easy_json::json_or;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::data::download::process_download_request;
 use crate::multiparty_gg20::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
-use crate::node_config::NodeConfigKeyPair;
+use redgold_keys::word_pass_support::NodeConfigKeyPair;
 use redgold_schema::helpers::easy_json::json;
 use crate::schema::response_metadata;
 use crate::schema::structs::{Response, ResponseMetadata};

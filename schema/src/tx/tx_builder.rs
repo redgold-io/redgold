@@ -20,7 +20,8 @@ pub struct TransactionBuilder {
     pub nc: Option<NodeConfig>,
     pub fee_addrs: Vec<Address>,
     pub allow_bypass_fee: bool,
-    pub input_addresses: Vec<Address>
+    pub input_addresses: Vec<Address>,
+    pub zero_fee_requested: bool
 }
 
 
@@ -117,6 +118,11 @@ impl TransactionBuilder {
         let first_fee_addr = self.fee_addrs.get(0).safe_get_msg("Missing fee address")?.clone().clone();
         self.with_fee(&first_fee_addr, &CurrencyAmount::min_fee())?;
         Ok(self)
+    }
+
+    pub fn with_zero_fee_requested(&mut self) -> &mut Self {
+        self.zero_fee_requested = true;
+        self
     }
 
     pub fn with_utxo(&mut self, utxo_entry: &UtxoEntry) -> Result<&mut Self, ErrorInfo> {
@@ -457,7 +463,7 @@ impl TransactionBuilder {
             self.with_remainder();
         }
 
-        if !self.transaction.validate_fee_only(&self.fee_addrs) {
+        if !self.transaction.validate_fee_only(&self.fee_addrs) && !self.zero_fee_requested {
             let mut found_fee = false;
             for o in self.transaction.outputs.iter_mut().rev() {
                 if let Some(a) = o.data.as_mut().and_then(|data| data.amount.as_mut()) {

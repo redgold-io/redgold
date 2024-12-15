@@ -46,8 +46,25 @@ pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {
     let args = Box::new(rg_args);
     let init = apply_args_initial(args.clone(), default);
     let config = load_config(init);
+    let config = reload_config_redirect(config);
     let config_after_final_args = apply_args_final(args.clone(), config);
     (args, config_after_final_args)
+}
+
+pub fn reload_config_redirect(initial: Box<ConfigData>) -> Box<ConfigData> {
+    if let Some(config_path) = initial.config.as_ref() {
+        println!("Reloading config from: {}", config_path);
+        if let Some(pb) = PathBuf::from_str(&*config_path).ok() {
+            let mut builder = Config::builder();
+            builder = builder.add_source(config::File::from(pb));
+            builder = builder.add_source(config_env_source());
+            let config = builder.build().unwrap();
+            let data = config.try_deserialize::<ConfigData>().unwrap();
+            println!("Reloaded config: {}", data.json_or());
+            return Box::new(data)
+        }
+    }
+    initial
 }
 
 pub fn process_data_folder_with_env(df: Option<&String>, network: Option<String>) -> Vec<PathBuf> {
@@ -151,7 +168,9 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
 
     let mut data = config.try_deserialize::<ConfigData>().unwrap();
     // Ensure loaded config path is stored
-    data.config = working_config_path;
+    if data.config.is_none() {
+        data.config = working_config_path;
+    }
     Box::new(data)
 }
 

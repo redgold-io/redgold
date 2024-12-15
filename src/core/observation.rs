@@ -27,7 +27,7 @@ use crate::core::internal_message::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::observability::errors::Loggable;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;

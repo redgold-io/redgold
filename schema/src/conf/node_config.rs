@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::fs;
 use std::sync::Arc;
 use itertools::Itertools;
-use crate::config_data::ConfigData;
+use crate::config_data::{ConfigData, RpcUrl};
 use crate::seeds::get_seeds_by_env_time;
 use crate::servers::ServerOldFormat;
 use crate::{structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
@@ -208,19 +208,20 @@ impl NodeConfig {
         Duration::from_millis(option as u64)
     }
 
-    pub fn rpc_url(&self, cur: SupportedCurrency) -> Option<String> {
+    pub fn rpc_url(&self, cur: SupportedCurrency) -> Vec<RpcUrl> {
+        let mut res = vec![];
         if let Some(external) = self.config_data.external.as_ref() {
             if let Some(r) = external.rpcs.as_ref() {
                 for rr in r.iter() {
                     if let Some(n) = NetworkEnvironment::from_std_string(&rr.network).ok() {
                         if rr.currency == cur && self.network == n {
-                            return Some(rr.url.clone());
+                            res.push(rr.clone());
                         }
                     }
                 }
             }
         }
-        None
+        res
     }
 
     pub fn enable_party_mode(&self) -> bool {

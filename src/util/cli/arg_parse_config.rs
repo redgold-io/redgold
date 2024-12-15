@@ -42,7 +42,7 @@ use crate::schema::structs::NetworkEnvironment;
 use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
 use crate::util::cli::{args, commands, immediate_commands};
 use redgold_schema::data_folder::DataFolder;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 // https://github.com/mehcode/config-rs/blob/master/examples/simple/src/main.rs
 
 pub fn get_default_data_top_folder() -> PathBuf {

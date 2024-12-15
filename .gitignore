@@ -42,3 +42,4 @@ yarn.lock
 /ai-py/session.txt
 __pycache__
 /keys/testdb
+redgold.app

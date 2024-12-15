@@ -31,9 +31,10 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
-use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig, NodeConfigKeyPair, WordsPassNodeConfig};
+use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use redgold_common_no_wasm::cmd::run_cmd;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::observability::errors::Loggable;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
@@ -548,6 +549,15 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
         match cmd {
             RgDebugCommand::GrafanaPublicDeploy(_) => {
                 manual_deploy_grafana_public().await.log_error().ok();
+                Ok(())
+            }
+            RgDebugCommand::BuildReleaseArtifacts(b) => {
+                // TODO: Capture this in rust instead of bash scripts.
+                /*
+                cargo install cargo-bundle
+                cargo bundle --release
+                /target/release/bundle/osx/redgold.app
+                 */
                 Ok(())
             }
             _ => {

@@ -17,7 +17,7 @@ use crate::core::relay::Relay;
 use crate::integrations::external_network_resources::MockExternalResources;
 use crate::node::Node;
 use redgold_schema::conf::node_config::NodeConfig;
-use crate::node_config::WordsPassNodeConfig;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::util;
 
 #[derive(Clone)]

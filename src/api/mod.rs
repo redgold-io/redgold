@@ -25,7 +25,7 @@ use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, CurrencyAmount, GetActivePartyKeyRequest, GetPeersInfoRequest, GetPeersInfoResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, PublicResponse, QueryAddressesRequest, Request, Response, Seed, Transaction, UtxoId};
 use redgold_schema::transaction::rounded_balance_i64;
 use crate::core::relay::Relay;
-use crate::node_config::NodeConfigKeyPair;
+use redgold_keys::word_pass_support::NodeConfigKeyPair;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use redgold_schema::party::party_internal_data::PartyInternalData;
