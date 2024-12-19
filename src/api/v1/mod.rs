@@ -40,7 +40,7 @@ impl<T: Filter<Extract=(), Error=Rejection> + Sized + Send + Clone> ApiHelpers f
             .and(warp::addr::remote())
             .and(extract_ip())
             .map(move |remote: Option<SocketAddr>, ip_header: Option<String>| {
-                let origin = process_origin(remote, ip_header);
+                let origin = process_origin(remote, ip_header, c.node_config.allowed_proxy_origins());
                 ApiData{
                     relay: c.clone(),
                     origin_ip: origin,

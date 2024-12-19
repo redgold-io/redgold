@@ -5,8 +5,10 @@ use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, Erro
 use tracing::{debug, info};
 use redgold_schema::{empty_public_request, SafeOption};
 use redgold_schema::helpers::easy_json::json;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::api::client::rest;
 use crate::core::relay::Relay;
+use crate::schema;
 
 #[derive(Clone)]
 pub struct PublicClient {

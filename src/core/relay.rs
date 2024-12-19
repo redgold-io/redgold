@@ -34,7 +34,7 @@ use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, Contract
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
-use crate::core::internal_message::PeerMessage;
+use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfoTimeout};
 use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};

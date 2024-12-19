@@ -125,7 +125,7 @@ pub(crate) fn explorer_specific_routes(relay: Relay) -> impl Filter<Extract = (i
         .and(extract_ip())
         .and_then(move |address: String, pagination: TokenParam, remote: Option<SocketAddr>, ip_header: Option<String>| {
             let relay3 = explorer_relay3.clone();
-            let origin = process_origin(remote, ip_header);
+            let origin = process_origin(remote, ip_header, vec![]);
             async move {
                 as_warp_json_response(
                     handle_explorer_faucet(address, relay3, pagination, origin).await
