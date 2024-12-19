@@ -6,6 +6,7 @@ use futures::FutureExt;
 use itertools::Itertools;
 use tracing::Level;
 use metrics::{counter, gauge};
+use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_schema::{error_info, error_message, RgResult};
@@ -15,7 +16,7 @@ use redgold_schema::structs::{Address, QueryTransactionResponse, Response, Submi
 use redgold_schema::fee_validator::TransactionFeeValidator;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::core::internal_message::{SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::TransactionMessage;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;

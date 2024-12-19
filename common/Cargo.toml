@@ -15,3 +15,4 @@ categories.workspace = true
 [dependencies]
 redgold-schema = {workspace = true}
 async-trait = { workspace = true }
+flume = { workspace = true }

@@ -1,4 +1,4 @@
-use crate::api::RgHttpClient;
+use crate::api::client::rest::RgHttpClient;
 use redgold_data::data_store::DataStore;
 use redgold_keys::util::mnemonic_support::WordsPass;
 

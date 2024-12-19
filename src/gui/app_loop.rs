@@ -275,6 +275,7 @@ use strum::IntoEnumIterator; // 0.17.1
 use strum_macros::EnumIter;
 use surf::http::security::default;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_common::flume_send_help::{new_channel, Channel};
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use redgold_schema::conf::node_config::NodeConfig; // 0.17.1
@@ -296,7 +297,6 @@ use redgold_keys::util::dhash_vec;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
-use crate::core::internal_message::{new_channel, Channel};
 use redgold_gui::tab::home::HomeState;
 use redgold_schema::conf::local_stored_state::{AccountKeySource, Identity, LocalStoredState, StoredMnemonic, StoredPrivateKey, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;

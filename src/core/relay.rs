@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use bdk::sled::Tree;
 
 use crate::core::internal_message;
-use crate::core::internal_message::{new_channel, Channel};
 use crate::schema::structs::{
     ErrorCode, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
@@ -26,6 +25,8 @@ use rocket::http::ext::IntoCollection;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
+use redgold_common::flume_send_help;
+use redgold_common::flume_send_help::{new_channel, Channel};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
@@ -34,7 +35,7 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
 use crate::core::internal_message::PeerMessage;
-use crate::core::internal_message::RecvAsyncErrorInfo;
+use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
@@ -434,7 +435,7 @@ Deliberately unclone-able structure that tracks strict unshared dependencies whi
 are instantiated by the node
 */
 
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
@@ -1173,7 +1174,7 @@ impl Relay {
         let mut contract_state_manager_channels = vec![];
         for _ in 0..node_config.contract.bucket_parallelism {
             contract_state_manager_channels.push(
-                internal_message::new_bounded_channel::<ContractStateMessage>(
+                flume_send_help::new_bounded_channel::<ContractStateMessage>(
                     node_config.contract.contract_state_channel_bound.clone()
                 )
             );
@@ -1181,7 +1182,7 @@ impl Relay {
         let mut contention = vec![];
         for _ in 0..node_config.contention.bucket_parallelism {
             contention.push(
-                internal_message::new_bounded_channel::<ContentionMessage>(
+                flume_send_help::new_bounded_channel::<ContentionMessage>(
                     node_config.contention.channel_bound.clone()
                 )
             );
@@ -1189,27 +1190,27 @@ impl Relay {
 
         Self {
             node_config: node_config.clone(),
-            mempool: internal_message::new_bounded_channel::<TransactionMessage>(node_config.mempool.channel_bound),
-            transaction_process: internal_message::new_bounded_channel(node_config.tx_config.channel_bound),
+            mempool: flume_send_help::new_bounded_channel::<TransactionMessage>(node_config.mempool.channel_bound),
+            transaction_process: flume_send_help::new_bounded_channel(node_config.tx_config.channel_bound),
             // TODO: Remove and merge this into tx
-            observation: internal_message::new_channel::<Transaction>(),
+            observation: flume_send_help::new_channel::<Transaction>(),
             // multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
-            observation_metadata: internal_message::new_channel::<ObservationMetadataInternalSigning>(),
-            peer_message_tx: internal_message::new_channel::<PeerMessage>(),
-            peer_message_rx: internal_message::new_channel::<PeerMessage>(),
+            observation_metadata: flume_send_help::new_channel::<ObservationMetadataInternalSigning>(),
+            peer_message_tx: flume_send_help::new_channel::<PeerMessage>(),
+            peer_message_rx: flume_send_help::new_channel::<PeerMessage>(),
             ds,
             transaction_channels: Arc::new(DashMap::new()),
             utxo_channels: Arc::new(DashMap::new()),
-            trust: internal_message::new_channel::<TrustUpdate>(),
+            trust: flume_send_help::new_channel::<TrustUpdate>(),
             node_state: Arc::new(AtomicCell::new(NodeState::Initializing)),
-            udp_outgoing_messages: internal_message::new_channel::<PeerMessage>(),
-            discovery: internal_message::new_bounded_channel(100),
+            udp_outgoing_messages: flume_send_help::new_channel::<PeerMessage>(),
+            discovery: flume_send_help::new_bounded_channel(100),
             mp_keygen_authorizations: Arc::new(Mutex::new(Default::default())),
             mp_signing_authorizations: Arc::new(Mutex::new(Default::default())),
             contract_state_manager_channels,
             contention,
             predicted_trust_overall_rating_score: Arc::new(Mutex::new(Default::default())),
-            unknown_resolved_inputs: internal_message::new_channel(),
+            unknown_resolved_inputs: flume_send_help::new_channel(),
             mempool_entries: Arc::new(Default::default()),
             faucet_rate_limiter: Arc::new(Mutex::new(Default::default())),
             tx_writer: new_channel(),

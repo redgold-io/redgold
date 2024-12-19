@@ -134,6 +134,9 @@ impl Address {
             AddressType::EthereumExternalString => {
                 self.external_string_address()?
             }
+            AddressType::MoneroExternalString => {
+                self.external_string_address()?
+            }
             _ => {
                 self.hex()
             }

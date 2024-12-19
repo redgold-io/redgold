@@ -2,8 +2,8 @@ use bdk::bitcoin::secp256k1::PublicKey;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::seeds::get_all_hardcoded_seeds;
 use redgold_schema::structs::{NetworkEnvironment, TrustData};
-use crate::api::public_api::PublicClient;
-use crate::api::RgHttpClient;
+use crate::api::client::public_client::PublicClient;
+use crate::api::client::rest::RgHttpClient;
 use redgold_schema::conf::node_config::NodeConfig;
 
 #[ignore]

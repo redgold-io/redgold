@@ -25,8 +25,8 @@ categories = ["cryptography::cryptocurrencies"]
 
 [dependencies]
 # workspace = true caused an error here? maybe
-redgold-schema = { path = "../schema", version = "0.1.29"}
-
+redgold-schema = { workspace = true}
+redgold-common-no-wasm = { workspace = true }
 # Make all the non-WASM dependencies optional
 tokio = { version = "1.36.0", features = ["rt"]}
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39", "sled"]}

@@ -5,7 +5,7 @@ use redgold_schema::RgResult;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
 use crate::core::resolver::{resolve_input, ResolvedInput};
 use crate::core::stream_handlers::IntervalFold;

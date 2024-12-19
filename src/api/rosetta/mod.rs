@@ -19,6 +19,7 @@ use redgold_schema::proto_serde::ProtoHashable;
 use redgold_schema::util::lang_util::SameResult;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use crate::api::client::rest::RgHttpClient;
 use crate::util::random_port;
 
 pub mod models;
@@ -36,7 +37,7 @@ where
       F: FnOnce(Resp) -> () {
     tokio::select! {
         _ = server => {}
-        res = crate::api::RgHttpClient::test_request::<Req, Resp>(relay.node_config.rosetta_port(), &req, endpoint) => {
+        res = RgHttpClient::test_request::<Req, Resp>(relay.node_config.rosetta_port(), &req, endpoint) => {
             res
             // .map( |r|
             //     log::info!("Test request response: {}", serde_json::to_string(&r.clone()).expect("ser"))

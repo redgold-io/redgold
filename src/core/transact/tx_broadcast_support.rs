@@ -19,7 +19,7 @@ impl TxBroadcastSupport for Transaction {
     }
 
     async fn broadcast_from(&self, nc: &NodeConfig) -> RgResult<SubmitTransactionResponse> {
-        let res = nc.api_client().send_transaction(&self, true).await?;
+        let res = nc.api_rg_client().send_transaction(&self, true).await?;
         Ok(res)
     }
 }

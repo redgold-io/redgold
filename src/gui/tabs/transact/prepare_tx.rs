@@ -41,7 +41,7 @@ pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &Stri
 #[tokio::test]
 pub async fn prepare_tx_test() {
     let nc = NodeConfig::dev_default().await;
-    let api = nc.api_client();
+    let api = nc.api_rg_client();
     let pk_hex = "";
     let pk = PublicKey::from_hex(pk_hex).expect("pk");
     let addr = pk.address().expect("addr");

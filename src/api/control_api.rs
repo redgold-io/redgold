@@ -13,10 +13,11 @@ use tracing::trace;
 use uuid::Uuid;
 use warp::{Filter, Rejection};
 use warp::reply::Json;
-use redgold_schema::{response_metadata, RgResult, SafeOption, structs};
+use redgold_schema::{response_metadata, structs, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::json_or;
 use redgold_schema::structs::{BytesData, ControlMultipartyKeygenRequest, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, ControlMultipartySigningResponse, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, MultipartyIdentifier, Request};
-use crate::api::{as_warp_json_response, RgHttpClient};
+use crate::api::warp_helpers::as_warp_json_response;
+use crate::api::client::rest::RgHttpClient;
 use crate::api::rosetta::models::Error;
 
 // use crate::util::to_libp2p_peer_id;

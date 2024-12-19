@@ -1,7 +1,7 @@
 use log::info;
 use rocket::form::validate::Len;
 
-use redgold::api::public_api::PublicClient;
+use redgold::api::client::public_client::PublicClient;
 
 use redgold::e2e::tx_submit::TransactionSubmitter;
 use redgold::node_config::EnvDefaultNodeConfig;

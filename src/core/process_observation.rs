@@ -4,7 +4,7 @@ use tracing::{debug, info, trace};
 use metrics::counter;
 use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
 use redgold_schema::util;
-use crate::core::internal_message::RecvAsyncErrorInfo;
+use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 use crate::core::relay::Relay;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;

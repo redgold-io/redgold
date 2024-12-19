@@ -4,7 +4,7 @@ use tracing::{error, info};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
 use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;

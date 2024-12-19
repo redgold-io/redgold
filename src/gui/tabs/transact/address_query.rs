@@ -5,7 +5,7 @@ use tracing::{error, info};
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::transaction::rounded_balance_i64;
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use redgold_schema::conf::node_config::NodeConfig;

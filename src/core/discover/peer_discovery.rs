@@ -9,7 +9,8 @@ use metrics::counter;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error};
-use redgold_schema::{RgResult, SafeOption, structs};
+use redgold_common::flume_send_help::RecvAsyncErrorInfo;
+use redgold_schema::{structs, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo, Response};
 use crate::core::relay::{Relay, SafeLock};
@@ -19,7 +20,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::util::lang_util::WithMaxLengthString;
-use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfo};
+use crate::core::internal_message::PeerMessage;
 use crate::util;
 
 /**

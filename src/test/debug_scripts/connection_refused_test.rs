@@ -1,5 +1,5 @@
 use redgold_schema::structs;
-use crate::api::RgHttpClient;
+use crate::api::client::rest::RgHttpClient;
 use crate::core::relay::Relay;
 
 #[ignore]

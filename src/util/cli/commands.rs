@@ -7,7 +7,7 @@ use itertools::Itertools;
 use tracing::{error, info};
 use rocket::form::FromForm;
 use tokio::task::JoinHandle;
-
+use redgold_common::flume_send_help::{Channel, RecvAsyncErrorInfo};
 use redgold_data::data_store::DataStore;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
@@ -25,8 +25,6 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
 use redgold_schema::transaction::rounded_balance_i64;
-use crate::core::internal_message::{Channel, RecvAsyncErrorInfo};
-
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
@@ -67,7 +65,7 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
 
 pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
     //let ds = config.data_store().await;
-    let c = config.api_client();
+    let c = config.api_rg_client();
     let a = c.about().await?;
     println!("{}", json_pretty(&a)?);
 
@@ -83,12 +81,12 @@ pub async fn status(config: &NodeConfig) -> Result<(), ErrorInfo>  {
 async fn metrics_debug() {
     let mut nc = NodeConfig::default();
     nc.network = NetworkEnvironment::Dev;
-    let c = nc.api_client();
+    let c = nc.api_rg_client();
     // let a = c.about().await?;
     // println!("{}", json_pretty(&a)?);
 
     let m = c.metrics().await.expect("");
-    let t = c.client_wrapper().table_sizes().await.expect("");
+    let t = c.table_sizes().await.expect("");
 
     println!("metrics: {}", m.json_or());
 

@@ -30,7 +30,7 @@ use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{ErrorInfo, Hash, PeerId, Seed, Transaction, TrustData};
 
 use crate::{e2e, gui, util};
-use crate::api::RgHttpClient;
+use crate::api::client::rest::RgHttpClient;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::{NodeCli, RgArgs, RgTopLevelSubcommand, TestCaptureCli, GUI};
 use redgold_schema::config_data::ConfigData;

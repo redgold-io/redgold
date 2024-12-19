@@ -11,14 +11,16 @@ use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 use tracing::trace;
 use warp::path::FullPath;
-use redgold_schema::{error_message, error_msg, ErrorInfoContext, RgResult, structs};
-use crate::api::{RgHttpClient, easy_post, rosetta, with_response_logger, with_response_logger_error};
+use redgold_schema::{error_message, error_msg, structs, ErrorInfoContext, RgResult};
+use crate::api::rosetta;
 use crate::api::rosetta::models::{AccountBalanceRequest, AccountBalanceResponse, AccountCoinsRequest, AccountIdentifier, Error};
 use crate::api::rosetta::spec::Rosetta;
 use crate::core::relay::Relay;
 use redgold_schema::util::lang_util::SameResult;
+use crate::api::client::rest::RgHttpClient;
 use crate::api::rosetta::handlers::*;
 use crate::api::rosetta::models;
+use crate::api::warp_helpers::{easy_post, with_response_logger, with_response_logger_error};
 use crate::util::random_port;
 // use crate::api::rosetta::reject::apply_rejection;
 

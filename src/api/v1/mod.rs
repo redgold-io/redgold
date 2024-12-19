@@ -15,7 +15,7 @@ use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
-use crate::api::as_warp_json_response;
+use crate::api::warp_helpers::as_warp_json_response;
 use crate::api::explorer::handle_address_info;
 use crate::api::explorer::server::{extract_ip, process_origin};
 use crate::api::hash_query::get_address_info;

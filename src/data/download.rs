@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use crate::core::internal_message::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
@@ -15,7 +14,8 @@ use futures::StreamExt;
 use itertools::Itertools;
 use metrics::{counter, gauge};
 use tokio_stream::Elapsed;
-use redgold_schema::{RgResult, SafeOption, structs};
+use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
+use redgold_schema::{structs, RgResult, SafeOption};
 use redgold_schema::structs::{ErrorInfo, Hash, PublicKey, Transaction, TransactionEntry, UtxoId};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;

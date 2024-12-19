@@ -1,10 +1,10 @@
-use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
-use crate::schema::structs::{ErrorCode, ErrorInfo, PublicResponse, Request, Response, Transaction};
-use crate::schema::error_message;
+use async_trait::async_trait;
+use crate::schema::structs::{ErrorInfo, Request, Response, Transaction};
 use bdk::bitcoin::secp256k1::PublicKey;
 use tokio::task::JoinError;
+use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 // #[derive(Clone)]
 // pub struct InternalChannel<T> {
 //     pub sender: flume::Sender<T>,
@@ -95,123 +95,8 @@ pub struct TransactionMessage {
     pub origin: Option<structs::PublicKey>,
     pub origin_ip: Option<String>
 }
-use async_trait::async_trait;
-use flume::TryRecvError;
-use futures::stream::{FuturesUnordered, StreamExt};
-use tokio::select;
-use tokio::task::JoinHandle;
-use redgold_schema::{error_info, ErrorInfoContext, structs, RgResult};
+use redgold_schema::{structs, ErrorInfoContext};
 use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata, TransportBackend};
-use crate::api::rosetta::models::Peer;
-use redgold_schema::conf::node_config::NodeConfig;
-
-#[async_trait]
-pub trait RecvAsyncErrorInfo<T> {
-    async fn recv_async_err(&self) -> Result<T, ErrorInfo>;
-    async fn recv_async_err_timeout(&self, timeout: Duration) -> Result<T, ErrorInfo>;
-    fn recv_err(&self) -> RgResult<T>;
-}
-
-#[async_trait]
-impl<T> RecvAsyncErrorInfo<T> for flume::Receiver<T>
-where
-    T: Send,
-{
-    async fn recv_async_err(&self) -> Result<T, ErrorInfo> {
-        self.recv_async()
-            .await
-            .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
-    }
-
-    fn recv_err(&self) -> RgResult<T> {
-        self.recv()
-            .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
-    }
-
-    async fn recv_async_err_timeout(&self, duration: Duration) -> Result<T, ErrorInfo> {
-        tokio::time::timeout(duration, self.recv_async_err())
-            .await
-            .error_info("Timeout recv async error")?
-    }
-
-}
-
-#[async_trait]
-pub trait SendErrorInfo<T> {
-    fn send_rg_err(&self, t: T) -> Result<(), ErrorInfo>;
-}
-
-#[async_trait]
-impl<T> SendErrorInfo<T> for flume::Sender<T>
-where
-    T: Send,
-{
-    fn send_rg_err(&self, t: T) -> Result<(), ErrorInfo> {
-        self.send(t)
-            .map_err(|e| error_message(ErrorCode::InternalChannelReceiveError, e.to_string()))
-    }
-}
-
-#[derive(Clone)]
-pub struct Channel<T> {
-    pub sender: flume::Sender<T>,
-    pub receiver: flume::Receiver<T>,
-}
-
-impl<T> Channel<T> {
-    pub async fn send(&self, t: T) -> Result<(), ErrorInfo> {
-        self.sender
-            .send(t)
-            .map_err(|e| error_message(ErrorCode::InternalChannelSendError, e.to_string()))
-    }
-    pub fn new() -> Channel<T> {
-        new_channel()
-    }
-
-    pub fn recv_while(&self) -> Result<Vec<T>, ErrorInfo> {
-        let mut results = vec![];
-        while {
-            let err = self.receiver.try_recv();
-            let mut continue_loop = true;
-            match err {
-                Ok(o) => {
-                    results.push(o);
-                }
-                Err(e) => {
-                    match e {
-                        TryRecvError::Empty => {
-                            continue_loop = false;
-                        }
-                        TryRecvError::Disconnected => {
-                            return Err(error_info("request processor channel closed unexpectedly"));
-                        }
-                    }
-                }
-            }
-            continue_loop
-        } {}
-        Ok(results)
-    }
-}
-
-pub fn new_channel<T>() -> Channel<T> {
-    let (s, r) = flume::unbounded::<T>();
-    return Channel {
-        sender: s,
-        receiver: r,
-    };
-}
-
-
-pub fn new_bounded_channel<T>(cap: usize) -> Channel<T> {
-    let (s, r) = flume::bounded::<T>(cap);
-    return Channel {
-        sender: s,
-        receiver: r,
-    };
-}
-
-
 pub fn map_fut(r: Option<Result<Result<(), ErrorInfo>, JoinError>>) -> Result<(), ErrorInfo> {
     match r {
         None => {
@@ -223,5 +108,22 @@ pub fn map_fut(r: Option<Result<Result<(), ErrorInfo>, JoinError>>) -> Result<()
             ))??;
             Ok(())
         }
+    }
+}
+
+#[async_trait]
+pub trait RecvAsyncErrorInfoTimeout<T> {
+    async fn recv_async_err_timeout(&self, timeout: Duration) -> Result<T, ErrorInfo>;
+}
+
+#[async_trait]
+impl<T> RecvAsyncErrorInfoTimeout<T> for flume::Receiver<T>
+where
+    T: Send,
+{
+    async fn recv_async_err_timeout(&self, duration: Duration) -> Result<T, ErrorInfo> {
+        tokio::time::timeout(duration, self.recv_async_err())
+            .await
+            .error_info("Timeout recv async error")?
     }
 }

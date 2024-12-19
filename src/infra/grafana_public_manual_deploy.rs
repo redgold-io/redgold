@@ -1,7 +1,7 @@
+use redgold_common_no_wasm::ssh_like::DeployMachine;
 use redgold_schema::RgResult;
 use redgold_schema::servers::ServerOldFormat;
-use crate::infra::deploy::{deploy_ops_services, DeployMachine, SSHProcessInvoke};
-use redgold_schema::conf::node_config::NodeConfig;
+use crate::infra::deploy::deploy_ops_services;
 use crate::util::cli::commands::log_handler;
 
 
