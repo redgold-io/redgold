@@ -64,6 +64,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 20px;
+  margin-left: 200px;
   //display: grid;
   //grid-template-columns: 2fr 1fr; /* Adjust as needed */
   //gap: 10px; /* Adjust as needed */
@@ -95,6 +96,7 @@ export default {
   height: 55px;
   width: 55px;
   margin-right: 10px;
+  //margin-left: 10px;
 }
 
 .custom-navbar .brand {
