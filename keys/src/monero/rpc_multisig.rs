@@ -5,6 +5,9 @@ use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use uuid::Uuid;
 
 use diqwest::WithDigestAuth;
+use serde::{Deserialize, Serialize};
+use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::helpers::easy_json::EasyJson;
 
 // https://docs.getmonero.org/rpc-library/wallet-rpc/#introduction
 pub struct MoneroWalletRpcMultisigClient {
@@ -21,6 +24,22 @@ async fn verify_multisig_test() {
         Some("username:password".to_string())
     ).unwrap();
 }
+
+
+#[derive(Debug, serde::Deserialize, Clone, Serialize)]
+struct MoneroRpcError {
+    code: i32,
+    message: String,
+}
+
+#[derive(Debug, serde::Deserialize, Clone)]
+struct MoneroRpcResponse<T> {
+    result: Option<T>,
+    error: Option<MoneroRpcError>,
+    id: String,
+    jsonrpc: String,
+}
+
 
 impl MoneroWalletRpcMultisigClient {
 
@@ -73,6 +92,8 @@ impl MoneroWalletRpcMultisigClient {
         threshold: u32,
         password: String,
     ) -> RgResult<MakeMultisigResult> {
+
+        println!("Make multisig threshold with {} {}", multisig_info.len(), threshold);
         let mut params: Map<String, Value> = Default::default();
         params.insert("multisig_info".to_string(), json!(multisig_info));
         params.insert("threshold".to_string(), json!(threshold));
@@ -111,27 +132,40 @@ impl MoneroWalletRpcMultisigClient {
                 params: params.into(),
                 id: Id::Str(Uuid::new_v4().to_string()),
             };
+        println!("JSON RPC Request: {:?}", method_call);
 
-            let req = client.post(&uri).json(&method_call);
 
-            let rsp = if let RpcAuthentication::Credentials { username, password } = &self.rpc_auth {
+        let req = client.post(&uri).json(&method_call);
+
+            // Get the raw response text first
+            let response_text = if let RpcAuthentication::Credentials { username, password } = &self.rpc_auth {
                 req.send_with_digest_auth(username, password)
                     .await
                     .error_info("Failed to send request")?
-                    .json::<response::Output>()
+                    .text()
                     .await
-                    .error_info("Failed to parse JSON response")?
+                    .error_info("Failed to get response text")?
             } else {
-                req.send().await
+                req.send()
+                    .await
                     .error_info("send err")?
-                    .json::<response::Output>()
-                    .await.error_info("decoding")?
+                    .text()
+                    .await
+                    .error_info("Failed to get response text")?
             };
 
-            // trace!("Received JSON-RPC response: {:?}", rsp);
-            let v = jsonrpc_core::Result::<Value>::from(rsp);
-            v.error_info("Failed to parse JSON-RPC response")
-        }
+        println!("JSON RPC Response text: {}", response_text.clone());
+            // Parse the response
+            let response: MoneroRpcResponse<Value> = serde_json::from_str(&response_text)
+                .error_info("Failed to parse JSON response")?;
+
+            // Handle potential RPC error
+            if let Some(error) = response.error {
+                error.json_or().to_error()?;
+            }
+            Ok(response.result.ok_msg("No result in response")?)
+
+    }
 
     /// Exchange multisig keys with other participants
     ///
@@ -336,7 +370,7 @@ impl MoneroWalletRpcMultisigClient {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IsMultisigResponse {
     pub multisig: bool,
     pub ready: bool,
@@ -344,30 +378,30 @@ pub struct IsMultisigResponse {
     pub total: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransferDestination {
     pub amount: u64,
     pub address: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrepareMultisigResult {
     pub multisig_txset: String,
     pub unsigned_txset: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SignedMultisigTxset {
     pub tx_data_hex: String,
     pub tx_hash_list: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExchangeMultisigKeysResult {
     pub address: String,
     pub multisig_info: String
 }
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MakeMultisigResult {
     pub address: String,
     pub multisig_info: String,

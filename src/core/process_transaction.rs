@@ -15,7 +15,7 @@ use uuid::Uuid;
 use redgold_schema::{struct_metadata_new, structs, RgResult, SafeOption};
 use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, UtxoId, ValidationType};
 
-use crate::core::internal_message::{new_bounded_channel, Channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::core::transaction::TransactionTestContext;
 use redgold_data::data_store::DataStore;
@@ -29,6 +29,7 @@ use crate::schema::structs::ObservationProof;
 use crate::schema::{empty_public_response, error_info, error_message};
 use crate::util;
 use futures::{stream::FuturesUnordered, StreamExt};
+use redgold_common::flume_send_help::{new_bounded_channel, Channel, RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_executor::extism_wrapper;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;

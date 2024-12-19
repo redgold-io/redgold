@@ -13,7 +13,8 @@ use metrics::{counter, histogram};
 // use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
-
+// use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
+use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_schema::{error_info, structs, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
@@ -22,7 +23,7 @@ use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, Ge
 use crate::api::about;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
-use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};

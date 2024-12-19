@@ -53,14 +53,14 @@ pub fn load_full_config(allow_no_args: bool) -> (Box<RgArgs>, Box<ConfigData>) {
 
 pub fn reload_config_redirect(initial: Box<ConfigData>) -> Box<ConfigData> {
     if let Some(config_path) = initial.config.as_ref() {
-        println!("Reloading config from: {}", config_path);
+        // println!("Reloading config from: {}", config_path);
         if let Some(pb) = PathBuf::from_str(&*config_path).ok() {
             let mut builder = Config::builder();
             builder = builder.add_source(config::File::from(pb));
             builder = builder.add_source(config_env_source());
             let config = builder.build().unwrap();
             let data = config.try_deserialize::<ConfigData>().unwrap();
-            println!("Reloaded config: {}", data.json_or());
+            // println!("Reloaded config: {}", data.json_or());
             return Box::new(data)
         }
     }

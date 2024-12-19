@@ -9,7 +9,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{InitiateMultipartyKeygenRequest, PartyInfo, PublicKey};
 use crate::core::relay::Relay;
-use crate::infra::deploy::DeployMachine;
+use redgold_common_no_wasm::ssh_like::DeployMachine;
 use redgold_schema::conf::node_config::NodeConfig;
 use crate::util;
 use crate::util::cli::commands::log_handler;

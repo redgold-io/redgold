@@ -14,7 +14,9 @@ categories.workspace = true
 
 [dependencies]
 redgold-schema = {workspace = true}
+redgold-common = {workspace = true}
 async-trait = { workspace = true }
+flume = { workspace = true }
 tokio = { version = "1.36.0", features = ["rt", "process", "fs"]}
 rand = { workspace = true }
 itertools = { workspace = true }

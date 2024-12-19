@@ -17,6 +17,8 @@ pub struct DebugSettings {
     pub live_e2e_interval_seconds: Option<i64>,
     pub bypass_seed_enrichment: Option<bool>,
     pub bypass_download: Option<bool>,
+    // CI / Debug words
+    pub words: Option<String>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -57,7 +59,10 @@ pub struct NodeData {
     pub port_offset: Option<i64>,
     pub passive: Option<bool>,
     pub name: Option<String>,
-    pub ip: Option<String>
+    pub ip: Option<String>,
+    pub http_client_proxy: Option<String>,
+    pub udp_serve_disabled: Option<bool>,
+    pub allowed_http_proxy_origins: Option<Vec<String>>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -80,7 +85,8 @@ pub struct RpcUrl {
     pub url: String,
     pub network: String,
     pub wallet_only: Option<bool>,
-    pub authentication: Option<String>
+    pub authentication: Option<String>,
+    pub file_path: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
@@ -196,6 +202,9 @@ impl ConfigData {
                 passive: Some(false),
                 name: None,
                 ip: None,
+                http_client_proxy: None,
+                udp_serve_disabled: None,
+                allowed_http_proxy_origins: None,
             }),
             party: Some(PartyConfigData {
                 enable: Some(false),

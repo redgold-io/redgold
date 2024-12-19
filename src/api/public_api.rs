@@ -18,11 +18,12 @@ use tracing::trace;
 use warp::reply::Json;
 use warp::{Filter, Server};
 use warp::http::Response;
-use redgold_schema::{empty_public_request, empty_public_response, from_hex, RgResult, SafeOption, structs};
+use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
+use redgold_schema::{empty_public_request, empty_public_response, from_hex, structs, RgResult, SafeOption};
 use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, AddressInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, NetworkEnvironment, Request, Response as RResponse, Seed, SupportedCurrency};
 use redgold_schema::transaction::rounded_balance_i64;
 
-use crate::core::internal_message::{new_channel, PeerMessage, RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_schema::helpers::easy_json::json;
@@ -40,220 +41,18 @@ use crate::schema::structs::{QueryAddressesResponse, Transaction};
 use crate::schema::{bytes_data, error_info};
 use crate::schema::response_metadata;
 use crate::{api, schema, util};
-use crate::api::{about, as_warp_json_response, explorer};
+use crate::api::{about, explorer};
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::hash_query;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::util::lang_util::{AnyPrinter, SameResult};
+use crate::api::client::rest;
 use crate::api::explorer::server::{extract_ip, process_origin};
 use crate::api::v1::v1_api_routes;
+use crate::api::warp_helpers::as_warp_json_response;
 use crate::node_config::ApiNodeConfig;
 use crate::util::runtimes::build_runtime;
-
-// https://github.com/rustls/hyper-rustls/blob/master/examples/server.rs
-
-#[derive(Clone)]
-pub struct PublicClient {
-    pub url: String,
-    pub port: u16,
-    pub timeout: Duration,
-    pub relay: Option<Relay>
-}
-
-impl PublicClient {
-    // pub fn default() -> Self {
-    //     PublicClient::local(3030)
-    // }
-
-    pub fn client_wrapper(&self) -> api::RgHttpClient {
-        api::RgHttpClient::new(self.url.clone(), self.port as u16, self.relay.clone())
-    }
-
-    pub fn local(port: u16, _relay: Option<Relay>) -> Self {
-        Self {
-            url: "localhost".to_string(),
-            port,
-            timeout: Duration::from_secs(120),
-            relay: None,
-        }
-    }
-
-    pub fn from(url: String, port: u16, relay: Option<Relay>) -> Self {
-        Self {
-            url,
-            port,
-            timeout: Duration::from_secs(120),
-            relay,
-        }
-    }
-
-
-    fn formatted_url(&self) -> String {
-        return "http://".to_owned() + &*self.url.clone() + ":" + &*self.port.to_string();
-    }
-
-    fn formatted_url_metrics(&self) -> String {
-        return "http://".to_owned() + &*self.url.clone() + ":" + &*(self.port - 2).to_string();
-    }
-
-    #[allow(dead_code)]
-    pub async fn request(&self, r: &PublicRequest) -> Result<PublicResponse, ErrorInfo> {
-        use reqwest::ClientBuilder;
-        let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
-        // // .default_headers(headers)
-        // // .gzip(true)
-        // .timeout(self.timeout)
-        // .build()?;
-        // info!("{:?}", "");
-        // info!(
-        //     "Sending PublicRequest: {:?}",
-        //     serde_json::to_string(&r.clone()).unwrap()
-        // );
-        let sent = client
-            .post(self.formatted_url() + "/request")
-            .json(r)
-            .send();
-        let response = sent.await;
-        match response {
-            Ok(r) => match r.json::<PublicResponse>().await {
-                Ok(res) => Ok(res),
-                Err(e) => Err(schema::error_info(e.to_string())),
-            },
-            Err(e) => Err(error_info(e.to_string())),
-        }
-    }
-
-    pub async fn metrics(&self) -> RgResult<Vec<(String, String)>>  {
-        let client = ClientBuilder::new().timeout(self.timeout).build().unwrap();
-        let sent = client
-            .get(self.formatted_url_metrics() + "/metrics")
-            .send();
-        let response = sent.await.map_err(|e | error_info(e.to_string()))?;
-        let x = response.text().await;
-        let text = x.map_err(|e | error_info(e.to_string()))?;
-        let res = text.split("\n")
-            .filter(|x| !x.starts_with("#"))
-            .filter(|x| !x.trim().is_empty())
-            .map(|x| x.split(" "))
-            .map(|x| x.collect_vec())
-            .flat_map(|x| x.get(0).as_ref().and_then(|k| x.get(1).as_ref().map(|v| (k.to_string(), v.to_string()))))
-            // .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect_vec();
-        Ok(res)
-    }
-
-    pub async fn send_transaction(
-        &self,
-        t: &Transaction,
-        sync: bool,
-    ) -> Result<SubmitTransactionResponse, ErrorInfo> {
-
-        let mut c = self.client_wrapper();
-        c.timeout = Duration::from_secs(180);
-
-        let mut request = Request::default();
-        request.submit_transaction_request = Some(SubmitTransactionRequest {
-                transaction: Some(t.clone()),
-                sync_query_response: sync,
-        });
-        debug!("Sending transaction: {}", t.clone().hash_hex());
-        let response = c.proto_post_request(request, None, None).await?;
-        response.as_error_info()?;
-        Ok(response.submit_transaction_response.safe_get()?.clone())
-    }
-
-
-    pub async fn faucet(
-        &self,
-        t: &Address
-    ) -> Result<FaucetResponse, ErrorInfo> {
-        let mut request = Request::default();
-        request.faucet_request = Some(FaucetRequest {
-            address: Some(t.clone()),
-            token: None
-        });
-        info!("Sending faucet request: {}", t.clone().render_string().expect("r"));
-        let response = self.client_wrapper().proto_post_request(request, None, None).await?;
-        let fr = response.faucet_response.safe_get()?;
-        let res = json(&response)?;
-        info!("Faucet response: {}", res);
-        Ok(fr.clone())
-    }
-
-    #[allow(dead_code)]
-    pub async fn query_address(
-        &self,
-        addresses: Vec<Address>,
-    ) -> Result<PublicResponse, ErrorInfo> {
-        let mut request = empty_public_request();
-        request.query_addresses_request = Some(QueryAddressesRequest {
-                addresses
-            });
-        self.request(&request).await
-    }
-
-    #[allow(dead_code)]
-    pub async fn query_hash(
-        &self,
-        input: String,
-    ) -> Result<HashSearchResponse, ErrorInfo> {
-        let mut request = Request::default();
-        request.hash_search_request = Some(HashSearchRequest {
-            search_string: input
-        });
-        Ok(self.client_wrapper().proto_post_request(request, None, None).await?.hash_search_response.safe_get()?.clone())
-    }
-    pub async fn balance(
-        &self,
-        address: Address,
-    ) -> Result<f64, ErrorInfo> {
-        let response = self.query_hash(address.render_string().expect("")).await?;
-        let ai = response.address_info.safe_get_msg("missing address_info")?;
-        Ok(rounded_balance_i64(ai.balance))
-    }
-
-    pub async fn address_info(
-        &self,
-        address: Address,
-    ) -> Result<AddressInfo, ErrorInfo> {
-        let response = self.query_hash(address.render_string().expect("")).await?;
-        let ai = response.address_info.safe_get_msg("missing address_info")?;
-        Ok(ai.clone())
-    }
-
-
-    pub async fn about(&self) -> Result<AboutNodeResponse, ErrorInfo> {
-        let mut request = empty_public_request();
-        request.about_node_request = Some(AboutNodeRequest{ verbose: true });
-        let result = self.request(&request).await;
-        let result1 = result?.as_error();
-        let option = result1?.about_node_response;
-        let result2 = option.safe_get_msg("Missing response");
-        Ok(result2?.clone())
-    }
-
-}
-//
-// async fn request(t: &Transaction) -> Result<Response, Box<dyn std::error::Error>> {
-//     let client = reqwest::Client::new();
-//     let res = client
-//         .post("http://localhost:3030/request")
-//         .json(&t)
-//         .send()
-//         .await?
-//         .json::<Response>()
-//         .await?;
-//     Ok(res)
-// }
-
-// #[test]
-// fn test_enum_ser() {
-//     State::Pending.
-// }
-
-// TODO: wrapper function to handle errors and return as json
-// TODO: wrapper function to covnert result to warp json
 
 async fn process_request(request: PublicRequest, relay: Relay) -> Json {
     let response = process_request_inner(request, relay).await.map_err(|e| {
@@ -401,23 +200,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
             }
         });
 
-    // let faucet_relay = relay.clone();
-
-    // let faucet = warp::get()
-    //     .and(warp::path("faucet"))
-    //     .and(warp::path::param())
-    //     .and_then(move |address: String| {
-    //         let relay3 = faucet_relay.clone();
-    //         async move {
-    //             let res: Result<Json, warp::reject::Rejection> =
-    //                 Ok(faucet_request(address, relay3.clone()).await
-    //                     .map_err(|e| warp::reply::json(&e))
-    //                     .map(|r| warp::reply::json(&r))
-    //                     .combine()
-    //                 );
-    //             res
-    //         }
-    //     });
     let qry_relay = relay.clone();
 
     let query_hash = warp::get()
@@ -568,7 +350,10 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         .and_then(move |reqb: Bytes, address: Option<SocketAddr>, remote: Option<String>| {
             // TODO: verify auth and receive message sync from above
             let relay3 = bin_relay2.clone();
-            let origin = process_origin(address, remote);
+            let origin = process_origin(address, remote, relay3
+                .node_config.config_data.node.as_ref().and_then(|c| c.allowed_http_proxy_origins.clone())
+                .unwrap_or(vec![])
+            );
             let result = async move {
                 let res: Result<Response<Vec<u8>>, warp::Rejection> =
                     Ok(as_warp_proto_bytes(handle_proto_post(reqb, address, relay3.clone(), origin).await).await);
@@ -578,7 +363,6 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
         });
 
     let port = relay2.node_config.public_port();
-    // info!("Running public API on port: {:?}", port.clone());
 
     let relay_arc = Arc::new(relay2.clone());
 

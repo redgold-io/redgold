@@ -23,7 +23,7 @@ use redgold_schema::structs::{Hash, ObservationProof, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
 
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::observability::errors::Loggable;

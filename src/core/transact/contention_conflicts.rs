@@ -6,7 +6,7 @@ use futures::future::Either;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{ContentionKey, Hash, ObservationMetadata, ObservationProof};
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
 use crate::core::stream_handlers::IntervalFoldOrReceive;
 use crate::util;

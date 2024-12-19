@@ -4,14 +4,15 @@ use futures::TryFutureExt;
 use itertools::Itertools;
 use tracing::{info, trace};
 use tokio::task::JoinHandle;
-use warp::{Filter, get, Rejection};
+use warp::{get, Filter, Rejection};
 use warp::path::Exact;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_keys::address_support::AddressSupport;
 use redgold_schema::structs::{Address, ErrorInfo, FaucetRequest, Request};
-use crate::api::{as_warp_json_response, explorer};
+use crate::api::explorer;
 use crate::api::explorer::{handle_explorer_faucet, handle_explorer_pool};
-use crate::api::public_api::{TokenParam, Pagination};
+use crate::api::public_api::{Pagination, TokenParam};
+use crate::api::warp_helpers::as_warp_json_response;
 use crate::core::relay::Relay;
 
 
@@ -34,10 +35,12 @@ pub fn allowed_proxy_origins() -> Vec<String> {
     ].iter().map(|x| x.to_string()).collect_vec()
 }
 
-pub fn process_origin(socket: Option<SocketAddr>, remote: Option<String>) -> Option<String> {
+pub fn process_origin(socket: Option<SocketAddr>, remote: Option<String>, extra_origins: Vec<String>) -> Option<String> {
     if let Some(socket) = socket {
         let socket_ip = socket.ip().to_string();
-        if allowed_proxy_origins().contains(&socket_ip) {
+        let mut vec = allowed_proxy_origins();
+        vec.extend(extra_origins);
+        if vec.contains(&socket_ip) {
             remote
         } else {
             Some(socket_ip)
@@ -122,7 +125,7 @@ pub(crate) fn explorer_specific_routes(relay: Relay) -> impl Filter<Extract = (i
         .and(extract_ip())
         .and_then(move |address: String, pagination: TokenParam, remote: Option<SocketAddr>, ip_header: Option<String>| {
             let relay3 = explorer_relay3.clone();
-            let origin = process_origin(remote, ip_header);
+            let origin = process_origin(remote, ip_header, vec![]);
             async move {
                 as_warp_json_response(
                     handle_explorer_faucet(address, relay3, pagination, origin).await

@@ -1,0 +1,19 @@
+#!/usr/bin/expect -f
+spawn ./monero-wallet-cli --testnet --wallet-file $env(filename) --daemon-address http://127.0.0.1:28089
+expect "Wallet password:"
+send "\r"
+expect "\[wallet*\]:"
+send "set enable-multisig-experimental 1\r"
+expect "Wallet password:"
+send "\r"
+expect "\[wallet*\]:"
+send "set enable-multisig-experimental 1\r"
+expect "Wallet password:"
+send "\r"
+expect "\[wallet*\]:"
+send "save\r"
+expect "\[wallet*\]:"
+send "set\r"
+expect "\[wallet*\]:"
+send "exit\r"
+expect eof

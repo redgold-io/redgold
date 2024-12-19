@@ -1,10 +1,10 @@
 use std::time::Duration;
 use async_trait::async_trait;
+use redgold_common::flume_send_help::{RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_schema::RgResult;
-use redgold_schema::structs::{Request, RecentDiscoveryTransactionsRequest};
-use crate::core::internal_message::{RecvAsyncErrorInfo, SendErrorInfo, TransactionMessage};
+use redgold_schema::structs::{RecentDiscoveryTransactionsRequest, Request};
+use crate::core::internal_message::TransactionMessage;
 use crate::core::relay::Relay;
-use crate::core::resolver::resolve_transaction_hash;
 use crate::core::stream_handlers::IntervalFold;
 
 pub struct DataDiscovery {

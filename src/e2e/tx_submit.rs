@@ -14,7 +14,7 @@ use redgold_schema::{bytes_data, empty_public_response, error_info, ErrorInfoCon
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, ErrorInfo, FaucetResponse, NetworkEnvironment, SubmitTransactionResponse, UtxoEntry, UtxoId};
 
-use crate::api::public_api::PublicClient;
+use crate::api::client::public_client::PublicClient;
 use crate::e2e::tx_gen::{SpendableUTXO, TransactionGenerator, TransactionWithKey};
 use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::{ErrorCode, PublicResponse, ResponseMetadata, Transaction};

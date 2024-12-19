@@ -2,7 +2,7 @@ use flume::Sender;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{ErrorInfo, PublicKey, Transaction};
 use redgold_schema::util::lang_util::JsonCombineResult;
-use crate::core::internal_message::SendErrorInfo;
+use redgold_common::flume_send_help::SendErrorInfo;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;

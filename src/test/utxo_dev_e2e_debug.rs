@@ -13,7 +13,7 @@ use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, ErrorInfo, UtxoId};
 use redgold_schema::transaction::amount_to_raw_amount;
-use crate::api::public_api::PublicClient;
+use crate::api::client::public_client::PublicClient;
 use crate::core::relay::Relay;
 use crate::core::resolver::resolve_input;
 use crate::e2e::LiveE2E;

@@ -19,8 +19,8 @@ use redgold_schema::constants::DEBUG_FINALIZATION_INTERVAL_MILLIS;
 use redgold_schema::data_folder::DataFolder;
 use redgold_schema::RgResult;
 use redgold_schema::util::lang_util::{AnyPrinter, JsonCombineResult};
-use crate::api::public_api::PublicClient;
-use crate::api::RgHttpClient;
+use crate::api::client::public_client::PublicClient;
+use crate::api::client::rest::RgHttpClient;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 //
 // impl Default for GenesisConfig {

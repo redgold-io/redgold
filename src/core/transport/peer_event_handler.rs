@@ -12,13 +12,13 @@ use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::debug;
-
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request, TransportBackend};
 
-use crate::api::RgHttpClient;
-use crate::core::internal_message::{PeerMessage, SendErrorInfo};
+use crate::api::client::rest::RgHttpClient;
+use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::port_offsets::PortOffsetHelpers;
@@ -98,7 +98,7 @@ impl PeerOutgoingEventHandler {
     async fn run(&mut self) -> Result<(), ErrorInfo> {
 
         use futures::StreamExt;
-        use crate::core::internal_message::RecvAsyncErrorInfo;
+        use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 
         let receiver = self.relay.peer_message_tx.receiver.clone();
         let relay = self.relay.clone();
@@ -206,6 +206,6 @@ impl PeerOutgoingEventHandler {
 }
 
 pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: Request, intended_pk: &structs::PublicKey) -> Result<Response, ErrorInfo> {
-    let client = crate::api::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
+    let client = crate::api::client::rest::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
     client.proto_post_request(request, Some(relay), Some(intended_pk)).await
 }

@@ -11,7 +11,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::structs::{Address, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::api::RgHttpClient;
+use crate::api::client::rest::RgHttpClient;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use redgold_schema::conf::node_config::NodeConfig;

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use redgold_schema::config_data::RpcUrl;
 use redgold_schema::constants::DEBUG_FINALIZATION_INTERVAL_MILLIS;
+use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::KeyPair;
 use crate::util::mnemonic_support::WordsPass;
 
@@ -47,21 +48,32 @@ impl WordsPassNodeConfig for NodeConfig {
         folder.delete().ensure_exists();
         // folder.ensure_exists();
         let mut node_config = NodeConfig::default();
-        let mut node = (*node_config.config_data).clone();
-        let node_data = node.node.get_or_insert(Default::default());
+        let mut config_data = (*node_config.config_data).clone();
+        let node_data = config_data.node.get_or_insert(Default::default());
         // This is only for manual testing
-        // let mut ext = node.external.get_or_insert(Default::default());
-        // ext.rpcs = Some(vec![
-        //     RpcUrl{
-        //     currency: SupportedCurrency::Monero,
-        //     url: format!("http://server:28{}88", seed_id),
-        //     network: NetworkEnvironment::Dev.to_std_string(),
-        //     wallet_only: Some(true),
-        //     authentication: Some("username:password".to_string()),
-        // }])
+        let mut ext = config_data.external.get_or_insert(Default::default());
+        ext.rpcs = Some(vec![
+            RpcUrl{
+            currency: SupportedCurrency::Monero,
+            url: format!("http://server:28{}88", seed_id),
+            network: NetworkEnvironment::Debug.to_std_string(),
+            wallet_only: Some(true),
+            authentication: Some("username:password".to_string()),
+                file_path: None,
+            },
+            RpcUrl{
+            currency: SupportedCurrency::Monero,
+            url: "http://server:28089".to_string(),
+            network: NetworkEnvironment::Debug.to_std_string(),
+            wallet_only: Some(false),
+            authentication: None,
+                file_path: None,
+            },
+        ]);
+
         node_data.words = Some(words);
-        node.debug.get_or_insert(Default::default()).enable_live_e2e = Some(false);
-        node_config.config_data = Arc::new(node);
+        config_data.debug.get_or_insert(Default::default()).enable_live_e2e = Some(false);
+        node_config.config_data = Arc::new(config_data);
 
         node_config.peer_id = node_config.default_peer_id().expect("worx");
         node_config.public_key = node_config.keypair().public_key();

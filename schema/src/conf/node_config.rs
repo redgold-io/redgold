@@ -162,6 +162,12 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+    pub fn allowed_proxy_origins(&self) -> Vec<String> {
+        self.config_data.node.as_ref().and_then(|n| n.allowed_http_proxy_origins.clone()).unwrap_or(vec![])
+    }
+}
+
+impl NodeConfig {
 
     pub fn mnemonic_words(&self) -> String {
         self.config_data.node.as_ref().and_then(|n| n.words.clone()).expect("mnemonic words")
