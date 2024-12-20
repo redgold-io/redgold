@@ -256,7 +256,7 @@ impl SwapState {
 
     fn swap_details(ui: &mut Ui, ls: &mut LocalState, locked: bool) {
         ui.separator();
-        let price_map_incl = ls.price_map_incl_rdg();
+        let price_map_incl = ls.data.price_map_usd_pair_incl_rdg.clone();
 
         ui.horizontal(|ui| {
             // ui.label("Swap From: ");
@@ -290,9 +290,12 @@ impl SwapState {
                 ls.swap_state.output_currency.clone()
             };
 
-            if let Some(cp) = ls.first_party.as_ref()
-                .and_then(|p| p.party_events.as_ref())
-                .and_then(|pe| pe.central_prices.get(&get_prices_of_currency)) {
+            if let Some(cp) = ls.data.first_party
+                .as_ref()
+                .lock()
+                .ok()
+                .and_then(|p| p.party_events.clone())
+                .and_then(|pe| pe.central_prices.get(&get_prices_of_currency).cloned()) {
 
                 // ETH => RDG for example, get_prices = ETH
                 // RDG => BTC for example, get_prices = BTC
@@ -345,8 +348,10 @@ impl SwapState {
     }
 
     fn party_explorer_link(ui: &mut Ui, ls: &&mut LocalState) {
-        if let Some(pa) = ls.first_party.as_ref()
-            .and_then(|p| p.party_info.party_key.as_ref())
+        if let Some(pa) = ls.data.first_party.as_ref()
+            .lock()
+            .ok()
+            .and_then(|p| p.party_info.party_key.clone())
             .and_then(|p| p.to_bitcoin_address_typed(&ls.node_config.network).ok())
             .and_then(|p| p.render_string().ok())
         {

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use flume::{Receiver, Sender};
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
@@ -11,12 +12,24 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::times::current_time_millis;
 use crate::components::tx_progress::PreparedTransaction;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use crate::state::local_state::LocalStateUpdate;
 
 pub struct WasmGuiDepends {
 
 }
 
 impl GuiDepends for WasmGuiDepends {
+    fn initial_queries_prices_parties_etc<E>(&self, sender: Sender<LocalStateUpdate>, ext: E) -> ()
+    where
+        E: ExternalNetworkResources + Send + 'static + Clone
+    {
+        todo!()
+    }
+
+    fn network_changed(&self) -> Receiver<NetworkEnvironment> {
+        todo!()
+    }
+
     fn parse_address(&self, address: impl Into<String>) -> RgResult<Address> {
         todo!()
     }

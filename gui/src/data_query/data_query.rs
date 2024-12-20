@@ -11,6 +11,7 @@ use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, Ha
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::components::currency_input::supported_wallet_currencies;
 use crate::dependencies::gui_depends::GuiDepends;
+use crate::state::local_state::PricesPartyInfoAndDelta;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + 'static {
@@ -342,6 +343,44 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
             }
         });
     }
+
+    pub fn load_party_data_and_prices(&mut self, prices_party_info_and_delta: PricesPartyInfoAndDelta)
+    {
+        self.price_map_usd_pair_incl_rdg = prices_party_info_and_delta.prices.clone();
+        self.delta_24hr_external = prices_party_info_and_delta.delta_24hr.clone();
+        let arc = self.party_data.clone();
+        let arc2 = self.first_party.clone();
+        let nav = self.party_nav.clone();
+        let pm = self.price_map_usd_pair_incl_rdg.clone();
+
+        let mut party_data = prices_party_info_and_delta.party_info.clone();
+        party_data.iter_mut().for_each(|(k, v)| {
+            v.party_events.as_mut().map(|pev| {
+                pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
+            });
+        });
+
+        if let Some(pd) = party_data.iter().next().clone() {
+            let mut a2 = arc2.lock().unwrap();
+            let mut data = pd.1.clone();
+            let mut total = 0.0;
+            if let Some(bm) = data.party_events.as_ref()
+                .map(|pev| pev.balance_map.clone()) {
+                for (k, v) in bm.iter() {
+                    if k != &SupportedCurrency::Redgold {
+                        pm.get(&k).map(|price| {
+                            total += v.to_fractional() * price;
+                        });
+                    }
+                }
+            }
+            *nav.lock().unwrap() = total;
+            *a2 = data;
+        }
+        let mut ai = arc.lock().unwrap();
+        *ai = party_data;
+    }
+
     pub fn refresh_network_info<G>(&self, g: &G) where G: GuiDepends + Send + Clone + 'static {
         let arc = self.metrics.clone();
         let hm = self.metrics_hm.clone();

@@ -16,6 +16,7 @@ use redgold::core::relay::Relay;
 use redgold::gui;
 use redgold::gui::ClientApp;
 use redgold::gui::initialize::start_native_gui;
+use redgold::gui::ls_ext::local_state_from;
 use redgold::gui::native_gui_dependencies::NativeGuiDepends;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
@@ -144,16 +145,21 @@ fn big_thread() -> std::thread::Builder {
 
 async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends> {
     // this is a lot of data, only reason it's being preloaded here is due to stack.
-    let party_data = if node_config.offline() {
-        Default::default()
-    } else {
-        node_config.api_rg_client().enriched_party_data().await
-    };
+    let party_data = Default::default();
+    // if node_config.offline() {
+    //     Default::default()
+    // } else {
+    //     node_config.api_rg_client().enriched_party_data().await
+    // };
     let res = Box::new(ExternalNetworkResourcesImpl::new(&node_config, None).expect("works"));
     let g = Box::new(NativeGuiDepends::new(*node_config.clone()));
     // let c = g.get_config();
-    let ret = gui::initialize::prepare_start(node_config, res, g, party_data).await.expect("GUI to start");
-    ret
+
+    ClientApp {
+        // logo,
+        local_state: local_state_from(node_config, *res, *g.clone(), party_data).await.unwrap(),
+        gui_depends: *g,
+    }
 }
 
 // #[tokio::main]

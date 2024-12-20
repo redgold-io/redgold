@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use flume::Sender;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
@@ -9,6 +11,7 @@ use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEn
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::components::tx_progress::PreparedTransaction;
+use crate::state::local_state::LocalStateUpdate;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct HardwareSigningInfo {
@@ -55,6 +58,9 @@ impl TransactionSignInfo {
 
 pub trait GuiDepends {
 
+    fn initial_queries_prices_parties_etc<E>(&self, sender: Sender<LocalStateUpdate>, ext: E) -> ()
+    where E: ExternalNetworkResources + Send + 'static + Clone;
+    fn network_changed(&self) -> flume::Receiver<NetworkEnvironment>;
     fn parse_address(&self, address: impl Into<String>) -> RgResult<Address>;
     fn set_network(&mut self, network: &NetworkEnvironment);
     fn get_network(&self) -> &NetworkEnvironment;

@@ -53,6 +53,12 @@ pub struct Channel<T> {
     pub receiver: flume::Receiver<T>,
 }
 
+impl<T> Default for Channel<T> {
+    fn default() -> Self {
+        Channel::new()
+    }
+}
+
 impl<T> Channel<T> {
     pub async fn send(&self, t: T) -> Result<(), ErrorInfo> {
         self.sender

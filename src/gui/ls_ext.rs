@@ -34,6 +34,7 @@ use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
 use crate::util;
 use crate::util::sym_crypt;
 
+
 pub async fn local_state_from<G>(
     node_config: Box<NodeConfig>,
     res: ExternalNetworkResourcesImpl,
@@ -50,19 +51,6 @@ where G: Send + Clone + GuiDepends {
 
     let mut ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
 
-    let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
-    for c in queryable_balances() {
-        if c == SupportedCurrency::Redgold {
-            continue;
-        }
-        // TODO: offline mode.
-        let price = if node_config.offline() {
-            c.price_default()
-        } else {
-            res.query_price(util::current_time_millis_i64(), c).await.unwrap()
-        };
-        price_map.insert(c, price);
-    }
 
     let first_party = party_data.clone().into_values().next();
 
@@ -97,12 +85,14 @@ where G: Send + Clone + GuiDepends {
         is_wasm: false,
         swap_state: Default::default(),
         external_network_resources: res,
-        price_map_usd_pair: price_map,
-        party_data,
-        first_party,
         airgap_signer: Default::default(),
         persist_requested: false,
+        local_messages: Channel::new(),
+        latest_local_messages: vec![],
     };
+
+
+
 
     ls.wallet.send_tx_progress.with_config(&node_config);
     ls.wallet.stake.complete.with_config(&node_config);
@@ -114,16 +104,8 @@ where G: Send + Clone + GuiDepends {
     ls.wallet.port.liquidation_tx.with_config(&node_config);
     // ls.airgap_signer.interior_view()
 
-
-    ls.data.price_map_usd_pair_incl_rdg = ls.price_map_incl_rdg();
     // info!("Price map price_map_usd_pair_incl_rdg: {}", ls.data.price_map_usd_pair_incl_rdg.json_or());
 
-    for cur in vec![
-        SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::Usdt, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::Usdc
-    ].iter() {
-        let delta = gui_depends.get_24hr_delta(cur.clone()).await;
-        ls.data.delta_24hr_external.insert(cur.clone(), delta);
-    }
     // info!("Delta 24hr external: {}", ls.data.delta_24hr_external.json_or());
 
     if node_config.development_mode() {
@@ -210,9 +192,13 @@ pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel
 }
 
 pub fn create_swap_tx(ls: &mut LocalState) {
-    let party_pk = ls.first_party.as_ref()
-        .and_then(|p| p.party_info.party_key.as_ref())
-        .cloned().unwrap();
+    let party_pk = ls
+        .data
+        .first_party
+        .as_ref()
+        .lock().ok()
+        .and_then(|p| p.party_info.party_key.clone())
+        .unwrap();
     let party_addr = party_pk.address().unwrap();
 
     let ups = ls.updates.sender.clone();
@@ -223,7 +209,7 @@ pub fn create_swap_tx(ls: &mut LocalState) {
     let kp = ls.wallet.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
     let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
     info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
-    let map = ls.price_map_incl_rdg();
+    let map = ls.data.price_map_usd_pair_incl_rdg.clone();
     let amount = ls.swap_state.currency_input_box.input_currency_amount(&map);
     let mut from_eth_addr_dir = pk.to_ethereum_address_typed().unwrap();
     info!("from_eth_addr_dir: {}", from_eth_addr_dir.render_string().unwrap());

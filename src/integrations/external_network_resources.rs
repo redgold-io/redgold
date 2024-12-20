@@ -68,7 +68,7 @@ impl ExternalNetworkResourcesImpl {
                     self.node_config.env_data_folder().bdk_sled_path(),
                     None
                 )?;
-                println!("New wallet created");
+                // println!("New wallet created");
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
                 guard.insert(pk.clone(), w.clone());
                 w

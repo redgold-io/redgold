@@ -32,26 +32,9 @@ pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     #[cfg_attr(feature = "persistence", serde(skip))]
     // logo: Image<'static>,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    local_state: LocalState,
+    pub local_state: LocalState,
     #[cfg_attr(feature = "persistence", serde(skip))]
-    gui_depends: G,
-}
-
-impl<G> ClientApp<G> where G: GuiDepends + Clone + Send + 'static{
-    pub async fn from(
-        // logo: Image<'static>,
-        nc: Box<NodeConfig>,
-        res: Box<ExternalNetworkResourcesImpl>,
-        gui_depends: Box<G>,
-        party_data: HashMap<structs::PublicKey, PartyInternalData>
-    ) -> Result<Self, ErrorInfo> where G: Send + Clone + GuiDepends {
-
-        Ok(Self {
-            // logo,
-            local_state: local_state_from(nc, *res, *gui_depends.clone(), party_data).await?,
-            gui_depends: *gui_depends,
-        })
-    }
+    pub gui_depends: G,
 }
 
 impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send + 'static {

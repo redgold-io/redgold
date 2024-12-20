@@ -6,8 +6,10 @@ use futures::future::join_all;
 use rand::Rng;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDelta};
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
@@ -22,6 +24,7 @@ use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::conf::local_stored_state::AccountKeySource;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
@@ -35,14 +38,19 @@ use crate::util;
 #[derive(Clone)]
 pub struct NativeGuiDepends {
     nc: Arc<NodeConfig>,
-    wallet_nw: HashMap<NetworkEnvironment, ExternalNetworkResourcesImpl>
+    wallet_nw: HashMap<NetworkEnvironment, ExternalNetworkResourcesImpl>,
+    network_changed_sender: Sender<NetworkEnvironment>,
+    network_changed: Receiver<NetworkEnvironment>,
 }
 
 impl NativeGuiDepends {
     pub fn new(nc: NodeConfig) -> Self {
+        let (network_changed_sender, network_changed) = flume::unbounded();
         Self {
             nc: Arc::new(nc),
             wallet_nw: Default::default(),
+            network_changed_sender,
+            network_changed,
         }
     }
 
@@ -59,6 +67,11 @@ impl NativeGuiDepends {
 }
 
 impl GuiDepends for NativeGuiDepends {
+
+    fn network_changed(&self) -> flume::Receiver<NetworkEnvironment> {
+        self.network_changed.clone()
+    }
+
     fn config_df_path_label(&self) -> Option<String> {
         self.nc.secure_or().path.to_str().map(|s| s.to_string())
     }
@@ -173,6 +186,9 @@ impl GuiDepends for NativeGuiDepends {
 
     fn set_network(&mut self, network: &NetworkEnvironment) {
         let mut nc = (*self.nc).clone();
+        if nc.network != network.clone() {
+            self.network_changed_sender.send(network.clone()).unwrap();
+        }
         nc.network = network.clone();
         self.nc = Arc::new(nc);
     }
@@ -240,6 +256,54 @@ impl GuiDepends for NativeGuiDepends {
                     result.abort();
                 },
             }
+        });
+    }
+
+    fn initial_queries_prices_parties_etc<E>(&self, sender: Sender<LocalStateUpdate>, ext: E) -> ()
+    where E: ExternalNetworkResources + Send + 'static + Clone {
+        if self.nc.offline() {
+            return;
+        }
+        let g2 = self.clone();
+
+        let client = self.nc.api_rg_client();
+        self.spawn(async move {
+            let result = client.party_data().await;
+
+            let mut price_map: HashMap<SupportedCurrency, f64> = Default::default();
+            for c in queryable_balances() {
+                if c == SupportedCurrency::Redgold {
+                    continue;
+                }
+                if let Some(p) = ext.query_price(util::current_time_millis_i64(), c).await.log_error().ok() {
+                    price_map.insert(c, p);
+                }
+            }
+
+            let cpp = result.as_ref().ok()
+                .and_then(|x| x.iter().next())
+                .map(|x| x.1)
+                .and_then(|p| p.party_events.as_ref())
+                .and_then(|pe| pe.central_prices.get(&SupportedCurrency::Ethereum))
+                .map(|c| c.min_bid_estimated.clone())
+                .unwrap_or(100.0);
+            price_map.insert(SupportedCurrency::Redgold, cpp);
+
+            let party = result.unwrap_or_default();
+
+
+            let mut deltas = HashMap::default();
+            for cur in vec![
+                SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::Usdt, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::Usdc
+            ].iter() {
+                let delta = g2.get_24hr_delta(cur.clone()).await;
+                deltas.insert(cur.clone(), delta);
+            }
+            sender.send(LocalStateUpdate::PricesPartyInfoAndDelta(PricesPartyInfoAndDelta{
+                prices: price_map,
+                party_info: party,
+                delta_24hr: deltas,
+            })).ok();
         });
     }
 }
