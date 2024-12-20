@@ -51,6 +51,7 @@ use redgold_gui::state::lss_addon::LssAddon;
 use redgold_gui::tab::custom_tx::CustomTxState;
 use redgold_gui::tab::receive::ReceiveData;
 use redgold_gui::tab::stake::StakeState;
+use redgold_gui::tab::transact::states::{DeviceListStatus, SendReceiveTabs, WalletTab};
 use crate::gui::components::explorer_links::rdg_explorer;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
@@ -59,21 +60,13 @@ use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardw
 use crate::gui::tabs::transact::portfolio_transact::{PortfolioState, PortfolioTransactSubTab};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
-#[derive(Debug, EnumIter, EnumString, PartialEq, Clone)]
-#[repr(i32)]
-pub enum WalletTab {
-    Hardware,
-    Software,
+
+pub trait DeviceListTrezorNative {
+    fn poll() -> Self;
 }
 
-#[derive(Clone)]
-pub struct DeviceListStatus {
-    pub device_output: Option<String>,
-    last_polled: Instant,
-}
-
-impl DeviceListStatus {
-    pub fn poll() -> Self {
+impl DeviceListTrezorNative for DeviceListStatus {
+    fn poll() -> Self {
         let result = trezor_list_devices().ok().flatten();
         Self {
             device_output: result,
@@ -81,33 +74,9 @@ impl DeviceListStatus {
         }
     }
 }
-
 // #[derive(Clone)]
 pub struct StateUpdate {
     pub(crate) update: Box<dyn FnMut(&mut LocalState) + Send>,
-}
-
-#[derive(Clone, PartialEq, EnumIter, EnumString, Debug)]
-pub enum SendReceiveTabs {
-    Home,
-    Send,
-    Receive,
-    Swap,
-    Stake,
-    Portfolio,
-    Custom,
-}
-
-impl Default for SendReceiveTabs {
-    fn default() -> Self {
-        SendReceiveTabs::Home
-    }
-}
-
-#[derive(Clone, PartialEq, EnumString)]
-pub enum CustomTransactionType {
-    Swap,
-    Stake
 }
 
 
@@ -118,7 +87,7 @@ pub struct WalletState {
     pub(crate) public_key: Option<PublicKey>,
     pub(crate) public_key_msg: Option<String>,
     // futs: Vec<impl Future>
-    pub(crate) updates: Channel<StateUpdate>,
+    // pub(crate) updates: Channel<StateUpdate>,
     pub send_receive: SendReceiveTabs,
     pub destination_address: String,
     pub amount_input: String,
@@ -387,7 +356,7 @@ impl WalletState {
             device_list_status: DeviceListStatus::poll(),
             public_key: None,
             public_key_msg: None,
-            updates: new_channel(),
+            // updates: new_channel(),
             send_receive: Default::default(),
             destination_address: "".to_string(),
             amount_input: "".to_string(),
@@ -470,16 +439,16 @@ impl WalletState {
 
 pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
     where G: GuiDepends + Clone + Send + 'static {
-    match local_state.wallet.updates.recv_while() {
-        Ok(updates) => {
-            for mut update in updates {
-                // info!("Received item of update, applying");
-                (update.update)(local_state);
-                // info!("New wallet state faucet message: {}", local_state.wallet_state.faucet_success.clone());
-            }
-        }
-        Err(e) => { error!("Error receiving updates: {}", e.json_or()) }
-    }
+    // match local_state.wallet.updates.recv_while() {
+    //     Ok(updates) => {
+    //         for mut update in updates {
+    //             // info!("Received item of update, applying");
+    //             (update.update)(local_state);
+    //             // info!("New wallet state faucet message: {}", local_state.wallet_state.faucet_success.clone());
+    //         }
+    //     }
+    //     Err(e) => { error!("Error receiving updates: {}", e.json_or()) }
+    // }
     local_state.wallet.update_hardware();
     ui.style_mut().spacing.item_spacing.y = 2f32;
 
@@ -778,8 +747,7 @@ fn send_receive_bar<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G) 
 fn refresh_balance<G>(ls: &mut LocalState, g: &G) where G: GuiDepends + Clone + Send + 'static {
     let pk = ls.wallet.public_key.clone().expect("pk");
     ls.data.refresh_all_pk(&pk, g);
-    address_query::get_address_info(&ls.node_config.clone(),
-                                    pk,
-                                    ls.wallet.updates.sender.clone(),
+    address_query::get_address_info(
+        &ls.node_config.clone(), pk, ls.local_messages.sender.clone(), g
     );
 }

@@ -24,6 +24,7 @@ pub mod qr_window;
 pub mod native_gui_dependencies;
 pub mod lock_screen;
 pub mod ls_ext;
+pub mod gui_update;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
@@ -41,7 +42,7 @@ impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send + 'stati
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut Frame) {
-        app_loop::app_update(self, ctx, frame);
+        gui_update::app_update(self, ctx, frame);
     }
 
     /// Called by the framework to load old app state (if any).

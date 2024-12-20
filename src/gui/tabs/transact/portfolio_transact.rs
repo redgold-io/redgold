@@ -1,24 +1,17 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use eframe::egui;
-use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, TextStyle, Ui};
-use egui_extras::{Column, TableBuilder};
+use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::common::big_button;
 use redgold_gui::components::balance_table::balance_table;
 use redgold_gui::components::combo_box::combo_box;
-use redgold_gui::components::currency_input::{currency_combo_box, CurrencyInputBox, supported_wallet_currencies};
-use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow, TransactionStage};
+use redgold_gui::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
+use redgold_gui::components::tx_progress::{TransactionProgressFlow, TransactionStage};
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::{RgResult, ShortString};
-use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey, SupportedCurrency};
-use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use redgold_gui::components::tables;
+use redgold_schema::ShortString;
+use redgold_schema::structs::{AddressInfo, CurrencyAmount, PublicKey, SupportedCurrency};
 use redgold_gui::components::tables::{table_nonetype, text_table_advanced};
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
@@ -27,10 +20,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::portfolio::PortfolioRequestEventInstance;
 use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix;
-use redgold_schema::util::lang_util::WithMaxLengthString;
 use redgold_schema::util::times::ToTimeString;
-use crate::gui::tabs::transact::wallet_tab::{SendReceiveTabs};
-
 #[derive(Clone, Default)]
 pub struct Portfolio {
     pub name: String,

@@ -69,7 +69,7 @@ pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Sen
         native_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::<ClientApp<G>>::new(app)
+            Ok(Box::<ClientApp<G>>::new(app))
         })
     ).map_err(|e| error_info(format!("GUI failed to start: {}", e.to_string())))
 }

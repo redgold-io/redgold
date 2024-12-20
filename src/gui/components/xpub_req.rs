@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, Ui};
+use flume::Sender;
 use rocket::serde::Serialize;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
@@ -12,6 +13,7 @@ use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::state::local_state::LocalStateUpdate;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use crate::hardware::trezor;
 use redgold_schema::observability::errors::Loggable;
@@ -61,8 +63,12 @@ impl RequestXpubState {
         }
     }
 
-    pub fn view<G>(&mut self, ui: &mut Ui, ctx: &egui::Context, updates: &Channel<StateUpdate>, device_list: Option<String>, g: &G) where G: GuiDepends {
+    pub fn view<G>(&mut self, ui: &mut Ui, ctx: &egui::Context, updates: Sender<LocalStateUpdate>,
+                   device_list: Option<String>, g: &G) -> Vec<AccountKeySource>
+    where G: GuiDepends {
         self.button(ui);
+
+        let mut add_named_xpubs = vec![];
 
         egui::Window::new("Request XPub")
             .open(&mut self.show_window)
@@ -91,9 +97,11 @@ impl RequestXpubState {
                     self.derivation_path.view(ui, g.clone());
 
                     if request_type == XPubLikeRequestType::Cold {
-                        send_update(&updates, |lss| {
-                            lss.wallet.update_hardware();
-                        });
+
+                        updates.send(LocalStateUpdate::RequestHardwareRefresh).ok();
+                        // send_update(&updates, |lss| {
+                        //     lss.wallet.update_hardware();
+                        // });
                         ui.horizontal(|ui| {
                             ui.label("Hardware Wallet: ");
                             let connected = device_list.is_some();
@@ -164,11 +172,11 @@ impl RequestXpubState {
                                     all_address: all,
                                     public_key: pk,
                                 };
-                                send_update(&updates, move |lss| {
+                                // send_update(&updates, move |lss| {
                                     let named2 = named.clone();
-                                    lss.add_named_xpubs(true, vec![named2], false).log_error().ok();
-                                    lss.persist_local_state_store();
-                                });
+
+                                    add_named_xpubs.push(named2);
+                                // });
 
                             };
                         }
@@ -176,6 +184,7 @@ impl RequestXpubState {
 
                 });
             });
+        add_named_xpubs
     }
 }
 

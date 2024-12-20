@@ -20,8 +20,8 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::util::dollar_formatter::{format_dollar_amount, format_dollar_amount_with_prefix, format_dollar_amount_with_prefix_and_suffix};
 use crate::gui::ls_ext::{create_swap_tx};
-use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs;
-use crate::gui::tabs::transact::wallet_tab::SendReceiveTabs::Swap;
+use redgold_gui::tab::transact::states::SendReceiveTabs;
+use redgold_gui::tab::transact::states::SendReceiveTabs::Swap;
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
