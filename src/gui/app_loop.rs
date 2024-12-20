@@ -66,11 +66,10 @@ pub struct LocalState {
     pub is_wasm: bool,
     pub swap_state: SwapState,
     pub external_network_resources: ExternalNetworkResourcesImpl,
-    pub price_map_usd_pair: HashMap<SupportedCurrency, f64>,
-    pub party_data: HashMap<PublicKey, PartyInternalData>,
-    pub first_party: Option<PartyInternalData>,
     pub airgap_signer: AirgapSignerWindow,
-    pub persist_requested: bool
+    pub persist_requested: bool,
+    pub local_messages: Channel<LocalStateUpdate>,
+    pub latest_local_messages: Vec<LocalStateUpdate>
 }
 
 pub trait LocalStateAddons {
@@ -83,7 +82,6 @@ pub trait LocalStateAddons {
     fn upsert_mnemonic(&mut self, new_named: StoredMnemonic) -> ();
     fn upsert_private_key(&mut self, new_named: StoredPrivateKey) -> ();
     fn process_updates(&mut self);
-    fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64>;
     fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo;
     // fn encrypt(&self, str: String) -> Vec<u8>;
     // fn decrypt(&self, data: &[u8]) -> Vec<u8>;
@@ -216,15 +214,6 @@ impl LocalStateAddons for LocalState {
         }
     }
 
-    fn price_map_incl_rdg(&self) -> HashMap<SupportedCurrency, f64> {
-        let mut price_map = self.price_map_usd_pair.clone();
-        let cpp = self.first_party.as_ref().and_then(|p| p.party_events.as_ref())
-            .and_then(|pe| pe.central_prices.get(&SupportedCurrency::Ethereum))
-            .map(|c| c.min_bid_estimated.clone())
-            .unwrap_or(100.0);
-        price_map.insert(SupportedCurrency::Redgold, cpp);
-        price_map
-    }
 
     fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
         // TODO: Need to migrate WordsPass to schema for trait impls.
@@ -287,6 +276,7 @@ use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgr
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_gui::state::local_state::LocalStateUpdate;
 use redgold_gui::tab::deploy::deploy_state::{ServerStatus, ServersState};
 // 0.8
 // use crate::gui::image_load::TexMngr;
@@ -337,9 +327,22 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
         g.set_config(&c);
         local_state.persist_requested = false;
     }
+    let updates = local_state.local_messages.recv_while().unwrap_or_default();
+    local_state.latest_local_messages = updates.clone();
+    for update in updates {
+        match update {
+            LocalStateUpdate::PricesPartyInfoAndDelta(p) => {
+                local_state.data.load_party_data_and_prices(p);
+            }
+        }
+    }
 
     // TODO: Replace with config query and check.
     INIT.call_once(|| {
+        app.gui_depends.initial_queries_prices_parties_etc(
+            local_state.local_messages.sender.clone(),
+            local_state.external_network_resources.clone()
+        );
         let amt = if local_state.is_mac {
             2.5
         } else if local_state.is_linux {

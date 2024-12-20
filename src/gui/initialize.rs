@@ -34,20 +34,6 @@ pub(crate) fn load_icon() -> IconData {
     }
 }
 
-pub async fn prepare_start<G>(
-    nc: Box<NodeConfig>,
-    res: Box<ExternalNetworkResourcesImpl>,
-    gui_depends: Box<G>,
-    party_data: HashMap<structs::PublicKey, PartyInternalData>
-) -> Result<ClientApp<G>, ErrorInfo> where G: Send + Clone + GuiDepends + 'static
-{
-    // let resources = crate::resources::Resources::default();
-    // let bytes = resources.logo_bytes;
-    // let logo_img = Image::from_bytes("bytes://logo", bytes);
-    // let ri = RetainedImage::from_image_bytes("logo", &*bytes).expect("img");
-    let app = gui::ClientApp::from(nc, res, gui_depends, party_data).await?;
-    Ok(app)
-}
 
 pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Send + Clone + GuiDepends + 'static  {
 
