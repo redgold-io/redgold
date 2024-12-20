@@ -4,13 +4,12 @@
       <!-- Intro text container -->
       <div class="col-12 col-md-6 order-1 order-md-1 px-md-3">
         <div class="intro-text">
-          <h2 style="margin-top: 10px">Peer-to-Peer ETFs, Portfolios & Data Lake Engine</h2>
-          <p class="sub-intro-text">
-            Redgold is a decentralized platform for building data-oriented crypto applications and smart contracts, with
+          <h2 style="margin-top: 10px">Decentralized Portfolio Contracts & Data Lake</h2>
+          <p class="sub-intro-text">Redgold is a platform for building data driven crypto applications and smart contracts, with
             a focus on ETFs, portfolio models & portfolio contracts.
-          </p>
-          <p>
-            With multiparty encryption support and customized financial ratings, construct your own
+<!--          </p>-->
+<!--          <p class="sub-intro-text">-->
+            Native multiparty encryption support, customized financial ratings, and real-time pricing data. Construct your own
             user-defined native crypto ETFs using data stores, analytics queries, and SQL backed smart contracts.
           </p>
           <div class="d-flex justify-content-center intro-buttons">
@@ -49,9 +48,9 @@
               <img :src="require('@/assets/powered-by/webassembly.webp')" alt="WebAssembly Logo" class="powered-by-logo" >
             </div>
 
-            <div class="logo">
-              <img :src="require('@/assets/powered-by/sql.webp')" alt="SQL Logo" class="powered-by-logo" style="height: 300%; width: auto;">
-            </div>
+<!--            <div class="logo">-->
+<!--              <img :src="require('@/assets/powered-by/sql.webp')" alt="SQL Logo" class="powered-by-logo" style="height: 300%; width: auto;">-->
+<!--            </div>-->
 
             <div class="logo">
               <img :src="require('@/assets/powered-by/parquet.webp')" alt="Parquet Logo" class="powered-by-logo" style="height: 40px; width: auto;">
@@ -61,9 +60,9 @@
               <img :src="require('@/assets/powered-by/arrow.webp')" alt="Arrow Logo" class="powered-by-logo" >
             </div>
 
-            <div class="logo">
-              <img :src="require('@/assets/powered-by/ebpf.webp')" alt="eBPF Logo" class="powered-by-logo" >
-            </div>
+<!--            <div class="logo">-->
+<!--              <img :src="require('@/assets/powered-by/ebpf.webp')" alt="eBPF Logo" class="powered-by-logo" >-->
+<!--            </div>-->
 
             <div class="logo">
               <img :src="require('@/assets/powered-by/docker.png')" alt="docker Logo" class="powered-by-logo" >
@@ -348,8 +347,15 @@
 
 @media (min-width: 768px) { /* Adjusts to Bootstrap's MD breakpoint */
   .desktop-buffer {
-    padding-left: 100px; /* Adjust as needed */
+    padding-left: 200px; /* Adjust as needed */
     padding-right: 100px; /* Adjust as needed */
+  }
+  .powered-by-container {
+    padding-left: 150px;
+    padding-right: 150px;
+  }
+  .intro-text {
+    padding-bottom: 10px;
   }
 }
 
@@ -378,7 +384,7 @@
 
 .intro-buttons {
   margin-top: 20px;
-  margin-right: 200px;
+  margin-right: 100px;
   //spacing: 20px;
 }
 .intro-button {
@@ -417,6 +423,12 @@
   background-color: #121111;
 
 }
+
+.container-fluid {
+  margin-top: 10px;
+}
+
+
 
 </style>
 
