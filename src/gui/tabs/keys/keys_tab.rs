@@ -15,6 +15,7 @@ use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, 
 use redgold_gui::components::account_deriv_sel::AccountDerivationPathInputState;
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::PublicKey;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
 use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
@@ -81,7 +82,12 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
         ui.heading("Add");
         add_new_key_button(ls, ui);
         add_xpub_csv_button(ls, ui, ctx);
-        ls.keytab_state.request_xpub.view(ui, ctx, &ls.updates, ls.wallet.device_list_status.device_output.clone(), g);
+        let res = ls.keytab_state.request_xpub.view(ui, ctx, ls.local_messages.sender.clone(), ls.wallet.device_list_status.device_output.clone(), g);
+        if !res.is_empty() {
+            ls.add_named_xpubs(true, res, false).log_error().ok();
+            ls.persist_local_state_store();
+        }
+
     });
 
     save_key_window::save_key_window(ui, ls, ctx);

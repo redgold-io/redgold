@@ -381,7 +381,7 @@ jobs:
           cargo build --release; 
           cp ${{ env.BUILD_OUTPUT }} ./redgold_mac;
           cargo install cargo-bundle;
-          cargo-bundle --release;
+          cargo bundle --release;
           cp target/release/bundle/osx/redgold.app ./redgold.app
 
       # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; ./bin/sqlx_prepare.sh &&

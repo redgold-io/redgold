@@ -83,32 +83,32 @@ pub fn identity_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
             ls.identity_state.selected_identity = Some(i)
         }
     }
-
-    if ui.button("Request Peer Tx").clicked() {
-        let id = &ls.identity_state.selected_identity;
-        let pk = id.as_ref()
-            .and_then(|i| ls.local_stored_state.public_key(i.xpub_name.clone()));
-        let u = ls.updates.sender.clone();
-        let c = ls.node_config.api_client();
-        tokio::spawn(async move {
-            // TODO: Replace this with get latest transaction matching pk address.
-            let option = c.client_wrapper().get_peers().await.ok();
-            let tx = option.as_ref()
-                .and_then(|r| r.get_peers_info_response.as_ref())
-                .and_then(|r| r.peer_info.iter().find(|p|
-                    pk == p.latest_peer_transaction.as_ref()
-                        .and_then(|p| p.peer_data().ok())
-                        .and_then(|p| p.peer_id)
-                        .and_then(|p| p.peer_id)
-                )).and_then(|p| p.latest_peer_transaction.clone());
-            u.send(StateUpdate{update: Box::new(move |ls2: &mut LocalState| {
-                if tx.is_none() {
-                    ls2.identity_state.peer_request_status = Some("No peer tx found".to_string());
-                }
-                ls2.identity_state.peer_tx = tx.clone();
-            })}).unwrap();
-        });
-    };
+    //
+    // if ui.button("Request Peer Tx").clicked() {
+    //     let id = &ls.identity_state.selected_identity;
+    //     let pk = id.as_ref()
+    //         .and_then(|i| ls.local_stored_state.public_key(i.xpub_name.clone()));
+    //     let u = ls.updates.sender.clone();
+    //     let c = ls.node_config.api_client();
+    //     tokio::spawn(async move {
+    //         // TODO: Replace this with get latest transaction matching pk address.
+    //         let option = c.client_wrapper().get_peers().await.ok();
+    //         let tx = option.as_ref()
+    //             .and_then(|r| r.get_peers_info_response.as_ref())
+    //             .and_then(|r| r.peer_info.iter().find(|p|
+    //                 pk == p.latest_peer_transaction.as_ref()
+    //                     .and_then(|p| p.peer_data().ok())
+    //                     .and_then(|p| p.peer_id)
+    //                     .and_then(|p| p.peer_id)
+    //             )).and_then(|p| p.latest_peer_transaction.clone());
+    //         u.send(StateUpdate{update: Box::new(move |ls2: &mut LocalState| {
+    //             if tx.is_none() {
+    //                 ls2.identity_state.peer_request_status = Some("No peer tx found".to_string());
+    //             }
+    //             ls2.identity_state.peer_tx = tx.clone();
+    //         })}).unwrap();
+    //     });
+    // };
 
     if let Some(tx) = &ls.identity_state.peer_request_status {
         ui.label(tx.clone());

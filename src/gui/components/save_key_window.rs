@@ -14,8 +14,9 @@ pub fn save_key_window(
     ls: &mut LocalState,
     ctx: &egui::Context,
 ) {
+    let mut add_new_key_window = ls.wallet.add_new_key_window;
     egui::Window::new("Add Mnemonic/Private Key")
-        .open(&mut ls.wallet.add_new_key_window)
+        .open(&mut add_new_key_window)
         .resizable(false)
         .collapsible(false)
         .min_width(500.0)
@@ -39,31 +40,34 @@ pub fn save_key_window(
                     ls.wallet.is_mnemonic_or_kp = is_mnemonic.clone();
 
                     if let Some(is_m) = is_mnemonic {
-                        ls.updates.sender.send(StateUpdate {
-                            update: Box::new(
-                                move |lss: &mut LocalState| {
+                        // ls.updates.sender.send(StateUpdate {
+                        //     update: Box::new(
+                        //         move |lss: &mut LocalState| {
                                     if is_m {
-                                        lss.upsert_mnemonic(StoredMnemonic {
+                                        ls.upsert_mnemonic(StoredMnemonic {
                                             name: name.clone(),
                                             mnemonic: data.clone(),
                                             passphrase: None,
                                             persist_disk: None,
                                         });
                                     } else {
-                                        lss.upsert_private_key(StoredPrivateKey {
+                                        ls.upsert_private_key(StoredPrivateKey {
                                             name: name.clone(),
                                             key_hex: data.clone(),
                                         })
                                     }
-                                })
-                        }).unwrap();
+                                // })
+                        // }).unwrap();
                         ls.wallet.mnemonic_save_name = "".to_string();
                         ls.wallet.mnemonic_save_data = "".to_string();
-                        send_update(&ls.updates, |lss| {
-                            lss.wallet.add_new_key_window = false;
-                        })
+                        // send_update(&ls.updates, |lss| {
+                            ls.wallet.add_new_key_window = false;
+                        // })
                     }
                 }
             });
         });
+
+    ls.wallet.add_new_key_window = add_new_key_window;
+
 }

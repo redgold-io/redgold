@@ -11,6 +11,7 @@ use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use redgold_gui::state::local_state::LocalStateUpdate;
 use redgold_gui::tab::tabs::Tab;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_support::WordsPass;
@@ -78,7 +79,7 @@ where G: Send + Clone + GuiDepends {
         address_state: Default::default(),
         otp_state: Default::default(),
         local_stored_state,
-        updates: new_channel(),
+        // updates: new_channel(),
         keytab_state: Default::default(),
         is_mac: env::consts::OS == "macos",
         is_linux: env::consts::OS == "linux",
@@ -89,6 +90,7 @@ where G: Send + Clone + GuiDepends {
         persist_requested: false,
         local_messages: Channel::new(),
         latest_local_messages: vec![],
+        portfolio_tab_state: Default::default(),
     };
 
 
@@ -183,10 +185,10 @@ where G: Send + Clone + GuiDepends {
 fn random_bytes() -> [u8; 32] {
     return rand::thread_rng().gen::<[u8; 32]>();
 }
-
-pub fn send_update_sender<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Sender<StateUpdate>, p0: F) {
-    updates.send(StateUpdate { update: Box::new(p0) }).unwrap();
-}
+//
+// pub fn send_update_sender<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Sender<StateUpdate>, p0: F) {
+//     updates.send(StateUpdate { update: Box::new(p0) }).unwrap();
+// }
 pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
     updates.sender.send(StateUpdate { update: Box::new(p0) }).unwrap();
 }
@@ -201,7 +203,6 @@ pub fn create_swap_tx(ls: &mut LocalState) {
         .unwrap();
     let party_addr = party_pk.address().unwrap();
 
-    let ups = ls.updates.sender.clone();
     let mut res = ls.external_network_resources.clone();
     let config = ls.node_config.clone();
     let currency = ls.swap_state.currency_input_box.input_currency.clone();
@@ -246,6 +247,7 @@ pub fn create_swap_tx(ls: &mut LocalState) {
     let address_info = ls.wallet.address_info.clone();
 
     // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
+    let channel = ls.local_messages.clone();
     tokio::spawn(async move {
         let res = TransactionProgressFlow::make_transaction(
             &config,
@@ -261,17 +263,9 @@ pub fn create_swap_tx(ls: &mut LocalState) {
             &ksi,
         ).await;
         // info!("prepared transaction: {}", res.json_or());
-        send_update_sender(&ups, move |lss| {
-            let (err, tx) = match &res {
-                Ok(tx) => (None, Some(tx)),
-                Err(e) => (Some(e.json_or()), None)
-            };
-            if err.is_none() {
-                lss.swap_state.stage = SwapStage::ShowAmountsPromptSigning;
-            }
-            lss.swap_state.tx_progress.created(tx.cloned(), err);
-            lss.swap_state.changing_stages = false;
-        });
+
+        channel.send(LocalStateUpdate::SwapResult(res)).await.ok();
+
     });
 }
 // pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {

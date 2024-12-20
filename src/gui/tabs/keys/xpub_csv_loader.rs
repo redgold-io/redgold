@@ -29,8 +29,10 @@ pub fn window_xpub_loader(
     ls: &mut LocalState,
     ctx: &egui::Context,
 ) {
+    let mut show = ls.wallet.show_xpub_loader_window;
+    let mut hide = false;
     egui::Window::new("Xpub Loader")
-        .open(&mut ls.wallet.show_xpub_loader_window)
+        .open(&mut show)
         .resizable(false)
         .collapsible(false)
         .min_width(300.0)
@@ -58,28 +60,32 @@ pub fn window_xpub_loader(
                     let data = ls.wallet.xpub_loader_rows.clone();
                     let parsed = parse_xpub_rows(&*data).ok();
                     if let Some(rows) = parsed {
-                        send_update(&ls.updates, move |lss| {
+                        // send_update(&ls.updates, move |lss| {
                             let rows2 = rows.clone();
                             info!("Parsed Xpub rows: {:?}", rows2.json_or());
                             let names = rows2.iter().map(|n| n.name.clone()).collect_vec();
-                            let has_existing = lss.local_stored_state.keys
+                            let has_existing = ls.local_stored_state.keys
                                 .as_ref()
                                 .map(|x| x.iter().find(|n| names.contains(&n.name)).is_some()).unwrap_or(false);
-                            if has_existing && !lss.wallet.allow_xpub_name_overwrite {
-                                lss.wallet.xpub_loader_error_message = "Existing xpubs found, please enable overwrite".to_string();
+                            if has_existing && !ls.wallet.allow_xpub_name_overwrite {
+                                ls.wallet.xpub_loader_error_message = "Existing xpubs found, please enable overwrite".to_string();
                             } else {
-                                if lss.wallet.purge_existing_xpubs_on_save {
-                                    lss.local_stored_state.keys = Some(vec![]);
+                                if ls.wallet.purge_existing_xpubs_on_save {
+                                    ls.local_stored_state.keys = Some(vec![]);
                                 }
                                 // TODO: Render error msg
-                                lss.add_named_xpubs(lss.wallet.allow_xpub_name_overwrite, rows2, false).ok();
-                                lss.wallet.show_xpub_loader_window = false;
+                                ls.add_named_xpubs(ls.wallet.allow_xpub_name_overwrite, rows2, false).ok();
+                                hide = true;
                             }
-                        });
+                        // });
                     } else {
                         ls.wallet.xpub_loader_error_message = "Failed to parse rows".to_string();
                     }
                 }
             });
         });
+    ls.wallet.show_xpub_loader_window = show;
+    if hide {
+        ls.wallet.show_xpub_loader_window = false;
+    }
 }
