@@ -36,7 +36,8 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + '
     // not yet used, would require a channel update on completion or collecting all the async in
     // future.
     pub recent_tx_sorted: Arc<Mutex<Vec<BriefTransaction>>>,
-    pub party_nav: Arc<Mutex<f64>>
+    pub party_nav: Arc<Mutex<f64>>,
+    pub daily_one_year: Arc<Mutex<HashMap<SupportedCurrency, Vec<(i64, f64)>>>>
 }
 
 
@@ -202,6 +203,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
             delta_24hr_external: Default::default(),
             recent_tx_sorted: Arc::new(Mutex::new(vec![])),
             party_nav: Arc::new(Mutex::new(0.0)),
+            daily_one_year: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -346,6 +348,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
 
     pub fn load_party_data_and_prices(&mut self, prices_party_info_and_delta: PricesPartyInfoAndDelta)
     {
+        *self.daily_one_year.lock().unwrap() = prices_party_info_and_delta.daily_one_year.clone();
         self.price_map_usd_pair_incl_rdg = prices_party_info_and_delta.prices.clone();
         self.delta_24hr_external = prices_party_info_and_delta.delta_24hr.clone();
         let arc = self.party_data.clone();

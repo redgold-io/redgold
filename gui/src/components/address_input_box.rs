@@ -27,6 +27,7 @@ pub struct AddressInputBox {
     pub address_input_mode: AddressInputMode,
     pub filter: String,
     pub selected_label: String,
+    pub allow_mode_change: bool,
 }
 
 impl Default for AddressInputBox {
@@ -44,7 +45,8 @@ impl Default for AddressInputBox {
             use_label_input: false,
             address_input_mode: AddressInputMode::Raw,
             filter: "".to_string(),
-            selected_label: "Select".to_string()
+            selected_label: "Select".to_string(),
+            allow_mode_change: true,
         }
     }
 }
@@ -138,7 +140,9 @@ impl AddressInputBox {
         ui.horizontal(|ui| {
             ui.label("Destination:");
             self.input_box(ui);
-            self.address_input_mode(ui);
+            if self.allow_mode_change {
+                self.address_input_mode(ui);
+            }
         });
 
         if self.input_has_changed {

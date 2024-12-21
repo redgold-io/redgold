@@ -362,7 +362,7 @@ jobs:
       - run: echo steps.check-branch.outputs.match
       - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
-      - run: echo "asdf" > ./redgold.app
+      - run: echo "asdf" > ./redgold.app.zip
       - name: Install GMP
         run: brew install gmp
       - name: Set GMP environment variables
@@ -382,7 +382,8 @@ jobs:
           cp ${{ env.BUILD_OUTPUT }} ./redgold_mac;
           cargo install cargo-bundle;
           cargo bundle --release;
-          cp target/release/bundle/osx/redgold.app ./redgold.app
+          zip -r redgold.app.zip target/release/bundle/osx/redgold.app
+
 
       # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; ./bin/sqlx_prepare.sh &&
 
@@ -393,7 +394,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: redgold.app
-          path: ./redgold.app
+          path: ./redgold.app.zip
 
   release:
     needs: [build-linux, build-mac, build-linux-ubuntu-20, build-windows, build-vue]
@@ -439,7 +440,7 @@ jobs:
       - name: Download redgold.app artifact
         uses: actions/download-artifact@v3
         with:
-          name: redgold.app
+          name: redgold.app.zip
 
       - name: Download redgold.exe windows artifact
         uses: actions/download-artifact@v3
@@ -545,7 +546,7 @@ jobs:
       - run: echo ${{ env.MAC_BUILD_CHECKSUM_SHA256 }} > mac_sha256_checksum
       - run: aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac_sha256_checksum
       - run: aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_mac
-      - run: aws s3 cp redgold.app ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold.app
+      - run: aws s3 cp redgold.app.zip ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold.app.zip
       # Windows
       - run: echo ${{ env.WINDOWS_CHECKSUM }} > windows_checksum
       - run: aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_windows_checksum
@@ -565,12 +566,9 @@ jobs:
           aws s3 cp mac_sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac_sha256_checksum &&
           aws s3 cp windows_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/windows_checksum &&
           aws s3 cp redgold_mac ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_mac
-          aws s3 cp redgold.app ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold.app
+          aws s3 cp redgold.app.zip ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold.app.zip 
           aws s3 cp redgold.exe ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold.exe
 #      - run: cd .; echo 'Intended upload path: s3://${{env.S3_EXPLORER_PREFIX}}-${{env.BRANCH}}'
-
-      - name: "compress redgold.app to zip"
-        run: zip -r redgold.app.zip redgold.app
 
 
       # TODO: Need tags associated with staging versions for changelog.

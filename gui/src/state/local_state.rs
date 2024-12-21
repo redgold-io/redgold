@@ -19,6 +19,7 @@ pub struct PricesPartyInfoAndDelta {
     pub prices: HashMap<SupportedCurrency, f64>,
     pub party_info: HashMap<PublicKey, PartyInternalData>,
     pub delta_24hr: HashMap<SupportedCurrency, f64>,
+    pub daily_one_year: HashMap<SupportedCurrency, Vec<(i64, f64)>>
 }
 
 #[derive(Clone, Debug)]

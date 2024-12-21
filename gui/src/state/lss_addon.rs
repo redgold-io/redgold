@@ -10,7 +10,8 @@ impl LssAddon for LocalStoredState {
 
     fn address_labels<G>(&self, g: &G) -> Vec<(String, Address)> where G: GuiDepends + Send + 'static {
         let mut all = self.saved_addresses.as_ref().unwrap_or(&vec![]).iter()
-            .map(|a| (a.name.clone(), a.address.clone())).collect::<Vec<(String, Address)>>();
+            .flat_map(|a| g.parse_address(a.address.clone()).ok().map(|parsed| (a.name.clone(), parsed)))
+            .collect::<Vec<(String, Address)>>();
         self.keys.as_ref().unwrap_or(&vec![]).iter().for_each(|x| {
             let all_address = if let Some(all_address) = &x.all_address {
                 all_address.clone()

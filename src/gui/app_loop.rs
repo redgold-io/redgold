@@ -56,7 +56,7 @@ pub struct LocalState {
     pub qr_show_state: QrShowState,
     pub identity_state: IdentityState,
     pub settings_state: SettingsState,
-    pub address_state: AddressState,
+    pub address_state: AddressTabState,
     pub otp_state: OtpState,
     pub local_stored_state: LocalStoredState,
     // pub updates: Channel<StateUpdate>,
@@ -218,14 +218,15 @@ impl LocalStateAddons for LocalState {
 
     fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
         // TODO: Need to migrate WordsPass to schema for trait impls.
-        let kp = self.wallet.hot_mnemonic().keypair_at(self.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+        let mut string = self.keytab_state.derivation_path_xpub_input_account.derivation_path_valid_fallback();
+        let kp = self.wallet.hot_mnemonic().keypair_at(string).unwrap();
         let hex = kp.to_private_hex();
         TransactionSignInfo::PrivateKey(hex)
     }
 
     fn cold_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
         // TODO: Need to migrate WordsPass to schema for trait impls.
-        let path = self.keytab_state.derivation_path_xpub_input_account.derivation_path();
+        let path = self.keytab_state.derivation_path_xpub_input_account.derivation_path_valid_fallback();
         let mut info = HardwareSigningInfo::default();
         info.path = path;
         TransactionSignInfo::ColdOrAirgap(info)
@@ -293,12 +294,12 @@ use redgold_schema::conf::local_stored_state::{AccountKeySource, Identity, Local
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::gui::components::swap::{SwapStage, SwapState};
-use crate::gui::tabs::address_tab::AddressState;
+use redgold_gui::tab::address_tab::AddressTabState;
 use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::otp_tab::{otp_tab, OtpState};
 use crate::gui::tabs::server_tab;
 use redgold_gui::tab::keys::keygen::KeygenState;
-use redgold_gui::tab::portfolio::PortfolioTabState;
+use redgold_gui::tab::portfolio::port_view::PortfolioTabState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
 use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;

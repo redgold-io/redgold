@@ -98,43 +98,11 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
 
     keygen_subtab::mnemonic_window(ctx, ls);
     show_private_key_window(ctx, ls);
-
-    // ui.label("".to_string());
-    // ui.add_space(10.0);
     ui.separator();
-    // ui.spacing();
     ui.spacing();
-    //
-    // ui.horizontal(|ui| {
-    //     ui.heading("View");
-    //
-    // for subsubtab in KeygenSubSubTab::iter() {
-    //     if ui.button(format!("View {:?}", subsubtab)).clicked() {
-    //         ls.keytab_state.subsubtab = subsubtab;
-    //     }
-    // }
-    // });
-    // ui.separator();
-    // ui.spacing();
-    // ui.spacing();
-    //
-    // match ls.keytab_state.subsubtab {
-    //     KeygenSubSubTab::Keys => {
-    //         ui.spacing();
-
     internal_stored_keys(ui, ls, first_init, g);
-
     ui.separator();
-        //
-        // }
-        // KeygenSubSubTab::XPubs => {
-        //     ui.spacing();
-            internal_stored_xpubs(ls, ui, ctx, first_init, g, Some("Internal Stored XPubs".to_string()), None, false);
-    //     }
-    // }
-    // TODO: Sub-subtabs for these two
-
-
+    internal_stored_xpubs(ls, ui, ctx, first_init, g, Some("Internal Stored XPubs".to_string()), None, false);
 
 }
 
@@ -284,7 +252,7 @@ pub fn internal_stored_xpubs<G>(
 
     ui.horizontal(|ui| {
         ui.heading(heading_override.unwrap_or("Transact".to_string()));
-        ui.label("Select XPub");
+        ui.label("Select Account");
         ComboBox::from_label("".to_string())
             .width(125.0)
             .selected_text(ls.wallet.selected_xpub_name.clone())
@@ -294,7 +262,7 @@ pub fn internal_stored_xpubs<G>(
                     ui.selectable_value(&mut ls.wallet.selected_xpub_name, style.clone(), style.to_string());
                 }
                 ui.selectable_value(&mut ls.wallet.selected_xpub_name,
-                                    "Select Xpub".to_string(), "Select Xpub".to_string());
+                                    "Select Account".to_string(), "Select Account".to_string());
             });
         xpub = ls.local_stored_state.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
                 .cloned());
@@ -303,7 +271,7 @@ pub fn internal_stored_xpubs<G>(
             if let Some(slice) = xp.xpub.get((i -8)..i) {
                 medium_data_item(ui, "Last 8:", slice);
             }
-            if ui.button("Show XPub").clicked() {
+            if ui.button("Show Source").clicked() {
                 ls.keytab_state.show_xpub = true;
             }
             ui.checkbox(&mut ls.wallet.view_additional_xpub_details, "Show Key Details");

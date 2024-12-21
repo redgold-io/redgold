@@ -189,7 +189,16 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
             }
             Tab::Address => {
-                crate::gui::tabs::address_tab::address_tab(ui, ctx, local_state);
+                let updated = local_state.address_state.address_tab(ui, ctx, &g);
+                if let Some(a) = updated.add_new_address {
+                    local_state.local_stored_state.saved_addresses.get_or_insert_default().push(a);
+                    local_state.persist_local_state_store()
+                }
+                if let Some(a) = updated.delete_address {
+                    local_state.local_stored_state.saved_addresses.get_or_insert_default()
+                        .retain(|x| x.address != a.address);
+                    local_state.persist_local_state_store()
+                }
             },
             Tab::OTP => {
                 otp_tab(ui, ctx, local_state);
@@ -203,6 +212,9 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 };
                 let info = TransactionSignInfo::Mnemonic(x);
                 local_state.airgap_signer.interior_view(ui, &g, Some(&info));
+            }
+            Tab::Portfolio => {
+                local_state.portfolio_tab_state.view(ui, &local_state.data, local_state.node_config.network.clone());
             }
             _ => {}
         }

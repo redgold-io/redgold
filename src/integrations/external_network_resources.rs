@@ -27,7 +27,8 @@ use redgold_keys::word_pass_support::NodeConfigKeyPair;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::core::relay::Relay;
 use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
-use crate::scrape::{crypto_compare_point_query, okx_point};
+use crate::scrape::okx_point;
+use crate::scrape::crypto_compare::{crypto_compare_point_query, daily_one_year};
 use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;
 
@@ -138,6 +139,10 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         };
         let price = okx_point(time, currency).await?.close;
         Ok(price)
+    }
+
+    async fn daily_historical_year(&self) -> RgResult<HashMap<SupportedCurrency, Vec<(i64, f64)>>> {
+        daily_one_year().await
     }
 
     async fn send(
@@ -435,6 +440,10 @@ impl ExternalNetworkResources for MockExternalResources {
             }
             _ => Err(error_info("Unsupported currency"))
         }
+    }
+
+    async fn daily_historical_year(&self) -> RgResult<HashMap<SupportedCurrency, Vec<(i64, f64)>>> {
+        "not implemented".to_error()
     }
 
     async fn send(

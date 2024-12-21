@@ -48,16 +48,17 @@ impl AccountKeySource {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct SavedAddress {
     pub name: String,
-    pub address: Address,
-    contact_name: String
+    pub address: String,
+    pub contact_name: String,
+    pub related_keysource: Option<String>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct WatchedAddress {
-    name: String,
-    address: Address,
-    alert_all: bool,
-    alert_outgoing: bool
+    pub name: String,
+    pub address: String,
+    pub alert_all: bool,
+    pub alert_outgoing: bool
 }
 
 

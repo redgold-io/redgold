@@ -51,13 +51,14 @@ use redgold_gui::state::lss_addon::LssAddon;
 use redgold_gui::tab::custom_tx::CustomTxState;
 use redgold_gui::tab::receive::ReceiveData;
 use redgold_gui::tab::stake::StakeState;
+use redgold_gui::tab::transact::portfolio_transact::{PortfolioState, PortfolioTransactSubTab};
 use redgold_gui::tab::transact::states::{DeviceListStatus, SendReceiveTabs, WalletTab};
 use crate::gui::components::explorer_links::rdg_explorer;
 use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
+use crate::gui::ls_ext::create_swap_tx;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
 use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardware_signing, hot_wallet, portfolio_transact, prepare_tx, prepared_tx_view};
-use crate::gui::tabs::transact::portfolio_transact::{PortfolioState, PortfolioTransactSubTab};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 
 
@@ -539,6 +540,9 @@ fn check_assign_hot_key(ls: &mut LocalState, x: &AccountKeySource, pk: &PublicKe
                 Some(pass.clone())
             );
             w.validate()?;
+            if !ls.keytab_state.derivation_path_xpub_input_account.valid {
+                return Ok(())
+            }
             let dp = ls.keytab_state.derivation_path_xpub_input_account.derivation_path();
             let dp_xpub =  ls.keytab_state.xpub_key_info.derivation_path.clone();
             let pk2 = w.public_at(
@@ -649,7 +653,10 @@ fn proceed_from_pk<G, E>(
             ls.wallet.custom_tx.view::<E, G>(ui, g, hot_tsi, csi, allowed);
         }
         SendReceiveTabs::Swap => {
-            SwapState::view(ui, ls, g, pk, allowed, csi, hot_tsi);
+            if ls.swap_state.view(ui, g, pk, allowed, csi, hot_tsi, d) {
+                // TODO: refactor this out
+                create_swap_tx(ls);
+            }
         }
         SendReceiveTabs::Home => {
             let rows = d.recent_tx(Some(pk), None, false, None);
