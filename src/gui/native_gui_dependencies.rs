@@ -265,6 +265,7 @@ impl GuiDepends for NativeGuiDepends {
             return;
         }
         let g2 = self.clone();
+        // let e2 = ext.clone();
 
         let client = self.nc.api_rg_client();
         self.spawn(async move {
@@ -303,6 +304,7 @@ impl GuiDepends for NativeGuiDepends {
                 prices: price_map,
                 party_info: party,
                 delta_24hr: deltas,
+                daily_one_year: ext.daily_historical_year().await.ok().unwrap_or_default(),
             })).ok();
         });
     }

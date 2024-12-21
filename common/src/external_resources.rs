@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use async_trait::async_trait;
 use redgold_schema::{error_info, structs, RgResult};
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
@@ -8,6 +9,7 @@ pub trait ExternalNetworkResources {
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>>;
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String>;
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
+    async fn daily_historical_year(&self) -> RgResult<HashMap<SupportedCurrency, Vec<(i64, f64)>>>;
     async fn send(&mut self, destination: &Address, currency_amount: &CurrencyAmount, broadcast: bool,
                   from: Option<PublicKey>, secret: Option<String>
     ) -> RgResult<(ExternalTransactionId, String)>;

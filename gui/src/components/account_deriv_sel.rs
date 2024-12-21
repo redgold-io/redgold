@@ -37,6 +37,20 @@ impl AccountDerivationPathInputState {
     pub fn derivation_path(&self) -> String {
         format!("{}/{}/{}", self.account_derivation_path, self.change, self.index)
     }
+
+    pub fn derivation_path_zero(&self) -> String {
+        format!("{}/0/0", self.account_derivation_path)
+    }
+
+    pub fn derivation_path_valid_fallback(&self) -> String {
+        if self.valid {
+            self.derivation_path()
+        } else {
+            self.derivation_path_zero()
+        }
+    }
+
+
     pub fn validation(&mut self, g: impl GuiDepends + Sized) -> bool {
         let has_changed = self.account_derivation_path != self.last_account_derivation_path ||
             self.index != self.last_index || self.change != self.last_change;

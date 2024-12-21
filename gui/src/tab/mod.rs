@@ -7,3 +7,4 @@ pub mod custom_tx;
 pub mod deploy;
 pub mod transact;
 pub mod portfolio;
+pub mod address_tab;
