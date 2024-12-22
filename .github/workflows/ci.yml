@@ -375,17 +375,13 @@ jobs:
           refs/heads/test
           refs/heads/main
           ', github.ref)
-
         run: |
           cargo clean;  export RUSTFLAGS="-A warnings"; 
           cargo build --release; 
           cp ${{ env.BUILD_OUTPUT }} ./redgold_mac;
           cargo install cargo-bundle;
           cargo bundle --release;
-#          zip -r redgold.app.zip target/release/bundle/osx/redgold.app
-          ditto -c -k --sequesterRsrc --keepParent target/release/bundle/osx/redgold.app redgold.app.zip || true
-
-
+          ditto -c -k --sequesterRsrc --keepParent target/release/bundle/osx/redgold.app redgold.app.zip
       # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; ./bin/sqlx_prepare.sh &&
 
       - uses: actions/upload-artifact@v3
