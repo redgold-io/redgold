@@ -49,7 +49,7 @@ impl AccountKeySource {
 pub struct SavedAddress {
     pub name: String,
     pub address: String,
-    pub contact_name: String,
+    pub contact: String,
     pub related_keysource: Option<String>
 }
 
@@ -79,7 +79,7 @@ pub struct Identity {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
 pub struct Contact {
     pub name: String,
-    pub peer_id: Option<PeerId>,
+    pub peer_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]

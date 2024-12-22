@@ -400,7 +400,7 @@ impl WalletState {
             show_save_xpub_window: false,
             purge_existing_xpubs_on_save: false,
             allow_xpub_name_overwrite: true,
-            selected_xpub_name: option.map(|o| o.name.clone()).unwrap_or("Select Xpub".to_string()),
+            selected_xpub_name: option.map(|o| o.name.clone()).unwrap_or("Select Account".to_string()),
             selected_key_name: "default".to_string(),
             last_selected_key_name: "default".to_string(),
             show_xpub_loader_window: false,

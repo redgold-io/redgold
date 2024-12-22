@@ -163,7 +163,7 @@ impl StakeState {
             tx_table.rows = all.iter().take(5).cloned().collect::<Vec<BriefTransaction>>();
             match self.mode {
                 StakeMode::View => {
-                    tx_table.view(ui, g.get_network());
+                    tx_table.view(ui, &g.get_network());
                 }
                 StakeMode::Deposit => {
                     ui.horizontal(|ui| {
