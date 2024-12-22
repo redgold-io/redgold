@@ -382,7 +382,8 @@ jobs:
           cp ${{ env.BUILD_OUTPUT }} ./redgold_mac;
           cargo install cargo-bundle;
           cargo bundle --release;
-          zip -r redgold.app.zip target/release/bundle/osx/redgold.app
+#          zip -r redgold.app.zip target/release/bundle/osx/redgold.app
+          ditto -c -k --sequesterRsrc --keepParent target/release/bundle/osx/redgold.app redgold.app.zip || true
 
 
       # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; ./bin/sqlx_prepare.sh &&
