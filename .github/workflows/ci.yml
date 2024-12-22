@@ -393,7 +393,7 @@ jobs:
           path: ./redgold_mac
       - uses: actions/upload-artifact@v3
         with:
-          name: redgold.app
+          name: redgold.app.zip
           path: ./redgold.app.zip
 
   release:
