@@ -39,7 +39,7 @@ impl GuiDepends for WasmGuiDepends {
     }
 
 
-    fn get_network(&self) -> &NetworkEnvironment {
+    fn get_network(&self) -> NetworkEnvironment {
         todo!()
     }
 

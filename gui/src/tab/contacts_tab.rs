@@ -10,7 +10,7 @@ use redgold_schema::structs::SupportedCurrency;
 use crate::components::tables::text_table_advanced;
 
 #[derive(Clone, Debug)]
-pub struct AddressTabState {
+pub struct ContactTabState {
     pub show_new_address: bool,
     pub new_address: String,
     pub address_name: String,

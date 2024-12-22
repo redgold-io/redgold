@@ -63,7 +63,7 @@ pub trait GuiDepends {
     fn network_changed(&self) -> flume::Receiver<NetworkEnvironment>;
     fn parse_address(&self, address: impl Into<String>) -> RgResult<Address>;
     fn set_network(&mut self, network: &NetworkEnvironment);
-    fn get_network(&self) -> &NetworkEnvironment;
+    fn get_network(&self) -> NetworkEnvironment;
 
     fn config_df_path_label(&self) -> Option<String>;
     fn get_salt(&self) -> i64;

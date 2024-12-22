@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use redgold_schema::structs::{Address, SupportedCurrency};
+use crate::common::valid_label;
 use crate::dependencies::gui_depends::GuiDepends;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumString, EnumIter)]
@@ -28,6 +29,8 @@ pub struct AddressInputBox {
     pub filter: String,
     pub selected_label: String,
     pub allow_mode_change: bool,
+    pub address_box_label: String,
+    pub show_valid: bool,
 }
 
 impl Default for AddressInputBox {
@@ -47,6 +50,8 @@ impl Default for AddressInputBox {
             filter: "".to_string(),
             selected_label: "Select".to_string(),
             allow_mode_change: true,
+            address_box_label: "Destination:".to_string(),
+            show_valid: false,
         }
     }
 }
@@ -138,10 +143,13 @@ impl AddressInputBox {
         }
 
         ui.horizontal(|ui| {
-            ui.label("Destination:");
+            ui.label(self.address_box_label.clone());
             self.input_box(ui);
             if self.allow_mode_change {
                 self.address_input_mode(ui);
+            }
+            if self.show_valid {
+                valid_label(ui, self.valid);
             }
         });
 

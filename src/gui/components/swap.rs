@@ -126,7 +126,7 @@ impl SwapState {
 
             ui.horizontal(|ui| {
                 ui.heading("Swap");
-                Self::party_explorer_link(ui, &data, depends.get_network());
+                Self::party_explorer_link(ui, &data, &depends.get_network());
                 if self.currency_input_box.input_currency == SupportedCurrency::Redgold {
                     let output = self.output_currency.clone();
                     let cpp = data.central_price_pair(None, output);
