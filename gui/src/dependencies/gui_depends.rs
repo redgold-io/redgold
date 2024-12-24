@@ -107,5 +107,6 @@ pub trait GuiDepends {
     fn to_all_address(&self, pk: &PublicKey) -> Vec<Address>;
 
     fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address>;
+    fn form_btc_address(&self, pk: &PublicKey) -> RgResult<Address>;
 
 }

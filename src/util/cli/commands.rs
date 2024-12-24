@@ -36,6 +36,7 @@ use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::observability::errors::Loggable;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
+use crate::test::daily_e2e::run_daily_e2e;
 use crate::util::metadata::read_metadata_json;
 
 pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(), ErrorInfo>  {
@@ -557,6 +558,9 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 /target/release/bundle/osx/redgold.app
                  */
                 Ok(())
+            }
+            RgDebugCommand::DailyTest(d) => {
+                run_daily_e2e(p1).await
             }
             _ => {
                 Ok(())

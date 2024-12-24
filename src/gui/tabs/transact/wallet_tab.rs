@@ -54,7 +54,6 @@ use redgold_gui::tab::stake::StakeState;
 use redgold_gui::tab::transact::portfolio_transact::{PortfolioState, PortfolioTransactSubTab};
 use redgold_gui::tab::transact::states::{DeviceListStatus, SendReceiveTabs, WalletTab};
 use crate::gui::components::explorer_links::rdg_explorer;
-use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::ls_ext::create_swap_tx;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;

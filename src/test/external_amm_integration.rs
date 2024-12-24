@@ -34,14 +34,19 @@ pub fn amm_public_key(network_environment: &NetworkEnvironment) -> PublicKey {
 // Has faucet bitcoin test funds
 pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
     if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
-        let w = WordsPass::new(w, None);
-        let path = "m/84'/0'/0'/0/0";
-        let privk = w.private_at(path.to_string()).expect("private key");
-        let keypair = w.keypair_at(path.to_string()).expect("private key");
+        let (privk, keypair) = words_to_ci_keypair(w);
         Some((privk, keypair))
     } else {
         None
     }
+}
+
+pub fn words_to_ci_keypair(w: String) -> (String, KeyPair) {
+    let w = WordsPass::new(w, None);
+    let path = "m/84'/0'/0'/0/0";
+    let privk = w.private_at(path.to_string()).expect("private key");
+    let keypair = w.keypair_at(path.to_string()).expect("private key");
+    (privk, keypair)
 }
 
 pub async fn send_btc(amount: i64, net: &NetworkEnvironment) {
