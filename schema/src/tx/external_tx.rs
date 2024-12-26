@@ -16,6 +16,7 @@ pub struct ExternalTimedTransaction {
     pub block_number: Option<u64>,
     pub price_usd: Option<f64>,
     pub fee: Option<CurrencyAmount>,
+    pub self_address: Option<String>,
 }
 
 impl ExternalTimedTransaction {
@@ -45,8 +46,8 @@ impl ExternalTimedTransaction {
     pub fn to_brief(&self) -> BriefTransaction {
         BriefTransaction {
             hash: self.tx_id.clone(),
-            from: if self.incoming { self.other_address.clone() } else { "".to_string() },
-            to: if self.incoming { "".to_string() } else { self.other_address.clone() },
+            from: if self.incoming { self.other_address.clone() } else { self.self_address.clone().unwrap_or("".to_string())},
+            to: if self.incoming { self.self_address.clone().unwrap_or("".to_string()) } else { self.other_address.clone() },
             amount: self.currency_amount().to_fractional(),
             bytes: 0,
             timestamp: self.timestamp.unwrap_or(0) as i64,
@@ -55,6 +56,7 @@ impl ExternalTimedTransaction {
             fee: self.fee.clone().unwrap_or(CurrencyAmount::zero(self.currency)).to_fractional() as i64,
             incoming: Some(self.incoming),
             currency: Some(self.currency.to_display_string()),
+            address_event_type: None,
         }
     }
 

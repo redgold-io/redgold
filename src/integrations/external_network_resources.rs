@@ -383,6 +383,7 @@ impl ExternalNetworkResources for MockExternalResources {
                     block_number: Some(0),
                     price_usd: None,
                     fee: Some(expected_fee),
+                    self_address: None,
                 };
                 ett
             },
@@ -411,6 +412,7 @@ impl ExternalNetworkResources for MockExternalResources {
                     block_number: Some(0),
                     price_usd: None,
                     fee: Some(expected_fee.clone()),
+                    self_address: None,
                 }
             }
             _ => Err(error_info("Unsupported currency"))?

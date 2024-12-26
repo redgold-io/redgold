@@ -10,6 +10,7 @@ mod debug_scripts;
 mod manual_it;
 pub mod harness;
 mod debug_id_mnemonics;
+pub mod daily_e2e;
 
 fn asdf() {
 

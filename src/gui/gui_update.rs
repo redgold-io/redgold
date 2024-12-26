@@ -2,6 +2,7 @@ use eframe::egui::{Align, ScrollArea, TextStyle};
 use redgold_gui::dependencies::gui_depends::{GuiDepends, MnemonicWordsAndPassphrasePath, TransactionSignInfo};
 use redgold_gui::state::local_state::LocalStateUpdate;
 use redgold_gui::tab::tabs::Tab;
+use redgold_gui::tab::transact::swap::SwapStage;
 use std::sync::Once;
 use eframe::egui;
 use strum::IntoEnumIterator;
@@ -11,7 +12,6 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::SupportedCurrency;
 use crate::gui::{top_panel, ClientApp};
 use crate::gui::app_loop::LocalStateAddons;
-use crate::gui::components::swap::SwapStage;
 
 use crate::gui::qr_window::{qr_show_window, qr_window};
 use crate::gui::tabs::keys::keys_tab::keys_tab;

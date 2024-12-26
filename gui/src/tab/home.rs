@@ -23,6 +23,7 @@ pub fn gui_status_networks() -> Vec<NetworkEnvironment> {
 #[derive(Clone)]
 pub struct HomeState {
     pub last_query_started_time: Option<i64>,
+    pub last_row_calc_time: Option<i64>,
     pub ran_once: bool,
     pub network_healthy: bool,
     pub recent_tx: TransactionTable
@@ -32,6 +33,7 @@ impl Default for HomeState {
     fn default() -> Self {
         Self {
             last_query_started_time: None,
+            last_row_calc_time: None,
             ran_once: false,
             network_healthy: false,
             recent_tx: Default::default(),
@@ -69,19 +71,21 @@ impl HomeState {
             };
         });
         ui.separator();
-        if self.last_query_started_time
+        let update_queries = self.last_query_started_time
             .map(|q| (current_time - q) > 1000 * 60)
-            .unwrap_or(true) {
+            .unwrap_or(true);
+        if update_queries {
             self.last_query_started_time = Some(current_time);
             d.refresh_network_info(g);
             if !loaded_pks.is_empty() {
                 d.refresh_pks(loaded_pks.clone(), g);
-                d.refresh_detailed_address_pks(loaded_pks.clone(), g)
+                d.refresh_detailed_address_pks(loaded_pks.clone(), g);
             }
             d.refresh_party_data(g);
-            if !self.ran_once {
+            if !self.ran_once && loaded_pks.len() > 0 {
                 self.ran_once = true;
                 d.refresh_external_balances(loaded_pks.clone(), g, e, &nc.network);
+                d.refresh_external_tts(loaded_pks.clone(), g);
             }
         }
         self.network_stats_table(ui, d, nc);
@@ -90,7 +94,16 @@ impl HomeState {
 
         balance_table(ui, d, &nc, None, None, None, Some("home_balance".to_string()));
 
-        self.recent_tx.rows = d.recent_tx(None, None, false, None);
+        // TODO: Make this reactive when multiple queries are complete send a trigger to update this
+        // but that's a little complex
+        let update_rows = self.last_row_calc_time
+            .map(|q| (current_time - q) > 1000 * 5)
+            .unwrap_or(true);
+        // TODO: Don't repeat this computation a lot. shouldn't rebuild it every update.
+        if update_rows {
+            self.last_row_calc_time = Some(current_time);
+            self.recent_tx.rows = d.recent_tx(None, None, true, None, g);
+        }
         ui.separator();
         self.recent_tx.full_view::<E>(ui, &nc.network, d, None);
         ui.separator();

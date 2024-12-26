@@ -54,7 +54,6 @@ use redgold_gui::tab::stake::StakeState;
 use redgold_gui::tab::transact::portfolio_transact::{PortfolioState, PortfolioTransactSubTab};
 use redgold_gui::tab::transact::states::{DeviceListStatus, SendReceiveTabs, WalletTab};
 use crate::gui::components::explorer_links::rdg_explorer;
-use crate::gui::components::swap::SwapState;
 use crate::gui::components::xpub_req;
 use crate::gui::ls_ext::create_swap_tx;
 use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
@@ -659,7 +658,7 @@ fn proceed_from_pk<G, E>(
             }
         }
         SendReceiveTabs::Home => {
-            let rows = d.recent_tx(Some(pk), None, false, None);
+            let rows = d.recent_tx(Some(pk), None, true, None, g);
             let mut tx_table = TransactionTable::default();
             tx_table.rows = rows;
             tx_table.full_view::<E>(ui, &g.get_network(), d, Some(pk));

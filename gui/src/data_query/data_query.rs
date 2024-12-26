@@ -1,17 +1,18 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use serde::{Deserialize, Serialize};
+use crate::components::currency_input::supported_wallet_currencies;
+use crate::dependencies::gui_depends::GuiDepends;
+use crate::state::local_state::PricesPartyInfoAndDelta;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::explorer::{BriefTransaction, DetailedAddress};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::party::central_price::CentralPricePair;
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{AboutNodeResponse, AddressInfo, CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
-use crate::components::currency_input::supported_wallet_currencies;
-use crate::dependencies::gui_depends::GuiDepends;
-use crate::state::local_state::PricesPartyInfoAndDelta;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use log::info;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + 'static {
@@ -62,7 +63,9 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         self.party_events(party).and_then(|ev| ev.central_prices.get(&cur).cloned())
     }
 
-    pub fn recent_tx(&self, pubkey_filter: Option<&PublicKey>, limit: Option<usize>, include_ext: bool, currency_filter: Option<SupportedCurrency>) -> Vec<BriefTransaction> {
+    pub fn recent_tx<G>(
+        &self, pubkey_filter: Option<&PublicKey>, limit: Option<usize>, include_ext: bool,
+        currency_filter: Option<SupportedCurrency>, g: &G) -> Vec<BriefTransaction> where G: GuiDepends + Send + Clone + 'static {
         let addrs = self.detailed_address.lock().unwrap().clone();
         let mut brief = addrs.iter()
             .filter(|(pk, _)| pubkey_filter.map(|f| f == *pk).unwrap_or(true))
@@ -71,12 +74,21 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
             .collect::<Vec<BriefTransaction>>();
         let mut all = vec![];
         all.extend(brief);
+        let parties = self.party_data.lock().unwrap().clone();
         if include_ext {
-            for ett in self.external_tx.lock().unwrap().iter()
+            for (_, ett) in self.external_tx.lock().unwrap().iter()
                 .filter(|((pk, _), _)| pubkey_filter.map(|f| f == pk).unwrap_or(true))
-                .flat_map(|x| x.1.iter())
+                .filter(|((_, net), _)| &g.get_network() == net)
+                .flat_map(|((pk, _), x)| x.iter().map(|ett| (pk.clone(), ett)))
             {
-                let transaction = ett.to_brief();
+                let mut transaction = ett.to_brief();
+                parties.iter().for_each(|(pk, party)| {
+                    if let Some(pev) = party.party_events.as_ref() {
+                        if let Some(ev) = pev.determine_event_type(&transaction.hash) {
+                            transaction.address_event_type = Some(ev);
+                        }
+                    }
+                });
                 all.push(transaction);
             }
         }
@@ -239,6 +251,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
                 let mut txs = g2.get_external_tx(&pk, SupportedCurrency::Bitcoin).await.log_error().unwrap_or_default();
                 let tx_eth = g2.get_external_tx(&pk, SupportedCurrency::Ethereum).await.log_error().unwrap_or(vec![]);
                 txs.extend(tx_eth);
+                info!("Refresh external txs for pk: {} count: {}", pk, txs.len());
 
                 arc.lock().unwrap().insert((pk, g2.get_network().clone()), txs);
             });

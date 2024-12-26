@@ -193,7 +193,7 @@ pub enum RgTopLevelSubcommand {
     // Faucet(FaucetCli),
     Balance(BalanceCli),
     GenerateConfig(GenerateConfig),
-    DebugCommand(DebugCommand)
+    Debug(DebugCommand)
 }
 
 /// Run a native gui client, this is the default command if no args are supplied
@@ -419,7 +419,8 @@ pub struct TestCaptureCli {
 pub enum RgDebugCommand {
     #[clap(version = "1.3", author = "Redgold")]
     GrafanaPublicDeploy(GrafanaPublicDeploy),
-    BuildReleaseArtifacts(BuildReleaseArtifacts)
+    BuildReleaseArtifacts(BuildReleaseArtifacts),
+    DailyTest(DailyE2ERunner)
     // TestTransaction(TestTransactionCli),
     // TestCapture(TestCaptureCli),
     // TestBitcoinBalance(TestBitcoinBalanceCli),
@@ -433,6 +434,10 @@ pub struct GrafanaPublicDeploy {}
 /// Used for CI, using this binary to construct a new one using the current directory.
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct BuildReleaseArtifacts {}
+
+/// Used for CI, daily test for AMM / transactions / etc.
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct DailyE2ERunner {}
 
 /// Debug Commands
 /// All commands that are used for development or debugging, not for primary end users.

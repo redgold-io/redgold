@@ -10,7 +10,7 @@ use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDelta};
-use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::proof_support::PublicKeySupport;
@@ -313,4 +313,11 @@ impl GuiDepends for NativeGuiDepends {
             })).ok();
         });
     }
+    
+    
+    fn form_btc_address(&self, pk: &PublicKey) -> RgResult<Address> {
+        pk.to_bitcoin_address_typed(&self.get_network())
+    }
+
+    
 }

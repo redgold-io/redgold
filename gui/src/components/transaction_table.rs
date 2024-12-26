@@ -35,7 +35,9 @@ pub fn format_fractional_currency_amount(amount: f64) -> String {
 impl TransactionTable {
     pub fn view(&mut self, ui: &mut Ui, network: &NetworkEnvironment) {
         let mut data = vec![];
-        let mut headers = vec!["Hash", "From", "To", "Time", "First Amount", "Total Amount", "Incoming","Fee", ];
+        let mut headers = vec![
+            "Hash", "From", "To", "Time", "First Amount", "Total Amount", "Incoming", "Type"
+        ];
         if self.stake_mode {
             headers = vec!["Hash", "Time", "Amount", "Currency", "Fee"]
         }
@@ -49,7 +51,7 @@ impl TransactionTable {
                 format_fractional_currency_amount(r.first_amount),
                 format_fractional_currency_amount(r.amount),
                 r.incoming.map(|b| b.to_string()).unwrap_or("".to_string()),
-                format!("{} sats", r.fee.to_string()),
+                r.address_event_type.as_ref().map(|e| format!("{:?}", e)).unwrap_or("".to_string())
             ];
             if self.stake_mode {
                 row = vec![

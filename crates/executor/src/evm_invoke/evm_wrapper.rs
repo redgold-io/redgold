@@ -470,8 +470,8 @@ for SubstrateStackState<'vicinity, 'config
     }
 }
 
-pub const ERC20_CONTRACT_BYTECODE: &str = include_str!("./res/erc20_contract_bytecode.txt");
-pub const GREETER_CONTRACT_BYTECODE: &str = include_str!("./res/greeter.txt");
+pub const ERC20_CONTRACT_BYTECODE: &str = include_str!("res/erc20_contract_bytecode.txt");
+pub const GREETER_CONTRACT_BYTECODE: &str = include_str!("res/greeter.txt");
 
 #[test]
 fn debug(){

@@ -1,0 +1,17 @@
+name: Release Rollout
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run every day at 00:00 UTC
+jobs:
+  daily-e2e:
+    if: ${{ vars.DAILY_E2E == 'true' }}
+    runs-on: ubuntu-latest-m
+    timeout-minutes: 120
+    steps:
+      - name: Pull the latest binary
+        run: |
+          wget https://github.com/redgold-io/redgold/releases/download/release%2Fdev/redgold_linux;
+          chmod +x ./redgold_linux;
+          export REDGOLD_DEBUG_WORDS=${{ secrets.REDGOLD_TEST_WORDS }};
+          ./redgold_linux --network dev debug daily-test

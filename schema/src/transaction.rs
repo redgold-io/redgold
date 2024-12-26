@@ -787,6 +787,18 @@ impl Transaction {
             .next()
     }
 
+    pub fn has_input_address_as_output_address(&self) -> bool {
+        let input_addrs = self.input_addresses();
+        self.outputs.iter()
+            .filter(|o| o.address.as_ref().map(|a| input_addrs.contains(a)).unwrap_or(false))
+            .next()
+            .is_some()
+    }
+
+    pub fn is_outgoing(&self) -> bool {
+        self.has_input_address_as_output_address()
+    }
+
     pub fn first_output_address_non_input_or_fee(&self) -> Option<Address> {
         self.first_output_non_input_or_fee()
             .and_then(|o| o.address.clone())

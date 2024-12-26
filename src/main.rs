@@ -70,7 +70,7 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
             RgTopLevelSubcommand::Deploy(d) => {
                 commands::deploy(&d, &nc).await.unwrap().abort();
             }
-            RgTopLevelSubcommand::DebugCommand(d) => {
+            RgTopLevelSubcommand::Debug(d) => {
                 commands::debug_commands(&d, &nc).await.unwrap();
             }
             RgTopLevelSubcommand::GenerateConfig(d) => {

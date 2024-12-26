@@ -146,4 +146,8 @@ impl GuiDepends for WasmGuiDepends {
     fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address> {
         todo!()
     }
+    
+    fn form_btc_address(&self, pk: &PublicKey) -> RgResult<Address> {
+        todo!()
+    }
 }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use num_bigint::BigInt;
 use itertools::Itertools;
-
+use strum_macros::{EnumIter, EnumString};
 use crate::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
 use crate::party::address_event::AddressEvent::External;
 use crate::{error_info, RgResult, SafeOption};
@@ -14,6 +14,14 @@ use crate::party::portfolio::PortfolioRequestEvents;
 use crate::structs::{Address, CurrencyAmount, DepositRequest, ErrorInfo, ExternalTransactionId, Hash, NetworkEnvironment, PublicKey, StakeDeposit, SupportedCurrency, Transaction, UtxoId};
 use crate::tx::external_tx::ExternalTimedTransaction;
 use crate::util::times::current_time_millis;
+
+
+
+#[derive(Serialize, Deserialize, EnumString, Clone, PartialEq, Debug, EnumIter)]
+pub enum AddressEventExtendedType {
+    StakeDeposit, StakeWithdrawal, Swap, SwapFulfillment, Send, Receive
+}
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PartyEvents where {
@@ -69,6 +77,17 @@ impl PartyEvents {
                 None
             }
         })
+    }
+
+    pub fn determine_event_type(&self, identifier: &String) -> Option<AddressEventExtendedType> {
+        if self.find_fulfillment_of(identifier.clone()).is_some() {
+            // This event was fulfilled by something, therefore it was originally a swap.
+            Some(AddressEventExtendedType::Swap)
+        } else if self.find_request_fulfilled_by(identifier.clone()).is_some() {
+            Some(AddressEventExtendedType::SwapFulfillment)
+        } else {
+            None
+        }
     }
 
     pub fn find_request_fulfilled_by(&self, identifier: String) -> Option<(OrderFulfillment, AddressEvent, AddressEvent)> {

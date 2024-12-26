@@ -256,9 +256,12 @@ impl EthHistoricalClient {
 
             if let (Some(tx_id), Some(from), Some(to)) = (tx_id, from_opt, to_opt) {
                 let incoming = &to == address;
+                let mut self_address = None;
                 let other_address = if incoming {
+                    self_address = Some(to.clone());
                     from
                 } else {
+                    self_address = Some(from.clone());
                     to
                 };
                 res.push(ExternalTimedTransaction {
@@ -272,7 +275,8 @@ impl EthHistoricalClient {
                     currency: SupportedCurrency::Ethereum,
                     block_number: block_num,
                     price_usd: None,
-                    fee
+                    fee,
+                    self_address,
                 });
             }
         }

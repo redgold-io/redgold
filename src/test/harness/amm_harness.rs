@@ -9,7 +9,7 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{error_info, RgResult, SafeOption};
-use redgold_schema::structs::{Address, CurrencyAmount, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::api::client::rest::RgHttpClient;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
@@ -171,6 +171,7 @@ impl PartyTestHarness {
         Ok(())
     }
 
+    // TODO: Change this to use external wallet sender interface.
     pub async fn send_external(&self, amount: CurrencyAmount) {
         let not_mock = !self.is_mock();
         let currency = amount.currency_or();
@@ -195,6 +196,7 @@ impl PartyTestHarness {
             block_number: Some(0),
             price_usd: None,
             fee: Some(PartyEvents::expected_fee_amount(currency, &self.network).expect("fee")),
+            self_address: None,
         };
 
         match currency {
@@ -383,8 +385,15 @@ impl PartyTestHarness {
         self.send_external(Self::eth_stake_amount()).await;
         retry!(self.verify_external_stake_internal_tx())?;
 
+        self.swap_post_stake_test().await?;
+
+        Ok(())
+    }
+
+    pub async fn swap_post_stake_test(&mut self) -> Result<(), ErrorInfo> {
         info!("Finished with staking, attempting to send swaps now");
         self.balance(true).await?;
+        info!("Sending BTC transaction now");
         self.send_external(Self::btc_swap_amount()).await;
         retry!(self.verify_balance_increased())?;
         retry!(async { self.verify_fulfillment_history(1).await })?;
@@ -399,9 +408,6 @@ impl PartyTestHarness {
         self.rdg_to_eth_swap().await.unwrap();
         info!("Sent rdg to eth swap internal tx now awaiting fulfillment externally");
         retry!(async { self.verify_fulfillment_history(4).await })?;
-
         Ok(())
     }
-
-
 }

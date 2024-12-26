@@ -1,28 +1,17 @@
 use std::collections::HashMap;
-use bdk::Utxo::Local;
-use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
 use log::info;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
-use tracing_subscriber::fmt::format;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use redgold_gui::common;
-use redgold_gui::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
-use redgold_gui::components::tx_progress::TransactionProgressFlow;
-use redgold_gui::data_query::data_query::DataQueryInfo;
-use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-use redgold_keys::address_external::ToBitcoinAddress;
+use crate::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
+use crate::components::tx_progress::TransactionProgressFlow;
+use crate::data_query::data_query::DataQueryInfo;
+use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
-use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::util::dollar_formatter::{format_dollar_amount, format_dollar_amount_with_prefix, format_dollar_amount_with_prefix_and_suffix};
-use crate::gui::ls_ext::{create_swap_tx};
-use redgold_gui::tab::transact::states::SendReceiveTabs;
-use redgold_gui::tab::transact::states::SendReceiveTabs::Swap;
-use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
+use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix_and_suffix;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {
@@ -36,7 +25,6 @@ pub enum SwapStage {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwapState {
-    pub active: bool,
     pub output_currency: SupportedCurrency,
     pub stage: SwapStage,
     pub tx_progress: TransactionProgressFlow,
@@ -49,7 +37,6 @@ pub struct SwapState {
 impl Default for SwapState {
     fn default() -> Self {
         Self {
-            active: false,
             output_currency: SupportedCurrency::Redgold,
             stage: SwapStage::StartPreparing,
             tx_progress: Default::default(),
@@ -89,18 +76,17 @@ impl SwapState {
                 self.swap_valid = false;
                 return
             }
-            let fp = {
+            let _fp = {
                 let r = data.first_party.lock().unwrap();
                 r.clone().party_events
             };
-            if let Some(cpp) = data.central_price_pair(None, self.other_currency()) {
+            if let Some(_cpp) = data.central_price_pair(None, self.other_currency()) {
                 // cpp.fulfill_taker_order()
             } else {
                 self.invalid_reason = "Missing party network data".to_string();
                 self.swap_valid = false;
                 return
             }
-
             self.swap_valid = self.currency_input_box.input_amount_value() > 0.0;
         }
 
@@ -119,129 +105,43 @@ impl SwapState {
             E: ExternalNetworkResources + Send + Clone {
 
         let mut create_swap_tx_bool = false;
+        self.check_valid(data, &depends.get_network(), pk);
 
-        if self.active {
-
-            self.check_valid(data, &depends.get_network(), pk);
-
-            ui.horizontal(|ui| {
-                ui.heading("Swap");
-                Self::party_explorer_link(ui, &data, &depends.get_network());
-                if self.currency_input_box.input_currency == SupportedCurrency::Redgold {
-                    let output = self.output_currency.clone();
-                    let cpp = data.central_price_pair(None, output);
-                    if let Some(c) = cpp {
-                        ui.label("Pair Balance:");
-                        let vol = c.pair_quote_volume.to_fractional();
-                        let b = format!("{:.8} {} ", vol, output.abbreviated());
-                        ui.label(b);
-                        let usd_vol = c.pair_quote_price_estimate * vol;
-                        ui.label(format_dollar_amount_with_prefix_and_suffix(usd_vol));
-                    }
-                }
-            });
-            // ui.separator();
-            let mut next_stage = SwapStage::ShowAmountsPromptSigning;;
-            let mut previous_stage = SwapStage::StartPreparing;;
-            let mut button_text = "Start Swap";
-
-            match self.stage {
-                SwapStage::StartPreparing => {
-                    self.swap_details(ui,false, data, depends.get_network().clone());
-                    // ui.heading("Lock Swap Details");
-                    next_stage = SwapStage::ShowAmountsPromptSigning;
-                    button_text = "Start Swap";
-                }
-                SwapStage::ShowAmountsPromptSigning => {
-                    self.swap_details(ui,true, data, depends.get_network().clone());
-
-                    // ui.heading("Swap Values Locked: Prepare to Sign");
-                    next_stage = SwapStage::ViewSignedAllowBroadcast;
-                    button_text = "Sign Transaction";
-                }
-                SwapStage::ViewSignedAllowBroadcast => {
-                    self.swap_details(ui,true, data, depends.get_network().clone());
-                    // ui.heading("Swap Signed: Prepare to Broadcast");
-                    previous_stage = SwapStage::ShowAmountsPromptSigning;
-                    next_stage = SwapStage::CompleteShowTrackProgress;
-                    button_text = "Broadcast Transaction";
-                }
-                SwapStage::CompleteShowTrackProgress => {
-                    self.swap_details(ui,true, data, depends.get_network().clone());
-                    previous_stage = SwapStage::StartPreparing;
-                    // ui.heading("Swap Complete");
+        ui.horizontal(|ui| {
+            ui.heading("Swap");
+            Self::party_explorer_link(ui, &data, &depends.get_network(), depends);
+            if self.currency_input_box.input_currency == SupportedCurrency::Redgold {
+                let output = self.output_currency.clone();
+                let cpp = data.central_price_pair(None, output);
+                if let Some(c) = cpp {
+                    ui.label("Pair Balance:");
+                    let vol = c.pair_quote_volume.to_fractional();
+                    let b = format!("{:.8} {} ", vol, output.abbreviated());
+                    ui.label(b);
+                    let usd_vol = c.pair_quote_price_estimate * vol;
+                    ui.label(format_dollar_amount_with_prefix_and_suffix(usd_vol));
                 }
             }
+        });
 
-            let ev = self.tx_progress.view(ui,depends, tsi, csi, allowed);
-            if ev.next_stage_create {
-                create_swap_tx_bool = true;
-                // create_swap_tx(ls);
-            }
+        let locked = self.tx_progress.locked();
+        self.swap_details(ui,locked, data, depends.get_network().clone());
 
-            ui.horizontal(|ui| {
-                // ui.horizontal(|ui| {
-                //     let style = ui.style_mut();
-                //     style.override_text_style = Some(TextStyle::Heading);
-                //     if ui.button("Reset").clicked() {
-                //         self.tx_progress.reset();
-                //         self.currency_input_box.input_box_str = "".to_string();
-                //         self.stage = SwapStage::StartPreparing;
-                //     }
-                // });
-                // if self.stage != SwapStage::StartPreparing {
-                //     ui.horizontal(|ui| {
-                //         let style = ui.style_mut();
-                //         style.override_text_style = Some(TextStyle::Heading);
-                //         let mut text = "Back";
-                //         if self.stage == SwapStage::CompleteShowTrackProgress {
-                //             text = "Start New Swap";
-                //         }
-                //         if ui.button(text).clicked() {
-                //             self.stage = previous_stage;
-                //
-                //             if self.stage == SwapStage::CompleteShowTrackProgress {
-                //                 self.tx_progress.reset();
-                //                 self.currency_input_box.input_box_str = "".to_string();
-                //                 self.stage = SwapStage::StartPreparing;
-                //             }
-                //         }
-                //     });
-                // }
-
-                if !self.swap_valid {
-                    ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));
-                    ui.label(RichText::new(self.invalid_reason.clone()).color(Color32::RED));
-                } else {
-                    // if self.stage != SwapStage::CompleteShowTrackProgress {
-                    //     if self.tx_progress.stage_err.is_none() {
-                    //         if !self.changing_stages {
-                    //             let changed = Self::big_proceed_button(ui, ls, next_stage, button_text);
-                    //             if changed {
-                    //                 // All these stages are off by one because they've just "changed" already.
-                    //                 match self.stage {
-                    //                     SwapStage::StartPreparing => {}
-                    //                     SwapStage::ShowAmountsPromptSigning => {
-                    //                         // create_swap_tx(ls);
-                    //                     }
-                    //                     SwapStage::ViewSignedAllowBroadcast => {
-                    //                         // sign_swap(ls, self.tx_progress.prepared_tx.clone().unwrap())
-                    //                     }
-                    //                     SwapStage::CompleteShowTrackProgress => {
-                    //                         // broadcast_swap(ls, self.tx_progress.prepared_tx.clone().unwrap())
-                    //                     }
-                    //                 }
-                    //             }
-                    //         }
-                    //     }
-                    // }
-                }
-            });
-
-            if SwapStage::CompleteShowTrackProgress == self.stage {
-                ui.label("Track your swap progress on the party AMM explorer link above");
-            }
+        let ev = self.tx_progress.view(ui,depends, tsi, csi, allowed);
+        if ev.next_stage_create {
+            create_swap_tx_bool = true;
         }
+
+        ui.horizontal(|ui| {
+
+            if !self.swap_valid {
+                ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));
+                ui.label(RichText::new(self.invalid_reason.clone()).color(Color32::RED));
+            } else {
+
+            }
+        });
+
         create_swap_tx_bool
     }
 
@@ -351,12 +251,17 @@ impl SwapState {
         });
     }
 
-    fn party_explorer_link<E>(ui: &mut Ui, data: &DataQueryInfo<E>, net: &NetworkEnvironment) where E: ExternalNetworkResources + Send + Clone {
+    fn party_explorer_link<E,G>(
+        ui: &mut Ui,
+        data: &DataQueryInfo<E>,
+        net: &NetworkEnvironment,
+        g: &G
+    ) where E: ExternalNetworkResources + Send + Clone, G: GuiDepends + Clone + Send + 'static {
         if let Some(pa) = data.first_party.as_ref()
             .lock()
             .ok()
             .and_then(|p| p.party_info.party_key.clone())
-            .and_then(|p| p.to_bitcoin_address_typed(&net).ok())
+            .and_then(|p| g.form_btc_address(&p).ok())
             .and_then(|p| p.render_string().ok())
         {
             ui.hyperlink_to("Party Explorer Link", net.explorer_hash_link(pa));
@@ -374,14 +279,14 @@ impl SwapState {
     }
 }
 
-
-#[ignore]
-#[tokio::test]
-async fn debug_fulfill() {
-    let nc = NodeConfig::default_env(NetworkEnvironment::Dev).await;
-    let pev = nc.api_rg_client().party_data().await.unwrap().into_values().next().unwrap().party_events.unwrap();
-    let cpp = pev.central_prices.get(&SupportedCurrency::Ethereum).unwrap();
-    let f = cpp.dummy_fulfill(16500000 as u64, false, &nc.network, SupportedCurrency::Ethereum);
-    println!("{}", f);
-    println!("{}", cpp.json_or());
-}
+//
+// #[ignore]
+// #[tokio::test]
+// async fn debug_fulfill() {
+//     let nc = NodeConfig::default_env(NetworkEnvironment::Dev).await;
+//     let pev = nc.api_rg_client().party_data().await.unwrap().into_values().next().unwrap().party_events.unwrap();
+//     let cpp = pev.central_prices.get(&SupportedCurrency::Ethereum).unwrap();
+//     let f = cpp.dummy_fulfill(16500000 as u64, false, &nc.network, SupportedCurrency::Ethereum);
+//     println!("{}", f);
+//     println!("{}", cpp.json_or());
+// }

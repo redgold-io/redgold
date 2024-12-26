@@ -43,3 +43,5 @@ yarn.lock
 __pycache__
 /keys/testdb
 redgold.app
+.DS_Store
+/test-parquet-export

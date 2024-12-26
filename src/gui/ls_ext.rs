@@ -22,7 +22,6 @@ use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequest
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use crate::gui::components::swap::SwapStage;
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
 use redgold_gui::tab::home::HomeState;
 use redgold_schema::party::party_internal_data::PartyInternalData;
