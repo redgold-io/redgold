@@ -7,6 +7,7 @@ use redgold_keys::KeyPair;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
@@ -43,12 +44,12 @@ pub async fn run_daily_e2e(nc: &Box<NodeConfig>) -> RgResult<()> {
     info!("Send txid for eth {result}");
     // 60 seconds, 10 times
     let b = party_harness.balance(true).await.unwrap();
-    info!("Balance: {b}");
+    info!("Balance: {}", b.json_or());
     retry!(party_harness.verify_balance_increased(), 60, 20)?;
 
     let self_pk = &kp.public_key();
     let eth_start_bal = w.get_balance(self_pk).await?;
-    info!("Starting eth balance: {eth_start_bal}");
+    info!("Starting eth balance: {}", eth_start_bal.json_or());
     party_harness.rdg_to_eth_swap().await.unwrap();
     retry!(async {
         let bal = w.get_balance(self_pk).await.unwrap();
