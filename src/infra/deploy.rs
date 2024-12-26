@@ -169,7 +169,7 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
     // TODO: Also wget from github directly depending on security concerns -- not verified from checksum hash
     // Only should be done to override if the given exe is outdated.
     ssh.exes(format!("mkdir -p {}", path), p).await?;
-    let mut compose_str = r.redgold_docker_compose;
+    let compose_str = r.redgold_docker_compose;
     let port = network.default_port_offset();
 
     let all_open_ports = vec![-1, 0, 1, 4, 5, 6].iter().map(|p| ((port as i64) + p) as u16)
@@ -779,7 +779,7 @@ pub async fn default_deploy(
         let ssh = DeployMachine::new(ss, None, output_handler.clone());
         if !deploy.skip_redgold_process {
 
-            let mut this_hm = hm.clone();
+            let this_hm = hm.clone();
 
             if ss.host == "".to_string() {
                 let ssh_local = LocalSSHLike::new(output_handler.clone());

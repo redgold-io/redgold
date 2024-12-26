@@ -130,7 +130,7 @@ impl LocalStateAddons for LocalState {
         // self.updates.sender.send(StateUpdate {
         //     update: Box::new(
         //         move |lss: &mut LocalState| {
-                    let mut m = StoredMnemonic {
+                    let m = StoredMnemonic {
                         name: name.clone(),
                         mnemonic: mnemonic.clone(),
                         passphrase: pass.clone(),
@@ -218,7 +218,7 @@ impl LocalStateAddons for LocalState {
 
     fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
         // TODO: Need to migrate WordsPass to schema for trait impls.
-        let mut string = self.keytab_state.derivation_path_xpub_input_account.derivation_path_valid_fallback();
+        let string = self.keytab_state.derivation_path_xpub_input_account.derivation_path_valid_fallback();
         let kp = self.wallet.hot_mnemonic().keypair_at(string).unwrap();
         let hex = kp.to_private_hex();
         TransactionSignInfo::PrivateKey(hex)

@@ -25,7 +25,7 @@ static INIT: Once = Once::new();
 
 pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
     // let logo = app.logo.clone();
-    let mut g = &mut app.gui_depends;
+    let g = &mut app.gui_depends;
     let local_state = &mut app.local_state;
 
     let check_config = g.get_config();

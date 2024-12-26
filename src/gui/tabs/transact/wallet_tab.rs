@@ -520,7 +520,7 @@ pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut Loca
             vec![XPubLikeRequestType::Hot]
         };
 
-        let mut hot_tsi = ls.hot_transaction_sign_info(g);
+        let hot_tsi = ls.hot_transaction_sign_info(g);
         proceed_from_pk(ui, ls, &pk, is_hot, g, d, &allowed, &hot_tsi, &ls.cold_transaction_sign_info(g));
     }
 

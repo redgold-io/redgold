@@ -233,7 +233,7 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
 
     async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
         let eth = self.eth_dummy_wallet().await?;
-        let mut tx = eth.create_transaction_typed(
+        let tx = eth.create_transaction_typed(
             &src, &dst, amount.clone(), None
         ).await?;
         let data = EthWalletWrapper::signing_data(&tx)?;
@@ -506,7 +506,7 @@ impl ExternalNetworkResources for MockExternalResources {
     async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
         let eth = self.inner.eth_dummy_wallet().await?;
         let dev_eth_addr = self.dev_ci_kp.public_key().to_ethereum_address_typed().unwrap();
-        let mut tx = eth.create_transaction_typed(
+        let tx = eth.create_transaction_typed(
             &dev_eth_addr, &dst, amount.clone(), None
         ).await?;
         let data = EthWalletWrapper::signing_data(&tx)?;
