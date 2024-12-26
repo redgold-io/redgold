@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::{env, thread};
 use std::sync::Arc;
 use std::thread::sleep;
-use std::time::Duration;
 
 use clap::Parser;
 use futures::stream::FuturesUnordered;
@@ -26,7 +25,7 @@ use redgold::util::cli::{commands, immediate_commands};
 use redgold::util::cli::load_config::{load_full_config, main_config};
 use redgold::util::runtimes::build_simple_runtime;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::{ErrorInfoContext, SafeOption};
 use redgold_schema::helpers::easy_json::{EasyJson, json_or};
 
 use redgold_schema::structs::ErrorInfo;
