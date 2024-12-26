@@ -1,67 +1,17 @@
-#name: Release Rollout
-#env:
-#  TOOLCHAIN: "stable"
-#  DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
-#
-#on:
-#  schedule:
-#    - cron: '0 0 * * *'  # Run every Saturday at 00:00 UTC
-#jobs:
-#  release-rollout:
-#    if: ${{ vars.DAILY_E2E == 'true' }}
-#    runs-on: ubuntu-latest-m
-#    timeout-minutes: 120
-#    steps:
-#      - uses: actions/checkout@v2
-#        with:
-#          fetch-depth: 0  # Fetch all history for all branches and tags
-#
-#      - name: Check out dev branch
-#        run: git checkout dev
-#
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: ${{ env.TOOLCHAIN }}
-#      - uses: Swatinem/rust-cache@v1
-#        with:
-#          cache-on-failure: true
-#      - name: Set branch variables
-#        run: |
-#          if [ "${{ github.event.schedule }}" == '0 0 * * 6' ]; then
-#            echo "SOURCE_BRANCH=dev" >> $GITHUB_ENV
-#            echo "DESTINATION_BRANCH=staging" >> $GITHUB_ENV
-#          elif [ "${{ github.event.schedule }}" == '0 0 * * 1' ]; then
-#            echo "SOURCE_BRANCH=staging" >> $GITHUB_ENV
-#            echo "DESTINATION_BRANCH=test" >> $GITHUB_ENV
-#          elif [ "${{ github.event.schedule }}" == '0 0 * * 3' ]; then
-#            echo "SOURCE_BRANCH=test" >> $GITHUB_ENV
-#            echo "DESTINATION_BRANCH=main" >> $GITHUB_ENV
-#          else
-#            echo "Unrecognized schedule"
-#            exit 1
-#          fi
-#
-#      - name: Check if current actions are passing
-#        run: |
-#          if ! gh run list --branch ${{env.SOURCE_BRANCH}} --status success --limit 1 | grep -q .; then
-#            echo "The most recent workflow run on the ${{env.SOURCE_BRANCH}} branch was not successful."
-#            exit 1
-#          fi
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#
-#      - name: Set git config
-#        run: |
-#          git config --local user.email "info@redgold.io"
-#          git config --local user.name "Redgold GitHub Action"
-#
-#      - name: Install test dependencies
-#        run: ./bin/install_build_deps.sh
-#      - run: ./bin/release_rollout.sh ${{env.SOURCE_BRANCH}} ${{env.DESTINATION_BRANCH}}
-#        env:
-#          DATABASE_URL: ${{ env.DATABASE_URL }}
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-#          REDGOLD_NETWORK: ${{ env.DESTINATION_BRANCH}}
-#          REDGOLD_TEST_WORDS: $${{ secrets.REDGOLD_TEST_WORDS }}
+name: Release Rollout
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run every day at 00:00 UTC
+jobs:
+  daily-e2e:
+    if: ${{ vars.DAILY_E2E == 'true' }}
+    runs-on: ubuntu-latest-m
+    timeout-minutes: 120
+    steps:
+      - name: Pull the latest binary
+        run: |
+          wget https://github.com/redgold-io/redgold/releases/download/release%2Fdev/redgold_linux;
+          chmod +x ./redgold_linux;
+          export REDGOLD_DEBUG_WORDS=${{ secrets.REDGOLD_TEST_WORDS }};
+          ./redgold_linux --network dev debug daily-test

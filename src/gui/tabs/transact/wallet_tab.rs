@@ -658,7 +658,7 @@ fn proceed_from_pk<G, E>(
             }
         }
         SendReceiveTabs::Home => {
-            let rows = d.recent_tx(Some(pk), None, false, None);
+            let rows = d.recent_tx(Some(pk), None, true, None, g);
             let mut tx_table = TransactionTable::default();
             tx_table.rows = rows;
             tx_table.full_view::<E>(ui, &g.get_network(), d, Some(pk));

@@ -12,7 +12,7 @@ impl RedgoldFs {
     }
 
     pub fn from_redgold_dir(root: PathBuf) -> Self {
-        Self { root: root.join("fs") }
+        Self { root: root.join("..") }
     }
 
 }

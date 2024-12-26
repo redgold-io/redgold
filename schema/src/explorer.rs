@@ -6,8 +6,9 @@ use crate::party::central_price::CentralPricePair;
 use crate::party::party_internal_data::PartyInternalData;
 use crate::party::price_volume::PriceVolume;
 use crate::{RgResult, SafeOption};
+use crate::party::party_events::AddressEventExtendedType;
 use crate::proto_serde::ProtoSerde;
-use crate::structs::{ErrorInfo, SupportedCurrency, Transaction};
+use crate::structs::{ErrorInfo, SupportedCurrency, Transaction, TransactionType};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct HashResponse {
@@ -16,6 +17,8 @@ pub struct HashResponse {
     pub timestamp: u64,
     pub transactions: Vec<String>,
 }
+
+
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct BriefTransaction {
@@ -29,7 +32,8 @@ pub struct BriefTransaction {
     pub is_test: bool,
     pub fee: i64,
     pub incoming: Option<bool>,
-    pub currency: Option<String>
+    pub currency: Option<String>,
+    pub address_event_type: Option<AddressEventExtendedType>
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -148,11 +152,6 @@ pub struct TransactionSwapInfo {
 #[derive(Serialize, Deserialize, EnumString)]
 enum AddressEventType {
     Internal, External
-}
-
-#[derive(Serialize, Deserialize, EnumString)]
-enum AddressEventExtendedType {
-    StakeDeposit, StakeWithdrawal, Swap
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -329,6 +328,24 @@ pub struct ExplorerPoolInfoResponse {
     pub threshold: f64,
 }
 
+
+pub fn check_address_event_type(tx: &Transaction) -> AddressEventExtendedType {
+
+    if tx.is_swap() {
+        AddressEventExtendedType::Swap
+    } else if tx.is_swap_fulfillment() {
+        return AddressEventExtendedType::SwapFulfillment;
+    } else if tx.stake_deposit_request().is_some() {
+        return AddressEventExtendedType::StakeDeposit;
+    } else if tx.stake_withdrawal_request().is_some() {
+        return AddressEventExtendedType::StakeWithdrawal;
+    } else if tx.is_outgoing() {
+        return AddressEventExtendedType::Send;
+    } else {
+        return AddressEventExtendedType::Receive;
+    }
+}
+
 // TODO Make trait implicit
 pub fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgResult<BriefTransaction> {
     let from_str = tx.first_input_address()
@@ -346,5 +363,6 @@ pub fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgR
         is_test: tx.is_test(),
         incoming: outgoing_from.map(|i| i != from_str),
         currency: Some(SupportedCurrency::Redgold.to_display_string()),
+        address_event_type: Some(check_address_event_type(tx)),
     })
 }

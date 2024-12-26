@@ -510,6 +510,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                     block_number: None,
                     price_usd: None,
                     fee: None,
+                    self_address: None
                 };
                 res.push(ett)
             }
@@ -625,6 +626,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                 block_number: None,
                 price_usd: None,
                 fee,
+                self_address: Some(self_addr),
             })
         } else {
             None

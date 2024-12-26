@@ -171,6 +171,7 @@ impl PartyTestHarness {
         Ok(())
     }
 
+    // TODO: Change this to use external wallet sender interface.
     pub async fn send_external(&self, amount: CurrencyAmount) {
         let not_mock = !self.is_mock();
         let currency = amount.currency_or();
@@ -195,6 +196,7 @@ impl PartyTestHarness {
             block_number: Some(0),
             price_usd: None,
             fee: Some(PartyEvents::expected_fee_amount(currency, &self.network).expect("fee")),
+            self_address: None,
         };
 
         match currency {
@@ -391,6 +393,7 @@ impl PartyTestHarness {
     pub async fn swap_post_stake_test(&mut self) -> Result<(), ErrorInfo> {
         info!("Finished with staking, attempting to send swaps now");
         self.balance(true).await?;
+        info!("Sending BTC transaction now");
         self.send_external(Self::btc_swap_amount()).await;
         retry!(self.verify_balance_increased())?;
         retry!(async { self.verify_fulfillment_history(1).await })?;

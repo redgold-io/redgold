@@ -10,6 +10,8 @@ use crate::components::tx_progress::TransactionProgressFlow;
 use crate::data_query::data_query::DataQueryInfo;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix_and_suffix;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {
@@ -85,7 +87,6 @@ impl SwapState {
                 self.swap_valid = false;
                 return
             }
-
             self.swap_valid = self.currency_input_box.input_amount_value() > 0.0;
         }
 
@@ -122,43 +123,13 @@ impl SwapState {
                 }
             }
         });
-        // ui.separator();
-        let mut next_stage = SwapStage::ShowAmountsPromptSigning;;
-        let mut previous_stage = SwapStage::StartPreparing;;
-        let mut button_text = "Start Swap";
 
-        match self.stage {
-            SwapStage::StartPreparing => {
-                self.swap_details(ui,false, data, depends.get_network().clone());
-                // ui.heading("Lock Swap Details");
-                next_stage = SwapStage::ShowAmountsPromptSigning;
-                button_text = "Start Swap";
-            }
-            SwapStage::ShowAmountsPromptSigning => {
-                self.swap_details(ui,true, data, depends.get_network().clone());
-
-                // ui.heading("Swap Values Locked: Prepare to Sign");
-                next_stage = SwapStage::ViewSignedAllowBroadcast;
-                button_text = "Sign Transaction";
-            }
-            SwapStage::ViewSignedAllowBroadcast => {
-                self.swap_details(ui,true, data, depends.get_network().clone());
-                // ui.heading("Swap Signed: Prepare to Broadcast");
-                previous_stage = SwapStage::ShowAmountsPromptSigning;
-                next_stage = SwapStage::CompleteShowTrackProgress;
-                button_text = "Broadcast Transaction";
-            }
-            SwapStage::CompleteShowTrackProgress => {
-                self.swap_details(ui,true, data, depends.get_network().clone());
-                previous_stage = SwapStage::StartPreparing;
-                // ui.heading("Swap Complete");
-            }
-        }
+        let locked = self.tx_progress.locked();
+        self.swap_details(ui,locked, data, depends.get_network().clone());
 
         let ev = self.tx_progress.view(ui,depends, tsi, csi, allowed);
         if ev.next_stage_create {
             create_swap_tx_bool = true;
-            // create_swap_tx(ls);
         }
 
         ui.horizontal(|ui| {
@@ -171,9 +142,6 @@ impl SwapState {
             }
         });
 
-        if SwapStage::CompleteShowTrackProgress == self.stage {
-            ui.label("Track your swap progress on the party AMM explorer link above");
-        }
         create_swap_tx_bool
     }
 

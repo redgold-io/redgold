@@ -16,6 +16,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
+use redgold_schema::util::lang_util::{JsonCombineResult, SameResult};
 use crate::airgap::signer_window::{AirgapSignerWindow, AirgapWindowMode};
 use crate::common;
 use crate::common::{big_button, data_item, editable_text_input_copy};
@@ -70,7 +71,7 @@ pub enum TransactionStage {
     AwaitingSignatures,
     Signed,
     AwaitingBroadcastResponse,
-    Broadcast
+    BroadcastComplete
 }
 
 impl TransactionStage {
@@ -81,7 +82,7 @@ impl TransactionStage {
             TransactionStage::AwaitingSignatures => "Awaiting Signatures",
             TransactionStage::Signed => "Signed Transaction Details",
             TransactionStage::AwaitingBroadcastResponse => "Awaiting Broadcast Response",
-            TransactionStage::Broadcast => "Broadcast Transaction Response",
+            TransactionStage::BroadcastComplete => "Broadcast Transaction Response",
         };
         res.to_string()
     }
@@ -93,7 +94,7 @@ impl TransactionStage {
             TransactionStage::AwaitingSignatures => false,
             TransactionStage::Signed => true,
             TransactionStage::AwaitingBroadcastResponse => false,
-            TransactionStage::Broadcast => false,
+            TransactionStage::BroadcastComplete => false,
         }
     }
 }
@@ -296,8 +297,8 @@ impl TransactionProgressFlow {
         self.stage_err = err;
     }
 
-    pub fn broadcast(&mut self, prepared_transaction: Option<PreparedTransaction>, err: Option<String>) {
-        self.stage = TransactionStage::Broadcast;
+    pub fn broadcast_done(&mut self, prepared_transaction: Option<PreparedTransaction>, err: Option<String>) {
+        self.stage = TransactionStage::BroadcastComplete;
         if let Some(tx) = prepared_transaction {
             self.prepared_tx = Some(tx.clone());
             self.broadcast_info = tx.broadcast_response.clone();
@@ -332,7 +333,7 @@ impl TransactionProgressFlow {
                     box_text = &self.signed_info_box;
                     txid = &self.signed_hash_txid;
                 }
-                TransactionStage::Broadcast => {
+                TransactionStage::BroadcastComplete => {
                     box_text = &self.broadcast_info;
                     txid = &self.signed_hash_txid;
                 }
@@ -384,7 +385,7 @@ impl TransactionProgressFlow {
             TransactionStage::Signed => {
                 self.stage = TransactionStage::Created;
             }
-            TransactionStage::Broadcast => {
+            TransactionStage::BroadcastComplete => {
                 self.stage = TransactionStage::Signed;
             }
             TransactionStage::NotCreated => {}
@@ -402,6 +403,7 @@ impl TransactionProgressFlow {
             TransactionStage::NotCreated => {
                 self.stage = TransactionStage::Created;
                 self.awaiting_broadcast = false;
+                self.rdg_broadcast_response = Arc::new(Mutex::new(None));
             }
             TransactionStage::Created => {
                 let signing_info = match self.signing_method {
@@ -415,9 +417,9 @@ impl TransactionProgressFlow {
 
                 let (s, r) = flume::unbounded();
                 let res = g.clone().sign_prepared_transaction(option, s);
-                self.stage = TransactionStage::AwaitingSignatures;
                 self.receiver = Some(r);
                 self.stage = TransactionStage::AwaitingSignatures;
+                self.rdg_broadcast_response = Arc::new(Mutex::new(None));
             }
             TransactionStage::Signed => {
 
@@ -445,7 +447,7 @@ impl TransactionProgressFlow {
             TransactionStage::NotCreated => { "Create Transaction" }
             TransactionStage::Created => { "Sign Transaction" }
             TransactionStage::Signed => { "Broadcast Transaction" }
-            TransactionStage::Broadcast => { "Complete" }
+            TransactionStage::BroadcastComplete => { "Complete" }
             _ => {""}
         };
         ret.unwrap_or(default.to_string())
@@ -496,16 +498,17 @@ impl TransactionProgressFlow {
         }
         // todo: receiver here.
         if self.stage == TransactionStage::AwaitingBroadcastResponse {
-            // if self.awaiting_broadcast {
-            //     if let Ok(mut r) = self.rdg_broadcast_response.lock() {
-            //         if r.is_some() {
-            //             let res = r.as_ref().unwrap();
-            //             self.broadcast_info = res.json_or();
-            //             self.stage = TransactionStage::Broadcast;
-            //             *r = None;
-            //         }
-            //     }
-            // }
+            if self.awaiting_broadcast {
+                if let Ok(mut r) = self.rdg_broadcast_response.lock() {
+                    if r.is_some() {
+                        let res = r.as_ref().unwrap();
+                        self.broadcast_info = res.as_ref().map_err(|j| j.json_or()).cloned().combine();
+                        self.stage = TransactionStage::BroadcastComplete;
+                        self.awaiting_broadcast = false;
+                        *r = None;
+                    }
+                }
+            }
         }
 
         self.info_box_view_inner(ui, allowed);
@@ -526,7 +529,7 @@ impl TransactionProgressFlow {
                 event.next_stage_transition_from = Some(self.stage.clone());
                 let res = r.as_ref().unwrap();
                 self.broadcast_info = res.json_or();
-                self.stage = TransactionStage::Broadcast;
+                self.stage = TransactionStage::BroadcastComplete;
                 *r = None;
             }
         }
@@ -542,7 +545,7 @@ impl TransactionProgressFlow {
                 self.reset();
             };
             if self.stage != TransactionStage::NotCreated {
-                if self.stage != TransactionStage::Broadcast {
+                if self.stage != TransactionStage::BroadcastComplete {
                     let back = big_button(ui, "Back");
                     if back {
                         self.back();
@@ -550,7 +553,7 @@ impl TransactionProgressFlow {
                 }
             }
 
-            if self.stage != TransactionStage::Broadcast && self.stage_err.is_none() {
+            if self.stage != TransactionStage::BroadcastComplete && self.stage_err.is_none() && self.stage != TransactionStage::AwaitingBroadcastResponse {
                 let changed = big_button(ui, self.stage_proceed_next_text());
                 if changed {
                     if self.stage == TransactionStage::NotCreated {

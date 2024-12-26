@@ -1,4 +1,8 @@
+use log::info;
+use redgold_common_no_wasm::retry;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
@@ -30,10 +34,35 @@ pub async fn run_daily_e2e(nc: &Box<NodeConfig>) -> RgResult<()> {
     let pev = party.clone().party_events.ok_msg("No party events")?;
     let cpe = pev.central_prices.get(&SupportedCurrency::Ethereum).ok_msg("No eth price")?;
 
+
+    let w = EthWalletWrapper::new(&private, &nc.network).expect("wallet");
     let mut party_harness = PartyTestHarness::from(
         &nc, kp, vec![], Some(api.clone()), vec![]).await;
 
-    party_harness.swap_post_stake_test().await?;
+    let result = w.send(&party_key.to_ethereum_address_typed().unwrap(), &CurrencyAmount::from_eth_fractional(0.00028914f64)).await.unwrap();
+    info!("Send txid for eth {result}");
+    // 60 seconds, 10 times
+    let b = party_harness.balance(true).await.unwrap();
+    info!("Balance: {b}");
+    retry!(party_harness.verify_balance_increased(), 60, 20)?;
+
+    let self_pk = &kp.public_key();
+    let eth_start_bal = w.get_balance(self_pk).await?;
+    info!("Starting eth balance: {eth_start_bal}");
+    party_harness.rdg_to_eth_swap().await.unwrap();
+    retry!(async {
+        let bal = w.get_balance(self_pk).await.unwrap();
+        if bal > eth_start_bal {
+            Ok(())
+        } else {
+            Err("Balance not increased")
+        }
+    }, 60, 20).expect("Balance not increased");
+    info!("test succeeded");
+    // PartyTestHarness::eth_swap_amount()
+    // w.send(&party_addr, &CurrencyAmount::from_fractional(0.01)).await?;
+
+    // party_harness.swap_post_stake_test().await?;
     // tb.with_swap(&party_addr, &CurrencyAmount::from_fractional(0.01))
 
     Ok(())
