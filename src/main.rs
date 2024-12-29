@@ -18,7 +18,7 @@ use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
 use redgold::util::cli::commands;
 use redgold::util::cli::load_config::main_config;
-use redgold::util::runtimes::build_simple_runtime;
+use redgold::util::runtimes::{big_thread, build_simple_runtime};
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::{ErrorInfoContext, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -128,11 +128,6 @@ fn main() {
     }).unwrap().join().unwrap();
 
 
-}
-
-fn big_thread() -> std::thread::Builder {
-    thread::Builder::new()
-        .stack_size(512 * 1024 * 1024)
 }
 
 async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends> {

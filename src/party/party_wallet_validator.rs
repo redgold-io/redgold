@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::database::BatchDatabase;
 use itertools::Itertools;
@@ -9,8 +10,10 @@ use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
+use crate::core::relay::Relay;
 use crate::party::party_stream::PartyEventBuilder;
 
+#[async_trait]
 pub trait PartyWalletMethods {
     fn validate_btc_fulfillment<D: BatchDatabase>(
         &self,
@@ -18,9 +21,10 @@ pub trait PartyWalletMethods {
         signing_data: Vec<u8>,
         w: &mut SingleKeyBitcoinWallet<D>
     ) -> RgResult<()>;
-    fn validate_eth_fulfillment(&self, typed_tx_payload: String, signing_data: Vec<u8>) -> RgResult<()>;
+    async fn validate_eth_fulfillment(&self, typed_tx_payload: String, signing_data: Vec<u8>, r: &Relay) -> RgResult<()>;
 }
 
+#[async_trait]
 impl PartyWalletMethods for PartyEvents {
     fn validate_btc_fulfillment<D: BatchDatabase>(
         &self,
@@ -74,13 +78,15 @@ impl PartyWalletMethods for PartyEvents {
     }
 
 
-    fn validate_eth_fulfillment(&self, typed_tx_payload: String, signing_data: Vec<u8>) -> RgResult<()> {
+    async fn validate_eth_fulfillment(&self, typed_tx_payload: String, signing_data: Vec<u8>, r: &Relay) -> RgResult<()> {
         let fulfills = self.fulfillment_orders(SupportedCurrency::Ethereum)
             .into_iter()
             .map(|o| {
                 (o.destination.clone(), o.fulfilled_currency_amount())
             }).collect_vec();
-        EthWalletWrapper::validate_eth_fulfillment(fulfills, &typed_tx_payload, &signing_data, &self.network)?;
+        let w = r.eth_wallet()?;
+        EthWalletWrapper::validate_eth_fulfillment(fulfills, &typed_tx_payload, &signing_data, &self.network, &w).await?;
+
         Ok(())
     }
 

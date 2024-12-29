@@ -8,3 +8,4 @@ pub mod deploy;
 pub mod transact;
 pub mod portfolio;
 pub mod address_tab;
+pub mod settings_tab;

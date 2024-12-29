@@ -107,7 +107,7 @@ impl LocalStateAddons for LocalState {
             Tab::Deploy => {}
             Tab::Ratings => {}
             Tab::Settings => {
-                self.settings_state.lss_serialized = self.local_stored_state.json_or();
+                self.settings_state.local_ser_config = self.local_stored_state.json_or();
             }
             _ => {}
         }
@@ -301,7 +301,7 @@ use redgold_gui::tab::keys::keygen::KeygenState;
 use redgold_gui::tab::portfolio::port_view::PortfolioTabState;
 use redgold_gui::tab::transact::swap::SwapState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
-use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
+use redgold_gui::tab::settings_tab::{SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{wallet_screen, StateUpdate, WalletState};
 use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};

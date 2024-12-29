@@ -27,7 +27,7 @@ use redgold_gui::tab::home::HomeState;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::tabs::identity_tab::IdentityState;
 use redgold_gui::tab::keys::keygen::KeygenState;
-use crate::gui::tabs::settings_tab::SettingsState;
+use redgold_gui::tab::settings_tab::SettingsState;
 use crate::gui::tabs::transact::wallet_tab::{StateUpdate, WalletState};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
@@ -70,10 +70,8 @@ where G: Send + Clone + GuiDepends {
         qr_state: Default::default(),
         qr_show_state: Default::default(),
         identity_state: IdentityState::new(),
-        settings_state: SettingsState::new(local_stored_state.json_or(),
-                                           node_config.data_folder.clone().path.parent().unwrap().to_str().unwrap().to_string(),
-                                           node_config.secure_data_folder.clone().unwrap_or(node_config.data_folder.clone())
-                                               .path.parent().unwrap().to_str().unwrap().to_string()
+        settings_state: SettingsState::new(
+            &node_config.config_data
         ),
         address_state: Default::default(),
         otp_state: Default::default(),

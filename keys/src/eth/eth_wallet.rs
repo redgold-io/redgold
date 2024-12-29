@@ -138,7 +138,9 @@ impl EthWalletWrapper {
         if value.currency_or() != SupportedCurrency::Ethereum {
             return Err(error_info("Currency must be Ethereum"));
         }
-        let fee_gas_price = fee_gas_price.unwrap_or(CurrencyAmount::gas_price_fixed_normal_by_env(&self.network));
+        // let gas_price_estimate = self.get_gas_price().await?;
+        let gas_price_estimate = CurrencyAmount::gas_price_fixed_normal_by_env(&self.network);
+        let fee_gas_price = fee_gas_price.unwrap_or(gas_price_estimate);
         let big_value = value.bigint_amount().ok_msg("CurrencyAmount bigint amount missing")?;
         // let big_value = EthHistoricalClient::translate_value_bigint(value as i64)?;
         // U256::from_dec_str()
@@ -153,6 +155,7 @@ impl EthWalletWrapper {
         tx.set_gas_price(gas_price_u256);
         // tx.gas_price()
         // tx.set_gas()
+        // Set a reasonable gas limit - 21000 is standard for basic ETH transfers
 
         tx.set_chain_id(self.wallet.chain_id());
         tx.set_from(from_address);
@@ -160,6 +163,11 @@ impl EthWalletWrapper {
         let nonce = maybe(tx.nonce().cloned(), self.client.get_transaction_count(from_address, None)).await
             .error_info("nonce get failure")?;
         tx.set_nonce(nonce);
+
+        tx.set_gas(U256::from(21000));  // or higher if needed, maybe 30000 to be safe
+        // this doesn't work if the wallet is empty...
+        // let gas_estimate = self.provider.estimate_gas(&tx, None).await.error_info("gas estimation failed")?;
+        // tx.set_gas(gas_estimate);
 
         self.provider.fill_transaction(&mut tx, None).await
             .error_info("tx fill failure")
@@ -231,8 +239,8 @@ impl EthWalletWrapper {
             Ok(_o) => {
                 Ok(())
             }
-            Err(_e) => {
-                Err(error_info(format!("tx send failure {}", "error")))
+            Err(e) => {
+                Err(error_info(format!("tx send failure {}", e.to_string())))
             }
         }
     }

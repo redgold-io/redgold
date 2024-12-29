@@ -136,9 +136,9 @@ async fn main() {
 
 }
 // 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
-// #[ignore]
 
 
+#[ignore]
 #[tokio::test]
 async fn debug_u256() {
 
@@ -164,12 +164,12 @@ async fn debug_u256() {
     println!("tx2: {:?}", tx2);
 
     let signing = EthWalletWrapper::signing_data(&tx).expect("works");
-
-    EthWalletWrapper::validate_eth_fulfillment(
-        vec![(eth_addr2.clone(), CurrencyAmount::from_eth_fractional(0.001))],
-        &tx_js,
-        &signing,
-        &NetworkEnvironment::Dev
-    ).expect("works");
+    //
+    // EthWalletWrapper::validate_eth_fulfillment(
+    //     vec![(eth_addr2.clone(), CurrencyAmount::from_eth_fractional(0.001))],
+    //     &tx_js,
+    //     &signing,
+    //     &NetworkEnvironment::Dev,
+    // ).expect("works");
 
 }

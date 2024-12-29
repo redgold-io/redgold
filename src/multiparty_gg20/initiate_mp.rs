@@ -550,7 +550,7 @@ pub async fn initiate_mp_keysign_follower(
     let signing_bytes = mp_req.data_to_sign.clone().safe_get()?.clone().value;
 
     if let Some(pk) = &party_info.party_key {
-        if party_info.not_debug() {
+        if party_info.not_debug() && relay.node_config.network.is_main_stage_network() {
             let validate = mp_req.party_signing_validation.safe_get_msg("No party signing validation")?.clone();
             let value = relay.external_network_shared_data.read().await;
             let data = value.get(pk).ok_or(error_info("No party key data found"))?;

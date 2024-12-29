@@ -3,6 +3,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use flume::{Receiver, Sender};
 use futures::future::join_all;
+use itertools::all;
 use rand::Rng;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
@@ -91,20 +92,25 @@ impl GuiDepends for NativeGuiDepends {
         (*self.nc().config_data).clone()
     }
 
-    fn set_config(&mut self, config: &ConfigData) {
+    fn set_config(&mut self, config: &ConfigData, allow_overwrite_all: bool) {
         let mut config = config.clone();
-        config.network = None;
-        config.home = None;
-        config.config = None;
+        if !allow_overwrite_all {
+            config.network = None;
+            config.home = None;
+            config.config = None;
+        }
         let l = config.local.get_or_insert(Default::default());
         let k = l.keys.get_or_insert(Default::default());
         k.retain(|k| k.skip_persist.map(|x| !x).unwrap_or(true));
         l.mnemonics.as_mut().map(|m| {
             m.retain(|m| m.persist_disk.map(|x| x).unwrap_or(true));
         });
-        config.node.get_or_insert(Default::default()).words = None;
-        let sec = config.secure.get_or_insert(Default::default());
-        sec.path = None;
+
+        if !allow_overwrite_all {
+            config.node.get_or_insert(Default::default()).words = None;
+            let sec = config.secure.get_or_insert(Default::default());
+            sec.path = None;
+        }
         let mut nc = self.nc();
         nc.config_data = Arc::new(config.clone());
         self.nc = Arc::new(Mutex::new(nc));

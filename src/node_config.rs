@@ -22,6 +22,7 @@ use redgold_schema::util::lang_util::{AnyPrinter, JsonCombineResult};
 use crate::api::client::public_client::PublicClient;
 use crate::api::client::rest::RgHttpClient;
 use crate::util::cli::arg_parse_config::ArgTranslate;
+use crate::util::cli::load_config::load_full_config;
 //
 // impl Default for GenesisConfig {
 //     fn default() -> Self {
@@ -70,6 +71,7 @@ impl ApiNodeConfig for NodeConfig {
 pub trait EnvDefaultNodeConfig {
     async fn dev_default() -> Self;
     async fn default_env(network_environment: NetworkEnvironment) -> Self;
+    async fn by_env_with_args(env: NetworkEnvironment) -> NodeConfig;
 }
 
 pub trait ToTransactionBuilder {
@@ -94,6 +96,17 @@ impl EnvDefaultNodeConfig for NodeConfig {
         let mut nc = arg_translate.translate_args().await.unwrap();
         nc.network = network_environment.clone();
         *nc
+    }
+
+    async fn by_env_with_args(env: NetworkEnvironment) -> NodeConfig {
+        let mut nc = NodeConfig::default_env(env).await;
+        let (mut opts, mut cd) = load_full_config(true);
+        cd.network = Some(env.to_std_string());
+        nc.config_data = Arc::new(*cd.clone());
+        let arg_translate = ArgTranslate::new(Box::new(nc.clone()), &opts);
+        let mut nc = arg_translate.translate_args().await.unwrap();
+        let mut nc = (*nc.clone());
+        nc
     }
 
 }

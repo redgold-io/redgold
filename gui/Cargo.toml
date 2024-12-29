@@ -31,6 +31,7 @@ qrencode = { workspace = true }
 csscolorparser = { workspace = true }
 either = "1.12.0"
 itertools = "0.10.5"
+toml = "0.8.19"
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]

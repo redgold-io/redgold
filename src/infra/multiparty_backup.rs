@@ -1,5 +1,7 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
+use bdk::bitcoin::Network;
 use tracing::info;
 use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
@@ -7,12 +9,16 @@ use redgold_schema::{ErrorInfoContext, from_hex, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
-use redgold_schema::structs::{InitiateMultipartyKeygenRequest, PartyInfo, PublicKey};
+use redgold_schema::structs::{Hash, InitiateMultipartyKeygenRequest, NetworkEnvironment, PartyInfo, PublicKey};
 use crate::core::relay::Relay;
 use redgold_common_no_wasm::ssh_like::DeployMachine;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::util::lang_util::WithMaxLengthString;
+use crate::node_config::EnvDefaultNodeConfig;
 use crate::util;
+use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::commands::log_handler;
+use crate::util::cli::load_config::{load_config, load_full_config, main_config};
 
 pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
 
@@ -25,6 +31,7 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
 
 
     for s in p1 {
+
         let server_dir = time_back.join(s.index.to_string());
         std::fs::create_dir_all(server_dir.clone()).expect("");
         let mut ssh = DeployMachine::new(&s, None, None);
@@ -36,17 +43,19 @@ pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<Serve
             net_str,
             fnm_export
         );
-        info!(" backup cmd Running command: {}", cmd);
+        info!(" backup cmd Running command: {} on {} for server: {}", cmd, net_str.clone(), s.host.clone());
         ssh.exes("sudo apt install -y sqlite3", &output_handler).await.expect("");
         ssh.exes(cmd, &output_handler).await.expect("");
         tokio::time::sleep(Duration::from_secs(1)).await;
         let user = s.username.unwrap_or("root".to_string());
+        let backup_cmd = format!(
+            "scp {}@{}:~/.rg/{}/{} {}",
+            user, s.host.clone(), net_str, fnm_export, fnm_export);
+        info!(" backup cmd Running command: {}", backup_cmd);
         let res = redgold_common_no_wasm::cmd::run_bash_async(
-            format!(
-                "scp {}@{}:~/.rg/{}/{} {}",
-                user, s.host.clone(), net_str, fnm_export, fnm_export)
+            backup_cmd
         ).await.expect("");
-        println!("Backup result: {:?}", res);
+        info!("Backup result: {:?}", res);
         let contents = std::fs::read_to_string(fnm_export).expect("");
         std::fs::remove_file(fnm_export).ok();
         std::fs::write(server_dir.join(fnm_export), contents).expect("");
@@ -101,10 +110,13 @@ pub(crate) async fn restore_multiparty_share(p0: NodeConfig, server: ServerOldFo
     Ok(())
 }
 
-async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<Option<PathBuf>> {
+pub(crate) async fn get_backup_latest_path(p0: NodeConfig) -> RgResult<Option<PathBuf>> {
     let secure_or = p0.secure_or().by_env(p0.network);
+
+    println!("Secure or: {:?}", secure_or);
     let bk = secure_or.backups();
 
+    println!("Backup path: {:?}", bk);
     // List bk directory and select the latest
 
     // Read the directory entries
@@ -173,17 +185,31 @@ pub async fn debug_fix_server() {
 #[ignore]
 #[tokio::test]
 pub async fn manual_parse_test() {
-    let r = Relay::dev_default().await;
 
-    let latest = get_backup_latest_path(r.node_config.clone()).await.expect("latest").expect("latest");
-    let mp_csv = latest.join("4");
-    let mp_csv = mp_csv.join("multiparty.csv");
+    let mut nc = NodeConfig::default_env(NetworkEnvironment::Main).await;
+    let (mut opts, mut cd) = load_full_config(true);
+    cd.network = Some("main".to_string());
+    nc.config_data = Arc::new(*cd.clone());
+    let arg_translate = ArgTranslate::new(Box::new(nc.clone()), &opts);
+    let mut nc = arg_translate.translate_args().await.unwrap();
+    let mut nc = (*nc.clone());
 
-    println!("Reading multiparty csv: {:?}", mp_csv);
-    let raw = tokio::fs::read_to_string(mp_csv).await.expect("read mp csv");
+    let latest = get_backup_latest_path(nc.clone()).await.expect("latest").expect("latest");
+    println!("Latest backup: {:?}", latest.clone());
 
-    let result = parse_mp_csv(raw);
-    for row in result.expect("parsed") {
-        println!("Parsed row: {:?}", row);
+    for i in 0..8 {
+        let mp_csv = latest.join(i.to_string());
+        let mp_csv = mp_csv.join("multiparty.csv");
+        println!("Reading multiparty csv: {:?}", mp_csv);
+
+        let raw = tokio::fs::read_to_string(mp_csv).await.expect("read mp csv");
+
+        let result = parse_mp_csv(raw);
+        for row in result.expect("parsed") {
+            let h = Hash::digest(row.clone().proto_serialize()).checksum_hex();
+            // let local_keyhash = row.local_key_share.unwrap().proto_serialize_hex();
+            let pk = row.party_key.unwrap().proto_serialize_hex().last_n(10);
+            println!("pk {} local {}", pk, h);
+        }
     }
 }
