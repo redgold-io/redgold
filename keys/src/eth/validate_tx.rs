@@ -58,7 +58,7 @@ impl EthWalletWrapper {
             return Err(error_info("signing data does not match transaction"));
         }
 
-        let fee_est = w.get_gas_cost_estimate(&tx).await?;
+        let fee_est = CurrencyAmount::fee_fixed_normal_by_env(network);
         let act_gas = tx.gas().ok_msg("gas missing")?;
         let act_gas_cost = tx.gas_price().ok_msg("gas price missing")?;
         let act_fee = act_gas * act_gas_cost;
