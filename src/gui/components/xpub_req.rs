@@ -94,7 +94,7 @@ impl RequestXpubState {
                             }
                         });
 
-                    self.derivation_path.view(ui, g.clone());
+                    self.derivation_path.view(ui, g);
 
                     if request_type == XPubLikeRequestType::Cold {
 

@@ -62,7 +62,7 @@ impl TxSignerProgress for PreparedTransaction {
                     TransactionSignInfo::ColdOrAirgap(h) => {
                         let msg = AirgapMessage::sign(h.path.clone(), tx.clone());
                         let mut transport = AirgapTransport::default();
-                        let mut await_airgap = false;
+                        let await_airgap = false;
                         match &self.signing_method {
                             XPubLikeRequestType::Cold => {
                                 let tx = external_resources.trezor_sign(
@@ -127,7 +127,7 @@ impl TxBroadcastProgress for PreparedTransaction {
         let mut updated = self.clone();
         match self.currency.clone() {
             SupportedCurrency::Redgold => {
-                let mut tx = self.tx.safe_get_msg("Missing transaction")?.clone();
+                let tx = self.tx.safe_get_msg("Missing transaction")?.clone();
                 updated.broadcast_response = tx.broadcast().await.json_or();
             }
             SupportedCurrency::Bitcoin => {

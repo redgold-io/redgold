@@ -107,7 +107,7 @@ impl LocalStateAddons for LocalState {
             Tab::Deploy => {}
             Tab::Ratings => {}
             Tab::Settings => {
-                self.settings_state.lss_serialized = self.local_stored_state.json_or();
+                self.settings_state.local_ser_config = self.local_stored_state.json_or();
             }
             _ => {}
         }
@@ -130,7 +130,7 @@ impl LocalStateAddons for LocalState {
         // self.updates.sender.send(StateUpdate {
         //     update: Box::new(
         //         move |lss: &mut LocalState| {
-                    let mut m = StoredMnemonic {
+                    let m = StoredMnemonic {
                         name: name.clone(),
                         mnemonic: mnemonic.clone(),
                         passphrase: pass.clone(),
@@ -218,7 +218,7 @@ impl LocalStateAddons for LocalState {
 
     fn hot_transaction_sign_info<G>(&self, g: &G) -> TransactionSignInfo {
         // TODO: Need to migrate WordsPass to schema for trait impls.
-        let mut string = self.keytab_state.derivation_path_xpub_input_account.derivation_path_valid_fallback();
+        let string = self.keytab_state.derivation_path_xpub_input_account.derivation_path_valid_fallback();
         let kp = self.wallet.hot_mnemonic().keypair_at(string).unwrap();
         let hex = kp.to_private_hex();
         TransactionSignInfo::PrivateKey(hex)
@@ -301,7 +301,7 @@ use redgold_gui::tab::keys::keygen::KeygenState;
 use redgold_gui::tab::portfolio::port_view::PortfolioTabState;
 use redgold_gui::tab::transact::swap::SwapState;
 use crate::gui::tabs::keys::keys_tab::{keys_tab, KeyTabState};
-use crate::gui::tabs::settings_tab::{settings_tab, SettingsState};
+use redgold_gui::tab::settings_tab::{SettingsState};
 use crate::gui::tabs::transact::hot_wallet::init_state;
 use crate::gui::tabs::transact::wallet_tab::{wallet_screen, StateUpdate, WalletState};
 use crate::gui::qr_window::{qr_show_window, qr_window, QrShowState, QrState};

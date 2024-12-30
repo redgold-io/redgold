@@ -12,7 +12,7 @@ impl PartyTestHarness {
 
 
     pub async fn create_portfolio(&self) {
-        let mut weights = vec![
+        let weights = vec![
             (SupportedCurrency::Bitcoin, 0.5),
             (SupportedCurrency::Ethereum, 0.5)
         ];

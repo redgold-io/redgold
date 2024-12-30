@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::thread;
 use tokio::runtime::{Builder, Runtime};
 
 pub fn build_runtime(threads: usize, name: impl Into<String>) -> Arc<Runtime> {
@@ -16,4 +17,9 @@ pub fn build_simple_runtime(threads: usize, name: impl Into<String> + Sized) -> 
         .enable_time()
         .build()
         .unwrap()
+}
+
+pub fn big_thread() -> std::thread::Builder {
+    thread::Builder::new()
+        .stack_size(512 * 1024 * 1024)
 }

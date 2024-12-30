@@ -1,46 +1,38 @@
 use std::collections::HashMap;
-use std::{env, thread};
+use std::thread;
 use std::sync::Arc;
-use std::thread::sleep;
-use std::time::Duration;
 
-use clap::Parser;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use itertools::Itertools;
 use tracing::{error, info};
-use metrics::{counter, gauge};
-use tokio::runtime::Builder;
+use metrics::gauge;
 use tokio::sync::Mutex;
 use redgold::core::relay::Relay;
-use redgold::gui;
 use redgold::gui::ClientApp;
 use redgold::gui::initialize::start_native_gui;
 use redgold::gui::ls_ext::local_state_from;
 use redgold::gui::native_gui_dependencies::NativeGuiDepends;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
-use redgold::node_config::ApiNodeConfig;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
-use redgold::util::cli::{commands, immediate_commands};
-use redgold::util::cli::load_config::{load_full_config, main_config};
-use redgold::util::runtimes::build_simple_runtime;
+use redgold::util::cli::commands;
+use redgold::util::cli::load_config::main_config;
+use redgold::util::runtimes::{big_thread, build_simple_runtime};
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::{EasyJson, json_or};
+use redgold_schema::{ErrorInfoContext, SafeOption};
+use redgold_schema::helpers::easy_json::EasyJson;
 
-use redgold_schema::structs::ErrorInfo;
 
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::conf::rg_args::{RgArgs, RgTopLevelSubcommand};
+use redgold_schema::conf::rg_args::RgTopLevelSubcommand;
 use redgold_schema::config_data::ConfigData;
-use redgold_schema::observability::errors::Loggable;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
     let (nc, opts) = main_config();
     // println!("loaded main config");
     let cmd = opts.subcmd.as_ref().map(|x| Box::new(x.clone()));
-    let mut arg_translate = Box::new(ArgTranslate::new(nc, &opts));
+    let arg_translate = Box::new(ArgTranslate::new(nc, &opts));
     let nc = arg_translate.translate_args().await.expect("arg translation");
     // println!("translated args");
     // info!("Loaded config: {}", nc.config_data.json_or());
@@ -136,11 +128,6 @@ fn main() {
     }).unwrap().join().unwrap();
 
 
-}
-
-fn big_thread() -> std::thread::Builder {
-    thread::Builder::new()
-        .stack_size(512 * 1024 * 1024)
 }
 
 async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends> {

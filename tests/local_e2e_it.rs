@@ -1,4 +1,3 @@
-use log::info;
 use rocket::form::validate::Len;
 
 use redgold::api::client::public_client::PublicClient;
@@ -6,11 +5,8 @@ use redgold::api::client::public_client::PublicClient;
 use redgold::e2e::tx_submit::TransactionSubmitter;
 use redgold::node_config::EnvDefaultNodeConfig;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold::test::harness::amm_harness::PartyTestHarness;
 use redgold::util;
-use redgold_keys::eth::example::dev_ci_kp;
 use redgold_schema::{SafeOption};
-use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
 
 

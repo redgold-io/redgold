@@ -22,11 +22,12 @@ impl EthWalletWrapper {
         Ok(res)
     }
 
-    pub fn validate_eth_fulfillment(
+    pub async fn validate_eth_fulfillment(
         fulfills: Vec<(structs::Address, CurrencyAmount)>,
         typed_tx_payload: &String,
         signing_data: &Vec<u8>,
-        network: &NetworkEnvironment
+        network: &NetworkEnvironment,
+        w: &EthWalletWrapper
     ) -> RgResult<()> {
         let mut tx = typed_tx_payload.json_from::<TypedTransaction>()?;
         tx.set_chain_id(EthHistoricalClient::chain_id(&network).id());
@@ -55,6 +56,17 @@ impl EthWalletWrapper {
         let signing = Self::signing_data(&tx)?;
         if signing != *signing_data && network.is_main_stage_network() {
             return Err(error_info("signing data does not match transaction"));
+        }
+
+        let fee_est = w.get_gas_cost_estimate(&tx).await?;
+        let act_gas = tx.gas().ok_msg("gas missing")?;
+        let act_gas_cost = tx.gas_price().ok_msg("gas price missing")?;
+        let act_fee = act_gas * act_gas_cost;
+        let act_fee_ca = CurrencyAmount::from_eth_bigint_string(act_fee.to_string());
+        if act_fee_ca > fee_est.clone()*10 {
+            return Err(error_info("fee estimate does not match transaction"))
+                .with_detail("fee_estimate", fee_est.json_or())
+                .with_detail("act_fee", act_fee_ca.json_or());
         }
 
         Ok(())

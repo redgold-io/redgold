@@ -148,7 +148,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     config2.load_balancer_url = string;
     let vec = local_nodes.ext.clone();
 
-    let mut party_harness = PartyTestHarness::from(
+    let party_harness = PartyTestHarness::from(
         &config2, kp, vec![vec], Some(client.client_wrapper()), vec![]).await;
 
     let address = party_harness.self_rdg_address();

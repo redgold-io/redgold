@@ -231,10 +231,10 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         Ok(EncodedTransactionPayload::JsonPayload(w.psbt.json_or()))
     }
 
-    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
+    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount, override_gas: Option<CurrencyAmount>) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
         let eth = self.eth_dummy_wallet().await?;
-        let mut tx = eth.create_transaction_typed(
-            &src, &dst, amount.clone(), None
+        let tx = eth.create_transaction_typed(
+            &src, &dst, amount.clone(), override_gas
         ).await?;
         let data = EthWalletWrapper::signing_data(&tx)?;
         let tx_ser = tx.json_or();
@@ -503,11 +503,11 @@ impl ExternalNetworkResources for MockExternalResources {
         self.inner.btc_add_signatures(&pk, psbt, results, hashes).await
     }
 
-    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
+    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount, override_gas: Option<CurrencyAmount>) -> RgResult<(Vec<u8>, PartySigningValidation, String)> {
         let eth = self.inner.eth_dummy_wallet().await?;
         let dev_eth_addr = self.dev_ci_kp.public_key().to_ethereum_address_typed().unwrap();
-        let mut tx = eth.create_transaction_typed(
-            &dev_eth_addr, &dst, amount.clone(), None
+        let tx = eth.create_transaction_typed(
+            &dev_eth_addr, &dst, amount.clone(), override_gas
         ).await?;
         let data = EthWalletWrapper::signing_data(&tx)?;
         let tx_ser = tx.json_or();

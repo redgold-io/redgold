@@ -68,7 +68,7 @@ pub trait GuiDepends {
     fn config_df_path_label(&self) -> Option<String>;
     fn get_salt(&self) -> i64;
     fn get_config(&self) -> ConfigData;
-    fn set_config(&mut self, config: &ConfigData);
+    fn set_config(&mut self, config: &ConfigData, allow_overwrite_all: bool);
     fn get_address_info(&self, pk: &PublicKey) -> impl std::future::Future<Output = RgResult<AddressInfo>> + Send;
     fn get_address_info_multi(&self, pk: Vec<&PublicKey>) -> impl std::future::Future<Output = Vec<RgResult<AddressInfo>> > + Send;
 

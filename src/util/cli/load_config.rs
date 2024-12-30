@@ -124,7 +124,7 @@ pub fn load_config(init: Box<ConfigData>) -> Box<ConfigData> {
     // As user would need to override values manually to do so, ideally they read the docs
     // and avoid that so it's clean to merge.
     if let Some(h) = init.home.as_ref() {
-        let mut home = PathBuf::from_str(h).unwrap();
+        let home = PathBuf::from_str(h).unwrap();
         let home_df = home.join(".rg");
         let home_df = home_df.to_str().unwrap().to_string();
         paths.extend(process_data_folder_with_env(Some(&home_df), init.network.clone()));

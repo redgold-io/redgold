@@ -262,7 +262,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         // let mut tx = eth.create_transaction_typed(
         //     &mp_eth_addr, &dest, fulfilled_currency, None
         // ).await
-        let (data, valid, tx_ser) = self.external_network_resources.eth_tx_payload(&mp_eth_addr, &dest, &fulfilled_currency).await
+        let (data, valid, tx_ser) = self.external_network_resources
+            .eth_tx_payload(&mp_eth_addr, &dest, &fulfilled_currency, None).await
             .with_detail("network_balance", network_balance.json_or())
             .with_detail("party_balance", pes.balance_map.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or(""))
             .with_detail("order", order.json_or())

@@ -7,12 +7,12 @@ use crate::eth::eth_wallet::EthWalletWrapper;
 impl EthWalletWrapper {
 
     pub async fn get_gas_cost_estimate(&self, tx: &TypedTransaction) -> RgResult<CurrencyAmount> {
-        let gas = self.provider.estimate_gas(tx, None).await.error_info("gas estimate failure")?;
+        let gas = self.provider.estimate_gas(tx, None).await.error_info("get gas cost estimate failure")?;
         Ok(CurrencyAmount::from_eth_bigint_string(gas.to_string()))
     }
 
     pub async fn get_gas_price(&self) -> RgResult<CurrencyAmount> {
-        let gas = self.provider.get_gas_price().await.error_info("gas estimate failure")?;
+        let gas = self.provider.get_gas_price().await.error_info("get gas price estimate failure")?;
         Ok(CurrencyAmount::from_eth_bigint_string(gas.to_string()))
     }
 

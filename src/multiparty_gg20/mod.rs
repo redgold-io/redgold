@@ -5,3 +5,4 @@ pub mod gg20_keygen;
 pub mod gg20_signing;
 pub mod watcher;
 pub mod offline_debug;
+mod utility_keysign;

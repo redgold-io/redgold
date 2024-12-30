@@ -26,7 +26,7 @@ impl PartyEventValidator for PartyEvents {
                 self.validate_btc_fulfillment(payload, hash_to_sign, &mut w)?;
             }
             SupportedCurrency::Ethereum => {
-                self.validate_eth_fulfillment(payload, hash_to_sign)?;
+                self.validate_eth_fulfillment(payload, hash_to_sign, r).await?;
             }
             _ => {
                 return Err(error_info("Unsupported currency"));

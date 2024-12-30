@@ -255,7 +255,7 @@ impl TransactionProgressFlow {
             SupportedCurrency::Ethereum => {
                 let secret = transaction_sign_info.secret().ok_msg("No secret")?;
                 let f = from_eth_addr.ok_msg("Ethereum address required")?;
-                let res = external_resources.eth_tx_payload(&f, to_address, amount).await?;
+                let res = external_resources.eth_tx_payload(&f, to_address, amount, None).await?;
                 prepped.eth_payload = Some(res);
                 let (txid, tx_ser) = external_resources.send(to_address, amount, false,
                                                              Some(from.clone()), Some(secret)).await?;
@@ -428,6 +428,7 @@ impl TransactionProgressFlow {
                 let (s, r) = flume::unbounded();
                 let res = g.clone().broadcast_prepared_transaction(option, s);
                 self.awaiting_broadcast = true;
+                self.stage = TransactionStage::AwaitingBroadcastResponse;
 
                 let res = async move {
                     let s = r.recv().unwrap();
@@ -527,8 +528,8 @@ impl TransactionProgressFlow {
         if let Ok(mut r) = self.rdg_broadcast_response.lock() {
             if r.is_some() && self.stage == TransactionStage::Signed {
                 event.next_stage_transition_from = Some(self.stage.clone());
-                let res = r.as_ref().unwrap();
-                self.broadcast_info = res.json_or();
+                let res = r.as_ref().unwrap().clone();
+                self.broadcast_info = res.map_err(|e| e.json_or()).combine();
                 self.stage = TransactionStage::BroadcastComplete;
                 *r = None;
             }
@@ -538,6 +539,9 @@ impl TransactionProgressFlow {
             .map(|h| h.clone()).unwrap_or(format!("{:?}", self.stage));
         //
         // ui.heading(header);
+
+        ui.label(format!("Stage: {:?}", self.stage));
+        // ui.label(format!("awaiting broadcast {:?}", self.awaiting_broadcast));
 
         ui.horizontal(|ui| {
             if big_button(ui, "Reset") {
@@ -553,7 +557,9 @@ impl TransactionProgressFlow {
                 }
             }
 
-            if self.stage != TransactionStage::BroadcastComplete && self.stage_err.is_none() && self.stage != TransactionStage::AwaitingBroadcastResponse {
+            if self.stage != TransactionStage::BroadcastComplete &&
+                self.stage_err.is_none() &&
+                self.stage != TransactionStage::AwaitingBroadcastResponse {
                 let changed = big_button(ui, self.stage_proceed_next_text());
                 if changed {
                     if self.stage == TransactionStage::NotCreated {

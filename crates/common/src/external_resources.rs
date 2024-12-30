@@ -23,7 +23,7 @@ pub trait ExternalNetworkResources {
         &mut self, pk: &PublicKey, psbt: String,
         results: Vec<Proof>, hashes: Vec<(Vec<u8>, String)>) -> RgResult<EncodedTransactionPayload>;
 
-    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount) -> RgResult<(Vec<u8>, PartySigningValidation, String)>;
+    async fn eth_tx_payload(&self, src: &Address, dst: &Address, amount: &CurrencyAmount, override_gas: Option<CurrencyAmount>) -> RgResult<(Vec<u8>, PartySigningValidation, String)>;
 
     async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>>;
 

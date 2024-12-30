@@ -17,7 +17,6 @@ use crate::gui::qr_window::{qr_show_window, qr_window};
 use crate::gui::tabs::keys::keys_tab::keys_tab;
 use crate::gui::tabs::otp_tab::otp_tab;
 use crate::gui::tabs::server_tab;
-use crate::gui::tabs::settings_tab::settings_tab;
 use crate::gui::tabs::transact::wallet_tab::wallet_screen;
 use crate::util;
 
@@ -25,14 +24,14 @@ static INIT: Once = Once::new();
 
 pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
     // let logo = app.logo.clone();
-    let mut g = &mut app.gui_depends;
+    let g = &mut app.gui_depends;
     let local_state = &mut app.local_state;
 
     let check_config = g.get_config();
     if local_state.persist_requested {
         let mut c = g.get_config();
         c.local = Some(local_state.local_stored_state.clone());
-        g.set_config(&c);
+        g.set_config(&c, false);
         local_state.persist_requested = false;
         // println!("Saved address after set config {}", g.get_config().local.unwrap().saved_addresses.json_or());
     }
@@ -184,7 +183,14 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 keys_tab(ui, ctx, local_state, has_changed_tab, g);
             }
             Tab::Settings => {
-                settings_tab(ui, ctx, local_state);
+                let delta = local_state.settings_state.settings_tab(ui, ctx, g);
+                if let Some(d) = delta.updated_config {
+                    g.set_config(&d, delta.overwrite_all);
+                    if let Some(c) = d.local.as_ref() {
+                        local_state.local_stored_state = c.clone();
+                    }
+
+                }
             }
             Tab::Ratings => {}
             Tab::Deploy => {

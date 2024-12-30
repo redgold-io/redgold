@@ -27,7 +27,7 @@ use redgold_gui::tab::home::HomeState;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::tabs::identity_tab::IdentityState;
 use redgold_gui::tab::keys::keygen::KeygenState;
-use crate::gui::tabs::settings_tab::SettingsState;
+use redgold_gui::tab::settings_tab::SettingsState;
 use crate::gui::tabs::transact::wallet_tab::{StateUpdate, WalletState};
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
@@ -42,14 +42,14 @@ pub async fn local_state_from<G>(
     party_data: HashMap<PublicKey, PartyInternalData>
 ) -> Result<LocalState, ErrorInfo>
 where G: Send + Clone + GuiDepends {
-    let mut node_config = node_config.clone();
+    let node_config = node_config.clone();
 
     let hot_mnemonic = node_config.secure_mnemonic_words_or();
 
     let config = gui_depends.get_config();
     let local_stored_state = config.local.unwrap_or_default();
 
-    let mut ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
+    let ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
 
 
     let first_party = party_data.clone().into_values().next();
@@ -70,10 +70,8 @@ where G: Send + Clone + GuiDepends {
         qr_state: Default::default(),
         qr_show_state: Default::default(),
         identity_state: IdentityState::new(),
-        settings_state: SettingsState::new(local_stored_state.json_or(),
-                                           node_config.data_folder.clone().path.parent().unwrap().to_str().unwrap().to_string(),
-                                           node_config.secure_data_folder.clone().unwrap_or(node_config.data_folder.clone())
-                                               .path.parent().unwrap().to_str().unwrap().to_string()
+        settings_state: SettingsState::new(
+            &node_config.config_data
         ),
         address_state: Default::default(),
         otp_state: Default::default(),
@@ -227,7 +225,7 @@ pub fn create_swap_tx(ls: &mut LocalState) {
                     pk.to_bitcoin_address_typed(&config.network).unwrap().clone()
                 }
                 SupportedCurrency::Ethereum => {
-                    let mut addr = pk.to_ethereum_address_typed().unwrap();
+                    let addr = pk.to_ethereum_address_typed().unwrap();
                     addr.clone()
                 }
                 _ => panic!("Unsupported currency")

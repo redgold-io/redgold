@@ -67,7 +67,7 @@ async fn debug_events2() -> RgResult<()> {
     let t2 = relay.ds.transaction_store.get_all_tx_for_address(&amm_addr, 1000000, 0).await?
         .iter().map(|t| t.hash_or()).collect::<HashSet<Hash>>();
     assert_eq!(t1, t2);
-    let mut pev = data.party_events.clone().expect("v");
+    let pev = data.party_events.clone().expect("v");
     // pev.json_or().print();
 
     let cp1 = pev.central_prices.get(&SupportedCurrency::Ethereum).expect("eth"); //.json_pretty_or().print();
