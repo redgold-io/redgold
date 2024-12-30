@@ -35,7 +35,7 @@ impl SettingsState {
     }
     pub fn settings_tab<G>(&mut self, ui: &mut Ui, _ctx: &Context, g: &G)
     -> SettingsDelta
-    where G: GuiDepends + Send + Sync + 'static
+    where G: GuiDepends + Clone + Send + 'static
     {
         ui.heading("Settings");
         ui.separator();

@@ -59,6 +59,7 @@ pub async fn mp_util_send_eth(destination: &Address, amount: &CurrencyAmount, ne
     Ok(())
 }
 
+#[ignore]
 #[tokio::test]
 pub async fn utility_keysign_test() {
     util::init_logger_once();

@@ -528,8 +528,8 @@ impl TransactionProgressFlow {
         if let Ok(mut r) = self.rdg_broadcast_response.lock() {
             if r.is_some() && self.stage == TransactionStage::Signed {
                 event.next_stage_transition_from = Some(self.stage.clone());
-                let res = r.as_ref().unwrap();
-                self.broadcast_info = res.json_or();
+                let res = r.as_ref().unwrap().clone();
+                self.broadcast_info = res.map_err(|e| e.json_or()).combine();
                 self.stage = TransactionStage::BroadcastComplete;
                 *r = None;
             }
@@ -540,8 +540,8 @@ impl TransactionProgressFlow {
         //
         // ui.heading(header);
 
-        ui.label(format!("Stage {:?}", self.stage));
-        ui.label(format!("awaiting broadcast {:?}", self.awaiting_broadcast));
+        ui.label(format!("Stage: {:?}", self.stage));
+        // ui.label(format!("awaiting broadcast {:?}", self.awaiting_broadcast));
 
         ui.horizontal(|ui| {
             if big_button(ui, "Reset") {

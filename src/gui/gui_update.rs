@@ -183,9 +183,13 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 keys_tab(ui, ctx, local_state, has_changed_tab, g);
             }
             Tab::Settings => {
-                let delta = local_state.settings_state.settings_tab(ui, ctx, &g);
+                let delta = local_state.settings_state.settings_tab(ui, ctx, g);
                 if let Some(d) = delta.updated_config {
                     g.set_config(&d, delta.overwrite_all);
+                    if let Some(c) = d.local.as_ref() {
+                        local_state.local_stored_state = c.clone();
+                    }
+
                 }
             }
             Tab::Ratings => {}
