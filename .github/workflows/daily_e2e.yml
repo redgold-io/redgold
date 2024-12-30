@@ -1,11 +1,11 @@
 name: Daily E2E Test
 
 on:
-  push:
-    branches:
-      - various-fixes
-#  schedule:
-#    - cron: '0 0 * * *'  # Run every day at 00:00 UTC
+#  push:
+#    branches:
+#      - various-fixes
+  schedule:
+    - cron: '0 0 * * *'  # Run every day at 00:00 UTC
 
 jobs:
   daily-e2e:
