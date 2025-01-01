@@ -49,7 +49,8 @@ impl AwsBackup {
             // let weekly_prefix = format!("weekly/{}", server_index);
             // let monthly_prefix = format!("monthly/{}", server_index);
             info!("Listing keys in bucket {}", bucket);
-            let daily_keys = Self::s3_ls(bucket, daily_prefix.clone()).await?;
+            let daily_keys = Self::s3_ls(bucket, daily_prefix.clone()).await
+                .log_error().unwrap_or(vec![]);
             if !daily_keys.is_empty() {
                 let newest = daily_keys.iter().max().unwrap();
                 let newest = newest.split('/').last().unwrap();
