@@ -34,7 +34,7 @@
         </td>
         <td>{{ transaction.amount }}</td>
         <td>
-          <HashLink :data="transaction.tx_hash" :use-external-link="true"
+          <HashLink :data="transaction.other_tx_hash" :use-external-link="true"
                     :is-address="false"
                     :bitcoin-external-link="transaction.other_address.startsWith('bc') || transaction.other_address.startsWith('tb')"
                     :ethereum-external-link="transaction.other_address.startsWith('0x')"
