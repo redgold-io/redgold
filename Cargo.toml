@@ -206,6 +206,7 @@ bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "ke
 derivative = "2.2.0"
 backtrace = "0.3.72"
 num_cpus = "1.16.0"
+mime_guess = "2.0.5"
 
 [dependencies.getrandom]
 version = "0.2.12"

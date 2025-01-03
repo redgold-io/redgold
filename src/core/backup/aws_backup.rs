@@ -99,22 +99,32 @@ impl AwsBackup {
 
                 if path.is_dir() {
                     dirs.push(path.clone());
+                } else {
+                    file_paths.push(path);
                 }
-                file_paths.push(path);
             }
         }
 
         for path in file_paths {
             let key = path.strip_prefix(dir).unwrap().to_string_lossy().to_string();
-            let key = format!("{}/{}", prefix, key);
+            let key = format!("{}/{}", prefix.trim_end_matches('/'), key);
+            let mime = mime_guess::from_path(&path)
+                .first_or_octet_stream()
+                .to_string();
             let body = ByteStream::from_path(&path).await.error_info("Failed to read file")?;
                 client.put_object()
                     .bucket(&bucket)
                     .key(&key)
                     .body(body)
+                    .content_type(mime.clone())
                     .send()
                     .await
-                    .error_info("S3 put object failure")?;
+                    .error_info("S3 put object failure")
+                    .with_detail("key", key)
+                    .with_detail("bucket", bucket.clone())
+                    .with_detail("path", path.to_string_lossy().to_string())
+                    .with_detail("mime", mime)
+                    ?;
         }
 
         Ok(())
