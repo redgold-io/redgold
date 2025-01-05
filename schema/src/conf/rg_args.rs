@@ -427,6 +427,7 @@ pub enum RgDebugCommand {
     // TestCapture(TestCaptureCli),
     // TestBitcoinBalance(TestBitcoinBalanceCli),
     // ConvertMetadataXpub(ConvertMetadataXpub),
+    CopyData(CopyData),
 }
 
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
@@ -447,6 +448,12 @@ pub struct S3UpDir {
     // Local file to copy
     pub source: String,
     pub dest: String,
+}
+
+/// S3 copy command
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct CopyData {
+    pub server_ssh_host: String
 }
 
 /// Debug Commands

@@ -26,7 +26,7 @@ impl ExternalTimedTransaction {
         if self.incoming {
             self.currency_amount()
         } else {
-            self.currency_amount() - fee
+            self.currency_amount() + fee
         }
     }
 

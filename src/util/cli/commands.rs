@@ -31,6 +31,7 @@ use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use redgold_common_no_wasm::cmd::run_cmd;
+use redgold_common_no_wasm::ssh_like::ToSSHDeploy;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::observability::errors::Loggable;
@@ -570,6 +571,18 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 let bucket = split.get(0).expect("bucket").to_string();
                 let prefix = split.get(1).expect("prefix").to_string();
                 AwsBackup::s3_upload_directory(&p, bucket, prefix).await
+            }
+            RgDebugCommand::CopyData(c) => {
+                // for d in p1.config_data.local.as_ref().unwrap().deploy.iter() {
+                //     let s = d.as_old_servers();
+                //     for s in s {
+                //         if s.host == c.server_ssh_host {
+                //            s.to_ssh(Some(log_handler().1.expect("sender")))
+                //
+                //         }
+                //     }
+                // }
+                Ok(())
             }
             _ => {
                 Ok(())

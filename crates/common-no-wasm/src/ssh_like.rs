@@ -88,6 +88,16 @@ pub struct DeployMachine<S: SSHOrCommandLike> {
     pub ssh: S,
 }
 
+pub trait ToSSHDeploy {
+    fn to_ssh(&self, output_handler: Option<Sender<String>>) -> DeployMachine<SSHProcessInvoke>;
+}
+
+impl ToSSHDeploy for ServerOldFormat {
+    fn to_ssh(&self, output_handler: Option<Sender<String>>) -> DeployMachine<SSHProcessInvoke> {
+        DeployMachine::new(self, None, output_handler)
+    }
+}
+
 impl DeployMachine<SSHProcessInvoke> {
 
     pub fn new(s: &ServerOldFormat, identity_path: Option<String>, output_handler: Option<Sender<String>>) -> Self {

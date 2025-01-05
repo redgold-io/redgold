@@ -1,5 +1,5 @@
 use std::iter::Sum;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub, SubAssign};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::str::FromStr;
@@ -204,6 +204,19 @@ impl CurrencyAmount {
     }
 }
 
+use std::ops::AddAssign;
+
+impl AddAssign for CurrencyAmount {
+    fn add_assign(&mut self, other: Self) {
+        *self = self.clone() + other;
+    }
+}
+
+impl SubAssign for CurrencyAmount {
+    fn sub_assign(&mut self, other: Self) {
+        *self = self.clone() - other;
+    }
+}
 
 impl Add for CurrencyAmount {
     type Output = Self;
