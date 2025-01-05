@@ -34,6 +34,7 @@ use redgold_common_no_wasm::cmd::run_cmd;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::observability::errors::Loggable;
+use crate::core::backup::aws_backup::AwsBackup;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::test::daily_e2e::run_daily_e2e;
@@ -561,6 +562,14 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
             }
             RgDebugCommand::DailyTest(d) => {
                 run_daily_e2e(p1).await
+            }
+            RgDebugCommand::S3UpDir(d) => {
+                let p = PathBuf::from(d.source.clone());
+                let dest = d.dest.replace("s3://", "");
+                let split = dest.split("/").collect::<Vec<&str>>();
+                let bucket = split.get(0).expect("bucket").to_string();
+                let prefix = split.get(1).expect("prefix").to_string();
+                AwsBackup::s3_upload_directory(&p, bucket, prefix).await
             }
             _ => {
                 Ok(())

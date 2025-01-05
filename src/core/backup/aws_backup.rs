@@ -45,6 +45,21 @@ impl AwsBackup {
             (self.relay.node_config.s3_backup(),
              self.relay.node_config.server_index()){
 
+
+            // Debug code for cluster error
+            let config = aws_config::load_from_env().await;
+            let client = s3::Client::new(&config);
+
+            let result = client.put_object()
+                .bucket("redgold-backups")
+                .key("test_from_cluster.txt")
+                .body(ByteStream::from(Vec::from("test")))
+                .send()
+                .await
+                .error_info("S3 put object failure in test")?;
+
+            info!("Put result: {:?}", result);
+
             let daily_prefix = format!("daily/{}", server_index);
             // let weekly_prefix = format!("weekly/{}", server_index);
             // let monthly_prefix = format!("monthly/{}", server_index);
@@ -81,10 +96,9 @@ impl AwsBackup {
     }
 
 
-    async fn s3_upload_directory(dir: &PathBuf, bucket: String, prefix: String) -> RgResult<()> {
+    pub async fn s3_upload_directory(dir: &PathBuf, bucket: String, prefix: String) -> RgResult<()> {
         let config = aws_config::load_from_env().await;
         let client = s3::Client::new(&config);
-
 
         let mut file_paths = Vec::new();
         let mut dirs = vec![dir.clone()];
@@ -105,6 +119,8 @@ impl AwsBackup {
             }
         }
 
+        info!("Upload S3 dir: {:?}", file_paths.iter().map(|p| p.to_string_lossy()).collect_vec());
+
         for path in file_paths {
             let key = path.strip_prefix(dir).unwrap().to_string_lossy().to_string();
             let key = format!("{}/{}", prefix.trim_end_matches('/'), key);
@@ -123,6 +139,7 @@ impl AwsBackup {
                     .with_detail("key", key)
                     .with_detail("bucket", bucket.clone())
                     .with_detail("path", path.to_string_lossy().to_string())
+                    .with_detail("prefix", prefix.clone())
                     .with_detail("mime", mime)
                     ?;
         }
@@ -237,6 +254,7 @@ impl IntervalFold for AwsBackup {
 #[ignore]
 #[tokio::test]
 async fn test_aws_backup() {
-    let res = AwsBackup::s3_ls(&"redgold-backups".to_string(), "".to_string()).await.unwrap();
+    AwsBackup::s3_upload_directory(&PathBuf::from("./testdir"), "redgold-backups".to_string(), "testdir3".to_string()).await.unwrap();
+    let res = AwsBackup::s3_ls(&"redgold-backups".to_string(), "testdir/testdir".to_string()).await.unwrap();
     println!("{:?}", res);
 }

@@ -420,7 +420,9 @@ pub enum RgDebugCommand {
     #[clap(version = "1.3", author = "Redgold")]
     GrafanaPublicDeploy(GrafanaPublicDeploy),
     BuildReleaseArtifacts(BuildReleaseArtifacts),
-    DailyTest(DailyE2ERunner)
+    DailyTest(DailyE2ERunner),
+    // check command
+    S3UpDir(S3UpDir),
     // TestTransaction(TestTransactionCli),
     // TestCapture(TestCaptureCli),
     // TestBitcoinBalance(TestBitcoinBalanceCli),
@@ -438,6 +440,14 @@ pub struct BuildReleaseArtifacts {}
 /// Used for CI, daily test for AMM / transactions / etc.
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct DailyE2ERunner {}
+
+/// S3 copy command
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct S3UpDir {
+    // Local file to copy
+    pub source: String,
+    pub dest: String,
+}
 
 /// Debug Commands
 /// All commands that are used for development or debugging, not for primary end users.
