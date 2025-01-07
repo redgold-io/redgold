@@ -3,7 +3,7 @@ use crate::{structs, RgResult};
 use crate::explorer::BriefTransaction;
 use crate::structs::{CurrencyAmount, SupportedCurrency};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ExternalTimedTransaction {
     pub tx_id: String,
     pub timestamp: Option<u64>,
@@ -18,6 +18,23 @@ pub struct ExternalTimedTransaction {
     pub fee: Option<CurrencyAmount>,
     pub self_address: Option<String>,
 }
+
+// Manual Eq implementation that ignores the f64 field
+impl PartialEq for ExternalTimedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.tx_id == other.tx_id &&
+        self.timestamp == other.timestamp &&
+        self.other_address == other.other_address &&
+        self.other_output_addresses == other.other_output_addresses &&
+        self.amount == other.amount &&
+        self.bigint_amount == other.bigint_amount &&
+        self.incoming == other.incoming &&
+        self.currency == other.currency &&
+        self.block_number == other.block_number
+    }
+}
+
+impl Eq for ExternalTimedTransaction {}
 
 impl ExternalTimedTransaction {
 

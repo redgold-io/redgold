@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::structs::{ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
+use crate::structs::{Address, ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
 use crate::tx::external_tx::ExternalTimedTransaction;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -14,6 +14,19 @@ pub enum AddressEvent {
 
 
 impl AddressEvent {
+
+    pub fn other_swap_address(&self) -> Option<String> {
+        match self {
+            AddressEvent::External(e) => Some(e.other_address.clone()),
+            AddressEvent::Internal(t) =>
+            if t.tx.is_swap() {
+                t.tx.first_input_address()
+                    .and_then(|a| a.render_string().ok())
+            } else {
+                None
+            }
+        }
+    }
 
     pub fn identifier(&self) -> String {
         match self {

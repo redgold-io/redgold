@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
+use itertools::Itertools;
 use log::info;
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
@@ -21,6 +23,12 @@ pub enum SwapStage {
     CompleteShowTrackProgress
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
+pub enum SwapSubTab {
+    New,
+    History
+}
+
 
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -32,6 +40,7 @@ pub struct SwapState {
     pub changing_stages: bool,
     pub swap_valid: bool,
     pub invalid_reason: String,
+    pub swap_subtab: SwapSubTab
 }
 
 impl Default for SwapState {
@@ -44,6 +53,7 @@ impl Default for SwapState {
             changing_stages: false,
             swap_valid: false,
             invalid_reason: "".to_string(),
+            swap_subtab: SwapSubTab::New,
         }
     }
 }
@@ -95,7 +105,7 @@ impl SwapState {
     pub fn view<G, E>(
         &mut self,
         ui: &mut Ui,
-        depends: &G,
+        g: &G,
         pk: &PublicKey,
         allowed: &Vec<XPubLikeRequestType>,
         csi: &TransactionSignInfo,
@@ -105,11 +115,11 @@ impl SwapState {
             E: ExternalNetworkResources + Send + Clone {
 
         let mut create_swap_tx_bool = false;
-        self.check_valid(data, &depends.get_network(), pk);
+        self.check_valid(data, &g.get_network(), pk);
 
         ui.horizontal(|ui| {
             ui.heading("Swap");
-            Self::party_explorer_link(ui, &data, &depends.get_network(), depends);
+            Self::party_explorer_link(ui, &data, &g.get_network(), g);
             if self.currency_input_box.input_currency == SupportedCurrency::Redgold {
                 let output = self.output_currency.clone();
                 let cpp = data.central_price_pair(None, output);
@@ -122,25 +132,40 @@ impl SwapState {
                     ui.label(format_dollar_amount_with_prefix_and_suffix(usd_vol));
                 }
             }
-        });
-
-        let locked = self.tx_progress.locked();
-        self.swap_details(ui,locked, data, depends.get_network().clone());
-
-        let ev = self.tx_progress.view(ui,depends, tsi, csi, allowed);
-        if ev.next_stage_create {
-            create_swap_tx_bool = true;
-        }
-
-        ui.horizontal(|ui| {
-
-            if !self.swap_valid {
-                ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));
-                ui.label(RichText::new(self.invalid_reason.clone()).color(Color32::RED));
-            } else {
-
+            for swap_subtab in SwapSubTab::iter() {
+                if ui.button(format!("{:?}", swap_subtab)).clicked() {
+                    self.swap_subtab = swap_subtab;
+                }
             }
         });
+
+        if self.swap_subtab == SwapSubTab::New {
+            let locked = self.tx_progress.locked();
+            self.swap_details(ui, locked, data, g.get_network().clone());
+
+            let ev = self.tx_progress.view(ui, g, tsi, csi, allowed);
+            if ev.next_stage_create {
+                create_swap_tx_bool = true;
+            }
+
+            ui.horizontal(|ui| {
+                if !self.swap_valid {
+                    ui.label(RichText::new("Invalid Swap: ").color(Color32::RED));
+                    ui.label(RichText::new(self.invalid_reason.clone()).color(Color32::RED));
+                } else {
+
+                }
+            });
+        } else if self.swap_subtab == SwapSubTab::History {
+            let addrs = g.to_all_address(&pk);
+            let parties = data.party_data.lock().unwrap().clone();
+            let swap_events = parties.iter().flat_map(|(pk, pid)|
+                pid.party_events.as_ref().iter().flat_map(|pe|
+                    pe.find_swaps_for_addresses(&addrs)
+            )).collect_vec();
+
+            ui.label("History coming soon, please check party address for events");
+        }
 
         create_swap_tx_bool
     }
