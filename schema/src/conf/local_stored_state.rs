@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use crate::conf::server_config::Deployment;
 use crate::servers::ServerOldFormat;
-use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
+use crate::structs::{Address, CurrencyAmount, PeerId, PublicKey, SupportedCurrency, TrustRatingLabel};
 use crate::tx::external_tx::ExternalTimedTransaction;
 
 
@@ -109,7 +109,9 @@ pub struct InternalStoredData {
 pub struct PendingExternalSwapInfo {
     // Could replace this potentially with specific class, but it's mostly the same.
     pub external_tx: ExternalTimedTransaction,
-    pub party_id: PublicKey
+    pub party_id: PublicKey,
+    pub destination_currency: SupportedCurrency,
+    pub expected_amount: CurrencyAmount
 }
 
 // TODO: Change server to new format

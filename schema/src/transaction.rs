@@ -417,6 +417,14 @@ impl Transaction {
                 .and_then(|_| o.opt_amount())}
         ).sum::<i64>()
     }
+    pub fn non_remainder_amount_rdg_typed(&self) -> CurrencyAmount {
+        let inputs = self.input_address_set();
+        self.outputs.iter().filter_map(|o| {
+            o.address.as_ref()
+                .filter(|&a| !inputs.contains(a))
+                .and_then(|_| o.opt_amount_typed())}
+        ).sum::<CurrencyAmount>()
+    }
 
     // TODO: Return as currency amount with plus operators, also maybe make optional?
     pub fn remainder_amount(&self) -> i64 {

@@ -26,6 +26,7 @@ use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, Proof, PublicKey};
 use redgold_schema::transaction::rounded_balance_i64;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
+use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
@@ -570,7 +571,8 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 let split = dest.split("/").collect::<Vec<&str>>();
                 let bucket = split.get(0).expect("bucket").to_string();
                 let prefix = split.get(1).expect("prefix").to_string();
-                AwsBackup::s3_upload_directory(&p, bucket, prefix).await
+                let relay = Relay::new(*p1.clone()).await;
+                AwsBackup::new(&relay).s3_upload_directory(&p, bucket, prefix).await
             }
             RgDebugCommand::CopyData(c) => {
                 // for d in p1.config_data.local.as_ref().unwrap().deploy.iter() {

@@ -297,6 +297,7 @@ impl ConfigData {
                 identities: None,
                 mnemonics: None,
                 private_keys: None,
+                internal_stored_data: None,
             }),
             portfolio: None,
             secure: None,

@@ -437,7 +437,7 @@ impl WalletState {
     }
 }
 
-pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
+pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &mut G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
     where G: GuiDepends + Clone + Send + 'static {
     // match local_state.wallet.updates.recv_while() {
     //     Ok(updates) => {
@@ -456,7 +456,7 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
 }
 
 
-pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, g: &G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
+pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, g: &mut G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
     where G: GuiDepends + Clone + Send + 'static {
 
     let (mut update, xpub) =
@@ -611,7 +611,7 @@ pub fn hot_passphrase_section(ui: &mut Ui, ls: &mut LocalState) -> bool {
 }
 
 fn proceed_from_pk<G, E>(
-    ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, g: &G, d: &DataQueryInfo<E>,
+    ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, g: &mut G, d: &DataQueryInfo<E>,
     allowed: &Vec<XPubLikeRequestType>, hot_tsi: &TransactionSignInfo, csi: &TransactionSignInfo
 )
     where G: GuiDepends + Clone + Send + 'static,

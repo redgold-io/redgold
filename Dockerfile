@@ -10,7 +10,12 @@ RUN apt install -y automake libtool libssl-dev \
  autoconf libxcb-xrm0 libxcb-xrm-dev automake libxcb-shape0-dev \
  g++ \
  sqlite3 libsqlite3-dev \
- nasm
+ nasm \
+ ca-certificates \
+ awscli
+
+RUN update-ca-certificates
+
 #RUN rustup target add x86_64-unknown-linux-gnu
 #RUN rustup toolchain install stable-x86_64-unknown-linux-gnu
 ADD cargo_config ~/.cargo/config

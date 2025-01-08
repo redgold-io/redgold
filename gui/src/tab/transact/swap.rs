@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
 use itertools::Itertools;
 use log::info;
+use redgold_schema::util::times::ToTimeString;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
@@ -12,8 +13,16 @@ use crate::components::tx_progress::TransactionProgressFlow;
 use crate::data_query::data_query::DataQueryInfo;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
+use redgold_schema::explorer::SwapStatus;
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix_and_suffix;
+use redgold_schema::party::search_events::PartyEventSearch;
+use redgold_schema::ShortString;
+use redgold_schema::trust::FloatRoundedConverti64;
+use crate::components::tables::text_table_advanced;
+use crate::components::transaction_table::{format_fractional_currency_amount, TransactionTable};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {
@@ -41,6 +50,22 @@ pub struct SwapState {
     pub swap_valid: bool,
     pub invalid_reason: String,
     pub swap_subtab: SwapSubTab
+}
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct UserSwapInfoRow {
+    pub txid: String,
+    pub input_currency: SupportedCurrency,
+    pub output_currency: SupportedCurrency,
+    pub input_amount: f64,
+    pub input_amount_usd: f64,
+    pub output_amount: f64,
+    pub output_amount_usd: f64,
+    pub time: i64,
+    pub status: SwapStatus,
+    pub party_id: PublicKey,
+    pub fulfillment_txid: String
 }
 
 impl Default for SwapState {
@@ -105,7 +130,7 @@ impl SwapState {
     pub fn view<G, E>(
         &mut self,
         ui: &mut Ui,
-        g: &G,
+        g: &mut G,
         pk: &PublicKey,
         allowed: &Vec<XPubLikeRequestType>,
         csi: &TransactionSignInfo,
@@ -159,10 +184,123 @@ impl SwapState {
         } else if self.swap_subtab == SwapSubTab::History {
             let addrs = g.to_all_address(&pk);
             let parties = data.party_data.lock().unwrap().clone();
+            let config = g.get_config();
+            let pending_external_events= config
+                .local.clone().unwrap_or_default().internal_stored_data.clone()
+                .unwrap_or_default()
+                .pending_external_swaps.clone().unwrap_or_default();
             let swap_events = parties.iter().flat_map(|(pk, pid)|
                 pid.party_events.as_ref().iter().flat_map(|pe|
                     pe.find_swaps_for_addresses(&addrs)
-            )).collect_vec();
+            ).collect_vec()).collect_vec();
+            
+            let mut events = vec![];
+            let pm = data.price_map_usd_pair_incl_rdg.clone();
+            for ev in pending_external_events {
+                if swap_events.iter()
+                    .find(|(of, s, _)| s.identifier() == ev.external_tx.tx_id)
+                    .is_some() {
+                    let mut config2 = config.clone();
+                    if let Some(l) = config2.local.as_mut() {
+                        if let Some(iss) = l.internal_stored_data.as_mut() {
+                            if let Some(pes) = &mut iss.pending_external_swaps {
+                                pes.retain(|p| p.external_tx.tx_id != ev.external_tx.tx_id);
+                            }
+                        }
+                    }
+                    g.set_config(&config2, false);
+                    continue
+                }
+                let input_amount = ev.external_tx.currency_amount().to_fractional();
+                let output = ev.expected_amount.to_fractional();
+                let row = UserSwapInfoRow {
+                    txid: ev.external_tx.tx_id.clone(),
+                    input_currency: ev.external_tx.currency.clone(),
+                    output_currency: ev.destination_currency.clone(),
+                    input_amount: input_amount,
+                    input_amount_usd: pm.get(&ev.external_tx.currency).map(|x| x * input_amount).unwrap_or(0.0),
+                    output_amount: output,
+                    output_amount_usd: pm.get(&ev.destination_currency).map(|x| x * output).unwrap_or(0.0),
+                    time: ev.external_tx.timestamp.unwrap_or(0) as i64,
+                    status: SwapStatus::Pending,
+                    party_id: ev.party_id.clone(),
+                    fulfillment_txid: "".to_string(),
+                };
+                events.push(row);
+            }
+
+            for (of, swap, fulfillment) in swap_events {
+                let mut row = UserSwapInfoRow::default();
+                row.output_amount = of.fulfilled_currency_amount().to_fractional();
+                match swap {
+                    AddressEvent::External(e) => {
+                        row.txid = e.tx_id.clone();
+                        row.input_currency = e.currency.clone();
+                        row.input_amount = e.currency_amount().to_fractional();
+                        row.input_amount_usd = e.currency_amount().to_fractional() * pm.get(&e.currency)
+                            .cloned().unwrap_or(0.0);
+                        row.time = e.timestamp.unwrap_or(0) as i64;
+                        row.status = SwapStatus::Complete;
+                        row.output_currency = SupportedCurrency::Redgold;
+                        match fulfillment {
+                            AddressEvent::External(_) => {}
+                            AddressEvent::Internal(e) => {
+                                row.party_id = e.tx.first_input_proof_public_key().cloned().unwrap();
+                                row.fulfillment_txid = e.tx.hash_hex();
+                            }
+                        }
+                    }
+                    AddressEvent::Internal(e) => {
+                        row.txid = e.tx.hash_hex();
+                        row.input_currency = SupportedCurrency::Redgold;
+                        row.input_amount = e.tx.non_remainder_amount_rdg_typed().to_fractional();
+                        row.input_amount_usd = e.tx.non_remainder_amount_rdg_typed().to_fractional() *
+                            pm.get(&SupportedCurrency::Redgold).cloned().unwrap_or(0.0);
+                        row.time = e.tx.time().cloned().unwrap_or(0);
+                        row.status = SwapStatus::Complete;
+                        match fulfillment {
+                            AddressEvent::External(e) => {
+                                row.output_currency = e.currency.clone();
+                                row.fulfillment_txid = e.tx_id.clone();
+                            }
+                            AddressEvent::Internal(_) => {}
+                        }
+                    }
+                }
+                row.output_amount_usd = pm.get(&row.output_currency).map(|x| x * row.output_amount).unwrap_or(0.0);
+
+            }
+
+            let mut data = vec![];
+            let mut headers = vec![
+                "Txid", "From", "To", "Amount", "USD", "Filled", "USD", "Time", "Status", "Fill Txid"
+            ].iter().map(|s| s.to_string()).collect_vec();
+            data.push(headers.iter().map(|s| s.to_string()).collect());
+            for r in events {
+                data.push(vec![
+                    r.txid.clone(),
+                    format!("{:?}", r.input_currency),
+                    format!("{:?}", r.output_currency),
+                    format_fractional_currency_amount(r.input_amount),
+                    format_dollar_amount_with_prefix_and_suffix(r.input_amount_usd),
+                    format_fractional_currency_amount(r.output_amount),
+                    format_dollar_amount_with_prefix_and_suffix(r.output_amount_usd),
+                    r.time.to_time_string_shorter_no_seconds(),
+                    format!("{:?}", r.status),
+                    r.fulfillment_txid.clone(),
+                ]);
+            }
+
+            let func = move |ui: &mut Ui, row: usize, col: usize, val: &String| {
+                let mut column_idxs = vec![0, 9];
+                if column_idxs.contains(&col) {
+                    ui.hyperlink_to(val.first_four_last_four_ellipses().unwrap_or("err".to_string()),
+                                    g.get_network().explorer_hash_link(val.clone()));
+                    return true
+                }
+                false
+            };
+            text_table_advanced(ui, data, false, false, None, vec![], Some(func));
 
             ui.label("History coming soon, please check party address for events");
         }

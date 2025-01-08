@@ -13,10 +13,47 @@ use aws_sdk_s3::types::{Delete, ObjectIdentifier, StorageClass};
 use itertools::Itertools;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReadDirStream;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::config_data::ConfigData;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::ErrorInfo;
 use crate::util;
+
+
+#[async_trait]
+pub trait S3Constructor {
+    async fn s3_client(&self) -> s3::Client;
+}
+
+#[async_trait]
+impl S3Constructor for ConfigData {
+    async fn s3_client(&self) -> s3::Client {
+        if let Some(k) = self.keys.as_ref() {
+            if let Some(a) = k.aws_access.as_ref() {
+                if let Some(s) = k.aws_secret.as_ref() {
+                    let config = aws_config::from_env()
+                        .region("us-west-1")
+                        .credentials_provider(aws_sdk_s3::config::Credentials::new(
+                            a,
+                            s,
+                            None,
+                            None,
+                            "static"
+                        ))
+                        .load()
+                        .await;
+                        return s3::Client::new(&config);
+                }
+            }
+        }
+        let config = aws_config::from_env()
+            .region("us-west-1")
+            .load()
+            .await;
+        s3::Client::new(&config)
+    }
+}
 
 pub struct AwsBackup {
     pub relay: Relay,
@@ -30,10 +67,10 @@ impl AwsBackup {
     }
 
     pub async fn can_do_backup(&self) -> bool {
-        if let (Some(bucket), server_index) =
-            (self.relay.node_config.s3_backup(),
+        if let (Some(bucket), server_index) = 
+            (self.relay.node_config.s3_backup(), 
              self.relay.node_config.server_index()) {
-            return Self::s3_ls(bucket, "".to_string()).await.is_ok()
+            return self.s3_ls(bucket, "".to_string()).await.is_ok()
         }
         false
     }
@@ -43,12 +80,9 @@ impl AwsBackup {
 
         if let (Some(bucket), server_index) =
             (self.relay.node_config.s3_backup(),
-             self.relay.node_config.server_index()){
+             self.relay.node_config.server_index()) {
 
-
-            // Debug code for cluster error
-            let config = aws_config::load_from_env().await;
-            let client = s3::Client::new(&config);
+            let client = self.relay.node_config.config_data.s3_client().await;
 
             let result = client.put_object()
                 .bucket("redgold-backups")
@@ -64,7 +98,7 @@ impl AwsBackup {
             // let weekly_prefix = format!("weekly/{}", server_index);
             // let monthly_prefix = format!("monthly/{}", server_index);
             info!("Listing keys in bucket {}", bucket);
-            let daily_keys = Self::s3_ls(bucket, daily_prefix.clone()).await
+            let daily_keys = self.s3_ls(bucket, daily_prefix.clone()).await
                 .log_error().unwrap_or(vec![]);
             if !daily_keys.is_empty() {
                 let newest = daily_keys.iter().max().unwrap();
@@ -82,23 +116,19 @@ impl AwsBackup {
                 let oldest = format!("{}/{}", daily_prefix.clone(), oldest);
                 // let oldest_to = format!("{}/{}", weekly_prefix, oldest);
                 // Self::s3_cp(bucket, oldest, ).await?;
-                Self::s3_rm(bucket, oldest).await?;
+                self.s3_rm(bucket, oldest).await?;
             }
             let daily_key = format!("{}/{}", daily_prefix.clone(), ct);
             let parquet_exports = format!("{}/{}", daily_key, "parquet_exports");
-            Self::s3_upload_directory(&self.relay.node_config.env_data_folder().parquet_exports(), bucket.clone(), parquet_exports).await?;
-            // let weekly_keys = Self::s3_ls(bucket, weekly_prefix).await?;
+            self.s3_upload_directory(&self.relay.node_config.env_data_folder().parquet_exports(), bucket.clone(), parquet_exports).await?;
         } else {
             info!("No s3_backup_bucket or server_index set")
         };
         Ok(())
-
     }
 
-
-    pub async fn s3_upload_directory(dir: &PathBuf, bucket: String, prefix: String) -> RgResult<()> {
-        let config = aws_config::load_from_env().await;
-        let client = s3::Client::new(&config);
+    pub async fn s3_upload_directory(&self, dir: &PathBuf, bucket: String, prefix: String) -> RgResult<()> {
+        let client = self.relay.node_config.config_data.s3_client().await;
 
         let mut file_paths = Vec::new();
         let mut dirs = vec![dir.clone()];
@@ -127,6 +157,8 @@ impl AwsBackup {
             let mime = mime_guess::from_path(&path)
                 .first_or_octet_stream()
                 .to_string();
+            let file_size = tokio::fs::metadata(&path).await.error_info("Failed to read file metadata")?.len();
+
             let body = ByteStream::from_path(&path).await.error_info("Failed to read file")?;
                 client.put_object()
                     .bucket(&bucket)
@@ -135,20 +167,22 @@ impl AwsBackup {
                     .content_type(mime.clone())
                     .send()
                     .await
+
                     .error_info("S3 put object failure")
                     .with_detail("key", key)
                     .with_detail("bucket", bucket.clone())
                     .with_detail("path", path.to_string_lossy().to_string())
                     .with_detail("prefix", prefix.clone())
                     .with_detail("mime", mime)
+                    .with_detail("file_size", file_size.to_string())
                     ?;
         }
 
         Ok(())
     }
-    async fn s3_ls(bucket: &String, prefix: String) -> Result<Vec<String>, ErrorInfo> {
-        let config = ::aws_config::load_from_env().await;
-        let client = s3::Client::new(&config);
+
+    async fn s3_ls(&self, bucket: &String, prefix: String) -> Result<Vec<String>, ErrorInfo> {
+        let client = self.relay.node_config.config_data.s3_client().await;
         let ls_result = client.list_objects().bucket(bucket)
             .prefix(prefix.clone())
             .send().await.error_info("List failed").add(prefix.clone())?;
@@ -163,12 +197,11 @@ impl AwsBackup {
         Ok(keys)
     }
 
-    async fn s3_cp(bucket: &String, prefix_source: String, prefix_destination: String) -> Result<(), ErrorInfo> {
-        let config = ::aws_config::load_from_env().await;
-        let client = Client::new(&config);
+    async fn s3_cp(&self, bucket: &String, prefix_source: String, prefix_destination: String) -> Result<(), ErrorInfo> {
 
+        let client = self.relay.node_config.config_data.s3_client().await;
         // List all objects with prefix_source
-        let keys = Self::s3_ls(bucket, prefix_source.clone()).await?;
+        let keys = self.s3_ls(bucket, prefix_source.clone()).await?;
 
         // Copy each object to prefix_destination
         for key in keys {
@@ -191,10 +224,10 @@ impl AwsBackup {
 
         Ok(())
     }
-    async fn s3_rm(bucket: &String, prefix: String) -> Result<(), ErrorInfo> {
-        let config = ::aws_config::load_from_env().await;
-        let client = Client::new(&config);
-        let keys = Self::s3_ls(bucket, prefix.clone()).await?;
+    async fn s3_rm(&self, bucket: &String, prefix: String) -> Result<(), ErrorInfo> {
+
+        let client = self.relay.node_config.config_data.s3_client().await;
+        let keys = self.s3_ls(bucket, prefix.clone()).await?;
 
         if keys.is_empty() {
             info!("No objects found with prefix: {}", prefix);
@@ -254,7 +287,7 @@ impl IntervalFold for AwsBackup {
 #[ignore]
 #[tokio::test]
 async fn test_aws_backup() {
-    AwsBackup::s3_upload_directory(&PathBuf::from("./testdir"), "redgold-backups".to_string(), "testdir3".to_string()).await.unwrap();
-    let res = AwsBackup::s3_ls(&"redgold-backups".to_string(), "testdir/testdir".to_string()).await.unwrap();
-    println!("{:?}", res);
+    // AwsBackup::s3_upload_directory(&PathBuf::from("./testdir"), "redgold-backups".to_string(), "testdir3".to_string()).await.unwrap();
+    // let res = AwsBackup::s3_ls(&"redgold-backups".to_string(), "testdir/testdir".to_string()).await.unwrap();
+    // println!("{:?}", res);
 }
