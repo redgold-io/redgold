@@ -22,6 +22,7 @@ use tracing::{error, info};
 use metrics::counter;
 use rocket::form::FromForm;
 use rocket::http::ext::IntoCollection;
+use strum::IntoEnumIterator;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
@@ -30,7 +31,7 @@ use redgold_common::flume_send_help::{new_channel, Channel};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, SupportedCurrencyIter, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
 
@@ -188,7 +189,27 @@ pub struct Relay {
     pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
-    pub peer_info: PeerInfo
+    pub peer_info: PeerInfo,
+    // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
+}
+
+impl Relay {
+    pub async fn price_map_pair_usd_incl_rdg(&self) -> HashMap<SupportedCurrency, f64> {
+        let mut hm = HashMap::new();
+        for c in SupportedCurrency::iter() {
+            let p = self.ds.price_time.max_time_price_by(c, util::current_time_millis_i64()).await
+                .ok().flatten();
+            if let Some(p) = p {
+                hm.insert(c, p);
+            }
+        }
+        let rdg = self.active_party_events().await
+            .and_then(|pe| pe.central_prices.get(&SupportedCurrency::Ethereum).cloned())
+            .map(|c| c.min_bid_estimated.clone())
+            .unwrap_or(100.0);
+        hm.insert(SupportedCurrency::Redgold, rdg);
+        hm
+    }
 }
 
 #[derive(Clone)]

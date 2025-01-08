@@ -8,13 +8,15 @@ use serde::Serialize;
 use sha3::digest::generic_array::functional::FunctionalSequence;
 use warp::{Filter, Rejection};
 use warp::reply::Json;
+use redgold_gui::tab::transact::swap::{SwapState, UserSwapInfoRow};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::public_key_parse_support::PublicKeyParseSupport;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::RgResult;
-use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::party::search_events::PartyEventSearch;
+use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
 use crate::api::warp_helpers::as_warp_json_response;
 use crate::api::explorer::handle_address_info;
 use crate::api::explorer::server::{extract_ip, process_origin};
@@ -26,7 +28,8 @@ use crate::core::relay::Relay;
 pub struct ApiData {
     pub relay: Arc<Relay>,
     pub origin_ip: Option<String>,
-    pub param: Option<String>
+    pub param: Option<String>,
+    pub param2: Option<String>
 }
 
 pub trait ApiHelpers {
@@ -45,6 +48,7 @@ impl<T: Filter<Extract=(), Error=Rejection> + Sized + Send + Clone> ApiHelpers f
                     relay: c.clone(),
                     origin_ip: origin,
                     param: None,
+                    param2: None,
                 }
             })
     }
@@ -226,6 +230,20 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             balance_lookup(api_data.relay, api_data.param.unwrap().clone()).await
         });
 
+    let public_swap = warp::get()
+        .with_v1()
+        .and(warp::path("key"))
+        .with_relay_and_ip(r.clone())
+        .and(warp::path::param())
+        .map(|mut api_data: ApiData, hash: String| {
+            api_data.param = Some(hash);
+            api_data
+        })
+        .and(warp::path("swaps"))
+        .and_then_as(move |api_data: ApiData| async move {
+            public_swap_lookup(api_data).await
+        });
+
     // TODO: Waterfall function, from address / raw address / public key proto / compact public key /
     let explorer_public_address = warp::get()
         .with_v1()
@@ -253,8 +271,31 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(transaction_get)
         .or(exe_hash)
         .or(explorer_public_address)
+        .or(public_swap)
 
 }
+
+async fn public_swap_lookup(p0: ApiData) -> RgResult<Vec<UserSwapInfoRow>> {
+    let pk = p0.param.ok_msg("Missing public key")?.parse_public_key()?;
+    let addrs = pk.to_all_addresses_for_network(&p0.relay.node_config.network)?;
+    let swaps = p0.relay.external_network_shared_data.clone_read().await
+        .iter()
+        .filter_map(|(k, v)| {
+            if let Some(pev) = v.party_events.as_ref() {
+                let swaps = pev.find_swaps_for_addresses(&addrs);
+                Some(swaps)
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect_vec();
+    // TODO: Replace with DS call.
+    let prices = p0.relay.price_map_pair_usd_incl_rdg().await;
+    let translated = SwapState::translate_swap_events(swaps, prices);
+    Ok(translated)
+}
+
 async fn explorer_public_address(relay: Arc<Relay>, hash: String) -> RgResult<Vec<DetailedAddress>> {
     let pk = hash.parse_public_key()?;
     let addrs = pk.to_all_addresses_for_network(&relay.node_config.network)?;

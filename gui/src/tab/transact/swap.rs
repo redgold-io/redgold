@@ -17,6 +17,7 @@ use redgold_schema::explorer::SwapStatus;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::party::address_event::AddressEvent;
+use redgold_schema::party::party_events::OrderFulfillment;
 use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix_and_suffix;
 use redgold_schema::party::search_events::PartyEventSearch;
 use redgold_schema::ShortString;
@@ -162,6 +163,11 @@ impl SwapState {
                     self.swap_subtab = swap_subtab;
                 }
             }
+            if self.swap_subtab == SwapSubTab::History {
+                if ui.button("Refresh").clicked() {
+                    data.refresh_swap_history(pk);
+                }
+            }
         });
 
         if self.swap_subtab == SwapSubTab::New {
@@ -229,47 +235,8 @@ impl SwapState {
                 events.push(row);
             }
 
-            for (of, swap, fulfillment) in swap_events {
-                let mut row = UserSwapInfoRow::default();
-                row.output_amount = of.fulfilled_currency_amount().to_fractional();
-                match swap {
-                    AddressEvent::External(e) => {
-                        row.txid = e.tx_id.clone();
-                        row.input_currency = e.currency.clone();
-                        row.input_amount = e.currency_amount().to_fractional();
-                        row.input_amount_usd = e.currency_amount().to_fractional() * pm.get(&e.currency)
-                            .cloned().unwrap_or(0.0);
-                        row.time = e.timestamp.unwrap_or(0) as i64;
-                        row.status = SwapStatus::Complete;
-                        row.output_currency = SupportedCurrency::Redgold;
-                        match fulfillment {
-                            AddressEvent::External(_) => {}
-                            AddressEvent::Internal(e) => {
-                                row.party_id = e.tx.first_input_proof_public_key().cloned().unwrap();
-                                row.fulfillment_txid = e.tx.hash_hex();
-                            }
-                        }
-                    }
-                    AddressEvent::Internal(e) => {
-                        row.txid = e.tx.hash_hex();
-                        row.input_currency = SupportedCurrency::Redgold;
-                        row.input_amount = e.tx.non_remainder_amount_rdg_typed().to_fractional();
-                        row.input_amount_usd = e.tx.non_remainder_amount_rdg_typed().to_fractional() *
-                            pm.get(&SupportedCurrency::Redgold).cloned().unwrap_or(0.0);
-                        row.time = e.tx.time().cloned().unwrap_or(0);
-                        row.status = SwapStatus::Complete;
-                        match fulfillment {
-                            AddressEvent::External(e) => {
-                                row.output_currency = e.currency.clone();
-                                row.fulfillment_txid = e.tx_id.clone();
-                            }
-                            AddressEvent::Internal(_) => {}
-                        }
-                    }
-                }
-                row.output_amount_usd = pm.get(&row.output_currency).map(|x| x * row.output_amount).unwrap_or(0.0);
-
-            }
+            let converted = Self::translate_swap_events(swap_events, pm);
+            events.extend(converted);
 
             let mut data = vec![];
             let mut headers = vec![
@@ -302,10 +269,56 @@ impl SwapState {
             };
             text_table_advanced(ui, data, false, false, None, vec![], Some(func));
 
-            ui.label("History coming soon, please check party address for events");
+            // ui.label("History coming soon, please check party address for events");
         }
 
         create_swap_tx_bool
+    }
+
+    pub fn translate_swap_events(swap_events: Vec<(OrderFulfillment, AddressEvent, AddressEvent)>, pm: HashMap<SupportedCurrency, f64>) -> Vec<UserSwapInfoRow> {
+        let mut rows = vec![];
+        for (of, swap, fulfillment) in swap_events {
+            let mut row = UserSwapInfoRow::default();
+            row.output_amount = of.fulfilled_currency_amount().to_fractional();
+            match swap {
+                AddressEvent::External(e) => {
+                    row.txid = e.tx_id.clone();
+                    row.input_currency = e.currency.clone();
+                    row.input_amount = e.currency_amount().to_fractional();
+                    row.input_amount_usd = e.currency_amount().to_fractional() * pm.get(&e.currency)
+                        .cloned().unwrap_or(0.0);
+                    row.time = e.timestamp.unwrap_or(0) as i64;
+                    row.status = SwapStatus::Complete;
+                    row.output_currency = SupportedCurrency::Redgold;
+                    match fulfillment {
+                        AddressEvent::External(_) => {}
+                        AddressEvent::Internal(e) => {
+                            row.party_id = e.tx.first_input_proof_public_key().cloned().unwrap();
+                            row.fulfillment_txid = e.tx.hash_hex();
+                        }
+                    }
+                }
+                AddressEvent::Internal(e) => {
+                    row.txid = e.tx.hash_hex();
+                    row.input_currency = SupportedCurrency::Redgold;
+                    row.input_amount = e.tx.non_remainder_amount_rdg_typed().to_fractional();
+                    row.input_amount_usd = e.tx.non_remainder_amount_rdg_typed().to_fractional() *
+                        pm.get(&SupportedCurrency::Redgold).cloned().unwrap_or(0.0);
+                    row.time = e.tx.time().cloned().unwrap_or(0);
+                    row.status = SwapStatus::Complete;
+                    match fulfillment {
+                        AddressEvent::External(e) => {
+                            row.output_currency = e.currency.clone();
+                            row.fulfillment_txid = e.tx_id.clone();
+                        }
+                        AddressEvent::Internal(_) => {}
+                    }
+                }
+            }
+            row.output_amount_usd = pm.get(&row.output_currency).map(|x| x * row.output_amount).unwrap_or(0.0);
+            rows.push(row);
+        }
+        rows
     }
 
     fn big_proceed_button(&mut self, ui: &mut Ui, next_stage: SwapStage, button_text: &str) -> bool {
