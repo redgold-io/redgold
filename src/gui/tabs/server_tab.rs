@@ -366,13 +366,20 @@ where G: GuiDepends + Clone + Send + 'static {
         }
     });
 
-    if ui.button("Backup Multiparty Local Shares").clicked() {
-        let option1 = servers.clone();
-        tokio::spawn(multiparty_backup::backup_multiparty_local_shares(
-            nc.clone(),
-            option1,
-        ));
-    }
+    ui.horizontal(|ui| {
+        if ui.button("Backup Multiparty Local Shares").clicked() {
+            let option1 = servers.clone();
+            tokio::spawn(multiparty_backup::backup_multiparty_local_shares(
+                nc.clone(),
+                option1,
+            ));
+        }
+
+        if ui.button("Backup Datastores").clicked() {
+            // let option1 = servers.clone();
+            g.backup_data_stores();
+        };
+    });
 
 }
 

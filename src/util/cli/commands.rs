@@ -32,6 +32,7 @@ use crate::infra::deploy::default_deploy;
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use redgold_common_no_wasm::cmd::run_cmd;
+use redgold_common_no_wasm::output_handlers;
 use redgold_common_no_wasm::ssh_like::ToSSHDeploy;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
@@ -286,36 +287,11 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
     nc.network = net;
 
 
-    let (default_fun, output_handler) = log_handler();
+    let (default_fun, output_handler) = output_handlers::log_handler();
 
     default_deploy(&mut deploy, &nc, output_handler, None, None).await?;
 
     Ok(default_fun)
-}
-
-pub fn log_handler() -> (JoinHandle<()>, Option<Sender<String>>) {
-    let c: Channel::<String> = Channel::new();
-    let r = c.receiver.clone();
-    let default_fun = tokio::spawn(async move {
-        loop {
-            let s = match r.recv_async_err().await {
-                Ok(x) => {
-                    x
-                }
-                Err(e) => {
-                    error!("Error in deploy: {}", e.json_or());
-                    break;
-                }
-            };
-            if !s.trim().is_empty() {
-                info!("{}", s);
-            }
-        }
-        ()
-    });
-
-    let output_handler = Some(c.sender.clone());
-    (default_fun, output_handler)
 }
 
 pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {

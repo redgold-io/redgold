@@ -7,6 +7,7 @@ use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
+use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
@@ -108,5 +109,7 @@ pub trait GuiDepends {
 
     fn form_eth_address(&self, pk: &PublicKey) -> RgResult<Address>;
     fn form_btc_address(&self, pk: &PublicKey) -> RgResult<Address>;
+
+    fn backup_data_stores(&self) -> RgResult<()>;
 
 }

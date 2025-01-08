@@ -20,6 +20,10 @@ impl EnvDataFolder {
         self.path.join("backups")
     }
 
+    pub fn backups_ds(&self) -> PathBuf {
+        self.path.join("backups-ds")
+    }
+
     pub fn data_store_path(&self) -> PathBuf {
         self.path.join("data_store.sqlite")
     }
