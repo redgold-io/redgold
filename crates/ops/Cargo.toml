@@ -1,0 +1,22 @@
+[package]
+name = "redgold-ops"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+redgold-schema = { workspace = true}
+redgold-data = { workspace = true}
+redgold-keys = { workspace = true}
+redgold-executor = { workspace = true}
+redgold-common-no-wasm = { workspace = true}
+tokio = {workspace = true}
+tracing = {workspace = true}

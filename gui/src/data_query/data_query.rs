@@ -43,7 +43,9 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + '
 
 
 impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
+    pub fn refresh_swap_history(&self, p0: &PublicKey) {
 
+    }
     pub fn party_keys(&self) -> Vec<PublicKey> {
         self.party_data.lock().unwrap().keys().cloned().collect::<Vec<PublicKey>>()
     }

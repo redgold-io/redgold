@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use redgold_schema::RgResult;
 use crate::DataStoreContext;
 use redgold_schema::structs::{SupportedCurrency, PriceSource, PriceTime, Weighting};
@@ -118,5 +119,32 @@ impl PriceTimeStore {
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         Ok(rows_m.map(|x| x.price))
     }
+    //
+    // pub async fn max_time_prices(&self, max_time: i64) -> RgResult<HashMap<SupportedCurrency, f64>> {
+    //     let mut pool = self.ctx.pool().await?;
+    //     let u = SupportedCurrency::Usd as i32;
+    //     let p = PriceSource::OkxMinute as i32;
+    //     let rows = sqlx::query!(
+    //         r#"
+    //     SELECT price, currency FROM price_time
+    //     WHERE denomination = ?1 AND source = ?2 AND time <= ?
+    //     ORDER BY time DESC
+    //     LIMIT 1
+    //     "#,
+    //         u,
+    //         p,
+    //         max_time
+    //     )
+    //         .fetch_all(&mut *pool)
+    //         .await;
+    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+    //     let mut hm = HashMap::new();
+    //     for r in rows_m {
+    //         let c = SupportedCurrency::from_i32(r.currency as i32).ok_msg("Missing currency")?;
+    //         let p = r.price;
+    //         hm.insert(c, p);
+    //     }
+    //     Ok(hm)
+    // }
 
 }

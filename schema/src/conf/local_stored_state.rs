@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
 use crate::conf::server_config::Deployment;
 use crate::servers::ServerOldFormat;
-use crate::structs::{Address, PeerId, PublicKey, TrustRatingLabel};
+use crate::structs::{Address, CurrencyAmount, PeerId, PublicKey, SupportedCurrency, TrustRatingLabel};
+use crate::tx::external_tx::ExternalTimedTransaction;
 
 
 
@@ -96,6 +97,22 @@ pub struct StoredPrivateKey {
     pub key_hex: String,
 }
 
+/// For data that is lightweight enough to be stored directly in config,
+/// somewhat ephermal, and not directly connected to chain data, such as external
+/// wallet integrations data before it appears in the network.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
+pub struct InternalStoredData {
+    pub pending_external_swaps: Option<Vec<PendingExternalSwapInfo>>
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
+pub struct PendingExternalSwapInfo {
+    // Could replace this potentially with specific class, but it's mostly the same.
+    pub external_tx: ExternalTimedTransaction,
+    pub party_id: PublicKey,
+    pub destination_currency: SupportedCurrency,
+    pub expected_amount: CurrencyAmount
+}
 
 // TODO: Change server to new format
 // TODO: Make all values optional for config loader.
@@ -113,6 +130,7 @@ pub struct LocalStoredState {
     pub identities: Option<Vec<Identity>>,
     pub mnemonics: Option<Vec<StoredMnemonic>>,
     pub private_keys: Option<Vec<StoredPrivateKey>>,
+    pub internal_stored_data: Option<InternalStoredData>
 }
 
 impl LocalStoredState {

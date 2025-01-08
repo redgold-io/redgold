@@ -17,7 +17,7 @@ use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::node_config::EnvDefaultNodeConfig;
 use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
-use crate::util::cli::commands::log_handler;
+use redgold_common_no_wasm::output_handlers::log_handler;
 use crate::util::cli::load_config::{load_config, load_full_config, main_config};
 
 pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
