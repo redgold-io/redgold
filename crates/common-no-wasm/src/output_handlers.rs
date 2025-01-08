@@ -1,7 +1,8 @@
 use tokio::task::JoinHandle;
 use flume::Sender;
-use redgold_common::flume_send_help::{Channel, RecvAsyncErrorInfo};
 use tracing::{error, info};
+use redgold_common::flume_send_help::{Channel, RecvAsyncErrorInfo};
+use redgold_schema::helpers::easy_json::EasyJson;
 
 pub fn log_handler() -> (JoinHandle<()>, Option<Sender<String>>) {
     let c: Channel::<String> = Channel::new();

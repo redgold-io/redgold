@@ -150,4 +150,8 @@ impl GuiDepends for WasmGuiDepends {
     fn form_btc_address(&self, pk: &PublicKey) -> RgResult<Address> {
         todo!()
     }
+
+    fn backup_data_stores(&self) -> RgResult<()> {
+        Ok(())
+    }
 }
