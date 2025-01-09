@@ -232,7 +232,9 @@ fn install_prometheus(socket: SocketAddrV4) -> RgResult<()> {
     let builder = PrometheusBuilder::new();
     let result = with_buckets(builder).error_info("Failed to set buckets")?;
     result
-        .with_http_listener(socket).install()
+        .with_http_listener(socket)
+        // .with_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        .install()
         .error_info("Failed to install Prometheus exporter")
         .with_detail("port", socket.port().to_string())
 }

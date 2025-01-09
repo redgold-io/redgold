@@ -100,12 +100,12 @@ impl EnvDefaultNodeConfig for NodeConfig {
 
     async fn by_env_with_args(env: NetworkEnvironment) -> NodeConfig {
         let mut nc = NodeConfig::default_env(env).await;
-        let (mut opts, mut cd) = load_full_config(true);
+        let (opts, mut cd) = load_full_config(true);
         cd.network = Some(env.to_std_string());
         nc.config_data = Arc::new(*cd.clone());
         let arg_translate = ArgTranslate::new(Box::new(nc.clone()), &opts);
-        let mut nc = arg_translate.translate_args().await.unwrap();
-        let mut nc = (*nc.clone());
+        let nc = arg_translate.translate_args().await.unwrap();
+        let nc = *nc.clone();
         nc
     }
 

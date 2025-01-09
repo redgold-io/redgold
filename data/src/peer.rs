@@ -5,6 +5,7 @@ use crate::DataStoreContext;
 use crate::schema::SafeOption;
 use itertools::Itertools;
 use metrics::{counter, gauge};
+use tracing::error;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::TestConstants;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -230,8 +231,9 @@ impl PeerStore {
         // return Err(ErrorInfo::error_info("debug error return"));
         // tracing::info!("add_peer_new");
         if peer_info.public_keys().contains(&self_key) {
-            return Err(ErrorInfo::error_info(
-                format!("Self key found in peer info {}", peer_info.json_or())))
+            error!("Self key found in peer info {}", peer_info.json_or());
+            self.remove_node(&self_key).await?;
+            return Ok(())
         }
 
         self.insert_peer(
