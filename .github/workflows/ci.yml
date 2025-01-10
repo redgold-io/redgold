@@ -152,6 +152,7 @@ jobs:
         # TODO: Update to use release plugin
         #      - run: cargo install cargo-release
         #      - run: cargo release # --execute --no-confirm --token ${{ secrets.GITHUB_TOKEN }}
+      - run: cargo clean;
       - run: echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
       - run: echo "Github branch = ${{ env.BRANCH }}"
       - run: export VERSION=$(head Cargo.toml | grep 'version = ' | cut -d "=" -f 2 | tr -d ' "'); echo "VERSION=$VERSION" >> $GITHUB_ENV
@@ -241,6 +242,7 @@ jobs:
         with:
           cache-on-failure: true
       - run: ./bin/install_build_deps.sh
+      - run: cargo clean
       - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
       - run: export RUSTFLAGS="-A warnings"; cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
