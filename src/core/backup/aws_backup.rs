@@ -119,14 +119,16 @@ impl AwsBackup {
                 }
 
             }
+
             if daily_keys.len() >= 7 {
-                let oldest = daily_keys.iter().min().unwrap();
-                let oldest = oldest.split('/').last().unwrap();
-                let oldest = oldest.parse::<i64>().unwrap();
-                let oldest = format!("{}/{}", daily_prefix.clone(), oldest);
-                // let oldest_to = format!("{}/{}", weekly_prefix, oldest);
-                // Self::s3_cp(bucket, oldest, ).await?;
-                self.s3_rm(bucket, oldest).await?;
+                if let Some(oldest) = daily_keys.iter().min()
+                    .and_then(|k| k.split('/').last().clone())
+                    .and_then(|k| k.parse::<i64>().ok()) {
+                    let oldest = format!("{}/{}", daily_prefix.clone(), oldest);
+                    // let oldest_to = format!("{}/{}", weekly_prefix, oldest);
+                    // Self::s3_cp(bucket, oldest, ).await?;
+                    self.s3_rm(bucket, oldest).await?;
+                }
             }
             let daily_key = format!("{}/{}", daily_prefix.clone(), ct);
             let parquet_exports = format!("{}/{}", daily_key, "parquet_exports");
