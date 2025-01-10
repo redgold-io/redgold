@@ -187,12 +187,12 @@ pub async fn debug_fix_server() {
 pub async fn manual_parse_test() {
 
     let mut nc = NodeConfig::default_env(NetworkEnvironment::Main).await;
-    let (mut opts, mut cd) = load_full_config(true);
+    let (opts, mut cd) = load_full_config(true);
     cd.network = Some("main".to_string());
     nc.config_data = Arc::new(*cd.clone());
     let arg_translate = ArgTranslate::new(Box::new(nc.clone()), &opts);
-    let mut nc = arg_translate.translate_args().await.unwrap();
-    let mut nc = (*nc.clone());
+    let nc = arg_translate.translate_args().await.unwrap();
+    let nc = *nc.clone();
 
     let latest = get_backup_latest_path(nc.clone()).await.expect("latest").expect("latest");
     println!("Latest backup: {:?}", latest.clone());

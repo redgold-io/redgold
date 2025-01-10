@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::thread;
 use std::sync::Arc;
 
 use futures::stream::FuturesUnordered;
