@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use async_trait::async_trait;
-use tracing::info;
+use tracing::{error, info};
 use redgold_data::data_store::DataStore;
 use redgold_data::parquet_export::ParquetExporter;
 use redgold_schema::{ErrorInfoContext, RgResult};
@@ -101,13 +101,23 @@ impl AwsBackup {
             let daily_keys = self.s3_ls(bucket, daily_prefix.clone()).await
                 .log_error().unwrap_or(vec![]);
             if !daily_keys.is_empty() {
-                let newest = daily_keys.iter().max().unwrap();
-                let newest = newest.split('/').last().unwrap();
-                let newest = newest.parse::<i64>().unwrap();
-                if ct - newest < (86400 / 2) {
-                    info!("Not enough time has passed since last backup");
-                    return Ok(());
+                if let Some(o) = daily_keys.iter().max() {
+                    if let Some(n) = o.split('/').last() {
+                        if let Ok(p) = n.parse::<i64>() {
+                            if ct - p < (86400 / 2) {
+                                info!("Not enough time has passed since last backup");
+                                return Ok(());
+                            }
+                        } else {
+                            error!("Failed to parse last value of max daily key");
+                        }
+                    } else {
+                        error!("Failed to get max daily key last value split /");
+                    }
+                } else {
+                    error!("Failed to get max daily key");
                 }
+
             }
             if daily_keys.len() >= 7 {
                 let oldest = daily_keys.iter().min().unwrap();
