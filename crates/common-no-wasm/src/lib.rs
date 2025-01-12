@@ -6,6 +6,8 @@ pub mod machine_info;
 pub mod ssh_like;
 pub mod output_handlers;
 
+pub mod stream_handlers;
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }

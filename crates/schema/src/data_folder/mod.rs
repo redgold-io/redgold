@@ -149,7 +149,7 @@ impl DataFolder {
 
     pub fn target(id: u32) -> Self {
         let cwd = std::env::current_dir().expect("Current dir");
-        let cwd_target = cwd.join("target");
+        let cwd_target = cwd.join("../../../../target");
         Self{path: cwd_target.join(format!("node_{}", id))}
     }
 

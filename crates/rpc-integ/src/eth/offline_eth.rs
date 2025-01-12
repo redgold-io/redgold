@@ -8,7 +8,7 @@ use redgold_schema::{RgResult, structs, ErrorInfoContext, SafeOption, error_info
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
-use crate::address_external::ToEthereumAddress;
+use redgold_keys::address_external::ToEthereumAddress;
 use crate::eth::historical_client::EthHistoricalClient;
 
 pub struct EthWalletWrapperOffline {

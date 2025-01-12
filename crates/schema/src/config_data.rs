@@ -87,6 +87,7 @@ pub struct RpcUrl {
     pub wallet_only: Option<bool>,
     pub authentication: Option<String>,
     pub file_path: Option<String>,
+    pub ws_only: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]

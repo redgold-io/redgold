@@ -1,5 +1,4 @@
 use std::str::FromStr;
-use bdk::bitcoin::hashes::hex::ToHex;
 use ethers::addressbook::Address;
 use ethers::middleware::{Middleware, SignerMiddleware};
 use ethers::prelude::{Bytes, LocalWallet, maybe, Provider, Signature, Signer, to_eip155_v, TransactionRequest, U256};
@@ -8,15 +7,13 @@ use ethers::providers;
 use ethers::providers::Http;
 // use log::kv::Key;
 use num_bigint::{BigInt, Sign};
+use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::KeyPair;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
-
-use crate::address_external::ToEthereumAddress;
 use crate::eth::historical_client::EthHistoricalClient;
-use crate::KeyPair;
-use crate::util::sign;
 
 pub struct EthWalletWrapper {
     pub wallet: LocalWallet,
@@ -93,7 +90,8 @@ impl EthWalletWrapper {
         let tx = self.client.get_transaction(receipt.transaction_hash).await.expect("works");
         // println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
         // println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
-        Ok(receipt.transaction_hash.0.to_hex())
+        let x = receipt.transaction_hash.0.to_vec();
+        Ok(hex::encode(x))
 
     }
 

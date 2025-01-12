@@ -2,20 +2,19 @@ use ethers::{core::types::TransactionRequest,
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, signers::{LocalWallet, Signer}};
 
 
-use crate::{KeyPair, TestConstants};
-
-use crate::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::WordsPass;
 
 use alloy_chains::Chain;
 use ethers::prelude::U256;
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::utils::Anvil;
 use foundry_block_explorers::Client;
+use redgold_keys::{KeyPair, TestConstants};
+use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::ErrorInfoContext;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::address_external::ToEthereumAddress;
 use crate::eth::eth_wallet::EthWalletWrapper;
 use crate::eth::historical_client::EthHistoricalClient;
 

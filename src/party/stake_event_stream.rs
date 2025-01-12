@@ -4,7 +4,7 @@ use itertools::Itertools;
 use rocket::form::validate::Contains;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::proof_support::PublicKeySupport;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalStakeEvent, PartyEvents, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
 use redgold_keys::external_tx_support::ExternalTxSupport;

@@ -2,7 +2,7 @@ use log::info;
 use redgold_common_no_wasm::retry;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;

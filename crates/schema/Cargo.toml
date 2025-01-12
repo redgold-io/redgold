@@ -1,16 +1,16 @@
 [package]
 name = "redgold-schema"
-version = "0.1.34"
-edition = "2021"
-authors = ["Redgold"]
-description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
-documentation = "https://dev.docs.redgold.io/"
-readme = "../README.md"
-homepage = "https://redgold.io"
-repository = "https://github.com/redgold-io/redgold"
-license = "MIT"
-keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
-categories = ["cryptography::cryptocurrencies"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 
 [dependencies]
@@ -19,12 +19,12 @@ parquet_derive = {workspace = true}
 sha3 = "0.10.8"
 prost = "0.11.9"
 prost-helper = "0.7.0"
-serde = { version = "1.0.130", features = ["default", "derive"] }
-serde_json = "1.0.59"
-serde_with = { version = "3.2.0", features = ["hex"] }
-itertools = "0.10.1"
-
-hex = "0.4.3"
+serde = { workspace = true}
+serde_json = { workspace = true}
+serde_cbor = { workspace = true}
+serde_with = { workspace = true}
+itertools = {workspace = true}
+hex = {workspace = true}
 strum = {workspace = true}
 strum_macros = {workspace = true}
 backtrace = "0.3.65"

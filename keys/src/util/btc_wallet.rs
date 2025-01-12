@@ -29,7 +29,6 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::{KeyPair, TestConstants};
 use crate::address_external::ToBitcoinAddress;
-use crate::eth::example::dev_ci_kp;
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
 use crate::util::mnemonic_support::{test_pkey_hex, test_pubk, WordsPass};

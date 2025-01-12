@@ -5,7 +5,7 @@ use redgold_schema::RgResult;
 use redgold_schema::party::all_parties::AllParties;
 use redgold_schema::structs::PublicKey;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;

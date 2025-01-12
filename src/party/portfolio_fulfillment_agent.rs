@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use log::info;
 use redgold_schema::RgResult;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToCurrencyAddress};
 use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};

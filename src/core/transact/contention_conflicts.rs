@@ -8,7 +8,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{ContentionKey, Hash, ObservationMetadata, ObservationProof};
 use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFoldOrReceive;
+use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use crate::util;
 
 #[derive(Clone)]

@@ -13,3 +13,20 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+redgold-schema = { workspace = true}
+redgold-keys = { workspace = true}
+tracing = {workspace = true}
+ethers = { version = "2.0.13", features = ["ws"]}
+foundry-block-explorers = "0.2.3"
+alloy-chains = "0.1.12"
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+tokio = {workspace = true}
+hex = {workspace = true}
+serde_json = { workspace = true }
+futures = { workspace = true }
+#serde_arrow = { version = "0.12.3", features = ["arrow-54"] }
+serde_cbor = { workspace = true }
+serde = {workspace = true}
+#arrow = "54.0.0"
+#serde_par

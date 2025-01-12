@@ -16,7 +16,7 @@ categories = ["cryptography::cryptocurrencies"]
 [workspace]
 members = [
     "data",
-    "schema",
+    "crates/schema",
     "sdk",
     "crates/executor",
     "keys",
@@ -31,6 +31,7 @@ members = [
     "crates/node-core",
     "crates/ci",
     "crates/ops",
+    "crates/daq",
 ]
 exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"]
 
@@ -60,7 +61,7 @@ description = "Crypto portfolio/ETF contract network"
 
 
 [workspace.dependencies]
-redgold-schema = { path = "schema", version = "0.1.34"}
+redgold-schema = { path = "crates/schema" }
 redgold-data = { path = "data", version = "0.1.34"}
 redgold-keys = { path = "keys", version = "0.1.34"}
 redgold-executor = { path = "crates/executor"}
@@ -76,26 +77,38 @@ redgold-common-no-wasm = { path = "crates/common-no-wasm" }
 redgold-fs = { path = "crates/fs" }
 redgold-ops = { path = "crates/ops" }
 
-parquet_derive = "53.3.0"
-hex = "0.4.3"
+# Serialization
 serde = { version = "1.0.130", features = ["default", "derive"] }
 serde_json = "1.0.59"
 serde_with = { version = "3.2.0", features = ["hex"] }
+serde_cbor = "0.11.2"
+serde_arrow = { version = "0.12.3", features = ["arrow-54"] }
+toml = "0.8.12"
+
+num-bigint = "0.4"
+num-traits = "0.2"
+parquet_derive = "54.0.0"
+hex = "0.4.3"
+sha3 = "0.10.8"
+
 itertools = "0.10.1"
+rand = '0.8.4'
+
 log = "0.4.14"
 metrics = "0.22.0"
-dirs = "5.0.1"
-sha3 = "0.10.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-rand = '0.8.4'
+dirs = "5.0.1"
+
+# Futures / Runtimes / Channels / Async
 tokio = { version = "1.41.1", features = ["io-util", "io-std", "macros", "rt", "rt-multi-thread", "process"] }
+tokio-stream = "0.1.14"
 futures = "0.3.1"
 async-trait = "0.1.56"
-num-bigint = "0.4"
-toml = "0.8.12"
 arc-swap = { version = "1.7.1", default-features = true }
 flume = { version = "0.11.0", features = ["futures-core", "futures-sink", "default"] }
+
+
 qrencode = "0.14.0"
 csscolorparser = "0.6.2"
 # enum stuff
@@ -115,6 +128,7 @@ redgold-gui = {workspace = true}
 redgold-common = {workspace = true}
 redgold-common-no-wasm = {workspace = true}
 redgold-ops = {workspace = true}
+redgold-rpc-integ = {workspace = true}
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
 flume = {workspace = true}
@@ -195,7 +209,7 @@ curv-kzen = { version = "0.9", default-features = false }
 # conflict with multi-party-ecdsa
 tokio = { workspace = true }
 tokio-util = { version = "0.7.8", features = ["default", "net", "codec"] }
-tokio-stream = "0.1.14"
+tokio-stream = { workspace = true }
 
 csv = "1.1"
 rpassword = "7.2.0"

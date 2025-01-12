@@ -2,10 +2,9 @@ use std::str::FromStr;
 use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use serde::Serialize;
-use redgold_schema::{ErrorInfoContext, RgResult, structs};
+use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, Hash};
-use crate::util::dhash_vec;
 use crate::util::keys::ToPublicKeyFromLib;
 use crate::util::mnemonic_support::WordsPass;
 
@@ -16,7 +15,6 @@ pub mod util;
 pub mod debug;
 pub mod xpub_wrapper;
 pub mod address_external;
-pub mod eth;
 pub mod address_support;
 pub mod hw_wallet_wrapper;
 pub mod tx_proof_validate;
@@ -26,6 +24,7 @@ pub mod solana;
 pub mod monero;
 pub mod gpg;
 pub mod word_pass_support;
+pub mod eth;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,

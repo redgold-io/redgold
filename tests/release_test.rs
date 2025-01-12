@@ -1,6 +1,6 @@
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_keys::eth::example::dev_ci_kp;
+use redgold_rpc_integ::::example::dev_ci_kp;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment};
 use redgold::core::transact::tx_broadcast_support::TxBroadcastSupport;

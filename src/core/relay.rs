@@ -41,7 +41,6 @@ use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
@@ -457,6 +456,7 @@ are instantiated by the node
 */
 
 use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};

@@ -12,8 +12,6 @@ use tracing::info;
 use tokio::sync::Mutex;
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
@@ -24,6 +22,8 @@ use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, Ne
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
 use redgold_keys::word_pass_support::NodeConfigKeyPair;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::core::relay::Relay;
 use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;

@@ -1,10 +1,11 @@
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
