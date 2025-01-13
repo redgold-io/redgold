@@ -12,6 +12,7 @@ use crate::core::relay::Relay;
 use crate::core::services::service_join_handles::{NamedHandle, ServiceJoinHandles};
 use redgold_common_no_wasm::stream_handlers;
 use redgold_common_no_wasm::stream_handlers::{run_interval_fold, run_interval_fold_or_recv, run_recv_concurrent, run_recv_single};
+use redgold_daq::eth::EthDaq;
 use crate::core::transact::tx_writer::TxWriter;
 use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
@@ -186,6 +187,11 @@ impl Node {
         sjh.add("RecentParityCheck", run_interval_fold(
             RecentParityCheck::new(&relay), Duration::from_secs(3600), false
         ));
+
+        // if let Some(jh) = relay.eth_daq.start(&relay.node_config).await {
+        //     let result = jh.expect("eth_daq start failed");
+        //     sjh.add("EthNodeSubscriber", result);
+        // }
 
         sjh.handles
     }

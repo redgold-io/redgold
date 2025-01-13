@@ -19,6 +19,7 @@ use crate::node::Node;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use crate::util;
+use crate::util::runtimes::big_thread;
 
 #[derive(Clone)]
 pub struct LocalTestNodeContext {
@@ -34,24 +35,12 @@ impl LocalTestNodeContext {
     async fn new(id: u16, random_port_offset: u16, seed: Vec<Seed>,
                  ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
     ) -> Self {
-        let mut node_config = NodeConfig::from_test_id(&id);
-        let mut pd = (*node_config.config_data).clone();
-        let mut party_data = pd.party.unwrap_or_default();
-        party_data.order_cutoff_delay_time = Some(5_000);
-        party_data.poll_interval = Some(20_000);
-        pd.party = Some(party_data);
-        node_config.config_data = Arc::new(pd);
-        node_config.port_offset = random_port_offset;
-        if id == 0 {
-            let mut opts = (&*node_config.config_data.clone()).clone();
-            let mut p = opts.party.clone().unwrap_or_default();
-            opts.debug.get_or_insert(Default::default()).genesis = Some(true);
-            p.enable = Some(true);
-            opts.party = Some(p);
-            node_config.config_data = Arc::new(opts);
-        }
 
-        node_config.seeds = seed.clone();
+        let nc = big_thread().spawn(move || {
+            Self::get_node_config(&id, random_port_offset, seed.clone())
+        });
+        let node_config = nc.unwrap().join().unwrap();
+
         // let runtimes = NodeRuntimes::default();
         let relay = Relay::new(node_config.clone()).await;
         Node::prelim_setup(relay.clone()
@@ -93,6 +82,27 @@ impl LocalTestNodeContext {
             control_client: ControlClient::local(node.relay.node_config.control_port()),
             // futures
         }
+    }
+
+    fn get_node_config(id: &u16, random_port_offset: u16, seed: Vec<Seed>) -> NodeConfig {
+        let mut node_config = NodeConfig::from_test_id(&id);
+        let mut pd = (*node_config.config_data).clone();
+        let mut party_data = pd.party.unwrap_or_default();
+        party_data.order_cutoff_delay_time = Some(5_000);
+        party_data.poll_interval = Some(20_000);
+        pd.party = Some(party_data);
+        node_config.config_data = Arc::new(pd);
+        node_config.port_offset = random_port_offset;
+        if *id == 0 {
+            let mut opts = (&*node_config.config_data.clone()).clone();
+            let mut p = opts.party.clone().unwrap_or_default();
+            opts.debug.get_or_insert(Default::default()).genesis = Some(true);
+            p.enable = Some(true);
+            opts.party = Some(p);
+            node_config.config_data = Arc::new(opts);
+        }
+        node_config.seeds = seed.clone();
+        node_config
     }
 }
 

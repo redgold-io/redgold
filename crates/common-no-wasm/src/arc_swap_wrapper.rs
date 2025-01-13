@@ -7,6 +7,12 @@ pub struct WriteOneReadAll<T> where T: Clone {
 }
 
 impl<T> WriteOneReadAll<T> where T: Clone  {
+
+    pub fn new(t: T) -> Self {
+        Self {
+            inner: Arc::new(ArcSwap::new(Arc::new(t)))
+        }
+    }
     pub fn write(&mut self, t: T) -> () {
         self.inner.store(Arc::new(t));
     }

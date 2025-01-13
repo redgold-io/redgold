@@ -69,7 +69,7 @@ pub struct NodeData {
     pub http_client_proxy: Option<String>,
     pub udp_serve_disabled: Option<bool>,
     pub allowed_http_proxy_origins: Option<Vec<String>>,
-    pub daq: Option<DaqConfig>
+    // pub daq: Option<DaqConfig>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -213,7 +213,7 @@ impl ConfigData {
                 http_client_proxy: None,
                 udp_serve_disabled: None,
                 allowed_http_proxy_origins: None,
-                daq: None,
+                // daq: None,
             }),
             party: Some(PartyConfigData {
                 enable: Some(false),

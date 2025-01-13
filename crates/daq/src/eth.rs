@@ -73,14 +73,14 @@ impl EthDaq {
     }
 
     pub async fn from_eth_provider_stream(
+        &self,
         e: RgResult<EthereumWsProvider>,
-        filter: WriteOneReadAll<Vec<String>>,
         duration: Duration,
     ) -> RgResult<JoinHandle<RgResult<()>>> {
         let provider = e?;
 
-        let mut s = EthDaq::default();
-        s.daq.subscribed_address_filter = filter.clone();
+        let mut s = self.clone();
+        let filter = s.daq.subscribed_address_filter.clone();
         let addrs = filter.read();
         for a in addrs.iter() {
             s.add_address_and_backfill_historical(a.clone()).await?;
@@ -103,16 +103,17 @@ impl EthDaq {
         }))
     }
     pub async fn start(
-        nc: &NodeConfig,
-        filter: WriteOneReadAll<Vec<String>>
+        &self,
+        nc: &NodeConfig
     ) -> Option<RgResult<JoinHandle<RgResult<()>>>> {
-        let duration = nc.config_data.node.as_ref()
-            .and_then(|n| n.daq.as_ref())
-            .and_then(|n| n.poll_duration_seconds.clone())
-            .unwrap_or(600);
+        // let duration = nc.config_data.node.as_ref()
+        //     .and_then(|n| n.daq.as_ref())
+        //     .and_then(|n| n.poll_duration_seconds.clone())
+        //     .unwrap_or(600);
+        let duration = 60;
 
         if let Some(p) = EthereumWsProvider::new_from_config(nc).await {
-            Some(Self::from_eth_provider_stream(p, filter, Duration::from_secs(duration as u64)).await)
+            Some(self.from_eth_provider_stream(p, Duration::from_secs(duration as u64)).await)
         } else {
             None
         }

@@ -13,6 +13,22 @@ pub struct ExternalDaq {
 }
 
 impl ExternalDaq {
+
+    pub fn all_tx_for(&self, address: &String) -> Vec<ExternalTimedTransaction> {
+        let recent = self.recent_transactions.read();
+        let historical = self.historical_transactions.read();
+        let mut txs = vec![];
+        if let Some(recent_txs) = recent.get(address) {
+            txs.extend(recent_txs.clone());
+        }
+        if let Some(historical_txs) = historical.get(address) {
+            if let Ok(historical_txs) = historical_txs {
+                txs.extend(historical_txs.clone());
+            }
+        }
+        txs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        txs
+    }
     pub fn add_new_tx(&mut self, tx: ExternalTimedTransaction) {
         let mut recent_tx = (*self.recent_transactions.read()).clone();
         let txs = recent_tx.entry(tx.other_address.clone()).or_insert(vec![]);
