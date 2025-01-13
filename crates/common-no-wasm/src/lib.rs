@@ -7,6 +7,7 @@ pub mod ssh_like;
 pub mod output_handlers;
 
 pub mod stream_handlers;
+pub mod arc_swap_wrapper;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

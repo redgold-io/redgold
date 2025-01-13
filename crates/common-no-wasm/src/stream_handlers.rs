@@ -1,18 +1,12 @@
-use std::time::Duration;
-use redgold_schema::{RgResult, structs};
-use tokio_stream::wrappers::IntervalStream;
-use tokio::task::JoinHandle;
 use async_trait::async_trait;
-use std::collections::HashSet;
-use std::future::Future;
 use flume::Receiver;
 use futures::future::Either;
-use futures::TryStreamExt;
+use futures::{Stream, TryStreamExt};
+use redgold_schema::RgResult;
 use tokio_stream::StreamExt;
-use redgold_schema::structs::{ErrorInfo, GetPeersInfoRequest};
-use tracing::error;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::observability::errors::Loggable;
+use std::time::Duration;
+use tokio::task::JoinHandle;
+use tokio_stream::wrappers::IntervalStream;
 
 #[async_trait]
 pub trait IntervalFold  {
@@ -103,9 +97,23 @@ pub async fn run_interval_fold_or_recv<T>(
     tokio::spawn(run_interval_inner_or_recv::<T>(interval_f, interval_duration, run_at_start, recv))
 }
 
+pub async fn run_interval_fold_or_recv_stream<T>(
+    interval_f: impl IntervalFoldOrReceive<T> + Send + 'static,
+    interval_duration: Duration, run_at_start: bool, recv: impl Stream<Item = T> + Clone + Send + 'static
+) -> JoinHandle<RgResult<()>> where T: Send + 'static {
+    tokio::spawn(run_interval_inner_or_recv_stream::<T>(interval_f, interval_duration, run_at_start, recv))
+}
+
 pub async fn run_interval_inner_or_recv<T>(
     interval_f: impl IntervalFoldOrReceive<T>, interval_duration: Duration, run_at_start: bool,
     receiver: Receiver<T>
+) -> RgResult<()> where T: Send + 'static {
+    run_interval_inner_or_recv_stream(interval_f, interval_duration, run_at_start, receiver.into_stream()).await
+}
+
+pub async fn run_interval_inner_or_recv_stream<T>(
+    interval_f: impl IntervalFoldOrReceive<T>, interval_duration: Duration, run_at_start: bool,
+    receiver: impl Stream<Item = T> + Clone + Send + 'static
 ) -> RgResult<()> where T: Send + 'static {
     let mut cs = interval_f;
     if run_at_start {
@@ -114,7 +122,6 @@ pub async fn run_interval_inner_or_recv<T>(
 
     let recv = receiver.clone();
     let stream = recv
-        .into_stream()
         .map(|x| Ok(Either::Left(x)));
     let interval = tokio::time::interval(interval_duration);
     let interval_stream = IntervalStream::new(interval).map(|_| Ok(Either::Right(())));

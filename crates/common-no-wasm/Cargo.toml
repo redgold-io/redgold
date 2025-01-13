@@ -23,3 +23,4 @@ futures = { workspace = true }
 rand = { workspace = true }
 itertools = { workspace = true }
 tracing = { workspace = true }
+arc-swap = {workspace = true}

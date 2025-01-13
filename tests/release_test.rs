@@ -1,11 +1,11 @@
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_rpc_integ::::example::dev_ci_kp;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment};
 use redgold::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use redgold::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use redgold::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
+use redgold::test::external_amm_integration::dev_ci_kp;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 
 #[tokio::test]

@@ -46,6 +46,12 @@ pub struct ServiceIntervals {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 #[serde(default)]
+pub struct DaqConfig {
+    pub poll_duration_seconds: Option<i64>
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
+#[serde(default)]
 pub struct NodeData {
     pub words: Option<String>,
     pub peer_id: Option<String>,
@@ -63,6 +69,7 @@ pub struct NodeData {
     pub http_client_proxy: Option<String>,
     pub udp_serve_disabled: Option<bool>,
     pub allowed_http_proxy_origins: Option<Vec<String>>,
+    pub daq: Option<DaqConfig>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -206,6 +213,7 @@ impl ConfigData {
                 http_client_proxy: None,
                 udp_serve_disabled: None,
                 allowed_http_proxy_origins: None,
+                daq: None,
             }),
             party: Some(PartyConfigData {
                 enable: Some(false),
@@ -313,6 +321,7 @@ impl ConfigData {
 
 use std::env;
 use crate::conf::server_config::{Deployment, DeploymentDefaultParams, NodeInstance, ServerData};
+use crate::party::external_data::PriceDataPointUsdQuery;
 use crate::proto_serde::ProtoSerde;
 use crate::RgResult;
 use crate::servers::ServerOldFormat;

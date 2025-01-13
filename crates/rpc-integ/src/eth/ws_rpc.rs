@@ -2,12 +2,11 @@ use std::str::FromStr;
 use ethers::middleware::Middleware;
 use ethers::prelude::{StreamExt, Transaction};
 use ethers::providers::{Provider, Ws};
-use futures::Stream;
+use futures::{stream, Stream};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, SupportedCurrency};
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
-use futures::stream::{self, StreamExt as _};
 use std::sync::Arc;
 use ethers::types::U256;
 use num_bigint::BigInt;
@@ -21,7 +20,7 @@ pub struct EthereumWsProvider {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-struct TimestampedEthereumTransaction {
+pub struct TimestampedEthereumTransaction {
     pub timestamp: U256,
     pub tx: Transaction
 }
@@ -35,6 +34,11 @@ impl TimestampedEthereumTransaction {
     pub fn tx_id(&self) -> String {
         hex::encode(self.tx.hash.0.to_vec())
     }
+
+    pub fn addrs(&self) -> Vec<String> {
+        vec![self.tx.from.to_string(), self.tx.to.clone().unwrap_or_default().to_string()]
+    }
+
 }
 
 impl EthereumWsProvider {
@@ -102,7 +106,7 @@ impl EthereumWsProvider {
     }
 
     pub fn convert_transaction(
-        party_self_addrs: Vec<String>,
+        party_self_addrs: &Vec<String>,
         timestamped_tx: TimestampedEthereumTransaction
     )
         -> RgResult<ExternalTimedTransaction> {

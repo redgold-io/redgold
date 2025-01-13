@@ -20,3 +20,6 @@ redgold-executor = { workspace = true}
 redgold-common-no-wasm = { workspace = true}
 redgold-rpc-integ = { workspace = true}
 tokio = {workspace = true}
+arc-swap = {workspace = true}
+futures = {workspace = true}
+metrics = {workspace = true}

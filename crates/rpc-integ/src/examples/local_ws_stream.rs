@@ -1,7 +1,6 @@
 use ethers::middleware::Middleware;
-use ethers::prelude::{StreamExt, Transaction, TransactionReceipt};
+use ethers::prelude::StreamExt;
 use ethers::providers::{Provider, Ws};
-use ethers::types::Block;
 
 #[ignore]
 #[tokio::test]

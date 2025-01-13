@@ -138,6 +138,7 @@ impl<T> ReadManyWriteOne<T> where T: Clone  {
 
 }
 
+
 #[derive(Clone)]
 pub struct Relay {
     /// Internal configuration
@@ -189,6 +190,7 @@ pub struct Relay {
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub peer_info: PeerInfo,
+    pub eth_daq: EthDaq
     // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
 }
 
@@ -456,6 +458,8 @@ are instantiated by the node
 */
 
 use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_daq::eth::EthDaq;
+use redgold_keys::address_external::ToEthereumAddress;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};

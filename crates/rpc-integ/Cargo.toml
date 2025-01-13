@@ -25,8 +25,11 @@ tokio = {workspace = true}
 hex = {workspace = true}
 serde_json = { workspace = true }
 futures = { workspace = true }
+#tokio-stream = { workspace = true }
 #serde_arrow = { version = "0.12.3", features = ["arrow-54"] }
 serde_cbor = { workspace = true }
 serde = {workspace = true}
 #arrow = "54.0.0"
 #serde_par
+#bitcoincore-rpc = "0.19.0"
+#bitcoin = "0.32.5"
