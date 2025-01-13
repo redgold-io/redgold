@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.34"
+version = "0.1.35"
 edition = "2021"
 authors = ["Redgold"]
 description = "Decentralized Portfolio Contracts & Data Lake"
@@ -62,10 +62,10 @@ description = "Crypto portfolio/ETF contract network"
 
 [workspace.dependencies]
 redgold-schema = { path = "crates/schema" }
-redgold-data = { path = "data", version = "0.1.34"}
-redgold-keys = { path = "keys", version = "0.1.34"}
+redgold-data = { path = "data", version = "0.1.35"}
+redgold-keys = { path = "keys", version = "0.1.35"}
 redgold-executor = { path = "crates/executor"}
-redgold-sdk-client = { path = "sdk-client", version = "0.1.34"}
+redgold-sdk-client = { path = "sdk-client", version = "0.1.35"}
 redgold-rpc-integ = { path = "crates/rpc-integ" }
 redgold-daq = { path = "crates/daq" }
 redgold-node-core = { path = "crates/node-core" }
