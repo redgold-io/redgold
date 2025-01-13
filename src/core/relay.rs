@@ -190,7 +190,7 @@ pub struct Relay {
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub peer_info: PeerInfo,
-    // pub eth_daq: EthDaq
+    pub eth_daq: EthDaq
     // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
 }
 
@@ -1221,7 +1221,7 @@ impl Relay {
             observation: flume_send_help::new_channel::<Transaction>(),
             // multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
             observation_metadata: flume_send_help::new_channel::<ObservationMetadataInternalSigning>(),
-            peer_message_tx: flume_send_help::new_channel::<PeerMessage>(),
+            peer_message_tx: new_channel::<PeerMessage>(),
             peer_message_rx: flume_send_help::new_channel::<PeerMessage>(),
             ds,
             transaction_channels: Arc::new(DashMap::new()),
@@ -1244,6 +1244,7 @@ impl Relay {
             btc_wallets: Arc::new(Default::default()),
             peer_info: Default::default(),
             // eth_daq: Default::default(),
+            eth_daq: Default::default(),
         }
     }
 }
