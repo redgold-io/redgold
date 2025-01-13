@@ -164,7 +164,7 @@ jobs:
       - run: rustup -V
 #      - run: cargo clean
 #      - run: ./bin/test.sh
-      - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
+      - run: echo "${{ github.run_number }}" > crates/schema/src/resources/build_number
       - run: export RUSTFLAGS="-A warnings"; cargo build --release
         # try CWD?
 #      - run: ./bin/local_test.sh "./target/release/redgold"
