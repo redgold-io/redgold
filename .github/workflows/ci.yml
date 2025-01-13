@@ -243,7 +243,7 @@ jobs:
           cache-on-failure: true
       - run: ./bin/install_build_deps.sh
       - run: cargo clean
-      - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
+      - run: echo "${{ github.run_number }}" > crates/schema/src/resources/build_number
       - run: export RUSTFLAGS="-A warnings"; cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
       - uses: actions/upload-artifact@v3
@@ -362,7 +362,7 @@ jobs:
         run: ./bin/release_branches.sh
       - run: echo "release branch match output ${{ steps.check-branch.outputs.match }}"
       - run: echo steps.check-branch.outputs.match
-      - run: echo "${{ github.run_number }}" > schema/src/resources/build_number
+      - run: echo "${{ github.run_number }}" > crates/schema/src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
       - run: echo "asdf" > ./redgold.app.zip
       - name: Install GMP
