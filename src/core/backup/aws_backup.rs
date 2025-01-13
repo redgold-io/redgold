@@ -18,6 +18,7 @@ use redgold_schema::config_data::ConfigData;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::ErrorInfo;
+use redgold_schema::util::times::{ToMillisFromTimeString, ToTimeString};
 use crate::util;
 
 
@@ -82,61 +83,58 @@ impl AwsBackup {
             (self.relay.node_config.s3_backup(),
              self.relay.node_config.server_index()) {
 
-            let client = self.relay.node_config.config_data.s3_client().await;
-
-            let result = client.put_object()
-                .bucket("redgold-backups")
-                .key("test_from_cluster.txt")
-                .body(ByteStream::from(Vec::from("test")))
-                .send()
-                .await
-                .error_info("S3 put object failure in test")?;
-
-            info!("Put result: {:?}", result);
-
-            let daily_prefix = format!("daily/{}", server_index);
+            let daily_prefix = format!("daily/{}/{}", self.relay.node_config.network.to_std_string(), server_index);
             // let weekly_prefix = format!("weekly/{}", server_index);
             // let monthly_prefix = format!("monthly/{}", server_index);
             info!("Listing keys in bucket {}", bucket);
             let daily_keys = self.s3_ls(bucket, daily_prefix.clone()).await
                 .log_error().unwrap_or(vec![]);
-            if !daily_keys.is_empty() {
-                if let Some(o) = daily_keys.iter().max() {
-                    if let Some(n) = o.split('/').last() {
-                        if let Ok(p) = n.parse::<i64>() {
-                            if ct - p < (86400 / 2) {
-                                info!("Not enough time has passed since last backup");
-                                return Ok(());
-                            }
-                        } else {
-                            error!("Failed to parse last value of max daily key");
-                        }
-                    } else {
-                        error!("Failed to get max daily key last value split /");
-                    }
-                } else {
-                    error!("Failed to get max daily key");
-                }
-
+            if Self::has_recent_daily_backup(&daily_keys) {
+                info!("Skipping backup, not enough time has passed since last backup");
+                return Ok(());
             }
 
-            if daily_keys.len() >= 7 {
-                if let Some(oldest) = daily_keys.iter().min()
-                    .and_then(|k| k.split('/').last().clone())
-                    .and_then(|k| k.parse::<i64>().ok()) {
-                    let oldest = format!("{}/{}", daily_prefix.clone(), oldest);
-                    // let oldest_to = format!("{}/{}", weekly_prefix, oldest);
-                    // Self::s3_cp(bucket, oldest, ).await?;
-                    self.s3_rm(bucket, oldest).await?;
-                }
-            }
-            let daily_key = format!("{}/{}", daily_prefix.clone(), ct);
+            // if daily_keys.len() >= 7 {
+            //     if let Some(oldest) = daily_keys.iter().min()
+            //         .and_then(|k| k.split('/').last().clone())
+            //         .and_then(|k| k.parse::<i64>().ok()) {
+            //         let oldest = format!("{}/{}", daily_prefix.clone(), oldest);
+            //         // let oldest_to = format!("{}/{}", weekly_prefix, oldest);
+            //         // Self::s3_cp(bucket, oldest, ).await?;
+            //         self.s3_rm(bucket, oldest).await?;
+            //     }
+            // }
+            let daily_key = format!("{}/{}", daily_prefix.clone(), ct.to_time_string_shorter_underscores());
             let parquet_exports = format!("{}/{}", daily_key, "parquet_exports");
             self.s3_upload_directory(&self.relay.node_config.env_data_folder().parquet_exports(), bucket.clone(), parquet_exports).await?;
         } else {
             info!("No s3_backup_bucket or server_index set")
         };
         Ok(())
+    }
+
+    fn has_recent_daily_backup(daily_keys: &Vec<String>) -> bool {
+        let ct = util::current_time_unix() as i64;
+        if !daily_keys.is_empty() {
+            if let Some(o) = daily_keys.iter().max() {
+                if let Some(n) = o.split('/').last() {
+                    let ms = n.to_string().to_millis_from_time_string_shorter_underscores();
+                    if let Some(p) = ms {
+                        if ct - p < (86400 / 2) {
+                            info!("Not enough time has passed since last backup");
+                            return true;
+                        }
+                    } else {
+                        error!("Failed to parse last value of max daily key");
+                    }
+                } else {
+                    error!("Failed to get max daily key last value split /");
+                }
+            } else {
+                error!("Failed to get max daily key");
+            }
+        }
+        false
     }
 
     pub async fn s3_upload_directory(&self, dir: &PathBuf, bucket: String, prefix: String) -> RgResult<()> {

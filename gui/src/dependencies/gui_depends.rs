@@ -111,5 +111,6 @@ pub trait GuiDepends {
     fn form_btc_address(&self, pk: &PublicKey) -> RgResult<Address>;
 
     fn backup_data_stores(&self) -> RgResult<()>;
+    fn restore_data_stores(&self) -> RgResult<()>;
 
 }

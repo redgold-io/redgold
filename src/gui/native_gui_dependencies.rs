@@ -18,7 +18,7 @@ use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
-use redgold_ops::backup_datastore::backup_datastore_servers;
+use redgold_ops::backup_datastore::{backup_datastore_servers, restore_datastore_servers};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
@@ -334,4 +334,14 @@ impl GuiDepends for NativeGuiDepends {
         });
         Ok(())
     }
+
+    fn restore_data_stores(&self) -> RgResult<()> {
+        let nc = self.nc.lock().unwrap().clone();
+        let servers = nc.servers_old();
+        self.spawn(async {
+            restore_datastore_servers(nc, servers).await
+        });
+        Ok(())
+    }
+
 }

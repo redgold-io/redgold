@@ -7,6 +7,45 @@ use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::util;
 use redgold_schema::util::times::{current_time_millis, ToTimeString};
 
+pub async fn restore_datastore_servers(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
+
+    let net_str = p0.network.to_std_string();
+    let secure_or = p0.secure_or().by_env(p0.network);
+    let bk = secure_or.backups_ds();
+
+    // List dir on backups path:
+    let mut dirs = vec![];
+    for dir in std::fs::read_dir(bk.clone()).expect("read dir") {
+        let path = dir.expect("dir").path();
+        dirs.push(path);
+    }
+    dirs.sort();
+    if let Some(d) = dirs.last() {
+        let handler = log_handler().1;
+        for s in p1 {
+            let server_dir = d.join(s.index.to_string());
+            let ds_dir = server_dir.join("data_store.sqlite");
+            let ds_str = ds_dir.to_str().expect("").to_string();
+            info!("Restoring data store for server: {} with path {}", s.index, ds_str);
+
+            let mut ssh = DeployMachine::new(&s, None, handler.clone());
+            let user = s.username.unwrap_or("root".to_string());
+            let backup_cmd = format!(
+                "scp {} {}@{}:~/.rg/{}/{}",
+                ds_str, user, s.host.clone(), net_str, "data_store.sqlite"
+            );
+            info!(" Restore cmd Running command: {}", backup_cmd);
+            let res = redgold_common_no_wasm::cmd::run_bash_async(
+                backup_cmd
+            ).await.expect("");
+            info!("Restore result: {:?}", res);
+            info!("Removing SHM and WAL");
+            ssh.exes(r"rm -f ~/.rg/{net_str}/data_store.sqlite-shm", &handler).await.expect("");
+            ssh.exes(r"rm -f ~/.rg/{net_str}/data_store.sqlite-wal", &handler).await.expect("");
+        }
+    }
+
+}
 pub async fn backup_datastore_servers(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
 
     let net_str = p0.network.to_std_string();

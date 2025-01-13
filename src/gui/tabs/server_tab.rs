@@ -251,7 +251,7 @@ where G: GuiDepends + Clone + Send + 'static {
         let hard = state.hard_coord_reset.clone();
         if hard {
             d.hard_coord_reset = true;
-            d.purge = true;
+            // d.purge = true;
             d.debug_skip_start = true;
         }
         let config = nc.clone();
@@ -379,6 +379,12 @@ where G: GuiDepends + Clone + Send + 'static {
             // let option1 = servers.clone();
             g.backup_data_stores();
         };
+
+        if ui.button("Restore Datastores").clicked() {
+            // let option1 = servers.clone();
+            g.restore_data_stores();
+        };
+
     });
 
 }

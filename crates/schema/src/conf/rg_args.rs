@@ -338,6 +338,10 @@ pub struct Deploy {
     /// Skip sudo / system modification commands, requires external setup in advance.
     #[clap(long)]
     pub disable_apt_system_init: bool,
+    /// Delete internal peer TX in favor of reloading from the config
+    #[clap(long)]
+    pub refresh_peer_tx: bool,
+
 }
 
 /// Send a transaction from current (default or active) wallet to a destination address

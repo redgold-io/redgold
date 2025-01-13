@@ -154,4 +154,8 @@ impl GuiDepends for WasmGuiDepends {
     fn backup_data_stores(&self) -> RgResult<()> {
         Ok(())
     }
+
+    fn restore_data_stores(&self) -> RgResult<()> {
+        Ok(())
+    }
 }

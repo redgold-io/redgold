@@ -60,3 +60,17 @@ impl ToTimeString for i64 {
     }
 
 }
+
+pub trait ToMillisFromTimeString {
+    fn to_millis_from_time_string_shorter_underscores(&self) -> Option<i64>;
+}
+
+impl ToMillisFromTimeString for String {
+    fn to_millis_from_time_string_shorter_underscores(&self) -> Option<i64> {
+        if let Some(dt) = chrono::NaiveDateTime::parse_from_str(self, "%Y_%m_%d_%H_%M_%S").ok() {
+            Some(dt.and_utc().timestamp_millis())
+        } else {
+            None
+        }
+    }
+}
