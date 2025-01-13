@@ -1,5 +1,5 @@
 [package]
-name = "redgold-common-no-wasm"
+name = "redgold-daq"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -13,14 +13,15 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-redgold-schema = {workspace = true}
-redgold-common = {workspace = true}
-async-trait = { workspace = true }
-flume = { workspace = true }
-tokio = { workspace = true }
-tokio-stream = { workspace = true }
-futures = { workspace = true }
-rand = { workspace = true }
-itertools = { workspace = true }
-tracing = { workspace = true }
+redgold-schema = { workspace = true}
+redgold-data = { workspace = true}
+redgold-keys = { workspace = true}
+redgold-executor = { workspace = true}
+redgold-common-no-wasm = { workspace = true}
+redgold-rpc-integ = { workspace = true}
+tokio = {workspace = true}
 arc-swap = {workspace = true}
+futures = {workspace = true}
+metrics = {workspace = true}
+async-trait = { workspace = true }
+tokio-stream = { workspace = true }

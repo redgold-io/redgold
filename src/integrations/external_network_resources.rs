@@ -12,8 +12,6 @@ use tracing::info;
 use tokio::sync::Mutex;
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
@@ -24,6 +22,8 @@ use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, Ne
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
 use redgold_keys::word_pass_support::NodeConfigKeyPair;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::core::relay::Relay;
 use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
@@ -103,6 +103,15 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                 let start_block_arg = None;
                 // let start_block_arg = start_block;
                 let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
+                if let Some(r) = self.relay.as_ref() {
+                    let all_tx2_comparison = r.eth_daq.daq.all_tx_for(&eth_addr_str);
+                    let missing_hashes = all_tx.iter().filter(|tx| {
+                        !all_tx2_comparison.iter().any(|tx2| tx2.tx_id == tx.tx_id)
+                    }).map(|tx| tx.tx_id.clone()).collect_vec();
+                    let equality = all_tx.iter().zip(all_tx2_comparison.iter()).all(|(tx1, tx2)| tx1 == tx2);
+                    info!("EthDaq all tx comparison: {} vs {} equality: {} missing hashes: {:?}", all_tx.len(), all_tx2_comparison.len(), equality, missing_hashes);
+                }
+
                 Ok(all_tx)
             }
             _ => Err(error_info("Unsupported currency"))

@@ -11,7 +11,6 @@ pub mod resolver;
 pub mod status;
 pub mod seeds;
 pub mod transact;
-pub mod stream_handlers;
 pub mod mempool;
 pub mod resolve;
 pub mod contract;

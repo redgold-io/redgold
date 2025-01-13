@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use flume::Sender;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::structs::{PublicKey, SupportedCurrency};
 use tracing::{error, info};
@@ -10,6 +9,7 @@ use redgold_schema::transaction::rounded_balance_i64;
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_gui::state::local_state::{BalanceAddressInfoUpdate, LocalStateUpdate};
+use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use crate::gui::app_loop::LocalState;
 use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use redgold_schema::conf::node_config::NodeConfig;

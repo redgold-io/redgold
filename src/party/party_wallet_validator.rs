@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::database::BatchDatabase;
 use itertools::Itertools;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};

@@ -18,7 +18,9 @@ use redgold::util::cli::arg_parse_config::ArgTranslate;
 use redgold::util::cli::commands;
 use redgold::util::cli::load_config::main_config;
 use redgold::util::runtimes::{big_thread, build_simple_runtime};
+use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::{ErrorInfoContext, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 
@@ -26,6 +28,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgTopLevelSubcommand;
 use redgold_schema::config_data::ConfigData;
+use redgold_schema::party::all_parties::AllParties;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
     let (nc, opts) = main_config();
@@ -166,11 +169,20 @@ async fn main_dbg(node_config: Box<NodeConfig>) {
     gauge!("redgold_service_crash", &node_config.gauge_id()).set(0);
     gauge!("redgold_start_fail", &node_config.gauge_id()).set(0);
 
-    let relay = Relay::new(*node_config.clone()).await;
-
-
+    let mut relay = Relay::new(*node_config.clone()).await;
     Node::prelim_setup(relay.clone()).await.expect("prelim");
 
+    let parties = relay.ds.multiparty_store.all_party_info_with_key()
+        .await
+        .expect("Party DS query failed");
+    let all_parties = AllParties::new(parties.clone());
+    let active = all_parties.active;
+    let addrs = active.iter()
+        .flat_map(|x| x.party_key.as_ref())
+        .flat_map(|x| x.to_ethereum_address().ok())
+        .collect_vec();
+    let addrs = WriteOneReadAll::new(addrs);
+    relay.eth_daq.daq.subscribed_address_filter = addrs.clone();
     // TODO: Match on node_config external network resources impl
     // TODO: Tokio select better?
     let join_handles = if node_config.debug_id().is_none() {

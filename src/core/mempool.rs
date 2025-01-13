@@ -18,7 +18,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::internal_message::TransactionMessage;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;

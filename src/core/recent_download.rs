@@ -8,7 +8,7 @@ use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
 use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
 use crate::core::resolver::{resolve_input, ResolvedInput};
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 
 
 enum DownloadTrigger {

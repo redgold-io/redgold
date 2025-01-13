@@ -4,14 +4,13 @@ use itertools::Itertools;
 use tracing::info;
 use serde::Serialize;
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_keys::eth::example::dev_ci_kp;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::{KeyPair, TestConstants};
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::WordsPass;
 use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::{bytes_data, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -33,8 +32,10 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::observability::metrics_registry;
 use redgold_schema::party::party_events::PartyEvents;
 use crate::party::stake_event_stream::StakeMethods;
+use crate::test::external_amm_integration::dev_ci_kp;
 use crate::test::harness::amm_harness::PartyTestHarness;
 use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
+use crate::util::runtimes::{big_thread, build_simple_runtime};
 //
 // #[test]
 // fn test_panic() {
@@ -82,11 +83,22 @@ use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 
 /// Main entry point for end to end testing.
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-#[tokio::test]
-async fn e2e() {
-    let result = e2e_async(false).await.log_error();
+// #[tokio::test]
+#[test]
+fn e2e() {
+// async fn e2e() {
+    util::init_logger_once();
+
+    let result = big_thread().spawn(|| {
+        let runtime = build_simple_runtime(num_cpus::get(), "config");
+        let ret = runtime.block_on(e2e_async(false));
+        runtime.shutdown_background();
+        ret
+    }).unwrap().join().unwrap();
+
+    // let result = .await.log_error();
     // Allow time to catch main service error
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // tokio::time::sleep(Duration::from_secs(2)).await;
     // let runtime = build_runtime(8, "e2e");
     // runtime.block_on(e2e_async()).expect("e2e");
     result.expect("e2e");
@@ -94,7 +106,6 @@ async fn e2e() {
 
 
 async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
-    util::init_logger_once();
     let _tc = TestConstants::new();
 
     let mut local_nodes = LocalNodes::new(None).await;

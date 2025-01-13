@@ -3,7 +3,7 @@ use crate::schema::structs::TrustRatingLabel;
 use std::collections::HashMap;
 use async_trait::async_trait;
 use redgold_schema::RgResult;
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 
 pub mod eigentrust;
 pub mod moon;

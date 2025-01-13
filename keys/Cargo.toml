@@ -1,6 +1,6 @@
 [package]
 name = "redgold-keys"
-version = "0.1.34"
+version = "0.1.35"
 edition = "2021"
 authors = ["Redgold"]
 description = "p2p database / compute engine & portfolio target models"
@@ -27,6 +27,7 @@ categories = ["cryptography::cryptocurrencies"]
 # workspace = true caused an error here? maybe
 redgold-schema = { workspace = true}
 redgold-common-no-wasm = { workspace = true }
+#redgold-rpc-integ = { workspace = true }
 # Make all the non-WASM dependencies optional
 tokio = { version = "1.36.0", features = ["rt"]}
 bdk = {package="bdk-debug", version = "0.28.1-debug", features = ["default", "keys-bip39", "bip39", "sled"]}
@@ -64,6 +65,7 @@ uuid = { version = "0.8.2", features = ["v4"] }
 #[dependencies.bitcoin]
 #version = "0.21"
 #features = ["serde", "bitcoinconsensus"]
+ethereum-types = "0.14.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 sequoia-openpgp = "1.21.2"

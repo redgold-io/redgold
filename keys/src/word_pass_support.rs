@@ -60,6 +60,7 @@ impl WordsPassNodeConfig for NodeConfig {
             wallet_only: Some(true),
             authentication: Some("username:password".to_string()),
                 file_path: None,
+                ws_only: None,
             },
             RpcUrl{
             currency: SupportedCurrency::Monero,
@@ -68,6 +69,7 @@ impl WordsPassNodeConfig for NodeConfig {
             wallet_only: Some(false),
             authentication: None,
                 file_path: None,
+                ws_only: None,
             },
         ]);
 

@@ -18,7 +18,6 @@ use redgold_common::flume_send_help::{new_channel, Channel, RecvAsyncErrorInfo, 
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::address_support::AddressSupport;
-use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};

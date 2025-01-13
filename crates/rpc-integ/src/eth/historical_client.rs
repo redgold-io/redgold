@@ -8,12 +8,13 @@ use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use std::str::FromStr;
 use std::time::Duration;
-use log::info;
+use ethers::utils::hex;
+use tracing::info;
 use num_traits::{FromPrimitive, ToPrimitive};
+use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::helpers::easy_json::EasyJson;
-use crate::address_external::ToEthereumAddress;
-use crate::eth::example;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use crate::examples::example;
 
 pub struct EthHistoricalClient {
     client: Client,
@@ -51,7 +52,7 @@ impl EthHistoricalClient {
     //     self.client.
     // }
 
-    pub(crate) fn chain_id(network_environment: &NetworkEnvironment) -> Chain {
+    pub fn chain_id(network_environment: &NetworkEnvironment) -> Chain {
         let chain = if network_environment.is_main() {
             Chain::mainnet()
         } else {

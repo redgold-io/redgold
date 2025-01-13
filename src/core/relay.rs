@@ -41,7 +41,6 @@ use crate::core::internal_message::TransactionMessage;
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
-use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
@@ -139,6 +138,7 @@ impl<T> ReadManyWriteOne<T> where T: Clone  {
 
 }
 
+
 #[derive(Clone)]
 pub struct Relay {
     /// Internal configuration
@@ -190,6 +190,7 @@ pub struct Relay {
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub peer_info: PeerInfo,
+    pub eth_daq: EthDaq
     // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
 }
 
@@ -457,6 +458,9 @@ are instantiated by the node
 */
 
 use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_daq::eth::EthDaq;
+use redgold_keys::address_external::ToEthereumAddress;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
 use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
 use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
@@ -1217,7 +1221,7 @@ impl Relay {
             observation: flume_send_help::new_channel::<Transaction>(),
             // multiparty: internal_message::new_channel::<MultipartyRequestResponse>(),
             observation_metadata: flume_send_help::new_channel::<ObservationMetadataInternalSigning>(),
-            peer_message_tx: flume_send_help::new_channel::<PeerMessage>(),
+            peer_message_tx: new_channel::<PeerMessage>(),
             peer_message_rx: flume_send_help::new_channel::<PeerMessage>(),
             ds,
             transaction_channels: Arc::new(DashMap::new()),
@@ -1239,6 +1243,8 @@ impl Relay {
             external_network_shared_data: Default::default(),
             btc_wallets: Arc::new(Default::default()),
             peer_info: Default::default(),
+            // eth_daq: Default::default(),
+            eth_daq: Default::default(),
         }
     }
 }

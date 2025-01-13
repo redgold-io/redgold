@@ -5,7 +5,7 @@ use redgold_data::data_store::DataStore;
 use redgold_data::parquet_export::ParquetExporter;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::primitives::ByteStream;

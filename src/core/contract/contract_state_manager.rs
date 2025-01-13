@@ -8,7 +8,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{ContentionKey, ContractStateMarker, Output, Transaction};
 use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFoldOrReceive;
+use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use crate::util;
 
 //

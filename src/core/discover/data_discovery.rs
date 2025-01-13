@@ -5,7 +5,7 @@ use redgold_schema::RgResult;
 use redgold_schema::structs::{RecentDiscoveryTransactionsRequest, Request};
 use crate::core::internal_message::TransactionMessage;
 use crate::core::relay::Relay;
-use crate::core::stream_handlers::IntervalFold;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 
 pub struct DataDiscovery {
     pub relay: Relay,

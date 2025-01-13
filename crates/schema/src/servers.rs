@@ -117,7 +117,7 @@ impl ServerOldFormat {
 
 #[test]
 fn parse_server_example() {
-    let str = include_str!("./resources/example_servers");
+    let str = include_str!("resources/example_servers");
     let servers = ServerOldFormat::parse(str.to_string()).unwrap();
     println!("{}", json_pretty(&servers).expect(""))
 }

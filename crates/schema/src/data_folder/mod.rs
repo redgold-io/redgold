@@ -149,12 +149,15 @@ impl DataFolder {
 
     pub fn target(id: u32) -> Self {
         let cwd = std::env::current_dir().expect("Current dir");
+        // let cwd_target = cwd.join("../../../../target");
         let cwd_target = cwd.join("target");
         Self{path: cwd_target.join(format!("node_{}", id))}
     }
 
     pub fn ensure_exists(&self) -> &Self {
-        std::fs::create_dir_all(&self.path).expect("Failed to create data folder");
+        let path = &self.path;
+        let err_path = path.to_string_lossy().to_string();
+        std::fs::create_dir_all(&path).expect(&*format!("Failed to create data folder {}", err_path));
         self
     }
 
