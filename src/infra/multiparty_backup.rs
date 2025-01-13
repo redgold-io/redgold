@@ -18,6 +18,7 @@ use crate::node_config::EnvDefaultNodeConfig;
 use crate::util;
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use redgold_common_no_wasm::output_handlers::log_handler;
+use redgold_schema::helpers::easy_json::EasyJson;
 use crate::util::cli::load_config::{load_config, load_full_config, main_config};
 
 pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
@@ -155,6 +156,7 @@ pub async fn check_updated_multiparty_csv(r: &Relay) -> RgResult<()> {
         r.ds.multiparty_store.add_keygen(
             &row
         ).await?;
+        info!("Imported multiparty row for {}", row.clone().clear_sensitive().json_or())
     };
     tokio::fs::remove_file(env.multiparty_import()).await.error_info("Failed to remove multiparty import")?;
     Ok(())
