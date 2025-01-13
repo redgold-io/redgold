@@ -23,3 +23,5 @@ tokio = {workspace = true}
 arc-swap = {workspace = true}
 futures = {workspace = true}
 metrics = {workspace = true}
+async-trait = { workspace = true }
+tokio-stream = { workspace = true }

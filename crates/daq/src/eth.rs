@@ -1,6 +1,9 @@
+use std::sync::Arc;
 use std::time::Duration;
+use async_trait::async_trait;
 use crate::external_net_daq::ExternalDaq;
 use futures::future::Either;
+use futures::TryStreamExt;
 use metrics::counter;
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_common_no_wasm::stream_handlers::{run_interval_fold_or_recv_stream, IntervalFoldOrReceive};
@@ -8,6 +11,8 @@ use redgold_rpc_integ::eth::ws_rpc::{EthereumWsProvider, TimestampedEthereumTran
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::RgResult;
 use tokio::task::JoinHandle;
+use tokio_stream::StreamExt;
+use tokio_stream::wrappers::IntervalStream;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::structs::PublicKey;
 
@@ -18,6 +23,7 @@ pub struct EthDaq {
 }
 
 
+#[async_trait]
 impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
     async fn interval_fold_or_recv(&mut self, message: Either<TimestampedEthereumTransaction, ()>) -> RgResult<()> {
         match message {
@@ -40,7 +46,7 @@ impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
             _ => {
                 for (a, res) in self.daq.historical_transactions.read().iter() {
                     if res.is_err() {
-                        self.add_address_and_backfill_historical(a.clone())?
+                        self.add_address_and_backfill_historical(a.clone()).await?;
                     }
                 }
                 // Persist historical here.
@@ -70,21 +76,36 @@ impl EthDaq {
         e: RgResult<EthereumWsProvider>,
         filter: WriteOneReadAll<Vec<String>>,
         duration: Duration,
-    ) -> RgResult<JoinHandle<()>> {
-        let e = e?;
-        let stream = e.subscribe_transactions().await?;
+    ) -> RgResult<JoinHandle<RgResult<()>>> {
+        let provider = e?;
+
         let mut s = EthDaq::default();
         s.daq.subscribed_address_filter = filter.clone();
         let addrs = filter.read();
         for a in addrs.iter() {
             s.add_address_and_backfill_historical(a.clone()).await?;
         }
-        Ok(run_interval_fold_or_recv_stream(s, duration, true, stream))
+
+        // Run at start
+        s.interval_fold_or_recv(Either::Right(())).await?;
+
+        Ok(tokio::spawn(async move  {
+            let init_stream = provider.subscribe_transactions().await?;
+            let stream = init_stream
+                .map(|x| Ok(Either::Left(x)));
+            let interval = tokio::time::interval(duration);
+            let interval_stream = IntervalStream::new(interval).map(|_| Ok(Either::Right(())));
+            stream.merge(interval_stream).try_fold(
+                s, |mut ob, o| async {
+                    ob.interval_fold_or_recv(o).await.map(|_| ob)
+                }
+            ).await.map(|_| ())
+        }))
     }
     pub async fn start(
         nc: &NodeConfig,
         filter: WriteOneReadAll<Vec<String>>
-    ) -> Option<RgResult<JoinHandle<()>>> {
+    ) -> Option<RgResult<JoinHandle<RgResult<()>>>> {
         let duration = nc.config_data.node.as_ref()
             .and_then(|n| n.daq.as_ref())
             .and_then(|n| n.poll_duration_seconds.clone())

@@ -913,34 +913,34 @@ async fn tx_debug() {
 }
 
 
-#[ignore]
-#[tokio::test]
-async fn balance_test2() {
-    let mut w = SingleKeyBitcoinWallet
-    ::new_wallet(PublicKey::from_hex_direct("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
-    let balance = w.get_wallet_balance().expect("");
+// #[ignore]
+// #[tokio::test]
+// async fn balance_test2() {
+//     let mut w = SingleKeyBitcoinWallet
+//     ::new_wallet(PublicKey::from_hex_direct("028215a7bdab82791763e79148b4784cc7474f0969f23e44fea65d066602dea585").expect(""), NetworkEnvironment::Test, true).expect("worx");
+//     let balance = w.get_wallet_balance().expect("");
 
 
 
-    println!("balance: {:?}", balance);
-    println!("address: {:?}", w.address().expect(""));
-    let txs = w.get_sourced_tx().expect("");
-    for t in txs {
-        println!("tx: {}", t.json_or());
-    }
-    let (_, kp) = dev_ci_kp().expect("");
-    let dest = kp.public_key().to_bitcoin_address(&NetworkEnvironment::Dev).expect("");
-    let tx = w.create_transaction(Some(kp.public_key()), None, 2200).expect("");
-    let psbt = w.psbt.expect("psbt");
-    let txb = psbt.clone().extract_tx();
-    println!("txb: {:?}", txb);
-    for o in txb.output {
-        println!("o: {:?}", o);
+//     println!("balance: {:?}", balance);
+//     println!("address: {:?}", w.address().expect(""));
+//     let txs = w.get_sourced_tx().expect("");
+//     for t in txs {
+//         println!("tx: {}", t.json_or());
+//     }
+//     let (_, kp) = dev_ci_kp().expect("");
+//     let dest = kp.public_key().to_bitcoin_address(&NetworkEnvironment::Dev).expect("");
+//     let tx = w.create_transaction(Some(kp.public_key()), None, 2200).expect("");
+//     let psbt = w.psbt.expect("psbt");
+//     let txb = psbt.clone().extract_tx();
+//     println!("txb: {:?}", txb);
+//     for o in txb.output {
+//         println!("o: {:?}", o);
 
-    }
+//     }
 
 
-}
+// }
 
 #[ignore]
 #[tokio::test]

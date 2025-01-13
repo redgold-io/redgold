@@ -1243,6 +1243,7 @@ impl Relay {
             external_network_shared_data: Default::default(),
             btc_wallets: Arc::new(Default::default()),
             peer_info: Default::default(),
+            eth_daq: Default::default(),
         }
     }
 }
