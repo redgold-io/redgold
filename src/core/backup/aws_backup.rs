@@ -10,6 +10,7 @@ use aws_sdk_s3 as s3;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{Delete, ObjectIdentifier, StorageClass};
+use eframe::egui::TextBuffer;
 use itertools::Itertools;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReadDirStream;
@@ -77,7 +78,7 @@ impl AwsBackup {
     }
 
     pub async fn backup_s3(&self) -> RgResult<()> {
-        let ct = util::current_time_unix() as i64;
+        let ct = util::current_time_millis_i64() as i64;
 
         if let (Some(bucket), server_index) =
             (self.relay.node_config.s3_backup(),
@@ -118,6 +119,7 @@ impl AwsBackup {
         if !daily_keys.is_empty() {
             if let Some(o) = daily_keys.iter().max() {
                 if let Some(n) = o.split('/').last() {
+                    let n = n.replace("/", "");
                     let ms = n.to_string().to_millis_from_time_string_shorter_underscores();
                     if let Some(p) = ms {
                         if ct - p < (86400 / 2) {
