@@ -119,7 +119,7 @@ impl TransactionGenerator {
 
     pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
         let prev = self.pop_finished().safe_get()?.clone();
-        let bytes = tokio::fs::read("./sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
+        let bytes = tokio::fs::read("../../crates/sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
         let mut tb = TransactionBuilder::new(&self.node_config);
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;

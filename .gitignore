@@ -41,7 +41,7 @@ yarn.lock
 /ai-py/include
 /ai-py/session.txt
 __pycache__
-/keys/testdb
+/crates/keys/testdb
 redgold.app
 .DS_Store
 /test-parquet-export
