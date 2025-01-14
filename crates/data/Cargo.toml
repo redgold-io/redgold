@@ -1,16 +1,16 @@
 [package]
 name = "redgold-data"
-version = "0.1.37"
-edition = "2021"
-authors = ["Redgold"]
-description = "p2p database / compute engine & portfolio target models"
-documentation = "https://dev.docs.redgold.io/"
-readme = "../README.md"
-homepage = "https://redgold.io"
-repository = "https://github.com/redgold-io/redgold"
-license = "MIT"
-keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
-categories = ["cryptography::cryptocurrencies"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

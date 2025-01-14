@@ -1,6 +1,6 @@
 [package]
 name = "redgold"
-version = "0.1.37"
+version = "0.1.39"
 edition = "2021"
 authors = ["Redgold"]
 description = "Decentralized Portfolio Contracts & Data Lake"
@@ -15,14 +15,14 @@ categories = ["cryptography::cryptocurrencies"]
 
 [workspace]
 members = [
-    "data",
+    "crates/data",
     "crates/schema",
-    "sdk",
+    "crates/sdk",
     "crates/executor",
-    "keys",
-    "sdk-client",
+    "crates/keys",
+    "crates/sdk-client",
     "crates/fs",
-    "gui",
+    "crates/gui",
     "crates/common",
     "crates/common-no-wasm",
     "crates/crawler",
@@ -62,17 +62,17 @@ description = "Crypto portfolio/ETF contract network"
 
 [workspace.dependencies]
 redgold-schema = { path = "crates/schema" }
-redgold-data = { path = "data", version = "0.1.37"}
-redgold-keys = { path = "keys", version = "0.1.37"}
+redgold-data = { path = "crates/data"}
+redgold-keys = { path = "crates/keys"}
 redgold-executor = { path = "crates/executor"}
-redgold-sdk-client = { path = "sdk-client", version = "0.1.37"}
+redgold-sdk-client = { path = "crates/sdk-client"}
 redgold-rpc-integ = { path = "crates/rpc-integ" }
 redgold-daq = { path = "crates/daq" }
 redgold-node-core = { path = "crates/node-core" }
 redgold-ci = { path = "crates/ci" }
 redgold-crawler = { path = "crates/crawler" }
 redgold-crawler-native = { path = "crates/crawler-native" }
-redgold-gui = { path = "./gui"}
+redgold-gui = { path = "crates/gui" }
 redgold-common = { path = "crates/common" }
 redgold-common-no-wasm = { path = "crates/common-no-wasm" }
 redgold-fs = { path = "crates/fs" }
