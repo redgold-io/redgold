@@ -28,7 +28,7 @@ bump_patch_version() {
 set -e
 
 bump_patch_version
-
-for dir in crates/schema data keys sdk sdk-client; do
-  (cd "$dir" && bump_patch_version)
-done
+#
+#for dir in keys sdk sdk-client; do
+#  (cd "$dir" && bump_patch_version)
+#done
