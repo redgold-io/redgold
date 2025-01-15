@@ -162,14 +162,16 @@ impl Transaction {
         self.outputs.iter().filter_map(|o| o.swap_fulfillment()).next()
     }
 
-    pub fn swap_fulfillment_amount_party(&self) -> Option<(&SwapFulfillment, &CurrencyAmount, &Address)> {
-        self.outputs.iter().filter_map(|o| {
-            o.swap_fulfillment().and_then(|f| {
-                o.opt_amount_typed_ref().and_then(|a|
-                    o.address.as_ref().map(|addr| (f, a, addr))
-                )
-            })
-        }).next()
+    pub fn swap_fulfillment_amount_and_destination_and_origin(&self) -> Option<(&SwapFulfillment, &CurrencyAmount, &Address, Address)> {
+        self.first_input_address().and_then(|origin|
+            self.outputs.iter().filter_map(|o| {
+                o.swap_fulfillment().and_then(|f| {
+                    o.opt_amount_typed_ref().and_then(|a|
+                        o.address.as_ref().map(|addr| (f, a, addr, origin))
+                    )
+                })
+            }).next()
+        )
     }
 
     pub fn output_data(&self) -> impl Iterator<Item=&StandardData> {

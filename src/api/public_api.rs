@@ -421,7 +421,7 @@ pub async fn run_server(relay: Relay) -> Result<(), ErrorInfo>{
     Ok(server)
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Default, Clone)]
 pub struct Pagination {
     pub offset: Option<u32>,
     pub limit: Option<u32>,
