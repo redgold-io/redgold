@@ -246,7 +246,6 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     ) -> RgResult<()> {
         let eth = self.relay.eth_wallet()?;
 
-
         if order.destination.currency_or() != SupportedCurrency::Ethereum {
             error!("Invalid currency for fulfillment: {}", order.json_or());
             return Ok(())

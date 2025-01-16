@@ -1,12 +1,16 @@
 use eframe::egui;
-use eframe::egui::{Color32, RichText, TextEdit, TextStyle, Ui, Widget};
+use eframe::egui::{Color32, Response, RichText, TextEdit, TextStyle, Ui, Widget};
 
 pub fn valid_label(ui: &mut Ui, bool: bool) {
     if bool {
-        ui.label(RichText::new("Valid").color(Color32::GREEN));
+        green_label(ui, "Valid");
     } else {
         ui.label(RichText::new("Invalid").color(Color32::RED));
     }
+}
+
+pub fn green_label(ui: &mut Ui, text: impl Into<String>) -> Response {
+    ui.label(RichText::new(text.into()).color(Color32::GREEN))
 }
 
 pub fn editable_text_input_copy(

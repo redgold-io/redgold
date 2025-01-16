@@ -487,7 +487,8 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
         info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
         info!("Fee fixed {}", CurrencyAmount::fee_fixed_normal_testnet().json_or());
         let res = tokio::time::timeout(
-            Duration::from_secs(120), eth.send(&party_eth_address, &exact_eth_stake_amount)
+            Duration::from_secs(120), eth.send(
+                &party_eth_address, &exact_eth_stake_amount, None)
         ).await.expect("works").expect("works");
         info!("Eth txid: {}", res);
         let mut retries = 0;
@@ -648,7 +649,8 @@ async fn proceed_swap_test_from_eth_send(
 
     eth.send(
         &party_eth_address,
-        &CurrencyAmount::test_send_amount_typed()
+        &CurrencyAmount::test_send_amount_typed(),
+        None
     ).await?;
     // let fee_amount_pool = CurrencyAmount::from_rdg(10000);
 

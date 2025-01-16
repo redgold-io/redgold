@@ -115,13 +115,14 @@ impl PartyEvents {
                             include_amm: Option<bool>,
                             include_portfolio: Option<bool>,
     ) -> HashMap<SupportedCurrency, CurrencyAmount> {
+        let has_address_filter = !addrs.is_empty();
         let include_amm = include_amm.unwrap_or(true);
         let include_portfolio = include_portfolio.unwrap_or(true);
         let str_addrs = addrs.iter().map(|a| a.render_string().unwrap()).collect::<HashSet<String>>();
         let port_events = self.portfolio_request_events.stake_utxos.iter().map(|e| e.1.clone()).collect::<Vec<ConfirmedExternalStakeEvent>>();
         let mut map = HashMap::new();
         for e in self.external_staking_events.iter() {
-            if !str_addrs.contains(&e.ett.other_address) {
+            if !str_addrs.contains(&e.ett.other_address) && has_address_filter {
                 continue
             }
             if port_events.contains(e) && !include_portfolio {
@@ -135,7 +136,7 @@ impl PartyEvents {
         }
         if include_amm {
             for e in self.internal_staking_events.iter() {
-                if !addrs.contains(&e.withdrawal_address) {
+                if !addrs.contains(&e.withdrawal_address) && has_address_filter {
                     continue
                 }
                 let amt = e.amount.clone();
@@ -367,7 +368,7 @@ impl PartyEvents {
                 Some(CurrencyAmount::from_btc(btc))
             }
             SupportedCurrency::Ethereum => {
-                Some(CurrencyAmount::fee_fixed_normal_by_env(env))
+                Some(CurrencyAmount::eth_fee_fixed_normal_by_env(env))
             }
             _ => None
         }
