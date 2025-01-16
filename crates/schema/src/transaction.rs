@@ -167,7 +167,7 @@ impl Transaction {
             self.outputs.iter().filter_map(|o| {
                 o.swap_fulfillment().and_then(|f| {
                     o.opt_amount_typed_ref().and_then(|a|
-                        o.address.as_ref().map(|addr| (f, a, addr, origin))
+                        o.address.as_ref().map(|addr| (f, a, addr, origin.clone()))
                     )
                 })
             }).next()
