@@ -1,11 +1,12 @@
 use eframe::egui;
-use eframe::egui::Ui;
+use eframe::egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::explorer::{BriefTransaction, DetailedTransaction};
 use redgold_schema::ShortString;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 use redgold_schema::util::times::ToTimeString;
+use crate::common::green_label;
 use crate::components::tables::{table_nonetype, text_table_advanced};
 use crate::data_query::data_query::DataQueryInfo;
 
@@ -58,7 +59,7 @@ impl TransactionTable {
                     r.hash.clone(),
                     r.timestamp.to_time_string_shorter_no_seconds(),
                     format_fractional_currency_amount(r.amount),
-                    r.currency.clone().unwrap_or("".to_string()),
+                    r.currency.clone().map(|c| c.replace("\"", "")).unwrap_or("".to_string()),
                     format!("{} sats", r.fee.to_string()),
                 ];
             }
@@ -73,6 +74,12 @@ impl TransactionTable {
             if column_idxs.contains(&col) {
                 ui.hyperlink_to(val.first_four_last_four_ellipses().unwrap_or("err".to_string()), network.explorer_hash_link(val.clone()));
                 return true
+            }
+            if self.stake_mode {
+                if col == 2 {
+                    green_label(ui, val.clone());
+                    return true
+                }
             }
             false
         };

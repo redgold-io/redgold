@@ -80,8 +80,8 @@ impl EthWalletWrapper {
         Ok((hex::encode(tx.hash.0), byte_vec))
     }
 
-    pub async fn send(&self, to: &structs::Address, value: &CurrencyAmount) -> RgResult<String> {
-        let tx = self.create_transaction_typed(&self.address()?, to, value.clone(), None).await?;
+    pub async fn send(&self, to: &structs::Address, value: &CurrencyAmount, fee_gas_price: Option<CurrencyAmount>) -> RgResult<String> {
+        let tx = self.create_transaction_typed(&self.address()?, to, value.clone(), fee_gas_price).await?;
         // send it!
         let pending_tx = self.client.send_transaction(tx, None).await.expect("works");
 
@@ -127,7 +127,7 @@ impl EthWalletWrapper {
             .with_detail("to", to.render_string()?)
             .with_detail("value", value.clone().json_or())
             .with_detail("fee", fee_gas_price.clone().json_or())
-            .with_detail("default_fee", CurrencyAmount::fee_fixed_normal_by_env(&self.network).json_or())
+            .with_detail("default_fee", CurrencyAmount::eth_fee_fixed_normal_by_env(&self.network).json_or())
     }
     pub async fn create_transaction_typed_inner(
         &self, from: &structs::Address, to: &structs::Address, value: CurrencyAmount,

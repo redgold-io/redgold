@@ -351,13 +351,27 @@ impl PartyEventBuilder for PartyEvents {
                         }
                     });
                 }
-                AddressEvent::External(_) => {}
+                External(_) => {}
             }
         }
 
+        let mut filtered_orders = vec![];
 
-        orders.sort_by(|a, b| a.event_time.cmp(&b.event_time));
-        orders
+        for o in orders {
+            let currency = o.destination.currency_or();
+            if let Some(b) = self.balance_map.get(&currency) {
+                let fee = Self::expected_fee_amount(currency, &self.network).unwrap_or(CurrencyAmount::zero(currency));
+                let total = o.fulfilled_currency_amount() + fee;
+                if b < &total {
+                    continue;
+                }
+            }
+            filtered_orders.push(o);
+        }
+
+
+        filtered_orders.sort_by(|a, b| a.event_time.cmp(&b.event_time));
+        filtered_orders
     }
 
     fn new(party_public_key: &PublicKey, network: &NetworkEnvironment, relay: &Relay) -> Self {

@@ -320,7 +320,7 @@ impl PartyTestHarness {
     pub async fn rdg_to_eth_swap(&self) -> RgResult<()> {
         // test rdg->btc swap
         self.tx_builder().await
-            .with_swap(&self.self_eth_address(), &CurrencyAmount::from_fractional(0.4).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_eth_address(), &CurrencyAmount::from_fractional(0.2).unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()

@@ -52,7 +52,7 @@ pub async fn run_daily_e2e_inner(nc: &Box<NodeConfig>) -> RgResult<()> {
     let mut party_harness = PartyTestHarness::from(
         &nc, kp, vec![], Some(api.clone()), vec![]).await;
 
-    let result = w.send(&party_key.to_ethereum_address_typed().unwrap(), &CurrencyAmount::from_eth_fractional(0.00028914f64)).await.unwrap();
+    let result = w.send(&party_key.to_ethereum_address_typed().unwrap(), &CurrencyAmount::from_eth_fractional(0.00028914f64), None).await.unwrap();
     info!("Send txid for eth {result}");
     // 60 seconds, 10 times
     let b = party_harness.balance(true).await.unwrap();

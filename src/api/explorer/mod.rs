@@ -102,6 +102,9 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
 
             let mut d = d.clone();
             let events = d.clear_sensitive().clone();
+            let overall_staking_balances = format_currency_balances(pe.staking_balances(&vec![], Some(true), Some(true)));
+            let portfolio_staking_balances = format_currency_balances(pe.staking_balances(&vec![], Some(true), Some(false)));
+            let amm_staking_balances = format_currency_balances(pe.staking_balances(&vec![], Some(false), Some(true)));
 
             return Ok(Some(AddressPoolInfo {
                 public_key,
@@ -114,12 +117,21 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 central_prices,
                 events: events.clone(),
                 detailed_events: convert_events(&events, &r.node_config)?,
+                overall_staking_balances,
+                portfolio_staking_balances,
+                amm_staking_balances
             }))
         };
 
 
     }
     Ok(None)
+}
+
+pub fn format_currency_balances(balances: HashMap<SupportedCurrency, CurrencyAmount>) -> Vec<(String, String)> {
+    balances.iter().map(|(k, v)| {
+        (format!("{:?}", k), format!("{:.8}", v.to_fractional().to_string()))
+    }).collect::<Vec<(String, String)>>()
 }
 
 pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedPartyEvent>> {

@@ -107,7 +107,7 @@ impl LocalStateAddons for LocalState {
             Tab::Deploy => {}
             Tab::Ratings => {}
             Tab::Settings => {
-                self.settings_state.local_ser_config = self.local_stored_state.json_or();
+                // self.settings_state.local_ser_config = self.local_stored_state.json_or();
             }
             _ => {}
         }
