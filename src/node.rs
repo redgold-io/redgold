@@ -141,12 +141,6 @@ impl Node {
         Ok(())
     }
 
-    pub fn throw_error_panic() -> Result<(), ErrorInfo> {
-        let result3: Result<Node, ErrorInfo> = Err(ErrorInfo::error_info("test"));
-        result3.expect("expected panic");
-        Ok(())
-    }
-
     pub fn genesis_from(node_config: NodeConfig) -> (Transaction, Vec<SpendableUTXO>) {
         let tx = genesis_transaction(&node_config, &node_config.words(), &node_config.seeds_now());
         let outputs = tx.utxo_outputs().expect("utxos");

@@ -73,6 +73,26 @@
               <div><TextCopy :data="'$' + askPriceUsdRdg" /></div>
               <div><strong>Price Bid USD/RDG BTC Quote</strong></div>
               <div><TextCopy :data="'$' + bidPriceUsdRdg" /></div>
+              <div v-if="hashData.address_pool_info.overall_staking_balances">
+                <div v-for="(balance, currency) in hashData.address_pool_info.overall_staking_balances" :key="currency">
+                  <div><strong>{{currency}} Staked</strong></div>
+                  <div>{{balance}}</div>
+                </div>
+              </div>
+
+              <div v-if="hashData.address_pool_info.amm_staking_balances">
+                <div v-for="(balance, currency) in hashData.address_pool_info.amm_staking_balances" :key="currency">
+                  <div><strong>{{currency}} AMM Staked</strong></div>
+                  <div>{{balance}}</div>
+                </div>
+              </div>
+
+              <div v-if="hashData.address_pool_info.portfolio_staking_balances">
+                <div v-for="(balance, currency) in hashData.address_pool_info.portfolio_staking_balances" :key="currency">
+                  <div><strong>{{currency}} Port Staked</strong></div>
+                  <div>{{balance}}</div>
+                </div>
+              </div>
 <!--              <div><strong>Price Center RDG/BTC </strong></div>-->
 <!--              <div><TextCopy :data="centerPriceRdgBtc" /></div>-->
 <!--              <div><strong>Spread USD</strong></div>-->

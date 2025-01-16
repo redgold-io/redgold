@@ -359,7 +359,8 @@ impl CurrencyAmount {
         // 112793670539 -> 0.00236
         // 212793670539 -> 0.0046
         // 412793670539 -> 0.008
-        CurrencyAmount::from_eth_bigint_string("412793670539")
+        // CurrencyAmount::from_eth_bigint_string("412793670539")
+        CurrencyAmount::from_eth_bigint_string("12793670539")
     }
 
     pub fn gas_price_fixed_normal_mainnet() -> CurrencyAmount {
@@ -389,7 +390,7 @@ impl CurrencyAmount {
         Self::gas_cost_fixed_normal() * Self::gas_price_fixed_normal_mainnet()
     }
 
-    pub fn fee_fixed_normal_by_env(env: &NetworkEnvironment) -> CurrencyAmount {
+    pub fn eth_fee_fixed_normal_by_env(env: &NetworkEnvironment) -> CurrencyAmount {
         if env.is_main() {
             Self::fee_fixed_normal_mainnet()
         } else {
