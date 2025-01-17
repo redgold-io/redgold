@@ -3,7 +3,7 @@ use std::ops::{Add, Div, Mul, Sub, SubAssign};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::str::FromStr;
-use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, PICO_DECIMAL_MULTIPLIER};
+use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, NANO_DECIMAL_MULTIPLIER, PICO_DECIMAL_MULTIPLIER};
 use crate::{ErrorInfoContext, RgResult};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
 use crate::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
@@ -128,6 +128,8 @@ impl CurrencyAmount {
             self.bigint_fractional().unwrap_or(0f64)
         } else if curr == SupportedCurrency::Monero {
             (self.amount as f64) / (PICO_DECIMAL_MULTIPLIER as f64)
+        } else if curr == SupportedCurrency::Solana {
+            (self.amount as f64) / (NANO_DECIMAL_MULTIPLIER as f64)
         } else {
             self.to_fractional_std()
         }

@@ -6,6 +6,7 @@ pub const REDGOLD_PURPOSE: i64 = 44;
 pub const REDGOLD_KEY_DERIVATION_PATH: i64 = 16180;
 pub const DECIMAL_MULTIPLIER: i64 = 1e8 as i64;
 pub const PICO_DECIMAL_MULTIPLIER: i64 = 1e12 as i64;
+pub const NANO_DECIMAL_MULTIPLIER: i64 = 1e9 as i64;
 pub const DECIMALS: i64 = 8;
 pub const MAX_COIN_SUPPLY: i64 = 1e7 as i64;
 pub const REWARD_CYCLES: i64 = 100;

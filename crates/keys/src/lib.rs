@@ -40,6 +40,15 @@ pub struct TestConstants {
 }
 
 impl TestConstants {
+
+    pub fn test_words() -> Option<String> {
+        std::env::var("REDGOLD_TEST_WORDS").ok()
+    }
+
+    pub fn test_words_pass() -> Option<WordsPass> {
+        Self::test_words().map(|w| WordsPass::new(w, None))
+    }
+
     pub fn key_pair(&self) -> KeyPair {
         KeyPair {
             secret_key: self.secret,
