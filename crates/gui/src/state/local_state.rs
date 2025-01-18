@@ -6,7 +6,7 @@ use crate::components::tx_progress::PreparedTransaction;
 
 #[derive(Clone, Debug)]
 pub enum LocalStateUpdate {
-    PricesPartyInfoAndDelta(PricesPartyInfoAndDelta),
+    PricesPartyInfoAndDelta(PricesPartyInfoAndDeltaInitialQuery),
     HardwareSignedInternalTransaction(Transaction),
     BalanceUpdates(BalanceAddressInfoUpdate),
     // TODO: Remove this in favor of unification with other transaction handlers
@@ -15,7 +15,7 @@ pub enum LocalStateUpdate {
 }
 
 #[derive(Clone, Debug)]
-pub struct PricesPartyInfoAndDelta {
+pub struct PricesPartyInfoAndDeltaInitialQuery {
     pub prices: HashMap<SupportedCurrency, f64>,
     pub party_info: HashMap<PublicKey, PartyInternalData>,
     pub delta_24hr: HashMap<SupportedCurrency, f64>,

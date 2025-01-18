@@ -15,7 +15,7 @@ pub fn balance_table<E>(
     pk_filter: Option<&PublicKey>,
     balance_map: Option<HashMap<SupportedCurrency, f64>>,
     id_opt: Option<String>
-) where E: ExternalNetworkResources + Send + Clone + 'static {
+) where E: ExternalNetworkResources + Send + Clone + 'static + Sync{
     let balance_currencies = balances.unwrap_or(queryable_balances());
     let mut headers = vec!["Denomination".to_string()];
     for b in balance_currencies.iter() {

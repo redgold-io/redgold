@@ -10,7 +10,7 @@ use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDelta};
+use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDeltaInitialQuery};
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
@@ -312,7 +312,7 @@ impl GuiDepends for NativeGuiDepends {
                 let delta = g2.get_24hr_delta(cur.clone()).await;
                 deltas.insert(cur.clone(), delta);
             }
-            sender.send(LocalStateUpdate::PricesPartyInfoAndDelta(PricesPartyInfoAndDelta{
+            sender.send(LocalStateUpdate::PricesPartyInfoAndDelta(PricesPartyInfoAndDeltaInitialQuery {
                 prices: price_map,
                 party_info: party,
                 delta_24hr: deltas,

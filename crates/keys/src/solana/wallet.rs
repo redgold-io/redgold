@@ -172,10 +172,10 @@ async fn debug_kg() {
     let ci = TestConstants::test_words_pass().unwrap();
     let amount = 1_000_000; // 0.001 SOL
     let amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
+    let amount = CurrencyAmount::from_fractional_cur(0.99, SupportedCurrency::Solana);
 
     let w = SolanaNetwork::new(NetworkEnvironment::Dev, Some(wp));
     let w2 = SolanaNetwork::new(NetworkEnvironment::Dev, Some(ci));
-
     println!("Wallet 1 address: {}", w.self_address().unwrap().render_string().unwrap());
     println!("Wallet 1 balance: {}", w.get_self_balance().await.unwrap().to_fractional());
     println!("Wallet 2 address: {}", w2.self_address().unwrap().render_string().unwrap());

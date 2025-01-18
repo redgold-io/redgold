@@ -48,6 +48,16 @@ impl CurrencyAmount {
         a.amount = amount;
         Ok(a)
     }
+    pub fn from_fractional_basis(a: impl Into<f64>, basis: i64) -> Result<Self, ErrorInfo> {
+        let a = a.into();
+        if a <= 0f64 {
+            Err(ErrorInfo::error_info("Invalid negative or zero transaction amount"))?
+        }
+        let amount = (a * (basis as f64)) as i64;
+        let mut a = CurrencyAmount::default();
+        a.amount = amount;
+        Ok(a)
+    }
 
     pub fn from_fractional_cur(a: impl Into<f64>, cur: SupportedCurrency) -> RgResult<Self> {
         let into = a.into();
@@ -55,6 +65,7 @@ impl CurrencyAmount {
             SupportedCurrency::Redgold => {Self::from_fractional(into)}
             SupportedCurrency::Bitcoin => {Self::from_fractional(into)}
             SupportedCurrency::Ethereum => {Ok(Self::from_eth_fractional(into))}
+            SupportedCurrency::Solana => {Self::from_fractional_basis(into, NANO_DECIMAL_MULTIPLIER)}
             _ => Err(ErrorInfo::error_info("Invalid currency"))
         }?;
         res.currency = Some(cur as i32);

@@ -90,8 +90,8 @@ impl StakeState {
         allowed_signing_methods: &Vec<XPubLikeRequestType>,
         csi: &TransactionSignInfo,
     )
-    where E: ExternalNetworkResources + Clone + Send + 'static,
-          G: GuiDepends + Clone + Send + 'static {
+    where E: ExternalNetworkResources + Clone + Send + 'static+ Sync,
+          G: GuiDepends + Clone + Send + 'static + Sync{
 
         let addr = pk.address().unwrap();
         let addrs = g.to_all_address(pk);
@@ -295,7 +295,9 @@ impl StakeState {
                                 let tsii = tsi.clone();
                                 let ncc = nc.clone();
                                 let sender = s.clone();
+                                let g3 = g.clone();
                                 let tx = async move {
+                                    let g2 = g3.clone();
                                     sender.send(TransactionProgressFlow::make_transaction(
                                         &ncc,
                                         &mut e,
@@ -307,7 +309,8 @@ impl StakeState {
                                         None,
                                         None,
                                         option1,
-                                        &tsii
+                                        &tsii,
+                                        &g2
                                     ).await).unwrap();
                                 };
                                 let res = g.spawn(tx);

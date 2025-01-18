@@ -190,7 +190,7 @@ pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel
     updates.sender.send(StateUpdate { update: Box::new(p0) }).unwrap();
 }
 
-pub fn create_swap_tx(ls: &mut LocalState) {
+pub fn create_swap_tx<G>(ls: &mut LocalState, g: &G) where G : GuiDepends + Clone + Send + 'static + Sync {
     let party_pk = ls
         .data
         .first_party
@@ -245,7 +245,9 @@ pub fn create_swap_tx(ls: &mut LocalState) {
 
     // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
     let channel = ls.local_messages.clone();
+    let g2 = g.clone();
     tokio::spawn(async move {
+        let g2 = g2.clone();
         let res = TransactionProgressFlow::make_transaction(
             &config,
             &mut res,
@@ -258,6 +260,7 @@ pub fn create_swap_tx(ls: &mut LocalState) {
             None,
             Some(from_eth_addr),
             &ksi,
+            &g2
         ).await;
         // info!("prepared transaction: {}", res.json_or());
 

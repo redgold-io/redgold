@@ -28,7 +28,7 @@ enum PlotTimeRangeBuckets {
 }
 
 impl PortfolioTabState {
-    pub fn view<E>(&mut self, ui: &mut Ui, d: &DataQueryInfo<E>, n: NetworkEnvironment) where E: ExternalNetworkResources + Send + Clone + 'static {
+    pub fn view<E>(&mut self, ui: &mut Ui, d: &DataQueryInfo<E>, n: NetworkEnvironment) where E: ExternalNetworkResources + Send + Clone + 'static  + Sync{
 
         let now = current_time_millis();
         let balances = d.balance_totals(&n, None);

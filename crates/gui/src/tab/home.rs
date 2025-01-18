@@ -55,8 +55,8 @@ impl HomeState {
         current_time: i64,
         lss: &LocalStoredState
     ) where
-        G: GuiDepends + Send + Clone + 'static,
-        E: ExternalNetworkResources + Send + Clone + 'static
+        G: GuiDepends + Send + Clone + 'static + Sync,
+        E: ExternalNetworkResources + Send + Clone + 'static + Sync
     {
 
         ui.horizontal(|ui| {
@@ -136,7 +136,7 @@ impl HomeState {
     }
 
     fn network_stats_table<T>(&mut self, ui: &mut Ui, d: &DataQueryInfo<T>, nc: &NodeConfig)
-    where T: ExternalNetworkResources + Clone + Send
+    where T: ExternalNetworkResources + Clone + Send + Sync
     {
         let mut table_data: Vec<Vec<String>> = vec![];
         let headers = vec![

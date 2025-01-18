@@ -26,8 +26,9 @@ impl SettingsState {
         config_data: &Arc<ConfigData>
     ) -> SettingsState {
         let c = config_data.clone();
+        let dat = (*c).clone();
         Self {
-            local_ser_config: toml::to_string(&config_data).unwrap(),
+            local_ser_config: toml::to_string(&dat).unwrap(),
             valid: true,
             all_configurations: false,
             last_parsed_config: (*c).clone(),

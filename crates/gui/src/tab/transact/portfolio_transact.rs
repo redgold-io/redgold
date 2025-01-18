@@ -107,8 +107,8 @@ impl PortfolioState {
                       csi: &TransactionSignInfo,
                       allowed: &Vec<XPubLikeRequestType>)
     where
-        G: GuiDepends + Clone + Send + 'static,
-        E: ExternalNetworkResources + Clone + Send + 'static
+        G: GuiDepends + Clone + Send + 'static + Sync,
+        E: ExternalNetworkResources + Clone + Send + 'static + Sync
     {
 
 
@@ -225,7 +225,7 @@ impl PortfolioState {
     }
     fn portfolio_row<E>(
         d: &DataQueryInfo<E>, fulfills: &Option<HashMap<SupportedCurrency, (f64, f64)>>, p: &PortfolioRequestEventInstance
-    ) -> Vec<String>where E: ExternalNetworkResources + Clone + Send + 'static {
+    ) -> Vec<String>where E: ExternalNetworkResources + Clone + Send + 'static + Sync {
         let starting_value_usd = p.value_at_time;
         // let starting_p.value_at_time
         let create_time = p.time.to_time_string_shorter_no_seconds_am_pm();

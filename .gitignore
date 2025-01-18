@@ -46,3 +46,4 @@ redgold.app
 .DS_Store
 /test-parquet-export
 tmpfile
+crates/gui/dist

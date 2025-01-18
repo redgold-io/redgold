@@ -35,7 +35,7 @@ pub(crate) fn load_icon() -> IconData {
 }
 
 
-pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Send + Clone + GuiDepends + 'static  {
+pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Send + Clone + GuiDepends + 'static + Sync {
 
     let mut x = 1400.0;
     let mut y = 1000.0;
