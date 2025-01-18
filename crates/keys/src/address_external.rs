@@ -59,7 +59,7 @@ impl ToBitcoinAddress for structs::Address {
         }
     }
 
-    fn to_bitcoin_address_typed(&self, network: &NetworkEnvironment) -> Result<structs::Address, ErrorInfo> {
+    fn to_bitcoin_address_typed(&self, _network: &NetworkEnvironment) -> Result<structs::Address, ErrorInfo> {
         if self.is_bitcoin() {
             Ok(self.clone())
         } else {

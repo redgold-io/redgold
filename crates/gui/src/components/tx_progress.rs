@@ -7,7 +7,6 @@ use strum_macros::{EnumIter, EnumString};
 use log::info;
 use strum::IntoEnumIterator;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::airgap::{AirgapMessage, AirgapResponse};
@@ -47,6 +46,7 @@ pub struct TransactionProgressFlow {
     pub heading_details: HashMap<TransactionStage, String>,
     pub proceed_button_text: HashMap<TransactionStage, String>,
     pub changing_stages: bool,
+    #[serde(skip)]
     pub rdg_broadcast_response: Arc<Mutex<Option<RgResult<String>>>>,
     pub signing_method: XPubLikeRequestType,
     // todo: change this to a transaction stage
@@ -192,7 +192,7 @@ impl TransactionProgressFlow {
     pub fn locked(&self) -> bool {
         self.stage != TransactionStage::NotCreated
     }
-    pub async fn make_transaction<T: ExternalNetworkResources>(
+    pub async fn make_transaction<T: ExternalNetworkResources, G>(
         nc: &NodeConfig,
         mut external_resources: &mut T,
         currency: &SupportedCurrency,
@@ -203,8 +203,9 @@ impl TransactionProgressFlow {
         party_address: Option<&Address>,
         party_fee: Option<&CurrencyAmount>,
         from_eth_addr: Option<Address>,
-        transaction_sign_info: &TransactionSignInfo
-    ) -> RgResult<PreparedTransaction> {
+        transaction_sign_info: &TransactionSignInfo,
+        g: &G
+    ) -> RgResult<PreparedTransaction> where G: GuiDepends + Sized + Clone + Send + 'static {
         let mut prepped = PreparedTransaction::default();
         prepped.currency = currency.clone();
         prepped.from = from.clone();
@@ -216,7 +217,7 @@ impl TransactionProgressFlow {
         match currency {
             SupportedCurrency::Redgold => {
                 let is_swap = party_address.is_some();
-                let mut builder = TransactionBuilder::new(&nc);
+                let mut builder = g.tx_builder();
                 info!("Builder fee addrs: {}", builder.fee_addrs.json_or());
                 let mut tx_b = builder.with_utxos(&address_info.unwrap().utxo_entries)?;
                 if is_swap {

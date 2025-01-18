@@ -29,7 +29,7 @@ pub mod gui_update;
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
-pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
+pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static + Sync {
     #[cfg_attr(feature = "persistence", serde(skip))]
     // logo: Image<'static>,
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -38,7 +38,7 @@ pub struct ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
     pub gui_depends: G,
 }
 
-impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send + 'static {
+impl<G> eframe::App for ClientApp<G> where G: GuiDepends + Clone + Send + 'static + Sync {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, frame: &mut Frame) {

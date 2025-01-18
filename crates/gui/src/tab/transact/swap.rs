@@ -98,7 +98,7 @@ impl SwapState {
         data: &DataQueryInfo<E>,
         network: &NetworkEnvironment,
         pk: &PublicKey
-    ) where E: ExternalNetworkResources + Send + Clone {
+    ) where E: ExternalNetworkResources + Send + Clone  + Sync{
 
         if self.currency_input_box.input_has_changed {
             let balances = data.balance_totals(&network, Some(pk));
@@ -137,8 +137,8 @@ impl SwapState {
         csi: &TransactionSignInfo,
         tsi: &TransactionSignInfo,
         data: &DataQueryInfo<E>
-    ) -> bool where G: GuiDepends + Clone + Send + 'static,
-            E: ExternalNetworkResources + Send + Clone {
+    ) -> bool where G: GuiDepends + Clone + Send + 'static + Sync,
+            E: ExternalNetworkResources + Send + Clone + Sync {
 
         let mut create_swap_tx_bool = false;
         self.check_valid(data, &g.get_network(), pk);
@@ -334,7 +334,7 @@ impl SwapState {
         changed
     }
 
-    fn swap_details<E>(&mut self, ui: &mut Ui, locked: bool, data: &DataQueryInfo<E>, net: NetworkEnvironment) where E: ExternalNetworkResources + Send + Clone {
+    fn swap_details<E>(&mut self, ui: &mut Ui, locked: bool, data: &DataQueryInfo<E>, net: NetworkEnvironment) where E: ExternalNetworkResources + Send + Clone  + Sync{
         ui.separator();
         let price_map_incl = data.price_map_usd_pair_incl_rdg.clone();
 
@@ -432,7 +432,7 @@ impl SwapState {
         data: &DataQueryInfo<E>,
         net: &NetworkEnvironment,
         g: &G
-    ) where E: ExternalNetworkResources + Send + Clone, G: GuiDepends + Clone + Send + 'static {
+    ) where E: ExternalNetworkResources + Send + Clone + Sync, G: GuiDepends + Clone + Send + 'static + Sync {
         if let Some(pa) = data.first_party.as_ref()
             .lock()
             .ok()

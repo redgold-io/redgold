@@ -1,4 +1,4 @@
-
+use redgold_gui::wasm_app;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -32,7 +32,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(eframe_template::TemplateApp::new(cc)))),
+                Box::new(|cc| Ok(Box::new(wasm_app::TemplateApp::new(cc)))),
             )
             .await;
 

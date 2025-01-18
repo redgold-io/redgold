@@ -94,7 +94,7 @@ impl TransactionTable {
         d: &DataQueryInfo<E>,
         filter_pk: Option<&PublicKey>
 
-    ) where E: ExternalNetworkResources + Clone + Send + 'static {
+    ) where E: ExternalNetworkResources + Clone + Send + 'static + Sync {
 
         ui.horizontal(|ui| {
             ui.vertical(|ui| {

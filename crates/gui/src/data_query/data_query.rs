@@ -1,6 +1,6 @@
 use crate::components::currency_input::supported_wallet_currencies;
 use crate::dependencies::gui_depends::GuiDepends;
-use crate::state::local_state::PricesPartyInfoAndDelta;
+use crate::state::local_state::PricesPartyInfoAndDeltaInitialQuery;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::explorer::{BriefTransaction, DetailedAddress};
 use redgold_schema::observability::errors::Loggable;
@@ -14,8 +14,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::info;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + 'static {
+#[derive(Clone, Debug)]
+pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + 'static + Sync{
     pub external: T,
     pub address_infos: Arc<Mutex<HashMap<PublicKey, AddressInfo>>>,
     pub metrics: Arc<Mutex<Vec<(String, String)>>>,
@@ -42,7 +42,7 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + '
 }
 
 
-impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
+impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync {
     pub fn refresh_swap_history(&self, p0: &PublicKey) {
 
     }
@@ -221,14 +221,14 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         }
     }
 
-    pub fn refresh_all_pk<G>(&self, pk: &PublicKey, g: &G) where G: GuiDepends + Send + Clone + 'static  {
+    pub fn refresh_all_pk<G>(&self, pk: &PublicKey, g: &G) where G: GuiDepends + Send + Clone + 'static + Sync  {
         self.refresh_pks(vec![pk], g);
         self.refresh_external_tts(vec![pk], g);
         self.refresh_detailed_address_pks(vec![pk], g);
         self.refresh_external_balances(vec![pk], g, &self.external, &g.get_network());
     }
 
-    pub fn refresh_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
+    pub fn refresh_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static + Sync {
         for pk in pks {
             let arc = self.address_infos.clone();
             let pk = pk.clone();
@@ -244,7 +244,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     }
 
 
-    pub fn refresh_external_tts<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
+    pub fn refresh_external_tts<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static + Sync {
         for pk in pks {
             let arc = self.external_tx.clone();
             let pk = pk.clone();
@@ -261,7 +261,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     }
 
 
-    pub fn refresh_detailed_address_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static {
+    pub fn refresh_detailed_address_pks<G>(&self, pks: Vec<&PublicKey>, g: &G) where G: GuiDepends + Send + Clone + 'static + Sync {
         for pk in pks {
             let arc = self.detailed_address.clone();
             let total_incoming = self.total_incoming.clone();
@@ -299,7 +299,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
     }
 
     pub fn refresh_external_balances<G,E>(&self, pks: Vec<&PublicKey>, g: &G, e: &E, network: &NetworkEnvironment)
-    where G: GuiDepends + Send + Clone + 'static, E: ExternalNetworkResources + Clone + Send + 'static {
+    where G: GuiDepends + Send + Clone + 'static + Sync, E: ExternalNetworkResources + Clone + Send + 'static + Sync {
         for pk in pks {
             for cur in supported_wallet_currencies() {
                 if cur == SupportedCurrency::Redgold {
@@ -321,7 +321,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         }
     }
 
-    pub fn refresh_party_data<G>(&self, g: &G) where G: GuiDepends + Send + Clone + 'static
+    pub fn refresh_party_data<G>(&self, g: &G) where G: GuiDepends + Send + Clone + 'static + Sync
     {
         let arc = self.party_data.clone();
         let arc2 = self.first_party.clone();
@@ -361,7 +361,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         });
     }
 
-    pub fn load_party_data_and_prices(&mut self, prices_party_info_and_delta: PricesPartyInfoAndDelta)
+    pub fn load_party_data_and_prices(&mut self, prices_party_info_and_delta: PricesPartyInfoAndDeltaInitialQuery)
     {
         *self.daily_one_year.lock().unwrap() = prices_party_info_and_delta.daily_one_year.clone();
         self.price_map_usd_pair_incl_rdg = prices_party_info_and_delta.prices.clone();
@@ -399,7 +399,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send {
         *ai = party_data;
     }
 
-    pub fn refresh_network_info<G>(&self, g: &G) where G: GuiDepends + Send + Clone + 'static {
+    pub fn refresh_network_info<G>(&self, g: &G) where G: GuiDepends + Send + Clone + 'static + Sync{
         let arc = self.metrics.clone();
         let hm = self.metrics_hm.clone();
         let g2 = g.clone();

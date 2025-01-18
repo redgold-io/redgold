@@ -22,7 +22,7 @@ use crate::util;
 
 static INIT: Once = Once::new();
 
-pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static {
+pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static + Sync {
     // let logo = app.logo.clone();
     let g = &mut app.gui_depends;
     let local_state = &mut app.local_state;

@@ -175,8 +175,8 @@ impl WalletState {
         csi: &TransactionSignInfo,
         allowed: &Vec<XPubLikeRequestType>
     )
-    where G: GuiDepends + Clone + Send + 'static,
-          E: ExternalNetworkResources + Clone + Send + 'static {
+    where G: GuiDepends + Clone + Send + 'static + Sync,
+          E: ExternalNetworkResources + Clone + Send + 'static + Sync{
 
 
         let labels = labels.into_iter().filter(|(l, v)|
@@ -215,8 +215,10 @@ impl WalletState {
                         let ncc = nc.clone();
                         let c = Channel::new();
                         let sender = c.clone();
+                        let g2 = g.clone();
                         let tx = async move {
-                            sender.send(TransactionProgressFlow::make_transaction(
+                            let g2 = g2.clone();
+                            let result = TransactionProgressFlow::make_transaction(
                                 &ncc,
                                 &mut e,
                                 &currency,
@@ -227,8 +229,10 @@ impl WalletState {
                                 None,
                                 None,
                                 option1,
-                                &tsii
-                            ).await).await.ok();
+                                &tsii,
+                                &g2
+                            ).await;
+                            sender.send(result).await.ok();
                         };
                         let res = g.spawn(tx);
                         let res = c.receiver.recv_err().unwrap();
@@ -437,7 +441,7 @@ impl WalletState {
 }
 
 pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, has_changed_tab: bool, depends: &mut G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
-    where G: GuiDepends + Clone + Send + 'static {
+    where G: GuiDepends + Clone + Send + 'static + Sync{
     // match local_state.wallet.updates.recv_while() {
     //     Ok(updates) => {
     //         for mut update in updates {
@@ -456,7 +460,7 @@ pub fn wallet_screen<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Loca
 
 
 pub fn wallet_screen_scrolled<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, has_changed_tab: bool, g: &mut G, d: &DataQueryInfo<ExternalNetworkResourcesImpl>)
-    where G: GuiDepends + Clone + Send + 'static {
+    where G: GuiDepends + Clone + Send + 'static + Sync{
 
     let (mut update, xpub) =
         internal_stored_xpubs(
@@ -613,8 +617,8 @@ fn proceed_from_pk<G, E>(
     ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, is_hot: bool, g: &mut G, d: &DataQueryInfo<E>,
     allowed: &Vec<XPubLikeRequestType>, hot_tsi: &TransactionSignInfo, csi: &TransactionSignInfo
 )
-    where G: GuiDepends + Clone + Send + 'static,
-    E: ExternalNetworkResources + Clone + Send + 'static {
+    where G: GuiDepends + Clone + Send + 'static + Sync,
+    E: ExternalNetworkResources + Clone + Send + 'static + Sync {
 
     // TODO: Include bitcoin address / ETH address for path 0 here for verification.
     ui.separator();
@@ -653,7 +657,7 @@ fn proceed_from_pk<G, E>(
         SendReceiveTabs::Swap => {
             if ls.swap_state.view(ui, g, pk, allowed, csi, hot_tsi, d) {
                 // TODO: refactor this out
-                create_swap_tx(ls);
+                create_swap_tx(ls, g);
             }
         }
         SendReceiveTabs::Home => {
@@ -719,7 +723,7 @@ fn swap_view(_ui: &mut Ui, _ls: &mut LocalState, _pk: &PublicKey) {
     // });
 }
 
-fn send_receive_bar<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G) where G: GuiDepends + Clone + Send + 'static  {
+fn send_receive_bar<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G) where G: GuiDepends + Clone + Send + 'static + Sync {
     ui.horizontal(|ui| {
         let style = ui.style_mut();
         style.override_text_style = Some(TextStyle::Heading);
@@ -749,7 +753,7 @@ fn send_receive_bar<G>(ui: &mut Ui, ls: &mut LocalState, pk: &PublicKey, g: &G) 
     });
 }
 
-fn refresh_balance<G>(ls: &mut LocalState, g: &G) where G: GuiDepends + Clone + Send + 'static {
+fn refresh_balance<G>(ls: &mut LocalState, g: &G) where G: GuiDepends + Clone + Send + 'static + Sync{
     let pk = ls.wallet.public_key.clone().expect("pk");
     ls.data.refresh_all_pk(&pk, g);
     address_query::get_address_info(
