@@ -2,6 +2,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -10,7 +11,7 @@ use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, SupportedCurrency};
 use crate::solana::wallet::SolanaNetwork;
 use crate::TestConstants;
-
+use crate::util::mnemonic_support::MnemonicSupport;
 
 #[derive(Serialize, Deserialize)]
 struct MemberPermission {
@@ -40,6 +41,8 @@ expect eof"#,
             s.into()
         );
 
+        println!("Writing expect script: {}", expect_script.clone());
+
         std::fs::write("temp.exp", expect_script).error_info("write expect script")?;
         std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
 
@@ -63,6 +66,8 @@ Parameters
  */
     pub async fn establish_multisig_party(&self, party_addrs_incl_self: Vec<Address>, threshold: i64
     ) -> RgResult<String> {
+
+        counter!("redgold_multisig_solana_establish").increment(1);
 
         let init = "multisig-create";
         // multisig_create --keypair /path/to/keypair.json
@@ -120,12 +125,15 @@ Parameters
     // Create a vault transaction to send funds
     pub async fn multisig_propose_send(
         &self,
-        multisig_pubkey: String,
+        multisig_pubkey: impl Into<String>,
         vault_index: Option<i64>,
         destination: Address,
         amount: CurrencyAmount,
         memo: Option<String>
     ) -> RgResult<(String, String)> {
+        let multisig_pubkey = multisig_pubkey.into();
+        counter!("redgold_multisig_solana_propose").increment(1);
+
         // Format transaction message for SOL transfer
         // You'll need to format this correctly for Solana transfer instruction
         let transaction_message = format!("{{\"transfer\": {{\"destination\": \"{}\", \"amount\": {}}}}}",
@@ -152,15 +160,17 @@ Parameters
     // Vote/approve a transaction
     pub async fn multisig_approve_transaction(
         &self,
-        multisig_pubkey: &str,
-        transaction_index: u64,
+        multisig_pubkey: impl Into<String>,
+        transaction_index: Option<u64>,
     ) -> RgResult<(String, String)> {
+        counter!("redgold_multisig_solana_vote").increment(1);
         let init = "proposal_vote";
+        let transaction_index = transaction_index.unwrap_or(0);
         let remainder = format!(
-            "--multisig_pubkey {} \
-            --transaction_index {} \
+            "--multisig-pubkey {} \
+            --transaction-index {} \
             --action Approve",
-            multisig_pubkey,
+            multisig_pubkey.into(),
             transaction_index
         );
 
@@ -170,15 +180,15 @@ Parameters
     // Execute the approved transaction
     pub async fn multisig_execute_transaction(
         &self,
-        multisig_pubkey: &str,
-        transaction_index: u64,
+        multisig_pubkey: impl Into<String>,
+        transaction_index: Option<i64>,
     ) -> RgResult<(String, String)> {
         let init = "vault_transaction_execute";
         let remainder = format!(
-            "--multisig_pubkey {} \
-            --transaction_index {}",
-            multisig_pubkey,
-            transaction_index
+            "--multisig-pubkey {} \
+            --transaction-index {}",
+            multisig_pubkey.into(),
+            transaction_index.unwrap_or(0)
         );
 
         self.cmd(init, remainder).await
@@ -215,7 +225,13 @@ async fn debug_kg() {
     //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
     //         , None, None).await.unwrap();
     // println!("Sent: {}", res.message.hash().to_string());
-    w.multisig_propose_send()
+    let destination = w1.self_address().unwrap();
+    let res = w.multisig_propose_send(
+        multisig_pubkey, Some(0),
+        destination,  CurrencyAmount::from_fractional_cur(0.05, SupportedCurrency::Solana).unwrap(), None
+    ).await.unwrap();
+    println!("Proposed: {}", res.0);
+    println!("Proposed stderr: {}", res.1);
     // w.init_multisig().await.unwrap();
 
 }
