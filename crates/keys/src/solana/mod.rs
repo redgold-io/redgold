@@ -1,2 +1,3 @@
 pub mod derive_solana;
-mod wallet;
+pub mod wallet;
+pub mod multisig;
