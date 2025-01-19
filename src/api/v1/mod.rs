@@ -4,7 +4,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use itertools::Itertools;
-use serde::Serialize;
+use rocket::form::FromForm;
+use serde::{Deserialize, Serialize};
 use sha3::digest::generic_array::functional::FunctionalSequence;
 use warp::{Filter, Rejection};
 use warp::reply::Json;
@@ -16,7 +17,7 @@ use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::party::search_events::PartyEventSearch;
-use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, PublicKey, Request, SupportedCurrency};
 use crate::api::warp_helpers::as_warp_json_response;
 use crate::api::explorer::handle_address_info;
 use crate::api::explorer::server::{extract_ip, process_origin};
@@ -29,7 +30,8 @@ pub struct ApiData {
     pub relay: Arc<Relay>,
     pub origin_ip: Option<String>,
     pub param: Option<String>,
-    pub param2: Option<String>
+    pub param2: Option<String>,
+    pub request: Option<Request>
 }
 
 pub trait ApiHelpers {
@@ -49,6 +51,7 @@ impl<T: Filter<Extract=(), Error=Rejection> + Sized + Send + Clone> ApiHelpers f
                     origin_ip: origin,
                     param: None,
                     param2: None,
+                    request: None,
                 }
             })
     }
@@ -261,6 +264,21 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         });
 
 
+    let gui_init = warp::post()
+        .with_v1()
+        .and(warp::path("gui"))
+        .and(warp::path("init"))
+        .with_relay_and_ip(r.clone())
+        .and(warp::body::json::<Request>())
+        .map(|mut api_data: ApiData, req: Request| {
+            api_data.request = Some(req);
+            api_data
+        })
+        .and(warp::path("swaps"))
+        .and_then_as(move |api_data: ApiData| async move {
+            public_swap_lookup(api_data).await
+        });
+
 
     hello
         .or(table_sizes)
@@ -272,7 +290,22 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
         .or(exe_hash)
         .or(explorer_public_address)
         .or(public_swap)
+        .or(gui_init)
 
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+struct GuiInitResponse {
+
+}
+
+async fn gui_init_request(p0: ApiData) -> RgResult<GuiInitResponse> {
+
+    let req = p0.request.ok_msg("req")?;
+    let req = req.gui_init_request.ok_msg("gui init request")?;
+    let response = GuiInitResponse::default();
+
+    Ok(response)
 }
 
 async fn public_swap_lookup(p0: ApiData) -> RgResult<Vec<UserSwapInfoRow>> {
@@ -325,5 +358,6 @@ async fn balance_lookup(relay: Arc<Relay>, hash: String) -> RgResult<CurrencyAmo
     }
     Ok(total)
 }
+
 
 

@@ -113,11 +113,6 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
     // Tip: a good default choice is to just keep the `CentralPanel`.
     // For inspiration and more examples, go to https://emilk.github.io/egui
 
-    // TODO: Change this to lock screen state transition, also enable it only based on a lock button
-    // if local_state.session_password_hashed.is_none() || local_state.session_locked {
-    //     update_lock_screen(app, ctx, frame);
-    //     return;
-    // }
 
     top_panel::render_top(ctx, local_state);
 

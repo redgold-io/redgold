@@ -8,6 +8,7 @@ use itertools::Itertools;
 use tracing::{error, info};
 use redgold_data::data_store::DataStore;
 use redgold_keys::KeyPair;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
