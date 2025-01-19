@@ -1,12 +1,6 @@
-use std::collections::HashMap;
-use redgold_keys::util::mnemonic_support::{WordsPass, WordsPassMetadata};
+use redgold_keys::util::mnemonic_support::WordsPassMetadata;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::NetworkEnvironment;
 use crate::core::relay::Relay;
-use crate::infra::deploy::derive_mnemonic_and_peer_id;
-
-
 #[ignore]
 #[tokio::test]
 async fn metadata_converter() {

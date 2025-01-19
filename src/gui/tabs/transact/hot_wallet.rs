@@ -1,16 +1,19 @@
 use eframe::egui;
 use eframe::egui::Ui;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use crate::gui::app_loop::LocalState;
 use crate::gui::components::key_source_sel::key_source;
 use crate::gui::components::save_key_window;
-use crate::gui::tabs::transact::wallet_tab::WalletState;
+use redgold_gui::tab::transact::wallet_state::WalletState;
 
 
-pub fn hot_header(ls: &mut LocalState, ui: &mut Ui, _ctx: &egui::Context) {
+pub fn hot_header<E, G>(ls: &mut LocalState<E>, ui: &mut Ui, _ctx: &egui::Context, g: &G
+) where E: ExternalNetworkResources + 'static + Sync + Send + Clone, G: GuiDepends + 'static + Sync + Send + Clone {
 
     save_key_window::save_key_window(ui, ls, _ctx);
 
-    key_source(ui, ls);
+    key_source(ui, ls, g);
 
     let state = &mut ls.wallet;
 
@@ -18,7 +21,7 @@ pub fn hot_header(ls: &mut LocalState, ui: &mut Ui, _ctx: &egui::Context) {
     ui.label(format!("Hot Wallet Checksum: {check}"));
 
     if state.public_key.is_none() {
-        state.update_hot_mnemonic_or_key_info();
+        state.update_hot_mnemonic_or_key_info(g);
     }
 
 }

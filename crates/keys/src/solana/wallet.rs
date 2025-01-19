@@ -12,7 +12,7 @@ use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurre
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::solana::derive_solana::{get_solana_address, get_solana_address_from_verifying, get_solana_public_key, SolanaWordPassExt, ToSolanaAddress};
 use crate::TestConstants;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 
 #[derive(Clone)]
 pub struct SolanaNetwork {

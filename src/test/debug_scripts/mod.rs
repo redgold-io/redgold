@@ -10,3 +10,4 @@ pub mod mac_stackover_partydata;
 pub mod main_table_sizes;
 pub mod swap_info_not_loading_explorer;
 mod party_gas_fee_insufficient;
+mod price_amm_fulfill;

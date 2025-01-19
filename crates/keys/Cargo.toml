@@ -74,10 +74,6 @@ solana-program = "2.1.9"
 solana-sdk = "2.1.9"
 solana-client = "2.1.9"
 
-
-solana-sdk = "2.1.9"
-solana-client = "2.1.9"
-
 [target.'cfg(target_os = "linux")'.dependencies]
 sequoia-openpgp = "1.21.2"
 

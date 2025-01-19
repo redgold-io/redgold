@@ -5,6 +5,7 @@ use eframe::egui::Image;
 use crate::gui::egui::IconData;
 use egui_extras::RetainedImage;
 use tokio::runtime::Runtime;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult};
 use redgold_schema::structs::ErrorInfo;
@@ -35,7 +36,7 @@ pub(crate) fn load_icon() -> IconData {
 }
 
 
-pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Send + Clone + GuiDepends + 'static + Sync {
+pub async fn start_native_gui<G,E>(app: ClientApp<G, E>) -> RgResult<()> where G: Send + Clone + GuiDepends + 'static + Sync, E: ExternalNetworkResources + Send + Sync + 'static + Clone {
 
     let mut x = 1400.0;
     let mut y = 1000.0;
@@ -69,7 +70,7 @@ pub async fn start_native_gui<G>(app: ClientApp<G>) -> RgResult<()> where G: Sen
         native_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::<ClientApp<G>>::new(app))
+            Ok(Box::<ClientApp<G,E>>::new(app))
         })
     ).map_err(|e| error_info(format!("GUI failed to start: {}", e.to_string())))
 }

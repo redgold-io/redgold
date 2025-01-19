@@ -6,7 +6,8 @@ use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, Hash};
 use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
+use crate::util::mnemonic_support::MnemonicSupport;
 
 pub mod proof_support;
 pub mod request_support;

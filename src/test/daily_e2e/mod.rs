@@ -4,7 +4,7 @@ use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;

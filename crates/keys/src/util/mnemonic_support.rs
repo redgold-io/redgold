@@ -11,9 +11,10 @@ use bdk::miniscript::miniscript;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
@@ -24,14 +25,39 @@ use crate::proof_support::PublicKeySupport;
 use crate::util::btc_wallet::SingleKeyBitcoinWallet;
 use crate::xpub_wrapper::ValidateDerivationPath;
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct WordsPass {
-    pub words: String,
-    pub passphrase: Option<String>,
-}
-
-trait MnemonicSupport {
-
+pub trait MnemonicSupport {
+    fn metadata(&self) -> RgResult<WordsPassMetadata>;
+    fn default_rg_path(account: usize) -> String;
+    fn kp_rg_account(&self, account: usize) -> RgResult<KeyPair>;
+    fn default_kp(&self) -> RgResult<KeyPair>;
+    fn default_xpub(&self) -> RgResult<String>;
+    fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<AccountKeySource>;
+    fn default_pid_kp(&self) -> RgResult<KeyPair>;
+    fn checksum(&self) -> RgResult<String>;
+    fn checksum_words(&self) -> RgResult<String>;
+    fn seed(&self) -> RgResult<[u8; 64]>;
+    fn hash_derive_words(&self, concat_nonce: impl Into<String>) -> RgResult<Self> where Self: Sized;
+    fn new_validated(words: impl Into<String>, passphrase: Option<String>) -> RgResult<Self> where Self: Sized;
+    fn words(words: String) -> Self  where Self: Sized;
+    fn generate() -> RgResult<Self>  where Self: Sized;
+    fn from_bytes(bytes: &[u8]) -> RgResult<Self> where Self: Sized;
+    fn from_str_hashed(str: impl Into<String>) -> Self where Self: Sized;
+    fn mnemonic(&self) -> RgResult<Mnemonic>;
+    fn validate(&self) -> RgResult<&Self> where Self: Sized;
+    fn pair(&self) -> RgResult<(Mnemonic, Option<String>)>;
+    fn extended_key(&self) -> RgResult<ExtendedKey>;
+    fn xprv(&self) -> RgResult<ExtendedPrivKey>;
+    fn xpub(&self, path: impl Into<String>) -> RgResult<ExtendedPubKey>;
+    fn derive_seed_at_path(&self, path: &str) -> RgResult<[u8; 32]>;
+    fn xpub_str(&self, path: impl Into<String>) -> RgResult<String>;
+    fn key_from_path_str(&self, path: impl Into<String>) -> RgResult<ExtendedPrivKey>;
+    fn private_at(&self, path: impl Into<String>) -> RgResult<String>;
+    fn keypair_at(&self, path: impl Into<String>) -> RgResult<KeyPair>;
+    fn public_at(&self, path: impl Into<String>) -> RgResult<structs::PublicKey>;
+    fn keypair_at_change(&self, change: impl Into<i64>) -> RgResult<KeyPair>;
+    fn default_peer_id(&self) -> RgResult<PeerId>;
+    fn default_public_key(&self) -> RgResult<structs::PublicKey>;
+    fn test_words() -> Self;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -66,9 +92,9 @@ impl WordsPassMetadata {
     }
 }
 
-impl WordsPass {
+impl MnemonicSupport for WordsPass {
 
-    pub fn metadata(&self) -> RgResult<WordsPassMetadata> {
+    fn metadata(&self) -> RgResult<WordsPassMetadata> {
         let default_calc = 20;
         let mut res = vec![];
         // Default spending keys
@@ -103,24 +129,24 @@ impl WordsPass {
         })
     }
 
-    pub fn default_rg_path(account: usize) -> String {
+    fn default_rg_path(account: usize) -> String {
         default_node_internal_derivation_path(account as i64)
     }
 
-    pub fn kp_rg_account(&self, account: usize) -> RgResult<KeyPair> {
+    fn kp_rg_account(&self, account: usize) -> RgResult<KeyPair> {
         self.keypair_at(Self::default_rg_path(account))
     }
 
-    pub fn default_kp(&self) -> RgResult<KeyPair> {
+    fn default_kp(&self) -> RgResult<KeyPair> {
         self.kp_rg_account(0)
     }
 
-    pub fn default_xpub(&self) -> RgResult<String> {
+    fn default_xpub(&self) -> RgResult<String> {
         let account_path = Self::default_rg_path(0).as_account_path().expect("works");
         self.xpub_str(account_path)
     }
 
-    pub fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<AccountKeySource> {
+    fn named_xpub(&self, key_name: impl Into<String>, skip_persist: bool, n: &NetworkEnvironment) -> RgResult<AccountKeySource> {
         self.default_xpub().map(|xpub| {
             let mut named = AccountKeySource::default();
             let key_into = key_name.into();
@@ -136,26 +162,26 @@ impl WordsPass {
         })
     }
 
-    pub fn default_pid_kp(&self) -> RgResult<KeyPair> {
+    fn default_pid_kp(&self) -> RgResult<KeyPair> {
         self.kp_rg_account(1)
     }
 
-    pub fn checksum(&self) -> RgResult<String> {
+    fn checksum(&self) -> RgResult<String> {
         Ok(Hash::new_checksum(&self.seed()?.to_vec()))
     }
 
-    pub fn checksum_words(&self) -> RgResult<String> {
+    fn checksum_words(&self) -> RgResult<String> {
         let mut s2 = self.clone();
         s2.passphrase = None;
         let s = s2.seed()?.to_vec();
         Ok(Hash::new_checksum(&s))
     }
 
-    pub fn seed(&self) -> RgResult<[u8; 64]> {
+    fn seed(&self) -> RgResult<[u8; 64]> {
         Ok(self.mnemonic()?.to_seed(self.passphrase.clone().unwrap_or("".to_string())))
     }
 
-    pub fn hash_derive_words(&self, concat_nonce: impl Into<String>) -> RgResult<Self> {
+    fn hash_derive_words(&self, concat_nonce: impl Into<String>) -> RgResult<Self> {
         let mut vec = self.seed()?.to_vec();
         vec.extend(concat_nonce.into().as_bytes());
         let entropy = structs::Hash::digest(vec).raw_bytes()?;
@@ -166,14 +192,7 @@ impl WordsPass {
         })
     }
 
-    pub fn new(words: impl Into<String>, passphrase: Option<String>) -> Self {
-        Self {
-            words: words.into(),
-            passphrase,
-        }
-    }
-
-    pub fn new_validated(words: impl Into<String>, passphrase: Option<String>) -> RgResult<Self> {
+    fn new_validated(words: impl Into<String>, passphrase: Option<String>) -> RgResult<Self> {
         let s = Self {
             words: words.into(),
             passphrase: passphrase.map(|p| p.into()),
@@ -183,13 +202,13 @@ impl WordsPass {
         Ok(s)
     }
 
-    pub fn words(words: String) -> Self {
+    fn words(words: String) -> Self {
         Self {
             words,
             passphrase: None
         }
     }
-    pub fn generate() -> RgResult<Self> {
+    fn generate() -> RgResult<Self> {
         let mut rng = rand::thread_rng();
         let mut entropy = [0u8; 32];
         rng.fill_bytes(&mut entropy);
@@ -206,7 +225,7 @@ impl WordsPass {
         })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> RgResult<Self> {
+    fn from_bytes(bytes: &[u8]) -> RgResult<Self> {
         let m = Mnemonic::from_entropy(bytes)
             .error_info("Failed to derive mnemonic from entropy")
             .with_detail("bytes", hex::encode(bytes))
@@ -218,12 +237,12 @@ impl WordsPass {
         })
     }
 
-    pub fn from_str_hashed(str: impl Into<String>) -> Self {
+    fn from_str_hashed(str: impl Into<String>) -> Self {
         let b: Vec<u8> = structs::Hash::from_string_calculate(&str.into()).raw_bytes().expect("hash");
         Self::from_bytes(&b).unwrap()
     }
 
-    pub fn mnemonic(&self) -> RgResult<Mnemonic> {
+    fn mnemonic(&self) -> RgResult<Mnemonic> {
         Mnemonic::parse_in(
             Language::English,
             self.words.clone(),
@@ -231,32 +250,32 @@ impl WordsPass {
         e.to_string())))
     }
 
-    pub fn validate(&self) -> RgResult<&Self> {
+    fn validate(&self) -> RgResult<&Self> {
         self.mnemonic()?;
         Ok(self)
     }
 
-    pub fn pair(&self) -> RgResult<(Mnemonic, Option<String>)> {
+    fn pair(&self) -> RgResult<(Mnemonic, Option<String>)> {
         Ok((self.mnemonic()?, self.passphrase.clone()))
     }
 
-    pub fn extended_key(&self) -> RgResult<ExtendedKey> {
+    fn extended_key(&self) -> RgResult<ExtendedKey> {
         self.pair()?.into_extended_key()
             .map_err(|e| error_info(format!("Failed to generate extended key: {}", e.to_string())))
     }
 
-    pub fn xprv(&self) -> RgResult<ExtendedPrivKey> {
+    fn xprv(&self) -> RgResult<ExtendedPrivKey> {
         self.extended_key()?.into_xprv(Network::Bitcoin)
             .safe_get_msg("Failed to generate xprv").cloned()
     }
 
-    pub fn xpub(&self, path: impl Into<String>) -> RgResult<ExtendedPubKey> {
+    fn xpub(&self, path: impl Into<String>) -> RgResult<ExtendedPubKey> {
         let xprv = self.key_from_path_str(path.into())?;
         let xpub = ExtendedPubKey::from_priv(&Secp256k1::new(), &xprv);
         Ok(xpub)
     }
 
-    pub fn derive_seed_at_path(&self, path: &str) -> RgResult<[u8; 32]> {
+    fn derive_seed_at_path(&self, path: &str) -> RgResult<[u8; 32]> {
         let xprv = self.key_from_path_str(path)?;
 
         // Extract the 32-byte seed from the extended private key
@@ -265,44 +284,44 @@ impl WordsPass {
         Ok(seed)
     }
 
-    pub fn xpub_str(&self, path: impl Into<String>) -> RgResult<String> {
+    fn xpub_str(&self, path: impl Into<String>) -> RgResult<String> {
         Ok(self.xpub(path)?.to_string())
     }
 
-    pub fn key_from_path_str(&self, path: impl Into<String>) -> RgResult<ExtendedPrivKey> {
+    fn key_from_path_str(&self, path: impl Into<String>) -> RgResult<ExtendedPrivKey> {
         let dp = DerivationPath::from_str(path.into().as_str())
             .error_info("Failed to parse derivation path")?;
         Ok(self.xprv()?.derive_priv(&Secp256k1::new(), &dp)
             .error_info("Failed to derive private key")?)
     }
 
-    pub fn private_at(&self, path: impl Into<String>) -> RgResult<String> {
+    fn private_at(&self, path: impl Into<String>) -> RgResult<String> {
         let key = self.key_from_path_str(path)?;
         let pkhex = hex::encode(key.private_key.secret_bytes().to_vec());
         Ok(pkhex)
     }
 
-    pub fn keypair_at(&self, path: impl Into<String>) -> RgResult<KeyPair> {
+    fn keypair_at(&self, path: impl Into<String>) -> RgResult<KeyPair> {
         KeyPair::from_private_hex(self.private_at(path)?)
     }
 
-    pub fn public_at(&self, path: impl Into<String>) -> RgResult<structs::PublicKey> {
+    fn public_at(&self, path: impl Into<String>) -> RgResult<structs::PublicKey> {
         let key = self.key_from_path_str(path.into())?;
         let vec = key.private_key.public_key(&Secp256k1::new()).serialize().to_vec();
         Ok(structs::PublicKey::from_bytes_direct_ecdsa(vec))
     }
 
-    pub fn keypair_at_change(&self, change: impl Into<i64>) -> RgResult<KeyPair> {
+    fn keypair_at_change(&self, change: impl Into<i64>) -> RgResult<KeyPair> {
         let key = self.keypair_at(redgold_keypair_change_path(change.into()))?;
         Ok(key)
     }
 
-    pub fn default_peer_id(&self) -> RgResult<PeerId> {
+    fn default_peer_id(&self) -> RgResult<PeerId> {
         let pk = self.public_at(default_node_internal_derivation_path(1))?;
         let pid = PeerId::from_pk(pk);
         Ok(pid)
     }
-    pub fn default_public_key(&self) -> RgResult<structs::PublicKey> {
+    fn default_public_key(&self) -> RgResult<structs::PublicKey> {
         let pk = self.public_at(default_node_internal_derivation_path(0))?;
         Ok(pk)
     }
@@ -320,20 +339,20 @@ impl WordsPass {
     assert_eq!(pkhex, pkhex2);
      */
 
-    pub fn test_words() -> Self {
+    fn test_words() -> Self {
         WordsPass::new("abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string(), None)
     }
 }
 
 #[test]
-pub fn generate_test() {
+fn generate_test() {
     let w = WordsPass::generate().expect("words");
     println!("{}", w.words.clone());
     assert_eq!(24, w.words.split(" ").collect_vec().len());
 }
 
 #[test]
-pub fn generate_xpub() {
+fn generate_xpub() {
     let w = WordsPass::generate().expect("words");
     println!("{}", w.words.clone());
     w.public_at("m/44'/0'/0'".to_string()).expect("private key");
@@ -360,7 +379,7 @@ pub fn test_pubk() -> Option<structs::PublicKey> {
 }
 
 #[test]
-pub fn load_ci_kp() {
+fn load_ci_kp() {
     if let Some(w) = std::env::var("REDGOLD_TEST_WORDS").ok() {
         let w = WordsPass::new(w, None);
         let path = "m/84'/0'/0'/0/0";
@@ -369,43 +388,6 @@ pub fn load_ci_kp() {
             SingleKeyBitcoinWallet::new_wallet(pk, NetworkEnvironment::Dev, true)
                 .expect("w");
         let a = w.address().expect("a");
-        // tb1qrxdzt6v9yuu567j52cmla4v9kler3wzj9swxy9
         println!("{a}");
     }
 }
-
-//
-// #[test]
-// pub fn test() {
-//
-//     let words = bitcoin_wallet::mnemonic::Mnemonic::new_random(MasterKeyEntropy::Double)
-//         .unwrap().to_string();
-//     println!("{}", words.clone());
-//
-//     let mnemonic1 = MnemonicWords::from_mnemonic_words(words.clone().as_str(), Some("test".to_string()));
-//     let seed1 = mnemonic1.seed.0.clone();
-//
-//     let mnemonic = Mnemonic::parse_in(
-//         Language::English,
-//         words.clone(),
-//     ).unwrap();
-//     let seed = mnemonic.to_seed("test");
-//     // let test_seed_no_p = mnemonic.to_seed(None);
-//     assert_eq!(seed1.clone(), seed.clone().to_vec());
-//     let xkey: ExtendedKey =
-//         (mnemonic, Some("test".to_string()))
-//             .into_extended_key().unwrap();
-//     let xprv = xkey.into_xprv(Network::Bitcoin).unwrap();
-//     let k1 = Secp256k1::new();
-//     let path = "m/84'/0'/0'/0/0";
-//     let dp = DerivationPath::from_str(path).unwrap();
-//     let key1 = xprv.derive_priv(&k1, &dp).unwrap();
-//     let pkhex = hex::encode(key1.private_key.secret_bytes().to_vec());
-//     println!("Pkhex {}", pkhex.clone());
-//
-//     let pkhex2 = mnemonic1.key_from_path_str(path.to_string()).0.to_hex();
-//     println!("Pkhex2 {}", pkhex2.clone());
-//     assert_eq!(pkhex, pkhex2);
-//     ()
-//
-// }

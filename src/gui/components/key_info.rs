@@ -2,15 +2,18 @@ use eframe::egui::{Color32, RichText, Ui};
 use tracing::info;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::KeyPair;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
 use crate::gui::app_loop::LocalState;
 use redgold_gui::common::{data_item, data_item_hyperlink, editable_text_input_copy, valid_label};
+use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::gui::components::explorer_links::{rdg_explorer, rdg_explorer_links};
 
 const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
@@ -136,15 +139,16 @@ impl KeyInfo {
 }
 
 
-pub fn extract_gui_key(ls: &mut LocalState) -> GuiKey {
+pub fn extract_gui_key<E, G>(ls: &mut LocalState<E>, g: &G) -> GuiKey where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     ls.wallet.active_hot_private_key_hex
         .as_ref().map(|x| GuiKey::DirectPrivateKey(x.clone()))
-        .unwrap_or(GuiKey::Mnemonic(ls.wallet.hot_mnemonic()))
+        .unwrap_or(GuiKey::Mnemonic(ls.wallet.hot_mnemonic(g)))
 }
 
 
-pub fn update_keys_key_info(ls: &mut LocalState) {
-    let gui_key = extract_gui_key(ls);
+pub fn update_keys_key_info<E, G>(ls: &mut LocalState<E>, g: &G)
+where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources + 'static + Sync + Send + Clone {
+    let gui_key = extract_gui_key(ls, g);
     ls.keytab_state.keys_key_info.update_fields(
         &ls.node_config.network,
         ls.keytab_state.key_derivation_path_input.derivation_path.clone(),
@@ -152,7 +156,7 @@ pub fn update_keys_key_info(ls: &mut LocalState) {
     );
 }
 
-pub fn update_xpub_key_info(ls: &mut LocalState) {
+pub fn update_xpub_key_info<E>(ls: &mut LocalState<E>) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     let xpub = ls.local_stored_state.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name));
     if let Some(xpub) = xpub {
         let gui_key = GuiKey::XPub(xpub.xpub.clone());

@@ -1,5 +1,6 @@
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, RichText};
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::common::copy_button;
 use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::times::ToTimeString;
@@ -9,7 +10,7 @@ fn round_down_to_minute(time_millis: i64) -> i64 {
     time_millis - (time_millis % 60000)
 }
 
-pub fn render_top(ctx: &Context, local_state: &mut LocalState) {
+pub fn render_top<E>(ctx: &Context, local_state: &mut LocalState<E>) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
         ui.horizontal(|ui| {
             let cur = ctx.pixels_per_point();

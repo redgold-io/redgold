@@ -24,14 +24,14 @@ use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Pro
 use serde::{Deserialize, Serialize};
 // use crate::util::cli::commands::send;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::{KeyPair, TestConstants};
-use crate::address_external::ToBitcoinAddress;
 use crate::proof_support::ProofSupport;
 use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk, WordsPass};
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk, MnemonicSupport};
 
 
 #[test]

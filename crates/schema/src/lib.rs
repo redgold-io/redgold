@@ -77,6 +77,7 @@ pub mod peer;
 pub mod explorer;
 pub mod supported_currency;
 pub mod airgap_msg;
+pub mod keys;
 
 impl BytesData {
     pub fn from(data: Vec<u8>) -> Self {

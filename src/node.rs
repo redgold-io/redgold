@@ -61,6 +61,7 @@ use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_common_no_wasm::stream_handlers;
 use crate::core::recent_download::RecentDownload;
 use redgold_common_no_wasm::stream_handlers::{run_recv_single, IntervalFold};
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::infra::multiparty_backup::check_updated_multiparty_csv;
 use crate::multiparty_gg20::initiate_mp::default_room_id_signing;

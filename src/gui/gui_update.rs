@@ -7,6 +7,7 @@ use std::sync::Once;
 use eframe::egui;
 use strum::IntoEnumIterator;
 use itertools::Itertools;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::SupportedCurrency;
@@ -22,18 +23,39 @@ use crate::util;
 
 static INIT: Once = Once::new();
 
-pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut eframe::Frame) where G: GuiDepends + Clone + Send + 'static + Sync {
-    // let logo = app.logo.clone();
+pub fn app_update<G, E>(app: &mut ClientApp<G, E>, ctx: &egui::Context, _frame: &mut eframe::Frame)
+where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources + Send + Sync + 'static + Clone {
+
     let g = &mut app.gui_depends;
     let local_state = &mut app.local_state;
 
-    let check_config = g.get_config();
+    let mut first_call = false;
+    // TODO: Replace with config query and check.
+    INIT.call_once(|| {
+        first_call = true;
+
+        let amt = if local_state.is_mac {
+            2.5
+        } else if local_state.is_linux {
+            1.8
+        } else {
+            2.0
+        };
+        ctx.set_pixels_per_point(amt);
+    });
+
+    if first_call {
+        g.initial_queries_prices_parties_etc(
+            local_state.local_messages.sender.clone(),
+            local_state.external_network_resources.clone()
+        );
+    }
+
     if local_state.persist_requested {
         let mut c = g.get_config();
         c.local = Some(local_state.local_stored_state.clone());
         g.set_config(&c, false);
         local_state.persist_requested = false;
-        // println!("Saved address after set config {}", g.get_config().local.unwrap().saved_addresses.json_or());
     }
 
     g.set_network(&local_state.node_config.network);
@@ -70,32 +92,10 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                 // });
             }
             LocalStateUpdate::RequestHardwareRefresh => {
-                local_state.wallet.update_hardware();
+                local_state.wallet.update_hardware(g);
             }
             _ => {}
         }
-    }
-
-    let mut first_call = false;
-    // TODO: Replace with config query and check.
-    INIT.call_once(|| {
-        first_call = true;
-
-        let amt = if local_state.is_mac {
-            2.5
-        } else if local_state.is_linux {
-            1.8
-        } else {
-            2.0
-        };
-        ctx.set_pixels_per_point(amt);
-    });
-
-    if first_call {
-        g.initial_queries_prices_parties_etc(
-            local_state.local_messages.sender.clone(),
-            local_state.external_network_resources.clone()
-        );
     }
 
     local_state.current_time = util::current_time_millis_i64();
@@ -201,8 +201,8 @@ pub fn app_update<G>(app: &mut ClientApp<G>, ctx: &egui::Context, _frame: &mut e
                         &mut local_state.server_state,
                         g,
                         &local_state.node_config,
-                        local_state.wallet.hot_mnemonic().words,
-                        local_state.wallet.hot_mnemonic().passphrase,
+                        local_state.wallet.hot_mnemonic(g).words,
+                        local_state.wallet.hot_mnemonic(g).passphrase,
                     );
                 });
             }
