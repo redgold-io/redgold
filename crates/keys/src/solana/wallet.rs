@@ -104,7 +104,7 @@ impl SolanaNetwork {
         Ok(transaction)
     }
 
-    fn convert_to_solana_keypair(signing: &SigningKey) -> RgResult<Keypair> {
+    pub fn convert_to_solana_keypair(signing: &SigningKey) -> RgResult<Keypair> {
         let secret = signing.to_bytes();
         let verifying = signing.verifying_key();
         let public = verifying.to_bytes();
@@ -117,6 +117,10 @@ impl SolanaNetwork {
         Keypair::from_bytes(&keypair_bytes)
             .error_info("Failed to convert to Solana keypair")
     }
+    pub fn convert_to_solana_keypair_bytes(signing: &SigningKey) -> RgResult<Vec<u8>> {
+        Ok(Self::convert_to_solana_keypair(signing)?.to_bytes().to_vec())
+    }
+
 
     pub fn get_pubkey(address: structs::Address) -> RgResult<Pubkey> {
         let address = address.render_string()?;

@@ -1,14 +1,18 @@
+use std::env::home_dir;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
+use solana_program::message::Message;
+use solana_sdk::pubkey::Pubkey;
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, SupportedCurrency};
+use crate::solana::derive_solana::SolanaWordPassExt;
 use crate::solana::wallet::SolanaNetwork;
 use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
@@ -102,6 +106,14 @@ Parameters
         Ok(multisig_pubkey.to_string())
     }
 
+    pub fn extract_multisig_send_stdout_txhash(stdout: String) -> RgResult<String> {
+        let split = stdout.split("Transaction confirmed: ").collect_vec();
+        let latter_part = split.get(1).ok_msg("Multisig pubkey not found")?;
+        let split = latter_part.split("Signature:").collect_vec();
+        let txid = split.get(0).ok_msg("Multisig pubkey not found")?;
+        Ok(txid.replace(" ", ""))
+    }
+
 
     pub async fn keypair_json_bytes(&self) -> RgResult<String> {
         let (signing, verifying) = self.keys()?;
@@ -130,31 +142,47 @@ Parameters
         destination: Address,
         amount: CurrencyAmount,
         memo: Option<String>
-    ) -> RgResult<(String, String)> {
+    ) -> RgResult<String> {
         let multisig_pubkey = multisig_pubkey.into();
         counter!("redgold_multisig_solana_propose").increment(1);
 
-        // Format transaction message for SOL transfer
-        // You'll need to format this correctly for Solana transfer instruction
-        let transaction_message = format!("{{\"transfer\": {{\"destination\": \"{}\", \"amount\": {}}}}}",
-                                          destination.render_string()?,
-                                          amount.amount
+
+        // Create transfer instruction
+        let msig_pubkey = Pubkey::from_str(&*multisig_pubkey).unwrap();
+        let transfer_ix = solana_program::system_instruction::transfer(
+            &msig_pubkey,  // from
+            &Pubkey::from_str(&destination.render_string()?).unwrap(),  // to
+            amount.amount as u64
         );
+
+        // Create message
+        let message = Message::new(
+            &[transfer_ix],
+            Some(&msig_pubkey),  // payer
+        );
+        let message_bytes = message.serialize();
+
         let vault_index = vault_index.unwrap_or(0);
         let memo_str = memo.map(|m| format!("--memo {}", m)).unwrap_or_default();
-        let init = "vault_transaction_create";
+        let init = "vault-transaction-create";
         let remainder = format!(
             "--multisig-pubkey {} \
-            --vault_index {} \
-            --transaction_message '{}' \
+            --vault-index {} \
+            {} \
             {}",
             multisig_pubkey,
             vault_index,
-            transaction_message,
+            message_bytes.iter().map(|b| format!("--transaction-message {}", b.to_string())).join(" "),
             memo_str
         );
 
-        self.cmd(init, remainder).await
+        // Transaction confirmed: 4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
+        // match on this.
+        let (stdout, stderr) = self.cmd(init, remainder).await?;
+        let tx_hash = Self::extract_multisig_send_stdout_txhash(stdout.clone())
+            .with_detail("stdout", stdout)
+            .with_detail("stderr", stderr)?;
+        Ok(tx_hash)
     }
 
     // Vote/approve a transaction
@@ -195,9 +223,19 @@ Parameters
     }
 
 }
+#[tokio::test]
+async fn dump_kp() {
+    let tc = TestConstants::new();
+    let wp = tc.words_pass;
+    let ci = TestConstants::test_words_pass().unwrap();
+    let b = SolanaNetwork::convert_to_solana_keypair_bytes(&ci.derive_solana_keys().unwrap().0).unwrap();
+    let s = b.json_or();
+    let h = home_dir().unwrap();
+    let path = h.join(".config/solana/id.json");
+    std::fs::write(path, s).unwrap();
+}
 
-
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn debug_kg() {
     let tc = TestConstants::new();
@@ -226,12 +264,22 @@ async fn debug_kg() {
     //         , None, None).await.unwrap();
     // println!("Sent: {}", res.message.hash().to_string());
     let destination = w1.self_address().unwrap();
-    let res = w.multisig_propose_send(
-        multisig_pubkey, Some(0),
-        destination,  CurrencyAmount::from_fractional_cur(0.05, SupportedCurrency::Solana).unwrap(), None
-    ).await.unwrap();
-    println!("Proposed: {}", res.0);
-    println!("Proposed stderr: {}", res.1);
+    // let res = w.multisig_propose_send(
+    //     multisig_pubkey, Some(0),
+    //     destination,  CurrencyAmount::from_fractional_cur(0.05, SupportedCurrency::Solana).unwrap(), None
+    // ).await.unwrap();
+    // println!("Proposed: {}", res.0);
+    // println!("Proposed stderr: {}", res.1);
+    /*
+
+
+
+⠤ Sending transaction...
+             Transaction confirmed:
+              4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
+
+
+     */
     // w.init_multisig().await.unwrap();
 
 }
