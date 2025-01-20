@@ -11,7 +11,6 @@ use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_gui::state::local_state::{BalanceAddressInfoUpdate, LocalStateUpdate};
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use crate::gui::app_loop::LocalState;
-use crate::gui::tabs::transact::wallet_tab::StateUpdate;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::observability::errors::Loggable;
 use crate::node_config::ApiNodeConfig;

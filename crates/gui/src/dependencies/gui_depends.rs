@@ -5,6 +5,7 @@ use strum_macros::EnumString;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
 use redgold_schema::servers::ServerOldFormat;
@@ -13,6 +14,7 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::components::tx_progress::PreparedTransaction;
 use crate::state::local_state::LocalStateUpdate;
+use crate::tab::transact::states::DeviceListStatus;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct HardwareSigningInfo {
@@ -58,6 +60,14 @@ impl TransactionSignInfo {
 }
 
 pub trait GuiDepends {
+
+    fn seed_checksum(m: WordsPass) -> RgResult<String>;
+    fn hash_derive_words(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<WordsPass>;
+    fn public_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<PublicKey>;
+    fn private_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<String>;
+    fn checksum_words(m: WordsPass) -> RgResult<String>;
+    fn private_hex_to_public_key(&self, hex: impl Into<String>) -> RgResult<PublicKey>;
+    fn get_device_list_status(&self) -> DeviceListStatus;
 
     fn initial_queries_prices_parties_etc<E>(&self, sender: Sender<LocalStateUpdate>, ext: E) -> ()
     where E: ExternalNetworkResources + Send + 'static + Clone;

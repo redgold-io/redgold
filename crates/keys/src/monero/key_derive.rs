@@ -4,7 +4,8 @@ use tiny_keccak::{Hasher, Keccak};
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::structs::NetworkEnvironment;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
+use crate::util::mnemonic_support::MnemonicSupport;
 
 pub trait MoneroSeedBytes {
     fn monero_seed_bytes(&self) -> RgResult<[u8; 32]>;

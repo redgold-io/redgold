@@ -11,12 +11,14 @@ use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDeltaInitialQuery};
+use redgold_gui::tab::transact::states::DeviceListStatus;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_ops::backup_datastore::{backup_datastore_servers, restore_datastore_servers};
 use redgold_schema::conf::node_config::NodeConfig;
@@ -32,6 +34,7 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::relay::Relay;
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
+use crate::gui::tabs::transact::wallet_tab::DeviceListTrezorNative;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::ApiNodeConfig;
 use crate::scrape::get_24hr_delta_change_pct;
@@ -344,4 +347,32 @@ impl GuiDepends for NativeGuiDepends {
         Ok(())
     }
 
+    fn get_device_list_status(&self) -> DeviceListStatus {
+        DeviceListStatus::poll()
+    }
+    fn private_hex_to_public_key(&self, hex: impl Into<String>) -> RgResult<PublicKey> {
+        let hex = hex.into();
+        let kp = KeyPair::from_private_hex(hex)?;
+        Ok(kp.public_key())
+    }
+
+    fn seed_checksum(m: WordsPass) -> RgResult<String> {
+        m.checksum()
+    }
+
+    fn public_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<PublicKey> {
+        m.public_at(derivation_path)
+    }
+
+    fn private_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<String> {
+        m.private_at(derivation_path)
+    }
+
+    fn checksum_words(m: WordsPass) -> RgResult<String> {
+        m.checksum_words()
+    }
+
+    fn hash_derive_words(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<WordsPass> {
+        todo!()
+    }
 }

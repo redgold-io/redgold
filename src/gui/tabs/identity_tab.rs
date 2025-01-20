@@ -1,17 +1,16 @@
-use std::collections::HashMap;
+use crate::gui::app_loop::{LocalState, LocalStateAddons, PublicKeyStoredState};
 use eframe::egui::{ComboBox, Context, Ui};
 use itertools::Itertools;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
-use redgold_schema::{error_info, RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
 use redgold_schema::conf::local_stored_state::Identity;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{PeerMetadata, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::gui::app_loop::{LocalState, LocalStateAddons, PublicKeyStoredState};
-use redgold_gui::common::{bounded_text_area, bounded_text_area_size, editable_text_input_copy};
-use crate::gui::tabs::transact::wallet_tab::StateUpdate;
-use crate::node_config::ApiNodeConfig;
+use redgold_schema::{error_info, RgResult, SafeOption};
+use std::collections::HashMap;
+use redgold_common::external_resources::ExternalNetworkResources;
 
 #[derive(Clone)]
 pub struct IdentityState {
@@ -44,7 +43,7 @@ impl IdentityState {
     }
 }
 
-pub fn identity_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
+pub fn identity_tab<E>(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState<E>) where E: ExternalNetworkResources + Sync + Send + Clone {
     ui.heading("Identity");
     // ui.label("WIP TAB -- not yet implemented, for now update json config manually in config tab");
 
@@ -138,7 +137,7 @@ pub fn identity_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
 
 }
 
-fn generate_peer_tx(ls: &mut LocalState) -> RgResult<()> {
+fn generate_peer_tx<E>(ls: &mut LocalState<E>) -> RgResult<()> where E: ExternalNetworkResources + Sync + Send + Clone {
     let tx = ls.identity_state.peer_tx.as_ref().ok_or(error_info("No peer tx"))?;
     let i = ls.identity_state.selected_identity.as_ref()
         .ok_or(error_info("No identity"))?;

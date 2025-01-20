@@ -14,7 +14,7 @@ use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use redgold_gui::state::local_state::LocalStateUpdate;
 use redgold_gui::tab::tabs::Tab;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -28,20 +28,21 @@ use redgold_schema::party::party_internal_data::PartyInternalData;
 use crate::gui::tabs::identity_tab::IdentityState;
 use redgold_gui::tab::keys::keygen::KeygenState;
 use redgold_gui::tab::settings_tab::SettingsState;
-use crate::gui::tabs::transact::wallet_tab::{StateUpdate, WalletState};
+use redgold_gui::tab::transact::wallet_state::WalletState;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
 use crate::util;
 use crate::util::sym_crypt;
 
 
-pub async fn local_state_from<G>(
+pub async fn local_state_from<G, E>(
     node_config: Box<NodeConfig>,
-    res: ExternalNetworkResourcesImpl,
+    res: E,
     gui_depends: G,
     party_data: HashMap<PublicKey, PartyInternalData>
-) -> Result<LocalState, ErrorInfo>
-where G: Send + Clone + GuiDepends {
+) -> Result<LocalState<E>, ErrorInfo>
+where G: Send + Clone + GuiDepends, E: ExternalNetworkResources + Send + Sync + 'static + Clone {
     let node_config = node_config.clone();
 
     let hot_mnemonic = node_config.secure_mnemonic_words_or();
@@ -186,11 +187,9 @@ fn random_bytes() -> [u8; 32] {
 // pub fn send_update_sender<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Sender<StateUpdate>, p0: F) {
 //     updates.send(StateUpdate { update: Box::new(p0) }).unwrap();
 // }
-pub fn send_update<F: FnMut(&mut LocalState) + Send + 'static>(updates: &Channel<StateUpdate>, p0: F) {
-    updates.sender.send(StateUpdate { update: Box::new(p0) }).unwrap();
-}
 
-pub fn create_swap_tx<G>(ls: &mut LocalState, g: &G) where G : GuiDepends + Clone + Send + 'static + Sync {
+pub fn create_swap_tx<G,E>(ls: &mut LocalState<E>, g: &G) where G : GuiDepends + Clone + Send + 'static + Sync,
+                                                                E: ExternalNetworkResources + Send + Sync + 'static + Clone {
     let party_pk = ls
         .data
         .first_party
@@ -204,7 +203,7 @@ pub fn create_swap_tx<G>(ls: &mut LocalState, g: &G) where G : GuiDepends + Clon
     let config = ls.node_config.clone();
     let currency = ls.swap_state.currency_input_box.input_currency.clone();
     let pk = ls.wallet.public_key.clone().unwrap();
-    let kp = ls.wallet.hot_mnemonic().keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+    let kp = ls.wallet.hot_mnemonic(g).keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
     let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
     info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
     let map = ls.data.price_map_usd_pair_incl_rdg.clone();

@@ -4,6 +4,7 @@ use flume::{Receiver, Sender};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::RgResult;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
@@ -13,12 +14,41 @@ use redgold_schema::util::times::current_time_millis;
 use crate::components::tx_progress::PreparedTransaction;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use crate::state::local_state::LocalStateUpdate;
+use crate::tab::transact::states::DeviceListStatus;
 
 pub struct WasmGuiDepends {
 
 }
 
 impl GuiDepends for WasmGuiDepends {
+    fn seed_checksum(m: WordsPass) -> RgResult<String> {
+        todo!()
+    }
+
+    fn hash_derive_words(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<WordsPass> {
+        todo!()
+    }
+
+    fn public_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<PublicKey> {
+        todo!()
+    }
+
+    fn private_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<String> {
+        todo!()
+    }
+
+    fn checksum_words(m: WordsPass) -> RgResult<String> {
+        todo!()
+    }
+
+    fn private_hex_to_public_key(&self, hex: impl Into<String>) -> RgResult<PublicKey> {
+        todo!()
+    }
+
+    fn get_device_list_status(&self) -> DeviceListStatus {
+        DeviceListStatus::default()
+    }
+
     fn initial_queries_prices_parties_etc<E>(&self, sender: Sender<LocalStateUpdate>, ext: E) -> ()
     where
         E: ExternalNetworkResources + Send + 'static + Clone

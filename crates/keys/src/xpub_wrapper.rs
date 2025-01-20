@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::proto_serde::ProtoSerde;
 use crate::TestConstants;
-use crate::util::mnemonic_support::WordsPass;
-
+use redgold_schema::keys::words_pass::WordsPass;
+use crate::util::mnemonic_support::MnemonicSupport;
 
 pub trait ValidateDerivationPath {
     fn valid_derivation_path(&self) -> bool;

@@ -1,13 +1,17 @@
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, TextEdit, Ui};
 use itertools::{Either, Itertools};
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::keys::words_pass::WordsPass;
 use crate::gui::app_loop::LocalState;
 use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item};
 use redgold_gui::components::tables::text_table;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 
-
-pub fn key_source(ui: &mut Ui, ls: &mut LocalState) -> bool {
+pub fn key_source<E, G>(
+    ui: &mut Ui, ls: &mut LocalState<E>, g: &G
+) -> bool where E: ExternalNetworkResources + 'static + Sync + Send + Clone,
+G: GuiDepends + 'static + Sync + Send + Clone {
 
     let mut has_changed = false;
     // Combo box to choose mnemonic
@@ -44,14 +48,14 @@ pub fn key_source(ui: &mut Ui, ls: &mut LocalState) -> bool {
             if opt.is_none() {
                 ls.wallet.active_hot_mnemonic = Some(ls.wallet.hot_mnemonic_default.clone());
             }
-            ls.wallet.update_hot_mnemonic_or_key_info();
+            ls.wallet.update_hot_mnemonic_or_key_info(g);
         }
         // add_new_key_button(ls, ui);
     });
     has_changed
 }
 
-pub fn add_new_key_button(ls: &mut LocalState, ui: &mut Ui) {
+pub fn add_new_key_button<E>(ls: &mut LocalState<E>, ui: &mut Ui) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     if ui.button("Add Hot Mnemonic / Private Key").clicked() {
         ls.wallet.add_new_key_window = true;
     }

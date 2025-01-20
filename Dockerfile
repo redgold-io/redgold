@@ -2,6 +2,7 @@ FROM ubuntu:22.04
 RUN apt update
 RUN apt install -y curl
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt install -y automake libtool libssl-dev \
  libxcb-xfixes0-dev libxcb1-dev libxcb-keysyms1-dev libpango1.0-dev libxcb-util0-dev \
@@ -15,6 +16,7 @@ RUN apt install -y automake libtool libssl-dev \
  awscli
 
 RUN update-ca-certificates
+
 
 #RUN rustup target add x86_64-unknown-linux-gnu
 #RUN rustup toolchain install stable-x86_64-unknown-linux-gnu

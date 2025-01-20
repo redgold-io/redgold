@@ -13,7 +13,7 @@ use redgold_schema::conf::rg_args::RgTopLevelSubcommand::Node;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use crate::monero::key_derive::MoneroSeedBytes;
 use crate::monero::rpc_multisig::MoneroWalletRpcMultisigClient;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use crate::word_pass_support::WordsPassNodeConfig;
 
 #[derive(Clone, Debug)]

@@ -24,6 +24,7 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
 
 use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::observability::errors::Loggable;

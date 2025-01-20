@@ -12,12 +12,12 @@ use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurre
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::solana::derive_solana::{get_solana_address, get_solana_address_from_verifying, get_solana_public_key, SolanaWordPassExt, ToSolanaAddress};
 use crate::TestConstants;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 
 #[derive(Clone)]
-struct SolanaNetwork {
-    net: NetworkEnvironment,
-    words: Option<WordsPass>
+pub struct SolanaNetwork {
+    pub net: NetworkEnvironment,
+    pub words: Option<WordsPass>
 }
 
 impl SolanaNetwork {
@@ -25,7 +25,7 @@ impl SolanaNetwork {
     pub fn network_rpc_url(&self) -> String {
         match self.net {
             NetworkEnvironment::Main => "https://api.mainnet.solana.com".to_string(),
-            _ => "https://api.testnet.solana.com".to_string(),
+            _ => "https://api.devnet.solana.com".to_string(),
         }
     }
 
@@ -43,7 +43,7 @@ impl SolanaNetwork {
         amount: CurrencyAmount,
         from: Option<structs::Address>,
         kp: Option<(SigningKey, VerifyingKey)>,
-    ) -> RgResult<()> {
+    ) -> RgResult<Transaction> {
         let (signing, verifying) = match kp {
             Some((s, v)) => (s, v),
             None => self.words.clone().ok_msg("Missing wallet keys")?.derive_solana_keys()?
@@ -99,11 +99,9 @@ impl SolanaNetwork {
         // Send and confirm transaction
         let signature = client.send_and_confirm_transaction(&transaction)
             .await.error_info("Failed to send and confirm transaction")?;
-
         // return txid
 
-
-        Ok(())
+        Ok(transaction)
     }
 
     fn convert_to_solana_keypair(signing: &SigningKey) -> RgResult<Keypair> {
@@ -125,6 +123,10 @@ impl SolanaNetwork {
         let pubkey = Pubkey::from_str(&address)
             .error_info("Failed to convert public key")?;
         Ok(pubkey)
+    }
+
+    pub fn keys(&self) -> RgResult<(SigningKey, VerifyingKey)> {
+        self.words.clone().ok_msg("Missing wallet keys")?.derive_solana_keys()
     }
 
     pub fn self_pubkey(&self) -> RgResult<Pubkey> {
@@ -172,13 +174,15 @@ async fn debug_kg() {
     let ci = TestConstants::test_words_pass().unwrap();
     let amount = 1_000_000; // 0.001 SOL
     let amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
-    let amount = CurrencyAmount::from_fractional_cur(0.99, SupportedCurrency::Solana);
+    let amount = CurrencyAmount::from_fractional_cur(0.95, SupportedCurrency::Solana).unwrap();
 
     let w = SolanaNetwork::new(NetworkEnvironment::Dev, Some(wp));
     let w2 = SolanaNetwork::new(NetworkEnvironment::Dev, Some(ci));
     println!("Wallet 1 address: {}", w.self_address().unwrap().render_string().unwrap());
     println!("Wallet 1 balance: {}", w.get_self_balance().await.unwrap().to_fractional());
     println!("Wallet 2 address: {}", w2.self_address().unwrap().render_string().unwrap());
-    w.send(w2.self_address().unwrap(), amount, None, None).await.unwrap();
+    println!("Wallet 2 balance: {}", w2.get_self_balance().await.unwrap().to_fractional());
+
+    // w.send(w2.self_address().unwrap(), amount, None, None).await.unwrap();
 
 }

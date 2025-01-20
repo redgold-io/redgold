@@ -8,7 +8,8 @@ use redgold_schema::config_data::RpcUrl;
 use redgold_schema::constants::DEBUG_FINALIZATION_INTERVAL_MILLIS;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::KeyPair;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
+use crate::util::mnemonic_support::MnemonicSupport;
 
 pub trait WordsPassNodeConfig {
     fn words(&self) -> WordsPass;

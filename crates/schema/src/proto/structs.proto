@@ -1065,6 +1065,11 @@ message Request {
   KeepAliveRequest keep_alive_request = 38;
   Response response = 39;
   PortOpenRequest port_open_request = 40;
+  GuiInitRequest gui_init_request = 41;
+}
+
+message GuiInitRequest {
+  repeated PublicKey public_keys = 1;
 }
 
 message HealthResponse {

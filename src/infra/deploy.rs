@@ -11,7 +11,7 @@ use itertools::Itertools;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use redgold_schema::constants::default_node_internal_derivation_path;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
@@ -22,6 +22,7 @@ use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadat
 use redgold_common_no_wasm::cmd::run_command_os;
 use redgold_common_no_wasm::ssh_like::{DeployMachine, LocalSSHLike, SSHOrCommandLike, SSHProcessInvoke};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 
 use crate::hardware::trezor;

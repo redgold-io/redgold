@@ -5,7 +5,8 @@ use redgold_schema::{structs, RgResult};
 use redgold_schema::structs::{AddressType, ErrorInfo, NetworkEnvironment, PublicKey};
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::TestConstants;
-use crate::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
+use crate::util::mnemonic_support::MnemonicSupport;
 // We'll use this for generating random bytes
 
 pub trait SolanaWordPassExt {

@@ -14,6 +14,15 @@ pub struct DeviceListStatus {
     pub last_polled: Instant,
 }
 
+impl Default for DeviceListStatus {
+    fn default() -> Self {
+        Self {
+            device_output: None,
+            last_polled: Instant::now(),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, EnumIter, EnumString, Debug)]
 pub enum SendReceiveTabs {
     Home,

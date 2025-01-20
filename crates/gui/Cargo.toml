@@ -33,7 +33,7 @@ either = "1.12.0"
 itertools = "0.10.5"
 toml = "0.8.19"
 derivative = "2.2"
-
+hex = { workspace = true }
 
 
 # web:

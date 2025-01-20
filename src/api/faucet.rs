@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::{error_info, ErrorInfoContext, SafeOption};
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse};
 use redgold_schema::tx::tx_builder::TransactionBuilder;

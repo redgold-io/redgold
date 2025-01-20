@@ -9,6 +9,8 @@ use redgold_gui::common::bounded_text_area;
 // use crate::gui::image_capture::{CaptureStream, default_stream};
 use crate::gui::qr_render::qr_encode;
 use std::clone;
+use redgold_common::external_resources::ExternalNetworkResources;
+
 pub fn clone_option_retained_image(opt: &Option<RetainedImage>) -> Option<RetainedImage> {
     None
 }
@@ -128,9 +130,9 @@ impl QrState {
 }
 
 
-pub fn qr_window(
-    ctx: &Context, state: &mut LocalState
-) {
+pub fn qr_window<E>(
+    ctx: &Context, state: &mut LocalState<E>
+) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
     if state.qr_state.show_window {
         state.qr_state.read_tick();
     }
@@ -149,9 +151,9 @@ pub fn qr_window(
             });
         });
 }
-pub fn qr_show_window(
-    ctx: &Context, state: &mut LocalState
-) {
+pub fn qr_show_window<E>(
+    ctx: &Context, state: &mut LocalState<E>
+) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
     egui::Window::new("QR Code")
         .open(&mut state.qr_show_state.show_window)
         .resizable(false)
