@@ -41,7 +41,7 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
     let hot_pk = hot_kp.public_key();
     let hot_addr = hot_pk.address().unwrap();
 
-    info!("Word checksum {}", words.checksum());
+    info!("Word checksum {}", words.checksum().unwrap());
     info!("Hot keypair loaded @ derivation path: {}", WordsPass::default_rg_path(0));
     info!("Hot keypair RDG address: {}", hot_addr.render_string().unwrap());
     let btc_addr =  hot_pk.to_bitcoin_address_typed(&nc.network).unwrap().render_string().unwrap();
