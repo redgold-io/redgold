@@ -1,5 +1,4 @@
 use std::env::home_dir;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
@@ -17,6 +16,9 @@ use crate::solana::derive_solana::SolanaWordPassExt;
 use crate::solana::wallet::SolanaNetwork;
 use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 
 #[derive(Serialize, Deserialize)]
 struct MemberPermission {
@@ -49,7 +51,17 @@ expect eof"#,
         println!("Writing expect script: {}", expect_script.clone());
 
         std::fs::write("temp.exp", expect_script).error_info("write expect script")?;
+        // std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
+
+        #[cfg(unix)]
         std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
+
+        #[cfg(windows)]
+        {
+            let mut perms = std::fs::metadata("temp.exp").error_info("get metadata")?.permissions();
+            perms.set_readonly(false);
+            std::fs::set_permissions("temp.exp", perms).error_info("set permissions")?;
+        }
 
         let cmd = "./temp.exp";
         run_bash_async(cmd).await
