@@ -87,6 +87,13 @@ impl Address {
             currency: Redgold as i32,
         }
     }
+    pub fn from_solana(address: &String) -> Address {
+        Self {
+            address: bytes_data(address.clone().into_bytes()),
+            address_type: AddressType::SolanaExternalString as i32,
+            currency: Redgold as i32,
+        }
+    }
 
     pub fn from_type(address: &String, t: AddressType) -> Address {
         Self {
@@ -97,6 +104,12 @@ impl Address {
     }
 
     pub fn from_monero_external(address: &String) -> Address {
+        let mut ret = Self::from_monero(address);
+        ret.currency = SupportedCurrency::Monero as i32;
+        ret
+    }
+
+    pub fn from_solana_external(address: &String) -> Address {
         let mut ret = Self::from_monero(address);
         ret.currency = SupportedCurrency::Monero as i32;
         ret
@@ -135,6 +148,9 @@ impl Address {
                 self.external_string_address()?
             }
             AddressType::MoneroExternalString => {
+                self.external_string_address()?
+            }
+            AddressType::SolanaExternalString => {
                 self.external_string_address()?
             }
             _ => {

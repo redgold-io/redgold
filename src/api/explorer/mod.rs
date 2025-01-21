@@ -102,6 +102,9 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
 
             let mut d = d.clone();
             let events = d.clear_sensitive().clone();
+            let overall_staking_balances = format_currency_balances(pe.staking_balances(&vec![], Some(true), Some(true)));
+            let portfolio_staking_balances = format_currency_balances(pe.staking_balances(&vec![], Some(true), Some(false)));
+            let amm_staking_balances = format_currency_balances(pe.staking_balances(&vec![], Some(false), Some(true)));
 
             return Ok(Some(AddressPoolInfo {
                 public_key,
@@ -114,12 +117,21 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
                 central_prices,
                 events: events.clone(),
                 detailed_events: convert_events(&events, &r.node_config)?,
+                overall_staking_balances,
+                portfolio_staking_balances,
+                amm_staking_balances
             }))
         };
 
 
     }
     Ok(None)
+}
+
+pub fn format_currency_balances(balances: HashMap<SupportedCurrency, CurrencyAmount>) -> Vec<(String, String)> {
+    balances.iter().map(|(k, v)| {
+        (format!("{:?}", k), format!("{:.8}", v.to_fractional().to_string()))
+    }).collect::<Vec<(String, String)>>()
 }
 
 pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedPartyEvent>> {
@@ -773,6 +785,7 @@ pub async fn check_for_external_network_swap_info(a: Option<Address>, opt_ext: O
 
 pub async fn derive_tx_swap_info(tx: &Transaction, r: &Relay) -> Option<TransactionSwapInfo> {
     let mut tsi = TransactionSwapInfo::default();
+    // This must be a swap to an external currency.
     if let Some((sr, sa, party)) = tx.swap_request_and_amount_and_party_address() {
         tsi.swap_destination_address = sr.destination.as_ref().and_then(|d| d.render_string().ok()).unwrap_or_default();
         tsi.is_request = true;
@@ -788,6 +801,10 @@ pub async fn derive_tx_swap_info(tx: &Transaction, r: &Relay) -> Option<Transact
         if let Some(p) = r.get_party_by_address(party).await {
 
             if let Some(pev) = p.party_events.as_ref() {
+
+                if let Some(p) = pev.get_rdg_max_bid_usd_estimate_at(current_time_millis_i64()) {
+                    tsi.swap_input_amount_usd_now = (sa.to_fractional() * p).render_currency_amount_2_decimals();
+                }
                 pev.central_prices.get(&tsi.output_currency).map(|cp| {
                     tsi.swap_output_amount = Some((cp.min_bid * sa.to_fractional()).render_currency_amount_8_decimals());
                     tsi.swap_output_amount_usd = Some((cp.min_bid_estimated * sa.to_fractional()).render_currency_amount_2_decimals());
@@ -801,9 +818,44 @@ pub async fn derive_tx_swap_info(tx: &Transaction, r: &Relay) -> Option<Transact
             }
         }
         Some(tsi)
-    } else if let Some((f, a, party)) = tx.swap_fulfillment_amount_party() {
-        if let Some(p) = r.get_party_events_by_address(party).await {
-
+        // This MUST be a fulfillment of Redgold currency! Because here we have a transaction
+        // in Redgold, with some amount, and the initiating event must be an external deposit to
+        // party address
+    } else if let Some((f, a, destination, origin)) = tx.swap_fulfillment_amount_and_destination_and_origin() {
+        if let Some(p) = r.get_party_events_by_address(&origin).await {
+            if let Some((of, e1, e2)) = p.find_request_fulfilled_by(tx.hash_hex()) {
+                tsi.swap_status = SwapStatus::Complete;
+                tsi.output_currency = SupportedCurrency::Redgold;
+                if let Some(c) = e1.external_currency() {
+                    let price = r.ds.price_time.max_time_price_by(c, of.event_time).await.ok().flatten();
+                    let price_now = r.ds.price_time.max_time_price_by(c, current_time_millis_i64()).await.ok().flatten();
+                    if let Some(p) = price {
+                        tsi.swap_input_amount_usd = (a.to_fractional() * p).render_currency_amount_2_decimals();
+                    }
+                    if let Some(p) = price_now {
+                        tsi.swap_input_amount_usd_now = (a.to_fractional() * p).render_currency_amount_2_decimals();
+                    }
+                    tsi.input_currency = c
+                }
+                // tsi.swap_fee
+                tsi.party_address = origin.render_string().unwrap_or_default();
+                tsi.is_request = false;
+                tsi.exchange_rate = Some(format!("{:.2}", (of.order_amount as f64) / (of.fulfilled_amount as f64)));
+                tsi.fulfillment_tx_hash = Some(e2.identifier());
+                tsi.input_currency = e1.external_currency().unwrap_or(SupportedCurrency::Redgold);
+                tsi.request_tx_hash = Some(e1.identifier());
+                tsi.is_fulfillment = true;
+                tsi.swap_destination_address = destination.render_string().unwrap_or_default();
+                tsi.swap_output_amount = Some(a.to_fractional().render_currency_amount_8_decimals());
+                let price_output = p.get_rdg_max_bid_usd_estimate_at(of.event_time);
+                if let Some(p) = price_output {
+                    tsi.swap_output_amount_usd = Some((a.to_fractional() * p).render_currency_amount_2_decimals());
+                }
+                let price_output = p.get_rdg_max_bid_usd_estimate_at(util::current_time_millis_i64());
+                if let Some(p) = price_output {
+                    tsi.swap_output_amount_usd = Some((a.to_fractional() * p).render_currency_amount_2_decimals());
+                }
+            }
         }
         Some(tsi)
     } else {

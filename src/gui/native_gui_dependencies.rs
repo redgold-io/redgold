@@ -10,13 +10,15 @@ use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDelta};
+use redgold_gui::state::local_state::{LocalStateUpdate, PricesPartyInfoAndDeltaInitialQuery};
+use redgold_gui::tab::transact::states::DeviceListStatus;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_ops::backup_datastore::{backup_datastore_servers, restore_datastore_servers};
 use redgold_schema::conf::node_config::NodeConfig;
@@ -32,6 +34,7 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use crate::core::relay::Relay;
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
+use crate::gui::tabs::transact::wallet_tab::DeviceListTrezorNative;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::ApiNodeConfig;
 use crate::scrape::get_24hr_delta_change_pct;
@@ -59,12 +62,15 @@ impl NativeGuiDepends {
     }
 
     fn external_res(&mut self) -> Result<ExternalNetworkResourcesImpl, ErrorInfo> {
-        let eee = if let Some(e) = self.wallet_nw.get(&self.nc().network) {
+        let net = self.nc().network;
+        let eee = if let Some(e) = self.wallet_nw.get(&net) {
             e
         } else {
-            let e = ExternalNetworkResourcesImpl::new(&self.original_uncleared_nc, None)?;
-            self.wallet_nw.insert(self.nc().network.clone(), e);
-            self.wallet_nw.get(&self.nc().network).unwrap()
+            let mut config = self.original_uncleared_nc.clone();
+            config.network = net;
+            let e = ExternalNetworkResourcesImpl::new(&config, None)?;
+            self.wallet_nw.insert(net.clone(), e);
+            self.wallet_nw.get(&net).unwrap()
         };
         Ok(eee.clone())
     }
@@ -277,7 +283,7 @@ impl GuiDepends for NativeGuiDepends {
             return;
         }
         let g2 = self.clone();
-        // let e2 = ext.clone();
+        let net = self.get_network();
 
         let client = self.nc().api_rg_client();
         self.spawn(async move {
@@ -312,11 +318,12 @@ impl GuiDepends for NativeGuiDepends {
                 let delta = g2.get_24hr_delta(cur.clone()).await;
                 deltas.insert(cur.clone(), delta);
             }
-            sender.send(LocalStateUpdate::PricesPartyInfoAndDelta(PricesPartyInfoAndDelta{
+            sender.send(LocalStateUpdate::PricesPartyInfoAndDelta(PricesPartyInfoAndDeltaInitialQuery {
                 prices: price_map,
                 party_info: party,
                 delta_24hr: deltas,
                 daily_one_year: ext.daily_historical_year().await.ok().unwrap_or_default(),
+                on_network: net,
             })).ok();
         });
     }
@@ -344,4 +351,32 @@ impl GuiDepends for NativeGuiDepends {
         Ok(())
     }
 
+    fn get_device_list_status(&self) -> DeviceListStatus {
+        DeviceListStatus::poll()
+    }
+    fn private_hex_to_public_key(&self, hex: impl Into<String>) -> RgResult<PublicKey> {
+        let hex = hex.into();
+        let kp = KeyPair::from_private_hex(hex)?;
+        Ok(kp.public_key())
+    }
+
+    fn seed_checksum(m: WordsPass) -> RgResult<String> {
+        m.checksum()
+    }
+
+    fn public_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<PublicKey> {
+        m.public_at(derivation_path)
+    }
+
+    fn private_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<String> {
+        m.private_at(derivation_path)
+    }
+
+    fn checksum_words(m: WordsPass) -> RgResult<String> {
+        m.checksum_words()
+    }
+
+    fn hash_derive_words(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<WordsPass> {
+        todo!()
+    }
 }

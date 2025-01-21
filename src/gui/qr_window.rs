@@ -8,31 +8,56 @@ use crate::gui::app_loop::LocalState;
 use redgold_gui::common::bounded_text_area;
 // use crate::gui::image_capture::{CaptureStream, default_stream};
 use crate::gui::qr_render::qr_encode;
-
-
-
-#[derive(Derivative)]
-#[derivative(Clone)]
-pub struct QrState {
-    pub show_window: bool,
-    // pub capture_stream: Option<CaptureStream>,
-    pub last_image: Option<DynamicImage>,
-    pub contents: Option<String>,
-    pub metadata: Option<MetaData>,
-    #[derivative(Clone(clone_with = "clone_option_retained_image"))]
-    pub retained_image: Option<RetainedImage>
-}
+use std::clone;
+use redgold_common::external_resources::ExternalNetworkResources;
 
 pub fn clone_option_retained_image(opt: &Option<RetainedImage>) -> Option<RetainedImage> {
     None
 }
 
 
-#[derive(Derivative)]
-#[derivative(Clone)]
+
+// #[derive(Derivative)]
+// #[derivative(Clone)]
+pub struct QrState {
+    pub show_window: bool,
+    // pub capture_stream: Option<CaptureStream>,
+    pub last_image: Option<DynamicImage>,
+    pub contents: Option<String>,
+    pub metadata: Option<MetaData>,
+    // #[derivative(Clone(clone_with = "clone_option_retained_image"))]
+    // #[derivative(Clone(bound=""))]
+    pub retained_image: Option<RetainedImage>
+}
+
+impl Clone for QrState {
+    fn clone(&self) -> Self {
+        Self {
+            show_window: self.show_window,
+            last_image: self.last_image.clone(),
+            contents: self.contents.clone(),
+            metadata: self.metadata.clone(),
+            retained_image: None,
+        }
+    }
+
+}
+
+impl Clone for QrShowState {
+    fn clone(&self) -> Self {
+        Self {
+            show_window: self.show_window,
+            qr_image: None,
+            qr_text: self.qr_text.clone(),
+        }
+    }
+}
+
+// #[derive(Derivative)]
+// #[derivative(Clone)]
 pub struct QrShowState {
     pub show_window: bool,
-    #[derivative(Clone(clone_with = "clone_option_retained_image"))]
+    // #[derivative(Clone(clone_with = "clone_option_retained_image"))]
     pub qr_image: Option<RetainedImage>,
     pub qr_text: Option<String>
 }
@@ -105,9 +130,9 @@ impl QrState {
 }
 
 
-pub fn qr_window(
-    ctx: &Context, state: &mut LocalState
-) {
+pub fn qr_window<E>(
+    ctx: &Context, state: &mut LocalState<E>
+) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
     if state.qr_state.show_window {
         state.qr_state.read_tick();
     }
@@ -126,9 +151,9 @@ pub fn qr_window(
             });
         });
 }
-pub fn qr_show_window(
-    ctx: &Context, state: &mut LocalState
-) {
+pub fn qr_show_window<E>(
+    ctx: &Context, state: &mut LocalState<E>
+) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
     egui::Window::new("QR Code")
         .open(&mut state.qr_show_state.show_window)
         .resizable(false)

@@ -4,7 +4,7 @@ use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -52,7 +52,7 @@ pub async fn run_daily_e2e_inner(nc: &Box<NodeConfig>) -> RgResult<()> {
     let mut party_harness = PartyTestHarness::from(
         &nc, kp, vec![], Some(api.clone()), vec![]).await;
 
-    let result = w.send(&party_key.to_ethereum_address_typed().unwrap(), &CurrencyAmount::from_eth_fractional(0.00028914f64)).await.unwrap();
+    let result = w.send(&party_key.to_ethereum_address_typed().unwrap(), &CurrencyAmount::from_eth_fractional(0.00028914f64), None).await.unwrap();
     info!("Send txid for eth {result}");
     // 60 seconds, 10 times
     let b = party_harness.balance(true).await.unwrap();

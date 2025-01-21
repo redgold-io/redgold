@@ -7,7 +7,8 @@ use crate::schema::structs::{Transaction, UtxoEntry};
 use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, OutputType, TestContractRequest, UtxoId};
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -119,7 +120,7 @@ impl TransactionGenerator {
 
     pub async fn generate_deploy_test_contract(&mut self) -> RgResult<TransactionWithKey> {
         let prev = self.pop_finished().safe_get()?.clone();
-        let bytes = tokio::fs::read("./sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
+        let bytes = tokio::fs::read("../../crates/sdk/test_contract_guest.wasm").await.error_info("Read failure")?;
         let mut tb = TransactionBuilder::new(&self.node_config);
         let x = &prev.utxo_entry;
         tb.with_unsigned_input(x.clone())?;

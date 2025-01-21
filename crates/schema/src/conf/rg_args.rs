@@ -1,5 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use crate::structs::SupportedCurrency;
 
 pub fn empty_args() -> RgArgs {
     RgArgs {
@@ -193,6 +194,7 @@ pub enum RgTopLevelSubcommand {
     // Faucet(FaucetCli),
     Balance(BalanceCli),
     GenerateConfig(GenerateConfig),
+    Swap(Swap),
     Debug(DebugCommand)
 }
 
@@ -356,20 +358,6 @@ pub struct WalletSend {
     pub amount: f64,
 }
 
-/// Send a transaction from current (default or active) wallet to a destination address
-/// expects arguments <destination> <amount>
-/// Destination should be a parseable address (will waterfall parse between types.)
-/// Amount should be a fractional amount, i.e. 0.1 for one tenth of a RDG
-#[derive(Args, Debug, Clone)]
-pub struct Swap {
-    /// Optional derivation path to use for deriving the key source (for the local transaction)
-    #[clap(short, long)]
-    pub path: Option<String>,
-    /// Currency to send, default is RDG
-    #[clap(short, long)]
-    pub currency: Option<String>
-}
-
 /// Generate an address from an existing wallet or key store
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct WalletAddress {
@@ -484,6 +472,23 @@ pub struct ConvertMetadataXpub {
 /// Generate a config with all values filled in
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateConfig {
+}
+
+/// Execute a swap from one currency to another, this will show the checksum/address of
+/// key pair being used for the swap, and the amount being swapped. Does not support cold
+/// hardware unless through GUI.
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct Swap {
+    /// Input currency to be used as source of funds, for instance Redgold or Ethereum or Bitcoin
+    pub input_currency: SupportedCurrency,
+    /// Destination currency to be used as target of funds, for instance Ethereum or Redgold or Bitcoin
+    pub output_currency: SupportedCurrency,
+    /// Amount to swap estimated in USD from latest pricing data, please use "not-usd" to avoid conversions.
+    pub amount: f64,
+    /// Skip use of price conversions in formatting amounts, this will default instead to parsing
+    /// the amount as a FRACTION of a whole token. I.e. 0.01 ETH will be parsed as equivalent to ~30 USD
+    #[clap(long)]
+    pub not_usd: bool
 }
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)

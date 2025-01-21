@@ -7,7 +7,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::gui::tabs::transact::wallet_tab::WalletState;
+use redgold_gui::tab::transact::wallet_state::WalletState;
 use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 
 pub fn prepare_transaction(ai: &AddressInfo, amount: &String, destination: &String, x: &WalletState, nc: &NodeConfig)

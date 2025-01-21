@@ -1,19 +1,19 @@
-use eframe::egui::Ui;
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use bdk::bitcoin::PrivateKey;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use eframe::egui;
+use eframe::egui::Ui;
+use redgold_gui::common::{editable_text_input_copy, valid_label};
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::conf::local_stored_state::{StoredMnemonic, StoredPrivateKey};
 use std::str::FromStr;
-use eframe::egui;
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use redgold_gui::common::{editable_text_input_copy, valid_label};
-use crate::gui::ls_ext::send_update;
-use crate::gui::tabs::transact::wallet_tab::StateUpdate;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 
-pub fn save_key_window(
+pub fn save_key_window<E>(
     _ui: &mut Ui,
-    ls: &mut LocalState,
+    ls: &mut LocalState<E>,
     ctx: &egui::Context,
-) {
+) where E: ExternalNetworkResources + 'static + Sync + Send + Clone{
     let mut add_new_key_window = ls.wallet.add_new_key_window;
     egui::Window::new("Add Mnemonic/Private Key")
         .open(&mut add_new_key_window)

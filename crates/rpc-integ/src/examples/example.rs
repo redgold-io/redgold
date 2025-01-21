@@ -2,7 +2,7 @@ use ethers::{core::types::TransactionRequest,
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, signers::{LocalWallet, Signer}};
 
 
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 
 use alloy_chains::Chain;
 use ethers::prelude::U256;
@@ -11,6 +11,7 @@ use ethers::utils::Anvil;
 use foundry_block_explorers::Client;
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::ErrorInfoContext;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};

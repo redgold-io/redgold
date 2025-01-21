@@ -1,23 +1,19 @@
-use std::str::FromStr;
+use crate::hardware::trezor;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, Ui};
 use flume::Sender;
-use rocket::serde::Serialize;
-use serde::Deserialize;
-use strum::IntoEnumIterator;
-use redgold_keys::xpub_wrapper::XpubWrapper;
-use redgold_schema::{error_info, RgResult};
-use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
-use redgold_common::flume_send_help::Channel;
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_gui::state::local_state::LocalStateUpdate;
-use crate::gui::tabs::transact::wallet_tab::StateUpdate;
-use crate::hardware::trezor;
+use redgold_keys::xpub_wrapper::XpubWrapper;
+use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
-use crate::gui::ls_ext::send_update;
+use redgold_schema::{error_info, RgResult};
+use rocket::serde::Serialize;
+use serde::Deserialize;
+use std::str::FromStr;
+use strum::IntoEnumIterator;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct RequestXpubState {

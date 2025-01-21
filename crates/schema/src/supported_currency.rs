@@ -2,6 +2,24 @@ use crate::structs::SupportedCurrency;
 
 impl SupportedCurrency {
 
+    pub fn valid_swap_input(&self) -> bool {
+        vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
+            .iter().any(|x| x == self)
+    }
+
+    pub fn valid_swap_output(&self) -> bool {
+        Self::supported_swap_currencies()
+            .iter().any(|x| x == self)
+    }
+
+    pub fn supported_swap_currencies() -> Vec<SupportedCurrency> {
+        vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
+    }
+
+    pub fn supported_external_swap_currencies() -> Vec<SupportedCurrency> {
+        vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
+    }
+
     pub fn abbreviated(&self) -> String {
         match self {
             SupportedCurrency::Redgold => "RDG".to_string(),

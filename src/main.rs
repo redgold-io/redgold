@@ -17,6 +17,7 @@ use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
 use redgold::util::cli::commands;
 use redgold::util::cli::load_config::main_config;
+use redgold::util::cli::swap::cli_swap;
 use redgold::util::runtimes::{big_thread, build_simple_runtime};
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
@@ -79,6 +80,9 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
                 let w = commands::generate_random_mnemonic().words;
                 println!("{}", w);
             }
+            RgTopLevelSubcommand::Swap(s) =>  {
+                cli_swap(s, &nc).await.unwrap();
+            }
             _ => {}
         }
     }
@@ -132,20 +136,11 @@ fn main() {
 
 }
 
-async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends> {
-    // this is a lot of data, only reason it's being preloaded here is due to stack.
+async fn gui_init(node_config: Box<NodeConfig>) -> ClientApp<NativeGuiDepends, ExternalNetworkResourcesImpl> {
     let party_data = Default::default();
-    // if node_config.offline() {
-    //     Default::default()
-    // } else {
-    //     node_config.api_rg_client().enriched_party_data().await
-    // };
     let res = Box::new(ExternalNetworkResourcesImpl::new(&node_config, None).expect("works"));
     let g = Box::new(NativeGuiDepends::new(*node_config.clone()));
-    // let c = g.get_config();
-
     ClientApp {
-        // logo,
         local_state: local_state_from(node_config, *res, *g.clone(), party_data).await.unwrap(),
         gui_depends: *g,
     }

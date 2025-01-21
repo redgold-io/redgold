@@ -2,9 +2,10 @@ use eframe::egui;
 use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
 use strum_macros::EnumString;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_builder;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::NetworkEnvironment;
 
@@ -12,6 +13,7 @@ use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
 use redgold_gui::components::tables::text_table;
 use redgold_gui::tab::keys::keygen::{GenerateMnemonicState, KeyDerivation, KeygenState, MnemonicWindowState, Rounds};
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::util;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
@@ -64,7 +66,8 @@ impl MnemonicWindowStateWordSupport for MnemonicWindowState {
     }
 }
 
-pub fn keys_screen_scroll(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn keys_screen_scroll<E>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState<E>)
+where E: ExternalNetworkResources + Sync + Send + Clone {
     let key = &mut local_state.keygen_state;
     ui.horizontal(|ui| {
         if ui.button("Generate Random Entropy Mnemonic Words").clicked() {
@@ -103,7 +106,7 @@ pub fn keys_screen_scroll(ui: &mut Ui, ctx: &egui::Context, local_state: &mut Lo
 
 }
 
-pub fn keys_screen(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState) {
+pub fn keys_screen<E>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState<E>) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     ui.heading("Keygen");
     ui.separator();
     ScrollArea::vertical().show(ui, |ui| keys_screen_scroll(ui, ctx, local_state));
@@ -369,9 +372,9 @@ fn get_displayed_password(key: &mut KeygenState) -> String {
     text.clone()
 }
 
-pub(crate) fn mnemonic_window(
-    ctx: &Context, ls: &mut LocalState
-) {
+pub(crate) fn mnemonic_window<E>(
+    ctx: &Context, ls: &mut LocalState<E>
+) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
 
     if ls.keygen_state.mnemonic_window_state.set_hot_mnemonic {
         ls.add_with_pass_mnemonic(ls.keygen_state.mnemonic_window_state.save_name.clone(),

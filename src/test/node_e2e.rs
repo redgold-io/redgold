@@ -7,7 +7,8 @@ use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::mnemonic_support::WordsPass;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
@@ -433,9 +434,10 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
         info!("Sending eth stake to party address");
         let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
         info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
-        info!("Fee fixed {}", CurrencyAmount::fee_fixed_normal_testnet().json_or());
+        info!("Fee fixed {}", CurrencyAmount::eth_fee_fixed_normal_testnet().json_or());
         let res = tokio::time::timeout(
-            Duration::from_secs(120), eth.send(&party_eth_address, &exact_eth_stake_amount)
+            Duration::from_secs(120), eth.send(
+                &party_eth_address, &exact_eth_stake_amount, None)
         ).await.expect("works").expect("works");
         info!("Eth txid: {}", res);
         let mut retries = 0;
@@ -596,7 +598,8 @@ async fn proceed_swap_test_from_eth_send(
 
     eth.send(
         &party_eth_address,
-        &CurrencyAmount::test_send_amount_typed()
+        &CurrencyAmount::test_send_amount_typed(),
+        None
     ).await?;
     // let fee_amount_pool = CurrencyAmount::from_rdg(10000);
 

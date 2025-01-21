@@ -73,10 +73,20 @@
               <div><TextCopy :data="'$' + askPriceUsdRdg" /></div>
               <div><strong>Price Bid USD/RDG BTC Quote</strong></div>
               <div><TextCopy :data="'$' + bidPriceUsdRdg" /></div>
-<!--              <div><strong>Price Center RDG/BTC </strong></div>-->
-<!--              <div><TextCopy :data="centerPriceRdgBtc" /></div>-->
-<!--              <div><strong>Spread USD</strong></div>-->
-<!--              <div>${{ spreadUsd }} USD</div>-->
+              <template v-for="balancePair in hashData.address_pool_info.overall_staking_balances" :key="balancePair[0]">
+                <div><strong>{{balancePair[0]}} Staked</strong></div>
+                <div>{{balancePair[1]}}</div>
+              </template>
+<!--              these are broken ?? displaying wrong balances. -->
+<!--              <template v-for="balancePair in hashData.address_pool_info.amm_staking_balances" :key="balancePair[0]">-->
+<!--                <div><strong>{{balancePair[0]}} AMM Staked</strong></div>-->
+<!--                <div>{{balancePair[1]}}</div>-->
+<!--              </template>-->
+<!--              <template v-for="balancePair in hashData.address_pool_info.portfolio_staking_balances" :key="balancePair[0]">-->
+<!--                <div><strong>{{balancePair[0]}} Port Staked</strong></div>-->
+<!--                <div>{{balancePair[1]}}</div>-->
+<!--              </template>-->
+
             </div>
 
             <h3 class="detail-group">Bid Ask AMM Curve RDG/BTC</h3>
@@ -197,7 +207,6 @@
             <h3 class="detail-group">AMM Events</h3>
             <div v-if="hashData.address_pool_info.detailed_events">
               <div><DetailedEvent :events="hashData.address_pool_info.detailed_events" /></div>
-
             </div>
           </div>
 

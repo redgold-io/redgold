@@ -82,6 +82,8 @@ use std::io;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_schema::{error_info, RgResult};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 
@@ -108,7 +110,7 @@ fn otp_xor(msg: &Vec<u8>, pad: &Vec<u8>) -> RgResult<Vec<u8>> {
     Ok(msg.iter().zip(pad.iter()).map(|(a, b)| a ^ b).collect_vec())
 }
 
-pub(crate) fn otp_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
+pub(crate) fn otp_tab<E>(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState<E>) where E : ExternalNetworkResources + Clone + Send + Sync + 'static {
     ui.heading("One Time Pad Tab");
     ui.horizontal(|ui| {
        for t in OtpSubTab::iter() {
@@ -211,7 +213,8 @@ pub(crate) fn otp_tab(ui: &mut Ui, _ctx: &Context, ls: &mut LocalState) {
     }
 }
 
-fn otp_pad_logic(ui: &mut Ui, ls: &mut LocalState, button_name: impl Into<String>, do_encrypt: bool) {
+fn otp_pad_logic<E>(ui: &mut Ui, ls: &mut LocalState<E>, button_name: impl Into<String>, do_encrypt: bool) where
+E : ExternalNetworkResources + Clone + Send + Sync + 'static {
     let name = button_name.into();
     bounded_text_area_size_id(ui, &mut ls.otp_state.input_message, 300., 5, format!("{}_input", name.clone()));
     editable_text_input_copy(ui, "Input Dir", &mut ls.otp_state.otp_dir, 300.);
@@ -275,12 +278,13 @@ fn otp_pad_logic(ui: &mut Ui, ls: &mut LocalState, button_name: impl Into<String
     bounded_text_area_size_id(ui, &mut ls.otp_state.output_message,300., 5, format!("{}_output", name));
 }
 
-fn use_hot_mnemonic(ui: &mut Ui, ls: &mut LocalState) {
+fn use_hot_mnemonic<E,G>(ui: &mut Ui, ls: &mut LocalState<E>, g: &G) where G: GuiDepends + Clone + Send + 'static + Sync,
+    E: ExternalNetworkResources + Clone + Send + Sync + 'static {
     ui.checkbox(&mut ls.otp_state.use_hot_mnemonic, "Use Hot PGP Key");
     if ls.otp_state.use_hot_mnemonic {
         ui.horizontal(|ui| {
             ui.label("Mnemonic checksum");
-            ui.label(ls.wallet.hot_mnemonic().checksum().expect("ok"));
+            ui.label(G::seed_checksum(ls.wallet.hot_mnemonic(g)).expect("ok"));
         });
     }
 }

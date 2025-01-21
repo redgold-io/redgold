@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 use async_trait::async_trait;
 use redgold_schema::{error_info, structs, RgResult};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 
 #[async_trait]
 pub trait ExternalNetworkResources {
+
+    fn set_network(&mut self, network: &NetworkEnvironment);
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>>;
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String>;
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
@@ -27,7 +30,8 @@ pub trait ExternalNetworkResources {
 
     async fn max_time_price_by(&self, currency: SupportedCurrency, max_time: i64) -> RgResult<Option<f64>>;
 
-    async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey) -> RgResult<CurrencyAmount>;
+    async fn get_balance_no_cache(&self, network: &NetworkEnvironment, currency: &SupportedCurrency, pk: &PublicKey) -> RgResult<CurrencyAmount> where
+        Self: Sync;
 
     async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: structs::Transaction) -> RgResult<structs::Transaction>;
 

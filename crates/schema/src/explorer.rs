@@ -177,10 +177,13 @@ pub struct AddressPoolInfo{
     pub bids: HashMap<String, Vec<PriceVolume>>,
     pub asks: HashMap<String, Vec<PriceVolume>>,
     pub bids_usd: HashMap<String, Vec<PriceVolume>>,
-    pub  asks_usd: HashMap<String, Vec<PriceVolume>>,
+    pub asks_usd: HashMap<String, Vec<PriceVolume>>,
     pub central_prices: HashMap<String, CentralPricePair>,
     pub events: PartyInternalData,
-    pub detailed_events: Vec<DetailedPartyEvent>
+    pub detailed_events: Vec<DetailedPartyEvent>,
+    pub overall_staking_balances: Vec<(String, String)>,
+    pub portfolio_staking_balances: Vec<(String, String)>,
+    pub amm_staking_balances: Vec<(String, String)>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

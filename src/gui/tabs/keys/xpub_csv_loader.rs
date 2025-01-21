@@ -1,14 +1,14 @@
+use crate::gui::app_loop::{LocalState, LocalStateAddons};
+
+use crate::gui::tabs::transact::wallet_tab;
 use eframe::egui;
 use eframe::egui::{ScrollArea, Ui, Widget};
-use tracing::info;
 use itertools::Itertools;
 use redgold_schema::conf::local_stored_state::AccountKeySource;
-use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJson;
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use crate::gui::ls_ext::send_update;
-use crate::gui::tabs::transact::wallet_tab;
-
+use redgold_schema::{ErrorInfoContext, RgResult};
+use tracing::info;
+use redgold_common::external_resources::ExternalNetworkResources;
 
 fn parse_xpub_rows(str: &str) -> RgResult<Vec<AccountKeySource>> {
     let mut rdr = csv::Reader::from_reader(str.as_bytes());
@@ -24,11 +24,11 @@ fn parse_xpub_rows(str: &str) -> RgResult<Vec<AccountKeySource>> {
 
 
 // TODO: This window exceeds the max size bound for some crazy reason??
-pub fn window_xpub_loader(
+pub fn window_xpub_loader<E>(
     _ui: &mut Ui,
-    ls: &mut LocalState,
+    ls: &mut LocalState<E>,
     ctx: &egui::Context,
-) {
+) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     let mut show = ls.wallet.show_xpub_loader_window;
     let mut hide = false;
     egui::Window::new("Xpub Loader")

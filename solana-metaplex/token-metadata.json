@@ -1,0 +1,16 @@
+{
+  "name": "WrappedRedgold",
+  "symbol": "wRDG",
+  "description": "Wrapped Redgold.io token on Solana",
+  "image": "https://redgold-public.s3.us-west-1.amazonaws.com/logo_orig_crop.png",
+  "external_url": "https://redgold.io",
+  "attributes": [],
+  "properties": {
+    "files": [
+      {
+        "uri": "https://redgold-public.s3.us-west-1.amazonaws.com/logo_orig_crop.png",
+        "type": "image/png"
+      }
+    ]
+  }
+}

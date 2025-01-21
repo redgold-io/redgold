@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
 use tracing::Instrument;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
@@ -15,6 +16,7 @@ use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, 
 use redgold_gui::components::account_deriv_sel::AccountDerivationPathInputState;
 use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::PublicKey;
 use crate::gui::components::key_info::{extract_gui_key, GuiKey, KeyInfo, update_keys_key_info, update_xpub_key_info};
@@ -74,7 +76,9 @@ impl Default for KeyTabState {
 }
 
 
-pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static  {
+pub fn manage_view<G, E>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState<E>, first_init: bool, g: &G)
+where G: GuiDepends + Clone + Send + 'static + Sync,
+    E: ExternalNetworkResources + Send + Sync + 'static + Clone {
     ui.add_space(10.0);
 
     // Add New Stuff buttons
@@ -93,7 +97,7 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
     save_key_window::save_key_window(ui, ls, ctx);
 
     if ls.wallet.public_key.is_none() {
-        ls.wallet.update_hot_mnemonic_or_key_info();
+        ls.wallet.update_hot_mnemonic_or_key_info(g);
     }
 
     keygen_subtab::mnemonic_window(ctx, ls);
@@ -106,17 +110,19 @@ pub fn manage_view<G>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState, fir
 
 }
 
-fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static {
+fn internal_stored_keys<G, E>(ui: &mut Ui, ls: &mut LocalState<E>, first_init: bool, g: &G)
+where G: GuiDepends + Clone + Send + 'static + Sync,
+E : ExternalNetworkResources + Send + Sync + 'static + Clone {
     let mut need_keys_update = false;
     ui.horizontal(|ui| {
         ui.heading("Internal Stored Keys");
-        let has_changed_key = key_source(ui, ls);
+        let has_changed_key = key_source(ui, ls, g);
         need_keys_update = has_changed_key;
         medium_data_item(ui,"Checksum: ", &ls.wallet.mnemonic_or_key_checksum);
         if ui.button("Show Key").clicked() {
             if ls.wallet.active_hot_private_key_hex.is_none() {
                 ls.keygen_state.mnemonic_window_state.set_words(
-                    ls.wallet.hot_mnemonic().words,
+                    ls.wallet.hot_mnemonic(g).words,
                     ls.wallet.selected_key_name.clone(),
                 );
             } else {
@@ -128,14 +134,14 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
     let dp_has_changed_key = ls.keytab_state.key_derivation_path_input.view(ui, g);
     // TODO: Hot passphrase should ONLY apply to mnemonics as it doesn't work for private keys
     if ls.wallet.active_hot_private_key_hex.is_none() {
-        let update_clicked = hot_passphrase_section(ui, ls);
+        let update_clicked = hot_passphrase_section(ui, ls, g);
         if update_clicked {
             need_keys_update = true;
         }
     }
     if need_keys_update || first_init || dp_has_changed_key {
         // info!("Updating keys key info {} {}", need_keys_update, first_init);
-        update_keys_key_info(ls);
+        update_keys_key_info(ls, g);
     }
     // Show seed checksum (if mnemonic)
     if ls.wallet.active_hot_private_key_hex.is_none() {
@@ -150,7 +156,7 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
             if ui.button("Save").clicked() {
                 let derivation_path = ls.keytab_state.key_derivation_path_input.derivation_path.as_account_path();
                 if let Some(derivation_account_path) = derivation_path {
-                    let m = ls.wallet.hot_mnemonic();
+                    let m = ls.wallet.hot_mnemonic(g);
                     if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
                         let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
                         let check = m.checksum().unwrap_or("".to_string());
@@ -186,7 +192,9 @@ fn internal_stored_keys<G>(ui: &mut Ui, ls: &mut LocalState, first_init: bool, g
 }
 
 
-pub fn keys_tab<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState, first_init: bool, g: &G) where G: GuiDepends + Clone + Send + 'static  {
+pub fn keys_tab<G, E>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState<E>, first_init: bool, g: &G)
+where G: GuiDepends + Clone + Send + 'static + Sync,
+ E : ExternalNetworkResources + Send + Sync + 'static + Clone{
 
     ui.horizontal(|ui| {
         ui.heading("Keys");
@@ -209,9 +217,9 @@ pub fn keys_tab<G>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalStat
 }
 
 
-pub(crate) fn show_private_key_window(
-    ctx: &Context, ls: &mut LocalState
-) {
+pub(crate) fn show_private_key_window<E>(
+    ctx: &Context, ls: &mut LocalState<E>
+) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
 
     egui::Window::new("Private Key")
         .open(&mut ls.keytab_state.show_private_key_window)
@@ -234,15 +242,15 @@ pub(crate) fn show_private_key_window(
 
 
 
-pub fn internal_stored_xpubs<G>(
-    ls: &mut LocalState,
+pub fn internal_stored_xpubs<G, E>(
+    ls: &mut LocalState<E>,
     ui: &mut Ui,
     ctx: &egui::Context,
     first_init: bool, g: &G,
     heading_override: Option<String>,
     option: Option<PublicKey>,
     show_balance_checkbox: bool,
-) -> (bool, Option<AccountKeySource>) where G: GuiDepends + Clone + Send + 'static  {
+) -> (bool, Option<AccountKeySource>) where G: GuiDepends + Clone + Send + 'static, E: ExternalNetworkResources + Send + Sync + 'static + Clone {
 
 
     let mut xpub : Option<AccountKeySource> = None;
@@ -328,7 +336,7 @@ pub fn internal_stored_xpubs<G>(
 
     (update, xpub)
 }
-pub fn add_xpub_csv_button(ls: &mut LocalState, ui: &mut Ui, ctx: &egui::Context) {
+pub fn add_xpub_csv_button<E>(ls: &mut LocalState<E>, ui: &mut Ui, ctx: &egui::Context) where E: ExternalNetworkResources + Send + Sync + 'static + Clone {
     window_xpub_loader(ui, ls, ctx);
     if ui.button("Add XPubs From CSV").clicked() {
         ls.wallet.show_xpub_loader_window = true;
