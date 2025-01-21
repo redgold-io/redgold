@@ -7,13 +7,16 @@ use ethers::providers;
 use ethers::providers::Http;
 // use log::kv::Key;
 use num_bigint::{BigInt, Sign};
+use tracing::info;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::KeyPair;
 use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
+use redgold_schema::structs::StandardContractType::Currency;
 use crate::eth::historical_client::EthHistoricalClient;
+use crate::examples::example::dev_ci_kp;
 
 pub struct EthWalletWrapper {
     pub wallet: LocalWallet,
@@ -98,6 +101,18 @@ impl EthWalletWrapper {
 
     pub async fn send_maybe_broadcast(&self, to: &structs::Address, value: &CurrencyAmount, broadcast: bool) -> RgResult<(String, String)> {
         let tx = self.create_transaction_typed(&self.address()?, to, value.clone(), None).await?;
+
+        let p_est = 3200.0;
+        let fee = Self::extract_fee(&tx).expect("fee extraction failure");
+
+        // let cur_bal = self.get_balance(&self.keypair.public_key()).await.expect("balance lookup failure");
+        //
+        info!("Send maybe broadcast on net {}, fee usd: {}, broadcast: {} amount: {}",
+            self.network.to_std_string(), fee.to_fractional() * p_est,
+            broadcast,
+            //cur_bal.to_fractional() * p_est
+            value.to_fractional() * p_est,
+        );
         // send it!
         if broadcast {
             let pending_tx = self.client.send_transaction(tx, None).await.expect("works");
@@ -114,6 +129,17 @@ impl EthWalletWrapper {
 
     }
 
+
+    pub fn extract_fee(t: &TypedTransaction) -> RgResult<CurrencyAmount> {
+        let gas_price = t.gas_price().ok_msg("gas price missing")?;
+        let gas = t.gas().ok_msg("gas missing")?;
+        let gas_price_str = gas_price.to_string();
+        let gas_str = gas.to_string();
+        let gas_price = CurrencyAmount::from_eth_bigint_string(&gas_price_str);
+        let gas = CurrencyAmount::from_eth_bigint_string(&gas_str);
+        let fee = gas_price * gas;
+        Ok(fee)
+    }
 
     pub async fn create_transaction_typed(
         &self,
@@ -254,5 +280,27 @@ impl EthWalletWrapper {
         let bi = BigInt::from_bytes_be(Sign::Plus, &*vec);*/
         Ok(CurrencyAmount::from_eth_bigint(bi))
     }
+
+}
+
+
+#[ignore]
+#[tokio::test]
+async fn check_gas_prices() {
+    let ci = dev_ci_kp().unwrap();
+    let p = 3200.0;
+    let amt = CurrencyAmount::eth_fee_fixed_normal_by_env(&NetworkEnvironment::Main).to_fractional() * p;
+    println!("fixed Gas price mainnet USD {}", amt);
+    let amt = CurrencyAmount::eth_fee_fixed_normal_by_env(&NetworkEnvironment::Dev).to_fractional() * p;
+    println!("fixed Gas price devnet USD {}", amt);
+
+    let w = EthWalletWrapper::new(&ci.0, &NetworkEnvironment::Main).unwrap();
+    let wd = EthWalletWrapper::new(&ci.0, &NetworkEnvironment::Dev).unwrap();
+
+    let amt = w.get_fee_estimate().await.unwrap();
+    println!("Gas price mainnet {}", amt.to_fractional() * p);
+
+    let amt = wd.get_fee_estimate().await.unwrap();
+    println!("Gas price devnet {}", amt.to_fractional() * p);
 
 }

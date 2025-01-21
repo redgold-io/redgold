@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common::flume_send_help::Channel;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::structs::PublicKey;
+use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 use strum::IntoEnumIterator;
 // 0.17.1
 
@@ -52,7 +53,7 @@ impl PublicKeyStoredState for LocalStoredState {
 // #[derive(Clone)]
 pub struct LocalState<E> where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
     pub(crate) active_tab: Tab,
-    pub data: DataQueryInfo<E>,
+    pub data: HashMap<NetworkEnvironment, DataQueryInfo<E>>,
     pub node_config: NodeConfig,
     pub home_state: HomeState,
     pub server_state: ServersState,

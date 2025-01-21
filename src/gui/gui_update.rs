@@ -8,6 +8,7 @@ use eframe::egui;
 use strum::IntoEnumIterator;
 use itertools::Itertools;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::SupportedCurrency;
@@ -19,6 +20,7 @@ use crate::gui::tabs::keys::keys_tab::keys_tab;
 use crate::gui::tabs::otp_tab::otp_tab;
 use crate::gui::tabs::server_tab;
 use crate::gui::tabs::transact::wallet_tab::wallet_screen;
+use crate::gui::top_panel::render_top;
 use crate::util;
 
 static INIT: Once = Once::new();
@@ -28,6 +30,10 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
 
     let g = &mut app.gui_depends;
     let local_state = &mut app.local_state;
+
+
+    let top_event = top_panel::render_top(ctx, local_state);
+
 
     let mut first_call = false;
     // TODO: Replace with config query and check.
@@ -44,7 +50,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
         ctx.set_pixels_per_point(amt);
     });
 
-    if first_call {
+    if first_call || top_event.refresh_all_clicked {
         g.initial_queries_prices_parties_etc(
             local_state.local_messages.sender.clone(),
             local_state.external_network_resources.clone()
@@ -57,15 +63,30 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
         g.set_config(&c, false);
         local_state.persist_requested = false;
     }
-
+    local_state.external_network_resources.set_network(&local_state.node_config.network);
     g.set_network(&local_state.node_config.network);
+    if local_state.data.get_mut(&local_state.node_config.network).is_none() {
+        let mut d = DataQueryInfo::new(&local_state.external_network_resources);
+        local_state.data.insert(local_state.node_config.network.clone(), d);
+        g.initial_queries_prices_parties_etc(
+            local_state.local_messages.sender.clone(),
+            local_state.external_network_resources.clone()
+        );
+    }
 
     let updates = local_state.local_messages.recv_while().unwrap_or_default();
     local_state.latest_local_messages = updates.clone();
     for update in updates {
         match update {
             LocalStateUpdate::PricesPartyInfoAndDelta(p) => {
-                local_state.data.load_party_data_and_prices(p);
+                if let Some(d) = local_state.data.get_mut(&p.on_network) {
+                    d.load_party_data_and_prices(p);
+                } else {
+                    let mut d = DataQueryInfo::new(&local_state.external_network_resources);
+                    d.load_party_data_and_prices(p.clone());
+                    local_state.data.insert(p.on_network.clone(), d);
+                }
+
             }
             LocalStateUpdate::BalanceUpdates(b) => {
                 local_state.wallet.address_info = b.address_info.clone();
@@ -114,7 +135,6 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
     // For inspiration and more examples, go to https://emilk.github.io/egui
 
 
-    top_panel::render_top(ctx, local_state);
 
     // let img = logo;
     // let texture_id = img.texture_id(ctx);
@@ -169,7 +189,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
             Tab::Home => {
                 let pks = local_state.local_stored_state.extract(g);
                 local_state.home_state.home_screen(
-                    ui, ctx, g, &local_state.external_network_resources, &local_state.data,
+                    ui, ctx, g, &local_state.external_network_resources, &local_state.data.get(&local_state.node_config.network).unwrap(),
                     &local_state.node_config, pks.iter().collect_vec(), local_state.current_time,
                     &local_state.local_stored_state
                 );
@@ -202,7 +222,8 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
                 });
             }
             Tab::Transact => {
-                wallet_screen(ui, ctx, local_state, has_changed_tab, g, &local_state.data.clone());
+                let d = local_state.data.get(&local_state.node_config.network).unwrap().clone();
+                wallet_screen(ui, ctx, local_state, has_changed_tab, g, &d);
             }
             Tab::Identity => {
                 crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
@@ -233,7 +254,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
                 local_state.airgap_signer.interior_view(ui, g, Some(&info));
             }
             Tab::Portfolio => {
-                local_state.portfolio_tab_state.view(ui, &local_state.data, local_state.node_config.network.clone());
+                local_state.portfolio_tab_state.view(ui, &local_state.data.get(&local_state.node_config.network).unwrap(), local_state.node_config.network.clone());
             }
             _ => {}
         }

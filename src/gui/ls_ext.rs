@@ -52,13 +52,14 @@ where G: Send + Clone + GuiDepends, E: ExternalNetworkResources + Send + Sync + 
 
     let ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
 
-
-    let first_party = party_data.clone().into_values().next();
+    let n = gui_depends.get_network();
+    let mut dhm = HashMap::new();
+    dhm.insert(n, DataQueryInfo::new(&res));
 
     // ss.genesis = node_config.opts.development_mode;
     let mut ls = LocalState {
         active_tab: Tab::Home,
-        data: DataQueryInfo::new(&res),
+        data: dhm,
         node_config: *node_config.clone(),
         // runtime,
         home_state: HomeState::default(),
@@ -188,17 +189,25 @@ fn random_bytes() -> [u8; 32] {
 //     updates.send(StateUpdate { update: Box::new(p0) }).unwrap();
 // }
 
-pub fn create_swap_tx<G,E>(ls: &mut LocalState<E>, g: &G) where G : GuiDepends + Clone + Send + 'static + Sync,
+pub fn create_swap_tx<G,E>(
+    ls: &mut LocalState<E>,
+    g: &G,
+) where G : GuiDepends + Clone + Send + 'static + Sync,
                                                                 E: ExternalNetworkResources + Send + Sync + 'static + Clone {
-    let party_pk = ls
-        .data
+    let data = ls.data.get(&g.get_network());
+    if data.is_none() {
+        return;
+    }
+    let data = data.unwrap();
+    let party_pk = data
         .first_party
         .as_ref()
         .lock().ok()
         .and_then(|p| p.party_info.party_key.clone())
         .unwrap();
-    let party_addr = party_pk.address().unwrap();
 
+
+    let party_addr = party_pk.address().unwrap();
     let mut res = ls.external_network_resources.clone();
     let config = ls.node_config.clone();
     let currency = ls.swap_state.currency_input_box.input_currency.clone();
@@ -206,7 +215,7 @@ pub fn create_swap_tx<G,E>(ls: &mut LocalState<E>, g: &G) where G : GuiDepends +
     let kp = ls.wallet.hot_mnemonic(g).keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
     let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
     info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
-    let map = ls.data.price_map_usd_pair_incl_rdg.clone();
+    let map = data.price_map_usd_pair_incl_rdg.clone();
     let amount = ls.swap_state.currency_input_box.input_currency_amount(&map);
     let mut from_eth_addr_dir = pk.to_ethereum_address_typed().unwrap();
     info!("from_eth_addr_dir: {}", from_eth_addr_dir.render_string().unwrap());

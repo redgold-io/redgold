@@ -86,6 +86,12 @@ impl ExternalNetworkResourcesImpl {
 
 #[async_trait]
 impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
+    fn set_network(&mut self, network: &NetworkEnvironment) {
+        let mut nc = (*self.node_config).clone();
+        nc.network = network.clone();
+        self.node_config = Arc::new(nc);
+    }
+
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
                                -> RgResult<Vec<ExternalTimedTransaction>> {
         match currency {
@@ -155,7 +161,8 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
     }
 
     async fn send(
-        &mut self, destination: &Address,
+        &mut self,
+        destination: &Address,
         currency_amount: &CurrencyAmount,
         broadcast: bool,
         from: Option<PublicKey>,
@@ -331,6 +338,9 @@ impl MockExternalResources {
 
 #[async_trait]
 impl ExternalNetworkResources for MockExternalResources {
+    fn set_network(&mut self, network: &NetworkEnvironment) {
+        self.node_config.network = network.clone();
+    }
 
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
                                -> RgResult<Vec<ExternalTimedTransaction>> {

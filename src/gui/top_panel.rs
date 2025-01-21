@@ -10,7 +10,23 @@ fn round_down_to_minute(time_millis: i64) -> i64 {
     time_millis - (time_millis % 60000)
 }
 
-pub fn render_top<E>(ctx: &Context, local_state: &mut LocalState<E>) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
+
+pub struct RenderTopEvent {
+    pub(crate) refresh_all_clicked: bool
+}
+
+impl Default for RenderTopEvent {
+    fn default() -> Self {
+        Self {
+            refresh_all_clicked: false
+        }
+    }
+}
+
+pub fn render_top<E>
+(ctx: &Context, local_state: &mut LocalState<E>) -> RenderTopEvent
+where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
+    let mut event = RenderTopEvent::default();
     egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
         ui.horizontal(|ui| {
             let cur = ctx.pixels_per_point();
@@ -55,6 +71,9 @@ pub fn render_top<E>(ctx: &Context, local_state: &mut LocalState<E>) where E: Ex
             ui.label(RichText::new(time_str.clone()).color(egui::Color32::LIGHT_BLUE));
             copy_button(ui, local_state.current_time.to_time_string_shorter());
             ui.hyperlink_to("Explorer Link", local_state.node_config.network.explorer_link());
+            if ui.button("Refresh All").clicked() {
+                event.refresh_all_clicked = true;
+            }
         });
 
 
@@ -69,4 +88,5 @@ pub fn render_top<E>(ctx: &Context, local_state: &mut LocalState<E>) where E: Ex
         //     });
         // });
     });
+    event
 }

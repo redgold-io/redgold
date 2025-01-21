@@ -192,7 +192,7 @@ Parameters
         transaction_index: Option<u64>,
     ) -> RgResult<(String, String)> {
         counter!("redgold_multisig_solana_vote").increment(1);
-        let init = "proposal_vote";
+        let init = "proposal-vote";
         let transaction_index = transaction_index.unwrap_or(0);
         let remainder = format!(
             "--multisig-pubkey {} \
@@ -264,22 +264,23 @@ async fn debug_kg() {
     //         , None, None).await.unwrap();
     // println!("Sent: {}", res.message.hash().to_string());
     let destination = w1.self_address().unwrap();
-    // let res = w.multisig_propose_send(
-    //     multisig_pubkey, Some(0),
-    //     destination,  CurrencyAmount::from_fractional_cur(0.05, SupportedCurrency::Solana).unwrap(), None
-    // ).await.unwrap();
-    // println!("Proposed: {}", res.0);
+    let res = w.multisig_propose_send(
+        multisig_pubkey, Some(0),
+        destination,  CurrencyAmount::from_fractional_cur(0.05, SupportedCurrency::Solana).unwrap(), None
+    ).await.unwrap();
+    println!("Proposed: {}", res);
     // println!("Proposed stderr: {}", res.1);
+
     /*
-
-
-
 ⠤ Sending transaction...
              Transaction confirmed:
               4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
-
-
      */
     // w.init_multisig().await.unwrap();
+
+    let approve1 = w.multisig_approve_transaction(multisig_pubkey, Some(0)).await.unwrap();
+    println!("Approve1: {}", approve1.0);
+    println!("Approve1 stderr: {}", approve1.1);
+
 
 }

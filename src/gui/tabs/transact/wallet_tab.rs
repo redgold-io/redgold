@@ -253,7 +253,11 @@ fn proceed_from_pk<G, E>(
     ui.separator();
 
     if ls.wallet.show_xpub_balance_info {
-        balance_table(ui, &ls.data, &ls.node_config, None, Some(pk), None, Some("wallet_balance".to_string()));
+        let data = ls.data.get(&g.get_network());
+        if let Some(d) = data {
+            balance_table(ui, d, &ls.node_config, None, Some(pk), None, Some("wallet_balance".to_string()));
+        }
+
     }
 
 
@@ -384,7 +388,9 @@ fn send_receive_bar<G, E>(ui: &mut Ui, ls: &mut LocalState<E>, pk: &PublicKey, g
 
 fn refresh_balance<G, E>(ls: &mut LocalState<E>, g: &G) where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources + Clone + Send + 'static + Sync {
     let pk = ls.wallet.public_key.clone().expect("pk");
-    ls.data.refresh_all_pk(&pk, g);
+    if let Some(d) = ls.data.get(&g.get_network()) {
+        d.refresh_all_pk(&pk, g);
+    }
     address_query::get_address_info(
         &ls.node_config.clone(), pk, ls.local_messages.sender.clone(), g
     );

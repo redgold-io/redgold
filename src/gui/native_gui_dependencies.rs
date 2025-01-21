@@ -62,12 +62,15 @@ impl NativeGuiDepends {
     }
 
     fn external_res(&mut self) -> Result<ExternalNetworkResourcesImpl, ErrorInfo> {
-        let eee = if let Some(e) = self.wallet_nw.get(&self.nc().network) {
+        let net = self.nc().network;
+        let eee = if let Some(e) = self.wallet_nw.get(&net) {
             e
         } else {
-            let e = ExternalNetworkResourcesImpl::new(&self.original_uncleared_nc, None)?;
-            self.wallet_nw.insert(self.nc().network.clone(), e);
-            self.wallet_nw.get(&self.nc().network).unwrap()
+            let mut config = self.original_uncleared_nc.clone();
+            config.network = net;
+            let e = ExternalNetworkResourcesImpl::new(&config, None)?;
+            self.wallet_nw.insert(net.clone(), e);
+            self.wallet_nw.get(&net).unwrap()
         };
         Ok(eee.clone())
     }
@@ -280,7 +283,7 @@ impl GuiDepends for NativeGuiDepends {
             return;
         }
         let g2 = self.clone();
-        // let e2 = ext.clone();
+        let net = self.get_network();
 
         let client = self.nc().api_rg_client();
         self.spawn(async move {
@@ -320,6 +323,7 @@ impl GuiDepends for NativeGuiDepends {
                 party_info: party,
                 delta_24hr: deltas,
                 daily_one_year: ext.daily_historical_year().await.ok().unwrap_or_default(),
+                on_network: net,
             })).ok();
         });
     }
