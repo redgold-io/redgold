@@ -106,12 +106,18 @@ Parameters
         Ok(multisig_pubkey.to_string())
     }
 
-    pub fn extract_multisig_send_stdout_txhash(stdout: String) -> RgResult<String> {
+    pub fn extract_multisig_send_stdout_txhash(stdout: String) -> RgResult<(String, i64)> {
         let split = stdout.split("Transaction confirmed: ").collect_vec();
-        let latter_part = split.get(1).ok_msg("Multisig pubkey not found")?;
+        let beginning = split.get(0).cloned().ok_msg("Missing before confirmed")?;
+        let mut config_split = beginning.split("Transaction Index:").collect_vec();
+        let tx_idx = config_split.get(1).cloned().ok_msg("Transaction index not found")?;
+        let vault_split = tx_idx.split("Vault Index:").collect_vec();
+        let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?.replace(" ", "");
+        let tx_idx = i64::from_str(&tx_idx).unwrap();
+        let latter_part = split.get(1).cloned().ok_msg("Multisig pubkey not found")?;
         let split = latter_part.split("Signature:").collect_vec();
         let txid = split.get(0).ok_msg("Multisig pubkey not found")?;
-        Ok(txid.replace(" ", ""))
+        Ok((txid.replace(" ", ""), tx_idx))
     }
 
 
@@ -142,7 +148,7 @@ Parameters
         destination: Address,
         amount: CurrencyAmount,
         memo: Option<String>
-    ) -> RgResult<String> {
+    ) -> RgResult<MultisigProposeOutput> {
         let multisig_pubkey = multisig_pubkey.into();
         counter!("redgold_multisig_solana_propose").increment(1);
 
@@ -179,10 +185,19 @@ Parameters
         // Transaction confirmed: 4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
         // match on this.
         let (stdout, stderr) = self.cmd(init, remainder).await?;
-        let tx_hash = Self::extract_multisig_send_stdout_txhash(stdout.clone())
+        println!("propose send stdout: {}", stdout);
+        println!("propose send stderr: {}", stderr);
+        let (tx_hash, tx_idx) = Self::extract_multisig_send_stdout_txhash(stdout.clone())
             .with_detail("stdout", stdout)
             .with_detail("stderr", stderr)?;
-        Ok(tx_hash)
+
+        let ret = MultisigProposeOutput {
+            multisig_pubkey,
+            tx_hash,
+            transaction_index: tx_idx,
+            vault_index
+        };
+        Ok(ret)
     }
 
     // Vote/approve a transaction
@@ -223,6 +238,16 @@ Parameters
     }
 
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct MultisigProposeOutput {
+    pub multisig_pubkey: String,
+    pub tx_hash: String,
+    pub transaction_index: i64,
+    pub vault_index: i64
+}
+
+#[ignore]
 #[tokio::test]
 async fn dump_kp() {
     let tc = TestConstants::new();
@@ -235,7 +260,7 @@ async fn dump_kp() {
     std::fs::write(path, s).unwrap();
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn debug_kg() {
     let tc = TestConstants::new();
@@ -266,9 +291,9 @@ async fn debug_kg() {
     let destination = w1.self_address().unwrap();
     let res = w.multisig_propose_send(
         multisig_pubkey, Some(0),
-        destination,  CurrencyAmount::from_fractional_cur(0.05, SupportedCurrency::Solana).unwrap(), None
+        destination,  CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(), None
     ).await.unwrap();
-    println!("Proposed: {}", res);
+    println!("Proposed: {:?}", res);
     // println!("Proposed stderr: {}", res.1);
 
     /*
@@ -277,10 +302,10 @@ async fn debug_kg() {
               4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
      */
     // w.init_multisig().await.unwrap();
-
-    let approve1 = w.multisig_approve_transaction(multisig_pubkey, Some(0)).await.unwrap();
-    println!("Approve1: {}", approve1.0);
-    println!("Approve1 stderr: {}", approve1.1);
+    //
+    // let approve1 = w.multisig_approve_transaction(multisig_pubkey, Some(0)).await.unwrap();
+    // println!("Approve1: {}", approve1.0);
+    // println!("Approve1 stderr: {}", approve1.1);
 
 
 }

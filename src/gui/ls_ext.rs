@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use flume::Sender;
 use log::info;
 use rand::Rng;
+use tokio::task::JoinHandle;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common::flume_send_help::{new_channel, Channel};
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
@@ -20,7 +21,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, PublicKey, SupportedCurrency};
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
 use redgold_gui::tab::home::HomeState;
@@ -29,6 +30,7 @@ use crate::gui::tabs::identity_tab::IdentityState;
 use redgold_gui::tab::keys::keygen::KeygenState;
 use redgold_gui::tab::settings_tab::SettingsState;
 use redgold_gui::tab::transact::wallet_state::WalletState;
+use redgold_keys::KeyPair;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
@@ -190,33 +192,26 @@ fn random_bytes() -> [u8; 32] {
 // }
 
 pub fn create_swap_tx<G,E>(
-    ls: &mut LocalState<E>,
     g: &G,
-) where G : GuiDepends + Clone + Send + 'static + Sync,
-                                                                E: ExternalNetworkResources + Send + Sync + 'static + Clone {
-    let data = ls.data.get(&g.get_network());
-    if data.is_none() {
-        return;
-    }
-    let data = data.unwrap();
-    let party_pk = data
-        .first_party
-        .as_ref()
-        .lock().ok()
-        .and_then(|p| p.party_info.party_key.clone())
-        .unwrap();
-
-
+    e: &E,
+    party_pk: PublicKey,
+    input_currency: SupportedCurrency,
+    hot_pk: PublicKey,
+    hot_kp: KeyPair,
+    amount: CurrencyAmount,
+    config: &NodeConfig,
+    address_info: Option<AddressInfo>,
+    channel: Channel<LocalStateUpdate>,
+    output_currency: SupportedCurrency
+) -> JoinHandle<()> where G : GuiDepends + Clone + Send + 'static + Sync,
+                          E: ExternalNetworkResources + Send + Sync + 'static + Clone {
     let party_addr = party_pk.address().unwrap();
-    let mut res = ls.external_network_resources.clone();
-    let config = ls.node_config.clone();
-    let currency = ls.swap_state.currency_input_box.input_currency.clone();
-    let pk = ls.wallet.public_key.clone().unwrap();
-    let kp = ls.wallet.hot_mnemonic(g).keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+    let mut res = e.clone();
+
+    let pk = hot_pk;
+    let kp = hot_kp;
     let kp_eth_addr = kp.public_key().to_ethereum_address_typed().unwrap();
     info!("kp_eth_addr: {}", kp_eth_addr.render_string().unwrap());
-    let map = data.price_map_usd_pair_incl_rdg.clone();
-    let amount = ls.swap_state.currency_input_box.input_currency_amount(&map);
     let mut from_eth_addr_dir = pk.to_ethereum_address_typed().unwrap();
     info!("from_eth_addr_dir: {}", from_eth_addr_dir.render_string().unwrap());
     from_eth_addr_dir.mark_external();
@@ -226,9 +221,9 @@ pub fn create_swap_tx<G,E>(
 
     let ksi = TransactionSignInfo::PrivateKey(kp.to_private_hex());
 
-    let to = match ls.swap_state.currency_input_box.input_currency {
+    let to = match input_currency {
         SupportedCurrency::Redgold => {
-            match ls.swap_state.output_currency {
+            match output_currency {
                 SupportedCurrency::Bitcoin => {
                     pk.to_bitcoin_address_typed(&config.network).unwrap().clone()
                 }
@@ -249,17 +244,15 @@ pub fn create_swap_tx<G,E>(
         }
         _ => panic!("Unsupported currency")
     };
-    let address_info = ls.wallet.address_info.clone();
 
-    // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
-    let channel = ls.local_messages.clone();
     let g2 = g.clone();
+    let config = config.clone();
     tokio::spawn(async move {
         let g2 = g2.clone();
         let res = TransactionProgressFlow::make_transaction(
             &config,
             &mut res,
-            &currency,
+            &input_currency,
             &pk,
             &to,
             &amount,
@@ -274,7 +267,7 @@ pub fn create_swap_tx<G,E>(
 
         channel.send(LocalStateUpdate::SwapResult(res)).await.ok();
 
-    });
+    })
 }
 // pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
 //     let ups = ls.updates.sender.clone();

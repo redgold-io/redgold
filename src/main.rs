@@ -17,6 +17,7 @@ use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
 use redgold::util::cli::commands;
 use redgold::util::cli::load_config::main_config;
+use redgold::util::cli::swap::cli_swap;
 use redgold::util::runtimes::{big_thread, build_simple_runtime};
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
@@ -78,6 +79,9 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
                 // todo; from hardware entropy.
                 let w = commands::generate_random_mnemonic().words;
                 println!("{}", w);
+            }
+            RgTopLevelSubcommand::Swap(s) =>  {
+                cli_swap(s, &nc).await.unwrap();
             }
             _ => {}
         }
