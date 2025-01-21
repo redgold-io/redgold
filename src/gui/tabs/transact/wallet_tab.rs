@@ -253,7 +253,11 @@ fn proceed_from_pk<G, E>(
     ui.separator();
 
     if ls.wallet.show_xpub_balance_info {
-        balance_table(ui, &ls.data, &ls.node_config, None, Some(pk), None, Some("wallet_balance".to_string()));
+        let data = ls.data.get(&g.get_network());
+        if let Some(d) = data {
+            balance_table(ui, d, &ls.node_config, None, Some(pk), None, Some("wallet_balance".to_string()));
+        }
+
     }
 
 
@@ -286,7 +290,30 @@ fn proceed_from_pk<G, E>(
         SendReceiveTabs::Swap => {
             if ls.swap_state.view(ui, g, pk, allowed, csi, hot_tsi, d) {
                 // TODO: refactor this out
-                create_swap_tx(ls, g);
+                let data = ls.data.get(&g.get_network());
+                if data.is_none() {
+                    return;
+                }
+                let data = data.unwrap();
+                let party_pk = data
+                    .first_party
+                    .as_ref()
+                    .lock().ok()
+                    .and_then(|p| p.party_info.party_key.clone())
+                    .unwrap();
+
+                let map = data.price_map_usd_pair_incl_rdg.clone();
+                let input_currency = ls.swap_state.currency_input_box.input_currency.clone();
+                let pk = ls.wallet.public_key.clone().unwrap();
+                let kp = ls.wallet.hot_mnemonic(g).keypair_at(ls.keytab_state.derivation_path_xpub_input_account.derivation_path()).unwrap();
+                let amount = ls.swap_state.currency_input_box.input_currency_amount(&map);
+                let address_info = ls.wallet.address_info.clone();
+                let output_currency = ls.swap_state.output_currency;
+
+                // let secret = ls.wallet_state.hot_secret_key.clone().unwrap();
+                let channel = ls.local_messages.clone();
+                create_swap_tx(g, &ls.external_network_resources.clone(), party_pk,
+                input_currency, pk, kp, amount, &ls.node_config.clone(), address_info, channel, output_currency);
             }
         }
         SendReceiveTabs::Home => {
@@ -384,7 +411,9 @@ fn send_receive_bar<G, E>(ui: &mut Ui, ls: &mut LocalState<E>, pk: &PublicKey, g
 
 fn refresh_balance<G, E>(ls: &mut LocalState<E>, g: &G) where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources + Clone + Send + 'static + Sync {
     let pk = ls.wallet.public_key.clone().expect("pk");
-    ls.data.refresh_all_pk(&pk, g);
+    if let Some(d) = ls.data.get(&g.get_network()) {
+        d.refresh_all_pk(&pk, g);
+    }
     address_query::get_address_info(
         &ls.node_config.clone(), pk, ls.local_messages.sender.clone(), g
     );

@@ -486,7 +486,7 @@ async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submi
         info!("Sending eth stake to party address");
         let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
         info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
-        info!("Fee fixed {}", CurrencyAmount::fee_fixed_normal_testnet().json_or());
+        info!("Fee fixed {}", CurrencyAmount::eth_fee_fixed_normal_testnet().json_or());
         let res = tokio::time::timeout(
             Duration::from_secs(120), eth.send(
                 &party_eth_address, &exact_eth_stake_amount, None)
