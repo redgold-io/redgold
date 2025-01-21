@@ -111,7 +111,7 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
         LocalStateUpdate::SwapResult(r) => {
             info!("Swap created");
             let prepared = r.unwrap();
-            let signed = prepared.sign(res, g).await.unwrap();
+            let signed = prepared.sign(res.clone(), g).await.unwrap();
             let result = signed.broadcast(res).await.unwrap();
             info!("Swap broadcasted: {}", result.broadcast_response);
             if let Some(t) = result.tx.as_ref() {
