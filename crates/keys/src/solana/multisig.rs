@@ -10,6 +10,7 @@ use solana_sdk::pubkey::Pubkey;
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, SupportedCurrency};
 use crate::solana::derive_solana::SolanaWordPassExt;
@@ -112,7 +113,11 @@ Parameters
         let mut config_split = beginning.split("Transaction Index:").collect_vec();
         let tx_idx = config_split.get(1).cloned().ok_msg("Transaction index not found")?;
         let vault_split = tx_idx.split("Vault Index:").collect_vec();
-        let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?.replace(" ", "");
+        let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?
+            .replace(" ", "").trim().to_string();
+
+
+        // println!("Expected tx idx {}", tx_idx.clone());
         let tx_idx = i64::from_str(&tx_idx).unwrap();
         let latter_part = split.get(1).cloned().ok_msg("Multisig pubkey not found")?;
         let split = latter_part.split("Signature:").collect_vec();
@@ -205,7 +210,7 @@ Parameters
         &self,
         multisig_pubkey: impl Into<String>,
         transaction_index: Option<u64>,
-    ) -> RgResult<(String, String)> {
+    ) -> RgResult<()> {
         counter!("redgold_multisig_solana_vote").increment(1);
         let init = "proposal-vote";
         let transaction_index = transaction_index.unwrap_or(0);
@@ -217,7 +222,16 @@ Parameters
             transaction_index
         );
 
-        self.cmd(init, remainder).await
+        let (stdout, stderr) = self.cmd(init, remainder).await?;
+        println!("approve stdout: {}", stdout.clone());
+        println!("approve stderr: {}", stderr.clone());
+        if stdout.contains("Casted Approve vote") {
+            Ok(())
+        } else {
+            "Failed to cast vote".to_error()
+                .with_detail("stdout", stdout)
+                .with_detail("stderr", stderr)
+        }
     }
 
     // Execute the approved transaction
@@ -225,8 +239,8 @@ Parameters
         &self,
         multisig_pubkey: impl Into<String>,
         transaction_index: Option<i64>,
-    ) -> RgResult<(String, String)> {
-        let init = "vault_transaction_execute";
+    ) -> RgResult<String> {
+        let init = "vault-transaction-execute";
         let remainder = format!(
             "--multisig-pubkey {} \
             --transaction-index {}",
@@ -234,7 +248,10 @@ Parameters
             transaction_index.unwrap_or(0)
         );
 
-        self.cmd(init, remainder).await
+        let (stdout, stderr) = self.cmd(init, remainder).await?;
+        println!("execute stdout: {}", stdout.clone());
+        println!("execute stderr: {}", stderr.clone());
+        Ok(stdout)
     }
 
 }
@@ -260,6 +277,8 @@ async fn dump_kp() {
     std::fs::write(path, s).unwrap();
 }
 
+
+// TODO: Attempt mainnet / ui testing to see why execute fails.
 #[ignore]
 #[tokio::test]
 async fn debug_kg() {
@@ -281,19 +300,39 @@ async fn debug_kg() {
     println!("Wallet 1 balance: {}", w.get_self_balance().await.unwrap().to_fractional());
     let party_addrs = vec![w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap()];
     let threshold = 2;
-    // let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
-    let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
+    let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
+    // let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
     println!("Multisig pubkey: {}", multisig_pubkey);
-    // let res = w.send(Address::from_solana_external(&multisig_pubkey.to_string()),
+    // let res = w.send(w1.self_address().unwrap(),
     //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
     //         , None, None).await.unwrap();
     // println!("Sent: {}", res.message.hash().to_string());
-    let destination = w1.self_address().unwrap();
+    //
+    // let res = w.send(w2.self_address().unwrap(),
+    //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
+    //         , None, None).await.unwrap();
+    // println!("Sent: {}", res.message.hash().to_string());
+
+
+    let res = w.send(Address::from_solana_external(&multisig_pubkey.to_string()),
+            CurrencyAmount::from_fractional_cur(0.2, SupportedCurrency::Solana).unwrap()
+            , None, None).await.unwrap();
+    println!("Sent: {}", res.message.hash().to_string());
+    let destination = w2.self_address().unwrap();
     let res = w.multisig_propose_send(
-        multisig_pubkey, Some(0),
+        multisig_pubkey.clone(), Some(0),
         destination,  CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(), None
     ).await.unwrap();
     println!("Proposed: {:?}", res);
+    let approve1 = w.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
+    // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    let approve2 = w1.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
+    // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    // let approve3 = w2.multisig_approve_transaction(multisig_pubkey, Some(res.transaction_index as u64)).await.unwrap();
+    tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+
+    let txid = w.multisig_execute_transaction(multisig_pubkey.clone(), Some(res.transaction_index)).await.unwrap();
+
     // println!("Proposed stderr: {}", res.1);
 
     /*
@@ -303,9 +342,7 @@ async fn debug_kg() {
      */
     // w.init_multisig().await.unwrap();
     //
-    // let approve1 = w.multisig_approve_transaction(multisig_pubkey, Some(0)).await.unwrap();
-    // println!("Approve1: {}", approve1.0);
-    // println!("Approve1 stderr: {}", approve1.1);
+
 
 
 }

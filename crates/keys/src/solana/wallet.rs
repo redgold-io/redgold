@@ -143,7 +143,7 @@ impl SolanaNetwork {
 
     pub fn self_address(&self) -> RgResult<structs::Address> {
         let string = get_solana_address(self.self_pubkey()?.to_bytes().to_vec());
-        let a = structs::Address::from_monero_external(&string);
+        let a = structs::Address::from_solana_external(&string);
         Ok(a)
     }
 
