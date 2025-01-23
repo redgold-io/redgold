@@ -38,15 +38,11 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             }
             if let Some(ps) = v.party_events.as_ref() {
                 let key_address = key.address()?;
-                let btc_starting_balance = ps.balance_with_deltas_applied.get(&SupportedCurrency::Bitcoin)
-                    .map(|d| d.amount).unwrap_or(0);
 
                 let cutoff_time = current_time_millis_i64() - (self.relay.node_config.order_cutoff_delay_time().as_millis() as i64); //
                 let orders = ps.orders();
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
                 let identifier = v.party_info.initiate.safe_get()?.identifier.safe_get().cloned()?;
-                let environment = self.relay.node_config.network.clone();
-                let btc_address = key.to_bitcoin_address(&environment)?;
 
                 let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
                 let rdg_ds_balance: i64 = balance.safe_get_msg("Missing balance").cloned().unwrap_or(0);
@@ -57,9 +53,6 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let num_unfulfilled_withdrawals = ps.unfulfilled_external_withdrawals.len();
                 let utxos = self.relay.ds.transaction_store.query_utxo_address(&key_address).await?;
 
-                let eth_balance = ps.balance_map.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or("");
-                let eth_address = key.to_ethereum_address().log_error().ok().unwrap_or("".to_string());
-
                 let num_pending_stake_deposits = ps.pending_external_staking_txs.len();
                 let fulfilled =  ps.fulfillment_history.len();
                 let internal_staking_events = ps.internal_staking_events.len();
@@ -68,10 +61,6 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let num_internal_events = ps.num_internal_events();
                 let num_external_events = ps.num_external_events();
                 let num_external_incoming = ps.num_external_incoming_events();
-                let num_eth_tx = v.network_data.get(&SupportedCurrency::Ethereum).map(|d| d.transactions.len())
-                    .unwrap_or(0);
-                let num_btc_tx = v.network_data.get(&SupportedCurrency::Bitcoin).map(|d| d.transactions.len())
-                    .unwrap_or(0);
 
                 let party_pk_hex = key.hex();
                 let party_pk_hex2 = key.hex();
