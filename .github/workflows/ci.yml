@@ -411,12 +411,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
-      - uses: actions/download-artifact@v4
-        with:
-          name: redgold_linux
-      - uses: actions/download-artifact@v4
-        with:
-          name: redgold_linux_ubuntu20
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -430,21 +424,6 @@ jobs:
 #          name: redgold_mac
 
       - run: sleep 10
-
-      - name: Download redgold_mac artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: redgold_mac
-
-      - name: Download redgold.app artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: redgold.app.zip
-
-      - name: Download redgold.exe windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: redgold.exe
 
       - name: Check branch
         id: check-branch
@@ -461,6 +440,25 @@ jobs:
           ./bin/install_build_deps.sh &&
           ./bin/cargo_publish.sh
 
+
+      - name: Download redgold_mac artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: redgold_mac
+      - name: Download redgold.app artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: redgold.app.zip
+      - name: Download redgold.exe windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: redgold.exe
+      - uses: actions/download-artifact@v4
+        with:
+          name: redgold_linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: redgold_linux_ubuntu20
 
 
       - run: ls -lA .

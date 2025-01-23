@@ -19,7 +19,6 @@ use crate::util::mnemonic_support::MnemonicSupport;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-
 #[derive(Serialize, Deserialize)]
 struct MemberPermission {
     address: String,
@@ -303,18 +302,31 @@ async fn debug_kg() {
     // let amount = 1_000_000; // 0.001 SOL
     // let amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
     // let amount = CurrencyAmount::from_fractional_cur(0.99, SupportedCurrency::Solana).unwrap();
+    let network = NetworkEnvironment::Main;
 
-    let w = SolanaNetwork::new(NetworkEnvironment::Dev, Some(ci));
-    let w1 = SolanaNetwork::new(NetworkEnvironment::Dev, Some(ci1));
-    let w2 = SolanaNetwork::new(NetworkEnvironment::Dev, Some(ci2));
+    let w = SolanaNetwork::new(network.clone(), Some(ci));
+    let w1 = SolanaNetwork::new(network.clone(), Some(ci1));
+    let w2 = SolanaNetwork::new(network.clone(), Some(ci2));
 
     println!("Wallet 1 address: {}", w.self_address().unwrap().render_string().unwrap());
     println!("Wallet 1 balance: {}", w.get_self_balance().await.unwrap().to_fractional());
-    let party_addrs = vec![w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap()];
-    let threshold = 2;
-    let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
-    // let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
-    println!("Multisig pubkey: {}", multisig_pubkey);
+
+
+    println!("Wallet 2 address: {}", w1.self_address().unwrap().render_string().unwrap());
+    println!("Wallet 2 balance: {}", w1.get_self_balance().await.unwrap().to_fractional());
+
+
+    println!("Wallet 3 address: {}", w2.self_address().unwrap().render_string().unwrap());
+    println!("Wallet 3 balance: {}", w2.get_self_balance().await.unwrap().to_fractional());
+
+
+    // let party_addrs = vec![w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap()];
+    // let threshold = 2;
+    // let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
+    // // let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
+    // println!("Multisig pubkey: {}", multisig_pubkey);
+    //
+    //
     // let res = w.send(w1.self_address().unwrap(),
     //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
     //         , None, None).await.unwrap();
@@ -324,36 +336,26 @@ async fn debug_kg() {
     //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
     //         , None, None).await.unwrap();
     // println!("Sent: {}", res.message.hash().to_string());
-
-
-    let res = w.send(Address::from_solana_external(&multisig_pubkey.to_string()),
-            CurrencyAmount::from_fractional_cur(0.2, SupportedCurrency::Solana).unwrap()
-            , None, None).await.unwrap();
-    println!("Sent: {}", res.message.hash().to_string());
-    let destination = w2.self_address().unwrap();
-    let res = w.multisig_propose_send(
-        multisig_pubkey.clone(), Some(0),
-        destination,  CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(), None
-    ).await.unwrap();
-    println!("Proposed: {:?}", res);
-    let approve1 = w.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
-    // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    let approve2 = w1.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
-    // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    // let approve3 = w2.multisig_approve_transaction(multisig_pubkey, Some(res.transaction_index as u64)).await.unwrap();
-    tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-
-    let txid = w.multisig_execute_transaction(multisig_pubkey.clone(), Some(res.transaction_index)).await.unwrap();
-
-    // println!("Proposed stderr: {}", res.1);
-
-    /*
-⠤ Sending transaction...
-             Transaction confirmed:
-              4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
-     */
-    // w.init_multisig().await.unwrap();
     //
+    //
+    // let res = w.send(Address::from_solana_external(&multisig_pubkey.to_string()),
+    //         CurrencyAmount::from_fractional_cur(0.2, SupportedCurrency::Solana).unwrap()
+    //         , None, None).await.unwrap();
+    // println!("Sent: {}", res.message.hash().to_string());
+    // let destination = w2.self_address().unwrap();
+    // let res = w.multisig_propose_send(
+    //     multisig_pubkey.clone(), Some(0),
+    //     destination,  CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(), None
+    // ).await.unwrap();
+    // println!("Proposed: {:?}", res);
+    // let approve1 = w.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
+    // // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    // let approve2 = w1.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
+    // // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    // // let approve3 = w2.multisig_approve_transaction(multisig_pubkey, Some(res.transaction_index as u64)).await.unwrap();
+    // tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+    //
+    // let txid = w.multisig_execute_transaction(multisig_pubkey.clone(), Some(res.transaction_index)).await.unwrap();
 
 
 

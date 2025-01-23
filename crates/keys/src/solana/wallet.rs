@@ -24,7 +24,7 @@ impl SolanaNetwork {
 
     pub fn network_rpc_url(&self) -> String {
         match self.net {
-            NetworkEnvironment::Main => "https://api.mainnet.solana.com".to_string(),
+            NetworkEnvironment::Main => "https://api.mainnet-beta.solana.com".to_string(),
             _ => "https://api.devnet.solana.com".to_string(),
         }
     }
