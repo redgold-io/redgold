@@ -1,7 +1,6 @@
-[package]
-name = "redgold"
-version = "0.1.40"
+[workspace.package]
 edition = "2021"
+version = "0.1.40"
 authors = ["Redgold"]
 description = "Decentralized Portfolio Contracts & Data Lake"
 documentation = "https://dev.docs.redgold.io/"
@@ -11,6 +10,21 @@ repository = "https://github.com/redgold-io/redgold"
 license = "MIT"
 keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
 categories = ["cryptography::cryptocurrencies"]
+
+
+[package]
+name = "redgold"
+version = {  workspace = true }
+edition = {  workspace = true }
+authors = {  workspace = true }
+description = {  workspace = true }
+documentation = {  workspace = true }
+readme = {  workspace = true }
+homepage = {  workspace = true }
+repository = {  workspace = true }
+license = {  workspace = true }
+keywords = {  workspace = true }
+categories = {  workspace = true }
 
 
 [workspace]
@@ -35,19 +49,6 @@ members = [
 ]
 exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"]
 
-
-[workspace.package]
-version = "0.1.5"
-edition = "2021"
-authors = ["Redgold"]
-description = "A relative proof conflict resolution & irreversibility service with trust modeling custodial pooling and executor contracts"
-documentation = "https://dev.docs.redgold.io/"
-readme = "README.md"
-homepage = "https://redgold.io"
-repository = "https://github.com/redgold-io/redgold"
-license = "MIT"
-keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
-categories = ["cryptography::cryptocurrencies"]
 
 
 [package.metadata.bundle]

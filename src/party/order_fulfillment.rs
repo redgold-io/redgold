@@ -153,18 +153,18 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     done_orders.extend(e);
                 }
 
+                let mut total_done_orders = done_orders.len();
 
                 // ps.process_locally_fulfilled_orders(done_orders);
                 if let Some(lfo) = v.locally_fulfilled_orders.as_mut() {
                     lfo.extend(done_orders);
                 } else {
-                    v.locally_fulfilled_orders = Some(done_orders);
+                    v.locally_fulfilled_orders = Some(done_orders.clone());
                 }
                 // Immediately update processed orders ^ to ensure no duplicate or no persistence failure
                 let pid = v.clone();
                 self.relay.ds.multiparty_store.update_party_data(&key, pid.to_party_data()).await?;
 
-                let mut total_done_orders = done_orders.len();
 
                 let rdg_fulfilled = self.fulfill_rdg_orders(&identifier, &utxos, ps, cutoff_time).await?;
                 total_done_orders += rdg_fulfilled;

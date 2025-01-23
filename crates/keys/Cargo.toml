@@ -1,27 +1,16 @@
 [package]
 name = "redgold-keys"
-version = "0.1.37"
-edition = "2021"
-authors = ["Redgold"]
-description = "p2p database / compute engine & portfolio target models"
-documentation = "https://dev.docs.redgold.io/"
-readme = "../../README.md"
-homepage = "https://redgold.io"
-repository = "https://github.com/redgold-io/redgold"
-license = "MIT"
-keywords = ["crypto", "cryptocurrency", "reputation", "decentralized", "p2p"]
-categories = ["cryptography::cryptocurrencies"]
-
-#edition = { worspace = true }
-#authors = { worspace = true }
-#description = { worspace = true }
-#documentation = { worspace = true }
-#readme = { worspace = true }
-#homepage = { worspace = true }
-#repository = { worspace = true }
-#license = { worspace = true }
-#keywords = { worspace = true }
-#categories = { worspace = true }
+version = {  workspace = true }
+edition = {  workspace = true }
+authors = {  workspace = true }
+description = {  workspace = true }
+documentation = {  workspace = true }
+readme = {  workspace = true }
+homepage = {  workspace = true }
+repository = {  workspace = true }
+license = {  workspace = true }
+keywords = {  workspace = true }
+categories = {  workspace = true }
 
 [dependencies]
 # workspace = true caused an error here? maybe
