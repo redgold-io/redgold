@@ -171,7 +171,7 @@ jobs:
 
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: redgold_linux
           path: ./redgold_linux
@@ -216,7 +216,7 @@ jobs:
 #      - run: cargo build --target x86_64-pc-windows-gnu --release
 #      - run: ls ./target/release -lA
 #
-#      - uses: actions/upload-artifact@v3
+#      - uses: actions/upload-artifact@v4
 #        with:
 #          name: redgold_win_cross
 #          path: ./target/release/redgold.exe
@@ -246,7 +246,7 @@ jobs:
       - run: echo "${{ github.run_number }}" > crates/schema/src/resources/build_number
       - run: export RUSTFLAGS="-A warnings"; cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: redgold_linux_ubuntu20
           path: ./redgold_linux_ubuntu20
@@ -317,7 +317,7 @@ jobs:
           ls target/x86_64-pc-windows-gnu/
           ls target/x86_64-pc-windows-gnu/release/
           cp target/x86_64-pc-windows-gnu/release/redgold.exe ./redgold.exe
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: redgold.exe
           path: ./redgold.exe
@@ -386,11 +386,11 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent target/release/bundle/osx/redgold.app redgold.app.zip
       # export RUST_BACKTRACE=full; export MAKEFLAGS="-j1"; ./bin/sqlx_prepare.sh &&
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: redgold_mac
           path: ./redgold_mac
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: redgold.app.zip
           path: ./redgold.app.zip
@@ -411,10 +411,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: redgold_linux
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: redgold_linux_ubuntu20
       - uses: actions-rs/toolchain@v1
@@ -425,24 +425,24 @@ jobs:
         with:
           cache-on-failure: true
 #
-      #      - uses: actions/download-artifact@v3
+      #      - uses: actions/download-artifact@v4
 #        with:
 #          name: redgold_mac
 
       - run: sleep 10
 
       - name: Download redgold_mac artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: redgold_mac
 
       - name: Download redgold.app artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: redgold.app.zip
 
       - name: Download redgold.exe windows artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: redgold.exe
 
