@@ -49,6 +49,13 @@ impl AddressEvent {
         }
     }
 
+    pub fn currency(&self) -> SupportedCurrency {
+        match self {
+            AddressEvent::External(e) => e.currency,
+            AddressEvent::Internal(t) => SupportedCurrency::Redgold
+        }
+    }
+
     pub fn usd_event_price(&self) -> Option<f64> {
         {match self {
             AddressEvent::External(e) => {e.price_usd}

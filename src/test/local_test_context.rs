@@ -14,6 +14,7 @@ use crate::api::control_api::ControlClient;
 use crate::api::client::public_client::PublicClient;
 use crate::api::client::rest::RgHttpClient;
 use crate::core::relay::Relay;
+use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::integrations::external_network_resources::MockExternalResources;
 use crate::node::Node;
 use redgold_schema::conf::node_config::NodeConfig;
@@ -115,6 +116,7 @@ pub struct LocalNodes {
     current_seed: Seed,
     pub(crate) seeds: Vec<Seed>,
     pub ext: Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>,
+    pub submit: TransactionSubmitter,
 }
 
 impl LocalNodes {
@@ -161,12 +163,43 @@ impl LocalNodes {
         let s = seeds.get(0).expect("").port_offset.expect("") as u16;
         let arc = Arc::new(Mutex::new(HashMap::new()));
         let start = LocalTestNodeContext::new(0, s, Self::seeds(), arc.clone()).await;
-        LocalNodes {
+
+        let vec = start.node.relay.ds.utxo.utxo_all_debug().await.expect("utxo all debug");
+        assert!(vec.len() > 0);
+    
+        let (_, spend_utxos) = Node::genesis_from(start.node.relay.node_config.clone());
+    
+        let submit = TransactionSubmitter::default(
+            start.public_client.clone(), spend_utxos, &start.node.relay.node_config
+        );
+
+        let l = LocalNodes {
             current_seed: start.node.relay.node_config.self_seed(),
-            nodes: vec![start],
+            nodes: vec![start.clone()],
             seeds,
             ext: arc,
-        }
+            submit,
+        };
+
+    
+
+        l
+    }
+
+    pub fn start_node(&self) -> &LocalTestNodeContext {
+        self.nodes.get(0).unwrap()  
+    }
+
+    pub fn client(&self) -> RgHttpClient {
+        self.nodes.get(0).unwrap().public_client.client_wrapper().clone()
+    }
+    
+    pub fn public_client(&self) -> PublicClient {
+        self.nodes.get(0).unwrap().public_client.clone()
+    }
+    
+    pub fn config(&self) -> NodeConfig {
+        self.nodes.get(0).unwrap().node.relay.node_config.clone()
     }
 
     pub fn clients(&self) -> Vec<RgHttpClient> {

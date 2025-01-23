@@ -163,7 +163,7 @@ impl GuiDepends for NativeGuiDepends {
         let ext = self.external_res()?.clone();
         let p = tx.clone();
         self.spawn(async move {
-            let res = p.broadcast(ext).await;
+            let res = p.broadcast(ext).await.log_error();
             results.send(res).unwrap();
         });
         Ok(())

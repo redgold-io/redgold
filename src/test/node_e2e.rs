@@ -23,7 +23,6 @@ use crate::api::client::rest::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
-// use crate::multiparty_gg20::watcher::DepositWatcherConfig;
 use crate::node::Node;
 use crate::node_config::ToTransactionBuilder;
 use crate::util;
@@ -37,52 +36,10 @@ use crate::test::external_amm_integration::dev_ci_kp;
 use crate::test::harness::amm_harness::PartyTestHarness;
 use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 use crate::util::runtimes::{big_thread, build_simple_runtime};
-//
-// #[test]
-// fn test_panic() {
-//     let runtime = build_runtime(1, "panic");
-//     let jh = runtime.spawn(throw_panic());
-//     runtime.block_on(jh).expect("Fail");
-// }
-//
-// #[ignore]
-// #[test]
-// fn debug_err() {
-//
-//     let runtime = build_runtime(10, "e2e");
-//     util::init_logger().ok(); //.expect("log");
-//     metrics_registry::register_metric_names();
-//     metrics_registry::init_print_logger();
-//     let _tc = TestConstants::new();
-//
-//     // testing part here debug
-//     let mut node_config = NodeConfig::from_test_id(&0);
-//     node_config.port_offset = 15000;
-//     let runtimes = NodeRuntimes::default();
-//     let mut relay = runtimes.auxiliary.block_on(Relay::new(node_config.clone()));
-//     Node::prelim_setup(relay.clone()
-//                        // , runtimes.clone()
-//     ).expect("prelim");
-//     // Node::start_services(relay.clone(), runtimes.clone());
-//     let result = Node::from_config(relay.clone(), runtimes);
-//     info!("wtf");
-//     let node = result;
-//         // .expect("Node start fail");
-//
-//     match node {
-//         Ok(_) => {
-//             info!("Success");
-//         }
-//         Err(e) => {
-//             info!("Node result: {:?}", e);
-//         }
-//     }
-//
-//
-// }
 
 
 /// Main entry point for end to end testing.
+/// Workaround used to avoid config related overflow caused by clap et al.
 // #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 // #[tokio::test]
 #[test]
@@ -100,8 +57,6 @@ fn e2e() {
     // let result = .await.log_error();
     // Allow time to catch main service error
     // tokio::time::sleep(Duration::from_secs(2)).await;
-    // let runtime = build_runtime(8, "e2e");
-    // runtime.block_on(e2e_async()).expect("e2e");
     result.expect("e2e");
 }
 
@@ -111,15 +66,8 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let mut local_nodes = LocalNodes::new(None).await;
 
-    let seed_json = local_nodes.seeds.json_or();
-    info!("Num Seeds: {}", local_nodes.seeds.len());
-    let start_node = local_nodes.start().clone();
+    let start_node: LocalTestNodeContext = local_nodes.start().clone();
     let config = start_node.node.relay.node_config.clone();
-    let relay_start = start_node.node.relay.clone();
-    let client1 = start_node.control_client.clone();
-    let _client2 = start_node.control_client.clone();
-    let _ds = start_node.node.relay.ds.clone();
-
     let client = start_node.public_client.clone();
 
     let vec = start_node.node.relay.ds.utxo.utxo_all_debug().await.expect("utxo all debug");

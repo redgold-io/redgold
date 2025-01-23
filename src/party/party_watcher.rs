@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use async_trait::async_trait;
+use metrics::gauge;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::RgResult;
 use redgold_schema::party::all_parties::AllParties;
@@ -31,6 +32,9 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
         let all_parties = AllParties::new(parties.clone());
         let active = all_parties.active;
+        gauge!("redgold_party_watcher_active_parties").set(active.len() as f64);
+        gauge!("redgold_party_watcher_total_parties").set(parties.len() as f64);
+
 
         let mut shared_data = self.enrich_prepare_data(active.clone()).await?;
         // TODO: self.merge_child_events

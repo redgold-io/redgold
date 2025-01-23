@@ -3,6 +3,9 @@ RUN apt update
 RUN apt install -y curl
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN cargo install squads-multisig-cli
+
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt install -y automake libtool libssl-dev \
  libxcb-xfixes0-dev libxcb1-dev libxcb-keysyms1-dev libpango1.0-dev libxcb-util0-dev \

@@ -26,14 +26,16 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
     if s.amount <= 0f64 {
         return "Amount must be greater than 0".to_error();
     }
-    if !s.input_currency.valid_swap_input() {
+
+    let input_currency = SupportedCurrency::try_from(s.input_currency.clone())?;
+    let output_currency = SupportedCurrency::try_from(s.output_currency.clone())?;
+
+    if !input_currency.valid_swap_input() {
         return "Invalid input currency".to_error();
     }
-    if !s.output_currency.valid_swap_output() {
+    if !output_currency.valid_swap_output() {
         return "Invalid output currency".to_error();
     }
-
-
 
 
     let words = nc.secure_words_or();
@@ -82,11 +84,25 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
     info!("RDG USD Highest Bid estimate: ${:.2}", usd);
     price_map.insert(SupportedCurrency::Redgold, usd);
 
+
+    info!("Swap input currency: {:?}", input_currency);
+    info!("Swap output currency: {:?}", output_currency);
+
+    let amount_denom = if s.not_usd {
+        input_currency.abbreviated()
+    } else { "USD".to_string() };
+
+    info!("Swap amount denomination: {}", amount_denom);
+
+    let usd_price = price_map.get(&input_currency).unwrap().clone();
+
     let amount = if s.not_usd {
-        CurrencyAmount::from_fractional_cur(s.amount, s.input_currency.clone()).unwrap()
+        CurrencyAmount::from_fractional_cur(s.amount, input_currency.clone()).unwrap()
     } else {
-        CurrencyAmount::from_fractional_cur(s.amount / usd, s.input_currency.clone()).unwrap()
+        CurrencyAmount::from_fractional_cur(s.amount / usd_price, input_currency.clone()).unwrap()
     };
+
+    info!("Swap amount: {} {}", amount.to_fractional(), input_currency.abbreviated());
 
     // pid
 
@@ -101,8 +117,8 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
 
     let channel = Channel::new();
 
-    let jh = create_swap_tx(&g, &res, party_key.clone(), s.input_currency.clone(), hot_pk, hot_kp, amount,
-                     &(*nc).clone(), ai, channel.clone(), s.output_currency.clone());
+    let jh = create_swap_tx(&g, &res, party_key.clone(), input_currency.clone(), hot_pk, hot_kp, amount,
+                     &(*nc).clone(), ai, channel.clone(), output_currency.clone());
 
     jh.await.unwrap();
 
@@ -114,6 +130,9 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
             let signed = prepared.sign(res.clone(), g).await.unwrap();
             let result = signed.broadcast(res).await.unwrap();
             info!("Swap broadcasted: {}", result.broadcast_response);
+            if result.broadcast_response.starts_with("{\"Err\"") {
+                panic!("Error broadcasting swap");
+            }
             if let Some(t) = result.tx.as_ref() {
                 info!("Internal TXID {}", t.hash_hex());
                 t.hash_hex()
@@ -143,7 +162,7 @@ pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
             break;
         }
         if attempts > 10 {
-            info!("Swap not completed after 15 minutes");
+            info!("Swap not completed after 15 minutes, please check party events address on explorer");
             break;
         }
     }

@@ -60,6 +60,16 @@ pub struct PartyEvents where {
 
 impl PartyEvents {
 
+    pub fn event_counts(&self) -> HashMap<SupportedCurrency, i64> {
+        let mut map = HashMap::new();
+        for e in self.events.iter() {
+            let cur = e.currency();
+            let count = map.get(&cur).cloned().unwrap_or(0);
+            map.insert(cur, count + 1);
+        }
+        map
+    }
+
     pub fn get_rdg_max_bid_usd_estimate_at(&self, time: i64) -> Option<f64> {
         self.central_price_history.clone().unwrap_or_default().iter().filter(|(t, _)| *t <= time).last().and_then(|(_, cp)| {
             let max = cp.iter().map(|(c, p)| {

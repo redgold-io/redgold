@@ -480,9 +480,10 @@ pub struct GenerateConfig {
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
 pub struct Swap {
     /// Input currency to be used as source of funds, for instance Redgold or Ethereum or Bitcoin
-    pub input_currency: SupportedCurrency,
-    /// Destination currency to be used as target of funds, for instance Ethereum or Redgold or Bitcoin
-    pub output_currency: SupportedCurrency,
+    /// or lowercase or abbreviated, redgold, rdg, ETH, eth, BTC, bitcoin, etc.
+    pub input_currency: String,
+    /// Destination currency to be used as target of output funds, for instance Ethereum or Redgold or Bitcoin
+    pub output_currency: String,
     /// Amount to swap estimated in USD from latest pricing data, please use "not-usd" to avoid conversions.
     pub amount: f64,
     /// Skip use of price conversions in formatting amounts, this will default instead to parsing

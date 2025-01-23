@@ -27,6 +27,7 @@ RUN apt install -y docker-ce-cli
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+ENV PATH="/root/.cargo/bin:${PATH}"
 RUN cargo install squads-multisig-cli
 
 COPY ./redgold /redgold

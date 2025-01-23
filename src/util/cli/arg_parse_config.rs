@@ -283,12 +283,7 @@ impl ArgTranslate {
 
         self.node_config.executable_checksum = shasum.clone();
         trace!("Executable checksum Sha256 from shell script: {:?}", shasum);
-        let or = shasum.unwrap_or("na".to_string());
-        let last_8 = or.chars().take(8).collect::<String>();
-        gauge!("redgold.node.executable_checksum", &[("executable_checksum".to_string(), or)]).set(1.0);
-        let id = self.node_config.gauge_id().to_vec();
-        let labels = [("executable_checksum_last_8".to_string(), last_8), id.get(0).cloned().expect("id")];
-        gauge!("redgold.node.executable_checksum_last_8", &labels).set(1.0);
+
     }
 
     async fn load_mnemonic(&mut self) -> RgResult<()> {
