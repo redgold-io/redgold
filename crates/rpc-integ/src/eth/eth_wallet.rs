@@ -115,11 +115,11 @@ impl EthWalletWrapper {
         );
         // send it!
         if broadcast {
-            let pending_tx = self.client.send_transaction(tx, None).await.expect("works");
+            let pending_tx = self.client.send_transaction(tx, None).await.error_info("send tx failure")?;
 
             // get the mined tx
             let receipt = pending_tx.await.expect("mined").expect("no error");
-            let tx = self.client.get_transaction(receipt.transaction_hash).await.expect("works");
+            let tx = self.client.get_transaction(receipt.transaction_hash).await.error_info("send get tx failure")?;
             // println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
             // println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
             Ok((hex::encode(receipt.transaction_hash.0), tx.json_or()))

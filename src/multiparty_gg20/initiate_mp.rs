@@ -206,7 +206,7 @@ pub async fn initiate_mp_keygen_authed(
 
     if successful < peers.len() {
         res.abort();
-        return Err(error_info("Not enough successful peers"));
+        return Err(error_info("Not enough successful peers on keygen attempt"));
     }
     let local_share = res.await.error_info("join handle error")???;
 
@@ -374,7 +374,6 @@ pub struct SelfInitiateKeysignResult {
 pub async fn initiate_mp_keysign(
     relay: Relay,
     ident: MultipartyIdentifier,
-    // Change to &Vec<u8>?
     data_to_sign: BytesData,
     mut parties: Vec<PublicKey>,
     signing_room_id: Option<RoomId>,
@@ -405,6 +404,11 @@ pub async fn initiate_mp_keysign(
     let res = initiate_mp_keysign_authed(relay.clone(), mp_req.clone()).await;
     relay.remove_signing_authorization(&signing_room_id.clone())?;
     // Err(error_info("debug"))
+    if res.is_err() {
+        counter!("redgold_party_initiate_mp_keysign_error").increment(1);
+    } else {
+        counter!("redgold_party_initiate_mp_keysign_success").increment(1);
+    }
     res
 }
 
@@ -483,9 +487,14 @@ pub async fn initiate_mp_keysign_authed(
             }
         }
     }
-    if successful < peers.clone().len() {
+
+    let thresh = pi.initiate.safe_get()?.identifier.safe_get()?.threshold.safe_get()?.value as usize;
+    if successful < thresh {
         jh.abort();
-        return Err(error_info("Not enough successful peers"));
+        return Err(error_info("Not enough successful peers on signing attempt"))
+            .with_detail("successful", successful.to_string())
+            .with_detail("threshold", thresh.to_string())
+            .with_detail("peers", peers.len().to_string());
     }
 
     let proof = jh.await.error_info("join handle error")???;

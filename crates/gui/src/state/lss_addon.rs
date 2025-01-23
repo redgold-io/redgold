@@ -20,7 +20,7 @@ impl LssAddon for LocalStoredState {
                     let mut addrs = g.to_all_address(&pk);
                     if x.definitely_not_hot() {
                         addrs = addrs.iter().filter(|a| {
-                            let mut a2 = a.clone().clone();
+                            let mut a2 = (*a).clone();
                             a2.mark_external().currency_or() == SupportedCurrency::Bitcoin
                         }).cloned().collect();
                     }

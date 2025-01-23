@@ -1,13 +1,13 @@
-use std::str::FromStr;
+use crate::util::keys::ToPublicKeyFromLib;
+use crate::util::mnemonic_support::MnemonicSupport;
 use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::secp256k1::Secp256k1;
-use serde::Serialize;
-use redgold_schema::{structs, ErrorInfoContext, RgResult};
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, Hash};
-use crate::util::keys::ToPublicKeyFromLib;
-use redgold_schema::keys::words_pass::WordsPass;
-use crate::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::{structs, ErrorInfoContext, RgResult};
+use serde::Serialize;
+use std::str::FromStr;
 
 pub mod proof_support;
 pub mod request_support;
@@ -26,6 +26,7 @@ pub mod monero;
 pub mod gpg;
 pub mod word_pass_support;
 pub mod eth;
+mod btc;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,

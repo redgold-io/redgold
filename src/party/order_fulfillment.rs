@@ -4,7 +4,7 @@ use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::MemoryDatabase;
 use itertools::Itertools;
 use tracing::{error, info};
-use metrics::gauge;
+use metrics::{counter, gauge};
 use serde::{Deserialize, Serialize};
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
@@ -49,8 +49,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let btc_address = key.to_bitcoin_address(&environment)?;
 
                 let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
-                let rdg_starting_balance: i64 = balance.safe_get_msg("Missing balance").cloned().unwrap_or(0);
-
+                let rdg_ds_balance: i64 = balance.safe_get_msg("Missing balance").cloned().unwrap_or(0);
 
                 let num_events = ps.events.len();
                 let num_unconfirmed = ps.unconfirmed_events.len();
@@ -75,13 +74,36 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     .unwrap_or(0);
 
                 let party_pk_hex = key.hex();
+                let party_pk_hex2 = key.hex();
 
+                let kv_label = |k: String, v: String| {
+                    [("party_key".to_string(), party_pk_hex2.clone()), (k, v)]
+                };
+                let cur_label = |v: SupportedCurrency| {
+                    kv_label("currency".to_string(), v.abbreviated().to_string())
+                };
                 let pk_label = [("party_key".to_string(), party_pk_hex)];
 
-                gauge!("redgold_party_rdg_balance", &pk_label).set(rdg_starting_balance as f64);
-                gauge!("redgold_party_btc_balance", &pk_label).set(btc_starting_balance as f64);
-                gauge!("redgold_party_eth_balance", &pk_label).set(eth_balance.parse::<f64>().unwrap_or(0.0));
-                gauge!("redgold_party_num_events", &pk_label).set(num_events as f64);
+                gauge!("redgold_ds_party_balance", &cur_label(SupportedCurrency::Redgold)).set(CurrencyAmount::from(rdg_ds_balance).to_fractional());
+                for (k, v) in ps.balance_map.iter() {
+                    gauge!("redgold_party_stream_balance", &cur_label(k.clone())).set(v.to_fractional());
+                }
+                for (k, v) in ps.balance_with_deltas_applied.iter() {
+                    gauge!("redgold_party_stream_balance_with_deltas", &cur_label(k.clone())).set(v.to_fractional());
+                }
+                for (k, v) in ps.balance_pending_order_deltas_map.iter() {
+                    gauge!("redgold_party_stream_balance_pending_order_deltas", &cur_label(k.clone())).set(v.to_fractional());
+                }
+                for (k, v) in ps.balances_with_deltas_sub_portfolio().iter() {
+                    gauge!("redgold_party_stream_balance_sub_portfolio", &cur_label(k.clone())).set(v.to_fractional());
+                }
+                for (k, v) in ps.staking_balances(&vec![], Some(true), Some(true)).iter() {
+                    gauge!("redgold_party_stream_staking_balance", &cur_label(k.clone())).set(v.to_fractional());
+                }
+                for (k, v) in ps.event_counts() {
+                    gauge!("redgold_party_stream_event_counts", &cur_label(k.clone())).set(v as f64);
+                }
+                gauge!("redgold_party_stream_total_events", &pk_label).set(num_events as f64);
                 gauge!("redgold_party_num_unconfirmed", &pk_label).set(num_unconfirmed as f64);
                 gauge!("redgold_party_num_unfulfilled_deposits", &pk_label).set(num_unfulfilled_deposits as f64);
                 gauge!("redgold_party_num_unfulfilled_withdrawals", &pk_label).set(num_unfulfilled_withdrawals as f64);
@@ -94,49 +116,32 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 gauge!("redgold_party_num_internal_events", &pk_label).set(num_internal_events as f64);
                 gauge!("redgold_party_num_external_events", &pk_label).set(num_external_events as f64);
                 gauge!("redgold_party_num_external_incoming", &pk_label).set(num_external_incoming as f64);
-                gauge!("redgold_party_num_eth_tx", &pk_label).set(num_eth_tx as f64);
+                gauge!("redgold_party_cutoff_orders", &pk_label).set(cutoff_orders.len() as f64);
+                gauge!("redgold_party_orders", &pk_label).set(orders.len() as f64);
+                gauge!("redgold_party_locally_fulfilled_orders,", &pk_label).set(ps.locally_fulfilled_orders.len() as f64);
+                for (k, v) in v.network_data.iter() {
+                    gauge!("redgold_party_num_network_tx", &cur_label(k.clone())).set(v.transactions.len() as f64);
+                }
 
-                let orders_abridged = orders.iter().map(|o| {
-                    vec![o.fulfilled_amount.to_string(), o.order_amount.to_string(), o.destination.render_string().unwrap(), match o.clone().primary_event {
-                        AddressEvent::External(e) => format!("{:?}", e),
-                        _ => "".to_string()
-                    }]
-                }).collect_vec().json_or();
-                let last_fulfilled = " ".to_string() ; //ps.locally_fulfilled_orders.last().json_or();
-                let imba = ps.portfolio_request_events.current_portfolio_imbalance.json_or();
-                let imba2 = ps.portfolio_request_events.external_stake_balance_deltas.json_or();
-                let imba3 = ps.portfolio_request_events.stake_utxos.len();
-                let alloc = ps.portfolio_request_events.current_rdg_allocations.json_or();
-                info!("\
-                watcher balances: RDG:{}, BTC:{}, ETH:{} ETH_address={} \
-        BTC_address: {} environment: {} orders {} cutoff_orders {} num_events: {} \
-        num_internal_events {num_internal_events} num_external_events {num_external_events} \
-        num_external_incoming {num_external_incoming} \
-        num_eth_tx {num_eth_tx} \
-        num_btc_tx {num_btc_tx} \
-        num_unconfirmed {} num_unfulfilled_deposits {} \
-         num_unfulfilled_withdrawals {} num_utxos: {} num_pending_stake_external_tx {} \
-         fulfilled {} \
-         internal_staking_events {} \
-         external_staking_events {} \
-         rejected_stake_withdrawals {rejected_stake_withdrawals} \
-         central_prices: {} orders_len {} self_pk {} locally_fulfilled_orders {} orders: {} last_fulfilled: {} portfolio_imbalance: {imba} external_stake_balance_deltas: {imba2} stake_utxos_len: {imba3} alloc {alloc}",
-            rdg_starting_balance, btc_starting_balance, eth_balance, eth_address, btc_address, environment.to_std_string(),
-            orders.len(),
-            cutoff_orders.len(),
-            num_events, num_unconfirmed, num_unfulfilled_deposits, num_unfulfilled_withdrawals,
-            utxos.len(),
-                    num_pending_stake_deposits,
-                    fulfilled,
-                    internal_staking_events,
-                    external_staking_events,
-            ps.central_prices.json_or(),
-            orders.len(),
-                    self.relay.node_config.short_id().expect("Node ID"),
-                    ps.locally_fulfilled_orders.len(),
-                    orders_abridged,
-                    last_fulfilled
-        );
+                for (k, c) in ps.central_prices.iter() {
+                    gauge!("redgold_party_central_price_min_ask_estimated", &cur_label(k.clone())).set(c.min_ask_estimated);
+                    gauge!("redgold_party_central_price_min_bid_estimated", &cur_label(k.clone())).set(c.min_bid_estimated);
+                }
+                for (k, v) in ps.event_counts() {
+                    gauge!("redgold_party_stream_event_counts", &cur_label(k.clone())).set(v as f64);
+                }
+                for (k, v) in ps.portfolio_request_events.current_portfolio_imbalance.iter() {
+                    gauge!("redgold_party_portfolio_imbalance", &cur_label(k.clone())).set(v.to_fractional());
+                }
+
+                for (k,v) in ps.portfolio_request_events.external_stake_balance_deltas.iter() {
+                    gauge!("redgold_party_portfolio_external_stake_balance_deltas", &cur_label(k.clone())).set(v.to_fractional());
+                }
+                gauge!("redgold_party_portfolio_stake_utxos", &pk_label).set(ps.portfolio_request_events.stake_utxos.len() as f64);
+
+                for (k, v) in ps.portfolio_request_events.current_rdg_allocations.iter() {
+                    gauge!("redgold_party_portfolio_rdg_allocations", &cur_label(k.clone())).set(v.to_fractional());
+                }
 
                 let mut done_orders = vec![];
                 let btc = self.fulfill_btc_orders(key, &identifier, ps, cutoff_time).await.log_error().ok();
@@ -148,7 +153,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     done_orders.extend(e);
                 }
 
-                info!("Finished fulfilling {} orders", done_orders.len());
+
                 // ps.process_locally_fulfilled_orders(done_orders);
                 if let Some(lfo) = v.locally_fulfilled_orders.as_mut() {
                     lfo.extend(done_orders);
@@ -159,8 +164,11 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let pid = v.clone();
                 self.relay.ds.multiparty_store.update_party_data(&key, pid.to_party_data()).await?;
 
-                self.fulfill_rdg_orders(&identifier, &utxos, ps, cutoff_time).await?;
+                let mut total_done_orders = done_orders.len();
 
+                let rdg_fulfilled = self.fulfill_rdg_orders(&identifier, &utxos, ps, cutoff_time).await?;
+                total_done_orders += rdg_fulfilled;
+                gauge!("redgold_party_fulfilled_orders_now", &pk_label).set(total_done_orders as f64);
 
             }
         }
@@ -193,7 +201,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         Ok(orders_to_fulfill)
     }
 
-    async fn fulfill_rdg_orders(&self, identifier: &MultipartyIdentifier, utxos: &Vec<UtxoEntry>, ps: &PartyEvents, cutoff_time: i64) -> Result<(), ErrorInfo> {
+    async fn fulfill_rdg_orders(&self, identifier: &MultipartyIdentifier, utxos: &Vec<UtxoEntry>, ps: &PartyEvents, cutoff_time: i64
+    ) -> Result<usize, ErrorInfo> {
         let mut tb = TransactionBuilder::new(&self.relay.node_config);
         tb.with_utxos(&utxos)?;
 
@@ -216,9 +225,10 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             ps.validate_rdg_swap_fulfillment_transaction(&tx)?;
             // info!("Sending RDG fulfillment transaction: {} with party_events: {} and orders {}", tx.json_or(), ps.json_or(), orders.json_or());
             self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
-            info!("Sent RDG fulfillment transaction: {}", tx.json_or());
+            // info!("Sent RDG fulfillment transaction: {}", tx.json_or());
+            return Ok(orders.len())
         }
-        Ok(())
+        Ok(0)
     }
 
 

@@ -1,14 +1,14 @@
-use std::str::FromStr;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use bdk::bitcoin::util::bip32::{ChildNumber, ExtendedPubKey};
 use itertools::Itertools;
+use std::str::FromStr;
 
-use serde::{Deserialize, Serialize};
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, structs};
-use redgold_schema::proto_serde::ProtoSerde;
+use crate::util::mnemonic_support::MnemonicSupport;
 use crate::TestConstants;
 use redgold_schema::keys::words_pass::WordsPass;
-use crate::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
+use serde::{Deserialize, Serialize};
 
 pub trait ValidateDerivationPath {
     fn valid_derivation_path(&self) -> bool;

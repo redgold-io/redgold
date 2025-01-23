@@ -13,6 +13,7 @@ use redgold_schema::airgap::{AirgapMessage, AirgapResponse};
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use redgold_schema::util::lang_util::{JsonCombineResult, SameResult};
@@ -417,7 +418,7 @@ impl TransactionProgressFlow {
                 option.file_input = self.file_input.clone();
 
                 let (s, r) = flume::unbounded();
-                let res = g.clone().sign_prepared_transaction(option, s);
+                let res = g.clone().sign_prepared_transaction(option, s).log_error();
                 self.receiver = Some(r);
                 self.stage = TransactionStage::AwaitingSignatures;
                 self.rdg_broadcast_response = Arc::new(Mutex::new(None));
@@ -427,12 +428,12 @@ impl TransactionProgressFlow {
                 let arc = self.rdg_broadcast_response.clone();
                 let option = self.prepared_tx.as_mut().unwrap();
                 let (s, r) = flume::unbounded();
-                let res = g.clone().broadcast_prepared_transaction(option, s);
+                let res = g.clone().broadcast_prepared_transaction(option, s).log_error();
                 self.awaiting_broadcast = true;
                 self.stage = TransactionStage::AwaitingBroadcastResponse;
 
                 let res = async move {
-                    let s = r.recv().unwrap();
+                    let s = r.recv().unwrap().log_error();
                     let mut guard = arc.lock().unwrap();
                     *guard = Some(s.map(|x| x.broadcast_response));
                 };

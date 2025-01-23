@@ -1,4 +1,25 @@
-use crate::structs::SupportedCurrency;
+use strum::IntoEnumIterator;
+use crate::errors::into_error::ToErrorInfo;
+use crate::observability::errors::EnhanceErrorInfo;
+use crate::structs::{ErrorInfo, SupportedCurrency};
+
+
+impl TryFrom<String> for SupportedCurrency {
+    type Error = ErrorInfo;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        for x in Self::iter() {
+            if format!("{:?}", x).to_lowercase() == value.to_lowercase() {
+                return Ok(x);
+            }
+            if x.abbreviated().to_lowercase() == value.to_lowercase() {
+                return Ok(x);
+            }
+        }
+        "Failed to parse currency".to_error()
+            .with_detail("input_string", value.to_string())
+    }
+}
 
 impl SupportedCurrency {
 
@@ -17,7 +38,7 @@ impl SupportedCurrency {
     }
 
     pub fn supported_external_swap_currencies() -> Vec<SupportedCurrency> {
-        vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
+        vec![SupportedCurrency::Bitcoin, SupportedCurrency::Ethereum]
     }
 
     pub fn abbreviated(&self) -> String {
