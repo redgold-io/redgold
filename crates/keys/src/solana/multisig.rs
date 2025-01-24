@@ -104,7 +104,8 @@ Parameters
             threshold
         );
         let (stdout, stderr) = self.cmd(init, remainder).await?;
-
+        println!("multisig create stdout: {}", stdout.clone());
+        println!("multisig create stderr: {}", stderr.clone());
         Self::extract_multisig_stdout(stdout.clone())
             .with_detail("stdout", stdout)
             .with_detail("stderr", stderr)
@@ -267,6 +268,8 @@ Parameters
 
 }
 
+
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct MultisigProposeOutput {
     pub multisig_pubkey: String,
@@ -289,12 +292,120 @@ async fn dump_kp() {
 }
 
 
+
+impl SolanaNetwork {
+    //
+    fn squads_program_id(&self) -> Pubkey{
+        Pubkey::from_str(match self.net {
+            NetworkEnvironment::Main => {"SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf"},
+            _ => {"SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf"}
+        }).unwrap()
+    }
+    // pub async fn get_squads_vault_address(&self, multisig_address: impl Into<String>) -> RgResult<String> {
+    //     // Squads program ID from your output
+    //     let program_id = self.squads_program_id();
+    //     let multisig_pubkey = Pubkey::from_str(&*multisig_address.into())
+    //         .error_info("Failed to parse multisig address")?;
+    //
+    //     // Find vault PDA
+    //     let seeds = &[
+    //         b"squad",
+    //         multisig_pubkey.as_ref(),
+    //         b"vault",
+    //     ];
+    //
+    //     let (vault_address, _bump) = Pubkey::find_program_address(
+    //         seeds,
+    //         &program_id,
+    //     );
+    //
+    //     Ok(vault_address.to_string())
+    // Constants matching Squads implementation
+    const SEED_PREFIX: &'static [u8] = b"multisig";
+    const SEED_VAULT: &'static [u8] = b"vault";
+    const SEED_TRANSACTION: &'static [u8] = b"transaction";
+    const SEED_PROPOSAL: &'static [u8] = b"proposal";
+    const SEED_MULTISIG: &'static [u8] = b"multisig";
+    const SEED_EPHEMERAL_SIGNER: &'static [u8] = b"ephemeral_signer";
+
+    pub async fn get_squads_vault_address(&self, multisig_address: impl Into<String>, vault_index: u8) -> RgResult<String> {
+        let program_id = self.squads_program_id();
+        let multisig_pubkey = Pubkey::from_str(&*multisig_address.into())
+            .error_info("Failed to parse multisig address")?;
+
+        let (vault_address, _bump) = Pubkey::find_program_address(
+            &[
+                Self::SEED_PREFIX,
+                multisig_pubkey.as_ref(),
+                Self::SEED_VAULT,
+                &[vault_index],
+            ],
+            &program_id,
+        );
+
+        Ok(vault_address.to_string())
+    }
+
+    pub async fn get_transaction_pda(&self, multisig_address: impl Into<String>, transaction_index: u64) -> RgResult<String> {
+        let program_id = self.squads_program_id();
+        let multisig_pubkey = Pubkey::from_str(&*multisig_address.into())
+            .error_info("Failed to parse multisig address")?;
+
+        let (tx_address, _bump) = Pubkey::find_program_address(
+            &[
+                Self::SEED_PREFIX,
+                multisig_pubkey.as_ref(),
+                Self::SEED_TRANSACTION,
+                &transaction_index.to_le_bytes(),
+            ],
+            &program_id,
+        );
+
+        Ok(tx_address.to_string())
+    }
+
+    pub async fn get_proposal_pda(&self, multisig_address: impl Into<String>, transaction_index: u64) -> RgResult<String> {
+        let program_id = self.squads_program_id();
+        let multisig_pubkey = Pubkey::from_str(&*multisig_address.into())
+            .error_info("Failed to parse multisig address")?;
+
+        let (proposal_address, _bump) = Pubkey::find_program_address(
+            &[
+                Self::SEED_PREFIX,
+                multisig_pubkey.as_ref(),
+                Self::SEED_TRANSACTION,
+                &transaction_index.to_le_bytes(),
+                Self::SEED_PROPOSAL,
+            ],
+            &program_id,
+        );
+
+        Ok(proposal_address.to_string())
+    }
+
+    pub async fn get_ephemeral_signer_pda(&self, transaction_address: impl Into<String>, signer_index: u8) -> RgResult<String> {
+        let program_id = self.squads_program_id();
+        let transaction_pubkey = Pubkey::from_str(&*transaction_address.into())
+            .error_info("Failed to parse transaction address")?;
+
+        let (signer_address, _bump) = Pubkey::find_program_address(
+            &[
+                Self::SEED_PREFIX,
+                &transaction_pubkey.to_bytes(),
+                Self::SEED_EPHEMERAL_SIGNER,
+                &[signer_index],
+            ],
+            &program_id,
+        );
+
+        Ok(signer_address.to_string())
+    }
+}
+
 // TODO: Attempt mainnet / ui testing to see why execute fails.
 #[ignore]
 #[tokio::test]
 async fn debug_kg() {
-    let tc = TestConstants::new();
-    let wp = tc.words_pass;
     let ci = TestConstants::test_words_pass().unwrap();
     let ci1 = ci.hash_derive_words("1").unwrap();
     let ci2 = ci.hash_derive_words("2").unwrap();
@@ -303,6 +414,7 @@ async fn debug_kg() {
     // let amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
     // let amount = CurrencyAmount::from_fractional_cur(0.99, SupportedCurrency::Solana).unwrap();
     let network = NetworkEnvironment::Main;
+    // let network = NetworkEnvironment::Dev;
 
     let w = SolanaNetwork::new(network.clone(), Some(ci));
     let w1 = SolanaNetwork::new(network.clone(), Some(ci1));
@@ -320,10 +432,28 @@ async fn debug_kg() {
     println!("Wallet 3 balance: {}", w2.get_self_balance().await.unwrap().to_fractional());
 
 
-    // let party_addrs = vec![w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap()];
+    let party_addrs = vec![
+        w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap(),
+        // Address::from_solana_external(&"".to_string())
+    ];
+
+
+    //
+    // let dev_pk = "GmcKCfTubZGujcGHCxtcmG3qDtP9EinCLuth8zvSLGPf".to_string();
+    // let va = w.get_squads_vault_address(dev_pk.clone()).await.unwrap();
+    // println!("Vault address: {}", va);
+
     // let threshold = 2;
     // let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
-    // // let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
+    let multisig_account_main = "3VkpcmEAwU7pRAJJRcB2eynnt91SQwpx3paqZz1RerYh";
+    let multisig_pubkey_main = multisig_account_main.to_string();
+    let squad_vault_main = "BDqYrHiqhtj8yJ2F8aBn5VruHppP89QKbtUFArVFRQLs";
+
+    let a = w.get_squads_vault_address(multisig_pubkey_main.clone(), 0).await.unwrap();
+    println!("Vault address: {}", a);
+
+    // let multisig_pubkey = "3VkpcmEAwU7pRAJJRcB2eynnt91SQwpx3paqZz1RerYh";
+    // let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
     // println!("Multisig pubkey: {}", multisig_pubkey);
     //
     //
@@ -343,6 +473,8 @@ async fn debug_kg() {
     //         , None, None).await.unwrap();
     // println!("Sent: {}", res.message.hash().to_string());
     // let destination = w2.self_address().unwrap();
+    //
+    // let multisig_pubkey = multisig_account_main;
     // let res = w.multisig_propose_send(
     //     multisig_pubkey.clone(), Some(0),
     //     destination,  CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(), None

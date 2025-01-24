@@ -429,16 +429,16 @@ jobs:
         id: check-branch
         run: ./bin/release_branches.sh
         shell: bash
-      - name: Cargo Publish
-        if:
-          contains('
-          refs/heads/staging
-          ', github.ref)
-        run: |
-          echo "Branch is release branch, doing cargo publish"
-          cargo login ${{ secrets.CARGO_TOKEN }} &&
-          ./bin/install_build_deps.sh &&
-          ./bin/cargo_publish.sh
+#      - name: Cargo Publish
+#        if:
+#          contains('
+#          refs/heads/staging
+#          ', github.ref)
+#        run: |
+#          echo "Branch is release branch, doing cargo publish"
+#          cargo login ${{ secrets.CARGO_TOKEN }} &&
+#          ./bin/install_build_deps.sh &&
+#          ./bin/cargo_publish.sh
 
 
       - name: Download redgold_mac artifact

@@ -167,6 +167,7 @@ impl SolanaNetwork {
     pub fn new(net: NetworkEnvironment, words: Option<WordsPass>) -> Self {
         Self { net, words }
     }
+
 }
 
 
