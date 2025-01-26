@@ -23,6 +23,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::json_pretty;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::proto_serde::ProtoSerde;
 use crate::party::event_validator::PartyEventValidator;
 use crate::util::current_time_millis_i64;
 
@@ -385,9 +386,9 @@ pub async fn initiate_mp_keysign(
         parties = find_multiparty_key_pairs(relay.clone()).await?;
     }
 
-    let rid = ident.room_id.as_ref().ok_msg("Missing room id")?;
+    let room_id_for_keygen = ident.room_id.as_ref().ok_msg("Missing room id")?;
     let pi = relay.ds.multiparty_store
-        .party_info(rid).await?
+        .party_info(room_id_for_keygen).await?
         .ok_or(error_info("Local share not found"))?;
     let party_key = pi.party_key.ok_msg("No party key")?;
 
@@ -396,7 +397,15 @@ pub async fn initiate_mp_keysign(
     let mut c = structs::MultipartyCheckReadyRequest::default();
     c.party_key = Some(party_key.clone());
     req.multiparty_check_ready_request = Some(c);
-    let res = relay.broadcast_async(parties.clone(), req, Some(Duration::from_secs(20))).await?;
+
+
+    let self_key = relay.node_config.public_key();
+    let peers = parties.iter().filter(|&p| p != &self_key)
+        .map(|x| x.clone())
+        .collect_vec();
+
+
+    let res = relay.broadcast_async(peers.clone(), req, Some(Duration::from_secs(20))).await?;
     let mut active_parties = vec![];
     for r in res {
         if let Ok(r) = r {
@@ -415,7 +424,15 @@ pub async fn initiate_mp_keysign(
         return Err(error_info("Not enough active parties for signing"));
     }
     info!("Active parties for signing: {} out of {}", active_parties.len(), parties.len());
-    parties = active_parties;
+    for p in parties {
+        if !active_parties.contains(&p) {
+            error!("Missing active party: {}", p.hex());
+        }
+    }
+
+    let mut self_head = vec![relay.node_config.public_key()];
+    self_head.extend(active_parties.clone());
+    // parties = active_parties;
 
     // Ensure that default starts with keygen UUID to avoid signing wrong hash
     // TODO: I don't think this is even necessary on the room id is it? maybe not or maybe for auth on request?
@@ -428,7 +445,7 @@ pub async fn initiate_mp_keysign(
     mp_req.identifier = Some(ident.clone());
     mp_req.data_to_sign = Some(data_to_sign.clone());
     mp_req.signing_room_id = Some(signing_room_id.clone());
-    mp_req.signing_party_keys = parties.clone();
+    mp_req.signing_party_keys = self_head.clone();
     mp_req.party_signing_validation = validation;
 
     relay.authorize_signing(mp_req.clone())?;
@@ -459,15 +476,17 @@ pub async fn initiate_mp_keysign_authed(
     let port = relay.node_config.mparty_port();
     let timeout = Duration::from_secs(200 as u64);
     let init_keygen_req_room_id_typed = ident.room_id.safe_get()?;
-    let init_keygen_req_room_id = ident.room_id.safe_get()?.uuid.safe_get()?.clone();
-    let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {
-        if parties.contains(pk) {
-            let idx = idx + 1;
-            Some(idx as u16)
-        } else {
-            None
-        }
-    }).collect_vec();
+    // let init_keygen_req_room_id = ident.room_id.safe_get()?.uuid.safe_get()?.clone();
+    let index = parties.iter().enumerate().map(|(idx, pk)| idx + 1 as u16)
+        .collect_vec();
+    // let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {
+    //     if parties.contains(pk) {
+    //         let idx = idx + 1;
+    //         Some(idx as u16)
+    //     } else {
+    //         None
+    //     }
+    // }).collect_vec();
 //let (local_share, init)
 
     let pi = relay.ds.multiparty_store
@@ -561,14 +580,18 @@ pub async fn initiate_mp_keysign_follower(
     let keygen_room_id = kg_rid_typed.uuid.safe_get()?.clone();
 
     // TODO: Duplicated, put on the identifier class
-    let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {
-        if mp_req.signing_party_keys.contains(pk) {
-            let idx = idx + 1;
-            Some(idx as u16)
-        } else {
-            None
-        }
-    }).collect_vec();
+    let index = mp_req.signing_party_keys.iter().enumerate()
+        .map(|(idx, pk)| (idx + 1) as u16)
+        .collect_vec();
+    //
+    // let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {
+    //     if mp_req.signing_party_keys.contains(pk) {
+    //         let idx = idx + 1;
+    //         Some(idx as u16)
+    //     } else {
+    //         None
+    //     }
+    // }).collect_vec();
     // TODO: Verify host key matches address -- do this in request/response API? or maybe here as a param
     // let key = mp_req.host_key.safe_get()?.clone();
     // let number_of_parties = ident.num_parties as u16;

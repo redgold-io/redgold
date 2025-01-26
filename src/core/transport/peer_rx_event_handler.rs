@@ -378,7 +378,8 @@ impl PeerRxEventHandler {
                         // info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
                         // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
                         // tokio::spawn(async move {
-                        let result1 = initiate_mp_keysign_follower(rel2.clone(), k.clone(), &pk).await;
+                        let result1 = initiate_mp_keysign_follower(rel2.clone(), k.clone(), &pk).await
+                            .log_error();
                         let mp_response: String = result1.clone()
                             .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
                         // info!("Multiparty signing response from follower: {}", mp_response);
