@@ -185,7 +185,7 @@ impl GuiDepends for WasmGuiDepends {
         Ok(())
     }
 
-    fn restore_data_stores(&self) -> RgResult<()> {
+    fn restore_data_stores(&self, filter: Option<Vec<i64>>) -> RgResult<()> {
         Ok(())
     }
 }

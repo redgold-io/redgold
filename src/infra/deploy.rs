@@ -46,6 +46,7 @@ async fn debug_ssh_invoke() {
         host: host.clone(),
         strict_host_key_checking: false,
         output_handler: None,
+        jump_host: None,
     };
     let result = ssh.execute("ls", None).await.expect("ssh");
     println!("Result: {}", result);
@@ -61,6 +62,7 @@ async fn debug_ssh_invoke() {
         node_name: None,
         external_host: None,
         reward_address: None,
+        jump_host: None,
     };
 
     let mut dm = DeployMachine::new(&s, None, None);

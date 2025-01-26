@@ -139,7 +139,7 @@ impl StakeState {
                 }).collect::<Vec<&InternalStakeEvent>>();
 
             let tx1 = internal_ev.iter().map(|e| {
-                let mut b = brief_transaction(&e.tx, None).unwrap();
+                let mut b = brief_transaction(&e.tx, None, None).unwrap();
                 b.amount = e.amount.to_fractional();
                 b.currency = Some(SupportedCurrency::Redgold.json_or());
                 b.clone()
@@ -150,7 +150,7 @@ impl StakeState {
                     addrs.contains(&e.pending_event.external_address)
                 }).collect::<Vec<&ConfirmedExternalStakeEvent>>();
             let tx2 = external_ev.iter().map(|e| {
-                let mut b = brief_transaction(&e.pending_event.tx, None).unwrap();
+                let mut b = brief_transaction(&e.pending_event.tx, None, None).unwrap();
                 b.amount = e.ett.currency_amount().to_fractional();
                 b.currency = Some(e.ett.currency.json_or());
                 b.clone()

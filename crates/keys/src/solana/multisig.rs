@@ -4,7 +4,7 @@ use std::str::FromStr;
 use itertools::Itertools;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
-use solana_program::message::Message;
+use solana_program::message::{Message, VersionedMessage};
 use solana_sdk::pubkey::Pubkey;
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -18,6 +18,8 @@ use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use solana_sdk::account::Account;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 
 #[derive(Serialize, Deserialize)]
 struct MemberPermission {
@@ -128,13 +130,30 @@ Parameters
         let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?
             .replace(" ", "").trim().to_string();
 
-
         // println!("Expected tx idx {}", tx_idx.clone());
         let tx_idx = i64::from_str(&tx_idx).unwrap();
         let latter_part = split.get(1).cloned().ok_msg("Multisig pubkey not found")?;
         let split = latter_part.split("Signature:").collect_vec();
         let txid = split.get(0).ok_msg("Multisig pubkey not found")?;
         Ok((txid.replace(" ", ""), tx_idx))
+    }
+
+    pub fn extract_multisig_send_stdout_tx_idx(stdout: String) -> RgResult<i64> {
+        let split = stdout.split("Transaction confirmed: ").collect_vec();
+        let beginning = split.get(0).cloned().ok_msg("Missing before confirmed")?;
+        let mut config_split = beginning.split("Transaction Index:").collect_vec();
+        let tx_idx = config_split.get(1).cloned().ok_msg("Transaction index not found")?;
+        let vault_split = tx_idx.split("Vault Index:").collect_vec();
+        let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?
+            .replace(" ", "").trim().to_string();
+        //
+        // // println!("Expected tx idx {}", tx_idx.clone());
+        let tx_idx = i64::from_str(&tx_idx).unwrap();
+        // let latter_part = split.get(1).cloned().ok_msg("Multisig pubkey not found")?;
+        // let split = latter_part.split("Signature:").collect_vec();
+        // let txid = split.get(0).ok_msg("Multisig pubkey not found")?;
+        // Ok((txid.replace(" ", ""), tx_idx))
+        Ok(tx_idx)
     }
 
 
@@ -146,76 +165,6 @@ Parameters
         Ok(s)
     }
 
-    //
-    // // what do i do here?
-    // pub async fn multisig_propose_send(&self,
-    //                                    party_addrs_incl_self: Vec<Address>,
-    //                                    destination: Address,
-    //                                    amount: CurrencyAmount
-    // ) -> RgResult<()> {
-    //     let self_addr = self.self_address()?;
-    //     Ok(())
-    // }
-
-    // Create a vault transaction to send funds
-    pub async fn multisig_propose_send(
-        &self,
-        multisig_pubkey: impl Into<String>,
-        vault_index: Option<i64>,
-        destination: Address,
-        amount: CurrencyAmount,
-        memo: Option<String>
-    ) -> RgResult<MultisigProposeOutput> {
-        let multisig_pubkey = multisig_pubkey.into();
-        counter!("redgold_multisig_solana_propose").increment(1);
-
-
-        // Create transfer instruction
-        let msig_pubkey = Pubkey::from_str(&*multisig_pubkey).unwrap();
-        let transfer_ix = solana_program::system_instruction::transfer(
-            &msig_pubkey,  // from
-            &Pubkey::from_str(&destination.render_string()?).unwrap(),  // to
-            amount.amount as u64
-        );
-
-        // Create message
-        let message = Message::new(
-            &[transfer_ix],
-            Some(&msig_pubkey),  // payer
-        );
-        let message_bytes = message.serialize();
-
-        let vault_index = vault_index.unwrap_or(0);
-        let memo_str = memo.map(|m| format!("--memo {}", m)).unwrap_or_default();
-        let init = "vault-transaction-create";
-        let remainder = format!(
-            "--multisig-pubkey {} \
-            --vault-index {} \
-            {} \
-            {}",
-            multisig_pubkey,
-            vault_index,
-            message_bytes.iter().map(|b| format!("--transaction-message {}", b.to_string())).join(" "),
-            memo_str
-        );
-
-        // Transaction confirmed: 4sAZGBngmGqCMuPKVeY96UzgwDXR1rGeWvRjUuN999Z3jUf8deKZqyepM7R6Bro4UR2fHA4vDahnrmeiBXRJB98n
-        // match on this.
-        let (stdout, stderr) = self.cmd(init, remainder).await?;
-        println!("propose send stdout: {}", stdout);
-        println!("propose send stderr: {}", stderr);
-        let (tx_hash, tx_idx) = Self::extract_multisig_send_stdout_txhash(stdout.clone())
-            .with_detail("stdout", stdout)
-            .with_detail("stderr", stderr)?;
-
-        let ret = MultisigProposeOutput {
-            multisig_pubkey,
-            tx_hash,
-            transaction_index: tx_idx,
-            vault_index
-        };
-        Ok(ret)
-    }
 
     // Vote/approve a transaction
     pub async fn multisig_approve_transaction(
@@ -273,7 +222,7 @@ Parameters
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct MultisigProposeOutput {
     pub multisig_pubkey: String,
-    pub tx_hash: String,
+    // pub tx_hash: String,
     pub transaction_index: i64,
     pub vault_index: i64
 }
@@ -301,26 +250,6 @@ impl SolanaNetwork {
             _ => {"SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf"}
         }).unwrap()
     }
-    // pub async fn get_squads_vault_address(&self, multisig_address: impl Into<String>) -> RgResult<String> {
-    //     // Squads program ID from your output
-    //     let program_id = self.squads_program_id();
-    //     let multisig_pubkey = Pubkey::from_str(&*multisig_address.into())
-    //         .error_info("Failed to parse multisig address")?;
-    //
-    //     // Find vault PDA
-    //     let seeds = &[
-    //         b"squad",
-    //         multisig_pubkey.as_ref(),
-    //         b"vault",
-    //     ];
-    //
-    //     let (vault_address, _bump) = Pubkey::find_program_address(
-    //         seeds,
-    //         &program_id,
-    //     );
-    //
-    //     Ok(vault_address.to_string())
-    // Constants matching Squads implementation
     const SEED_PREFIX: &'static [u8] = b"multisig";
     const SEED_VAULT: &'static [u8] = b"vault";
     const SEED_TRANSACTION: &'static [u8] = b"transaction";
@@ -400,7 +329,37 @@ impl SolanaNetwork {
 
         Ok(signer_address.to_string())
     }
+    pub async fn list_multisig_transactions_raw(&self, multisig_address: impl Into<String>) -> RgResult<Vec<Account>> {
+        let client = self.rpc_confirmed().await;
+        let mut transactions = vec![];
+        let mut index = 0u64;
+
+        // Keep checking until we hit an account that doesn't exist
+        let addr = multisig_address.into();
+        loop {
+            let tx_address = self.get_transaction_pda(addr.clone(), index).await?;
+            match client.get_account(&Pubkey::from_str(&tx_address).error_info("pubkey")?).await {
+                Ok(a) => {
+                    transactions.push(a);
+                    index += 1;
+                },
+                Err(_) => break // Stop when we hit a non-existent account
+            }
+        }
+
+        Ok(transactions)
+    }
+
+    // Optional: Get full transaction info including status
+    pub async fn get_transaction_info(&self, tx_address: impl Into<String>) -> RgResult<Vec<u8>> {
+        let client = self.rpc_confirmed().await;
+        let pubkey = Pubkey::from_str(&tx_address.into()).error_info("pubkey")?;
+        let account = client.get_account(&pubkey).await
+            .error_info("Failed to get transaction account")?;
+        Ok(account.data)
+    }
 }
+
 
 // TODO: Attempt mainnet / ui testing to see why execute fails.
 #[ignore]
@@ -409,12 +368,8 @@ async fn debug_kg() {
     let ci = TestConstants::test_words_pass().unwrap();
     let ci1 = ci.hash_derive_words("1").unwrap();
     let ci2 = ci.hash_derive_words("2").unwrap();
-    //
-    // let amount = 1_000_000; // 0.001 SOL
-    // let amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
-    // let amount = CurrencyAmount::from_fractional_cur(0.99, SupportedCurrency::Solana).unwrap();
+
     let network = NetworkEnvironment::Main;
-    // let network = NetworkEnvironment::Dev;
 
     let w = SolanaNetwork::new(network.clone(), Some(ci));
     let w1 = SolanaNetwork::new(network.clone(), Some(ci1));
@@ -431,64 +386,116 @@ async fn debug_kg() {
     println!("Wallet 3 address: {}", w2.self_address().unwrap().render_string().unwrap());
     println!("Wallet 3 balance: {}", w2.get_self_balance().await.unwrap().to_fractional());
 
-
-    let party_addrs = vec![
-        w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap(),
-        // Address::from_solana_external(&"".to_string())
-    ];
-
-
-    //
-    // let dev_pk = "GmcKCfTubZGujcGHCxtcmG3qDtP9EinCLuth8zvSLGPf".to_string();
-    // let va = w.get_squads_vault_address(dev_pk.clone()).await.unwrap();
-    // println!("Vault address: {}", va);
-
-    // let threshold = 2;
-    // let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
     let multisig_account_main = "3VkpcmEAwU7pRAJJRcB2eynnt91SQwpx3paqZz1RerYh";
     let multisig_pubkey_main = multisig_account_main.to_string();
     let squad_vault_main = "BDqYrHiqhtj8yJ2F8aBn5VruHppP89QKbtUFArVFRQLs";
+    let multisig_pubkey = multisig_pubkey_main.clone();
 
-    let a = w.get_squads_vault_address(multisig_pubkey_main.clone(), 0).await.unwrap();
+    let a = w.get_squads_vault_address(multisig_pubkey.clone(), 0).await.unwrap();
     println!("Vault address: {}", a);
+    assert_eq!(a, squad_vault_main);
 
-    // let multisig_pubkey = "3VkpcmEAwU7pRAJJRcB2eynnt91SQwpx3paqZz1RerYh";
-    // let multisig_pubkey = "SSUXdtd957gaBMUA6aqEgBtByzKJ1mCQj7PC6Vqr8o7";
+    for i in 0..10 {
+        let res = w.get_vault_tx_by_index(multisig_pubkey.clone(), i).await;
+        if let Ok(v) = res {
+            let d = v.decode_transfer();
+            println!("Tx by index: {:?} {:?}", i, d);
+        }
+    }
+
+
+    for tx in w.list_multisig_transactions_vault(multisig_pubkey).await.unwrap() {
+        println!("Tx by list: {:?}", tx.index);
+    }
+
+    //
+    // let res = w.send(
+    //     Address::from_solana_external(&a),
+    //     CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap(),
+    //     None,
+    //     None
+    // ).await.unwrap();
+    // println!("Sent: {}", res.message.hash().to_string());
+    //
     // println!("Multisig pubkey: {}", multisig_pubkey);
     //
-    //
-    // let res = w.send(w1.self_address().unwrap(),
-    //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
-    //         , None, None).await.unwrap();
-    // println!("Sent: {}", res.message.hash().to_string());
-    //
-    // let res = w.send(w2.self_address().unwrap(),
-    //         CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap()
-    //         , None, None).await.unwrap();
-    // println!("Sent: {}", res.message.hash().to_string());
-    //
-    //
-    // let res = w.send(Address::from_solana_external(&multisig_pubkey.to_string()),
-    //         CurrencyAmount::from_fractional_cur(0.2, SupportedCurrency::Solana).unwrap()
-    //         , None, None).await.unwrap();
-    // println!("Sent: {}", res.message.hash().to_string());
     // let destination = w2.self_address().unwrap();
-    //
-    // let multisig_pubkey = multisig_account_main;
-    // let res = w.multisig_propose_send(
-    //     multisig_pubkey.clone(), Some(0),
-    //     destination,  CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(), None
-    // ).await.unwrap();
-    // println!("Proposed: {:?}", res);
-    // let approve1 = w.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
-    // // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    // let approve2 = w1.multisig_approve_transaction(multisig_pubkey.clone(), Some(res.transaction_index as u64)).await.unwrap();
-    // // tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    // // let approve3 = w2.multisig_approve_transaction(multisig_pubkey, Some(res.transaction_index as u64)).await.unwrap();
-    // tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-    //
-    // let txid = w.multisig_execute_transaction(multisig_pubkey.clone(), Some(res.transaction_index)).await.unwrap();
 
+    // let multisig_pubkey = multisig_account_main;
+    // let res = w.initiate_normal_transaction(
+    //     multisig_pubkey.clone(),
+    //     Some(0),
+    //     destination,
+    //     CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(),
+    //     None,
+    // ).await.unwrap();
+    //
+    // println!("Proposed: {:?}", res);
+
+
+}
+
+#[ignore]
+#[tokio::test]
+async fn e2e_multisig_example() {
+    let ci = TestConstants::test_words_pass().unwrap();
+    let ci1 = ci.hash_derive_words("1").unwrap();
+    let ci2 = ci.hash_derive_words("2").unwrap();
+    let network = NetworkEnvironment::Dev;
+
+    let w = SolanaNetwork::new(network.clone(), Some(ci));
+    let w1 = SolanaNetwork::new(network.clone(), Some(ci1));
+    let w2 = SolanaNetwork::new(network.clone(), Some(ci2));
+
+    println!("Wallet 1 address: {}", w.self_address().unwrap().render_string().unwrap());
+    println!("Wallet 1 balance: {}", w.get_self_balance().await.unwrap().to_fractional());
+
+    println!("Wallet 2 address: {}", w1.self_address().unwrap().render_string().unwrap());
+    println!("Wallet 2 balance: {}", w1.get_self_balance().await.unwrap().to_fractional());
+
+    println!("Wallet 3 address: {}", w2.self_address().unwrap().render_string().unwrap());
+    println!("Wallet 3 balance: {}", w2.get_self_balance().await.unwrap().to_fractional());
+
+    let party_addrs = vec![
+        w.self_address().unwrap(), w1.self_address().unwrap(), w2.self_address().unwrap(),
+    ];
+
+    let threshold = 2;
+    let multisig_pubkey = w.establish_multisig_party(party_addrs, threshold).await.unwrap();
+    let a = w.get_squads_vault_address(multisig_pubkey.clone(), 0).await.unwrap();
+    println!("Vault address: {}", a);
+
+    let res = w.send(
+        Address::from_solana_external(&a),
+        CurrencyAmount::from_fractional_cur(0.1, SupportedCurrency::Solana).unwrap(),
+        None,
+        None
+    ).await.unwrap();
+    println!("Sent: {}", res.message.hash().to_string());
+
+
+    println!("Multisig pubkey: {}", multisig_pubkey);
+
+    let destination = w2.self_address().unwrap();
+
+    let res = w.initiate_normal_transaction(
+        multisig_pubkey.clone(),
+        Some(0),
+        destination,
+        CurrencyAmount::from_fractional_cur(0.01, SupportedCurrency::Solana).unwrap(),
+        None,
+    ).await.unwrap();
+
+    println!("Proposed: {:?}", res);
+
+    // w.get_account_as_vault_tx()
+
+    let tx_idx = res.transaction_index;
+    let approve1 = w.multisig_approve_transaction(multisig_pubkey.clone(), Some(tx_idx as u64)).await.unwrap();
+    let approve2 = w1.multisig_approve_transaction(multisig_pubkey.clone(), Some(tx_idx as u64)).await.unwrap();
+    let txid = w.multisig_execute_transaction(multisig_pubkey.clone(), Some(tx_idx)).await.unwrap();
+
+    println!("Executed: {}", txid);
 
 
 }

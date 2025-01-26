@@ -74,6 +74,7 @@ impl ExternalTimedTransaction {
             incoming: Some(self.incoming),
             currency: Some(self.currency.to_display_string()),
             address_event_type: None,
+            num_signers: None,
         }
     }
 

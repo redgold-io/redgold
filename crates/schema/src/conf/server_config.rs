@@ -49,7 +49,8 @@ pub struct ServerData {
     pub external_ipv4: Option<String>,
     pub external_hostname: Option<String>,
     pub instances: Option<Vec<NodeInstance>>,
-    pub deploy_metrics_instance: Option<bool>
+    pub deploy_metrics_instance: Option<bool>,
+    pub ssh_jump_host: Option<String>
 }
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct DeploymentDefaultParams {
@@ -86,6 +87,7 @@ impl Deployment {
                         server_old.ipv4 = server.external_ipv4.clone();
                         server_old.username = server.ssh_user.clone();
                         server_old.reward_address = instance.reward_address.clone().or(reward.clone());
+                        server_old.jump_host = server.ssh_jump_host.clone();
                         servers.push(server_old);
                         id += 1;
                     }

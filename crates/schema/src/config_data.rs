@@ -246,6 +246,7 @@ impl ConfigData {
                         ]
                         ),
                         deploy_metrics_instance: Some(true),
+                        ssh_jump_host: None,
                     }]),
                     docker_swarm_proxies: None,
                     default_params: Some(DeploymentDefaultParams{

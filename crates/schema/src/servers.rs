@@ -20,7 +20,8 @@ pub struct ServerOldFormat {
     pub ipv4: Option<String>,
     pub node_name: Option<String>,
     pub external_host: Option<String>,
-    pub reward_address: Option<String>
+    pub reward_address: Option<String>,
+    pub jump_host: Option<String>
 }
 
 impl ServerOldFormat {
@@ -102,6 +103,7 @@ impl ServerOldFormat {
             network_environment: NetworkEnvironment::All.to_std_string(),
             external_host: Some(host_str),
             reward_address: None,
+            jump_host: None,
         }
     }
 

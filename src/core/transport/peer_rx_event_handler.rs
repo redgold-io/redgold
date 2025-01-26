@@ -155,6 +155,15 @@ impl PeerRxEventHandler {
 
         let auth_required = request.auth_required();
 
+        if let Some(r) = &request.multiparty_check_ready_request {
+            response.multiparty_check_ready_response = Some(false);
+            if let Some(r) = r.party_key.as_ref() {
+                if let Some(_) = relay.ds.multiparty_store.party_data(r).await? {
+                    response.multiparty_check_ready_response = Some(true);
+                }
+            }
+        }
+
         if let Some(r) = &request.get_public_key_balance_request {
             response.get_public_key_balance_response = Some(relay.ds.utxo.get_balance_for_public_key(&r).await?);
         }

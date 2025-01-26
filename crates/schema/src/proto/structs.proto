@@ -1066,6 +1066,11 @@ message Request {
   Response response = 39;
   PortOpenRequest port_open_request = 40;
   GuiInitRequest gui_init_request = 41;
+  MultipartyCheckReadyRequest multiparty_check_ready_request = 42;
+}
+
+message MultipartyCheckReadyRequest {
+  PublicKey party_key = 1;
 }
 
 message GuiInitRequest {
@@ -1126,6 +1131,7 @@ message Response {
   CurrencyAmount get_public_key_balance_response = 28;
   KeepAliveResponse keep_alive_response = 29;
   PortOpenResponse port_open_response = 30;
+  optional bool multiparty_check_ready_response = 31;
 }
 
 message KeepAliveResponse {

@@ -22,11 +22,16 @@ pub trait SSHOrCommandLike {
 impl SSHOrCommandLike for SSHProcessInvoke {
 
     async fn execute(&self, command: impl Into<String> + Send, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        let proxy_jump = match &self.jump_host {
+            Some(jump) => format!("-J {}", jump),
+            None => String::new()
+        };
         let identity_opt = self.identity_opt();
         let user = self.user_opt();
         let cmd = format!(
-            "ssh {} {} {}@{} \"bash -c '{}'\"",
+            "ssh {} {} {} {}@{} \"bash -c '{}'\"",
             self.strict_host_key_checking_opt(),
+            proxy_jump,
             identity_opt, user, self.host, command.into()
         );
         output_handler.clone().map(|s|
@@ -35,14 +40,19 @@ impl SSHOrCommandLike for SSHProcessInvoke {
     }
 
     async fn scp(&self, local_file: impl Into<String> + Send, remote_file: impl Into<String> + Send, to_dest: bool, output_handler: Option<Sender<String>>) -> RgResult<String> {
+        let proxy_jump = match &self.jump_host {
+            Some(jump) => format!("-o ProxyJump={}", jump),
+            None => String::new()
+        };
         let identity_opt = self.identity_opt();
         let user = self.user_opt();
         let lf = local_file.into();
         let first_arg = if to_dest { lf.clone() } else { "".to_string() };
         let last_arg = if to_dest { "".to_string() } else { lf };
         let cmd = format!(
-            "scp {} {} {} {}@{}:{} {}",
+            "scp {} {} {} {} {}@{}:{} {}",
             self.strict_host_key_checking_opt(),
+            proxy_jump,
             identity_opt, first_arg, user, self.host, remote_file.into(), last_arg
         );
         self.run_cmd(output_handler, cmd).await
@@ -108,7 +118,8 @@ impl DeployMachine<SSHProcessInvoke> {
             identity_path,
             host: s.host.clone(),
             strict_host_key_checking: false,
-            output_handler: output_handler.clone()
+            output_handler: output_handler.clone(),
+            jump_host: s.jump_host.clone(),
         };
         Self {
             server: s.clone(),
@@ -192,7 +203,8 @@ pub struct SSHProcessInvoke {
     pub identity_path: Option<String>,
     pub host: String,
     pub strict_host_key_checking: bool,
-    pub output_handler: Option<Sender<String>>
+    pub output_handler: Option<Sender<String>>,
+    pub jump_host: Option<String>
 }
 
 impl SSHProcessInvoke {
@@ -204,6 +216,7 @@ impl SSHProcessInvoke {
             host: host.into(),
             strict_host_key_checking: false,
             output_handler,
+            jump_host: None,
         }
     }
     fn identity_opt(&self) -> String {

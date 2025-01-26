@@ -33,7 +33,8 @@ pub struct BriefTransaction {
     pub fee: i64,
     pub incoming: Option<bool>,
     pub currency: Option<String>,
-    pub address_event_type: Option<AddressEventExtendedType>
+    pub address_event_type: Option<AddressEventExtendedType>,
+    pub num_signers: Option<i64>
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -350,7 +351,7 @@ pub fn check_address_event_type(tx: &Transaction) -> AddressEventExtendedType {
 }
 
 // TODO Make trait implicit
-pub fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgResult<BriefTransaction> {
+pub fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>, num_signers: Option<i64>) -> RgResult<BriefTransaction> {
     let from_str = tx.first_input_address()
         .and_then(|a| a.render_string().ok())
         .unwrap_or("".to_string());
@@ -367,5 +368,6 @@ pub fn brief_transaction(tx: &Transaction, outgoing_from: Option<String>) -> RgR
         incoming: outgoing_from.map(|i| i != from_str),
         currency: Some(SupportedCurrency::Redgold.to_display_string()),
         address_event_type: Some(check_address_event_type(tx)),
+        num_signers,
     })
 }

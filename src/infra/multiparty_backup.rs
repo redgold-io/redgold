@@ -156,7 +156,8 @@ pub async fn check_updated_multiparty_csv(r: &Relay) -> RgResult<()> {
         r.ds.multiparty_store.add_keygen(
             &row
         ).await?;
-        info!("Imported multiparty row for {}", row.clone().clear_sensitive().json_or())
+        info!("Imported multiparty row for {}", row.clone().clear_sensitive().json_or());
+        info!("Multiparty total count {:?}", r.ds.multiparty_store.count_multiparty_total().await);
     };
     tokio::fs::remove_file(env.multiparty_import()).await.error_info("Failed to remove multiparty import")?;
     Ok(())
@@ -174,14 +175,19 @@ pub fn parse_mp_csv(contents: String) -> RgResult<Vec<PartyInfo>> {
     Ok(res)
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 pub async fn debug_fix_server() {
-    let r = Relay::dev_default().await;
-    let sdf = r.node_config.clone().secure_data_folder.expect("works");
-    let servers = sdf.all().servers().expect("servers");
-    let s = servers.iter().filter(|s| s.index == 4).next().expect("server 4");
-    restore_multiparty_share(r.node_config.clone(), s.clone()).await.expect("");
+
+    for env in vec![NetworkEnvironment::Main, NetworkEnvironment::Staging, NetworkEnvironment::Test] {
+        let nc = NodeConfig::by_env_with_args(env).await;
+        let sdf = nc.clone().secure_data_folder.expect("works");
+        let servers = sdf.all().servers().expect("servers");
+        let s = servers.iter().filter(|s| s.index == 3).next().expect("server 4");
+        restore_multiparty_share(nc.clone(), s.clone()).await.expect("");
+    }
+
+
 }
 
 #[ignore]

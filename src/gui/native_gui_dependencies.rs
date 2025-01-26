@@ -342,11 +342,11 @@ impl GuiDepends for NativeGuiDepends {
         Ok(())
     }
 
-    fn restore_data_stores(&self) -> RgResult<()> {
+    fn restore_data_stores(&self, filter: Option<Vec<i64>>) -> RgResult<()> {
         let nc = self.nc.lock().unwrap().clone();
         let servers = nc.servers_old();
         self.spawn(async {
-            restore_datastore_servers(nc, servers).await
+            restore_datastore_servers(nc, servers, filter).await
         });
         Ok(())
     }

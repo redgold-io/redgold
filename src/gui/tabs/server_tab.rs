@@ -382,7 +382,8 @@ where G: GuiDepends + Clone + Send + 'static {
 
         if ui.button("Restore Datastores").clicked() {
             // let option1 = servers.clone();
-            g.restore_data_stores();
+            // state.server_index_edit
+            g.restore_data_stores(None);
         };
 
     });

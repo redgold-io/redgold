@@ -385,6 +385,38 @@ pub async fn initiate_mp_keysign(
         parties = find_multiparty_key_pairs(relay.clone()).await?;
     }
 
+    let rid = ident.room_id.as_ref().ok_msg("Missing room id")?;
+    let pi = relay.ds.multiparty_store
+        .party_info(rid).await?
+        .ok_or(error_info("Local share not found"))?;
+    let party_key = pi.party_key.ok_msg("No party key")?;
+
+
+    let mut req = Request::default();
+    let mut c = structs::MultipartyCheckReadyRequest::default();
+    c.party_key = Some(party_key.clone());
+    req.multiparty_check_ready_request = Some(c);
+    let res = relay.broadcast_async(parties.clone(), req, Some(Duration::from_secs(20))).await?;
+    let mut active_parties = vec![];
+    for r in res {
+        if let Ok(r) = r {
+            if r.as_error_info().is_ok() {
+                if r.multiparty_check_ready_response.unwrap_or(false) {
+                    if let Some(n) = r.node_metadata.as_ref() {
+                        if let Some(pk) = n.public_key.as_ref() {
+                            active_parties.push(pk.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if active_parties.len() < (ident.threshold.safe_get()?.value as usize - 1) {
+        return Err(error_info("Not enough active parties for signing"));
+    }
+    info!("Active parties for signing: {} out of {}", active_parties.len(), parties.len());
+    parties = active_parties;
+
     // Ensure that default starts with keygen UUID to avoid signing wrong hash
     // TODO: I don't think this is even necessary on the room id is it? maybe not or maybe for auth on request?
     let signing_room_id = signing_room_id

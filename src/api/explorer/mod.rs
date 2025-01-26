@@ -235,10 +235,10 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
     let recent: Vec<Transaction> = ai.recent_transactions.clone();
     let incoming_transactions = r.ds.transaction_store.get_filter_tx_for_address(
         &a, limit.unwrap_or(10), offset.unwrap_or(0), true
-    ).await?.iter().map(|u| explorer::brief_transaction(&u, outgoing_from.clone())).collect::<RgResult<Vec<BriefTransaction>>>()?;
+    ).await?.iter().map(|u| explorer::brief_transaction(&u, outgoing_from.clone(), None)).collect::<RgResult<Vec<BriefTransaction>>>()?;
     let outgoing_transactions = r.ds.transaction_store.get_filter_tx_for_address(
         &a, limit.unwrap_or(10), offset.unwrap_or(0), false
-    ).await?.iter().map(|u| explorer::brief_transaction(&u, outgoing_from.clone())).collect::<RgResult<Vec<BriefTransaction>>>()?;
+    ).await?.iter().map(|u| explorer::brief_transaction(&u, outgoing_from.clone(), None)).collect::<RgResult<Vec<BriefTransaction>>>()?;
 
     let incoming_count = r.ds.transaction_store.get_count_filter_tx_for_address(&a, true).await?;
     let outgoing_count = r.ds.transaction_store.get_count_filter_tx_for_address(&a, false).await?;
@@ -251,7 +251,7 @@ pub async fn handle_address_info(ai: &AddressInfo, r: &Relay, limit: Option<i64>
         address: address_str,
         balance: rounded_balance_i64(ai.balance.clone()),
         total_utxos: ai.utxo_entries.len() as i64,
-        recent_transactions: recent.iter().map(|u| explorer::brief_transaction(&u, outgoing_from.clone())).collect::<RgResult<Vec<BriefTransaction>>>()?,
+        recent_transactions: recent.iter().map(|u| explorer::brief_transaction(&u, outgoing_from.clone(), None)).collect::<RgResult<Vec<BriefTransaction>>>()?,
         utxos: ai.utxo_entries.iter().map(|u| convert_utxo(u)).collect::<RgResult<Vec<BriefUtxoEntry>>>()?,
         incoming_transactions,
         outgoing_transactions,
@@ -686,7 +686,7 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
     let num_accepted_signers = counts.get(&(State::Accepted as i32)).unwrap_or(&0).clone() as i64;
 
     let mut detailed = DetailedTransaction {
-        info: explorer::brief_transaction(tx, None)?,
+        info: explorer::brief_transaction(tx, None, None)?,
         confirmation_score: 1.0,
         acceptance_score: 1.0,
         message,
@@ -874,7 +874,8 @@ pub async fn handle_explorer_recent(r: Relay, is_test: Option<bool>) -> RgResult
     trace!("Dashboard query time elapsed: {:?}", current_time_millis_i64() - start);
     let mut recent_transactions = Vec::new();
     for tx in recent {
-        let brief_tx = explorer::brief_transaction(&tx, None)?;
+        let c = r.ds.observation.count_observation_edge(&tx.hash_or()).await;
+        let brief_tx = explorer::brief_transaction(&tx, None, c.ok().map(|x| x as i64))?;
         recent_transactions.push(brief_tx);
     }
     trace!("Brief transaction build time elapsed: {:?}", current_time_millis_i64() - start);

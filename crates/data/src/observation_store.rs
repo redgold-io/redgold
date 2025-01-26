@@ -250,6 +250,19 @@ impl ObservationStore {
         Ok(res)
     }
 
+    pub async fn count_observation_edge(&self, observed_hash: &Hash) -> RgResult<i32> {
+        let mut pool = self.ctx.pool().await?;
+        let bytes = observed_hash.vec();
+        let rows = sqlx::query!(
+            r#"SELECT count(edge) as count FROM observation_edge WHERE observed_hash = ?1"#,
+            bytes
+        )
+            .fetch_one(&mut *pool)
+            .await;
+        let rows_m = DataStoreContext::map_err_sqlx(rows)?;
+        Ok(rows_m.count)
+    }
+
 
     pub async fn insert_observation_edge(&self, observation_edge: &ObservationEdge) -> Result<i64, ErrorInfo> {
         let mut pool = self.ctx.pool().await?;

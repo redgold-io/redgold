@@ -7,7 +7,7 @@ use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::util;
 use redgold_schema::util::times::{current_time_millis, ToTimeString};
 
-pub async fn restore_datastore_servers(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
+pub async fn restore_datastore_servers(p0: NodeConfig, p1: Vec<ServerOldFormat>, idx_filter: Option<Vec<i64>>) {
 
     let net_str = p0.network.to_std_string();
     let secure_or = p0.secure_or().by_env(p0.network);
@@ -23,6 +23,11 @@ pub async fn restore_datastore_servers(p0: NodeConfig, p1: Vec<ServerOldFormat>)
     if let Some(d) = dirs.last() {
         let handler = log_handler().1;
         for s in p1 {
+            if let Some(filter) = idx_filter.as_ref() {
+                if !filter.contains(&s.index) {
+                    continue;
+                }
+            }
             let server_dir = d.join(s.index.to_string());
             let ds_dir = server_dir.join("data_store.sqlite");
             let ds_str = ds_dir.to_str().expect("").to_string();
