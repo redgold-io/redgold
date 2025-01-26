@@ -16,3 +16,9 @@ impl MultipartyIdentifier {
         self.party_keys.iter().enumerate().find(|(_, k)| k == &pk).map(|(i, _)| i + 1)
     }
 }
+
+impl InitiateMultipartySigningRequest {
+    pub fn party_index(&self, pk: &structs::PublicKey) -> Option<usize> {
+        self.signing_party_keys.iter().enumerate().find(|(_, k)| k == &pk).map(|(i, _)| i + 1)
+    }
+}

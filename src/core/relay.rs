@@ -833,8 +833,7 @@ impl Relay {
     pub fn check_signing_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
         Ok(l.get(room_id).safe_get_msg("missing room_id")
-            .and_then(|x| x.identifier.safe_get_msg("missing identifier")
-            ).map(|p| p.party_index(public_key)).unwrap_or(None))
+            .map(|x| x.party_index(public_key)).unwrap_or(None))
     }
 
     pub fn authorize_keygen(&self, p0: InitiateMultipartyKeygenRequest) -> RgResult<()> {
