@@ -477,7 +477,7 @@ pub async fn initiate_mp_keysign_authed(
     let timeout = Duration::from_secs(200 as u64);
     let init_keygen_req_room_id_typed = ident.room_id.safe_get()?;
     // let init_keygen_req_room_id = ident.room_id.safe_get()?.uuid.safe_get()?.clone();
-    let index = parties.iter().enumerate().map(|(idx, pk)| idx + 1 as u16)
+    let index = parties.iter().enumerate().map(|(idx, pk)| (idx + 1) as u16)
         .collect_vec();
     // let index = ident.party_keys.iter().enumerate().filter_map(|(idx, pk)| {
     //     if parties.contains(pk) {
