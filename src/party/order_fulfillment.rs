@@ -274,7 +274,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         // valid.currency = SupportedCurrency::Ethereum as i32;
         let res = initiate_mp_keysign(
             self.relay.clone(), ident.clone(), BytesData::from(data), ident.party_keys.clone(), None,
-            Some(valid)
+            Some(valid),
+            false
         ).await?;
         let sig = res.proof.signature.ok_msg("Missing keysign result signature")?;
         let raw = EthWalletWrapper::process_signature_ser(sig, tx_ser, eth.chain_id, !self.relay.node_config.network.is_main_stage_network())?;
@@ -317,7 +318,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             let result = initiate_mp_keysign(self.relay.clone(), identifier.clone(),
                                              BytesData::from(hash.clone()),
                                              identifier.party_keys.clone(), None,
-                                             Some(validation.clone())
+                                             Some(validation.clone()),
+                                             false
             ).await?;
 
             results.push(result);
@@ -351,7 +353,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         let hash = tx.signable_hash();
         let result = initiate_mp_keysign(self.relay.clone(), identifier.clone(),
                                          hash.bytes.safe_get()?.clone(), identifier.party_keys.clone(), None,
-                                         Some(validation.clone())
+                                         Some(validation.clone()), false
         ).await?;
         tx.add_proof_per_input(&result.proof);
         self.relay.submit_transaction_sync(tx).await

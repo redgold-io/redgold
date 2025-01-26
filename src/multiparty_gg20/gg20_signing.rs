@@ -51,15 +51,26 @@ use curv::elliptic::curves::Point;
 
 // #[tokio::main]
 async fn signing_original(
-    address: surf::Url, room: &str, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>,
-    relay: Relay
+    address: surf::Url,
+    room: &str,
+    local_share: String,
+    parties: Vec<u16>,
+    data_to_sign: Vec<u8>,
+    relay: Relay,
+    expected_number_of_parties: usize,
+    is_follower: bool,
+    self_index: usize,
 ) -> Result<SignatureRecid> {
 
-    let local_share = serde_json::from_str(&local_share).context("parse local share")?;
+    let mut local_share: LocalKey<curv::elliptic::curves::Secp256k1> = serde_json::from_str(&local_share).context("parse local share")?;
+    // let orig_local_share = local_share.i.clone();
+    // local_share.i = self_index as u16;
+    // let n = local_share.n;
+    // let t = local_share.t;
     let number_of_parties = parties.len();
 
     // Ahh here we go.
-    info!("Starting signing join computation offline for room {} on node {}", room, relay.node_config.short_id().expect(""));
+    // info!("Starting signing join computation offline for room {} on node {} original {orig_local_share} self_index {self_index} n {n} t {t} and parties {:?}", room, relay.node_config.short_id().expect(""), parties);
 
     let (i, incoming, outgoing) =
         join_computation(address.clone(), &format!("{}-offline", room), &relay)
@@ -70,6 +81,7 @@ async fn signing_original(
     tokio::pin!(incoming);
     tokio::pin!(outgoing);
 
+    // info!("Offline signing i {i} parties {:?}", parties);
     let signing = OfflineStage::new(i, parties, local_share)?;
     let completed_offline_stage = AsyncProtocol::new(signing, incoming, outgoing)
         .run()
@@ -100,10 +112,11 @@ async fn signing_original(
         .await?;
 
     let partial_signatures: Vec<_> = incoming
-        .take(number_of_parties - 1)
+        .take(expected_number_of_parties)
         .map_ok(|msg| msg.body)
         .try_collect()
         .await?;
+    // info!("Received partial signatures num {} from expected_num {} is_follower: {}", partial_signatures.len(), expected_number_of_parties, is_follower);
     let signature = signing
         .complete(&partial_signatures)
         .context("online stage failed")?;
@@ -120,10 +133,14 @@ use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::RsvSignature;
 
 pub async fn signing(
-    external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, relay: Relay
+    external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, relay: Relay,
+    expected_parties: usize,
+    is_follower: bool,
+    self_index: usize
 ) -> Result<Proof, ErrorInfo> {
     let url = external_address_to_surf_url(external_address, port)?;
-    let sig = signing_original(url, &*room, local_share, parties, data_to_sign.clone(), relay)
+    let sig = signing_original(
+        url, &*room, local_share, parties, data_to_sign.clone(), relay, expected_parties, is_follower, self_index)
         .await
         .map_err(|e| error_info(e.to_string()))?;
     let mut vec: Vec<u8> = vec![];

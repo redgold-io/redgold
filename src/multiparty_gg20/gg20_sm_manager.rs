@@ -21,6 +21,7 @@ use redgold_schema::structs;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use crate::core::relay::Relay;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::RoomId;
 
 #[rocket::get("/rooms/<room_id>/subscribe")]
@@ -66,6 +67,7 @@ fn verify_message(room_id: &str, message: String, db: &State<Db>) -> Option<(usi
         if let Some(m) = &d.multiparty_authentication_request {
             if let Ok(pk) = &d.verify_auth() {
                 if let Ok(Some(a)) = db.relay.check_mp_authorized(&room_id, &pk) {
+                    // info!("verify message for pk {} with result {}", pk.hex(), a);
                     // db.get_room_or_create_empty(room_id).await;
                     ret = Some((a, m.message.clone()));
                 } else {

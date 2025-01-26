@@ -1413,6 +1413,7 @@ message InitiateMultipartySigningRequest {
   repeated PublicKey signing_party_keys = 3;
   BytesData data_to_sign = 4;
   PartySigningValidation party_signing_validation = 5;
+  optional bool skip_party_key_lookup = 6;
 }
 
 

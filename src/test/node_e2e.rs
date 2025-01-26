@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use itertools::Itertools;
+use rocket::yansi::Paint;
 use tracing::info;
 use serde::Serialize;
 use redgold_keys::address_external::ToEthereumAddress;
@@ -16,7 +17,7 @@ use redgold_schema::{bytes_data, structs, ErrorInfoContext, RgResult, SafeOption
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
+use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, PublicKey, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
 use crate::api::control_api::ControlClient;
 use crate::api::client::public_client::PublicClient;
 use crate::api::client::rest::RgHttpClient;
@@ -93,7 +94,9 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // three nodes
     local_nodes.add_node().await;
 
-    // three_node_keygen_tests(&mut local_nodes, client1, &submit).await?;
+    info!("Three node keygen test");
+    three_node_keygen_tests(&mut local_nodes, start_node.control_client.clone(), &submit).await?;
+    info!("Three node keygen test passed");
 
     let kp = WordsPass::test_words().keypair_at_change(0).unwrap();
     // let kp = dev_ci_kp().expect("kp").1;
@@ -160,12 +163,29 @@ async fn three_node_keygen_tests(local_nodes: &mut LocalNodes, client1: ControlC
     local_nodes.verify_peers().await?;
     //
     // This works but is really flaky for some reason?
-    submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+    // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
 
-    submit.submit().await?.at_least_n(3).unwrap();
+    // submit.submit().await?.at_least_n(3).unwrap();
 
-    // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
-    // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
+    let signing_data = Hash::from_string_calculate("hey");
+
+    let first_two = local_nodes.nodes.iter().take(2).map(|n| n.node.relay.node_config.public_key())
+        .collect_vec();
+
+    let first_three = local_nodes.nodes.iter().take(3).map(|n| n.node.relay.node_config.public_key())
+        .collect_vec();
+
+    let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    // info!("Keygen 2 response {}", keygen2.json_or());
+    // required to get the public key
+    info!("Starting first signing round with ALL");
+    let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone(), first_three, true).await;
+    res.verify(&signing_data.clone()).expect("verify");
+    // info!("Starting second signing round with ALL-1");
+    // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone(), first_two, false).await;
+    // res.verify(&signing_data.clone()).expect("verify");
+
+
     // let public = res.public_key.expect("public key");
     // let mp_eth_addr = public.to_ethereum_address().expect("eth address");
     //
@@ -675,24 +695,32 @@ async fn data_store_test() {
 
 }
 
-async fn do_signing(party: ControlMultipartyKeygenResponse, signing_data: Hash, client: ControlClient) -> Proof {
+async fn do_signing(
+    party: ControlMultipartyKeygenResponse,
+    signing_data: Hash,
+    client: ControlClient,
+    restrict_peers: Vec<PublicKey>,
+    skip_party_key: bool
+) -> Proof {
 
-        let vec1 = signing_data.raw_bytes().expect("works");
-        let vec = bytes_data(vec1.clone()).expect("");
-        let mut signing_request = ControlMultipartySigningRequest::default();
-        let mut init_signing = InitiateMultipartySigningRequest::default();
-        let identifier = party.multiparty_identifier.expect("");
-        init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
-        init_signing.data_to_sign = Some(vec);
-        init_signing.identifier = Some(identifier.clone());
-        signing_request.signing_request = Some(init_signing);
-        let res =
-            client.multiparty_signing(signing_request).await;
-        // println!("{:?}", res);
-        assert!(res.is_ok());
-        let proof = res.expect("ok").proof.expect("prof");
-        proof.verify(&signing_data).expect("verified");
-        proof
+    let vec1 = signing_data.raw_bytes().expect("works");
+    let vec = bytes_data(vec1.clone()).expect("");
+    let mut signing_request = ControlMultipartySigningRequest::default();
+    let mut init_signing = InitiateMultipartySigningRequest::default();
+    let identifier = party.multiparty_identifier.expect("");
+    init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
+    init_signing.data_to_sign = Some(vec);
+    init_signing.identifier = Some(identifier.clone());
+    init_signing.signing_party_keys = restrict_peers;
+    init_signing.skip_party_key_lookup = Some(skip_party_key);
+    signing_request.signing_request = Some(init_signing);
+    let res =
+        client.multiparty_signing(signing_request).await.log_error().unwrap();
+    // println!("{:?}", res);
+    // assert!(res.is_ok());
+    let proof = res.proof.expect("prof");
+    proof.verify(&signing_data).expect("verified");
+    proof
 
 }
 

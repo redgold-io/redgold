@@ -68,7 +68,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             bd.clone(),
             r.identifier.party_keys.clone(),
             None,
-            None
+            None,
+            true
         ).await?;
         // info!("Keygen signing group formed with {} peers {}", party_peers.len(), ksr.json_or());
         let party_pk = ksr.proof.public_key.safe_get_msg("proof in ksr")?.clone();

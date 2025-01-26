@@ -125,7 +125,8 @@ impl ControlServer {
                     req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
                     req.signing_party_keys.clone(),
                     req.signing_room_id.clone(),
-                    None
+                    None,
+                    req.skip_party_key_lookup.unwrap_or(false)
                 ).await?;
                 let mut res = ControlMultipartySigningResponse::default();
                 res.identifier = req.identifier.clone();

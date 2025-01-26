@@ -17,7 +17,6 @@ use crate::solana::wallet::SolanaNetwork;
 use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 use solana_sdk::account::Account;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 
@@ -55,7 +54,10 @@ expect eof"#,
         // std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
 
         #[cfg(unix)]
-        std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
+        }
 
         #[cfg(windows)]
         {
