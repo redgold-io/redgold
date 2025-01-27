@@ -83,15 +83,21 @@ async fn balance_test_mn() {
         Some(descriptor)
     ).expect("Failed to create wallet");
 
-    let w2 = SingleKeyBitcoinWallet::new_wallet(
+    let balance = w.get_wallet_balance().expect("Failed to get balance");
+    println!("balance: {:?}", balance);
+    let addr = w.get_descriptor_address().expect("Failed to get descriptor address");
+    println!("addr: {:?}", addr);
+
+
+    let mut w2 = SingleKeyBitcoinWallet::new_wallet(
         pub0.clone(), NetworkEnvironment::Dev, true
     ).expect("Failed to create wallet");
 
-    let balance = w2.get_wallet_balance().expect("Failed to get balance");
-    println!("balance: {:?}", balance);
-    let addr = w.get_descriptor_address().expect("Failed to get descriptor address");
-    println!("addr: {:?}", addr)
-
-    // w.send_local(dest, 8000, pkey_hex, None).expect("Failed to send");
+    let balance2 = w2.get_wallet_balance().expect("Failed to get balance");
+    println!("balance2: {:?}", balance2);
+    let addr2 = w2.get_descriptor_address().expect("Failed to get descriptor address");
+    println!("addr2: {:?}", addr2);
+    let res = w2.send_local(addr, 8000, pkh).expect("Failed to send");
+    println!("res: {:?}", res);
 
 }

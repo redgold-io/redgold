@@ -94,7 +94,7 @@ impl SingleKeyBitcoinWallet<MemoryDatabase> {
         do_sync: bool
     ) -> Result<Self, ErrorInfo> {
 
-        let backend = electrum_mainnet_backends().get(0).unwrap().clone();
+        let backend = network_to_backends(&network_environment).get(0).unwrap().clone();
         let network = network_to_bdk_network(&network_environment);
         let client = Client::new(&*backend)
             .error_info("Error building bdk client")?;
@@ -143,7 +143,7 @@ impl SingleKeyBitcoinWallet<Tree> {
         electrum_mn_backend: Option<String>,
         override_descriptor: Option<String>
     ) -> Result<Self, ErrorInfo> {
-        let backend = electrum_mn_backend.unwrap_or_else(|| electrum_mainnet_backends().get(0).unwrap().clone());
+        let backend = electrum_mn_backend.unwrap_or_else(|| network_to_backends(&network_environment).get(0).unwrap().clone());
         let network = network_to_bdk_network(&network_environment);
         let mut config = Config::builder().validate_domain(false).build();
         let client = Client::from_config(&*backend, config)
