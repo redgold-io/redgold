@@ -156,8 +156,18 @@ pub async fn check_updated_multiparty_csv(r: &Relay) -> RgResult<()> {
         r.ds.multiparty_store.add_keygen(
             &row
         ).await?;
+        if let Some(pk) = row.party_key.as_ref() {
+            if let Some(room_id) = row.initiate.as_ref()
+                .and_then(|i| i.identifier.as_ref())
+                .and_then(|i| i.room_id.as_ref()) {
+                r.ds.multiparty_store.update_room_id_party_key(&room_id, &pk).await?;
+                info!("Imported multiparty updated room id {} with party key {}", room_id, pk.hex());
+            }
+
+        }
         info!("Imported multiparty row for {}", row.clone().clear_sensitive().json_or());
         info!("Multiparty total count {:?}", r.ds.multiparty_store.count_multiparty_total().await);
+        info!("Multiparty all info count {:?}", r.ds.multiparty_store.all_party_info_with_key().await?.len());
     };
     tokio::fs::remove_file(env.multiparty_import()).await.error_info("Failed to remove multiparty import")?;
     Ok(())
