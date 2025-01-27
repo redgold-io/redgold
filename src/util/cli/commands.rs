@@ -259,6 +259,7 @@ pub fn add_server_prompt() -> ServerOldFormat {
         external_host: None,
         reward_address: None,
         jump_host: None,
+        party_config: None,
     }
 }
 
