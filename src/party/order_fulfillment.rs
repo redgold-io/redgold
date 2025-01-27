@@ -192,7 +192,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                         let amt = b.clone() - (f.clone()*2);
                         if amt.to_fractional() > f.to_fractional() {
                             let fulfilled_amount = amt.amount as u64;
-                            self.mp_send_btc(key, &identifier, vec![(dest.to_string(), fulfilled_amount)], ps).await?;
+                            self.mp_send_btc(key, &identifier, vec![(dest.to_string(), fulfilled_amount)], ps)
+                                .await.log_error().ok();
                         }
                     }
                 }

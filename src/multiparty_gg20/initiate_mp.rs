@@ -430,7 +430,7 @@ pub async fn initiate_mp_keysign(
             return Err(error_info("Not enough active parties for signing"));
         }
         info!("Active parties for signing: {} out of {}", active_parties.len(), parties.len());
-        for p in parties {
+        for p in peers.iter() {
             if !active_parties.contains(&p) {
                 error!("Missing active party: {}", p.hex());
                 return Err(error_info("Missing active party"));
