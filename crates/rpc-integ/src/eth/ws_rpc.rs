@@ -6,7 +6,7 @@ use futures::{stream, Stream};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, SupportedCurrency};
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use std::sync::Arc;
 use ethers::types::U256;
 use num_bigint::BigInt;
@@ -147,6 +147,11 @@ impl EthereumWsProvider {
             price_usd: None,
             fee: Some(g_amount),
             self_address: Some(self_address),
+            currency_id: Some(SupportedCurrency::Ethereum.into()),
+            currency_amount: Some(amount.clone()),
+            from: structs::Address::from_eth_external(&from),
+            to: vec![(structs::Address::from_eth_external(&to), amount)],
+            other: Some(structs::Address::from_eth_external(&other_address)),
         })
     }
 }

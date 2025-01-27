@@ -393,7 +393,7 @@ impl ExternalNetworkResources for MockExternalResources {
                 let ett = ExternalTimedTransaction {
                     tx_id: tx.txid().to_string(),
                     timestamp: Some(time.clone()),
-                    other_address,
+                    other_address: other_address.clone(),
                     other_output_addresses,
                     amount: other_amount,
                     bigint_amount: None,
@@ -403,6 +403,12 @@ impl ExternalNetworkResources for MockExternalResources {
                     price_usd: None,
                     fee: Some(expected_fee),
                     self_address: None,
+                    currency_id: Some(SupportedCurrency::Bitcoin.into()),
+                    currency_amount: Some(CurrencyAmount::from_btc(other_amount as i64)),
+                    from: this_btc_addr,
+                    to: other_outputs.iter().map(|(ad, amt)|
+                        (Address::from_bitcoin_external(ad), CurrencyAmount::from_btc(amt.clone() as i64))).collect_vec(),
+                    other: Some(Address::from_bitcoin_external(&other_address)),
                 };
                 ett
             },
@@ -422,16 +428,21 @@ impl ExternalNetworkResources for MockExternalResources {
                 ExternalTimedTransaction {
                     tx_id: hex::encode(tx.hash.0),
                     timestamp: Some(time as u64),
-                    other_address: other_addr,
+                    other_address: other_addr.clone(),
                     other_output_addresses: vec![],
                     amount: amount as u64,
-                    bigint_amount: Some(value_str),
+                    bigint_amount: Some(value_str.clone()),
                     incoming: false,
                     currency: SupportedCurrency::Ethereum,
                     block_number: Some(0),
                     price_usd: None,
                     fee: Some(expected_fee.clone()),
                     self_address: None,
+                    currency_id: Some(SupportedCurrency::Ethereum.into()),
+                    currency_amount: Some(CurrencyAmount::from_eth_bigint_string(value_str.clone())),
+                    from: Address::from_eth_external(&tx.from.to_string()),
+                    to: vec![(Address::from_eth_external(&other_addr.clone()), CurrencyAmount::from_eth_bigint_string(value_str))],
+                    other: Some(Address::from_eth_external(&other_addr)),
                 }
             }
             _ => Err(error_info("Unsupported currency"))?

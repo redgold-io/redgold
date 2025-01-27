@@ -3,7 +3,7 @@ use num_bigint::{BigInt, Sign};
 use alloy_chains::Chain;
 use ethers::addressbook::Address;
 use ethers::prelude::U256;
-use foundry_block_explorers::account::{GenesisOption, Sort, TxListParams};
+use foundry_block_explorers::account::{GenesisOption, Sort, TokenQueryOption, TxListParams};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use std::str::FromStr;
@@ -216,6 +216,83 @@ impl EthHistoricalClient {
     }
 
 
+
+    pub async fn get_all_erc20_token_tx(
+        &self,
+        address: &structs::Address,
+        start_block: Option<u64>
+    ) -> RgResult<Vec<ExternalTimedTransaction>> {
+
+        let address = address.render_string()?;
+        let addr = address.parse().error_info("address parse failure")?;
+
+        let tx_params = if let Some(s) = start_block {
+            Some(TxListParams::new(s, 1e16 as u64, 0, 0, Sort::Asc))
+        } else {
+            None
+        };
+
+        let token_query = TokenQueryOption::ByAddress(addr);
+        let txs = self.client.get_erc20_token_transfer_events(token_query, tx_params).await
+            .error_info("EthHistoricalClient get_all_tx transaction fetch failure")?;
+
+        let mut res: Vec<ExternalTimedTransaction> = vec![];
+        for t in txs.iter() {
+            let mut ett = ExternalTimedTransaction::default();
+            let txid = hex::encode(t.hash.0);
+            ett.tx_id = txid;
+            let to_opt = t.to.map(|h| h.to_string());
+            let timestamp = t.time_stamp.parse::<u64>().ok().map(|t| t * 1000);
+            let block_num = t.block_number.as_number().map(|b| b.as_limbs()[0].clone());
+
+            let value_str = t.value.to_string();
+            // t.token_decimal
+            let amount = Self::translate_value(&value_str)?;
+        }
+        /*
+
+
+            //
+            // let string = t.gas_used.to_string();
+            // let gas_used = BigInt::from_str(&*string).error_info("BigInt parse failure on gas used")?;
+            // let fee = t.gas_price.map(|p| p.to_string())
+            //     .map(|gas_price| BigInt::from_str(&*gas_price).error_info("BigInt parse failure on gas price"))
+            //     .transpose()?
+            //     .map(|gp| gp * gas_used)
+            //     .map(|ca| CurrencyAmount::from_eth_bigint(ca));
+            //
+            // if let (Some(tx_id), Some(from), Some(to)) = (tx_id, from_opt, to_opt) {
+            //     let incoming = &to == address;
+            //     let mut self_address = None;
+            //     let other_address = if incoming {
+            //         self_address = Some(to.clone());
+            //         from
+            //     } else {
+            //         self_address = Some(from.clone());
+            //         to
+            //     };
+            //     res.push(ExternalTimedTransaction {
+            //         tx_id,
+            //         timestamp,
+            //         other_address,
+            //         other_output_addresses: vec![],
+            //         amount: amount as u64,
+            //         bigint_amount: Some(value_str),
+            //         incoming,
+            //         currency: SupportedCurrency::Ethereum,
+            //         block_number: block_num,
+            //         price_usd: None,
+            //         fee,
+            //         self_address,
+            //         currency_id: None,
+            //     });
+            // }
+        }
+         */
+        Ok(res)
+    }
+
+
     pub async fn get_all_tx(
         &self,
         address: &String,
@@ -260,24 +337,30 @@ impl EthHistoricalClient {
                 let mut self_address = None;
                 let other_address = if incoming {
                     self_address = Some(to.clone());
-                    from
+                    from.clone()
                 } else {
                     self_address = Some(from.clone());
-                    to
+                    to.clone()
                 };
+                let amount_t = CurrencyAmount::from_eth_bigint_string(value_str.clone());
                 res.push(ExternalTimedTransaction {
                     tx_id,
                     timestamp,
-                    other_address,
+                    other_address: other_address.clone(),
                     other_output_addresses: vec![],
                     amount: amount as u64,
-                    bigint_amount: Some(value_str),
+                    bigint_amount: Some(value_str.clone()),
                     incoming,
                     currency: SupportedCurrency::Ethereum,
                     block_number: block_num,
                     price_usd: None,
                     fee,
                     self_address,
+                    currency_id: Some(SupportedCurrency::Ethereum.into()),
+                    currency_amount: Some(amount_t.clone()),
+                    from: structs::Address::from_eth_external(&from),
+                    to: vec![(structs::Address::from_eth_external(&to), amount_t)],
+                    other: Some(structs::Address::from_eth_external(&other_address)),
                 });
             }
         }

@@ -59,7 +59,7 @@ pub fn balance_table<E>(
     let price_map = d.price_map_usd_pair_incl_rdg.clone();
     for c in ordered_cur.iter() {
         let price = price_map.get(&c).cloned().unwrap_or(0.0);
-        if c == &SupportedCurrency::Usdt || c == &SupportedCurrency::Usdc {
+        if c == &SupportedCurrency::UsdtEth || c == &SupportedCurrency::UsdcEth {
             row.push(format!("${:.4}", price));
         } else {
             row.push(format!("${}", format_dollar_amount(price)));
@@ -96,7 +96,7 @@ pub fn queryable_balances() -> Vec<SupportedCurrency> {
         SupportedCurrency::Ethereum,
         SupportedCurrency::Monero,
         SupportedCurrency::Solana,
-        SupportedCurrency::Usdt
+        SupportedCurrency::UsdtEth
     ]
 }
 

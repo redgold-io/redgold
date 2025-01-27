@@ -1,23 +1,32 @@
+use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment};
-use crate::address_external::ToEthereumAddress;
+use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
 
 pub struct SafeMultisig {
-    network: NetworkEnvironment,
-    pub wp: WordsPass,
+    pub network: NetworkEnvironment,
+    pub self_address: Address,
+    pub private_hex: String
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct SafeCreationInfo {
+    pub tx_hash: String,
+    pub safe_addr: String
 }
 
 
 impl SafeMultisig {
 
-    pub fn new(wp: WordsPass, network: NetworkEnvironment) -> Self {
+    pub fn new(network: NetworkEnvironment, self_address: Address, private_hex: String) -> Self {
         Self {
-            wp,
-            network
+            network,
+            self_address,
+            private_hex
         }
     }
 
@@ -52,14 +61,14 @@ impl SafeMultisig {
                             Use a custom nonce for the deployment. Same nonce with same deployment configuration will lead to the same Safe address
       --without-events      Use non events deployment of the Safe instead of the regular one. Recommended for mainnet to save gas costs when using the Safe
      */
-    pub async fn create_safe(&self, threshold: i64, owners: Vec<Address>) -> RgResult<()> {
+    pub async fn create_safe(&self, threshold: i64, owners: Vec<Address>) -> RgResult<SafeCreationInfo> {
         let threshold = threshold.to_string();
         let owners_str = owners
             .iter().map(|x| x.render_string())
             .collect::<RgResult<Vec<String>>>()?;
         let owners_str = owners_str.join(" ");
         let rpc = self.rpc_url().await?;
-        let private_key = self.get_pk_hex()?;
+        let private_key = self.private_hex.clone();
         let cmd = format!("docker run -it safeglobal/safe-cli safe-creator \
             --owners {owners_str} --threshold {threshold} {rpc} {private_key}");
         println!("cmd: {}", cmd);
@@ -68,12 +77,21 @@ impl SafeMultisig {
         // Create expect script
         let expect_script = format!(
             r#"#!/usr/bin/expect -f
-spawn bash -c "{}"
-expect "Do you want to continue"
-send "y\r"
-expect "Transaction confirmed:"
-expect eof"#,
-            cmd,
+set timeout 300
+spawn {cmd}
+expect {{
+    timeout {{ puts "Timeout waiting for initial prompt"; exit 1 }}
+    "*continue*" {{ send "y\r" }}
+}}
+expect {{
+    timeout {{ puts "Timeout waiting for deployment confirmation"; exit 1 }}
+    "*Safe will be deployed*" {{ send "y\r" }}
+}}
+expect {{
+    timeout {{ puts "Timeout waiting for transaction hash"; exit 1 }}
+    "*tx-hash*" {{ puts "Transaction submitted successfully" }}
+}}
+expect eof"#
         );
 
         println!("Writing expect script: {}", expect_script.clone());
@@ -99,7 +117,29 @@ expect eof"#,
         ).await?;
         println!("stdout: {}", stdout);
         println!("stderr: {}", stderr);
-        Ok(())
+        Self::extract_creation_info(&stdout)
+    }
+
+    pub fn extract_creation_info(stdout: &str) -> RgResult<SafeCreationInfo> {
+        let tx_hash_re = regex::Regex::new(r"tx-hash=(\w+)").error_info("Invalid regex")?;
+        let safe_re = regex::Regex::new(r"Safe=(\w+)").error_info("Invalid regex")?;
+
+        let tx_hash = tx_hash_re
+            .captures(stdout)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().to_string())
+            .ok_msg("Could not find transaction hash in output")?;
+
+        let safe_addr = safe_re
+            .captures(stdout)
+            .and_then(|cap| cap.get(1))
+            .map(|m| m.as_str().to_string())
+            .ok_msg("Could not find Safe address in output")?;
+        let info = SafeCreationInfo{
+            tx_hash,
+            safe_addr,
+        };
+        Ok(info)
     }
     pub async fn safe_cli(
         &self,
@@ -114,16 +154,6 @@ expect eof"#,
         Ok(())
     }
 
-    pub fn get_pk_hex(&self) -> Result<String, ErrorInfo> {
-        let private_key = self.wp.default_kp()?.to_private_hex();
-        Ok(private_key)
-    }
-
-    pub fn self_eth_addr(&self) -> RgResult<Address> {
-        let eth_addr = self.wp.default_kp()?.public_key().to_ethereum_address_typed()?;
-        Ok(eth_addr)
-    }
-
     pub async fn rpc_url(&self) -> RgResult<String> {
         let res = {
             if self.network == NetworkEnvironment::Main {
@@ -136,16 +166,37 @@ expect eof"#,
     }
 }
 
+
+pub fn dev_ci_kp_path() -> String {
+    "m/84'/0'/0'/0/0".to_string()
+}
+
 #[ignore]
 #[tokio::test]
 pub async fn test_safe_multisig() {
     let ci = TestConstants::test_words_pass().unwrap();
     let ci1 = ci.hash_derive_words("1").unwrap();
     let ci2 = ci.hash_derive_words("2").unwrap();
+    let path = dev_ci_kp_path();
+    let pkh = ci.private_at(path.clone()).unwrap();
+    let pkh1 = ci1.private_at(path.clone()).unwrap();
+    let pkh2 = ci2.private_at(path.clone()).unwrap();
+    let addr = ci.public_at(path.clone()).unwrap().to_ethereum_address_typed().unwrap();
+    let addr1 = ci1.public_at(path.clone()).unwrap().to_ethereum_address_typed().unwrap();
+    let addr2 = ci2.public_at(path.clone()).unwrap().to_ethereum_address_typed().unwrap();
 
-    let safe = SafeMultisig::new(ci, NetworkEnvironment::Dev);
-    let safe1 = SafeMultisig::new(ci1, NetworkEnvironment::Dev);
-    let safe2 = SafeMultisig::new(ci2, NetworkEnvironment::Dev);
-    let addrs = vec![safe.self_eth_addr().unwrap(), safe1.self_eth_addr().unwrap(), safe2.self_eth_addr().unwrap()];
-    let res = safe.create_safe(2, addrs).await.unwrap();
+    let safe = SafeMultisig::new(NetworkEnvironment::Dev, addr.clone(), pkh);
+    let safe1 = SafeMultisig::new(NetworkEnvironment::Dev, addr1.clone(), pkh1);
+    let safe2 = SafeMultisig::new(NetworkEnvironment::Dev, addr2.clone(), pkh2);
+
+    let addrs = vec![addr.clone(), addr1.clone(), addr2.clone()];
+    // let res = safe.create_safe(2, addrs).await.unwrap();
+    println!("ETH ADDR {}", addr.render_string().unwrap());
+    println!("BTC ADDR main {}", ci.public_at(path.clone()).unwrap()
+        .to_bitcoin_address_typed(&NetworkEnvironment::Main).unwrap().render_string().unwrap());
+    println!("BTC ADDR {}", ci.public_at(path.clone()).unwrap()
+        .to_bitcoin_address_typed(&NetworkEnvironment::Dev).unwrap().render_string().unwrap());
+    println!("RDG ADDR {}", ci.public_at(path.clone()).unwrap()
+        .address().unwrap().render_string().unwrap());
+
 }

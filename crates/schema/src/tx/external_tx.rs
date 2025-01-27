@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::{structs, RgResult};
 use crate::explorer::BriefTransaction;
-use crate::structs::{CurrencyAmount, SupportedCurrency};
+use crate::structs::{Address, CurrencyAmount, CurrencyId, SupportedCurrency};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ExternalTimedTransaction {
@@ -17,6 +17,11 @@ pub struct ExternalTimedTransaction {
     pub price_usd: Option<f64>,
     pub fee: Option<CurrencyAmount>,
     pub self_address: Option<String>,
+    pub currency_id: Option<CurrencyId>,
+    pub currency_amount: Option<CurrencyAmount>,
+    pub from: Address,
+    pub to: Vec<(Address, CurrencyAmount)>,
+    pub other: Option<Address>
 }
 
 // Manual Eq implementation that ignores the f64 field

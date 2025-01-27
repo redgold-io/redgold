@@ -503,10 +503,10 @@ pub async fn test_btc_balance(p0: &&String, network: NetworkEnvironment) {
     let b = w.get_wallet_balance().expect("balance");
     println!("Balance: {:?}", b);
     info!("Balance: {:?}", b);
-    let txs = w.get_sourced_tx().expect("tx");
-    for t in txs {
-        println!("Tx: {:?}", t);
-    }
+    // let txs = w.get_sourced_tx().expect("tx");
+    // for t in txs {
+    //     println!("Tx: {:?}", t);
+    // }
 }
 pub async fn convert_metadata_xpub(path: &String) -> RgResult<()> {
     let md = read_metadata_json(path).await?;

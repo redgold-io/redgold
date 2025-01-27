@@ -448,74 +448,6 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Address::from_str(&addr).error_info("Unable to convert destination pk to bdk address")
     }
 
-    #[deprecated]
-    pub fn get_sourced_tx(&self) -> Result<Vec<ExternalTimedTransaction>, ErrorInfo> {
-        let self_addr = self.address()?;
-        let mut res = vec![];
-        let result = self.wallet.list_transactions(true)
-            .error_info("Error listing transactions")?;
-        for x in result.iter() {
-            let tx = x.transaction.safe_get_msg("Error getting transaction")?;
-            let mut to_self_output_amount: Option<u64> = None;
-            let mut non_self_addrs_output = vec![];
-            for o in &tx.output {
-                if let Some(a) = Address::from_script(&o.script_pubkey, self.network).ok() {
-                    if a.to_string() == self_addr {
-                        // sum value here instead?
-                        to_self_output_amount = Some(o.value)
-                    } else {
-                        non_self_addrs_output.push(a.to_string())
-                    }
-                }
-            }
-            // This is probably fine for now, but we should really keep track of all inputs
-            // in the event of use of multiple addresses?
-            let mut non_self_input_addr: Option<String> = None;
-            for i in &tx.input {
-                let txid = i.previous_output.txid;
-                let vout = i.previous_output.vout;
-                let prev_tx = self.client.get_tx(&txid).error_info("Error getting tx")?;
-                let prev_tx = prev_tx.safe_get_msg("No tx found")?;
-                let prev_output = prev_tx.output.get(vout as usize);
-                let prev_output = prev_output.safe_get_msg("Error getting output")?;
-                let a = Address::from_script(&prev_output.script_pubkey, self.network).ok();
-                // println!("{}", format!("TxIn address: {:?}", a));
-                if let Some(a) = a {
-                    let a = a.to_string();
-                    if a != self_addr {
-                        non_self_input_addr = Some(a)
-                    }
-                }
-            }
-
-            // println!("{}", format!("Transaction: {} received: {} sent: {} non_self_input_addr {} \
-            // nonself_output_addr {}",
-            //                        x.txid, x.received, x.sent,
-            //                        non_self_input_addr.unwrap_or("None".to_string()),
-            //                        to_self_output_amount.unwrap_or(0)
-            // ));
-            if let (Some(c), Some(a), Some(value)) =
-                (x.confirmation_time.clone(), non_self_input_addr, to_self_output_amount) {
-
-                let ett = ExternalTimedTransaction {
-                    tx_id: x.txid.to_string(),
-                    timestamp: Some(c.timestamp),
-                    other_address: a,
-                    other_output_addresses: non_self_addrs_output,
-                    amount: value,
-                    bigint_amount: None,
-                    incoming: true,
-                    currency: SupportedCurrency::Bitcoin,
-                    block_number: None,
-                    price_usd: None,
-                    fee: None,
-                    self_address: None
-                };
-                res.push(ett)
-            }
-        }
-        Ok(res)
-    }
 
     pub fn convert_network(network_environment: &NetworkEnvironment) -> Network {
         if *network_environment == NetworkEnvironment::Main {
@@ -604,6 +536,14 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
             output_amounts.iter().filter(|(x, _y)| x != &self_addr).next().map(|(x, _y)| x.clone())
         };
 
+        let from =
+            input_addrs.iter().next().map(|(x, _y)| structs::Address::from_bitcoin_external(x))
+                .ok_msg("No input address found")?;
+
+        let to = output_amounts.iter().map(|(x, y)| {
+            (structs::Address::from_bitcoin_external(x), CurrencyAmount::from_btc(*y as i64))
+        }).collect_vec();
+
         let amount = if incoming {
             output_amounts.iter().filter(|(x, _y)| x == &self_addr).next().map(|(_x, y)| y.clone())
         } else {
@@ -616,7 +556,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
             Some(ExternalTimedTransaction {
                 tx_id: transaction_details.txid.to_string(),
                 timestamp: block_timestamp,
-                other_address: a,
+                other_address: a.clone(),
                 other_output_addresses,
                 amount: value,
                 bigint_amount: None,
@@ -626,6 +566,11 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                 price_usd: None,
                 fee,
                 self_address: Some(self_addr),
+                currency_id: Some(SupportedCurrency::Bitcoin.into()),
+                currency_amount: Some(CurrencyAmount::from_btc(value as i64)),
+                from: from,
+                to: to,
+                other: Some(structs::Address::from_bitcoin_external(&a)),
             })
         } else {
             None
@@ -962,7 +907,7 @@ async fn balance_test() {
     let balance = w2.get_wallet_balance().expect("");
     println!("balance2: {:?}", balance);
     println!("address2: {:?}", w2.address().expect(""));
-    println!("{:?}", w2.get_sourced_tx().expect(""));
+    // println!("{:?}", w2.get_sourced_tx().expect(""));
 
 
     // w.create_transaction(tc.public2.to_struct_public_key(), 3500).expect("");

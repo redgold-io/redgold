@@ -325,7 +325,7 @@ fn translate_currency(supported_currency: SupportedCurrency) -> RgResult<String>
         SupportedCurrency::Ethereum => {
             "ETH-USD"
         },
-        SupportedCurrency::Usdt => {
+        SupportedCurrency::UsdtEth => {
             "USDT-USD"
         },
         // SupportedCurrency::Monero => {
@@ -334,7 +334,7 @@ fn translate_currency(supported_currency: SupportedCurrency) -> RgResult<String>
         SupportedCurrency::Solana => {
             "SOL-USD"
         }
-        SupportedCurrency::Usdc => {
+        SupportedCurrency::UsdcEth => {
             "USDC-USD"
         }
         _ => {
@@ -411,8 +411,8 @@ fn translate_currency_short(currency: SupportedCurrency) -> RgResult<String>  {
     let res = match currency {
         SupportedCurrency::Bitcoin => { "BTC" }
         SupportedCurrency::Ethereum => { "ETH" }
-        SupportedCurrency::Usdc => { "USDC" }
-        SupportedCurrency::Usdt => { "USDT" }
+        SupportedCurrency::UsdcEth => { "USDC" }
+        SupportedCurrency::UsdtEth => { "USDT" }
         SupportedCurrency::Monero => { "XMR" }
         SupportedCurrency::Solana => { "SOL" }
         _ => return "Unsupported currency translation".to_error()

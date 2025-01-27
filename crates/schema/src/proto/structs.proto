@@ -76,10 +76,7 @@ message PoWProof {
 // associated with the origin of a particular amount. Useful for schema-represented ERC-20 equivalent products.
 // Or other schema-driven contract definitions.
 message ProductId {
-  // Used to represent off-chain products
-  Hash network = 1;
-  // Used to represent on-chain products
-  Hash product = 2;
+  CurrencyId currency_id = 1;
 }
 
 
@@ -281,6 +278,8 @@ message BytesData {
 
 enum HashFormatType {
   Sha3_256 = 0;
+  Unknown_Format = 1;
+  Keccak_256 = 2;
 }
 
 message Hash {
@@ -587,6 +586,7 @@ message CurrencyAmount {
   // Support for arbitrary amount, used for multi-currency support
   optional string string_amount = 3;
   BytesData bytes = 4;
+  optional string decimals = 5;
   // The currency type associated with the amount, used for multi-currency support
 }
 
@@ -736,6 +736,7 @@ enum HashType {
   ADDRESS = 4;
   UNKNOWN = 5;
   Utxo_Id = 6;
+  Contract = 7;
 }
 
 message Tombstone {
@@ -1525,11 +1526,34 @@ enum SupportedCurrency {
   Bitcoin = 1;
   Ethereum = 2;
   Usd = 3;
-  Usdc = 4;
-  Usdt = 5;
+  UsdcEth = 4;
+  UsdtEth = 5;
   Solana = 6;
   Monero = 7;
   Cardano = 8;
+  WrappedRedgoldEthereum = 9;
+  WrappedRedgoldSolana = 10;
+}
+//
+//enum CurrencyType {
+//  Fiat = 0;
+//  Crypto = 1;
+//  Stablecoin = 2;
+//  Token = 3;
+//}
+//
+//enum CurrencyContractType {
+//
+//}
+
+message CurrencyDescriptor {
+  SupportedCurrency network_currency = 1;
+  Hash contract_hash = 2;
+}
+
+message CurrencyId {
+  SupportedCurrency supported_currency = 1;
+  CurrencyDescriptor descriptor = 2;
 }
 
 

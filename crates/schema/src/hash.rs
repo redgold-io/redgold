@@ -8,6 +8,9 @@ use crate::proto_serde::ProtoSerde;
 
 impl Hash {
 
+    pub fn raw_bytes_hex(&self) -> RgResult<String> {
+        Ok(hex::encode(self.raw_bytes()?))
+    }
     // Please don't use this, or be careful if using this as it's missing hash format.
     pub fn raw_bytes(&self) -> RgResult<Vec<u8>> {
         Ok(self.bytes.safe_get()?.clone().value)

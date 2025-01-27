@@ -313,7 +313,7 @@ impl GuiDepends for NativeGuiDepends {
 
             let mut deltas = HashMap::default();
             for cur in vec![
-                SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::Usdt, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::Usdc
+                SupportedCurrency::Ethereum, SupportedCurrency::Bitcoin, SupportedCurrency::UsdtEth, SupportedCurrency::Solana, SupportedCurrency::Monero, SupportedCurrency::UsdcEth
             ].iter() {
                 let delta = g2.get_24hr_delta(cur.clone()).await;
                 deltas.insert(cur.clone(), delta);

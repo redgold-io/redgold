@@ -183,6 +183,7 @@ impl PartyTestHarness {
             amount.amount
         };
 
+        // TODO: May need to fill out other fields here?
         let ts = util::current_time_millis_i64();
         let mut mocked = ExternalTimedTransaction {
             tx_id: Hash::from_string_calculate(&*ts.to_string()).hex(),
@@ -197,6 +198,11 @@ impl PartyTestHarness {
             price_usd: None,
             fee: Some(PartyEvents::expected_fee_amount(currency, &self.network).expect("fee")),
             self_address: None,
+            currency_id: None,
+            currency_amount: Some(amount.clone()),
+            from: Default::default(),
+            to: vec![],
+            other: None,
         };
 
         match currency {

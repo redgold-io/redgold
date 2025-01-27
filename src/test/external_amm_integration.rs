@@ -8,6 +8,7 @@ use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey};
@@ -41,6 +42,10 @@ pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
     } else {
         None
     }
+}
+
+pub fn dev_ci_kp_path() -> String {
+    "m/84'/0'/0'/0/0".to_string()
 }
 
 pub fn words_to_ci_keypair(w: String) -> (String, KeyPair) {
