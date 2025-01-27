@@ -35,58 +35,24 @@ pub async fn test_safe_multisig() {
 
     let safe_contract_addr = Address::from_eth_external("0x449F629b6bf816db771b69388E5b02b30ED86ACe");
 
-    // println!("pk {}", pkh);
-    // println!("pk1 {}", pkh1);
-    // println!("pk2 {}", pkh2);
-
     let eth_amount = CurrencyAmount::from_fractional_cur(0.001, SupportedCurrency::Ethereum).unwrap();
-    // println!("ETH AMOUNT {:?}", eth_amount.string_amount);
     let w = EthWalletWrapper::new(&pkh, &NetworkEnvironment::Dev).unwrap();
     let to = addr1.clone();
-    // let (tx_data, signature) = w.create_and_sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
-    // println!("TX DATA {}", hex::encode(tx_data.clone()));
-    // println!("SIGNATURE {}", hex::encode(signature.clone()));
-    // let data = EthWalletWrapper::decode_safe_tx_data(tx_data.as_ref()).unwrap();
+    println!("To {}", to.render_string().unwrap());
 
     let w1 = EthWalletWrapper::new(&pkh1, &NetworkEnvironment::Dev).unwrap();
     let w2 = EthWalletWrapper::new(&pkh2, &NetworkEnvironment::Dev).unwrap();
-    let res = w.sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
-    let res1 = w1.sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
-    let res2 = w2.sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
+    let (tx_hash, res) = w.sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
+    let (t1, res1) = w1.sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
+    // let (t2, res2) = w2.sign_safe_tx(&safe_contract_addr, &to, &eth_amount).await.unwrap();
+    assert_eq!(tx_hash, t1);
+    // assert_eq!(tx_hash, t2);
+    // EthWalletWrapper::combine_signatures(tx_hash, vec![res, res1, res2]).unwrap();
 
-    let res = w.execute_safe_transaction(&safe_contract_addr, &to, &eth_amount, vec![res, res1, res2]).await.unwrap();
-
-
-
-
-
-
-    // println!("ETH ADDR {}", addr.render_string().unwrap());
-    // println!("BTC ADDR main {}", ci.public_at(path.clone()).unwrap()
-    //     .to_bitcoin_address_typed(&NetworkEnvironment::Main).unwrap().render_string().unwrap());
-    // println!("BTC ADDR {}", ci.public_at(path.clone()).unwrap()
-    //     .to_bitcoin_address_typed(&NetworkEnvironment::Dev).unwrap().render_string().unwrap());
-    // println!("RDG ADDR {}", ci.public_at(path.clone()).unwrap()
-    //     .address().unwrap().render_string().unwrap());
-
-    // let eth = EthHistoricalClient::new(&NetworkEnvironment::Dev)
-    //     .unwrap().unwrap();
+    // println!("Actual addresses: {}", addrs.iter().map(|x| x.render_string().unwrap()).collect::<Vec<String>>().join(", "));
     //
-    // let to = safe.factory_address();
-    // let from = addr.clone();
     //
-
-    // let contracts = eth.get_all_deployed_contracts(&from, &to, None).await.unwrap();
-    //
-    // println!("Contracts {}", contracts.len());
-    // for c in contracts {
-    //     println!("Contract {}", c.render_string().unwrap());
-    // }
-    //
-    // let all = eth.get_all_raw_tx(&from, None).await.unwrap();
-    // println!("All tx {}", all.len());
-    // for tx in all {
-    //     println!("Tx {}", tx.json_or());
-    // }
+    let res = w.execute_safe_transaction(
+        &safe_contract_addr, &to, &eth_amount, vec![res, res1], tx_hash).await.unwrap();
 
 }

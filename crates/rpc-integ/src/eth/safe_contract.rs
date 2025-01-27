@@ -8,6 +8,7 @@ use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::CurrencyAmount;
 use crate::eth::eth_wallet::EthWalletWrapper;
 use ethers::core::types::U256;
+use ethers::providers::Middleware;
 use ethers::types::{Bytes, RecoveryMessage, H256};
 use redgold_keys::util::sign;
 use redgold_schema::errors::into_error::ToErrorInfo;
@@ -20,122 +21,117 @@ impl EthWalletWrapper {
         let res = safe::safe::new(safe_address, Arc::new(self.client.clone()));
         Ok(res)
     }
+    //
+    // pub async fn gas_estimate(
+    //     &self,
+    //     safe_addr: &structs::Address,
+    //     to: &structs::Address,
+    //     amount: &CurrencyAmount,
+    // ) -> RgResult<U256> {
+    //     let safe = self.safe(safe_addr).await?;
+    //     let to_address = to.render_string()?.parse::<Address>().error_info("parse to address")?;
+    //     let amount_wei = U256::from_dec_str(&amount.string_amount.clone().ok_msg("Missing amount")?)
+    //         .error_info("parse amount")?;
+    //
+    //     let data = safe.encode_transaction_data(
+    //         to_address,
+    //         amount_wei,
+    //         Bytes::default(),
+    //         0u8,
+    //         U256::zero(),
+    //         U256::zero(),
+    //         U256::zero(),
+    //         Address::zero(),
+    //         Address::zero(),
+    //         U256::zero()
+    //     ).call().await.error_info("encode transaction data")?;
+    //
+    //     let estimate = self.provider
+    //         .estimate_gas(
+    //             &TransactionRequest {
+    //                 from:   Some(self.client.address().into()),
+    //                 to:     Some(safe_address.into()),
+    //                 data:   Some(data),
+    //                 value:  Some(U256::zero()),
+    //                 ..Default::default()
+    //             }
+    //         )
+    //         .await
+    //         .error_info("estimate gas")?;
+    //     Ok(estimate)
+    // }
 
-    pub async fn get_transaction_data(
-        &self,
-        safe_contract_address: &structs::Address,
-        to: &structs::Address,
-        amount: &CurrencyAmount
-    ) -> RgResult<(Bytes, [u8; 32])> { // Return transaction data and signature
-        // Get the Safe contract instance
-        let this_safe = self.safe(safe_contract_address).await?;
-
-        // Convert destination address
-        let to_address = to.render_string()?.parse::<Address>().error_info("parse to address")?;
-
-        // Convert amount to Wei (assuming amount is in ETH)
-        let string_amount = amount.string_amount.clone().ok_msg("Missing amount")?;
-        let amount_wei = U256::from_dec_str(&*string_amount).error_info("parse amount")?;
-
-        // Get the nonce for the Safe transaction
-        let nonce = this_safe.nonce().call().await.error_info("fetch nonce")?;
-
-
-        // Create Safe transaction data
-        let tx_data = this_safe
-            .encode_transaction_data(
-                to_address,           // to
-                amount_wei,           // value
-                Bytes::default(),     // data (empty for simple ETH transfer)
-                0u8,                  // operation (0 for call)
-                U256::zero(),         // safeTxGas
-                U256::zero(),         // baseGas
-                U256::zero(),         // gasPrice
-                Address::zero(),      // gasToken
-                Address::zero(),      // refundReceiver
-                nonce                 // _nonce
-            )
-            .call()
-            .await
-            .error_info("encode transaction")?;
-
-
-        // Get the transaction hash
-        let tx_hash = this_safe
-            .get_transaction_hash(
-                to_address,           // to
-                amount_wei,           // value
-                Bytes::default(),     // data (empty for simple ETH transfer)
-                0u8,                  // operation (0 for call)
-                U256::zero(),         // safeTxGas
-                U256::zero(),         // baseGas
-                U256::zero(),         // gasPrice
-                Address::zero(),      // gasToken
-                Address::zero(),      // refundReceiver
-                nonce                 // nonce
-            )
-            .call()
-            .await
-            .error_info("get transaction hash")?;
-
-
-        Ok((tx_data, tx_hash))
-    }
     pub async fn sign_safe_tx(
         &self,
         safe_addr: &structs::Address,
         to: &structs::Address,
         amount: &CurrencyAmount,
-    ) -> RgResult<Bytes> {
+    ) -> RgResult<([u8; 32], Bytes)> {
         let safe = self.safe(safe_addr).await?;
 
-        // Convert addresses and amount
         let to_address = to.render_string()?.parse::<Address>().error_info("parse to address")?;
         let amount_wei = U256::from_dec_str(&amount.string_amount.clone().ok_msg("Missing amount")?)
             .error_info("parse amount")?;
 
-        // Get the nonce
         let nonce = safe.nonce().call().await.error_info("fetch nonce")?;
 
-        // Get the transaction hash
+
+        // // Get the domain separator
+        // let domain_separator = safe.domain_separator().call().await.error_info("get domain separator")?;
+        // println!("Domain separator: 0x{}", hex::encode(domain_separator));
+
+        // Get the safe transaction hash
         let tx_hash = safe
             .get_transaction_hash(
-                to_address,           // to
-                amount_wei,           // value
-                Bytes::default(),     // data (empty for simple ETH transfer)
-                0u8,                  // operation (0 for call)
-                U256::zero(),         // safeTxGas
-                U256::zero(),         // baseGas
-                U256::zero(),         // gasPrice
-                Address::zero(),      // gasToken
-                Address::zero(),      // refundReceiver
-                nonce                 // nonce
+                to_address,
+                amount_wei,
+                Bytes::default(),
+                0u8,
+                U256::zero(),
+                U256::zero(),
+                U256::zero(),
+                Address::zero(),
+                Address::zero(),
+                nonce
             )
             .call()
             .await
             .error_info("get transaction hash")?;
 
-        // Sign the transaction hash
+        // println!("Safe tx hash: 0x{}", hex::encode(tx_hash));
+
+        // Sign the hash
         let signature = self.client.signer()
-            .sign_message(tx_hash)
+            .sign_message(&tx_hash)
             .await
             .error_info("sign transaction")?;
 
-        Ok(signature.to_vec().into())
+        let sig_bytes = signature.to_vec();
+        // println!("Signature: 0x{}", hex::encode(&sig_bytes));
 
+        Ok((tx_hash, sig_bytes.into()))
     }
     pub async fn execute_safe_transaction(
         &self,
         safe_addr: &structs::Address,
         to: &structs::Address,
         amount: &CurrencyAmount,
-        signatures: Vec<Bytes>
+        signatures: Vec<Bytes>,
+        message_hash: [u8; 32],
     ) -> RgResult<()> {
         let safe = self.safe(safe_addr).await?;
 
-        let (tx_data, tx_hash) = self.get_transaction_data(safe_addr, to, amount).await?;
 
-        let combined_signatures = Self::combine_signatures(tx_hash.into(), signatures)?;
+        // Log threshold and owners
+        let threshold = safe.get_threshold().call().await.error_info("threshold")?;
+        let owners = safe.get_owners().call().await.error_info("owners")?;
+        println!("Safe threshold: {}", threshold);
+        println!("Safe owners: {:?}", owners);
+
+        // Log number of signatures
+        println!("Number of signatures provided: {}", signatures.len());
+
+        let combined_signatures = Self::combine_signatures(message_hash, signatures)?;
 
         // Convert destination address
         let to_address = to.render_string()?.parse::<Address>().error_info("parse to address")?;
@@ -143,7 +139,6 @@ impl EthWalletWrapper {
         // Convert amount to Wei
         let amount_wei = U256::from_dec_str(&amount.string_amount.clone().ok_msg("Missing amount")?)
             .error_info("parse amount")?;
-
         // Execute transaction with collected signatures
         safe.exec_transaction(
             to_address,           // destination address
@@ -157,6 +152,7 @@ impl EthWalletWrapper {
             Address::zero(),      // refundReceiver
             combined_signatures   // combined signatures
         )
+            .gas(3_500_000u64)
             .send()
             .await
             .error_info("Failed to execute transaction")?;
@@ -164,9 +160,11 @@ impl EthWalletWrapper {
         Ok(())
     }
     pub fn combine_signatures(
-        tx_hash: H256,
+        message_hash: [u8; 32],
         signatures: Vec<Bytes>
     ) -> RgResult<Bytes> {
+
+        let rec_message = RecoveryMessage::Data(message_hash.to_vec());
         // First recover signer addresses from signatures to sort them
         let mut sigs_with_addresses: Vec<(Address, Bytes)> = signatures
             .into_iter()
@@ -181,7 +179,7 @@ impl EthWalletWrapper {
 
                 // Recover the address using ecrecover
                 let recovered = signature
-                    .recover(tx_hash)
+                    .recover(rec_message.clone())
                     .error_info("Failed to recover address")?;
 
                 Ok((recovered, sig))
@@ -190,6 +188,7 @@ impl EthWalletWrapper {
 
         // Sort by signer address
         sigs_with_addresses.sort_by(|a, b| a.0.cmp(&b.0));
+        println!("Sorted signer addresses: {:?}", sigs_with_addresses.iter().map(|(addr, _)| addr).collect::<Vec<_>>());
 
         // Concatenate sorted signatures
         let mut combined = Vec::new();
@@ -199,22 +198,5 @@ impl EthWalletWrapper {
 
         Ok(combined.into())
     }
-    // Add helper method to decode transaction data
-    // pub fn decode_safe_tx_data(tx_data: &[u8]) -> RgResult<(Address, U256, Bytes, u8)> {
-    //     if tx_data.len() < 100 {
-    //         "Transaction data too short".to_error()?
-    //     }
-    //
-    //     let to = Address::from_slice(&tx_data[16..36]);
-    //     let value = U256::from_big_endian(&tx_data[36..68]);
-    //     let data_length = U256::from_big_endian(&tx_data[68..100]).as_usize();
-    //     let data = if data_length > 0 && tx_data.len() >= 100 + data_length {
-    //         Bytes::from(&tx_data[100..100 + data_length])
-    //     } else {
-    //         Bytes::default()
-    //     };
-    //     let operation = 0u8;  // Default to Call operation
-    //
-    //     Ok((to, value, data, operation))
-    // }
+
 }
