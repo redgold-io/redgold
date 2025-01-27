@@ -1,7 +1,7 @@
 use rocket::yansi::Paint;
 use redgold_schema::{error_info, from_hex};
 use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, PeerId, PublicKey, Transaction, TransactionInfo, TransactionState};
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use crate::core::relay::Relay;
 use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};

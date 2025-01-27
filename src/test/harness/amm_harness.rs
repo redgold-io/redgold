@@ -6,7 +6,7 @@ use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, PublicKey, SupportedCurrency};

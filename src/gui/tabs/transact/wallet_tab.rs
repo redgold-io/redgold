@@ -19,7 +19,7 @@ use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, Hash, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use crate::hardware::trezor;

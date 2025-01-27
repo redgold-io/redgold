@@ -44,7 +44,7 @@ use redgold_data::peer::PeerTrustQueryResult;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -305,6 +305,7 @@ impl Relay {
                 let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
                     pk.clone(), self.node_config.network.clone(), true,
                     self.node_config.env_data_folder().bdk_sled_path2(),
+                    None,
                     None
                 )?;
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));

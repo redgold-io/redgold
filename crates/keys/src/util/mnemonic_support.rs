@@ -22,7 +22,7 @@ use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::KeyPair;
 use crate::proof_support::PublicKeySupport;
-use crate::util::btc_wallet::SingleKeyBitcoinWallet;
+use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use crate::xpub_wrapper::ValidateDerivationPath;
 
 pub trait MnemonicSupport {

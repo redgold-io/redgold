@@ -7,15 +7,13 @@ use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 
 use redgold_schema::{bytes_data, error_info, error_message,
-                     ErrorInfoContext, structs};
+                     structs, ErrorInfoContext};
 use redgold_schema::structs::ErrorInfo;
 
-use crate::{TestConstants, util};
+use crate::{util, TestConstants};
 
 pub mod mnemonic_builder;
 pub mod mnemonic_support;
-pub mod bitcoin_message_signer;
-pub mod btc_wallet;
 pub mod keys;
 
 // TODO: Replace with our own signature type

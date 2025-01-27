@@ -87,9 +87,9 @@ impl EthWalletWrapper {
                 amount_wei,
                 Bytes::default(),
                 0u8,
-                U256::zero(),
-                U256::zero(),
-                U256::zero(),
+                U256::from(150000),    // safe_tx_gas - estimate for ETH transfer
+                U256::from(121000),    // base_gas - standard ETH transfer cost
+                U256::from(1),        // gas_price - minimum non-zero value
                 Address::zero(),
                 Address::zero(),
                 nonce
@@ -102,8 +102,7 @@ impl EthWalletWrapper {
 
         // Sign the hash
         let signature = self.client.signer()
-            .sign_message(&tx_hash)
-            .await
+            .sign_hash(H256::from(tx_hash))
             .error_info("sign transaction")?;
 
         let sig_bytes = signature.to_vec();
@@ -111,60 +110,14 @@ impl EthWalletWrapper {
 
         Ok((tx_hash, sig_bytes.into()))
     }
-    pub async fn execute_safe_transaction(
-        &self,
-        safe_addr: &structs::Address,
-        to: &structs::Address,
-        amount: &CurrencyAmount,
-        signatures: Vec<Bytes>,
-        message_hash: [u8; 32],
-    ) -> RgResult<()> {
-        let safe = self.safe(safe_addr).await?;
 
-
-        // Log threshold and owners
-        let threshold = safe.get_threshold().call().await.error_info("threshold")?;
-        let owners = safe.get_owners().call().await.error_info("owners")?;
-        println!("Safe threshold: {}", threshold);
-        println!("Safe owners: {:?}", owners);
-
-        // Log number of signatures
-        println!("Number of signatures provided: {}", signatures.len());
-
-        let combined_signatures = Self::combine_signatures(message_hash, signatures)?;
-
-        // Convert destination address
-        let to_address = to.render_string()?.parse::<Address>().error_info("parse to address")?;
-
-        // Convert amount to Wei
-        let amount_wei = U256::from_dec_str(&amount.string_amount.clone().ok_msg("Missing amount")?)
-            .error_info("parse amount")?;
-        // Execute transaction with collected signatures
-        safe.exec_transaction(
-            to_address,           // destination address
-            amount_wei,           // amount in wei
-            Bytes::default(),     // data (empty for simple ETH transfer)
-            0u8,                  // operation (0 for Call)
-            U256::zero(),         // safeTxGas
-            U256::zero(),         // baseGas
-            U256::zero(),         // gasPrice
-            Address::zero(),      // gasToken
-            Address::zero(),      // refundReceiver
-            combined_signatures   // combined signatures
-        )
-            .gas(3_500_000u64)
-            .send()
-            .await
-            .error_info("Failed to execute transaction")?;
-
-        Ok(())
-    }
     pub fn combine_signatures(
         message_hash: [u8; 32],
         signatures: Vec<Bytes>
     ) -> RgResult<Bytes> {
 
-        let rec_message = RecoveryMessage::Data(message_hash.to_vec());
+        let rec_message = RecoveryMessage::Hash(H256::from(message_hash));
+        // let rec_message = RecoveryMessage::Data(message_hash.to_vec());
         // First recover signer addresses from signatures to sort them
         let mut sigs_with_addresses: Vec<(Address, Bytes)> = signatures
             .into_iter()
@@ -197,6 +150,56 @@ impl EthWalletWrapper {
         }
 
         Ok(combined.into())
+    }
+    pub async fn execute_safe_transaction(
+        &self,
+        safe_addr: &structs::Address,
+        to: &structs::Address,
+        amount: &CurrencyAmount,
+        signatures: Vec<Bytes>,
+        message_hash: [u8; 32],
+    ) -> RgResult<String> {
+        let safe = self.safe(safe_addr).await?;
+
+
+        // Log threshold and owners
+        let threshold = safe.get_threshold().call().await.error_info("threshold")?;
+        let owners = safe.get_owners().call().await.error_info("owners")?;
+        println!("Safe threshold: {}", threshold);
+        println!("Safe owners: {:?}", owners);
+
+        // Log number of signatures
+        println!("Number of signatures provided: {}", signatures.len());
+
+        let combined_signatures = Self::combine_signatures(message_hash, signatures)?;
+
+        // Convert destination address
+        let to_address = to.render_string()?.parse::<Address>().error_info("parse to address")?;
+
+        // Convert amount to Wei
+        let amount_wei = U256::from_dec_str(&amount.string_amount.clone().ok_msg("Missing amount")?)
+            .error_info("parse amount")?;
+        // Execute transaction with collected signatures
+        let call = safe.exec_transaction(
+            to_address,           // destination address
+            amount_wei,           // amount in wei
+            Bytes::default(),     // data (empty for simple ETH transfer)
+            0u8,                  // operation (0 for Call)
+            U256::from(150000),    // safe_tx_gas - estimate for ETH transfer
+            U256::from(121000),    // base_gas - standard ETH transfer cost
+            U256::from(1),        // gas_price - minimum non-zero value
+            Address::zero(),      // gasToken
+            Address::zero(),      // refundReceiver
+            combined_signatures   // combined signatures
+        )
+            .gas(3_500_000u64);
+        let result = call
+            .send()
+            .await
+            .error_info("Failed to execute transaction")?;
+        let h256 = result.tx_hash();
+        Ok(hex::encode(h256.0))
+
     }
 
 }

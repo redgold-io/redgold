@@ -161,7 +161,7 @@ pub async fn check_updated_multiparty_csv(r: &Relay) -> RgResult<()> {
                 .and_then(|i| i.identifier.as_ref())
                 .and_then(|i| i.room_id.as_ref()) {
                 r.ds.multiparty_store.update_room_id_party_key(&room_id, &pk).await?;
-                info!("Imported multiparty updated room id {} with party key {}", room_id, pk.hex());
+                info!("Imported multiparty updated room id {} with party key {}", room_id.json_or(), pk.hex());
             }
 
         }

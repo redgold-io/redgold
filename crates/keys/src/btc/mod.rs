@@ -1,2 +1,10 @@
-mod multisig_taproot;
-mod multisig_script;
+pub mod multisig_taproot;
+pub mod multisig_script;
+pub mod bitcoin_message_signer;
+pub mod btc_wallet;
+pub mod threshold_multiparty;
+pub mod single_signer;
+pub mod debug;
+pub mod daq;
+pub mod hardware;
+pub mod multisig_bdk;

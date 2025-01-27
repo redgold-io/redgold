@@ -330,7 +330,7 @@ pub fn trezor_bitcoin_standard_path(account_num: u32, non_standard_coin_type: Op
 /// PublicKey here should ideally be derived from an xpub requested earlier in the process
 /// And needs to match the supplied path
 pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Result<Proof, ErrorInfo> {
-    let msg = redgold_keys::util::bitcoin_message_signer::message_from_hash(hash);
+    let msg = redgold_keys::btc::bitcoin_message_signer::message_from_hash(hash);
     let signature = sign_message(path, msg)?;
     let sig = signature.signature();
     let proof = Proof::from(public, sig);

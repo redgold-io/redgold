@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use flume::Sender;
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::structs::{PublicKey, SupportedCurrency};
 use tracing::{error, info};
 use redgold_keys::address_external::ToEthereumAddress;

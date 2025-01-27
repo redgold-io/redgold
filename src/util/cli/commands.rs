@@ -13,7 +13,7 @@ use redgold_keys::address_support::AddressSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::conf::node_config::NodeConfig;

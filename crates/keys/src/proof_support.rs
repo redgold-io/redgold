@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use itertools::Itertools;
-use redgold_schema::{error_info, error_message, from_hex, RgResult, SafeOption, signature_data, structs};
+use redgold_schema::{error_info, error_message, from_hex, signature_data, structs, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, SupportedCurrency};
-use crate::{KeyPair, TestConstants, util};
+use crate::{btc, util, KeyPair, TestConstants};
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::{public_key_ser, ToPublicKey};
 
@@ -116,7 +116,7 @@ impl ProofSupport for Proof {
             }
             // SignatureType::EcdsaBitcoinSignMessageHardware
             1 => {
-                util::bitcoin_message_signer::prepare_message_sign_hash(&hash)
+                btc::bitcoin_message_signer::prepare_message_sign_hash(&hash)
             }
             _ => {
                 return Err(error_info(

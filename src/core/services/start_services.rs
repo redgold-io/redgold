@@ -188,10 +188,10 @@ impl Node {
             RecentParityCheck::new(&relay), Duration::from_secs(3600), false
         ));
 
-        // if let Some(jh) = relay.eth_daq.start(&relay.node_config).await {
-        //     let result = jh.expect("eth_daq start failed");
-        //     sjh.add("EthNodeSubscriber", result);
-        // }
+        if let Some(jh) = relay.eth_daq.start(&relay.node_config).await {
+            let result = jh.expect("eth_daq start failed");
+            sjh.add("EthDaq", result);
+        }
 
         sjh.handles
     }

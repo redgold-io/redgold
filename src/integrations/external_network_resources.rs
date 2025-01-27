@@ -13,7 +13,7 @@ use tokio::sync::Mutex;
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::{KeyPair, TestConstants};
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
@@ -67,6 +67,7 @@ impl ExternalNetworkResourcesImpl {
                 let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
                     pk.clone(), self.node_config.network.clone(), true,
                     self.node_config.env_data_folder().bdk_sled_path(),
+                    None,
                     None
                 )?;
                 // println!("New wallet created");

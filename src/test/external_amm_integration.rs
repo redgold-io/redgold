@@ -3,7 +3,7 @@ use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 
 use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;

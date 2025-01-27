@@ -26,7 +26,7 @@ pub mod monero;
 pub mod gpg;
 pub mod word_pass_support;
 pub mod eth;
-mod btc;
+pub mod btc;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,
@@ -42,6 +42,11 @@ pub struct TestConstants {
 }
 
 impl TestConstants {
+
+    pub fn dev_ci_kp_path() -> String {
+        "m/84'/0'/0'/0/0".to_string()
+    }
+
 
     pub fn test_words() -> Option<String> {
         std::env::var("REDGOLD_TEST_WORDS").ok()
