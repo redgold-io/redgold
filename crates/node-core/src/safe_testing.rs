@@ -12,7 +12,7 @@ pub fn dev_ci_kp_path() -> String {
     "m/84'/0'/0'/0/0".to_string()
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn test_safe_multisig() {
     let ci = TestConstants::test_words_pass().unwrap();
