@@ -87,9 +87,12 @@ impl EthWalletWrapper {
                 amount_wei,
                 Bytes::default(),
                 0u8,
-                U256::from(150000),    // safe_tx_gas - estimate for ETH transfer
-                U256::from(121000),    // base_gas - standard ETH transfer cost
-                U256::from(1),        // gas_price - minimum non-zero value
+                U256::zero(),
+                U256::zero(),
+                U256::zero(),
+                // U256::from(150000),    // safe_tx_gas - estimate for ETH transfer
+                // U256::from(121000),    // base_gas - standard ETH transfer cost
+                // U256::from(1),        // gas_price - minimum non-zero value
                 Address::zero(),
                 Address::zero(),
                 nonce
@@ -185,14 +188,17 @@ impl EthWalletWrapper {
             amount_wei,           // amount in wei
             Bytes::default(),     // data (empty for simple ETH transfer)
             0u8,                  // operation (0 for Call)
-            U256::from(150000),    // safe_tx_gas - estimate for ETH transfer
-            U256::from(121000),    // base_gas - standard ETH transfer cost
-            U256::from(1),        // gas_price - minimum non-zero value
+            U256::zero(),
+            U256::zero(),
+            U256::zero(),
+            // U256::from(150000),    // safe_tx_gas - estimate for ETH transfer
+            // U256::from(121000),    // base_gas - standard ETH transfer cost
+            // U256::from(1),        // gas_price - minimum non-zero value
             Address::zero(),      // gasToken
             Address::zero(),      // refundReceiver
             combined_signatures   // combined signatures
         )
-            .gas(3_500_000u64);
+            .gas(150_000u64);
         let result = call
             .send()
             .await

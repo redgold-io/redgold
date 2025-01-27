@@ -29,7 +29,8 @@ pub struct PartyConfigData {
     pub order_cutoff_delay_time: Option<i64>,
     pub poll_interval: Option<i64>,
     pub peer_timeout_seconds: Option<i64>,
-    pub gg20_peer_timeout_seconds: Option<i64>
+    pub gg20_peer_timeout_seconds: Option<i64>,
+    pub party_config: Option<NodePartyConfig>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -221,6 +222,7 @@ impl ConfigData {
                 poll_interval: None,
                 peer_timeout_seconds: None,
                 gg20_peer_timeout_seconds: None,
+                party_config: None,
             }),
             debug: None,
             local: Some(LocalStoredState {
@@ -242,6 +244,7 @@ impl ConfigData {
                                 keys: None,
                                 reward_address: None,
                                 use_id_ds_prefix: None,
+                                party_config: None,
                             }
                         ]
                         ),
@@ -321,7 +324,7 @@ impl ConfigData {
 }
 
 use std::env;
-use crate::conf::server_config::{Deployment, DeploymentDefaultParams, NodeInstance, ServerData};
+use crate::conf::server_config::{Deployment, DeploymentDefaultParams, NodeInstance, NodePartyConfig, ServerData};
 use crate::party::external_data::PriceDataPointUsdQuery;
 use crate::proto_serde::ProtoSerde;
 use crate::RgResult;

@@ -5,6 +5,7 @@ use std::str::FromStr;
 use serde::Serialize;
 use serde::Deserialize;
 use crate::{ErrorInfoContext, RgResult};
+use crate::conf::server_config::NodePartyConfig;
 use crate::helpers::easy_json::json_pretty;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{Address, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerMetadata, PublicKey, TransportInfo, VersionInfo};
@@ -21,7 +22,8 @@ pub struct ServerOldFormat {
     pub node_name: Option<String>,
     pub external_host: Option<String>,
     pub reward_address: Option<String>,
-    pub jump_host: Option<String>
+    pub jump_host: Option<String>,
+    pub party_config: Option<NodePartyConfig>,
 }
 
 impl ServerOldFormat {
@@ -104,6 +106,7 @@ impl ServerOldFormat {
             external_host: Some(host_str),
             reward_address: None,
             jump_host: None,
+            party_config: None,
         }
     }
 

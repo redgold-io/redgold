@@ -27,6 +27,19 @@ pub struct DockerSwarmProxy {
     proxy_host: String,
 }
 
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct MultisigContract {
+    network: String,
+    address: String,
+    currency: String
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct NodePartyConfig {
+    contracts: Option<Vec<MultisigContract>>
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct NodeInstance {
     // Enable multiparty support, requires API keys and additional setup for oracle pricing info.
@@ -38,7 +51,8 @@ pub struct NodeInstance {
     pub docker_swarm_proxy: Option<String>,
     pub keys: Option<Keys>,
     pub reward_address: Option<String>,
-    pub use_id_ds_prefix: Option<bool>
+    pub use_id_ds_prefix: Option<bool>,
+    pub party_config: Option<NodePartyConfig>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]

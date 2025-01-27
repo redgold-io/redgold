@@ -37,7 +37,7 @@ pub async fn test_safe_multisig() {
 
     let eth_amount = CurrencyAmount::from_fractional_cur(0.001, SupportedCurrency::Ethereum).unwrap();
     let w = EthWalletWrapper::new(&pkh, &NetworkEnvironment::Dev).unwrap();
-    let to = addr1.clone();
+    let to = addr.clone();
     println!("To {}", to.render_string().unwrap());
 
     let w1 = EthWalletWrapper::new(&pkh1, &NetworkEnvironment::Dev).unwrap();

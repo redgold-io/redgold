@@ -63,6 +63,7 @@ async fn debug_ssh_invoke() {
         external_host: None,
         reward_address: None,
         jump_host: None,
+        party_config: None,
     };
 
     let mut dm = DeployMachine::new(&s, None, None);
@@ -259,6 +260,7 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
     email.from = env.get("REDGOLD_FROM_EMAIL").cloned();
     let party = config.party.get_or_insert(Default::default());
     let external = config.external.get_or_insert(Default::default());
+    party.party_config = ssh.server.party_config.clone();
 
     if ssh.server.index == 0 && nc.development_mode() {
         if nc.development_mode_main() {
@@ -290,6 +292,7 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
         for port_i in port_range {
             let port_o = (port as i64) + port_i;
             ssh.exes(format!("sudo ufw allow proto tcp from any to any port {}", port_o), p).await?;
+            ssh.exes(format!("sudo ufw allow proto udp from any to any port {}", port_o), p).await?;
         }
     }
 
