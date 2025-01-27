@@ -65,6 +65,7 @@ pub async fn add_server(add_server: &AddServer, config: &NodeConfig) -> Result<(
         external_host: None,
         reward_address: None,
         jump_host: None,
+        party_config: None,
     });
     ds.config_store.insert_update("servers".to_string(), json(&servers)?).await?;
     Ok(())
