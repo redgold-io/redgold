@@ -331,26 +331,6 @@ impl SolanaNetwork {
 
         Ok(signer_address.to_string())
     }
-    pub async fn list_multisig_transactions_raw(&self, multisig_address: impl Into<String>) -> RgResult<Vec<Account>> {
-        let client = self.rpc_confirmed().await;
-        let mut transactions = vec![];
-        let mut index = 0u64;
-
-        // Keep checking until we hit an account that doesn't exist
-        let addr = multisig_address.into();
-        loop {
-            let tx_address = self.get_transaction_pda(addr.clone(), index).await?;
-            match client.get_account(&Pubkey::from_str(&tx_address).error_info("pubkey")?).await {
-                Ok(a) => {
-                    transactions.push(a);
-                    index += 1;
-                },
-                Err(_) => break // Stop when we hit a non-existent account
-            }
-        }
-
-        Ok(transactions)
-    }
 
     // Optional: Get full transaction info including status
     pub async fn get_transaction_info(&self, tx_address: impl Into<String>) -> RgResult<Vec<u8>> {

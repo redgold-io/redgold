@@ -30,7 +30,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
     }
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn balance_test_mn() {
     let ci = TestConstants::test_words_pass().unwrap();
