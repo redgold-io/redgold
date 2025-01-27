@@ -17,3 +17,6 @@ redgold-schema = { workspace = true}
 redgold-data = { workspace = true}
 redgold-keys = { workspace = true}
 redgold-executor = { workspace = true}
+redgold-rpc-integ = { workspace = true}
+tokio = {workspace = true}
+hex = "0.4.3"

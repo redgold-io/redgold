@@ -115,7 +115,8 @@ impl Address {
         ret
     }
 
-    pub fn from_eth_external(address: &String) -> Address {
+    pub fn from_eth_external(address: impl Into<String>) -> Address {
+        let address = address.into();
         let mut ret = Self::from_eth(address);
         ret.currency = SupportedCurrency::Ethereum as i32;
         ret

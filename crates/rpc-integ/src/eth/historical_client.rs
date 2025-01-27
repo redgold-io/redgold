@@ -3,9 +3,9 @@ use num_bigint::{BigInt, Sign};
 use alloy_chains::Chain;
 use ethers::addressbook::Address;
 use ethers::prelude::U256;
-use foundry_block_explorers::account::{GenesisOption, Sort, TokenQueryOption, TxListParams};
+use foundry_block_explorers::account::{GenesisOption, NormalTransaction, Sort, TokenQueryOption, TxListParams};
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
 use std::str::FromStr;
 use std::time::Duration;
 use ethers::utils::hex;
@@ -17,7 +17,7 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::examples::example;
 
 pub struct EthHistoricalClient {
-    client: Client,
+    pub client: Client,
 }
 
 impl EthHistoricalClient {
@@ -216,6 +216,37 @@ impl EthHistoricalClient {
     }
 
 
+    pub async fn get_all_deployed_contracts(
+        &self,
+        address: &structs::Address,
+        to_address: &structs::Address,
+        start_block: Option<u64>
+    ) -> RgResult<Vec<structs::Address>> {
+        let address = address.render_string()?;
+        let addr = address.parse().error_info("address parse failure")?;
+        let tx_params = if let Some(s) = start_block {
+            Some(TxListParams::new(s, 1e16 as u64, 0, 0, Sort::Asc))
+        } else {
+            None
+        };
+        let txs = self.client.get_transactions(&addr, tx_params)
+            .await
+            .error_info("EthHistoricalClient get_all_deployed_contracts transaction fetch failure")?;
+        let mut res = vec![];
+        let to_address = to_address.render_string()?;
+        for t in txs {
+            // if let Some(to) = t.to.as_ref() {
+            //     if to_address == to.to_string() {
+                    if let Some(c) = t.contract_address {
+                        let addr = c.to_string();
+                        let addr = structs::Address::from_eth(&addr);
+                        res.push(addr);
+                    }
+                // }
+            // }
+        }
+        Ok(res)
+    }
 
     pub async fn get_all_erc20_token_tx(
         &self,
@@ -238,13 +269,10 @@ impl EthHistoricalClient {
 
         let mut res: Vec<ExternalTimedTransaction> = vec![];
         for t in txs.iter() {
-            let mut ett = ExternalTimedTransaction::default();
             let txid = hex::encode(t.hash.0);
-            ett.tx_id = txid;
             let to_opt = t.to.map(|h| h.to_string());
             let timestamp = t.time_stamp.parse::<u64>().ok().map(|t| t * 1000);
             let block_num = t.block_number.as_number().map(|b| b.as_limbs()[0].clone());
-
             let value_str = t.value.to_string();
             // t.token_decimal
             let amount = Self::translate_value(&value_str)?;
@@ -292,6 +320,23 @@ impl EthHistoricalClient {
         Ok(res)
     }
 
+    pub async fn get_all_raw_tx(
+        &self,
+        address: &structs::Address,
+        start_block: Option<u64>
+    ) -> RgResult<Vec<NormalTransaction>> {
+        let address = address.render_string()?;
+        let addr = address.parse().error_info("address parse failure")?;
+
+        let tx_params = if let Some(s) = start_block {
+            Some(TxListParams::new(s, 1e16 as u64, 0, 0, Sort::Asc))
+        } else {
+            None
+        };
+        let txs = self.client.get_transactions(&addr, tx_params).await
+            .error_info("EthHistoricalClient get_all_tx transaction fetch failure")?;
+        Ok(txs)
+    }
 
     pub async fn get_all_tx(
         &self,

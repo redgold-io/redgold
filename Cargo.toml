@@ -46,6 +46,7 @@ members = [
     "crates/ci",
     "crates/ops",
     "crates/daq",
+    "crates/safe-bindings",
 ]
 exclude = ["examples/experiments/rust_wasm", "ai", "ai-py"]
 
@@ -78,6 +79,7 @@ redgold-common = { path = "crates/common" , version = "0.1.41" }
 redgold-common-no-wasm = { path = "crates/common-no-wasm" , version = "0.1.41" }
 redgold-fs = { path = "crates/fs" , version = "0.1.41" }
 redgold-ops = { path = "crates/ops" , version = "0.1.41" }
+redgold-safe-bindings = { path = "crates/safe-bindings" , version = "0.1.41" }
 
 # Serialization
 serde = { version = "1.0.130", features = ["default", "derive"] }

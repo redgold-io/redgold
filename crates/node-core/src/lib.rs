@@ -1,4 +1,5 @@
 mod debug_fs_test;
+mod safe_testing;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

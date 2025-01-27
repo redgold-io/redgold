@@ -587,6 +587,7 @@ message CurrencyAmount {
   optional string string_amount = 3;
   BytesData bytes = 4;
   optional string decimals = 5;
+  optional CurrencyId currency_id = 6;
   // The currency type associated with the amount, used for multi-currency support
 }
 

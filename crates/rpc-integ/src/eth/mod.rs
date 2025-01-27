@@ -4,3 +4,4 @@ pub mod eth_amounts;
 pub mod validate_tx;
 pub mod offline_eth;
 pub mod ws_rpc;
+pub mod safe_contract;

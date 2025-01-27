@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment};
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
+
+// cast bind --crate-name safe-bindings keys/src/eth/safe.json
 
 pub struct SafeMultisig {
     pub network: NetworkEnvironment,
@@ -21,6 +23,14 @@ pub struct SafeCreationInfo {
 
 
 impl SafeMultisig {
+
+    pub fn factory_address(&self) -> structs::Address {
+        if self.network == NetworkEnvironment::Main {
+            panic!("Main network not supported");
+        } else {
+            Address::from_eth_external("0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67")
+        }
+    }
 
     pub fn new(network: NetworkEnvironment, self_address: Address, private_hex: String) -> Self {
         Self {
@@ -141,6 +151,34 @@ expect eof"#
         };
         Ok(info)
     }
+    /*
+    this will get regexable information
+     ____           __          ____  _      ___
+/ ___|   __ _  / _|  ___   / ___|| |    |_ _|
+\___ \  / _` || |_  / _ \ | |    | |     | |
+ ___) || (_| ||  _||  __/ | |___ | |___  | |
+|____/  \__,_||_|   \___|  \____||_____||___|
+
+
+Version: 1.4.0
+Warning: Input is not a terminal (fd=0).
+Loading Safe information...
+Address=0x449F629b6bf816db771b69388E5b02b30ED86ACe
+Nonce=0
+Threshold=2
+Owners=['0xA729F9430fc31Cda6173A0e81B55bBC92426f759', '0x0504B07Ea15D1bE5e8c49B7e4cfF43f26743f9Ac', '0x4F7d0E7F809C2C278FB5D3F558bc0F71017c4847']
+Master_copy=0x29fcB43b46531BcA003ddC8FCB67FFE91900C762
+Modules=[]
+Fallback_handler=0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99
+Guard=0x0000000000000000000000000000000000000000
+Balance_ether=0
+Version=1.4.1
+Safe Tx Service=https://safe-transaction-sepolia.safe.global/api/v1/safes/0x449F629b6bf816db771b69388E5b02b30ED86ACe/transactions/
+Etherscan=https://sepolia.etherscan.io/address/0x449F629b6bf816db771b69388E5b02b30ED86ACe
+Ledger=Disabled  Optional ledger library is not installed, run pip install safe-cli[ledger]
+Trezor=Disabled  Optional trezor library is not installed, run pip install safe-cli[trezor]
+    docker run safeglobal/safe-cli safe-cli 0x449F629b6bf816db771b69388E5b02b30ED86ACe https://sepolia.drpc.org
+    */
     pub async fn safe_cli(
         &self,
         checksummed_safe_address: String,
@@ -166,37 +204,3 @@ expect eof"#
     }
 }
 
-
-pub fn dev_ci_kp_path() -> String {
-    "m/84'/0'/0'/0/0".to_string()
-}
-
-#[ignore]
-#[tokio::test]
-pub async fn test_safe_multisig() {
-    let ci = TestConstants::test_words_pass().unwrap();
-    let ci1 = ci.hash_derive_words("1").unwrap();
-    let ci2 = ci.hash_derive_words("2").unwrap();
-    let path = dev_ci_kp_path();
-    let pkh = ci.private_at(path.clone()).unwrap();
-    let pkh1 = ci1.private_at(path.clone()).unwrap();
-    let pkh2 = ci2.private_at(path.clone()).unwrap();
-    let addr = ci.public_at(path.clone()).unwrap().to_ethereum_address_typed().unwrap();
-    let addr1 = ci1.public_at(path.clone()).unwrap().to_ethereum_address_typed().unwrap();
-    let addr2 = ci2.public_at(path.clone()).unwrap().to_ethereum_address_typed().unwrap();
-
-    let safe = SafeMultisig::new(NetworkEnvironment::Dev, addr.clone(), pkh);
-    let safe1 = SafeMultisig::new(NetworkEnvironment::Dev, addr1.clone(), pkh1);
-    let safe2 = SafeMultisig::new(NetworkEnvironment::Dev, addr2.clone(), pkh2);
-
-    let addrs = vec![addr.clone(), addr1.clone(), addr2.clone()];
-    // let res = safe.create_safe(2, addrs).await.unwrap();
-    println!("ETH ADDR {}", addr.render_string().unwrap());
-    println!("BTC ADDR main {}", ci.public_at(path.clone()).unwrap()
-        .to_bitcoin_address_typed(&NetworkEnvironment::Main).unwrap().render_string().unwrap());
-    println!("BTC ADDR {}", ci.public_at(path.clone()).unwrap()
-        .to_bitcoin_address_typed(&NetworkEnvironment::Dev).unwrap().render_string().unwrap());
-    println!("RDG ADDR {}", ci.public_at(path.clone()).unwrap()
-        .address().unwrap().render_string().unwrap());
-
-}
