@@ -1,8 +1,8 @@
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{Address, Hash, UtxoId};
-use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
 use crate::util;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::{Address, Hash};
+use redgold_schema::util::lang_util::AnyPrinter;
 
 #[ignore]
 #[tokio::test]

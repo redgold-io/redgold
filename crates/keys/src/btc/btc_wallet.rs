@@ -3,31 +3,28 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use bdk::{sled, Balance, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
-use bdk::bitcoin::{Address, EcdsaSighashType, Network, TxIn, TxOut};
+use crate::btc::threshold_multiparty;
+use crate::btc::threshold_multiparty::MultipartySigner;
+use crate::proof_support::ProofSupport;
+use crate::util::mnemonic_support::MnemonicSupport;
 use bdk::bitcoin::hashes::Hash;
 use bdk::bitcoin::util::psbt::PartiallySignedTransaction;
-use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetTx};
+use bdk::bitcoin::{Address, EcdsaSighashType, Network, PrivateKey};
+use bdk::blockchain::{Blockchain, ElectrumBlockchain};
 use bdk::database::{BatchDatabase, MemoryDatabase};
 use bdk::electrum_client::{Client, Config};
-use bdk::signer::SignerOrdering;
+use bdk::signer::{SignerContext, SignerOrdering, SignerWrapper};
 use bdk::sled::Tree;
+use bdk::{sled, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
 use itertools::Itertools;
 // use crate::util::cli::commands::send;
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, Proof, PublicKey, SupportedCurrency};
-// use crate::util::cli::commands::send;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::tx::external_tx::ExternalTimedTransaction;
-use crate::{KeyPair, TestConstants};
-use crate::btc::threshold_multiparty;
-use crate::btc::threshold_multiparty::{MultipartySigner, RawTransaction};
-use crate::proof_support::ProofSupport;
-use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk, MnemonicSupport};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
+// use crate::util::cli::commands::send;
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 
 pub fn struct_public_to_address(pk: structs::PublicKey, network: Network) -> Result<Address, ErrorInfo> {
     let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.raw_bytes()?)
@@ -52,7 +49,7 @@ pub struct SingleKeyBitcoinWallet<D: BatchDatabase> {
     pub transaction_details: Option<TransactionDetails>,
     pub(crate) client: ElectrumBlockchain,
     custom_signer: Arc<MultipartySigner>,
-    sat_per_vbyte: f32
+    pub(crate) sat_per_vbyte: f32
 }
 
 
@@ -141,7 +138,9 @@ impl SingleKeyBitcoinWallet<Tree> {
         do_sync: bool,
         database_path: PathBuf,
         electrum_mn_backend: Option<String>,
-        override_descriptor: Option<String>
+        opt_private_key_hex: Option<String>,
+        peer_multisig_pks: Option<Vec<structs::PublicKey>>,
+        threshold: Option<i64>
     ) -> Result<Self, ErrorInfo> {
         let backend = electrum_mn_backend.unwrap_or_else(|| network_to_backends(&network_environment).get(0).unwrap().clone());
         let network = network_to_bdk_network(&network_environment);
@@ -170,8 +169,19 @@ impl SingleKeyBitcoinWallet<Tree> {
         let database = database?.open_tree(wallet_name.clone()).error_info("Database open tree error")?;
         // let database = MemoryDatabase::default();
         let hex = public_key.to_hex_direct_ecdsa()?;
-        let descr = override_descriptor.clone().unwrap_or(format!("wpkh({})", hex));
-        let change_descriptor = if override_descriptor.clone().is_none() {
+
+        let doing_multisig = opt_private_key_hex.is_some() && peer_multisig_pks.is_some() && threshold.is_some();
+        let descr = if doing_multisig {
+            Self::multisig_descriptor_create(
+                hex,
+                peer_multisig_pks.unwrap(),
+                threshold.unwrap(),
+            )?
+        } else {
+            format!("wpkh({})", hex)
+        };
+
+        let change_descriptor = if doing_multisig {
             Some(&*descr)
         } else {
             None
@@ -194,12 +204,24 @@ impl SingleKeyBitcoinWallet<Tree> {
             custom_signer: custom_signer.clone(),
             sat_per_vbyte: 4.0,
         };
-        // Adding the multiparty signer to the BDK wallet
-        bitcoin_wallet.wallet.add_signer(
-            KeychainKind::External,
-            SignerOrdering(200),
-            custom_signer.clone(),
-        );
+
+        if !doing_multisig {
+            // Adding the multiparty signer to the BDK wallet
+            bitcoin_wallet.wallet.add_signer(
+                KeychainKind::External,
+                SignerOrdering(200),
+                custom_signer.clone(),
+            );
+        } else {
+            // Convert hex to private key
+            let priv_key = PrivateKey::from_str(&opt_private_key_hex.unwrap())
+                .error_info("Invalid private key hex")?;
+            bitcoin_wallet.wallet.add_signer(
+                KeychainKind::Internal,
+                SignerOrdering(100),
+                Arc::new(SignerWrapper::new(priv_key, SignerContext::Segwitv0))
+            )
+        }
 
         if do_sync {
             bitcoin_wallet.sync()?;

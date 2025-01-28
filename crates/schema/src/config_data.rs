@@ -1,5 +1,5 @@
+use crate::conf::local_stored_state::{AccountKeySource, LocalStoredState};
 use serde::{Deserialize, Serialize};
-use crate::conf::local_stored_state::{LocalStoredState, AccountKeySource, ServerTrustRatingLabels};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 #[serde(default)] // This allows fields to be omitted in TOML
@@ -323,13 +323,12 @@ impl ConfigData {
     }
 }
 
-use std::env;
 use crate::conf::server_config::{Deployment, DeploymentDefaultParams, NodeInstance, NodePartyConfig, ServerData};
-use crate::party::external_data::PriceDataPointUsdQuery;
 use crate::proto_serde::ProtoSerde;
-use crate::RgResult;
 use crate::servers::ServerOldFormat;
-use crate::structs::{NetworkEnvironment, PeerId, RatingType, SupportedCurrency, TrustData, TrustRatingLabel};
+use crate::structs::{PeerId, SupportedCurrency, TrustData, TrustRatingLabel};
+use crate::RgResult;
+use std::env;
 
 fn get_home_dir() -> Option<String> {
     env::var("HOME").or_else(|_| env::var("USERPROFILE")).ok()

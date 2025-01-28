@@ -1,7 +1,7 @@
-use itertools::Itertools;
-use crate::structs::{Observation, ObservationMetadata, ObservationProof, Proof};
-use crate::{Hash, HashClear, StructMetadata, util};
 use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
+use crate::structs::{Observation, ObservationMetadata, ObservationProof, Proof};
+use crate::{util, Hash, HashClear, StructMetadata};
+use itertools::Itertools;
 //
 // impl HashClear for Observation {
 //     fn hash_clear(&mut self) {

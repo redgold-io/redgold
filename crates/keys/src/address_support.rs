@@ -1,9 +1,9 @@
+use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use bdk::database::MemoryDatabase;
-use redgold_schema::{error_info, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::Address;
-use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_schema::{error_info, RgResult};
 
 pub trait AddressSupport {
     fn parse_address(&self) -> RgResult<Address>;

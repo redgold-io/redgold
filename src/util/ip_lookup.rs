@@ -1,7 +1,6 @@
-
-use reqwest::ClientBuilder;
-use redgold_schema::{error_info, error_message};
 use crate::schema::structs::ErrorInfo;
+use redgold_schema::error_info;
+use reqwest::ClientBuilder;
 
 pub async fn get_self_ip() -> Result<String, ErrorInfo> {
     let client = ClientBuilder::new().build().expect("client build error");

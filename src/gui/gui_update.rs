@@ -1,26 +1,25 @@
-use eframe::egui::{Align, ScrollArea, TextStyle};
-use redgold_gui::dependencies::gui_depends::{GuiDepends, MnemonicWordsAndPassphrasePath, TransactionSignInfo};
-use redgold_gui::state::local_state::LocalStateUpdate;
-use redgold_gui::tab::tabs::Tab;
-use redgold_gui::tab::transact::swap::SwapStage;
-use std::sync::Once;
+use crate::gui::app_loop::LocalStateAddons;
+use crate::gui::{top_panel, ClientApp};
 use eframe::egui;
-use strum::IntoEnumIterator;
+use eframe::egui::{Align, ScrollArea, TextStyle};
 use itertools::Itertools;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
+use redgold_gui::dependencies::gui_depends::{GuiDepends, MnemonicWordsAndPassphrasePath, TransactionSignInfo};
+use redgold_gui::state::local_state::LocalStateUpdate;
+use redgold_gui::tab::tabs::Tab;
+use redgold_gui::tab::transact::swap::SwapStage;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::SupportedCurrency;
-use crate::gui::{top_panel, ClientApp};
-use crate::gui::app_loop::LocalStateAddons;
+use std::sync::Once;
+use strum::IntoEnumIterator;
 
 use crate::gui::qr_window::{qr_show_window, qr_window};
 use crate::gui::tabs::keys::keys_tab::keys_tab;
 use crate::gui::tabs::otp_tab::otp_tab;
 use crate::gui::tabs::server_tab;
 use crate::gui::tabs::transact::wallet_tab::wallet_screen;
-use crate::gui::top_panel::render_top;
 use crate::util;
 
 static INIT: Once = Once::new();

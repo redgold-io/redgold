@@ -2,18 +2,15 @@ use std::convert::TryInto;
 
 use anyhow::{Context, Result};
 use futures::{Sink, Stream, StreamExt, TryStreamExt};
-use tracing::info;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // use structopt::StructOpt;
 
-use round_based::Msg;
+use crate::core::relay::Relay;
+use crate::schema::structs::MultipartyAuthenticationRequest;
 use redgold_keys::request_support::RequestSupport;
-use redgold_schema::RgResult;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Request, RoomId};
-use crate::core::relay::Relay;
-use redgold_schema::conf::node_config::NodeConfig;
-use crate::schema::structs::MultipartyAuthenticationRequest;
+use round_based::Msg;
 
 pub async fn join_computation<M>(
     address: surf::Url,

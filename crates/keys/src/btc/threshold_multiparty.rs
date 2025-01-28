@@ -1,17 +1,17 @@
-use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId};
-use bdk::bitcoin::psbt::PartiallySignedTransaction;
-use bdk::{bitcoin, SignOptions, TransactionDetails};
-use bdk::bitcoin::secp256k1::{All, Secp256k1, Signature};
-use redgold_schema::{error_info, structs, ErrorInfoContext, SafeOption};
-use std::sync::{Arc, RwLock};
-use bdk::bitcoin::{psbt, EcdsaSighashType, Script, Sighash};
-use redgold_schema::structs::{ErrorInfo, Proof};
-use std::collections::HashMap;
-use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
-use bdk::bitcoin::blockdata::opcodes;
-use bdk::bitcoin::util::sighash;
-use serde::{Deserialize, Serialize};
 use crate::btc::btc_wallet;
+use bdk::bitcoin::blockdata::opcodes;
+use bdk::bitcoin::blockdata::script::Builder as ScriptBuilder;
+use bdk::bitcoin::psbt::PartiallySignedTransaction;
+use bdk::bitcoin::secp256k1::{All, Secp256k1, Signature};
+use bdk::bitcoin::util::sighash;
+use bdk::bitcoin::{psbt, EcdsaSighashType, Script, Sighash};
+use bdk::signer::{InputSigner, SignerCommon, SignerError, SignerId};
+use bdk::{bitcoin, SignOptions, TransactionDetails};
+use redgold_schema::structs::{ErrorInfo, Proof};
+use redgold_schema::{error_info, structs, ErrorInfoContext, SafeOption};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct MultipartySigner {

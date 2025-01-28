@@ -1,7 +1,7 @@
-use serde::Serialize;
-use crate::{ErrorInfoContext, RgResult};
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{ErrorInfo, VersionInfo};
+use crate::{ErrorInfoContext, RgResult};
+use serde::Serialize;
 
 // #[async_trait]
 pub trait EasyJson {

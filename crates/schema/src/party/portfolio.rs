@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-use itertools::{all, Itertools};
-use itertools::Either::{Left, Right};
-use serde::{Deserialize, Serialize};
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_events::ConfirmedExternalStakeEvent;
 use crate::structs::{CurrencyAmount, Hash, PortfolioRequest, PortfolioWeighting, SupportedCurrency, Transaction, UtxoId};
+use itertools::Either::{Left, Right};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PortfolioRequestEvents {
@@ -52,7 +51,7 @@ impl PortfolioRequestEvents {
                         }).collect::<HashMap<SupportedCurrency, f64>>();
 
                     for (c, u) in value_usd_by_cur.into_iter() {
-                        let mut x = cur_fulfills.entry(c.clone()).or_insert(vec![]);
+                        let x = cur_fulfills.entry(c.clone()).or_insert(vec![]);
                         x.push((e.tx.hash_or(), (0.0,u.clone())));
                     }
                     // this is a request
@@ -65,7 +64,7 @@ impl PortfolioRequestEvents {
                         // this is someone supplying the stake for that request.
                         if let Some(vec) = cur_fulfills.get_mut(&cur) {
                             // Iterate over the vec, remove an element if it is fully fulfilled.
-                            vec.retain_mut(|(hash, (cur_fulfilled, remaining))| {
+                            vec.retain_mut(|(_hash, (cur_fulfilled, remaining))| {
                                 if usd_value == 0.0 {
                                     true
                                 } else {

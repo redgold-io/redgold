@@ -1,14 +1,14 @@
 use std::io::Cursor;
 
-use bdk::miniscript::serde::Serialize;
 use bdk::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use bdk::bitcoin::util::bip158::{BitStreamReader, BitStreamWriter};
+use bdk::miniscript::serde::Serialize;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
 
+use redgold_schema::structs::ErrorInfo;
 use redgold_schema::{bytes_data, error_info, error_message,
                      structs, ErrorInfoContext};
-use redgold_schema::structs::ErrorInfo;
 
 use crate::{util, TestConstants};
 

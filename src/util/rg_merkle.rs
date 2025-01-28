@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use redgold_keys::util::{dhash, dhash_vec};
 
-use redgold_schema::structs::HashType;
 use redgold_keys::util::merge_hash;
+use redgold_schema::structs::HashType;
 
 use crate::schema::bytes_data;
 use crate::schema::structs::{Hash, HashFormatType};

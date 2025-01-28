@@ -1,12 +1,12 @@
+use crate::schema::SafeOption;
+use crate::DataStoreContext;
 use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
-use redgold_schema::structs::{ErrorInfo, Hash, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction, TransactionEntry};
-use redgold_schema::{RgResult, structs};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{ErrorInfo, Hash, ObservationEdge, ObservationEntry, ObservationProof, PublicKey, Transaction, TransactionEntry};
 use redgold_schema::util::times;
-use crate::DataStoreContext;
-use crate::schema::SafeOption;
+use redgold_schema::{structs, RgResult};
 
 #[derive(Clone)]
 pub struct ObservationStore {

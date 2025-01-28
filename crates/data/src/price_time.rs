@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-use redgold_schema::RgResult;
 use crate::DataStoreContext;
-use redgold_schema::structs::{SupportedCurrency, PriceSource, PriceTime, Weighting};
+use redgold_schema::structs::{PriceSource, PriceTime, SupportedCurrency, Weighting};
+use redgold_schema::RgResult;
 use redgold_schema::SafeOption;
 
 #[derive(Clone)]

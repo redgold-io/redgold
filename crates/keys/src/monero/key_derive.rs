@@ -1,11 +1,10 @@
+use crate::util::mnemonic_support::MnemonicSupport;
 use curve25519_dalek::Scalar;
 use monero::{Address, KeyPair, Network, PrivateKey, PublicKey};
-use tiny_keccak::{Hasher, Keccak};
-use redgold_schema::{structs, ErrorInfoContext, RgResult};
-use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::keys::words_pass::WordsPass;
-use crate::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::structs::NetworkEnvironment;
+use redgold_schema::{structs, RgResult};
+use tiny_keccak::{Hasher, Keccak};
 
 pub trait MoneroSeedBytes {
     fn monero_seed_bytes(&self) -> RgResult<[u8; 32]>;

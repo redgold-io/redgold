@@ -1,5 +1,5 @@
-use octocrab::{models, params};
 use octocrab::models::issues::Issue;
+use octocrab::{models, params};
 use redgold_schema::{ErrorInfoContext, RgResult};
 
 pub async fn issues() -> RgResult<Vec<Issue>> {

@@ -1,18 +1,11 @@
-use curv::arithmetic::Zero;
 use serde_json;
 
 use redgold_data::data_store::DataStore;
-use redgold_schema::proto_serde::ProtoSerde;
 
-use crate::genesis;
 use crate::core::relay::Relay;
 use crate::e2e::tx_gen::TransactionGenerator;
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::schema::structs::{
-    ObservationMetadata, Transaction,
-};
+use crate::schema::structs::Transaction;
 use redgold_keys::TestConstants;
-use redgold_keys::util::dhash_str;
 
 // use crate::schema::transaction::rounded_amount;
 

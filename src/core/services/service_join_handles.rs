@@ -1,5 +1,5 @@
-use tokio::task::JoinHandle;
 use redgold_schema::{ErrorInfoContext, RgResult};
+use tokio::task::JoinHandle;
 
 pub struct ServiceJoinHandles {
     pub handles: Vec<NamedHandle>

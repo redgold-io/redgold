@@ -1,10 +1,8 @@
-use std::sync::{Arc, Mutex};
+use crate::functionality::capture::CaptureLike;
 use image::DynamicImage;
+use redgold_schema::{error_info, RgResult};
 use rqrr::MetaData;
 use serde::{Deserialize, Serialize};
-use redgold_schema::{error_info, RgResult};
-use redgold_schema::errors::into_error::ToErrorInfo;
-use crate::functionality::capture::CaptureLike;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CaptureStream {

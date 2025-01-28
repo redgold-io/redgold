@@ -1,5 +1,5 @@
-use crate::{bytes_data, RgResult, SafeOption};
 use crate::structs::{Signature, SignatureType};
+use crate::{bytes_data, RgResult, SafeOption};
 
 impl Signature {
     pub fn ecdsa(bytes: Vec<u8>) -> Self {

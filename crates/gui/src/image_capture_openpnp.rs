@@ -1,13 +1,12 @@
+use crate::image_capture::CaptureStream;
+use image::{DynamicImage, ImageBuffer};
+use openpnp_capture::{Device, Format, Stream};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult};
+use rqrr::MetaData;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use image::{DynamicImage, ImageBuffer};
-use openpnp_capture::{Device, Format, Stream};
-use rqrr::MetaData;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult};
-use crate::image_capture::CaptureStream;
-use image::DynamicImage::ImageRgb8;
 // use nokhwa::Camera;
 // use nokhwa::pixel_format::RgbFormat;
 // use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};

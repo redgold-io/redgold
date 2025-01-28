@@ -1,17 +1,15 @@
-use std::ops::Index;
-use std::sync::Arc;
-use ethers::abi::Address;
-use ethers::middleware::SignerMiddleware;
-use ethers::prelude::{Http, LocalWallet, Provider, Signer, TransactionRequest};
-use redgold_safe_bindings::safe;
-use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::structs::CurrencyAmount;
 use crate::eth::eth_wallet::EthWalletWrapper;
+use ethers::abi::Address;
 use ethers::core::types::U256;
+use ethers::middleware::SignerMiddleware;
+use ethers::prelude::{Http, LocalWallet, Provider};
 use ethers::providers::Middleware;
 use ethers::types::{Bytes, RecoveryMessage, H256};
-use redgold_keys::util::sign;
+use redgold_safe_bindings::safe;
 use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::structs::CurrencyAmount;
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
+use std::sync::Arc;
 
 impl EthWalletWrapper {
 

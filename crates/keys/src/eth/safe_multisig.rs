@@ -1,11 +1,7 @@
-use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::cmd::run_bash_async;
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::structs::{Address, NetworkEnvironment};
 use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::structs::{Address, ErrorInfo, NetworkEnvironment};
-use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
-use crate::TestConstants;
-use crate::util::mnemonic_support::MnemonicSupport;
+use serde::{Deserialize, Serialize};
 
 // cast bind --crate-name safe-bindings keys/src/eth/safe.json
 

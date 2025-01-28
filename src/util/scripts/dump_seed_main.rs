@@ -1,10 +1,8 @@
-use std::fs;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, Hash, NetworkEnvironment, Transaction, UtxoId};
-use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
-use crate::util;
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{NetworkEnvironment, Transaction};
+use std::fs;
 
 #[ignore]
 #[tokio::test]

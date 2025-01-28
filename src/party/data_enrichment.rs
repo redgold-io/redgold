@@ -1,15 +1,15 @@
-use redgold_schema::structs::{ErrorInfo, PartyInfo, PublicKey, SupportedCurrency};
-use std::collections::HashMap;
+use crate::party::party_watcher::PartyWatcher;
+use crate::party::price_query::PriceDataPointQueryImpl;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
-use crate::party::party_watcher::PartyWatcher;
-use redgold_schema::party::external_data::PriceDataPointUsdQuery;
 use redgold_schema::party::external_data::ExternalNetworkData;
+use redgold_schema::party::external_data::PriceDataPointUsdQuery;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use crate::party::price_query::PriceDataPointQueryImpl;
+use redgold_schema::structs::{ErrorInfo, PartyInfo, PublicKey, SupportedCurrency};
+use redgold_schema::{RgResult, SafeOption};
+use std::collections::HashMap;
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 

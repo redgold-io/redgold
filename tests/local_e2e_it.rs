@@ -4,10 +4,10 @@ use redgold::api::client::public_client::PublicClient;
 
 use redgold::e2e::tx_submit::TransactionSubmitter;
 use redgold::node_config::EnvDefaultNodeConfig;
-use redgold_schema::conf::node_config::NodeConfig;
 use redgold::util;
-use redgold_schema::{SafeOption};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use redgold_schema::SafeOption;
 
 
 #[tokio::test]

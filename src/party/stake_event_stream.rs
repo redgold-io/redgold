@@ -1,14 +1,13 @@
-use redgold_schema::structs::{CurrencyAmount, DepositRequest, NetworkEnvironment, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
-use redgold_schema::RgResult;
+use crate::party::portfolio_request::PortfolioEventMethods;
 use itertools::Itertools;
-use rocket::form::validate::Contains;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::external_tx_support::ExternalTxSupport;
 use redgold_keys::proof_support::PublicKeySupport;
-use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalStakeEvent, PartyEvents, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
-use redgold_keys::external_tx_support::ExternalTxSupport;
-use crate::party::portfolio_request::PortfolioEventMethods;
+use redgold_schema::structs::{CurrencyAmount, DepositRequest, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
+use redgold_schema::RgResult;
+use rocket::form::validate::Contains;
 
 pub trait StakeMethods {
     fn check_external_event_pending_stake(&mut self, event_o: &AddressEvent) -> bool;

@@ -1,9 +1,9 @@
-use std::env::current_dir;
+use crate::gui::app_loop::LocalState;
 use eframe::egui::{Context, Ui};
+use redgold_gui::common::{bounded_text_area_size_id, editable_text_input_copy};
+use std::env::current_dir;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
-use crate::gui::app_loop::LocalState;
-use redgold_gui::common::{bounded_text_area_size_id, editable_text_input_copy};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtpMetadata {
@@ -76,16 +76,16 @@ impl Default for OtpState {
     }
 }
 
-use std::fs::File;
-use std::io::Read;
-use std::io;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::{error_info, RgResult};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::{error_info, RgResult};
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io;
+use std::io::Read;
+use uuid::Uuid;
 
 fn get_random_from_device(device_path: impl Into<String>) -> io::Result<Vec<u8>> {
     let mut file = File::open(device_path.into())?;

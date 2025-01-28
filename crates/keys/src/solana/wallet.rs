@@ -1,5 +1,9 @@
-use std::str::FromStr;
+use crate::solana::derive_solana::{get_solana_address, get_solana_address_from_verifying, SolanaWordPassExt};
+use crate::TestConstants;
 use ed25519_dalek::{SigningKey, VerifyingKey};
+use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::message::Message;
@@ -7,12 +11,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
 use solana_sdk::system_instruction;
 use solana_sdk::transaction::Transaction;
-use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, SupportedCurrency};
-use redgold_schema::util::lang_util::AnyPrinter;
-use crate::solana::derive_solana::{get_solana_address, get_solana_address_from_verifying, get_solana_public_key, SolanaWordPassExt, ToSolanaAddress};
-use crate::TestConstants;
-use redgold_schema::keys::words_pass::WordsPass;
+use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct SolanaNetwork {
@@ -97,7 +96,7 @@ impl SolanaNetwork {
 
 
         // Send and confirm transaction
-        let signature = client.send_and_confirm_transaction(&transaction)
+        let _signature = client.send_and_confirm_transaction(&transaction)
             .await.error_info("Failed to send and confirm transaction")?;
         // return txid
 
@@ -178,8 +177,8 @@ async fn debug_kg() {
     let wp = tc.words_pass;
     let ci = TestConstants::test_words_pass().unwrap();
     let amount = 1_000_000; // 0.001 SOL
-    let amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
-    let amount = CurrencyAmount::from_fractional_cur(0.95, SupportedCurrency::Solana).unwrap();
+    let _amount = CurrencyAmount::from_currency(amount, SupportedCurrency::Solana);
+    let _amount = CurrencyAmount::from_fractional_cur(0.95, SupportedCurrency::Solana).unwrap();
 
     let w = SolanaNetwork::new(NetworkEnvironment::Dev, Some(wp));
     let w2 = SolanaNetwork::new(NetworkEnvironment::Dev, Some(ci));

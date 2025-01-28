@@ -1,4 +1,3 @@
-use crate::schema::structs::NetworkEnvironment;
 use std::time::Duration;
 
 /*

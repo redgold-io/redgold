@@ -1,7 +1,7 @@
-use std::fs;
+use crate::conf::local_stored_state::LocalStoredState;
 use crate::config_data::ConfigData;
 use crate::helpers::easy_json::EasyJsonDeser;
-use crate::conf::local_stored_state::LocalStoredState;
+use std::fs;
 
 #[test]
 fn load_schema_dump() {

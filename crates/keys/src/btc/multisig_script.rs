@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::str::FromStr;
-use bdk::bitcoin;
-use bdk::bitcoin::secp256k1::{Secp256k1, PublicKey};
-use bdk::bitcoin::{Address, Network, OutPoint, Script, Transaction, TxIn, TxOut};
 use bdk::bitcoin::blockdata::opcodes::all::*;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
-use bdk::bitcoin::secp256k1::ecdsa::Signature;
+use bdk::bitcoin::secp256k1::{PublicKey, Secp256k1};
+use bdk::bitcoin::{Address, Network, Script, Transaction};
 use bdk::descriptor::Descriptor;
 use bdk::descriptor::DescriptorPublicKey;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::{Arc, RwLock};
 
 // Structure to hold information about a participant in the multisig
 #[derive(Clone, Debug)]

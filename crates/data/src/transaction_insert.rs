@@ -1,10 +1,10 @@
-use sqlx::Sqlite;
-use redgold_schema::structs::{ErrorInfo, Transaction};
-use redgold_schema::RgResult;
+use crate::transaction_store::TransactionStore;
+use crate::DataStoreContext;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::DataStoreContext;
-use crate::transaction_store::TransactionStore;
+use redgold_schema::structs::{ErrorInfo, Transaction};
+use redgold_schema::RgResult;
+use sqlx::Sqlite;
 
 impl TransactionStore {
 

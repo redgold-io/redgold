@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::config::Region;
-use aws_sdk_sesv2::{Client, Error};
 use aws_sdk_sesv2::types::{Body, Content, Destination, EmailContent, Message};
-use redgold_schema::{error_info, RgResult};
+use aws_sdk_sesv2::{Client, Error};
+use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::ErrorInfo;
-use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::{error_info, RgResult};
 
 
 const DEFAULT_EMAIL: &str = "info@redgold.io";

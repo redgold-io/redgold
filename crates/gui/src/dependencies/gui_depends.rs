@@ -1,20 +1,18 @@
-use std::collections::HashMap;
+use crate::components::tx_progress::PreparedTransaction;
+use crate::state::local_state::LocalStateUpdate;
+use crate::tab::transact::states::DeviceListStatus;
 use flume::Sender;
-use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::RgResult;
-use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::components::tx_progress::PreparedTransaction;
-use crate::state::local_state::LocalStateUpdate;
-use crate::tab::transact::states::DeviceListStatus;
+use redgold_schema::RgResult;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct HardwareSigningInfo {

@@ -1,21 +1,18 @@
-
-use std::time::Duration;
-use tracing::info;
-use std::path::PathBuf;
-use std::fs;
-use std::sync::Arc;
-use itertools::Itertools;
+use crate::conf::rg_args::RgTopLevelSubcommand;
 use crate::config_data::{ConfigData, RpcUrl};
-use crate::seeds::get_seeds_by_env_time;
-use crate::servers::ServerOldFormat;
-use crate::{structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
-use crate::conf::rg_args::{empty_args, RgArgs, RgTopLevelSubcommand};
-use crate::constants::{DEBUG_FINALIZATION_INTERVAL_MILLIS, OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
+use crate::constants::{OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
 use crate::observability::errors::Loggable;
 use crate::proto_serde::ProtoSerde;
-use crate::structs::{Address, DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerId, PeerMetadata, PublicKey, Seed, SupportedCurrency, Transaction, TransportInfo, TrustData, VersionInfo};
+use crate::seeds::get_seeds_by_env_time;
+use crate::servers::ServerOldFormat;
+use crate::structs::{Address, DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, NodeType, PeerId, PublicKey, Seed, SupportedCurrency, TransportInfo, TrustData, VersionInfo};
 use crate::util::times::current_time_millis;
+use crate::{structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
+use itertools::Itertools;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub struct CanaryConfig {}
 

@@ -2,30 +2,30 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
-use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
-use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
+use crate::multiparty_gg20::{gg20_keygen, gg20_signing};
 use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
 use metrics::{counter, gauge};
+use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
 // use ssh2::init;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
-use crate::multiparty_gg20::{gg20_keygen, gg20_signing};
 
 #[test]
 fn debug() {
 
 }
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::helpers::easy_json::json_pretty;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::proto_serde::ProtoSerde;
 use crate::party::event_validator::PartyEventValidator;
 use crate::util::current_time_millis_i64;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::easy_json::json_pretty;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::proto_serde::ProtoSerde;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SelfInitiateKeygenResult {

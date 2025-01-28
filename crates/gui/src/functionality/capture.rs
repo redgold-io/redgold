@@ -1,6 +1,6 @@
 use image::DynamicImage;
-use rqrr::MetaData;
 use redgold_schema::RgResult;
+use rqrr::MetaData;
 
 pub trait CaptureLike {
     fn read_qr(&mut self) -> RgResult<(DynamicImage, RgResult<(MetaData, String)>)>;

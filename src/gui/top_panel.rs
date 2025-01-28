@@ -1,10 +1,10 @@
+use crate::gui::app_loop::LocalState;
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, RichText};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::common::copy_button;
 use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::times::ToTimeString;
-use crate::gui::app_loop::LocalState;
 
 fn round_down_to_minute(time_millis: i64) -> i64 {
     time_millis - (time_millis % 60000)

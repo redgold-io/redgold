@@ -1,8 +1,8 @@
-use async_openai::Client;
+use crate::directory_code_reader::{count_tokens, AccumFileData, ScanConfig};
 use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse, Embedding};
+use async_openai::Client;
 use redgold_schema::EasyJson;
 use serde::{Deserialize, Serialize};
-use crate::directory_code_reader::{AccumFileData, count_tokens, ScanConfig};
 
 fn split_with_overlap(s: &str, substring_size: usize, overlap: usize) -> Vec<String> {
     let mut result = Vec::new();

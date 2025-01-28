@@ -1,21 +1,21 @@
-use std::collections::HashMap;
-use std::time::Duration;
+use crate::core::relay::Relay;
+use crate::e2e::tx_gen::SpendableUTXO;
 use itertools::Itertools;
-use tracing::info;
 use metrics::counter;
-use reqwest::ClientBuilder;
-use serde::{Deserialize, Serialize};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
-use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
-use redgold_schema::{error_info, ErrorInfoContext, SafeOption};
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use redgold_keys::KeyPair;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::e2e::tx_gen::SpendableUTXO;
-use crate::core::relay::Relay;
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use redgold_schema::{error_info, ErrorInfoContext, SafeOption};
+use reqwest::ClientBuilder;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
+use tracing::info;
 //
 // async fn faucet_request_old(address_input: String, relay: Relay) -> Result<FaucetResponse, ErrorInfo> {
 //     info!("Faucet request {}", address_input);

@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use redgold_schema::RgResult;
-use redgold_schema::structs::PublicKey;
+use crate::party::party_watcher::PartyWatcher;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use crate::party::party_watcher::PartyWatcher;
+use redgold_schema::structs::PublicKey;
+use redgold_schema::RgResult;
+use std::collections::HashMap;
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 

@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-use log::info;
-use redgold_common_no_wasm::retry;
-use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{error_info, RgResult};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use crate::test::harness::amm_harness::PartyTestHarness;
+use redgold_common_no_wasm::retry;
+use redgold_keys::transaction_support::TransactionSupport;
+use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
+use redgold_schema::{error_info, RgResult};
+use std::collections::HashMap;
 
 impl PartyTestHarness {
 

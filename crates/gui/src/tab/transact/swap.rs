@@ -1,29 +1,29 @@
-use std::collections::HashMap;
-use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
-use itertools::Itertools;
-use log::info;
-use redgold_schema::util::times::ToTimeString;
-use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
-use strum_macros::{EnumIter, EnumString};
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
 use crate::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
+use crate::components::tables::text_table_advanced;
+use crate::components::transaction_table::{format_fractional_currency_amount, TransactionTable};
 use crate::components::tx_progress::TransactionProgressFlow;
 use crate::data_query::data_query::DataQueryInfo;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use eframe::egui::{Color32, ComboBox, RichText, TextStyle, Ui};
+use itertools::Itertools;
+use log::info;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
 use redgold_schema::explorer::SwapStatus;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::party_events::OrderFulfillment;
-use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix_and_suffix;
 use redgold_schema::party::search_events::PartyEventSearch;
-use redgold_schema::ShortString;
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::trust::FloatRoundedConverti64;
-use crate::components::tables::text_table_advanced;
-use crate::components::transaction_table::{format_fractional_currency_amount, TransactionTable};
+use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix_and_suffix;
+use redgold_schema::util::times::ToTimeString;
+use redgold_schema::ShortString;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {

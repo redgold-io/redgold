@@ -4,14 +4,12 @@ use std::sync::Arc;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use itertools::Itertools;
-use tracing::{error, info};
 use metrics::gauge;
-use tokio::sync::Mutex;
 use redgold::core::relay::Relay;
-use redgold::gui::ClientApp;
 use redgold::gui::initialize::start_native_gui;
 use redgold::gui::ls_ext::local_state_from;
 use redgold::gui::native_gui_dependencies::NativeGuiDepends;
+use redgold::gui::ClientApp;
 use redgold::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
 use redgold::node::Node;
 use redgold::util::cli::arg_parse_config::ArgTranslate;
@@ -22,8 +20,10 @@ use redgold::util::runtimes::{big_thread, build_simple_runtime};
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_keys::address_external::ToEthereumAddress;
-use redgold_schema::{ErrorInfoContext, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::{ErrorInfoContext, SafeOption};
+use tokio::sync::Mutex;
+use tracing::{error, info};
 
 
 use redgold_schema::conf::node_config::NodeConfig;

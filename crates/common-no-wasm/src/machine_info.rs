@@ -1,9 +1,9 @@
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 use crate::cmd;
 use crate::cmd::run_bash;
 // This should really be in a separate module
 use itertools::Itertools;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 pub fn file_size_bytes(path: impl Into<String>) -> RgResult<i64> {
     let out = run_bash(format!("wc -c < {}", path.into()))?.0;
     let size = out.split_whitespace().next().ok_msg("Missing size from du command")?

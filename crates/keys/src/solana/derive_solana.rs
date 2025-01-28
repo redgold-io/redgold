@@ -1,12 +1,11 @@
-use bdk::bitcoin::bech32::ToBase32;
+use crate::util::mnemonic_support::MnemonicSupport;
+use crate::TestConstants;
 use bdk::bitcoin::util::base58;
 use ed25519_dalek::{SigningKey, VerifyingKey};
-use redgold_schema::{structs, RgResult};
-use redgold_schema::structs::{AddressType, ErrorInfo, NetworkEnvironment, PublicKey};
-use redgold_schema::util::lang_util::AnyPrinter;
-use crate::TestConstants;
 use redgold_schema::keys::words_pass::WordsPass;
-use crate::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::structs::{AddressType, ErrorInfo, PublicKey};
+use redgold_schema::util::lang_util::AnyPrinter;
+use redgold_schema::{structs, RgResult};
 // We'll use this for generating random bytes
 
 pub trait SolanaWordPassExt {

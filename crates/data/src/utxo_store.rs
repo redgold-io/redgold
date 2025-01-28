@@ -1,22 +1,16 @@
-use std::collections::HashSet;
-use itertools::Itertools;
-use metrics::gauge;
-use sqlx::Sqlite;
-use redgold_keys::proof_support::PublicKeySupport;
-use redgold_keys::TestConstants;
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, Output, PublicKey, SupportedCurrency, Transaction, TransactionEntry, UtxoEntry, UtxoId};
-use redgold_schema::{from_hex, RgResult, structs};
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
-use crate::DataStoreContext;
 use crate::schema::SafeOption;
+use crate::DataStoreContext;
+use itertools::Itertools;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, PublicKey, SupportedCurrency, UtxoEntry, UtxoId};
+use redgold_schema::{structs, RgResult};
+use sqlx::Sqlite;
 
 #[derive(Clone)]
 pub struct UtxoStore {
     pub ctx: DataStoreContext
 }
-
-use redgold_schema::helpers::easy_json::json_or;
 
 impl UtxoStore {
 

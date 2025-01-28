@@ -1,13 +1,13 @@
+use crate::data_query::data_query::DataQueryInfo;
 use eframe::egui::Ui;
 use egui_plot::{HPlacement, Line, Plot};
+use itertools::Itertools;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
 use redgold_schema::util::dollar_formatter::{format_dollar_amount_brief_with_prefix_and_suffix, format_dollar_amount_with_prefix_and_suffix};
 use redgold_schema::util::times::{current_time_millis, ToTimeString};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
-use itertools::Itertools;
-use crate::data_query::data_query::DataQueryInfo;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct PortfolioTabState {

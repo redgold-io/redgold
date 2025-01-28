@@ -1,6 +1,6 @@
+use crate::dependencies::gui_depends::GuiDepends;
 use redgold_schema::conf::local_stored_state::LocalStoredState;
 use redgold_schema::structs::PublicKey;
-use crate::dependencies::gui_depends::GuiDepends;
 
 pub trait ExtractorPublicKey {
     fn extract<G>(&self, g: &G) -> Vec<PublicKey> where G: GuiDepends + Send + Clone;

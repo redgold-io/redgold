@@ -1,22 +1,22 @@
 use crate::e2e::tx_gen::SpendableUTXO;
 use crate::util::{self};
 use itertools::Itertools;
-use tracing::{error, info};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use tracing::{error, info};
 
+use crate::core::relay::Relay;
 use metrics::{counter, gauge};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use tokio_stream::wrappers::IntervalStream;
-use redgold_schema::{RgResult, SafeOption};
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, NetworkEnvironment, SubmitTransactionRequest, Transaction};
-use crate::core::relay::Relay;
-use tokio_stream::StreamExt;
 use redgold_common::flume_send_help::{RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_data::data_store::DataStore;
-use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::KeyPair;
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, NetworkEnvironment, SubmitTransactionRequest, Transaction};
+use redgold_schema::{RgResult, SafeOption};
+use tokio_stream::wrappers::IntervalStream;
+use tokio_stream::StreamExt;
 
 pub mod tx_gen;
 pub mod tx_submit;
@@ -24,9 +24,9 @@ pub mod alert;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::Loggable;
 use redgold_schema::transaction::amount_to_raw_amount;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use redgold_schema::observability::errors::Loggable;
 // i think this is the one currently in use?
 
 // This one is NOT being used due to malfunctioning, thats why metrics weren't being picked up
@@ -137,12 +137,12 @@ pub struct LiveE2E {
     num_success: u64,
 }
 
+use crate::observability::send_email;
 use redgold_keys::tx_proof_validate::TransactionProofValidator;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
-use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::conf::node_config::NodeConfig;
 use redgold_keys::word_pass_support::WordsPassNodeConfig;
-use crate::observability::send_email;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::keys::words_pass::WordsPass;
 
 impl LiveE2E {
     pub async fn build_tx(&self) -> RgResult<Option<Transaction>> {

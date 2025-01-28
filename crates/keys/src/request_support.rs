@@ -1,11 +1,10 @@
-
-use redgold_schema::{error_info, RgResult, SafeOption};
+use crate::proof_support::ProofSupport;
+use crate::{KeyPair, TestConstants};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{AboutNodeResponse, NodeMetadata, Proof, PublicKey, Request, Response};
-use crate::{KeyPair, TestConstants};
-use crate::proof_support::ProofSupport;
+use redgold_schema::{error_info, RgResult, SafeOption};
 
 pub trait RequestSupport {
     fn with_auth(self, key_pair: &KeyPair) -> Request;

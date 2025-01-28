@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use async_trait::async_trait;
-use redgold_schema::{error_info, structs, RgResult};
-use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_schema::{structs, RgResult};
+use std::collections::HashMap;
 
 #[async_trait]
 pub trait ExternalNetworkResources {
@@ -37,6 +36,7 @@ pub trait ExternalNetworkResources {
 
 }
 
+#[allow(dead_code)]
 pub struct NetworkDataFilter {
     min_block: Option<u64>,
     min_time: Option<u64>

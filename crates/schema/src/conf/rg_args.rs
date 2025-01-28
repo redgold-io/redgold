@@ -1,6 +1,5 @@
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use crate::structs::SupportedCurrency;
 
 pub fn empty_args() -> RgArgs {
     RgArgs {

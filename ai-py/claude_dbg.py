@@ -1,9 +1,8 @@
+import anthropic
 import os
+from anthropic.types import ToolResultBlockParam, MessageParam
 from datetime import datetime
 from typing import Iterable
-
-import anthropic
-from anthropic.types import ToolResultBlockParam, MessageParam
 
 from claude_fmt import tool_format, user_text_content
 from git_scrape import get_one_ai_dev_issue

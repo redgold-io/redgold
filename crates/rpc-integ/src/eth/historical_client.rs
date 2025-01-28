@@ -1,20 +1,20 @@
-use foundry_block_explorers::Client;
-use num_bigint::{BigInt, Sign};
+use crate::examples::example;
 use alloy_chains::Chain;
 use ethers::addressbook::Address;
 use ethers::prelude::U256;
-use foundry_block_explorers::account::{GenesisOption, NormalTransaction, Sort, TokenQueryOption, TxListParams};
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
-use std::str::FromStr;
-use std::time::Duration;
 use ethers::utils::hex;
-use tracing::info;
+use foundry_block_explorers::account::{GenesisOption, NormalTransaction, Sort, TokenQueryOption, TxListParams};
+use foundry_block_explorers::Client;
+use num_bigint::{BigInt, Sign};
 use num_traits::{FromPrimitive, ToPrimitive};
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
-use crate::examples::example;
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
+use std::str::FromStr;
+use std::time::Duration;
+use tracing::info;
 
 pub struct EthHistoricalClient {
     pub client: Client,

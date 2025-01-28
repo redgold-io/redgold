@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-use crate::RgResult;
-use crate::structs::Hash;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WordsPass {

@@ -1,14 +1,14 @@
-use serde::{Deserialize, Serialize};
-use strum_macros::{EnumIter, EnumString};
-use std::collections::HashMap;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::party::central_price::CentralPricePair;
+use crate::party::party_events::AddressEventExtendedType;
 use crate::party::party_internal_data::PartyInternalData;
 use crate::party::price_volume::PriceVolume;
-use crate::{RgResult, SafeOption};
-use crate::party::party_events::AddressEventExtendedType;
 use crate::proto_serde::ProtoSerde;
-use crate::structs::{ErrorInfo, SupportedCurrency, Transaction, TransactionType};
+use crate::structs::{ErrorInfo, SupportedCurrency, Transaction};
+use crate::{RgResult, SafeOption};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct HashResponse {

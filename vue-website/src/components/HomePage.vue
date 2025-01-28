@@ -12,10 +12,11 @@
             Native multiparty encryption support, customized financial ratings, and real-time pricing data. Construct your own
             user-defined native crypto ETFs using data stores, analytics queries, and SQL backed smart contracts.
           </p>
-          <div class="d-flex justify-content-center intro-buttons">
-            <a href="https://dev.docs.redgold.io/introduction/getting-started" class="btn btn-primary intro-button">Get Started</a>
-            <a href="https://dev.docs.redgold.io/whitepaper/introduction" class="btn btn-primary intro-button" >Whitepaper</a>
-            <a href="https://dev.docs.redgold.io/guides/amm-swaps-exchange" class="btn btn-primary intro-button" >Buy with AMM</a>
+          <div class="d-flex intro-buttons">
+<!--            justify-content-center -->
+            <a href="https://dev.docs.redgold.io/introduction/getting-started" class="btn btn-primary intro-button">Start</a>
+            <a href="https://dev.docs.redgold.io/whitepaper/introduction" class="btn btn-primary intro-button" >Paper</a>
+            <a href="https://dev.docs.redgold.io/guides/amm-swaps-exchange" class="btn btn-primary intro-button" >Buy</a>
           </div>
         </div>
       </div>
@@ -366,9 +367,17 @@
 }
 
 .splash-image-smaller {
-  width: auto;
-  height: 500px;
-  display: block; /* Remove extra space below the image */
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .splash-image-smaller {
+    height: 500px;
+    width: auto;
+  }
 }
 
 .splash-padding-top {
@@ -391,6 +400,8 @@
   //margin-top: 20px;
   margin-right: 10px;
   //spacing: 20px;
+  min-width: 135px;
+  max-height: 40px;
 }
 
 .intro-text {

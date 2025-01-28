@@ -1,13 +1,11 @@
+use crate::common::bounded_text_area;
+use crate::components::tx_progress::TransactionProgressFlow;
+use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use eframe::egui::{Color32, RichText, Ui};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
-use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{PublicKey, Transaction};
-use crate::common::bounded_text_area;
-use crate::components::tx_progress::TransactionProgressFlow;
-use crate::data_query::data_query::DataQueryInfo;
-use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use redgold_schema::structs::Transaction;
 
 #[derive(Clone)]
 pub struct CustomTxState {

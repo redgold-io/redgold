@@ -1,8 +1,7 @@
-use std::fmt::{Display, Formatter};
-use crate::{bytes_data, RgResult, SafeOption, ShortString, structs};
 use crate::proto_serde::ProtoSerde;
 use crate::structs::{Address, ErrorInfo, PublicKey, PublicKeyType};
-
+use crate::{bytes_data, RgResult, SafeOption, ShortString};
+use std::fmt::{Display, Formatter};
 
 
 impl Display for PublicKey {

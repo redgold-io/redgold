@@ -1,14 +1,14 @@
-use eframe::egui;
-use eframe::egui::{RichText, Ui};
-use serde::{Deserialize, Serialize};
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::explorer::{BriefTransaction, DetailedTransaction};
-use redgold_schema::ShortString;
-use redgold_schema::structs::{NetworkEnvironment, PublicKey};
-use redgold_schema::util::times::ToTimeString;
 use crate::common::green_label;
 use crate::components::tables::{table_nonetype, text_table_advanced};
 use crate::data_query::data_query::DataQueryInfo;
+use eframe::egui;
+use eframe::egui::Ui;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::explorer::BriefTransaction;
+use redgold_schema::structs::{NetworkEnvironment, PublicKey};
+use redgold_schema::util::times::ToTimeString;
+use redgold_schema::ShortString;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct TransactionTable {

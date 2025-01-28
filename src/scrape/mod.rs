@@ -1,16 +1,16 @@
 pub mod external_networks;
 pub mod crypto_compare;
 
-use std::time::Duration;
+use crate::util;
+use crate::util::{current_time_millis_i64, current_time_unix};
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::SupportedCurrency;
-use crate::util;
-use crate::util::{current_time_millis_i64, current_time_unix};
+use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 
 // "https://api.coinbase.com/v2/exchange-rates?currency=BTC".to_string();

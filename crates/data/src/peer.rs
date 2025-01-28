@@ -1,19 +1,19 @@
-use std::time::Duration;
-use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PartitionInfo, PeerId, PeerMetadata, PeerNodeInfo, PublicKey, Transaction};
-use redgold_schema::{RgResult, util};
-use crate::DataStoreContext;
 use crate::schema::SafeOption;
+use crate::DataStoreContext;
 use itertools::Itertools;
 use metrics::{counter, gauge};
-use tracing::error;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::TestConstants;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PeerIdInfo;
+use redgold_schema::structs::{ErrorInfo, Hash, NodeMetadata, PartitionInfo, PeerId, PeerMetadata, PeerNodeInfo, PublicKey, Transaction};
 use redgold_schema::util::times;
 use redgold_schema::util::xor_distance::xorfc_hash;
+use redgold_schema::{util, RgResult};
+use std::time::Duration;
+use tracing::error;
 
 #[derive(Clone)]
 pub struct PeerStore {

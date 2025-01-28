@@ -1,13 +1,13 @@
-use jsonrpc_core::{response, Id, MethodCall, Params, Version};
+use jsonrpc_core::{Id, MethodCall, Params, Version};
 use monero_rpc::RpcAuthentication;
-use serde_json::{json, Map, Value};
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
 use diqwest::WithDigestAuth;
-use serde::{Deserialize, Serialize};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::EasyJson;
+use serde::{Deserialize, Serialize};
 
 // https://docs.getmonero.org/rpc-library/wallet-rpc/#introduction
 pub struct MoneroWalletRpcMultisigClient {

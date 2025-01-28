@@ -1,6 +1,7 @@
 use crate::components::currency_input::supported_wallet_currencies;
 use crate::dependencies::gui_depends::GuiDepends;
 use crate::state::local_state::PricesPartyInfoAndDeltaInitialQuery;
+use log::info;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::explorer::{BriefTransaction, DetailedAddress};
 use redgold_schema::observability::errors::Loggable;
@@ -12,7 +13,6 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use log::info;
 
 #[derive(Clone, Debug)]
 pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + 'static + Sync{

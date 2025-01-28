@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use crate::core::relay::Relay;
+use crate::infra::deploy::derive_mnemonic_and_peer_id;
 use redgold_common_no_wasm::data_folder_read_ext::EnvFolderReadExt;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::NetworkEnvironment;
-use crate::core::relay::Relay;
-use crate::infra::deploy::derive_mnemonic_and_peer_id;
+use std::collections::HashMap;
 
 #[ignore]
 #[tokio::test]

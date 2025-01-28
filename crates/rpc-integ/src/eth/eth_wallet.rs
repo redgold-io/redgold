@@ -1,22 +1,22 @@
-use std::str::FromStr;
+use crate::eth::historical_client::EthHistoricalClient;
+use crate::examples::example::dev_ci_kp;
 use ethers::addressbook::Address;
 use ethers::middleware::{Middleware, SignerMiddleware};
-use ethers::prelude::{Bytes, LocalWallet, maybe, Provider, Signature, Signer, to_eip155_v, TransactionRequest, U256};
 use ethers::prelude::transaction::eip2718::TypedTransaction;
+use ethers::prelude::{maybe, to_eip155_v, Bytes, LocalWallet, Provider, Signature, Signer, TransactionRequest, U256};
 use ethers::providers;
 use ethers::providers::Http;
 // use log::kv::Key;
 use num_bigint::{BigInt, Sign};
-use tracing::info;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::KeyPair;
-use redgold_schema::{error_info, ErrorInfoContext, from_hex, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::structs::StandardContractType::Currency;
-use crate::eth::historical_client::EthHistoricalClient;
-use crate::examples::example::dev_ci_kp;
+use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency};
+use redgold_schema::{error_info, from_hex, structs, ErrorInfoContext, RgResult, SafeOption};
+use std::str::FromStr;
+use tracing::info;
 
 pub struct EthWalletWrapper {
     pub wallet: LocalWallet,

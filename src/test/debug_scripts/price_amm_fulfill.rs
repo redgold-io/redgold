@@ -1,7 +1,7 @@
+use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::SupportedCurrency;
-use crate::node_config::{ApiNodeConfig, EnvDefaultNodeConfig};
 
 #[ignore]
 #[tokio::test]

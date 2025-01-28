@@ -1,5 +1,5 @@
-use crate::{error_info, RgResult};
 use crate::structs::ErrorInfo;
+use crate::{error_info, RgResult};
 
 
 pub trait ToErrorInfo {

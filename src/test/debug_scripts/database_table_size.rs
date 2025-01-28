@@ -1,5 +1,5 @@
-use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::relay::Relay;
+use redgold_schema::util::lang_util::AnyPrinter;
 
 #[ignore]
 #[tokio::test]

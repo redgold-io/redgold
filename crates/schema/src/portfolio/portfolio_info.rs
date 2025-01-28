@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::structs::{PortfolioInfo, SupportedCurrency};
+use std::collections::HashMap;
 
 impl PortfolioInfo {
     pub fn fixed_currency_allocations(&self) -> HashMap<SupportedCurrency, f64> {

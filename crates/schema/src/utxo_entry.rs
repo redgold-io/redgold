@@ -25,9 +25,9 @@
 //     }
 // }
 
+use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::structs::{Address, CurrencyAmount, Hash, Input, Output, UtxoEntry, UtxoId};
 use crate::{RgResult, SafeOption, Transaction};
-use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 
 impl UtxoEntry {
 

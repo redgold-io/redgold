@@ -1,10 +1,10 @@
+use crate::gui::app_loop::LocalState;
+use crate::gui::components::key_source_sel::key_source;
+use crate::gui::components::save_key_window;
 use eframe::egui;
 use eframe::egui::Ui;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use crate::gui::app_loop::LocalState;
-use crate::gui::components::key_source_sel::key_source;
-use crate::gui::components::save_key_window;
 use redgold_gui::tab::transact::wallet_state::WalletState;
 
 

@@ -1,5 +1,5 @@
-use std::fmt::{Debug, Display};
 use eframe::egui::{ComboBox, Ui};
+use std::fmt::{Debug, Display};
 
 pub fn combo_box<T>(
     ui: &mut Ui,

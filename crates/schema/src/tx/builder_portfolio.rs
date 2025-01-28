@@ -1,7 +1,7 @@
-use itertools::Itertools;
-use crate::{structs, RgResult};
 use crate::structs::{Address, CurrencyAmount, DepositRequest, Output, PortfolioFulfillmentParams, PortfolioRequest, PortfolioWeighting, StakeDeposit, StakeRequest, StandardData, StandardRequest, SupportedCurrency, Weighting};
 use crate::tx::tx_builder::TransactionBuilder;
+use crate::structs;
+use itertools::Itertools;
 
 impl TransactionBuilder {
 

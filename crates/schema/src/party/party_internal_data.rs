@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use crate::helpers::easy_json::EasyJson;
 use crate::party::address_event::AddressEvent;
 use crate::party::external_data::{ExternalNetworkData, PriceDataPointUsdQuery};
 use crate::party::party_events::{OrderFulfillment, PartyEvents};
 use crate::structs::{PartyData, PartyInfo, SupportedCurrency, Transaction};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct PartyInternalData {

@@ -1,13 +1,12 @@
-use std::str::FromStr;
+use crate::solana::wallet::SolanaNetwork;
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
-use solana_program::pubkey::Pubkey;
-use solana_program::instruction::AccountMeta;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::structs::{Address, CurrencyAmount, SupportedCurrency};
-use crate::solana::wallet::SolanaNetwork;
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use serde::{Deserialize, Serialize};
+use solana_program::pubkey::Pubkey;
+use std::str::FromStr;
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct VaultTransaction {

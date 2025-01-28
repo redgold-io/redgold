@@ -1,15 +1,15 @@
-use std::collections::HashMap;
+use crate::core::relay::Relay;
+use crate::util;
 // use async_std::prelude::FutureExt;
 use async_trait::async_trait;
 use flume::Sender;
 use futures::future::Either;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult};
+use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{ContentionKey, Hash, ObservationMetadata, ObservationProof};
-use redgold_common::flume_send_help::SendErrorInfo;
-use crate::core::relay::Relay;
-use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
-use crate::util;
+use redgold_schema::{error_info, ErrorInfoContext, RgResult};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct ContentionResult {

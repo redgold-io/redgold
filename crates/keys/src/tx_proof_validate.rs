@@ -1,10 +1,10 @@
-use itertools::Itertools;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::{error_info, RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{AddressType, NetworkEnvironment, SupportedCurrency, Transaction};
 use crate::transaction_support::InputSupport;
+use itertools::Itertools;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{AddressType, NetworkEnvironment, SupportedCurrency, Transaction};
 use redgold_schema::tx_schema_validate::SchemaValidationSupport;
+use redgold_schema::{error_info, RgResult, SafeOption};
 
 pub trait TransactionProofValidator {
     fn validate_signatures(&self) -> RgResult<()>;

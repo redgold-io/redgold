@@ -1,6 +1,6 @@
-use itertools::Itertools;
 use crate::proto_serde::ProtoSerde;
 use crate::structs::{Hash, NodeMetadata, PartitionInfo, PublicKey};
+use itertools::Itertools;
 
 pub fn xor_distance(v1: &Vec<u8>, v2: &Vec<u8>) -> i64 {
     let xor_value: Vec<u8> = v1

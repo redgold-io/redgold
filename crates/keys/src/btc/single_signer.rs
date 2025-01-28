@@ -1,11 +1,11 @@
-use bdk::database::BatchDatabase;
-use redgold_schema::{error_info, structs, RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{CurrencyAmount, Proof};
 use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use crate::btc::threshold_multiparty::RawTransaction;
-use crate::KeyPair;
 use crate::proof_support::ProofSupport;
+use crate::KeyPair;
+use bdk::database::BatchDatabase;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::{CurrencyAmount, Proof};
+use redgold_schema::{error_info, structs, RgResult, SafeOption};
 
 impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
 

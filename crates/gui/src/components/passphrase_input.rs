@@ -1,8 +1,6 @@
 use eframe::egui;
 use eframe::egui::{RichText, Ui};
 use serde::{Deserialize, Serialize};
-use crate::common::{editable_text_input_copy, valid_label};
-
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -1,8 +1,8 @@
-use std::time::Instant;
-use sha3::Digest;
-use crate::{bytes_data, RgResult, SafeOption};
 use crate::proto_serde::ProtoSerde;
 use crate::structs::{Hash, PoWProof, PoWProofType, Transaction};
+use crate::{bytes_data, RgResult, SafeOption};
+use sha3::Digest;
+use std::time::Instant;
 
 
 fn check_difficulty_bytes(vec: &Vec<u8>, leading_zeros_bytes: usize) -> bool {

@@ -1,11 +1,11 @@
+use crate::common::valid_label;
+use crate::dependencies::gui_depends::GuiDepends;
 use eframe::egui;
 use eframe::egui::{ComboBox, Ui};
+use redgold_schema::structs::{Address, SupportedCurrency};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
-use redgold_schema::structs::{Address, SupportedCurrency};
-use crate::common::valid_label;
-use crate::dependencies::gui_depends::GuiDepends;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumString, EnumIter)]
 pub enum AddressInputMode {

@@ -1,9 +1,9 @@
-use redgold_schema::{RgResult, SafeOption};
+use crate::transaction_store::TransactionStore;
+use crate::DataStoreContext;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ErrorInfo, Hash, Transaction};
 use redgold_schema::util::times;
-use crate::DataStoreContext;
-use crate::transaction_store::TransactionStore;
+use redgold_schema::{RgResult, SafeOption};
 
 impl TransactionStore {
 

@@ -1,9 +1,7 @@
-from anthropic.types import TextBlockParam
+import numpy as np
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
-import numpy as np
 
-from claude_fmt import fmt_list
 from repo_reader import AccumFileData
 
 

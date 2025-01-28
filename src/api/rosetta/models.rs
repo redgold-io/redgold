@@ -3,12 +3,9 @@
 
 use serde::ser::Serializer;
 
-use crate::schema::structs::UtxoEntry;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::string::ParseError;
 use redgold_schema::structs::ErrorInfo;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 // use swagger;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

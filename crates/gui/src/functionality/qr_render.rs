@@ -1,9 +1,9 @@
+use csscolorparser::Color;
 use eframe::egui::load::Bytes;
 use eframe::egui::Image;
 use image::codecs::png::PngEncoder;
 use image::{ColorType, EncodableLayout, ImageBuffer, ImageEncoder, Rgba};
 use qrencode::{QrCode, QrResult};
-use csscolorparser::Color;
 
 fn build_qr_image_internal(
     content: &str,

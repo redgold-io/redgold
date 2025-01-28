@@ -1,25 +1,22 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use eframe::egui;
-use eframe::egui::{ColorImage, Image, TextureHandle, Ui};
-use eframe::egui::load::SizedTexture;
-use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
-use strum_macros::{EnumIter, EnumString};
-use redgold_schema::airgap::{AirgapMessage, AirgapResponse, IndexedInputProof, SignInternalResponse, TransactionSignDetails};
-use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs;
-use redgold_schema::util::times::{current_time_millis, ToTimeString};
-use crate::airgap;
 use crate::common::{bounded_text_area, editable_text_input_copy};
 use crate::components::combo_box::combo_box;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
 use crate::functionality::capture::CaptureLike;
 use crate::functionality::qr_render::qr_encode_image;
 use crate::image_capture::CaptureStream;
+use eframe::egui;
+use eframe::egui::load::SizedTexture;
+use eframe::egui::{ColorImage, Image, Ui};
+use redgold_schema::airgap::{AirgapMessage, AirgapResponse, IndexedInputProof, SignInternalResponse, TransactionSignDetails};
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::util::times::{current_time_millis, ToTimeString};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(EnumString, EnumIter, Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub enum AirgapWindowMode {

@@ -1,7 +1,7 @@
-use prost::Message;
-use crate::{HashClear, RgResult, SafeOption};
 use crate::proto_serde::{ProtoHashable, ProtoSerde};
-use crate::structs::{ErrorInfo, Hash, StructMetadata, ErrorCode};
+use crate::structs::{ErrorCode, Hash, StructMetadata};
+use crate::{HashClear, RgResult, SafeOption};
+use prost::Message;
 
 pub trait WithMetadataHashableFields {
     fn struct_metadata_opt(&mut self) -> Option<&mut StructMetadata>;

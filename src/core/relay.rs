@@ -1,65 +1,65 @@
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::pin::pin;
-use crossbeam::atomic::AtomicCell;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bdk::sled::Tree;
+use crossbeam::atomic::AtomicCell;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::pin::pin;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
+use crate::core::discover::peer_discovery::DiscoveryMessage;
 use crate::core::internal_message;
 use crate::schema::structs::{
     ErrorCode, ErrorInfo, NodeState, PeerMetadata, SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use dashmap::DashMap;
 use flume::{Receiver, Sender};
-use futures::{future, TryFutureExt};
 use futures::stream::FuturesUnordered;
 use futures::task::SpawnExt;
+use futures::{future, TryFutureExt};
 use itertools::Itertools;
-use tracing::{error, info};
 use metrics::counter;
+use redgold_common::flume_send_help;
+use redgold_common::flume_send_help::{new_channel, Channel};
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, SupportedCurrencyIter, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use rocket::form::FromForm;
 use rocket::http::ext::IntoCollection;
 use strum::IntoEnumIterator;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
 use tracing::trace;
-use redgold_common::flume_send_help;
-use redgold_common::flume_send_help::{new_channel, Channel};
-use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
-use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, SupportedCurrencyIter, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
-use redgold_schema::tx::tx_builder::TransactionBuilder;
-use crate::core::discover::peer_discovery::DiscoveryMessage;
+use tracing::{error, info};
 
-use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfoTimeout};
-use redgold_common::flume_send_help::RecvAsyncErrorInfo;
+use crate::core::contract::contract_state_manager::ContractStateMessage;
 use crate::core::internal_message::TransactionMessage;
+use crate::core::internal_message::{PeerMessage, RecvAsyncErrorInfoTimeout};
 use crate::core::process_transaction::{RequestProcessor, UTXOContentionPool};
+use crate::node_config::{DataStoreNodeConfig, EnvDefaultNodeConfig, ToTransactionBuilder};
+use crate::schema::structs::{Observation, ObservationMetadata};
+use crate::schema::SafeOption;
+use crate::util;
+use crate::util::keys::ToPublicKey;
+use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 use redgold_data::data_store::DataStore;
 use redgold_data::peer::PeerTrustQueryResult;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::party::external_data::ExternalNetworkData;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::transaction::{amount_to_raw_amount, TransactionMaybeError};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use redgold_schema::util::xor_distance::{xorf_conv_distance, xorfc_hash};
-use crate::core::contract::contract_state_manager::ContractStateMessage;
-use crate::node_config::{DataStoreNodeConfig, EnvDefaultNodeConfig, ToTransactionBuilder};
-use crate::schema::structs::{Observation, ObservationMetadata};
-use crate::schema::SafeOption;
-use redgold_schema::party::external_data::ExternalNetworkData;
-use crate::util;
-use crate::util::keys::ToPublicKey;
 
 #[derive(Clone)]
 pub struct TransactionErrorCache {
@@ -306,7 +306,9 @@ impl Relay {
                     pk.clone(), self.node_config.network.clone(), true,
                     self.node_config.env_data_folder().bdk_sled_path2(),
                     None,
-                    None
+                    None,
+                    None,
+                    None,
                 )?;
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
                 guard.insert(pk.clone(), w.clone());
@@ -453,6 +455,11 @@ impl Relay {
 
 }
 
+use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
+use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
+use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
+use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
+use crate::e2e::tx_gen::SpendableUTXO;
 /**
 Deliberately unclone-able structure that tracks strict unshared dependencies which
 are instantiated by the node
@@ -462,14 +469,9 @@ use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_daq::eth::EthDaq;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
-use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::core::resolver::{resolve_input, validate_single_result, ResolvedInput};
-use crate::core::transact::contention_conflicts::{ContentionMessage, ContentionMessageInner, ContentionResult};
-use crate::core::transact::tx_writer::{TransactionWithSender, TxWriterMessage};
-use crate::e2e::tx_gen::SpendableUTXO;
 use redgold_schema::party::address_event::AddressEvent;
-use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::party_events::PartyEvents;
+use redgold_schema::party::party_internal_data::PartyInternalData;
 
 pub struct StrictRelay {}
 // Relay should really construct a bunch of non-clonable channels and return that data

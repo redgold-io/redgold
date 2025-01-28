@@ -4,11 +4,11 @@ use crate::gui::tabs::transact::wallet_tab;
 use eframe::egui;
 use eframe::egui::{ScrollArea, Ui, Widget};
 use itertools::Itertools;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::conf::local_stored_state::AccountKeySource;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use tracing::info;
-use redgold_common::external_resources::ExternalNetworkResources;
 
 fn parse_xpub_rows(str: &str) -> RgResult<Vec<AccountKeySource>> {
     let mut rdr = csv::Reader::from_reader(str.as_bytes());

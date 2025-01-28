@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use crate::structs;
 use crate::structs::SupportedCurrency;
 use crate::tx::external_tx::ExternalTimedTransaction;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ExternalNetworkData {

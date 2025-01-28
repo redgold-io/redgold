@@ -227,18 +227,10 @@ import CopyClipboard from "@/components/util/CopyClipboard.vue";
 import BriefTransaction from "@/components/BriefTransaction.vue";
 import fetchHashInfo from "@/components/mixins/fetchHashInfo";
 // import BidAskCurve from "@/components/BidAskCurve.vue";
-
 // import LineWithLineChart from '@/components/LineWithLineChart.ts'
 // import * as chartConfig from './chartConfig.js'
-import { Chart as ChartJS } from 'chart.js';
-import {   Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  CategoryScale,
-  LinearScale
-} from 'chart.js';
-import { Bar } from 'vue-chartjs';
+import {BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Title, Tooltip} from 'chart.js';
+import {Bar} from 'vue-chartjs';
 import TextCopy from "@/components/util/TextCopy.vue";
 import HashLink from "@/components/util/HashLink.vue";
 import DetailedEvent from "@/components/DetailedEvent.vue";

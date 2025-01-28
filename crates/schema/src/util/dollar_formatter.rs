@@ -1,4 +1,3 @@
-
 use std::fmt::Write;
 
 pub fn format_dollar_amount(amount: f64) -> String {

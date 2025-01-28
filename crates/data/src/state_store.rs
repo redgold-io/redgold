@@ -1,9 +1,9 @@
-use redgold_schema::structs::{Address, ContractStateMarker, ErrorInfo, StateSelector};
-use redgold_schema::{RgResult};
-use crate::DataStoreContext;
 use crate::schema::SafeOption;
+use crate::DataStoreContext;
 use itertools::Itertools;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
+use redgold_schema::structs::{Address, ContractStateMarker, ErrorInfo, StateSelector};
+use redgold_schema::RgResult;
 
 #[derive(Clone)]
 pub struct StateStore {

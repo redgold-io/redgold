@@ -1,11 +1,10 @@
+use crate::DataStoreContext;
 use futures::{StreamExt, TryFutureExt};
-use itertools::Itertools;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Transaction, UtxoEntry, UtxoId};
 use redgold_schema::{RgResult, SafeOption};
-use crate::DataStoreContext;
 use sqlx::Executor;
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde}; // Make sure this is at the top of your file
+// Make sure this is at the top of your file
 
 #[derive(Clone)]
 pub struct TransactionStore {

@@ -1,6 +1,6 @@
 use redgold_schema::data_folder::EnvDataFolder;
-use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::structs::ErrorInfo;
+use redgold_schema::{ErrorInfoContext, RgResult};
 
 pub trait EnvFolderReadExt {
     async fn mnemonic(&self) -> RgResult<String>;

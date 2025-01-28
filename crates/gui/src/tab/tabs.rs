@@ -1,5 +1,5 @@
-use strum_macros::EnumIter;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 #[derive(Debug, EnumIter, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(i32)]

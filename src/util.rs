@@ -4,18 +4,17 @@ use std::io::Write;
 use std::sync::Once;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bdk::bitcoin::hashes::Hash;
 use bdk::bitcoin::hashes::hex::ToHex;
+use bdk::bitcoin::hashes::Hash;
 use crypto::digest::Digest;
 use crypto::sha2::{Sha256, Sha512};
-use tracing::info;
-use rand::{Rng, RngCore};
 use rand::rngs::OsRng;
+use rand::{Rng, RngCore};
 
 use redgold_keys::util::dhash_str;
 
-use redgold_schema::conf::node_config::NodeConfig;
 use crate::observability::trace_setup::init_tracing;
+use redgold_schema::conf::node_config::NodeConfig;
 
 pub mod auto_update;
 pub mod base26;

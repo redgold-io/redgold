@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use crate::components::tables::text_table_advanced;
+use crate::data_query::data_query::DataQueryInfo;
 use eframe::egui::{Color32, RichText, Ui};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{PublicKey, SupportedCurrency};
 use redgold_schema::util::dollar_formatter::format_dollar_amount;
-use crate::components::tables::text_table_advanced;
-use crate::data_query::data_query::DataQueryInfo;
+use std::collections::HashMap;
 
 pub fn balance_table<E>(
     ui: &mut Ui,

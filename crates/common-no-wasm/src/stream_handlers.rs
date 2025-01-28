@@ -3,10 +3,10 @@ use flume::Receiver;
 use futures::future::Either;
 use futures::{Stream, TryStreamExt};
 use redgold_schema::RgResult;
-use tokio_stream::StreamExt;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
+use tokio_stream::StreamExt;
 
 #[async_trait]
 pub trait IntervalFold  {

@@ -1,14 +1,14 @@
 // TODO: Remove this
 
-use std::time::Duration;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, ErrorInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, PublicRequest, PublicResponse, QueryAddressesRequest, Request, SubmitTransactionRequest, SubmitTransactionResponse, Transaction};
-use tracing::{debug, info};
-use redgold_schema::{empty_public_request, SafeOption};
-use redgold_schema::helpers::easy_json::json;
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::api::client::rest;
 use crate::core::relay::Relay;
 use crate::schema;
+use redgold_schema::helpers::easy_json::json;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, ErrorInfo, FaucetRequest, FaucetResponse, HashSearchRequest, HashSearchResponse, PublicRequest, PublicResponse, QueryAddressesRequest, Request, SubmitTransactionRequest, SubmitTransactionResponse, Transaction};
+use redgold_schema::{empty_public_request, SafeOption};
+use std::time::Duration;
+use tracing::{debug, info};
 
 #[derive(Clone)]
 pub struct PublicClient {

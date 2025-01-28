@@ -1,11 +1,7 @@
-use eframe::egui;
-use eframe::egui::{ComboBox, Context, TextEdit, Ui};
-use itertools::{Either, Itertools};
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::keys::words_pass::WordsPass;
 use crate::gui::app_loop::LocalState;
-use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item};
-use redgold_gui::components::tables::text_table;
+use eframe::egui::{ComboBox, Ui};
+use itertools::Either;
+use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 
 pub fn key_source<E, G>(

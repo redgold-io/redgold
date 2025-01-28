@@ -2,8 +2,8 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
-use bdk::bitcoin::secp256k1::{Message, Secp256k1, Signature};
 use bdk::bitcoin::secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
+use bdk::bitcoin::secp256k1::{Message, Secp256k1, Signature};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::party_i::SignatureRecid;
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::keygen::LocalKey;
@@ -12,15 +12,15 @@ use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::key
 use curv::arithmetic::Converter;
 use curv::BigInt;
 
+use crate::multiparty_gg20::gg20_keygen::external_address_to_surf_url;
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::sign::{
     OfflineStage, SignManual,
 };
+use redgold_keys::util::verify;
+use redgold_schema::structs::{ErrorInfo, Proof};
+use redgold_schema::{bytes_data, error_info, structs};
 use round_based::async_runtime::AsyncProtocol;
 use round_based::Msg;
-use redgold_schema::{bytes_data, error_info, structs};
-use redgold_schema::structs::{ErrorInfo, Proof};
-use redgold_keys::util::verify;
-use crate::multiparty_gg20::gg20_keygen::external_address_to_surf_url;
 
 use crate::multiparty_gg20::gg20_sm_client::join_computation;
 
@@ -125,12 +125,12 @@ async fn signing_original(
 
     Ok(signature)
 }
-use curv::elliptic::curves::ECScalar;
-use tracing::info;
-use redgold_schema::helpers::easy_json::{json, json_from};
 use crate::core::relay::Relay;
-use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::RsvSignature;
+use curv::elliptic::curves::ECScalar;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::easy_json::{json, json_from};
+use tracing::info;
 
 pub async fn signing(
     external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, relay: Relay,

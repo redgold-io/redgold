@@ -1,7 +1,7 @@
-use crate::{error_info, HashClear, RgResult, SafeOption};
 use crate::proto_serde::ProtoSerde;
 use crate::structs::{ErrorInfo, Hash, NetworkEnvironment, NodeMetadata, PartitionInfo, PeerNodeInfo, PublicKey, TransportInfo};
 use crate::util::xor_distance::xorfc_hash;
+use crate::{HashClear, RgResult, SafeOption};
 
 impl HashClear for NodeMetadata {
     fn hash_clear(&mut self) {}

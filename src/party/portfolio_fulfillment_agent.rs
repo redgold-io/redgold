@@ -1,14 +1,14 @@
+use crate::core::relay::Relay;
+use crate::party::stake_event_stream::StakeMethods;
 use async_trait::async_trait;
 use log::info;
-use redgold_schema::RgResult;
-use crate::core::relay::Relay;
-use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_keys::address_external::{ToBitcoinAddress, ToCurrencyAddress};
-use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::proto_serde::ProtoSerde;
-use crate::party::stake_event_stream::StakeMethods;
+use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
+use redgold_schema::RgResult;
 
 pub struct PortfolioFullfillmentAgent<T> where T: ExternalNetworkResources {
     pub relay: Relay,

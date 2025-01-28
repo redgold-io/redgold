@@ -1,6 +1,6 @@
+use bdk::bitcoin::util::base58;
 use bdk::bitcoin::util::base58::Error;
 use std::{fmt, iter, slice, str};
-use bdk::bitcoin::util::base58;
 
 static BASE26_CHARS: &'static [u8] = b"abcdefghijklmnopqrstuvwxyz";
 // use num_traits::cast::ToPrimitive;

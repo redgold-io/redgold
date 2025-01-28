@@ -1,24 +1,23 @@
 use eframe::egui;
 use eframe::egui::{Context, ScrollArea, TextEdit, Ui, Widget};
 use itertools::Itertools;
-use strum_macros::EnumString;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::util::mnemonic_builder;
-use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::structs::NetworkEnvironment;
+use strum_macros::EnumString;
 
 use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
-use redgold_gui::components::tables::text_table;
-use redgold_gui::tab::keys::keygen::{GenerateMnemonicState, KeyDerivation, KeygenState, MnemonicWindowState, Rounds};
-use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::util;
 use crate::util::argon_kdf::argon2d_hash;
 use crate::util::cli::commands::generate_random_mnemonic;
 use crate::util::keys::ToPublicKeyFromLib;
-
+use redgold_gui::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item, valid_label};
+use redgold_gui::components::tables::text_table;
+use redgold_gui::tab::keys::keygen::{GenerateMnemonicState, KeyDerivation, KeygenState, MnemonicWindowState, Rounds};
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 
 
 pub trait MnemonicWindowStateWordSupport {

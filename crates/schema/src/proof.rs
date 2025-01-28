@@ -1,7 +1,7 @@
-use crate::structs::{Address, ErrorCode as RGError, ErrorInfo, Hash, Proof};
+use crate::structs::{Address, ErrorCode as RGError, ErrorInfo, Proof};
 
-use crate::{error_message, HashClear, RgResult, SafeOption, signature_data, structs};
 use crate::proto_serde::ProtoSerde;
+use crate::{error_message, structs, HashClear, RgResult, SafeOption};
 
 impl HashClear for Proof {
     // TODO: Separate the hashclear method for those that don't require clears

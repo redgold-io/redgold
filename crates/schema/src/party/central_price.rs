@@ -1,12 +1,12 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use crate::helpers::easy_json::EasyJson;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_events::{OrderFulfillment, PartyEvents};
-use crate::{RgResult, SafeOption};
-use crate::helpers::easy_json::EasyJson;
 use crate::party::price_volume::PriceVolume;
 use crate::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
 use crate::tx::external_tx::ExternalTimedTransaction;
+use crate::{RgResult, SafeOption};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub const DUST_LIMIT: i64 = 2500;
 
@@ -170,7 +170,7 @@ impl CentralPricePair {
                 }
             } else {
                 // We have less Other than this ask can fulfill, so we take it and stop
-                remaining_order_amount = 0;
+                // remaining_order_amount = 0;
                 fulfilled_amount += other_amount_requested;
                 break
             }

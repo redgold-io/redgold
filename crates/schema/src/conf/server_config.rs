@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
 use crate::config_data::Keys;
 use crate::servers::ServerOldFormat;
-use crate::structs::NetworkEnvironment;
+use serde::{Deserialize, Serialize};
 
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

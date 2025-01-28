@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-use crate::{error_code, error_info, error_message, RgResult, SafeOption, structs};
 use crate::constants::MAX_INPUTS_OUTPUTS;
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
@@ -9,6 +7,8 @@ use crate::proto_serde::ProtoSerde;
 use crate::structs::{NetworkEnvironment, Transaction, UtxoId};
 use crate::transaction::MAX_TRANSACTION_MESSAGE_SIZE;
 use crate::util::times;
+use crate::{error_code, error_info, error_message, structs, RgResult, SafeOption};
+use std::collections::HashSet;
 
 pub trait SchemaValidationSupport {
     fn validate_schema(&self, network_opt: Option<&NetworkEnvironment>, expect_signed: bool) -> RgResult<()>;

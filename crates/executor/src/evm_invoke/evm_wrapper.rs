@@ -19,15 +19,14 @@
 //     }
 // }
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::marker::PhantomData;
-use std::mem;
 use evm::backend::{Backend, Log};
-use evm::executor::stack::{Accessed, PrecompileHandle, PrecompileSet, StackExecutor, StackState, StackSubstateMetadata};
+use evm::executor::stack::{Accessed, PrecompileHandle, StackExecutor, StackState, StackSubstateMetadata};
 use evm::{Config, ExitError, Transfer};
 use parity_scale_codec::{Decode, Encode};
 use primitive_types::{H160, H256, U256};
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+use std::mem;
 
 
 // #[proc_macro_derive(TypeInfo, attributes(scale_info, codec))]

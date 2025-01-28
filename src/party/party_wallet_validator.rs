@@ -1,17 +1,17 @@
+use crate::core::relay::Relay;
+use crate::party::party_stream::PartyEventBuilder;
 use async_trait::async_trait;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::database::BatchDatabase;
 use itertools::Itertools;
-use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
-use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::party::party_events::PartyEvents;
-use redgold_schema::{error_info, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::structs::{NetworkEnvironment, SupportedCurrency};
-use crate::core::relay::Relay;
-use crate::party::party_stream::PartyEventBuilder;
+use redgold_schema::{error_info, RgResult};
 
 #[async_trait]
 pub trait PartyWalletMethods {

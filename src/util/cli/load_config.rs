@@ -1,17 +1,15 @@
-use std::env;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::util::cli::apply_args_to_config::{apply_args_final, apply_args_initial};
 use clap::Parser;
 use config::{Config, Environment};
 use itertools::Itertools;
-use log::info;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::{empty_args, RgArgs};
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::NetworkEnvironment;
-use crate::util::cli::apply_args_to_config::{apply_args_final, apply_args_initial};
+use std::env;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 
 
 pub fn main_config() -> (Box<NodeConfig>, Box<RgArgs>) {

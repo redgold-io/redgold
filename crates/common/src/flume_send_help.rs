@@ -1,8 +1,7 @@
 use async_trait::async_trait;
-use redgold_schema::{error_info, error_message, ErrorInfoContext, RgResult};
-use redgold_schema::structs::{ErrorCode, ErrorInfo};
-use std::time::Duration;
 use flume::TryRecvError;
+use redgold_schema::structs::{ErrorCode, ErrorInfo};
+use redgold_schema::{error_info, error_message, RgResult};
 
 #[async_trait]
 pub trait RecvAsyncErrorInfo<T> {

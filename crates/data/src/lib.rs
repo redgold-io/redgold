@@ -1,14 +1,11 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
-use std::result;
-use std::sync::Arc;
-use sqlx::pool::PoolConnection;
-use sqlx::{Error, Sqlite, SqlitePool};
-use sqlx::query::Map;
-use sqlx::sqlite::{SqliteArguments, SqliteRow};
 use redgold_schema::error_message;
 use redgold_schema::structs::ErrorInfo;
+use sqlx::pool::PoolConnection;
+use sqlx::{Sqlite, SqlitePool};
+use std::sync::Arc;
 
 pub use redgold_schema as schema;
 pub mod peer;

@@ -1,11 +1,10 @@
+use crate::conf::server_config::Deployment;
+use crate::servers::ServerOldFormat;
+use crate::structs::{Address, CurrencyAmount, PublicKey, SupportedCurrency, TrustRatingLabel};
+use crate::tx::external_tx::ExternalTimedTransaction;
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString};
-use crate::conf::server_config::Deployment;
-use crate::servers::ServerOldFormat;
-use crate::structs::{Address, CurrencyAmount, PeerId, PublicKey, SupportedCurrency, TrustRatingLabel};
-use crate::tx::external_tx::ExternalTimedTransaction;
-
 
 
 #[derive(Clone, Debug, EnumIter, EnumString, PartialEq, Serialize, Deserialize, Eq)]

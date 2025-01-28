@@ -1,5 +1,5 @@
-use strum_macros::{EnumIter, EnumString};
 use std::time::Instant;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(Debug, EnumIter, EnumString, PartialEq, Clone)]
 #[repr(i32)]

@@ -1,5 +1,3 @@
-use redgold_gui::wasm_app;
-
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     println!("woo gui");

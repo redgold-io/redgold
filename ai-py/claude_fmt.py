@@ -1,6 +1,5 @@
-from typing import Iterable
-
 from anthropic.types import TextBlockParam, ToolResultBlockParam, MessageParam
+from typing import Iterable
 
 
 def fmt_list(hits):

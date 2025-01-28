@@ -1,18 +1,3 @@
-use std::collections::HashMap;
-use eframe::egui::{Color32, RichText, Ui};
-use eframe::egui::style::Interaction;
-use strum::IntoEnumIterator;
-use strum_macros::{EnumIter, EnumString};
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
-use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::explorer::{brief_transaction, BriefTransaction};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::party::address_event::AddressEvent;
-use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent};
-use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency, UtxoEntry};
-use redgold_schema::util::lang_util::WithMaxLengthString;
 use crate::components::address_input_box::AddressInputBox;
 use crate::components::balance_table::balance_table;
 use crate::components::combo_box::combo_box;
@@ -21,6 +6,19 @@ use crate::components::transaction_table::TransactionTable;
 use crate::components::tx_progress::{TransactionProgressFlow, TransactionStage};
 use crate::data_query::data_query::DataQueryInfo;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use eframe::egui::{Color32, RichText, Ui};
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::explorer::{brief_transaction, BriefTransaction};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalStakeEvent, PendingExternalStakeEvent};
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{CurrencyAmount, PublicKey, SupportedCurrency};
+use redgold_schema::util::lang_util::WithMaxLengthString;
+use std::collections::HashMap;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(EnumString, EnumIter, Clone, Debug, PartialEq)]
 pub enum StakeMode {

@@ -10,14 +10,14 @@ finalized: true
 test integrations::bitcoin::bdk_example::balance_test ... ok
 
  */
-use std::path::PathBuf;
+use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
+use crate::util::keys::ToPublicKeyFromLib;
+use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
+use crate::TestConstants;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
-use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
-use crate::TestConstants;
-use crate::util::keys::ToPublicKeyFromLib;
-use crate::util::mnemonic_support::{test_pkey_hex, test_pubk};
+use std::path::PathBuf;
 
 #[ignore]
 #[tokio::test]
@@ -121,6 +121,8 @@ async fn balance_test_mn() {
         PublicKey::from_hex("0a230a210220f12e974037da99be8152333d4b72fc06c9041fbd39ac6b37fb6f65e3057c39")
             .expect(""), NetworkEnvironment::Main, true, PathBuf::from("testdb"),
         Some("ssl://fulcrum.sethforprivacy.com:50002".to_string()),
+        None,
+        None,
         None
     ).expect("worx");
     let balance = w.get_wallet_balance().expect("");

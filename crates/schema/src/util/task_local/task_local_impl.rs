@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use tokio::task::futures::TaskLocalFuture;
-use std::future::Future;
-use itertools::Itertools;
-use tokio::task_local;
 use crate::structs::ErrorDetails;
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::future::Future;
+use tokio::task::futures::TaskLocalFuture;
+use tokio::task_local;
 
 // TODO: This feature is only available in tokio RT, need to substitute this for a
 // standard local key implementation depending on the features available for WASM crate.

@@ -1,6 +1,6 @@
 use redgold_keys::util::mnemonic_support::WordsPassMetadata;
-use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
+use redgold_schema::{ErrorInfoContext, RgResult};
 
 pub(crate) async fn read_metadata_json(path: &String) -> RgResult<WordsPassMetadata> {
     tokio::fs::read_to_string(path).await

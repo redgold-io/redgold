@@ -1,10 +1,7 @@
-use eframe::egui;
-use eframe::egui::{Image, Separator, Ui, Vec2};
-use log::info;
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{PublicKey, SupportedCurrency};
 use crate::dependencies::gui_depends::GuiDepends;
 use crate::functionality::qr_render::qr_encode_image;
+use eframe::egui::{Image, Separator, Ui, Vec2};
+use redgold_schema::structs::{PublicKey, SupportedCurrency};
 
 #[derive(Clone, Debug)]
 pub struct ReceiveData {

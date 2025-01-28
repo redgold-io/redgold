@@ -1,10 +1,10 @@
+use crate::gui::app_loop::LocalState;
 use eframe::egui;
 use eframe::egui::Context;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, medium_data_item};
 use redgold_keys::xpub_wrapper::ValidateDerivationPath;
 use redgold_schema::conf::local_stored_state::AccountKeySource;
-use crate::gui::app_loop::LocalState;
-use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, medium_data_item};
 
 pub(crate) fn show_xpub_window<E>(
     ctx: &Context, ls: &mut LocalState<E>, xpub: AccountKeySource

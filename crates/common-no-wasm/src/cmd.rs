@@ -1,8 +1,8 @@
-use std::env;
-use std::process::Command;
-use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::ErrorInfo;
+use redgold_schema::{ErrorInfoContext, RgResult};
+use std::env;
+use std::process::Command;
 
 pub fn run_cmd(cmd: impl Into<String>, args: Vec<impl Into<String>>) -> (String, String) {
     let mut echo_hello = Command::new(cmd.into());

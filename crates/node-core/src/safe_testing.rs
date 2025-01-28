@@ -1,12 +1,9 @@
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
-use redgold_keys::TestConstants;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_keys::TestConstants;
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
-use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
-use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, SupportedCurrency};
-use redgold_schema::structs::SupportedCurrency::Ethereum;
 
 pub fn dev_ci_kp_path() -> String {
     "m/84'/0'/0'/0/0".to_string()

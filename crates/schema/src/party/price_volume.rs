@@ -1,7 +1,7 @@
-use tracing::error;
-use serde::{Deserialize, Serialize};
-use num_traits::Zero;
 use crate::party::central_price::DUST_LIMIT;
+use num_traits::Zero;
+use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PriceVolume {

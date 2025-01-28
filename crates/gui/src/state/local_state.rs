@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::RgResult;
-use redgold_schema::structs::{AddressInfo, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
 use crate::components::tx_progress::PreparedTransaction;
+use redgold_schema::party::party_internal_data::PartyInternalData;
+use redgold_schema::structs::{AddressInfo, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
+use redgold_schema::RgResult;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub enum LocalStateUpdate {

@@ -51,6 +51,7 @@ import HashLink from "@/components/util/HashLink.vue";
 // import PeerNodeInfo from "@/components/hash_types/PeerNodeInfo.vue";
 import {toTitleCase} from "@/utils";
 import BriefObservation from "@/components/BriefObservation.vue";
+
 export default {
   name: "PeerInfo",
   components: {

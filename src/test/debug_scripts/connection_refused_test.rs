@@ -1,6 +1,6 @@
-use redgold_schema::structs;
 use crate::api::client::rest::RgHttpClient;
 use crate::core::relay::Relay;
+use redgold_schema::structs;
 
 #[ignore]
 #[tokio::test]
