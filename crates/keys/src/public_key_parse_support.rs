@@ -1,8 +1,8 @@
-use redgold_schema::{error_info, RgResult};
+use crate::proof_support::PublicKeySupport;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PublicKey;
-use crate::proof_support::PublicKeySupport;
+use redgold_schema::{error_info, RgResult};
 
 //
 // if let Some(pk) = PublicKey::from_hex(hash_input.clone()).ok().or(

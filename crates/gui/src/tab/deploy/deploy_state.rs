@@ -1,8 +1,8 @@
-use std::sync::{Arc, Mutex};
 use either::Either;
 use redgold_schema::structs::NetworkEnvironment;
-use std::collections::HashMap;
 use redgold_schema::RgResult;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub struct ServerStatus {

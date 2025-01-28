@@ -1,5 +1,4 @@
-use crate::{SafeOption};
-use crate::structs::{Address, AddressSelector, ErrorInfo, FloatingUtxoId, Hash, Input, Output, Proof};
+use crate::structs::{Address, AddressSelector, ErrorInfo, FloatingUtxoId, Input, Proof};
 
 impl Input {
 

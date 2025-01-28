@@ -1,13 +1,13 @@
-use sqlx::Row;
+use crate::schema::SafeOption;
+use crate::DataStoreContext;
+use redgold_schema::conf::local_stored_state::LocalStoredState;
+use redgold_schema::helpers::easy_json::json;
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
+use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, Transaction};
 use redgold_schema::{ErrorInfoContext, RgResult};
-use crate::DataStoreContext;
-use crate::schema::SafeOption;
-use redgold_schema::helpers::easy_json::json;
 use serde::{Deserialize, Serialize};
-use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use redgold_schema::conf::local_stored_state::LocalStoredState;
-use redgold_schema::proto_serde::ProtoSerde;
+use sqlx::Row;
 
 #[derive(Clone)]
 pub struct ConfigStore {

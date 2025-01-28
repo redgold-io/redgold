@@ -1,13 +1,13 @@
-use std::str::FromStr;
+use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use bdk::bitcoin::{Address, Network, TxIn, TxOut};
 use bdk::blockchain::GetTx;
 use bdk::database::BatchDatabase;
 use bdk::{Balance, TransactionDetails};
 use itertools::Itertools;
-use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
-use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
+use std::str::FromStr;
 
 impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
 

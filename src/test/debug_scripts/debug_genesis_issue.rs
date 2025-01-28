@@ -1,7 +1,7 @@
-use std::hash::Hash;
-use redgold_schema::helpers::easy_json::{EasyJson, json_from};
+use redgold_schema::helpers::easy_json::{json_from, EasyJson};
 use redgold_schema::proto_serde::ProtoHashable;
 use redgold_schema::structs::{ErrorInfo, Transaction};
+use std::hash::Hash;
 
 
 // Use for future debugging, strange disagreement on genesis.

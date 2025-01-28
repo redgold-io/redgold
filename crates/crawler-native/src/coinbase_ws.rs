@@ -1,11 +1,11 @@
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use futures_util::{SinkExt, StreamExt};
 use metrics::counter;
-use url::Url;
-use serde_json::json;
-use redgold_schema::{ErrorInfoContext, RgResult};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::{ErrorInfoContext, RgResult};
+use serde_json::json;
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use url::Url;
 
 async fn run_websocket_stream_inf(
     url: String, initial_subscribe_message: String, messages: flume::Sender<String>

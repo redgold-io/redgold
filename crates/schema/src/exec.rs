@@ -1,4 +1,3 @@
-use crate::response_metadata;
 use crate::structs::{ExecutionResult, ResponseMetadata};
 
 impl ExecutionResult {

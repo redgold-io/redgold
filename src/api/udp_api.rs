@@ -6,27 +6,26 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
 
+use crate::api::udp_api::UdpOperation::Outgoing;
+use crate::core::internal_message::{MessageOrigin, PeerMessage};
+use crate::util;
 use bytes::{BufMut, BytesMut};
 use futures::future::try_join;
 use futures::future::FutureExt;
 use futures::sink::SinkExt;
+use futures::stream::{SplitSink, SplitStream};
+use futures::TryStreamExt;
+use itertools::Itertools;
+use redgold_common::flume_send_help::{Channel, SendErrorInfo};
+use redgold_keys::request_support::RequestSupport;
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{ErrorInfo, Request, Response, UdpMessage};
+use redgold_schema::{bytes_data, ErrorInfoContext, RgResult};
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use futures::TryStreamExt;
-use futures::stream::{SplitSink, SplitStream};
-use itertools::Itertools;
 use tokio_stream::wrappers::IntervalStream;
 use uuid::Uuid;
-use redgold_common::flume_send_help::{Channel, SendErrorInfo};
-use redgold_keys::request_support::RequestSupport;
-use redgold_schema::{bytes_data, ErrorInfoContext, RgResult};
-use redgold_schema::structs::{ErrorInfo, Request, Response, UdpMessage};
-use crate::core::internal_message::{MessageOrigin, PeerMessage};
-use crate::util;
-use redgold_schema::proto_serde::ProtoSerde;
-use crate::api::udp_api::UdpOperation::Outgoing;
-use redgold_schema::helpers::easy_json::EasyJson;
 #[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
 #[tokio::test]
 async fn send_framed_byte_codec() -> std::io::Result<()> {

@@ -1,6 +1,6 @@
 use crate::util;
-use redgold_schema::keys::words_pass::WordsPass;
 use crate::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::keys::words_pass::WordsPass;
 
 // Legacy usage, deprecated but still supported
 pub fn from_str_rounds(s: &str, additional_rounds: usize) -> String {

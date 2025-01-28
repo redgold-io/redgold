@@ -1,20 +1,16 @@
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use num_bigint::BigInt;
-use itertools::Itertools;
-use strum_macros::{EnumIter, EnumString};
-use crate::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
-use crate::party::address_event::AddressEvent::External;
-use crate::{error_info, RgResult, SafeOption};
-use crate::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::observability::errors::EnhanceErrorInfo;
+use crate::party::address_event::AddressEvent::External;
+use crate::party::address_event::AddressEvent;
 use crate::party::central_price::CentralPricePair;
 use crate::party::portfolio::PortfolioRequestEvents;
-use crate::structs::{Address, CurrencyAmount, DepositRequest, ErrorInfo, ExternalTransactionId, Hash, NetworkEnvironment, PublicKey, StakeDeposit, SupportedCurrency, Transaction, UtxoId};
+use crate::structs::{Address, CurrencyAmount, DepositRequest, ExternalTransactionId, NetworkEnvironment, PublicKey, StakeDeposit, SupportedCurrency, Transaction, UtxoId};
 use crate::tx::external_tx::ExternalTimedTransaction;
-use crate::util::times::current_time_millis;
-
+use crate::RgResult;
+use itertools::Itertools;
+use num_bigint::BigInt;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use strum_macros::{EnumIter, EnumString};
 
 
 #[derive(Serialize, Deserialize, EnumString, Clone, PartialEq, Debug, EnumIter)]
@@ -72,7 +68,7 @@ impl PartyEvents {
 
     pub fn get_rdg_max_bid_usd_estimate_at(&self, time: i64) -> Option<f64> {
         self.central_price_history.clone().unwrap_or_default().iter().filter(|(t, _)| *t <= time).last().and_then(|(_, cp)| {
-            let max = cp.iter().map(|(c, p)| {
+            let max = cp.iter().map(|(_, p)| {
                 p.min_bid_estimated
             }).reduce(|a, b| if a > b { a } else { b });
             max
@@ -358,7 +354,7 @@ impl PartyEvents {
                 let receipt_match = t2.tx_id == tx_id.identifier;
                 !receipt_match
             }
-            AddressEvent::Internal(i) => {
+            AddressEvent::Internal(_) => {
                 true
             }
         }

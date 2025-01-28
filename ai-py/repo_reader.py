@@ -1,7 +1,7 @@
 import dataclasses
-import os
-from pathlib import Path
 import tiktoken
+from pathlib import Path
+
 
 def directory_exclusions():
     return [

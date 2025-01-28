@@ -1,14 +1,14 @@
-use redgold_schema::conf::node_config::NodeConfig;
 use crate::schema::structs::NetworkEnvironment;
 use redgold_common_no_wasm::cmd::run_cmd;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::structs::ErrorInfo;
 // use crate::util::init_logger;
 use redgold_schema::util::lang_util::remove_whitespace;
-use tracing::{error, info};
-use std::time::Duration;
-use reqwest::ClientBuilder;
-use tokio::time;
 use redgold_schema::ErrorInfoContext;
-use redgold_schema::structs::ErrorInfo;
+use reqwest::ClientBuilder;
+use std::time::Duration;
+use tokio::time;
+use tracing::{error, info};
 
 const S3_PREFIX_URL: &str = "https://redgold-public.s3.us-west-1.amazonaws.com/release/";
 // detect OS.

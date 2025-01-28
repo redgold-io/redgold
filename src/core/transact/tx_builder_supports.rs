@@ -9,10 +9,10 @@
 //     fn with_ds(&self, ds: DataStore)
 // }
 
-use async_trait::async_trait;
-use redgold_schema::RgResult;
-use redgold_schema::tx::tx_builder::{TransactionBuilder};
 use crate::node_config::ApiNodeConfig;
+use async_trait::async_trait;
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::RgResult;
 
 #[async_trait]
 pub trait TxBuilderApiSupport {

@@ -1,20 +1,20 @@
-use std::sync::Arc;
-use std::time::Duration;
-use async_trait::async_trait;
 use crate::external_net_daq::ExternalDaq;
+use async_trait::async_trait;
 use futures::future::Either;
 use futures::TryStreamExt;
 use metrics::counter;
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_common_no_wasm::stream_handlers::{run_interval_fold_or_recv_stream, IntervalFoldOrReceive};
+use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_rpc_integ::eth::ws_rpc::{EthereumWsProvider, TimestampedEthereumTransaction};
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::RgResult;
-use tokio::task::JoinHandle;
-use tokio_stream::StreamExt;
-use tokio_stream::wrappers::IntervalStream;
-use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::structs::PublicKey;
+use redgold_schema::RgResult;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::task::JoinHandle;
+use tokio_stream::wrappers::IntervalStream;
+use tokio_stream::StreamExt;
 
 #[derive(Clone, Default)]
 pub struct EthDaq {

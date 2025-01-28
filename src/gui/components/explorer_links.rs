@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use eframe::egui::Ui;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
+use std::collections::HashMap;
 
 // TODO Inject GUI dependencies to translate PK to all addresses
 pub fn rdg_explorer(ui: &mut Ui, network: &NetworkEnvironment, pk: &PublicKey) {

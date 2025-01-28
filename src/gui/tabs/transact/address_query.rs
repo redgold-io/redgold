@@ -1,19 +1,19 @@
-use std::collections::HashMap;
+use crate::gui::app_loop::LocalState;
+use crate::node_config::ApiNodeConfig;
 use flume::Sender;
-use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::structs::{PublicKey, SupportedCurrency};
-use tracing::{error, info};
-use redgold_keys::address_external::ToEthereumAddress;
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::transaction::rounded_balance_i64;
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_gui::state::local_state::{BalanceAddressInfoUpdate, LocalStateUpdate};
+use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
-use crate::gui::app_loop::LocalState;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
-use crate::node_config::ApiNodeConfig;
+use redgold_schema::structs::{PublicKey, SupportedCurrency};
+use redgold_schema::transaction::rounded_balance_i64;
+use std::collections::HashMap;
+use tracing::{error, info};
 
 pub fn get_address_info<G>(
     node_config: &NodeConfig,

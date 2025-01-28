@@ -1,7 +1,7 @@
-use eframe::egui::Ui;
-use serde::{Deserialize, Serialize};
 use crate::common::{editable_text_input_copy, medium_data_item, valid_label};
 use crate::dependencies::gui_depends::GuiDepends;
+use eframe::egui::Ui;
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_ACCOUNT_DP: &str = "m/44'/0'/50'";
 

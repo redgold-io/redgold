@@ -1,20 +1,18 @@
-use eframe::egui::{Color32, RichText, Ui};
-use tracing::info;
-use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
+use crate::gui::app_loop::LocalState;
+use crate::gui::components::explorer_links::rdg_explorer_links;
+use eframe::egui::Ui;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::common::{data_item, data_item_hyperlink};
+use redgold_gui::dependencies::gui_depends::GuiDepends;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_keys::KeyPair;
 use redgold_schema::keys::words_pass::WordsPass;
-use redgold_keys::xpub_wrapper::XpubWrapper;
-use redgold_schema::{error_info, RgResult};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
-use crate::gui::app_loop::LocalState;
-use redgold_gui::common::{data_item, data_item_hyperlink, editable_text_input_copy, valid_label};
-use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_keys::util::mnemonic_support::MnemonicSupport;
-use crate::gui::components::explorer_links::{rdg_explorer, rdg_explorer_links};
+use redgold_schema::{error_info, RgResult};
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
 

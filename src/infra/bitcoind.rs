@@ -1,5 +1,4 @@
 use crate::schema::structs::ErrorCode;
-use crate::util;
 use itertools::Itertools;
 
 #[derive(Debug, Clone)]

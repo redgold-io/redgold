@@ -1,9 +1,7 @@
 use crate::core::relay::Relay;
-use crate::schema::structs::TrustRatingLabel;
-use std::collections::HashMap;
 use async_trait::async_trait;
-use redgold_schema::RgResult;
 use redgold_common_no_wasm::stream_handlers::IntervalFold;
+use redgold_schema::RgResult;
 
 pub mod eigentrust;
 pub mod moon;

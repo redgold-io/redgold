@@ -1,13 +1,13 @@
-use std::fs::File;
-use std::path::PathBuf;
+use crate::data_store::DataStore;
 use async_trait::async_trait;
 use itertools::Itertools;
 use log::info;
 use polars::export::chrono::{DateTime, Utc};
 use polars::frame::row::Row;
-use redgold_schema::{error_info, ErrorInfoContext, RgResult, util};
 use redgold_schema::structs::Transaction;
-use crate::data_store::DataStore;
+use redgold_schema::{error_info, util, ErrorInfoContext, RgResult};
+use std::fs::File;
+use std::path::PathBuf;
 
 #[async_trait]
 pub trait ParquetExporter {
@@ -129,15 +129,15 @@ impl DataStore {
 }
 
 
+use crate::parquet_min_index::{transaction_simple_parquet_schema, translate_tx_simple};
 use polars::prelude::*;
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::util::times::current_time_millis;
 use redgold_schema::util::timers::PerfTimer;
 use redgold_schema::util::times;
-use crate::parquet_min_index::{transaction_simple_parquet_schema, translate_tx_simple};
+use redgold_schema::util::times::current_time_millis;
 
 
 // Assumes transactions are already sorted by time.

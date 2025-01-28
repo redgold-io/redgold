@@ -1,36 +1,36 @@
+use crate::core::relay::Relay;
+use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
+use crate::scrape::crypto_compare::{crypto_compare_point_query, daily_one_year};
+use crate::scrape::okx_point;
+use crate::test::external_amm_integration::dev_ci_kp;
+use crate::util::current_time_millis_i64;
+use async_trait::async_trait;
+use bdk::bitcoin::psbt::PartiallySignedTransaction;
+use bdk::bitcoin::EcdsaSighashType;
+use bdk::database::{BatchDatabase, MemoryDatabase};
+use bdk::sled::Tree;
+use itertools::Itertools;
+use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter};
+use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::word_pass_support::NodeConfigKeyPair;
+use redgold_keys::{KeyPair, TestConstants};
+use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
+use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::party::party_events::PartyEvents;
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency, Transaction};
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_schema::util::lang_util::AnyPrinter;
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use async_trait::async_trait;
-use bdk::bitcoin::psbt::PartiallySignedTransaction;
-use bdk::sled::Tree;
-use bdk::bitcoin::EcdsaSighashType;
-use bdk::database::{BatchDatabase, MemoryDatabase};
-use itertools::Itertools;
-use tracing::info;
 use tokio::sync::Mutex;
-use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter};
-use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::{KeyPair, TestConstants};
-use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency, Transaction};
-use redgold_schema::tx::external_tx::ExternalTimedTransaction;
-use redgold_schema::util::lang_util::AnyPrinter;
-use redgold_keys::word_pass_support::NodeConfigKeyPair;
-use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
-use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
-use redgold_schema::party::party_events::PartyEvents;
-use crate::core::relay::Relay;
-use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
-use crate::scrape::okx_point;
-use crate::scrape::crypto_compare::{crypto_compare_point_query, daily_one_year};
-use crate::test::external_amm_integration::dev_ci_kp;
-use crate::util::current_time_millis_i64;
+use tracing::info;
 
 #[derive(Clone)]
 pub struct ExternalNetworkResourcesImpl {
@@ -67,6 +67,8 @@ impl ExternalNetworkResourcesImpl {
                 let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
                     pk.clone(), self.node_config.network.clone(), true,
                     self.node_config.env_data_folder().bdk_sled_path(),
+                    None,
+                    None,
                     None,
                     None
                 )?;

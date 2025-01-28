@@ -1,22 +1,22 @@
-use std::collections::HashMap;
+use crate::core::relay::Relay;
+use crate::party::portfolio_request::PortfolioEventMethods;
+use crate::party::stake_event_stream::StakeMethods;
 use itertools::Itertools;
 use redgold_keys::external_tx_support::ExternalTxSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
-use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
-use redgold_schema::{error_info, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::party::address_event::AddressEvent::External;
+use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
 use redgold_schema::party::central_price::CentralPricePair;
+use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::times::current_time_millis;
-use crate::core::relay::Relay;
-use crate::party::portfolio_request::PortfolioEventMethods;
-use crate::party::stake_event_stream::StakeMethods;
+use redgold_schema::{error_info, RgResult, SafeOption};
+use std::collections::HashMap;
 
 pub trait PartyEventBuilder {
     fn new(party_public_key: &PublicKey, network: &NetworkEnvironment, relay: &Relay) -> Self;

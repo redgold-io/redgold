@@ -1,12 +1,9 @@
-import json
 import os
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, TypedDict
-
 from repo_reader import AccumFileData
 from ts_ast.ts_util import ts_read, child_functions, impl_items, get_identifier_name, get_impl_details, find_functions
+from typing import Optional
 
 
 def find_rust_function_exact():

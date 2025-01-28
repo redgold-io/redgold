@@ -1,7 +1,7 @@
-import os
-
 import google.generativeai as genai
+import os
 import typing_extensions as typing
+
 
 class Recipe(typing.TypedDict):
   recipe_name: str

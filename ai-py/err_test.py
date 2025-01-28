@@ -1,6 +1,6 @@
-import rg_proto.structs.structs_pb2 as structs
 from google.protobuf.json_format import MessageToJson, Parse
 
+import rg_proto.structs.structs_pb2 as structs
 
 
 def main():

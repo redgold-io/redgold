@@ -1,15 +1,14 @@
+use crate::util::mnemonic_support::MnemonicSupport;
+use crate::KeyPair;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::data_folder::DataFolder;
-use redgold_schema::RgResult;
-use redgold_schema::structs::{NetworkEnvironment, PeerId, SupportedCurrency};
-use std::sync::Arc;
-use std::time::Duration;
 use redgold_schema::config_data::RpcUrl;
 use redgold_schema::constants::DEBUG_FINALIZATION_INTERVAL_MILLIS;
-use redgold_schema::errors::into_error::ToErrorInfo;
-use crate::KeyPair;
+use redgold_schema::data_folder::DataFolder;
 use redgold_schema::keys::words_pass::WordsPass;
-use crate::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::structs::{NetworkEnvironment, PeerId, SupportedCurrency};
+use redgold_schema::RgResult;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub trait WordsPassNodeConfig {
     fn words(&self) -> WordsPass;

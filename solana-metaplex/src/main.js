@@ -1,9 +1,8 @@
 // TODO: Ended up not using this, used spl-token metadata instead
 
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
-import { createMetadataAccountV3 } from '@metaplex-foundation/mpl-token-metadata';
-import { publicKey } from '@metaplex-foundation/umi';
+import {createUmi} from '@metaplex-foundation/umi-bundle-defaults';
+import {createMetadataAccountV3, mplTokenMetadata} from '@metaplex-foundation/mpl-token-metadata';
+import {publicKey} from '@metaplex-foundation/umi';
 
 // Add console logs for debugging
 console.log('Script starting...');

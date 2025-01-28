@@ -50,7 +50,6 @@
 <script>
 
 
-
 import axios from "axios";
 import fetchHashInfo from "@/components/mixins/fetchHashInfo";
 import HashLink from "@/components/util/HashLink.vue";

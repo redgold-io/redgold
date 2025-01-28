@@ -1,8 +1,8 @@
 import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap"
 
-import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import {createApp} from 'vue'
+import {createRouter, createWebHistory} from 'vue-router'
 import App from './App.vue'
 // import HelloWorld from './components/HelloWorld.vue'
 // import HelloWorld2 from './components/HelloWorld2.vue'

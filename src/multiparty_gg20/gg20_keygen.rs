@@ -1,15 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use futures::StreamExt;
-use std::path::PathBuf;
-use tracing::info;
 // use structopt::StructOpt;
 
+use crate::core::relay::Relay;
 use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::keygen::Keygen;
-use round_based::async_runtime::AsyncProtocol;
 use redgold_schema::error_info;
 use redgold_schema::structs::ErrorInfo;
-use crate::core::relay::Relay;
-use redgold_schema::conf::node_config::NodeConfig;
+use round_based::async_runtime::AsyncProtocol;
 
 use super::gg20_sm_client::join_computation;
 //

@@ -1,19 +1,17 @@
-use std::path::PathBuf;
+use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use async_trait::async_trait;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::airgap::signer_window::AirgapTransport;
-use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
+use redgold_gui::components::tx_progress::PreparedTransaction;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-use redgold_keys::KeyPair;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{RgResult, SafeOption};
+use redgold_keys::KeyPair;
 use redgold_schema::airgap::AirgapMessage;
 use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{PublicKey, SupportedCurrency};
-use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
-use crate::util::current_time_unix;
+use redgold_schema::structs::SupportedCurrency;
+use redgold_schema::{RgResult, SafeOption};
 
 #[async_trait]
 pub trait TxSignerProgress {

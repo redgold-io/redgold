@@ -1,7 +1,7 @@
-use std::time::Duration;
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::error_info;
+use crate::api::udp_api::UdpServer;
+use crate::api::udp_keepalive::UdpKeepAlive;
 use crate::api::{control_api, explorer, public_api};
+use crate::core::contract::contract_state_manager::ContractStateManager;
 use crate::core::discover::data_discovery::DataDiscovery;
 use crate::core::discover::peer_discovery::Discovery;
 use crate::core::misc_periodic::MiscPeriodic;
@@ -10,17 +10,10 @@ use crate::core::process_observation::ObservationHandler;
 use crate::core::process_transaction::TransactionProcessContext;
 use crate::core::relay::Relay;
 use crate::core::services::service_join_handles::{NamedHandle, ServiceJoinHandles};
-use redgold_common_no_wasm::stream_handlers;
-use redgold_common_no_wasm::stream_handlers::{run_interval_fold, run_interval_fold_or_recv, run_recv_concurrent, run_recv_single};
-use redgold_daq::eth::EthDaq;
+use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::core::transact::tx_writer::TxWriter;
 use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::{api, e2e};
-use crate::api::udp_api::UdpServer;
-use crate::api::udp_keepalive::UdpKeepAlive;
-use crate::core::contract::contract_state_manager::ContractStateManager;
-use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::multiparty_gg20::gg20_sm_manager;
 use crate::node::Node;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
@@ -29,6 +22,11 @@ use crate::party::party_watcher::PartyWatcher;
 use crate::party::portfolio_fulfillment_agent::PortfolioFullfillmentAgent;
 use crate::sanity::recent_parity::RecentParityCheck;
 use crate::shuffle::shuffle_interval::Shuffle;
+use crate::{api, e2e};
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_common_no_wasm::stream_handlers::{run_interval_fold, run_interval_fold_or_recv, run_recv_concurrent, run_recv_single};
+use redgold_schema::error_info;
+use std::time::Duration;
 
 impl Node {
     /**

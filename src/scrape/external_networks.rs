@@ -1,8 +1,8 @@
+use crate::core::relay::Relay;
 use async_trait::async_trait;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::RgResult;
-use crate::core::relay::Relay;
-use redgold_common_no_wasm::stream_handlers::IntervalFold;
 
 // TODO: Future event streaming solution here
 

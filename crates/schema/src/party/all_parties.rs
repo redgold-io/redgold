@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use itertools::Itertools;
 use crate::structs::{PartyInfo, PublicKey};
 use crate::util::times;
+use itertools::Itertools;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct AllParties {

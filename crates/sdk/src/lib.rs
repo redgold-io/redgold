@@ -1,15 +1,15 @@
 pub mod example;
 pub mod entry;
 
+use crate::entry::with_entry_decoder;
+use crate::example::example_contract_main;
 use extism_pdk::*;
-use serde::Serialize;
-use redgold_schema::RgResult;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ExecutionInput, ExecutionResult};
 use redgold_schema::transaction::amount_data;
 use redgold_schema::util::lang_util::SameResult;
-use crate::entry::with_entry_decoder;
-use crate::example::example_contract_main;
+use redgold_schema::RgResult;
+use serde::Serialize;
 
 const VOWELS: &[char] = &['a', 'A', 'e', 'E', 'i', 'I', 'o', 'O', 'u', 'U'];
 

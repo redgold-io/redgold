@@ -1,7 +1,6 @@
 import os
-from typing import Optional
-
 from commands import ai_working_dir
+from typing import Optional
 
 
 def edit_file_replace_lines_tooldef():

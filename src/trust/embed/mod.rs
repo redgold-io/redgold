@@ -1,9 +1,8 @@
 pub mod gembed;
 
 
-use std::collections::HashSet;
 use rand::Rng;
-use csv::Writer;
+use std::collections::HashSet;
 use std::fs::File;
 
 struct Edge {

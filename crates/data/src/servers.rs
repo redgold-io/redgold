@@ -1,6 +1,4 @@
-use redgold_schema::structs::{Address, ErrorInfo};
 use crate::DataStoreContext;
-use crate::schema::SafeOption;
 
 #[derive(Clone)]
 pub struct ServerStore {

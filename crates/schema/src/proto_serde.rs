@@ -1,7 +1,7 @@
-use std::fmt::{Display, Formatter};
-use prost::Message;
+use crate::structs::{ErrorCode, Hash};
 use crate::{ErrorInfoContext, HashClear, RgResult};
-use crate::structs::{ErrorCode, ErrorInfo, Hash, PublicKey};
+use prost::Message;
+use std::fmt::Display;
 
 pub trait ProtoSerde
     where Self: Message + Default,

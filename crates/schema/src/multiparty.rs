@@ -1,5 +1,5 @@
-use crate::{HashClear, structs};
 use crate::structs::{InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier};
+use crate::{structs, HashClear};
 
 
 // TODO: Eliminate these and make a separate trait for proto_serialize

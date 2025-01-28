@@ -1,14 +1,14 @@
+use crate::cmd::run_command_os;
 use async_trait::async_trait;
 use flume::Sender;
-use redgold_schema::RgResult;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
-use std::fs;
-use std::fs::File;
+use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::servers::ServerOldFormat;
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment};
+use redgold_schema::RgResult;
+use std::fs;
+use std::fs::File;
 use std::io::Write;
-use redgold_common::flume_send_help::SendErrorInfo;
-use crate::cmd::run_command_os;
 
 #[async_trait]
 pub trait SSHOrCommandLike {
@@ -242,7 +242,7 @@ impl SSHProcessInvoke {
                cmd: String
     ) -> RgResult<String> {
         let (stdout, stderr) = run_command_os(cmd).await?;
-        if let Some(s) = output_handler {
+        if let Some(_) = output_handler {
             self.output(stdout.clone())?;
             self.output(stderr.clone())?;
         }
@@ -267,7 +267,7 @@ impl LocalSSHLike {
                      cmd: String
     ) -> RgResult<String> {
         let (stdout, stderr) = run_command_os(cmd).await?;
-        if let Some(s) = output_handler {
+        if let Some(_) = output_handler {
             self.output(stdout.clone())?;
             self.output(stderr.clone())?;
         }

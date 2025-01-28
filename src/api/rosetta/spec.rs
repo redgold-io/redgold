@@ -1,9 +1,8 @@
-use redgold_schema::{bytes_data, constants, error_info, error_message, from_hex, SafeOption, structs};
-use redgold_schema::structs::{Address, ErrorCode as RGError, ErrorInfo, Proof, State};
 use crate::api::rosetta::models::{AccountIdentifier, Amount, Block, BlockIdentifier, CoinAction, CoinChange, CoinIdentifier, Currency, NetworkIdentifier, Operation, OperationIdentifier, PublicKey, Signature, Transaction, TransactionIdentifier};
 use crate::core::relay::Relay;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::schema;
+use redgold_schema::structs::{Address, ErrorCode as RGError, ErrorInfo, Proof, State};
+use redgold_schema::{bytes_data, constants, error_info, error_message, from_hex, structs, SafeOption};
 
 #[derive(Clone)]
 pub struct Rosetta {

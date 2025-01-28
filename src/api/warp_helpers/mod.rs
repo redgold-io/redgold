@@ -1,10 +1,10 @@
+use redgold_schema::structs::ErrorInfo;
+use redgold_schema::util::lang_util::SameResult;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::future::Future;
 use warp::reply::Json;
 use warp::{Filter, Rejection};
-use redgold_schema::structs::ErrorInfo;
-use serde::de::DeserializeOwned;
-use std::future::Future;
-use redgold_schema::util::lang_util::SameResult;
 
 pub fn easy_post<T, ReqT, RespT, Fut, S>(
     clonable: T,

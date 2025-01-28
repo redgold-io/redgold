@@ -1,9 +1,9 @@
-use log::{error, Level};
-use tracing::{event, Event, Metadata};
-use tracing::field::FieldSet;
-use crate::{HashClear, RgResult, structs};
 use crate::helpers::easy_json::EasyJson;
 use crate::structs::{ErrorDetails, ErrorInfo, ResponseMetadata};
+use crate::{structs, HashClear, RgResult};
+use log::{error, Level};
+use tracing::field::FieldSet;
+use tracing::{event, Event, Metadata};
 
 pub fn convert_log_level(level: String) -> log::Level {
     match level.to_lowercase().as_str() {
@@ -40,7 +40,7 @@ impl<T> Loggable<T> for RgResult<T> where T: Clone {
                 if !e2.skip_logging {
                     let ser = e2.json_or();
                     if let Some(l) = e2.internal_log_level.as_ref(){
-                        let level = convert_trace_log_level(l.clone());
+                        let _level = convert_trace_log_level(l.clone());
                         // TODO: Finish this
                         // let metadata = Metadata::new("log_error", "?", level, None, None, None, FieldSet::new(&[],), &[], &[]);
                         // let event = Event::new(&metadata, &ser);

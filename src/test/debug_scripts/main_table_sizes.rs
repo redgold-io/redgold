@@ -1,12 +1,9 @@
-use std::fs;
+use crate::node_config::EnvDefaultNodeConfig;
 use redgold_data::data_store::DataStore;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{Address, Hash, NetworkEnvironment, Transaction, UtxoId};
+use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::lang_util::AnyPrinter;
-use crate::core::relay::Relay;
-use crate::node_config::EnvDefaultNodeConfig;
-use crate::util;
+use std::fs;
 
 #[ignore]
 #[tokio::test]

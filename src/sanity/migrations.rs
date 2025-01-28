@@ -1,12 +1,12 @@
-use tracing::{error, info};
-use redgold_schema::RgResult;
-use redgold_schema::structs::{Hash, UtxoId};
-use rocket::serde::{Deserialize, Serialize};
-use itertools::Itertools;
-use rocket::form::validate::Contains;
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use crate::core::relay::Relay;
 use crate::util;
+use itertools::Itertools;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
+use redgold_schema::structs::{Hash, UtxoId};
+use redgold_schema::RgResult;
+use rocket::form::validate::Contains;
+use rocket::serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ManualMigration {

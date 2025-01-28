@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::structs::{ErrorInfo, Hash, MerkleProof};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct MerkleEntry {

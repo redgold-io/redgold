@@ -1,24 +1,24 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use std::fmt::Display;
-use std::future::Future;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::{Context, Result};
 use backtrace::Backtrace;
 use itertools::Itertools;
 use prost::{DecodeError, Message};
 use serde::Serialize;
+use std::fmt::Display;
+use std::future::Future;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
+use crate::util::task_local::task_local_impl::task_local_error_details;
+use observability::errors::EnhanceErrorInfo;
+use proto_serde::{ProtoHashable, ProtoSerde};
 use structs::{
     Address, BytesData, ErrorCode, ErrorInfo, Hash, HashFormatType, ResponseMetadata,
     StructMetadata, Transaction,
 };
-use observability::errors::EnhanceErrorInfo;
-use proto_serde::{ProtoHashable, ProtoSerde};
 use util::{lang_util, times};
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
-use crate::util::task_local::task_local_impl::task_local_error_details;
 
 pub mod structs {
     include!(concat!(env!("OUT_DIR"), "/structs.rs"));
@@ -650,8 +650,6 @@ impl NetworkEnvironment {
 #[test]
 fn network_environment_ser() {
     use std::str::FromStr;
-    use strum_macros::EnumString;
-
     println!("{}", format!("{:?}", NetworkEnvironment::Local).to_lowercase());
     assert_eq!(NetworkEnvironment::Local.to_std_string(), "local");
 }
@@ -743,7 +741,7 @@ impl ShortString for String {
         let start = (len as i32) - n.into();
         if start < 0 {
             return Ok("".to_string());
-            return Err(error_info("string too short to short_string"));
+            // return Err(error_info("string too short to short_string"));
         }
         let start = start as usize;
         let x = &self[start..len];

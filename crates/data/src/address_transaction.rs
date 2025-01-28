@@ -1,11 +1,11 @@
-use std::collections::HashSet;
-use sqlx::Sqlite;
-use redgold_schema::{RgResult, SafeOption};
+use crate::transaction_store::TransactionStore;
+use crate::DataStoreContext;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, Transaction};
-use crate::DataStoreContext;
-use crate::transaction_store::TransactionStore;
+use redgold_schema::{RgResult, SafeOption};
+use sqlx::Sqlite;
+use std::collections::HashSet;
 
 // TODO: Consider migrating to own store?
 impl TransactionStore {

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use eframe::egui;
 use eframe::egui::{Color32, RichText, Ui};
 use egui_extras::{Column, TableBuilder};

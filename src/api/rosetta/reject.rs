@@ -1,9 +1,3 @@
-use std::future::Future;
-use futures::future::{Fuse, Map};
-use warp::Rejection;
-use futures::FutureExt;
-use redgold_schema::structs::ErrorInfo;
-
 // this did not work out right due to type signatures
 // pub(crate) fn apply_rejection<RespT, Fut, T, ReqT, FutOut>(
 //     handler: fn(T, ReqT) -> Fut,

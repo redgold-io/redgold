@@ -1,16 +1,14 @@
+use crate::proof_support::{ProofSupport, PublicKeySupport};
+use crate::KeyPair;
 use itertools::Itertools;
-use redgold_schema::{error_message, RgResult, SafeOption, structs};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions, UtxoEntry};
-use crate::KeyPair;
-use crate::proof_support::{ProofSupport, PublicKeySupport};
+use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
+use redgold_schema::{structs, RgResult, SafeOption};
 
 
-
-
-use redgold_schema::util::times::current_time_millis;
 use crate::address_external::ToBitcoinAddress;
+use redgold_schema::util::times::current_time_millis;
 
 pub trait TransactionSupport {
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
@@ -57,7 +55,7 @@ impl TransactionSupport for Transaction {
         let pk = key_pair.public_key();
         let hash = self.signable_hash();
         let all_key_pair_addresses = pk.to_all_addresses()?;
-        let mut signed = false;
+        // let mut signed = false;
         for i in self.inputs.iter_mut() {
             if let Some(o) = i.output.as_ref() {
                 if i.proof.iter().flat_map(|p| p.public_key.as_ref()).contains(&pk) {
@@ -68,7 +66,7 @@ impl TransactionSupport for Transaction {
                 if all_key_pair_addresses.contains(input_addr) {
                     let proof = Proof::from_keypair_hash(&hash, &key_pair);
                     i.proof.push(proof);
-                    signed = true;
+                    // signed = true;
                 }
             }
         }

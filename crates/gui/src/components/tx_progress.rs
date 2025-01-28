@@ -1,29 +1,28 @@
-use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::{Arc, Mutex};
-use eframe::egui::{TextStyle, Ui};
-use serde::{Deserialize, Serialize};
-use strum_macros::{EnumIter, EnumString};
-use log::info;
-use strum::IntoEnumIterator;
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::{RgResult, SafeOption};
-use redgold_schema::airgap::{AirgapMessage, AirgapResponse};
-use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::observability::errors::Loggable;
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
-use redgold_schema::tx::tx_builder::{TransactionBuilder};
-use redgold_schema::util::lang_util::{JsonCombineResult, SameResult};
 use crate::airgap::signer_window::{AirgapSignerWindow, AirgapWindowMode};
 use crate::common;
 use crate::common::{big_button, data_item, editable_text_input_copy};
 use crate::components::combo_box::combo_box;
 use crate::components::currency_input::currency_combo_box;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-
+use eframe::egui::{TextStyle, Ui};
+use log::info;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::airgap::{AirgapMessage, AirgapResponse};
+use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::observability::errors::Loggable;
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, ExternalTransactionId, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
+use redgold_schema::util::lang_util::{JsonCombineResult, SameResult};
+use redgold_schema::{RgResult, SafeOption};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumString};
 
 
 // #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString, Eq, Hash)]

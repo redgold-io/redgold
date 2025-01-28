@@ -1,8 +1,7 @@
-use itertools::Itertools;
-use crate::from_hex;
 use crate::proto_serde::ProtoSerde;
-use crate::structs::{Address, NetworkEnvironment, PeerId, PublicKey, Seed, TrustData, TrustRatingLabel};
+use crate::structs::{Address, NetworkEnvironment, PeerId, PublicKey, Seed, TrustData};
 use crate::util::times::current_time_millis;
+use itertools::Itertools;
 
 
 impl Seed {

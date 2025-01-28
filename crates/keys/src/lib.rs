@@ -3,7 +3,6 @@ use crate::util::mnemonic_support::MnemonicSupport;
 use bdk::bitcoin::hashes::hex::ToHex;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, Hash};
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use serde::Serialize;

@@ -1,29 +1,29 @@
 use std::str::FromStr;
 
-use bdk::bitcoin::Network;
-use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::secp256k1::rand::RngCore;
+use bdk::bitcoin::secp256k1::{rand, Secp256k1};
 use bdk::bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey, ExtendedPubKey};
-use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
-use bdk::keys::bip39::{Language, Mnemonic};
+use bdk::bitcoin::Network;
 use bdk::keys::bip39::WordCount::Words24;
+use bdk::keys::bip39::{Language, Mnemonic};
+use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey, GeneratedKey};
 use bdk::miniscript::miniscript;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
+use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
-use crate::KeyPair;
-use crate::proof_support::PublicKeySupport;
 use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
+use crate::proof_support::PublicKeySupport;
 use crate::xpub_wrapper::ValidateDerivationPath;
+use crate::KeyPair;
 
 pub trait MnemonicSupport {
     fn metadata(&self) -> RgResult<WordsPassMetadata>;

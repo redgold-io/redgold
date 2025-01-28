@@ -1,7 +1,7 @@
-use extism_pdk::{FnResult, plugin_fn};
+use extism_pdk::{plugin_fn, FnResult};
 
-use redgold_schema::{bytes_data, RgResult};
 use redgold_schema::structs::{ExecutionInput, ExecutionResult, StandardData, TestContractInternalState, TestContractRequest};
+use redgold_schema::{bytes_data, RgResult};
 
 use crate::entry::with_entry_decoder;
 

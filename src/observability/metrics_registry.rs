@@ -6,20 +6,20 @@
 //! We demonstrate the various permutations of values that can be passed in the macro calls, all of
 //! which are documented in detail for the respective macro.
 
-use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddrV4};
-use tracing::{error, info};
+use crate::observability::metrics_help::WithMetrics;
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::{ErrorInfoContext, RgResult};
+use std::collections::HashMap;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
+use tracing::{error, info};
 use tracing_subscriber::Registry;
-use redgold_schema::{ErrorInfoContext, RgResult};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use crate::observability::metrics_help::WithMetrics;
 
 
 pub struct WrappedMetrics {

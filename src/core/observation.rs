@@ -5,15 +5,7 @@
 use eframe::epaint::ahash::HashMap;
 use futures::TryStreamExt;
 use itertools::Itertools;
-use tracing::{debug, info, trace};
 use metrics::{counter, gauge};
-use tokio::task::JoinHandle;
-// use futures::stream::StreamExt;
-use tokio::time::Interval;
-// Make sure to import StreamExt
-use tokio_stream::StreamExt;
-use tokio_stream::wrappers::IntervalStream;
-use tokio_util::either::Either;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::transaction_support::TransactionSupport;
@@ -22,17 +14,25 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Hash, ObservationProof, Transaction};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::merkle::build_root;
+use tokio::task::JoinHandle;
+// use futures::stream::StreamExt;
+use tokio::time::Interval;
+use tokio_stream::wrappers::IntervalStream;
+// Make sure to import StreamExt
+use tokio_stream::StreamExt;
+use tokio_util::either::Either;
+use tracing::{debug, info, trace};
 
-use redgold_common::flume_send_help::SendErrorInfo;
-use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
-use redgold_schema::helpers::easy_json::json;
-use redgold_schema::observability::errors::Loggable;
-use redgold_keys::word_pass_support::WordsPassNodeConfig;
-use crate::schema::structs::{Observation, ObservationMetadata};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;
 use crate::schema::structs::Request;
+use crate::schema::structs::{Observation, ObservationMetadata};
+use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use redgold_schema::helpers::easy_json::json;
+use redgold_schema::observability::errors::Loggable;
 
 const ANCESTOR_MERKLE_ROOT_LENGTH: usize = 1000;
 

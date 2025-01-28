@@ -1,25 +1,24 @@
-use std::collections::HashMap;
-use warp::Rejection;
-use redgold_keys::address_support::AddressSupport;
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
+use redgold_keys::address_support::AddressSupport;
+use std::collections::HashMap;
+use warp::Rejection;
 
-use redgold_schema::{error_info, SafeOption, struct_metadata_new};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::{error_info, struct_metadata_new, SafeOption};
 
-use crate::schema;
-use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
-use redgold_schema::structs::UtxoId;
 use crate::schema::error_message;
-use crate::schema::{
-    from_hex, i64_from_string,
-};
 use crate::schema::structs;
 use crate::schema::structs::{
     Address, ErrorCode as RGError, Output, State,
     SubmitTransactionRequest, UtxoEntry,
 };
 use crate::schema::structs::{ErrorInfo, Hash};
+use crate::schema::{
+    from_hex, i64_from_string,
+};
+use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::UtxoId;
 
 // TODO: What is a better way to handle this?
 pub async fn account_balance_wrap(r: Rosetta, request: AccountBalanceRequest,) -> Result<Result<AccountBalanceResponse, ErrorInfo>, Rejection> {
@@ -200,7 +199,6 @@ pub async fn construction_combine(
             }
         }
     }
-    use std::cmp::Ordering;
     for i in tx.inputs.iter_mut() {
         i.proof.sort_by(|x, y| {
             let vec = x.clone().proto_serialize();

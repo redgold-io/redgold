@@ -40,6 +40,7 @@
 <script>
 import HashLink from "@/components/util/HashLink.vue";
 import RenderTime from "@/components/RenderTime.vue";
+
 export default {
   name: "BriefTransaction",
   components: {

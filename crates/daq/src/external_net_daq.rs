@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
-use redgold_schema::RgResult;
 use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_schema::RgResult;
+use std::collections::HashMap;
 
 #[derive(Clone, Default)]
 pub struct ExternalDaq {

@@ -2,12 +2,12 @@ use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use bdk::bitcoin::PrivateKey;
 use eframe::egui;
 use eframe::egui::Ui;
-use redgold_gui::common::{editable_text_input_copy, valid_label};
-use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::conf::local_stored_state::{StoredMnemonic, StoredPrivateKey};
-use std::str::FromStr;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::common::{editable_text_input_copy, valid_label};
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_schema::conf::local_stored_state::{StoredMnemonic, StoredPrivateKey};
+use redgold_schema::keys::words_pass::WordsPass;
+use std::str::FromStr;
 
 pub fn save_key_window<E>(
     _ui: &mut Ui,

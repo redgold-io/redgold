@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use arc_swap::ArcSwap;
+use std::sync::Arc;
 
 #[derive(Clone, Default)]
 pub struct WriteOneReadAll<T> where T: Clone {

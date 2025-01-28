@@ -1,7 +1,4 @@
-use async_trait::async_trait;
-use itertools::Itertools;
 use crate::conf::node_config::NodeConfig;
-use crate::{bytes_data, error_info, structs, RgResult, SafeOption};
 use crate::fee_validator::{TransactionFeeValidator, MIN_RDG_SATS_FEE};
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
@@ -9,6 +6,8 @@ use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, DepositRequest, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, LiquidityRange, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StakeDeposit, StakeRequest, StakeWithdrawal, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, UtxoId};
 use crate::transaction::amount_data;
 use crate::tx_schema_validate::SchemaValidationSupport;
+use crate::{bytes_data, error_info, structs, RgResult, SafeOption};
+use itertools::Itertools;
 
 #[derive(Clone)]
 pub struct TransactionBuilder {
@@ -115,7 +114,7 @@ impl TransactionBuilder {
     }
 
     pub fn with_default_fee(&mut self) -> RgResult<&mut Self> {
-        let first_fee_addr = self.fee_addrs.get(0).safe_get_msg("Missing fee address")?.clone().clone();
+        let first_fee_addr = (*self.fee_addrs.get(0).safe_get_msg("Missing fee address")?).clone();
         self.with_fee(&first_fee_addr, &CurrencyAmount::min_fee())?;
         Ok(self)
     }

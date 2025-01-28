@@ -1,13 +1,9 @@
-use rocket::yansi::Paint;
-use redgold_schema::{error_info, from_hex};
-use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, PeerId, PublicKey, Transaction, TransactionInfo, TransactionState};
-use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use crate::core::relay::Relay;
-use redgold_data::data_store::DataStore;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::structs::{Address, AddressInfo, ErrorInfo, Hash, HashSearchResponse, PeerId, PublicKey};
 
 pub async fn hash_query(relay: Relay, hash_input: String, limit: Option<i64>, offset: Option<i64>) -> Result<HashSearchResponse, ErrorInfo> {
     let mut response = HashSearchResponse::default();

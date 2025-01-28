@@ -26,6 +26,7 @@
 import HashLink from "@/components/util/HashLink.vue";
 import RenderTime from "@/components/RenderTime.vue";
 import {toTitleCase} from "@/utils";
+
 export default {
   name: "ObservationMetadata",
   components: {

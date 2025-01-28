@@ -1,9 +1,9 @@
-use std::path::PathBuf;
-use crate::helpers::easy_json::{json_from, EasyJsonDeser};
-use crate::{ErrorInfoContext, RgResult};
 use crate::config_data::ConfigData;
+use crate::helpers::easy_json::{json_from, EasyJsonDeser};
 use crate::servers::ServerOldFormat;
-use crate::structs::{ErrorInfo, NetworkEnvironment, Transaction};
+use crate::structs::{NetworkEnvironment, Transaction};
+use crate::{ErrorInfoContext, RgResult};
+use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
 pub struct EnvDataFolder {

@@ -1,20 +1,20 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use eframe::{egui};
-use eframe::egui::Image;
+use crate::api::rosetta::models::PublicKey;
+use crate::gui;
 use crate::gui::egui::IconData;
+use crate::gui::ClientApp;
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use eframe::egui::Image;
+use eframe::egui;
 use egui_extras::RetainedImage;
-use tokio::runtime::Runtime;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult};
-use redgold_schema::structs::ErrorInfo;
-use crate::gui;
-use crate::gui::ClientApp;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use crate::api::rosetta::models::PublicKey;
-use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use redgold_schema::structs::ErrorInfo;
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 pub(crate) fn load_icon() -> IconData {
     let (icon_rgba, icon_width, icon_height) = {

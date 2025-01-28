@@ -3,36 +3,36 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use bdk::bitcoin::secp256k1::PublicKey;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use futures::FutureExt;
-// use libp2p::Multiaddr;
-use tracing::{error, info};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use metrics::counter;
+use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request, TransportBackend};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::debug;
-use redgold_common::flume_send_help::SendErrorInfo;
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request, TransportBackend};
+// use libp2p::Multiaddr;
+use tracing::{error, info};
 
 use crate::api::client::rest::RgHttpClient;
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
+use crate::schema::structs::{Response, ResponseMetadata};
+use crate::util;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::port_offsets::PortOffsetHelpers;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::json;
-use crate::schema::structs::{Response, ResponseMetadata};
-use crate::util;
 // use crate::util::{to_libp2p_peer_id, to_libp2p_peer_id_ser};
 
-use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::json_or;
-use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
+use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 
 #[derive(Clone)]
 pub struct PeerOutgoingEventHandler {
@@ -98,8 +98,6 @@ impl PeerOutgoingEventHandler {
     async fn run(&mut self) -> Result<(), ErrorInfo> {
 
         use futures::StreamExt;
-        use redgold_common::flume_send_help::RecvAsyncErrorInfo;
-
         let receiver = self.relay.peer_message_tx.receiver.clone();
         let relay = self.relay.clone();
         let err = receiver.into_stream()

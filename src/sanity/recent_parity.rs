@@ -1,16 +1,15 @@
-use std::collections::HashSet;
-use async_trait::async_trait;
-use tracing::info;
-use redgold_schema::{error_info, RgResult};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{Hash, Transaction, TransactionEntry, UtxoId};
 use crate::core::relay::Relay;
-use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use crate::core::transact::tx_validate::TransactionValidator;
 use crate::observability::send_email::EmailOnError;
 use crate::util;
+use async_trait::async_trait;
+use redgold_common_no_wasm::stream_handlers::IntervalFold;
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::structs::{Hash, Transaction, UtxoId};
+use redgold_schema::{error_info, RgResult};
+use std::collections::HashSet;
 
 pub struct RecentParityCheck {
     relay: Relay

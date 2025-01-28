@@ -1,13 +1,12 @@
-use std::iter::Sum;
-use std::ops::{Add, Div, Mul, Sub, SubAssign};
-use num_bigint::BigInt;
-use num_traits::{FromPrimitive, ToPrimitive};
-use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, NANO_DECIMAL_MULTIPLIER, PICO_DECIMAL_MULTIPLIER};
-use crate::{ErrorInfoContext, RgResult};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
 use crate::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
-
+use crate::{ErrorInfoContext, RgResult};
+use num_bigint::BigInt;
+use num_traits::{FromPrimitive, ToPrimitive};
+use std::iter::Sum;
+use std::ops::{Add, Div, Mul, Sub, SubAssign};
+use std::str::FromStr;
 
 
 pub trait RenderCurrencyAmountDecimals {

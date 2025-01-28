@@ -1,13 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY};
-use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, StakeDeposit, StakeRequest, StakeWithdrawal, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, ProductId, Proof, PublicKey, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId, PoWProof, SwapFulfillment, PortfolioRequest};
-use crate::{bytes_data, error_info, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption, struct_metadata_new, structs};
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 use crate::helpers::with_metadata_hashable::{WithMetadataHashable, WithMetadataHashableFields};
 use crate::proto_serde::ProtoHashable;
 use crate::structs::TransactionType;
+use crate::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, FloatingUtxoId, Hash, HashType, Input, NetworkEnvironment, NodeMetadata, Observation, ObservationProof, Output, OutputType, PoWProof, PortfolioRequest, ProductId, Proof, PublicKey, StakeDeposit, StakeRequest, StakeWithdrawal, StandardContractType, StandardData, StandardRequest, StandardResponse, StructMetadata, SupportedCurrency, SwapFulfillment, SwapRequest, Transaction, TransactionOptions, TypedValue, UtxoEntry, UtxoId};
+use crate::{bytes_data, error_info, structs, ErrorInfoContext, HashClear, PeerMetadata, RgResult, SafeOption};
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 pub const MAX_TRANSACTION_MESSAGE_SIZE: usize = 40;
 
@@ -311,7 +311,7 @@ impl Transaction {
         let input = input_opt.safe_get_msg("Missing input")?;
         let proof = input.proof.get(0);
         let proof_act = proof.safe_get_msg("Missing input proof")?;
-        Ok(proof_act.clone())
+        Ok(*proof_act)
     }
     pub fn observation_public_key(&self) -> RgResult<&PublicKey> {
         let proof_act = self.observation_proof()?;
@@ -685,8 +685,8 @@ impl Transaction {
     pub fn head_utxo(&self) -> RgResult<UtxoEntry> {
         let utxos = self.utxo_outputs()?;
         let head_utxo = utxos.get(0);
-        let utxo = head_utxo.safe_get_msg("Missing UTXO output for node metadata")?;
-        Ok(utxo.clone().clone())
+        let utxo = *head_utxo.safe_get_msg("Missing UTXO output for node metadata")?;
+        Ok(utxo.clone())
     }
 
     pub fn nmd_utxo(&self) -> RgResult<UtxoEntry> {
@@ -694,8 +694,8 @@ impl Transaction {
             u.output.as_ref().map(|o| o.is_node_metadata()).unwrap_or(false)
         ).cloned().collect_vec();
         let head_utxo = utxos.get(0);
-        let utxo = head_utxo.safe_get_msg("Missing UTXO output for node metadata")?;
-        Ok(utxo.clone().clone())
+        let utxo = *head_utxo.safe_get_msg("Missing UTXO output for node metadata")?;
+        Ok(utxo.clone())
     }
 
     pub fn height(&self) -> RgResult<i64> {

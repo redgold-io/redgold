@@ -1,11 +1,11 @@
-use std::thread::sleep;
-use std::time::Duration;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use tokio::task::JoinError;
-use redgold_schema::structs::ErrorInfo;
 use crate::util;
 use crate::util::runtimes::build_runtime;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use redgold_schema::structs::ErrorInfo;
+use std::thread::sleep;
+use std::time::Duration;
+use tokio::task::JoinError;
 
 
 struct ServiceInfo {

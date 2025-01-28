@@ -1,9 +1,9 @@
-use bdk::bitcoin::secp256k1::{Error, PublicKey};
 use bdk::bitcoin::hashes::hex::ToHex;
+use bdk::bitcoin::secp256k1::{Error, PublicKey};
 use redgold_keys::TestConstants;
-use redgold_schema::{error_info, structs};
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::ErrorInfo;
+use redgold_schema::{error_info, structs};
 
 pub trait ToPublicKey {
     fn to_public_key(&self) -> Result<PublicKey, ErrorInfo>;

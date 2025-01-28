@@ -1,18 +1,18 @@
-use std::str::FromStr;
 use ethers::middleware::Middleware;
 use ethers::prelude::{StreamExt, Transaction};
 use ethers::providers::{Provider, Ws};
+use ethers::types::U256;
 use futures::{stream, Stream};
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, SupportedCurrency};
 use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
-use std::sync::Arc;
-use ethers::types::U256;
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
-use redgold_schema::errors::into_error::ToErrorInfo;
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub struct EthereumWsProvider {
     pub provider: Arc<Provider<Ws>>,
@@ -158,7 +158,6 @@ impl EthereumWsProvider {
 
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
-use redgold_schema::util::cbor::SerdeCborConverters;
 #[ignore]
 #[tokio::test]
 pub async fn ws_stream_test() {

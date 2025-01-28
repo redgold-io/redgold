@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
-use itertools::Itertools;
-use std::collections::HashMap;
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::structs::{Address, ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
+use crate::structs::{ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
 use crate::tx::external_tx::ExternalTimedTransaction;
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum AddressEvent {
@@ -52,7 +52,7 @@ impl AddressEvent {
     pub fn currency(&self) -> SupportedCurrency {
         match self {
             AddressEvent::External(e) => e.currency,
-            AddressEvent::Internal(t) => SupportedCurrency::Redgold
+            AddressEvent::Internal(_) => SupportedCurrency::Redgold
         }
     }
 

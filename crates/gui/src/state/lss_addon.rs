@@ -1,6 +1,6 @@
+use crate::dependencies::gui_depends::GuiDepends;
 use redgold_schema::conf::local_stored_state::LocalStoredState;
 use redgold_schema::structs::{Address, SupportedCurrency};
-use crate::dependencies::gui_depends::GuiDepends;
 
 pub trait LssAddon {
     fn address_labels<G>(&self, g: &G) -> Vec<(String, Address)> where G: GuiDepends + Send + 'static;

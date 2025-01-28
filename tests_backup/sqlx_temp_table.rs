@@ -1,6 +1,5 @@
 use sqlx::migrate::Migrator;
 use sqlx::SqlitePool;
-use std::path::Path;
 
 // static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
 //

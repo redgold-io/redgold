@@ -1,5 +1,5 @@
-use strum_macros::EnumString;
 use itertools::Itertools;
+use strum_macros::EnumString;
 #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone, EnumString)]
 // #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum KeyDerivation {

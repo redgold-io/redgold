@@ -1,6 +1,6 @@
-use redgold_schema::{structs, RgResult};
-use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use crate::address_support::AddressSupport;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
+use redgold_schema::{structs, RgResult};
 
 pub trait ExternalTxSupport {
 

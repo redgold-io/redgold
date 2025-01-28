@@ -1,4 +1,4 @@
-use redgold_schema::{ErrorInfoContext, RgResult};
+use redgold_schema::RgResult;
 use sequoia_openpgp::packet::key::Key4;
 use sequoia_openpgp::packet::prelude::SignatureBuilder;
 use sequoia_openpgp::packet::UserID;

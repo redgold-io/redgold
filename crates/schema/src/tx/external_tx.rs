@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
-use crate::{structs, RgResult};
 use crate::explorer::BriefTransaction;
 use crate::structs::{Address, CurrencyAmount, CurrencyId, SupportedCurrency};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ExternalTimedTransaction {

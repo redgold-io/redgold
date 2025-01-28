@@ -1,10 +1,9 @@
-
+use crate::util::ToPublicKey;
+use bdk::bitcoin::util::key;
 use bdk::bitcoin::{Address, Network};
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PublicKey, SupportedCurrency};
-use bdk::bitcoin::util::key;
-use redgold_schema::{ErrorInfoContext, structs};
+use redgold_schema::{structs, ErrorInfoContext};
 use sha3::{Digest, Keccak256};
-use crate::util::ToPublicKey;
 
 pub trait ToBitcoinAddress {
     fn to_bitcoin_address(&self, network: &NetworkEnvironment) -> Result<String, ErrorInfo>;

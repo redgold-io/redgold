@@ -1,4 +1,10 @@
-use std::collections::HashMap;
+use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
+use crate::gui::ls_ext::create_swap_tx;
+use crate::gui::native_gui_dependencies::NativeGuiDepends;
+use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
+use crate::node_config::ApiNodeConfig;
+use crate::party::portfolio_request::PortfolioEventMethods;
+use crate::util;
 use log::info;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common::flume_send_help::Channel;
@@ -9,17 +15,11 @@ use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::Swap;
 use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::{RgResult, SafeOption};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
-use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
-use crate::gui::ls_ext::create_swap_tx;
-use crate::gui::native_gui_dependencies::NativeGuiDepends;
-use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
-use crate::node_config::ApiNodeConfig;
-use crate::party::portfolio_request::PortfolioEventMethods;
-use crate::util;
+use redgold_schema::{RgResult, SafeOption};
+use std::collections::HashMap;
 
 pub async fn cli_swap(s: Swap, nc: &Box<NodeConfig>) -> RgResult<()> {
 

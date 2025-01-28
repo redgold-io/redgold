@@ -1,13 +1,12 @@
 use crate::common::{data_item, editable_text_input_copy};
 use crate::components::address_input_box::{AddressInputBox, AddressInputMode};
+use crate::components::tables::text_table_advanced;
 use crate::dependencies::gui_depends::GuiDepends;
 use eframe::egui::{Context, Ui};
 use itertools::Itertools;
 use redgold_schema::conf::local_stored_state::SavedAddress;
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::ShortString;
 use redgold_schema::structs::SupportedCurrency;
-use crate::components::tables::text_table_advanced;
+use redgold_schema::ShortString;
 
 #[derive(Clone, Debug)]
 pub struct AddressTabState {

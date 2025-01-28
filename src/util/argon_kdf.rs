@@ -1,8 +1,7 @@
+use crate::util::current_time_millis;
 use argon2::Algorithm::Argon2d;
 use argon2::{Argon2, Params, Version};
-use redgold_schema::{ErrorInfoContext, RgResult, structs};
-use redgold_schema::structs::ErrorInfo;
-use crate::util::current_time_millis;
+use redgold_schema::{structs, RgResult};
 
 
 pub fn argon2d_hash(salt: Vec<u8>, password: Vec<u8>, m_cost: u32, t_cost: u32, p_cost: u32)

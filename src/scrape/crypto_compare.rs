@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use std::time::Duration;
-use itertools::Itertools;
-use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
-use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use redgold_schema::structs::SupportedCurrency;
-use rocket::serde::{Deserialize, Serialize};
 use crate::scrape::translate_currency_short;
 use crate::util;
+use itertools::Itertools;
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
+use redgold_schema::structs::SupportedCurrency;
+use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
+use rocket::serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct XMRResponse {

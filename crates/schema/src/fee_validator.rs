@@ -1,7 +1,6 @@
-use std::collections::HashSet;
-use itertools::Itertools;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::structs::{Address, Seed, SupportedCurrency, Transaction};
+use crate::structs::{Address, SupportedCurrency, Transaction};
+use itertools::Itertools;
 
 pub const MIN_RDG_SATS_FEE: i64 = 1000;
 
@@ -53,7 +52,7 @@ impl TransactionFeeValidator for Transaction {
         let value = self.output_address_amounts_opt()
             .filter(|(address, amount)| {
                 addresses.contains(address) && amount.currency_or() == SupportedCurrency::Redgold
-            }).map(|(address, amount)| amount.amount).sum::<i64>();
+            }).map(|(_, amount)| amount.amount).sum::<i64>();
         let fee_condition = value >= MIN_RDG_SATS_FEE;
         fee_condition
     }

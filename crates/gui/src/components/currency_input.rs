@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, Ui};
-use serde::{Deserialize, Serialize};
 use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub fn currency_combo_box(ui: &mut Ui, currency_selector: &mut SupportedCurrency, label: impl Into<String>, supported: Vec<SupportedCurrency>, locked: bool) -> bool {
     let mut changed = false;

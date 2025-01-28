@@ -1,12 +1,11 @@
-use crate::structs::{Address, AddressInfo, AddressType, ErrorCode, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
-use crate::{bytes_data, error_info, ErrorInfoContext, from_hex, RgResult, SafeOption};
-use crate::{error_message, structs};
-use std::io::Write;
+use crate::structs::{Address, AddressInfo, AddressType, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
+use crate::{bytes_data, error_info, from_hex, ErrorInfoContext, RgResult, SafeOption};
+use crate::structs;
 use sha3::Sha3_224;
 
-use sha3::Digest;
 use crate::proto_serde::ProtoSerde;
 use crate::structs::SupportedCurrency::Redgold;
+use sha3::Digest;
 
 // impl fromstr for address etc. impl tostring
 impl Into<Address> for structs::PublicKey {

@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use crate::core::relay::Relay;
 use redgold_data::parquet_export::ParquetExporter;
+use std::path::PathBuf;
 #[ignore]
 #[tokio::test]
 async fn debug_parquet() {

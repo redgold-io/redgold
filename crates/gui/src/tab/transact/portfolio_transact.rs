@@ -1,19 +1,3 @@
-use redgold_schema::structs::{AddressInfo, CurrencyAmount, PublicKey, SupportedCurrency};
-use strum_macros::{EnumIter, EnumString};
-use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
-use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
-use redgold_schema::conf::node_config::NodeConfig;
-use std::collections::HashMap;
-use redgold_schema::party::party_events::PartyEvents;
-use redgold_schema::party::portfolio::PortfolioRequestEventInstance;
-use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix;
-use strum::IntoEnumIterator;
-use itertools::Itertools;
-use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::ShortString;
-use redgold_schema::util::times::ToTimeString;
-use std::str::FromStr;
 use crate::components::balance_table::balance_table;
 use crate::components::combo_box::combo_box;
 use crate::components::currency_input::{currency_combo_box, supported_wallet_currencies, CurrencyInputBox};
@@ -21,6 +5,22 @@ use crate::components::tables::{table_nonetype, text_table_advanced};
 use crate::components::tx_progress::{TransactionProgressFlow, TransactionStage};
 use crate::data_query::data_query::DataQueryInfo;
 use crate::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
+use eframe::egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
+use itertools::Itertools;
+use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_schema::conf::local_stored_state::XPubLikeRequestType;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::party::party_events::PartyEvents;
+use redgold_schema::party::portfolio::PortfolioRequestEventInstance;
+use redgold_schema::structs::{AddressInfo, CurrencyAmount, PublicKey, SupportedCurrency};
+use redgold_schema::util::dollar_formatter::format_dollar_amount_with_prefix;
+use redgold_schema::util::times::ToTimeString;
+use redgold_schema::ShortString;
+use std::collections::HashMap;
+use std::str::FromStr;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(Clone, Default)]
 pub struct Portfolio {

@@ -1,8 +1,8 @@
+use crate::eth::eth_wallet::EthWalletWrapper;
 use ethers::middleware::Middleware;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
+use redgold_schema::structs::CurrencyAmount;
 use redgold_schema::{ErrorInfoContext, RgResult};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment, PublicKey};
-use crate::eth::eth_wallet::EthWalletWrapper;
 
 impl EthWalletWrapper {
 

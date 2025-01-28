@@ -1,10 +1,10 @@
 use polars::datatypes::{AnyValue, DataType, Field, TimeUnit};
 use polars::frame::row::Row;
 use polars::prelude::Schema;
-use redgold_schema::RgResult;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::Transaction;
+use redgold_schema::RgResult;
 
 pub fn transaction_simple_parquet_schema(time: Option<i64>) -> Schema {
     Schema::from_iter(vec![

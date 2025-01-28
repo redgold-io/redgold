@@ -1,5 +1,5 @@
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo};
 use crate::core::relay::Relay;
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo};
 
 pub async fn handle_about_node(_p0: AboutNodeRequest, relay: Relay) -> Result<AboutNodeResponse, ErrorInfo> {
     let num_active_peers = relay.ds.peer_store.active_nodes(None).await?.len();

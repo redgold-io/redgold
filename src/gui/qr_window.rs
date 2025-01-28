@@ -1,15 +1,13 @@
-use derivative::Derivative;
+use crate::gui::app_loop::LocalState;
+// use crate::gui::image_capture::{CaptureStream, default_stream};
+use crate::gui::qr_render::qr_encode;
 use eframe::egui;
 use eframe::egui::Context;
 use egui_extras::RetainedImage;
 use image::DynamicImage;
-use rqrr::MetaData;
-use crate::gui::app_loop::LocalState;
-use redgold_gui::common::bounded_text_area;
-// use crate::gui::image_capture::{CaptureStream, default_stream};
-use crate::gui::qr_render::qr_encode;
-use std::clone;
 use redgold_common::external_resources::ExternalNetworkResources;
+use redgold_gui::common::bounded_text_area;
+use rqrr::MetaData;
 
 pub fn clone_option_retained_image(opt: &Option<RetainedImage>) -> Option<RetainedImage> {
     None

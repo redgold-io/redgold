@@ -1,6 +1,5 @@
-use std::process::Command;
-use tokio::process::Command as TokioCommand;
 use crate::directory_code_reader::count_tokens;
+use tokio::process::Command as TokioCommand;
 
 async fn get_git_diff_history(repo_path: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Change directory to the repository path

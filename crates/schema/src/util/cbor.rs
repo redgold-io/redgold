@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::{ErrorInfoContext, RgResult};
+use serde::{Deserialize, Serialize};
 
 pub trait SerdeCborConverters {
     fn to_cbor(&self) -> RgResult<Vec<u8>>;

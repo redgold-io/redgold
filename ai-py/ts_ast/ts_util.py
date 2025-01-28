@@ -1,8 +1,7 @@
 
-from tree_sitter import Language, Parser
-
 # Make sure you have the tree-sitter-rust library installed
 import tree_sitter_rust
+from tree_sitter import Language, Parser
 
 # Initialize the Rust language
 RUST_LANGUAGE = Language(tree_sitter_rust.language())

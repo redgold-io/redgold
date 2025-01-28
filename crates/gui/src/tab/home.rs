@@ -3,16 +3,15 @@ use crate::dependencies::gui_depends::GuiDepends;
 use eframe::egui;
 use eframe::egui::{Color32, RichText, Ui};
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 
-use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::explorer::BriefTransaction;
-use redgold_schema::conf::local_stored_state::LocalStoredState;
-use redgold_schema::util::dollar_formatter::{format_dollar_amount, format_dollar_amount_with_prefix};
 use crate::common::data_item;
 use crate::components::balance_table::balance_table;
 use crate::components::tables::{table_nonetype, text_table_advanced};
 use crate::components::transaction_table::TransactionTable;
+use redgold_schema::conf::local_stored_state::LocalStoredState;
+use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::util::dollar_formatter::{format_dollar_amount, format_dollar_amount_with_prefix};
 
 pub fn gui_status_networks() -> Vec<NetworkEnvironment> {
     let _vec = NetworkEnvironment::status_networks();

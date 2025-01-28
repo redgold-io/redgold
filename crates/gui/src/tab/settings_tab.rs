@@ -1,11 +1,9 @@
-use std::sync::Arc;
-use eframe::egui::{Context, Ui};
-use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use redgold_schema::conf::local_stored_state::LocalStoredState;
-use redgold_schema::config_data::ConfigData;
-use redgold_schema::ErrorInfoContext;
 use crate::common::{bounded_text_area, valid_label};
 use crate::dependencies::gui_depends::GuiDepends;
+use eframe::egui::{Context, Ui};
+use redgold_schema::config_data::ConfigData;
+use redgold_schema::ErrorInfoContext;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct SettingsState {

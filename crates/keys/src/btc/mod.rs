@@ -8,3 +8,4 @@ pub mod debug;
 pub mod daq;
 pub mod hardware;
 pub mod multisig_bdk;
+pub mod bdk_conversion_util;

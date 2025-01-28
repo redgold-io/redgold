@@ -1,17 +1,9 @@
-use std::collections::HashMap;
+use crate::gui::app_loop::LocalState;
+use crate::node_config::ApiNodeConfig;
 use eframe::{egui, Frame};
-use eframe::egui::Image;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_schema::structs::{ErrorInfo, PublicKey};
-use redgold_schema::structs;
-use crate::gui::app_loop::LocalState;
-use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::party::party_internal_data::PartyInternalData;
-use crate::gui::ls_ext::local_state_from;
-use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
-use crate::node_config::ApiNodeConfig;
 
 pub mod app_loop;
 pub mod initialize;

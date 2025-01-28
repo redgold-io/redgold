@@ -1,15 +1,15 @@
+use crate::core::process_transaction::{ProcessTransactionMessage, RequestProcessor};
+use crate::core::relay::Relay;
 use dashmap::mapref::one::Ref;
 use futures::{StreamExt, TryStreamExt};
-use tracing::{debug, info, trace};
 use metrics::counter;
-use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
-use redgold_schema::util;
 use redgold_common::flume_send_help::RecvAsyncErrorInfo;
-use crate::core::relay::Relay;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::core::process_transaction::{ProcessTransactionMessage, RequestProcessor};
 use redgold_schema::observability::errors::Loggable;
+use redgold_schema::structs::{ErrorInfo, Hash, HashType, Observation, Transaction};
+use redgold_schema::util;
+use tracing::{debug, info, trace};
 
 #[derive(Clone)]
 pub struct ObservationHandler {

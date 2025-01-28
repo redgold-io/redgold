@@ -1,8 +1,8 @@
-use prost::DecodeError;
 use crate::structs::MerkleProof;
+use prost::DecodeError;
 
-use prost::Message;
 use crate::{ErrorInfo, SafeOption};
+use prost::Message;
 
 impl MerkleProof {
     pub fn proto_serialize(&self) -> Vec<u8> {

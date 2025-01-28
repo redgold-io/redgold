@@ -1,10 +1,10 @@
+use crate::schema::structs::{ErrorInfo, Request, Response, Transaction};
+use async_trait::async_trait;
+use bdk::bitcoin::secp256k1::PublicKey;
+use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 use std::net::SocketAddr;
 use std::time::Duration;
-use async_trait::async_trait;
-use crate::schema::structs::{ErrorInfo, Request, Response, Transaction};
-use bdk::bitcoin::secp256k1::PublicKey;
 use tokio::task::JoinError;
-use redgold_common::flume_send_help::RecvAsyncErrorInfo;
 // #[derive(Clone)]
 // pub struct InternalChannel<T> {
 //     pub sender: flume::Sender<T>,
@@ -95,8 +95,8 @@ pub struct TransactionMessage {
     pub origin: Option<structs::PublicKey>,
     pub origin_ip: Option<String>
 }
-use redgold_schema::{structs, ErrorInfoContext};
 use redgold_schema::structs::{DynamicNodeMetadata, NodeMetadata, TransportBackend};
+use redgold_schema::{structs, ErrorInfoContext};
 pub fn map_fut(r: Option<Result<Result<(), ErrorInfo>, JoinError>>) -> Result<(), ErrorInfo> {
     match r {
         None => {

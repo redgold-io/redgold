@@ -1,9 +1,9 @@
-use std::fmt::Display;
-use crate::{bytes_data, from_hex, Hash, HashFormatType, RgResult, SafeOption};
 use crate::structs::{ErrorInfo, HashType};
+use crate::{bytes_data, from_hex, Hash, HashFormatType, RgResult, SafeOption};
+use std::fmt::Display;
 
-use sha3::{Digest, Sha3_256};
 use crate::proto_serde::ProtoSerde;
+use sha3::{Digest, Sha3_256};
 
 
 impl Hash {

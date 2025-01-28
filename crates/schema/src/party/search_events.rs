@@ -1,7 +1,7 @@
-use itertools::Itertools;
 use crate::party::address_event::AddressEvent;
 use crate::party::party_events::{OrderFulfillment, PartyEvents};
-use crate::structs::{Address, PublicKey};
+use crate::structs::Address;
+use itertools::Itertools;
 
 pub trait PartyEventSearch {
     fn find_swaps_for_addresses(&self, addrs: &Vec<Address>) -> Vec<(OrderFulfillment, AddressEvent, AddressEvent)>;

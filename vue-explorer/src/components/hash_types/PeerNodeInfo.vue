@@ -27,6 +27,7 @@
 <script>
 import HashLink from "@/components/util/HashLink.vue";
 import {toTitleCase} from "@/utils";
+
 export default {
   name: "PeerNodeInfo",
   components: {

@@ -1,12 +1,8 @@
-use image::{ColorType, EncodableLayout, ImageBuffer, ImageEncoder, Rgba};
-use qrencode::{QrCode, QrResult};
-use qrencode::render::svg;
-use qrencode::render::unicode::Dense1x2;
-use qrencode::render::unicode::Dense1x2::Dark;
-use qrencode::render::unicode::Dense1x2::Light;
 use csscolorparser::Color;
 use egui_extras::RetainedImage;
 use image::codecs::png::PngEncoder;
+use image::{ColorType, EncodableLayout, ImageBuffer, ImageEncoder, Rgba};
+use qrencode::{QrCode, QrResult};
 
 fn build_binary_image(
     content: &str,

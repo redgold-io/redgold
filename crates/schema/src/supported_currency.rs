@@ -1,7 +1,7 @@
-use strum::IntoEnumIterator;
 use crate::errors::into_error::ToErrorInfo;
 use crate::observability::errors::EnhanceErrorInfo;
 use crate::structs::{ErrorInfo, SupportedCurrency};
+use strum::IntoEnumIterator;
 
 
 impl TryFrom<String> for SupportedCurrency {

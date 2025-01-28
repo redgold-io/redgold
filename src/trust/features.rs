@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use redgold_schema::structs::{PeerId, TrustRatingLabel};
 // http://viz-js.com/
 // #[allow(dead_code)]
 // fn transitive_trust_feature(

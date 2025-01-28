@@ -1,6 +1,6 @@
+use crate::core::relay::Relay;
 use redgold_keys::util::mnemonic_support::WordsPassMetadata;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
-use crate::core::relay::Relay;
 #[ignore]
 #[tokio::test]
 async fn metadata_converter() {

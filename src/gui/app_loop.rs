@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common::flume_send_help::Channel;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
+use std::collections::HashMap;
 use strum::IntoEnumIterator;
 // 0.17.1
 
@@ -14,8 +14,6 @@ use crate::gui::tabs::identity_tab::IdentityState;
 use crate::gui::tabs::keys::keys_tab::KeyTabState;
 use crate::gui::tabs::otp_tab::OtpState;
 use crate::gui::tabs::transact::hot_wallet::init_state;
-use redgold_gui::tab::transact::wallet_state::WalletState;
-use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use redgold_gui::airgap::signer_window::AirgapSignerWindow;
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::state::local_state::LocalStateUpdate;
@@ -27,6 +25,7 @@ use redgold_gui::tab::portfolio::port_view::PortfolioTabState;
 use redgold_gui::tab::settings_tab::SettingsState;
 use redgold_gui::tab::tabs::Tab;
 use redgold_gui::tab::transact::swap::SwapState;
+use redgold_gui::tab::transact::wallet_state::WalletState;
 use redgold_keys::xpub_wrapper::XpubWrapper;
 use redgold_schema::conf::local_stored_state::{AccountKeySource, Identity, LocalStoredState, StoredMnemonic, StoredPrivateKey};
 
@@ -34,8 +33,8 @@ use itertools::Itertools;
 use redgold_schema::{error_info, RgResult};
 
 use redgold_gui::dependencies::gui_depends::{GuiDepends, HardwareSigningInfo, TransactionSignInfo};
-use rocket::form::validate::Contains;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use rocket::form::validate::Contains;
 
 pub trait PublicKeyStoredState {
     fn public_key(&self, xpub_name: String) -> Option<PublicKey>;

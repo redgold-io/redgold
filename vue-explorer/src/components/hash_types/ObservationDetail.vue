@@ -56,6 +56,7 @@ import CopyClipboard from "@/components/util/CopyClipboard.vue";
 // import PeerNodeInfo from "@/components/PeerNodeInfo.vue";
 import ObservationMetadata from "@/components/hash_types/ObservationMetadata.vue";
 import RenderTime from "@/components/RenderTime.vue";
+
 export default {
   name: "ObservationDetail",
   components: {

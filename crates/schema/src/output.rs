@@ -1,5 +1,4 @@
-
-use crate::structs::{ContentionKey, ErrorInfo, Hash, Output, OutputType, StandardContractType, StateSelector, CurrencyAmount, UtxoEntry, Observation, StandardData, StandardRequest, StandardResponse, SwapFulfillment, StakeRequest, SwapRequest};
+use crate::structs::{ContentionKey, CurrencyAmount, ErrorInfo, Hash, Observation, Output, OutputType, StakeRequest, StandardContractType, StandardData, StandardRequest, StandardResponse, StateSelector, SwapFulfillment, SwapRequest, UtxoEntry};
 use crate::transaction::amount_data;
 use crate::{Address, HashClear, RgResult, SafeOption};
 

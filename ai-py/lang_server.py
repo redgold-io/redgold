@@ -1,8 +1,8 @@
-from pathlib import Path
-
 from monitors4codegen.multilspy import SyncLanguageServer
 from monitors4codegen.multilspy.multilspy_config import MultilspyConfig
 from monitors4codegen.multilspy.multilspy_logger import MultilspyLogger
+from pathlib import Path
+
 config = MultilspyConfig.from_dict({"code_language": "rust"})  # Also supports "python", "rust", "csharp"
 logger = MultilspyLogger()
 parent = Path.cwd().parent
