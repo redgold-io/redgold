@@ -440,7 +440,7 @@ jobs:
           cargo install cargo-workspaces &&
           cargo login ${{ secrets.CARGO_TOKEN }} &&
           ./bin/install_build_deps.sh &&
-          cargo publish 
+          cargo workspaces publish
 
       - name: Download redgold_mac artifact
         uses: actions/download-artifact@v4
