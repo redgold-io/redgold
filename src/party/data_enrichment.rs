@@ -7,9 +7,10 @@ use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservat
 use redgold_schema::party::external_data::ExternalNetworkData;
 use redgold_schema::party::external_data::PriceDataPointUsdQuery;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::structs::{ErrorInfo, PartyInfo, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{ErrorInfo, PublicKey, SupportedCurrency};
 use redgold_schema::{RgResult, SafeOption};
 use std::collections::HashMap;
+use redgold_schema::parties::PartyInfo;
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 

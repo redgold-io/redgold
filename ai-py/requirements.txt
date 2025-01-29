@@ -7,3 +7,4 @@ tree-sitter
 tree-sitter-rust
 mypy-protobuf
 graphrag
+tiktoken

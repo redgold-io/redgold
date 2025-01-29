@@ -1,7 +1,8 @@
+use redgold_schema::parties::PartyInfo;
 use crate::schema::SafeOption;
 use crate::DataStoreContext;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{ErrorInfo, InitiateMultipartySigningRequest, PartyData, PartyInfo, Proof, PublicKey, RoomId};
+use redgold_schema::structs::{ErrorInfo, InitiateMultipartySigningRequest, PartyData, Proof, PublicKey, RoomId};
 use redgold_schema::util::times;
 use redgold_schema::RgResult;
 

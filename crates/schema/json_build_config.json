@@ -1,6 +1,6 @@
 {
   "includes": ["src/proto"],
-  "files": ["src/proto/structs.proto", "src/proto/execution.proto", "src/proto/airgap.proto"],
+  "files": ["src/proto/structs.proto", "src/proto/execution.proto", "src/proto/airgap.proto", "src/proto/parties.proto"],
   "output": "build",
   "opts": [
     {
@@ -8,6 +8,11 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "parties.PartyMetadata",
+        "parties.PartyInstance",
+        "parties.PartyMembership",
+        "parties.PartyParticipation",
+        "parties.PartyInfo",
         "structs.CurrencyDescriptor",
         "structs.CurrencyId",
         "structs.GuiInitRequest",
@@ -51,7 +56,6 @@
         "structs.BatchTransactionResolveResponse",
         "structs.GenesisRequest",
         "structs.PartyMember",
-        "structs.PartyInfo",
         "structs.PartyInfoAbridged",
         "structs.GetPartiesInfoRequest",
         "structs.GetPartiesInfoResponse",
@@ -220,7 +224,7 @@
         "structs.TransactionType",
         "structs.AddressType",
         "structs.LocalShareType",
-        "structs.PartyState",
+        "parties.PartyState",
         "structs.SupportedCurrency"
       ]
     },

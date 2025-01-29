@@ -1,7 +1,9 @@
+use async_trait::async_trait;
 use redgold_schema::data_folder::EnvDataFolder;
 use redgold_schema::structs::ErrorInfo;
 use redgold_schema::{ErrorInfoContext, RgResult};
 
+#[async_trait]
 pub trait EnvFolderReadExt {
     async fn mnemonic(&self) -> RgResult<String>;
     async fn multiparty_import_str(&self) -> RgResult<String>;
@@ -10,6 +12,7 @@ pub trait EnvFolderReadExt {
     async fn key(&self) -> Result<Vec<u8>, ErrorInfo>;
 }
 
+#[async_trait]
 impl EnvFolderReadExt for EnvDataFolder {
 
     async fn mnemonic(&self) -> RgResult<String> {

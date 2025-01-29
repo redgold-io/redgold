@@ -1,15 +1,20 @@
+use crate::address_external::ToBitcoinAddress;
 use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use crate::util::mnemonic_support::MnemonicSupport;
 use crate::TestConstants;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::bitcoin::Address;
+use bdk::blockchain::Blockchain;
 use bdk::database::BatchDatabase;
+use bdk::miniscript::psbt::PsbtExt;
 use bdk::{FeeRate, SignOptions};
 use itertools::Itertools;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment};
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use std::path::PathBuf;
 use std::str::FromStr;
+use bdk::bitcoin::secp256k1::Secp256k1;
 
 
 impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
@@ -109,9 +114,22 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(descriptor)
     }
 
+    pub fn finalize_and_broadcast_psbt(&self, psbt: PartiallySignedTransaction) -> Result<String, ErrorInfo> {
+        let secp = Secp256k1::new();
+        let finalized_psbt = psbt.finalize(&secp)
+        .map_err(|(e, v)| {
+            ErrorInfo::new(format!("{} {}", e.json_or(), v.iter().map(|v| v.to_string()).collect_vec().join(" ")))
+        })?;
+        let tx = finalized_psbt.extract_tx();
+        self.client.broadcast(&tx)
+            .error_info("Failed to broadcast transaction")?;
+        
+        Ok(tx.txid().to_string())
+    }
+
 }
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn balance_test_mn() {
     let ci = TestConstants::test_words_pass().unwrap();
@@ -136,19 +154,18 @@ async fn balance_test_mn() {
     std::fs::remove_dir_all(&pb1).ok();
     std::fs::remove_dir_all(&pb2).ok();
 
-    let wm = SingleKeyBitcoinWallet::new_wallet_db_backed(
+    let mut wm = SingleKeyBitcoinWallet::new_wallet_db_backed(
         pub0.clone(),
         NetworkEnvironment::Dev,
         true,
         pb,
         None,
-        // Pass None for the change descriptor by using tr()
-        Some(pkh),
+        Some(pkh.clone()),
         Some(vec![pub1.clone(), pub2.clone()]),
         Some(2),
     ).expect("Failed to create wallet");
 
-    let wm1 = SingleKeyBitcoinWallet::new_wallet_db_backed(
+    let mut wm1 = SingleKeyBitcoinWallet::new_wallet_db_backed(
         pub1.clone(),
         NetworkEnvironment::Dev,
         true,
@@ -159,6 +176,8 @@ async fn balance_test_mn() {
         Some(vec![pub2.clone(), pub0.clone()]),
         Some(2),
     ).expect("Failed to create wallet");
+
+    assert_eq!(wm.get_descriptor_address().unwrap(), wm1.get_descriptor_address().unwrap());
 
     let balance = wm.get_wallet_balance().expect("Failed to get balance");
     println!("balance: {:?}", balance);
@@ -175,11 +194,33 @@ async fn balance_test_mn() {
     let addr2 = w2.get_descriptor_address().expect("Failed to get descriptor address");
     println!("addr2: {:?}", addr2);
 
-    assert_eq!(wm.get_descriptor_address().unwrap(), wm1.get_descriptor_address().unwrap())
+    assert_eq!(wm.get_descriptor_address().unwrap(), wm1.get_descriptor_address().unwrap());
 
-    // let res = w2.send_local(addr, 8000, pkh).expect("Failed to send");
+    let res = w2.send_local(addr, 8000, pkh).expect("Failed to send");
     // println!("res: {:?}", res);
 
-    // w.create_multisig_transaction()
+    let destination = pub0.to_bitcoin_address_typed(&NetworkEnvironment::Dev).unwrap();
+    let amount = CurrencyAmount::from_btc(3000);
+    // let psbt = wm.create_multisig_transaction(&destination, &amount).expect("Failed to create transaction");
+    // println!("psbt: {:?}", &psbt);
+
+    // // First signer signs
+    // let signed_psbt1 = wm.sign_multisig_psbt(psbt.clone()).expect("Failed to sign PSBT with first key");
+    // println!("signed_psbt1: {:?}", signed_psbt1);
+
+    // // Second signer signs
+    // let signed_psbt2 = wm1.sign_multisig_psbt(psbt.clone()).expect("Failed to sign PSBT with second key");
+    // println!("signed_psbt2: {:?}", signed_psbt2);
+
+    // // Combine both signatures
+    // let combined_psbt = wm.combine_psbts(psbt, vec![signed_psbt1, signed_psbt2]).expect("Failed to combine PSBTs");
+    // println!("combined_psbt: {:?}", combined_psbt);
+
+    // let res = wm.finalize_and_broadcast_psbt(combined_psbt).expect("Failed to broadcast PSBT");
+    // println!("Transaction ID: {:?}", res);
+
+    for tx in wm.get_all_tx().expect("Failed to get all tx") {
+        println!("tx: {}", tx.json_or());
+    }
 
 }

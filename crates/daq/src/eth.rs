@@ -4,7 +4,7 @@ use futures::future::Either;
 use futures::TryStreamExt;
 use metrics::counter;
 use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
-use redgold_common_no_wasm::stream_handlers::{run_interval_fold_or_recv_stream, IntervalFoldOrReceive};
+use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_rpc_integ::eth::ws_rpc::{EthereumWsProvider, TimestampedEthereumTransaction};
 use redgold_schema::conf::node_config::NodeConfig;

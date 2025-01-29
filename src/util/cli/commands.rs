@@ -3,6 +3,9 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::path::Path;
+use tokio::fs;
+use reqwest;
 
 use crate::core::backup::aws_backup::AwsBackup;
 use crate::core::relay::Relay;
@@ -555,16 +558,8 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 let relay = Relay::new(*p1.clone()).await;
                 AwsBackup::new(&relay).s3_upload_directory(&p, bucket, prefix).await
             }
-            RgDebugCommand::CopyData(c) => {
-                // for d in p1.config_data.local.as_ref().unwrap().deploy.iter() {
-                //     let s = d.as_old_servers();
-                //     for s in s {
-                //         if s.host == c.server_ssh_host {
-                //            s.to_ssh(Some(log_handler().1.expect("sender")))
-                //
-                //         }
-                //     }
-                // }
+            RgDebugCommand::Usb(c) => {
+                copy_usb_info(p1).await?;
                 Ok(())
             }
             _ => {
@@ -574,4 +569,81 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
     } else {
         Ok(())
     }
+}
+
+
+
+
+async fn copy_usb_info(p1: &Box<NodeConfig>) -> RgResult<()> {
+    // Download the binary first
+    let url = "https://github.com/redgold-io/redgold/releases/download/release%2Fdev/redgold_linux_ubuntu20";
+    let response = reqwest::get(url).await.error_info("Failed to download binary")?;
+    let bytes = response.bytes().await.error_info("Failed to read binary")?;
+    fs::write("redgold", bytes).await.error_info("Failed to write binary")?;
+
+
+    // Make binary executable
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata("redgold").await.error_info("Failed to get metadata")?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions("redgold", perms).await.error_info("Failed to set permissions")?;
+    }
+
+    // Define possible USB paths
+    let user_media_path = format!("/media/{}/", std::env::var("USER").unwrap_or_default());
+    let prefix_paths = vec![
+        "/Volumes/",
+        &user_media_path
+    ];
+    
+    let suffix_paths = vec![
+        "Samsung USB",
+        "NO NAME", 
+        "USB_DRIVE",
+        "KINGSTON",
+        "B2CF-75D8"
+    ];
+
+    let mut copied = false;
+
+    // Try each possible USB path combination
+    for prefix in prefix_paths {
+        for suffix in suffix_paths.iter() {
+            let full_path = format!("{}{}", prefix, suffix);
+            let path = Path::new(&full_path);
+            
+            if path.is_dir() {
+                info!("Found USB drive at {}", full_path);
+                let dest_path = path.join("redgold");
+                match fs::copy("redgold", &dest_path).await {
+                    Ok(_) => {
+                        info!("Successfully copied redgold binary to {}", dest_path.display());
+                        copied = true;
+                        break;
+                    }
+                    Err(e) => {
+                        info!("Failed to copy to {}: {}", dest_path.display(), e);
+                    }
+                }
+                // Also copy the config.toml file if present
+                let config_path = p1.secure_or().config_path();
+                if config_path.exists() {
+                    let config_dest = dest_path.join("config.toml");
+                    fs::copy(config_path, config_dest.clone()).await.error_info("Failed to copy config.toml")?;
+                    info!("Successfully copied config.toml to {:?}", config_dest);
+                }
+            }
+        }
+        if copied {
+            break;
+        }
+    }
+
+    if !copied {
+        info!("Could not find any of the specified USB drives");
+    }
+
+    Ok(())
 }

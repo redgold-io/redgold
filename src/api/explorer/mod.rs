@@ -32,7 +32,7 @@ use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::price_volume::PriceVolume;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PartyInfoAbridged;
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PartyInfo, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::tx::currency_amount::RenderCurrencyAmountDecimals;
 use redgold_schema::util::times::ToTimeString;

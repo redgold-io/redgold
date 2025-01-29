@@ -8,7 +8,7 @@ use futures::{StreamExt, TryFutureExt};
 use itertools::Itertools;
 use metrics::{counter, gauge};
 use redgold_common::flume_send_help::SendErrorInfo;
-use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
+use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
 // use ssh2::init;
@@ -25,6 +25,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::json_pretty;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::parties::PartyInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

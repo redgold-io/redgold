@@ -419,6 +419,7 @@ pub enum RgDebugCommand {
     // TestBitcoinBalance(TestBitcoinBalanceCli),
     // ConvertMetadataXpub(ConvertMetadataXpub),
     CopyData(CopyData),
+    Usb(CopyUsb),
 }
 
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
@@ -446,6 +447,10 @@ pub struct S3UpDir {
 pub struct CopyData {
     pub server_ssh_host: String
 }
+
+/// S3 copy command
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct CopyUsb {}
 
 /// Debug Commands
 /// All commands that are used for development or debugging, not for primary end users.

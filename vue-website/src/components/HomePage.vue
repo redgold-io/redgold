@@ -267,7 +267,7 @@
           <a href="https://arxiv.org/pdf/2108.05236.pdf">ACCEPT based horizontal scaling</a>
 
           <div class="d-flex justify-content-center intro-buttons">
-            <!--            <a href="https://dev.docs.redgold.io/introduction/about" class="btn btn-primary intro-button">Read more in the About section</a>-->
+              <a href="https://dev.docs.redgold.io" class="btn btn-primary intro-button">Read more in the Docs</a>
             <!--            <a href="https://dev.docs.redgold.io/whitepaper/introduction" class="btn btn-primary intro-button" >Whitepaper</a>-->
           </div>
         </div>
@@ -394,20 +394,11 @@
 .intro-buttons {
   margin-top: 20px;
   margin-right: 100px;
-  //spacing: 20px;
 }
 .intro-button {
-  //margin-top: 20px;
   margin-right: 10px;
-  //spacing: 20px;
-  min-width: 135px;
+  min-width: 70px;
   max-height: 40px;
-}
-
-.intro-text {
-  //padding-bottom: 5%;
-  //font-size: 1.2em;
-  //font-weight: bold;
 }
 
 .intro-text h2 {
@@ -415,19 +406,16 @@
   font-weight: bold;
   font-family: 'Impact', sans-serif;
   color: #1dc4de;
-  //margin-top: 10px;
 }
 
 .sub-intro-text {
   padding-top: 20px;
   font-size: 1.2em;
-  //background-color: #2e2e2e
 }
 
 .sub-intro-text-section2 {
   padding-top: 20px;
   font-size: 1.2em;
-  //background-color: #2e2e2e
 }
 
 .second-element {

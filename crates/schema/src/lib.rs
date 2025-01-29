@@ -32,6 +32,10 @@ pub mod airgap {
     include!(concat!(env!("OUT_DIR"), "/airgap.rs"));
 }
 
+pub mod parties {
+    include!(concat!(env!("OUT_DIR"), "/parties.rs"));
+}
+
 pub mod address;
 pub mod hash;
 pub mod block;

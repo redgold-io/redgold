@@ -189,6 +189,7 @@ pub struct Relay {
     pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
+    pub btc_multisig_wallets: Arc<tokio::sync::Mutex<HashMap<Address, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub peer_info: PeerInfo,
     pub eth_daq: EthDaq
     // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
@@ -1255,6 +1256,7 @@ impl Relay {
             peer_send_failures: Arc::new(Default::default()),
             external_network_shared_data: Default::default(),
             btc_wallets: Arc::new(Default::default()),
+            btc_multisig_wallets: Arc::new(Default::default()),
             peer_info: Default::default(),
             // eth_daq: Default::default(),
             eth_daq: Default::default(),

@@ -1,6 +1,6 @@
 use crate::structs;
-use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PartyInfo, PartyState, PublicKey};
-
+use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PublicKey};
+use crate::parties::{PartyState, PartyInfo};
 impl PartyInfo {
 
     pub fn active(&self) -> bool {

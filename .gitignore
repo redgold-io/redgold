@@ -47,3 +47,7 @@ redgold.app
 /test-parquet-export
 tmpfile
 crates/gui/dist
+testdb
+testdb1
+testdb2
+all_repo_contents.txt

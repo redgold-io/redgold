@@ -12,7 +12,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
-use redgold_schema::structs::{Hash, InitiateMultipartyKeygenRequest, NetworkEnvironment, PartyInfo, PublicKey};
+use redgold_schema::structs::{Hash, InitiateMultipartyKeygenRequest, NetworkEnvironment, PublicKey};
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use redgold_schema::{from_hex, ErrorInfoContext, RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::info;
+use redgold_schema::parties::PartyInfo;
 
 pub(crate) async fn backup_multiparty_local_shares(p0: NodeConfig, p1: Vec<ServerOldFormat>) {
 

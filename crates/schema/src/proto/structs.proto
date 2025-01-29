@@ -52,6 +52,8 @@ message PublicKey {
   BytesData aux_data = 3;
 }
 
+
+
 // Witness data for a particular signing event, does not include the hash required to re-verify the information.
 message Proof {
   // Raw signing data, associated with the signature of a particular, individual hash, typically a transaction hash
@@ -1646,23 +1648,6 @@ message LocalKeyShare {
   optional int32 version = 3;
 }
 
-enum PartyState {
-  Debug = 0;
-  Active = 1;
-  PendingRemoval = 2;
-  Inactive = 3;
-  Starting = 4;
-}
-
-message PartyInfo {
-  InitiateMultipartyKeygenRequest initiate = 1;
-  LocalKeyShare local_key_share = 2;
-  PublicKey party_key = 3;
-  optional bool self_initiated = 4;
-  optional int64 expired_time = 5;
-  PublicKey successor_key = 6;
-  PartyState state = 7;
-}
 
 message PartyData {
   // Used for db storage for internal types.

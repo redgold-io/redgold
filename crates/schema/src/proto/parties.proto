@@ -1,0 +1,52 @@
+syntax = "proto3";
+package parties;
+
+import "structs.proto";
+
+
+// Representation of metadata for all existing parties.
+message PartyMetadata {
+    repeated PartyInstance instances = 1;
+    repeated PartyMembership memberships = 2;
+}
+
+message PartyParticipation {
+    structs.Address address = 1;
+    structs.Weighting weight = 2;
+}
+
+
+message PartyMembership {
+    structs.PublicKey public_key = 1;
+    repeated PartyParticipation participate = 2;
+}
+
+message PartyInstance {
+    structs.Address address = 1;
+    structs.Weighting threshold = 2;
+    structs.PublicKey proposer = 3;
+    PartyInfo state = 4;
+    optional int64 creation_time = 5;
+    optional int64 last_update_time = 6;
+    optional int64 expired_time = 7;
+    structs.Address successor = 8;
+}
+
+
+enum PartyState {
+    Debug = 0;
+    Active = 1;
+    PendingRemoval = 2;
+    Inactive = 3;
+    Starting = 4;
+}
+
+message PartyInfo {
+    structs.InitiateMultipartyKeygenRequest initiate = 1;
+    structs.LocalKeyShare local_key_share = 2;
+    structs.PublicKey party_key = 3;
+    optional bool self_initiated = 4;
+    optional int64 expired_time = 5;
+    structs.PublicKey successor_key = 6;
+    PartyState state = 7;
+}

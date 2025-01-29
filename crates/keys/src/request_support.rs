@@ -1,5 +1,5 @@
 use crate::proof_support::ProofSupport;
-use crate::{KeyPair, TestConstants};
+use crate::KeyPair;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};

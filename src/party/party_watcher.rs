@@ -27,6 +27,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             external_network_resources: t,
         }
     }
+    
     pub async fn tick(&mut self) -> RgResult<()> {
         let parties = self.relay.ds.multiparty_store.all_party_info_with_key().await?;
 

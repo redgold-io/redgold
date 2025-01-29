@@ -25,6 +25,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
 // use crate::util::cli::commands::send;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
+use hex;
 
 pub fn struct_public_to_address(pk: structs::PublicKey, network: Network) -> Result<Address, ErrorInfo> {
     let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.raw_bytes()?)
@@ -49,7 +50,9 @@ pub struct SingleKeyBitcoinWallet<D: BatchDatabase> {
     pub transaction_details: Option<TransactionDetails>,
     pub(crate) client: ElectrumBlockchain,
     custom_signer: Arc<MultipartySigner>,
-    pub(crate) sat_per_vbyte: f32
+    pub(crate) sat_per_vbyte: f32,
+    pub doing_multisig: bool,
+    pub address: String
 }
 
 
@@ -116,7 +119,10 @@ impl SingleKeyBitcoinWallet<MemoryDatabase> {
             client,
             custom_signer: custom_signer.clone(),
             sat_per_vbyte: 4.0,
+            doing_multisig: false,
+            address: "".to_string(),
         };
+        bitcoin_wallet.address = bitcoin_wallet.address().unwrap();
         // Adding the multiparty signer to the BDK wallet
         bitcoin_wallet.wallet.add_signer(
             KeychainKind::External,
@@ -203,7 +209,10 @@ impl SingleKeyBitcoinWallet<Tree> {
             client,
             custom_signer: custom_signer.clone(),
             sat_per_vbyte: 4.0,
+            doing_multisig,
+            address: "".to_string(),
         };
+        bitcoin_wallet.address = bitcoin_wallet.get_descriptor_address().unwrap();
 
         if !doing_multisig {
             // Adding the multiparty signer to the BDK wallet
@@ -213,14 +222,17 @@ impl SingleKeyBitcoinWallet<Tree> {
                 custom_signer.clone(),
             );
         } else {
-            // Convert hex to private key
-            let priv_key = PrivateKey::from_str(&opt_private_key_hex.unwrap())
+            // Convert hex to private key bytes first
+            let priv_key_bytes = hex::decode(opt_private_key_hex.unwrap())
                 .error_info("Invalid private key hex")?;
+            let priv_key = PrivateKey::from_slice(&priv_key_bytes, network)
+                .error_info("Invalid private key bytes")?;
+            
             bitcoin_wallet.wallet.add_signer(
-                KeychainKind::Internal,
+                KeychainKind::External,
                 SignerOrdering(100),
                 Arc::new(SignerWrapper::new(priv_key, SignerContext::Segwitv0))
-            )
+            );
         }
 
         if do_sync {

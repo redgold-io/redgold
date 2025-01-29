@@ -176,6 +176,10 @@ def test_scan_tld():
         root = ac.root
         print(k.path[len(str(root)):])
         print(root)
+    with open("all_repo_contents.txt", "w") as f:
+        f.write(ac.contents_all())
+
+
 
 
 if __name__ == "__main__":

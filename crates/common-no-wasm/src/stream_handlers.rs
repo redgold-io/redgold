@@ -96,17 +96,17 @@ pub async fn run_interval_fold_or_recv<T>(
 ) -> JoinHandle<RgResult<()>> where T: Send + 'static {
     tokio::spawn(run_interval_inner_or_recv::<T>(interval_f, interval_duration, run_at_start, recv))
 }
-
-pub async fn run_interval_fold_or_recv_stream<T,Q>(
-    interval_f: impl IntervalFoldOrReceive<T> + Send + 'static,
-    interval_duration: Duration, run_at_start: bool, recv: impl Stream<Item = T> + Send + 'static,
-    empty: Q
-) -> JoinHandle<RgResult<()>> where T: Send + 'static, Q: Send + 'static {
-    tokio::spawn(async move {
-        empty;
-        run_interval_inner_or_recv_stream::<T>(interval_f, interval_duration, run_at_start, recv).await
-    })
-}
+//
+// pub async fn run_interval_fold_or_recv_stream<T,Q>(
+//     interval_f: impl IntervalFoldOrReceive<T> + Send + 'static,
+//     interval_duration: Duration, run_at_start: bool, recv: impl Stream<Item = T> + Send + 'static,
+//     empty: Q
+// ) -> JoinHandle<RgResult<()>> where T: Send + 'static, Q: Send + 'static {
+//     tokio::spawn(async move {
+//         let _ = empty;
+//         run_interval_inner_or_recv_stream::<T>(interval_f, interval_duration, run_at_start, recv).await
+//     })
+// }
 
 pub async fn run_interval_inner_or_recv<T>(
     interval_f: impl IntervalFoldOrReceive<T>, interval_duration: Duration, run_at_start: bool,

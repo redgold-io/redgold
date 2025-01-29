@@ -18,10 +18,10 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::StandardContractType::Currency;
-use redgold_schema::structs::{Address, ControlMultipartySigningRequest, CurrencyAmount, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PartyInfo, PartyPurpose, Proof, SupportedCurrency};
+use redgold_schema::structs::{Address, ControlMultipartySigningRequest, CurrencyAmount, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PartyPurpose, Proof, SupportedCurrency};
 use redgold_schema::{bytes_data, RgResult, SafeOption};
 use std::sync::Arc;
-
+use redgold_schema::parties::PartyInfo;
 
 pub async fn mp_util_send_eth(destination: &Address, amount: &CurrencyAmount, net: NetworkEnvironment) -> RgResult<()> {
 

@@ -64,7 +64,10 @@ pub struct NodeData {
     pub server_index: Option<i64>,
     pub peer_id_index: Option<i64>,
     pub port_offset: Option<i64>,
-    pub passive: Option<bool>,
+    // Doesn't participate in any consensus operations, only watches the network for live data
+    pub watch_only_node: Option<bool>,
+    // Warning, you must have a LOT of disk space available / S3 for this to work
+    pub archival_mode: Option<bool>,
     pub name: Option<String>,
     pub ip: Option<String>,
     pub http_client_proxy: Option<String>,
@@ -182,6 +185,7 @@ impl ConfigData {
         self.debug.as_ref().and_then(|x| x.develop).unwrap_or(false)
     }
 
+    #[allow(deprecated)]
     pub fn servers_old(&self) -> Vec<ServerOldFormat> {
         self.local.as_ref()
             .and_then(|x|
@@ -190,6 +194,8 @@ impl ConfigData {
                               .or(x.servers.clone())
             ).unwrap_or_default()
     }
+
+    #[allow(deprecated)]
     pub fn generate_user_sample_config() -> Self {
         Self {
             network: Some("main".to_string()),
@@ -199,20 +205,21 @@ impl ConfigData {
             bulk: Some("/home/user/mnt/.rg/".to_string()),
             node: Some(NodeData {
                 words: Some("abuse lock pledge crowd pair become ridge alone target viable black plate ripple sad tape victory blood river gloom air crash invite volcano release".to_string()),
-                peer_id: Some("enter_your_peer_id_here_or_blank_to_generate".to_string()),
+                peer_id: Some("enter_your_peer_id_here_or_blank_to_generate_or_use_the_deploy_script".to_string()),
                 network: Some("main".to_string()),
                 disable_control_api: Some(false),
                 nat_traversal_required: Some(false),
                 udp_keepalive_seconds: None,
                 service_intervals: None,
-                server_index: None,
-                peer_id_index: None,
-                port_offset: None,
-                passive: Some(false),
-                name: None,
-                ip: None,
+                server_index: Some(0),
+                peer_id_index: Some(0),
+                port_offset: Some(16180),
+                watch_only_node: Some(false),
+                archival_mode: Some(false),
+                name: Some("your_node_name_if_set_manually_instead_of_through_deployment".to_string()),
+                ip: Some("your_external_ip_goes_here".to_string()),
                 http_client_proxy: None,
-                udp_serve_disabled: None,
+                udp_serve_disabled: Some(false),
                 allowed_http_proxy_origins: None,
                 // daq: None,
             }),
@@ -253,7 +260,7 @@ impl ConfigData {
                     }]),
                     docker_swarm_proxies: None,
                     default_params: Some(DeploymentDefaultParams{
-                        reward_address: None,
+                        reward_address: Some("your_cold_reward_address_here".to_string()),
                         keys: None,
                         network_environment: None,
                     }),
