@@ -255,43 +255,43 @@ impl PartyEventBuilder for PartyEvents {
 
 
     fn validate_rdg_swap_fulfillment_transaction(&self, tx: &Transaction) -> RgResult<()> {
-        let rdg_orders = self.orders().into_iter()
-            .filter(|e| e.fulfilled_currency_amount().currency_or() == SupportedCurrency::Redgold)
-            .collect_vec();
-
-        // TODO: add stake withdrawal fulfillment here too.
-        for o in tx.outputs.iter() {
-            if let Some(amt) = o.opt_amount_typed() {
-                let a = o.address.safe_get_msg("Missing address")?;
-                if self.party_pk_all_address.contains(&a) {
-                    continue;
-                }
-                if o.is_fee() && self.default_fee_addrs.contains(&a) {
-                    continue;
-                }
-                let withdrawal = rdg_orders.iter().find(|o|
-                    o.is_stake_withdrawal && &o.destination == a && o.fulfilled_currency_amount() == amt);
-                if withdrawal.is_some() {
-                    continue;
-                }
-                let ful = o.swap_fulfillment();
-                let f = ful.safe_get_msg("Missing swap fulfillment")?;
-                let txid = f.external_transaction_id.safe_get_msg("Missing txid")?;
-                let order = rdg_orders.iter()
-                    .find(|o| {
-                        let order_i64_amt = o.fulfilled_currency_amount().amount_i64_or();
-                        let tx_i64_amount = amt.amount_i64_or();
-                        let rdg_sats_tolerance = 1_000_000;
-                        let within_reasonable_range = i64::abs(order_i64_amt - tx_i64_amount) < rdg_sats_tolerance;
-                        o.tx_id_ref.as_ref() == Some(txid) && within_reasonable_range
-                    });
-                if order.is_none() {
-                    return Err(error_info("Invalid fulfillment for output"))
-                        .with_detail("output", o.json_or())
-                        .with_detail("rdg_orders", rdg_orders.json_or());
-                }
-            }
-        }
+        // let rdg_orders = self.orders().into_iter()
+        //     .filter(|e| e.fulfilled_currency_amount().currency_or() == SupportedCurrency::Redgold)
+        //     .collect_vec();
+        //
+        // // TODO: add stake withdrawal fulfillment here too.
+        // for o in tx.outputs.iter() {
+        //     if let Some(amt) = o.opt_amount_typed() {
+        //         let a = o.address.safe_get_msg("Missing address")?;
+        //         if self.party_pk_all_address.contains(&a) {
+        //             continue;
+        //         }
+        //         if o.is_fee() && self.default_fee_addrs.contains(&a) {
+        //             continue;
+        //         }
+        //         let withdrawal = rdg_orders.iter().find(|o|
+        //             o.is_stake_withdrawal && &o.destination == a && o.fulfilled_currency_amount() == amt);
+        //         if withdrawal.is_some() {
+        //             continue;
+        //         }
+        //         let ful = o.swap_fulfillment();
+        //         let f = ful.safe_get_msg("Missing swap fulfillment")?;
+        //         let txid = f.external_transaction_id.safe_get_msg("Missing txid")?;
+        //         let order = rdg_orders.iter()
+        //             .find(|o| {
+        //                 let order_i64_amt = o.fulfilled_currency_amount().amount_i64_or();
+        //                 let tx_i64_amount = amt.amount_i64_or();
+        //                 let rdg_sats_tolerance = 1_000_000;
+        //                 let within_reasonable_range = i64::abs(order_i64_amt - tx_i64_amount) < rdg_sats_tolerance;
+        //                 o.tx_id_ref.as_ref() == Some(txid) && within_reasonable_range
+        //             });
+        //         if order.is_none() {
+        //             return Err(error_info("Invalid fulfillment for output"))
+        //                 .with_detail("output", o.json_or())
+        //                 .with_detail("rdg_orders", rdg_orders.json_or());
+        //         }
+        //     }
+        // }
 
         Ok(())
     }
