@@ -4,6 +4,12 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;
 
+
+enum PreparedMultisigTransaction {
+    BtcMultisig(String),
+    EthMultisig(Vec<u8>)
+}
+
 #[async_trait]
 pub trait ExternalNetworkResources {
 
@@ -33,6 +39,11 @@ pub trait ExternalNetworkResources {
         Self: Sync;
 
     async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: structs::Transaction) -> RgResult<structs::Transaction>;
+
+    async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation;
+
+    async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId>;
+
 
 }
 

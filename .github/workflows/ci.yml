@@ -440,7 +440,7 @@ jobs:
           cargo install cargo-workspaces &&
           cargo login ${{ secrets.CARGO_TOKEN }} &&
           ./bin/install_build_deps.sh &&
-          cargo workspaces publish
+          cargo workspaces publish --allow-branch staging --no-git-commit --no-git-push --no-git-tag --no-global-tag
 
       - name: Download redgold_mac artifact
         uses: actions/download-artifact@v4

@@ -621,22 +621,29 @@ async fn copy_usb_info(p1: &Box<NodeConfig>) -> RgResult<()> {
                     Ok(_) => {
                         info!("Successfully copied redgold binary to {}", dest_path.display());
                         copied = true;
+                        // Also copy the config.toml file if present
+                        let config_path = p1.secure_or().config_path();
+                        let p2 = p1.secure_path();
+                        info!("Secure path at {:?}", p2);
+                        info!("Looking for config.toml at {:?}", config_path);
+                        if config_path.exists() {
+                            let config_dest = path.join("config.toml");
+                            fs::copy(config_path, config_dest.clone()).await.error_info("Failed to copy config.toml")?;
+                            info!("Successfully copied config.toml to {:?}", config_dest);
+                        } else {
+                            info!("No config.toml found at {:?}", config_path);
+                        }
                         break;
                     }
                     Err(e) => {
                         info!("Failed to copy to {}: {}", dest_path.display(), e);
                     }
                 }
-                // Also copy the config.toml file if present
-                let config_path = p1.secure_or().config_path();
-                if config_path.exists() {
-                    let config_dest = dest_path.join("config.toml");
-                    fs::copy(config_path, config_dest.clone()).await.error_info("Failed to copy config.toml")?;
-                    info!("Successfully copied config.toml to {:?}", config_dest);
-                }
+
             }
         }
         if copied {
+
             break;
         }
     }

@@ -836,12 +836,9 @@ impl Relay {
     }
     pub fn check_signing_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let l = self.mp_signing_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
-        let init = l.get(room_id).ok_msg("missing room_id").ok();
-        let signing_id = init.as_ref().and_then(|i| i.party_index(public_key));
-        let original_id = init.as_ref().and_then(|i|
-                                                     i.identifier.as_ref().and_then(|i| i.party_index(public_key)));
-        // info!("check_signing_authorized Signing ID: {:?} Original ID: {:?}", signing_id, original_id);
-        Ok(original_id)
+        Ok(l.get(room_id).safe_get_msg("missing room_id")
+            .and_then(|x| x.identifier.safe_get_msg("missing identifier")
+            ).map(|p| p.party_index(public_key)).unwrap_or(None))
     }
 
     pub fn authorize_keygen(&self, p0: InitiateMultipartyKeygenRequest) -> RgResult<()> {
@@ -856,16 +853,9 @@ impl Relay {
     }
     pub fn check_keygen_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let l = self.mp_keygen_authorizations.lock().map_err(|e| error_info(format!("Failed to lock mp_authorizations {}", e.to_string())))?;
-        let get_result = l.get(room_id).ok_msg("missing room_id");
-        let result = get_result
-            .clone()
+        Ok(l.get(room_id).safe_get_msg("missing room_id")
             .and_then(|x| x.identifier.safe_get_msg("missing identifier")
-            ).clone();
-        let option = result.clone().map(|p| p.party_index(public_key)).clone().unwrap_or(None);
-        // info!("Check keygen authorized for room: {:?} public_key: {} get_result {:?} result {:?} option {:?}",
-        //     room_id, public_key.hex(), get_result, result, option
-        // );
-        Ok(option)
+            ).map(|p| p.party_index(public_key)).unwrap_or(None))
     }
     pub fn check_mp_authorized(&self, room_id: &RoomId, public_key: &structs::PublicKey) -> RgResult<Option<usize>> {
         let room_id = room_id.uuid.safe_get()?.clone();
@@ -874,7 +864,6 @@ impl Relay {
         let room_id = RoomId::from(room_id);
         Ok(self.check_keygen_authorized(&room_id, public_key)?.or(self.check_signing_authorized(&room_id, public_key)?))
     }
-
 
     pub async fn observe(&self, mut om: ObservationMetadata) -> Result<ObservationProof, ErrorInfo> {
         om.with_hash();

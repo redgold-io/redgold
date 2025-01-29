@@ -284,6 +284,15 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         let mut t = t.clone();
         gui_trezor_sign(public, derivation_path, &mut t).await
     }
+
+    async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation {
+        todo!()
+    }
+
+    async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId> {
+        todo!()
+    }
+
 }
 
 
@@ -571,6 +580,16 @@ impl ExternalNetworkResources for MockExternalResources {
     async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: Transaction) -> RgResult<Transaction> {
         "Not implemented".to_error()
     }
+
+
+    async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation {
+        todo!()
+    }
+
+    async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId> {
+        todo!()
+    }
+
 }
 
 #[test]

@@ -99,7 +99,6 @@ impl EthWalletWrapper {
             .await
             .error_info("get transaction hash")?;
 
-        // println!("Safe tx hash: 0x{}", hex::encode(tx_hash));
 
         // Sign the hash
         let signature = self.client.signer()
@@ -107,7 +106,6 @@ impl EthWalletWrapper {
             .error_info("sign transaction")?;
 
         let sig_bytes = signature.to_vec();
-        // println!("Signature: 0x{}", hex::encode(&sig_bytes));
 
         Ok((tx_hash, sig_bytes.into()))
     }
@@ -116,9 +114,7 @@ impl EthWalletWrapper {
         message_hash: [u8; 32],
         signatures: Vec<Bytes>
     ) -> RgResult<Bytes> {
-
         let rec_message = RecoveryMessage::Hash(H256::from(message_hash));
-        // let rec_message = RecoveryMessage::Data(message_hash.to_vec());
         // First recover signer addresses from signatures to sort them
         let mut sigs_with_addresses: Vec<(Address, Bytes)> = signatures
             .into_iter()
@@ -127,23 +123,17 @@ impl EthWalletWrapper {
                 if sig.len() != 65 {
                     return "Invalid signature length".to_error();
                 }
-
                 let signature = ethers::core::types::Signature::try_from(sig.as_ref())
                     .error_info("Failed to create signature")?;
-
                 // Recover the address using ecrecover
                 let recovered = signature
                     .recover(rec_message.clone())
                     .error_info("Failed to recover address")?;
-
                 Ok((recovered, sig))
             })
             .collect::<RgResult<Vec<_>>>()?;
-
         // Sort by signer address
         sigs_with_addresses.sort_by(|a, b| a.0.cmp(&b.0));
-        println!("Sorted signer addresses: {:?}", sigs_with_addresses.iter().map(|(addr, _)| addr).collect::<Vec<_>>());
-
         // Concatenate sorted signatures
         let mut combined = Vec::new();
         for (_, sig) in sigs_with_addresses {

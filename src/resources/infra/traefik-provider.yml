@@ -7,7 +7,13 @@ http:
       tls:
         certResolver: default
       service: redgold-io-www
-
+    blog-redgold-io:
+      entryPoints:
+        - web-secure
+      rule: Host(`blog.redgold.io`)
+      tls:
+        certResolver: default
+      service: blog-redgold-io
     redgold-io-dev-api:
       entryPoints:
         - web-secure
@@ -75,3 +81,7 @@ http:
       loadBalancer:
         servers:
           - url: http://matrix-nginx-proxy:8080
+    blog-redgold-io:
+      loadBalancer:
+        servers:
+          - url: http://100.84.231.7:8050

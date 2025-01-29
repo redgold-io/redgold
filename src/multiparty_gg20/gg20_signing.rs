@@ -57,9 +57,6 @@ async fn signing_original(
     parties: Vec<u16>,
     data_to_sign: Vec<u8>,
     relay: Relay,
-    expected_number_of_parties: usize,
-    is_follower: bool,
-    self_index: usize,
 ) -> Result<SignatureRecid> {
 
     let mut local_share: LocalKey<curv::elliptic::curves::Secp256k1> = serde_json::from_str(&local_share).context("parse local share")?;
@@ -112,16 +109,13 @@ async fn signing_original(
         .await?;
 
     let partial_signatures: Vec<_> = incoming
-        .take(expected_number_of_parties)
+        .take(number_of_parties - 1)
         .map_ok(|msg| msg.body)
         .try_collect()
         .await?;
-    // info!("Received partial signatures num {} from expected_num {} is_follower: {}", partial_signatures.len(), expected_number_of_parties, is_follower);
     let signature = signing
         .complete(&partial_signatures)
         .context("online stage failed")?;
-    // let signature = serde_json::to_string(&signature).context("serialize signature")?;
-    // println!("{}", signature);
 
     Ok(signature)
 }
@@ -134,13 +128,10 @@ use tracing::info;
 
 pub async fn signing(
     external_address: String, port: u16, room: String, local_share: String, parties: Vec<u16>, data_to_sign: Vec<u8>, relay: Relay,
-    expected_parties: usize,
-    is_follower: bool,
-    self_index: usize
 ) -> Result<Proof, ErrorInfo> {
     let url = external_address_to_surf_url(external_address, port)?;
     let sig = signing_original(
-        url, &*room, local_share, parties, data_to_sign.clone(), relay, expected_parties, is_follower, self_index)
+        url, &*room, local_share, parties, data_to_sign.clone(), relay)
         .await
         .map_err(|e| error_info(e.to_string()))?;
     let mut vec: Vec<u8> = vec![];
