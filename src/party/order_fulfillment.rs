@@ -159,7 +159,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 if let Some(b) = ps.balance_map.get(&SupportedCurrency::Ethereum) {
                     let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Ethereum, &self.relay.node_config.network);
                     if let Some(f) = fee {
-                        let dest = Address::from_eth_external(&"0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string());
+                        let dest = Address::from_eth_external_exact(&"0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string());
                         let amt = b.clone() - (f.clone()*2);
                         if amt.to_fractional() > f.to_fractional() {
                             let fulfilled_amount = (amt.to_fractional() * 1e8) as u64;

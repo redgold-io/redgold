@@ -23,6 +23,23 @@ impl TryFrom<String> for SupportedCurrency {
 
 impl SupportedCurrency {
 
+    pub fn multisig_party_currencies() -> Vec<SupportedCurrency> {
+        vec![
+            SupportedCurrency::Redgold,
+            SupportedCurrency::Bitcoin,
+            SupportedCurrency::Ethereum,
+            SupportedCurrency::Solana,
+            SupportedCurrency::Monero,
+        ]
+    }
+
+    pub fn multisig_contract_fees() -> Vec<SupportedCurrency> {
+        vec![
+            SupportedCurrency::Ethereum,
+            SupportedCurrency::Solana,
+        ]
+    }
+
     pub fn valid_swap_input(&self) -> bool {
         vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
             .iter().any(|x| x == self)

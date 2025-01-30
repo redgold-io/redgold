@@ -1,6 +1,6 @@
 use crate::constants::{DECIMAL_MULTIPLIER, MAX_COIN_SUPPLY, NANO_DECIMAL_MULTIPLIER, PICO_DECIMAL_MULTIPLIER};
 use crate::fee_validator::MIN_RDG_SATS_FEE;
-use crate::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
+use crate::structs::{CurrencyAmount, CurrencyId, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use crate::{ErrorInfoContext, RgResult};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -125,6 +125,10 @@ impl CurrencyAmount {
         self.currency_or() == SupportedCurrency::Redgold
     }
 
+    pub fn is_zero(&self) -> bool {
+        self.to_fractional() == 0f64
+    }
+
     pub fn min_fee() -> Self {
         Self::from(MIN_RDG_SATS_FEE)
     }
@@ -135,6 +139,13 @@ impl CurrencyAmount {
     pub fn to_fractional(&self) -> f64 {
         let curr = self.currency_or();
         if curr == SupportedCurrency::Ethereum {
+            if let Some(decimals) = self.decimals.as_ref() {
+                if let Some(b) = self.bigint_amount() {
+                    if let Some(d) = BigInt::from_str(decimals).ok() {
+                        return (b / d).to_f64().unwrap_or(0f64);
+                    }
+                }
+            }
             self.bigint_fractional().unwrap_or(0f64)
         } else if curr == SupportedCurrency::Monero {
             (self.amount as f64) / (PICO_DECIMAL_MULTIPLIER as f64)
@@ -143,6 +154,10 @@ impl CurrencyAmount {
         } else {
             self.to_fractional_std()
         }
+    }
+
+    pub fn to_1e8(&self) -> i64 {
+        ((self.to_fractional() * 1e8) / (1e8f64)) as i64
     }
 
     fn to_fractional_std(&self) -> f64 {
@@ -189,6 +204,18 @@ impl CurrencyAmount {
         a.currency = Some(SupportedCurrency::Ethereum as i32);
         a
     }
+    pub fn from_eth_network_bigint_string_currency_id_decimals(
+        amount: impl Into<String>,
+        currency_id: impl Into<CurrencyId>,
+        decimals: Option<String>
+    ) -> Self {
+        let mut a = Self::from_string(amount.into());
+        a.currency = Some(SupportedCurrency::Ethereum as i32);
+        a.decimals = decimals;
+        a.currency_id = Some(currency_id.into());
+        a
+    }
+
     pub fn from_eth_bigint(amount: BigInt) -> Self {
         let mut a = Self::from_string(amount.to_string());
         a.currency = Some(SupportedCurrency::Ethereum as i32);

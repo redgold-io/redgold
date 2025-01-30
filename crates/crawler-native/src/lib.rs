@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 pub mod coinbase_ws;
 
 pub fn add(left: u64, right: u64) -> u64 {

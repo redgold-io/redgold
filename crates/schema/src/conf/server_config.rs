@@ -1,4 +1,4 @@
-use crate::config_data::Keys;
+use crate::config_data::{Keys, RpcUrl};
 use crate::servers::ServerOldFormat;
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +52,7 @@ pub struct NodeInstance {
     pub reward_address: Option<String>,
     pub use_id_ds_prefix: Option<bool>,
     pub party_config: Option<NodePartyConfig>,
+    pub rpc_overrides: Option<Vec<RpcUrl>>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]

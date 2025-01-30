@@ -252,6 +252,7 @@ impl ConfigData {
                                 reward_address: None,
                                 use_id_ds_prefix: None,
                                 party_config: None,
+                                rpc_overrides: None,
                             }
                         ]
                         ),

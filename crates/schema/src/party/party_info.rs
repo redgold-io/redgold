@@ -1,6 +1,6 @@
 use crate::structs;
-use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PublicKey};
-use crate::parties::{PartyState, PartyInfo};
+use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PublicKey, SupportedCurrency};
+use crate::parties::{PartyState, PartyInfo, PartyMetadata};
 impl PartyInfo {
 
     pub fn active(&self) -> bool {
@@ -54,4 +54,13 @@ impl PartyInfo {
         }
     }
 
+}
+
+
+impl PartyMetadata {
+    pub fn has_instance(&self, cur: SupportedCurrency) -> bool {
+        self.instances.iter()
+            .flat_map(|i| i.address.as_ref())
+            .any(|a| a.currency() == cur)
+    }
 }

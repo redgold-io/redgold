@@ -1,6 +1,6 @@
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use crate::util::{public_key_ser, ToPublicKey};
-use crate::{btc, util, KeyPair, TestConstants};
+use crate::{btc, util, KeyPair};
 use bdk::bitcoin::secp256k1::{PublicKey, SecretKey};
 use itertools::Itertools;
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -131,7 +131,15 @@ impl ProofSupport for Proof {
 
 
 
-#[test]
+#[cfg(test)]
+mod test {
+    use redgold_schema::signature_data;
+    use redgold_schema::structs::Proof;
+    use crate::proof_support::ProofSupport;
+    use crate::TestConstants;
+    use crate::util::public_key_ser;
+
+    #[test]
 fn verify_single_signature_proof() {
     let tc = TestConstants::new();
 
@@ -153,6 +161,8 @@ fn verify_invalid_key_single_signature_proof() {
     let mut proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
     proof.public_key = public_key_ser(&tc.public2);
     assert!(proof.verify(&tc.rhash_1).is_err());
+}
+
 }
 
 

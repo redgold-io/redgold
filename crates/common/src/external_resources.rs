@@ -5,11 +5,6 @@ use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;
 
 
-enum PreparedMultisigTransaction {
-    BtcMultisig(String),
-    EthMultisig(Vec<u8>)
-}
-
 #[async_trait]
 pub trait ExternalNetworkResources {
 
@@ -43,6 +38,8 @@ pub trait ExternalNetworkResources {
     async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation;
 
     async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId>;
+
+    async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount>;
 
 
 }

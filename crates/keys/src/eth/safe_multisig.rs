@@ -24,7 +24,7 @@ impl SafeMultisig {
         if self.network == NetworkEnvironment::Main {
             panic!("Main network not supported");
         } else {
-            Address::from_eth_external("0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67")
+            Address::from_eth_external_exact("0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67")
         }
     }
 

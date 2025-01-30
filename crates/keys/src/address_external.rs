@@ -82,7 +82,7 @@ impl ToEthereumAddress for PublicKey {
     }
 
     fn to_ethereum_address_typed(&self) -> Result<structs::Address, ErrorInfo> {
-        self.to_ethereum_address().map(|a| structs::Address::from_eth(&a))
+        self.to_ethereum_address().map(|a| structs::Address::from_eth_direct(&a))
     }
 }
 // https://github.com/xenowits/eth-address/blob/main/src/address.rs

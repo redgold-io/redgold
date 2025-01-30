@@ -8,6 +8,7 @@ use redgold_schema::{error_info, RgResult};
 pub trait AddressSupport {
     fn parse_address(&self) -> RgResult<Address>;
     fn parse_address_incl_raw(&self) -> RgResult<Address>;
+    fn parse_ethereum_address(&self) -> RgResult<Address>;
 }
 
 impl<T : Into<String> + Clone> AddressSupport for T {
@@ -30,6 +31,16 @@ impl<T : Into<String> + Clone> AddressSupport for T {
     fn parse_address_incl_raw(&self) -> RgResult<Address> {
         let hex = self.clone().into();
         self.parse_address().or(Address::raw_from_hex(hex))
+    }
+
+    fn parse_ethereum_address(&self) -> RgResult<Address> {
+        let str_rep: String = self.clone().into();
+        let result = if let Ok(a) = crate::eth::address_parser::parse_address(&str_rep) {
+            a
+        } else {
+            return Err(error_info("Unable to parse address: ".to_string())).add(str_rep.clone());
+        };
+        Ok(result)
     }
 }
 

@@ -293,6 +293,9 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         todo!()
     }
 
+    async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount> {
+        todo!()
+    }
 }
 
 
@@ -452,9 +455,9 @@ impl ExternalNetworkResources for MockExternalResources {
                     self_address: None,
                     currency_id: Some(SupportedCurrency::Ethereum.into()),
                     currency_amount: Some(CurrencyAmount::from_eth_bigint_string(value_str.clone())),
-                    from: Address::from_eth_external(&tx.from.to_string()),
-                    to: vec![(Address::from_eth_external(&other_addr.clone()), CurrencyAmount::from_eth_bigint_string(value_str))],
-                    other: Some(Address::from_eth_external(&other_addr)),
+                    from: Address::from_eth_external_exact(&tx.from.to_string()),
+                    to: vec![(Address::from_eth_external_exact(&other_addr.clone()), CurrencyAmount::from_eth_bigint_string(value_str))],
+                    other: Some(Address::from_eth_external_exact(&other_addr)),
                 }
             }
             _ => Err(error_info("Unsupported currency"))?
@@ -590,6 +593,9 @@ impl ExternalNetworkResources for MockExternalResources {
         todo!()
     }
 
+    async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount> {
+        todo!()
+    }
 }
 
 #[test]

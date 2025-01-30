@@ -104,6 +104,12 @@ export default {
     };
   },
   mixins: [fetchHashInfo],
+  computed: {
+    isMainnet() {
+      const hostname = window.location.hostname;
+      return hostname.includes("explorer.redgold.io")
+    }
+  },
   methods: {
     handleSubmit() {
       this.$router.push(`/hash/${this.searchValue}`);

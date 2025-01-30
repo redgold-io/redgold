@@ -34,7 +34,7 @@ use redgold_schema::conf::rg_args::Deploy;
 use redgold_schema::conf::server_config::{Deployment, NodeInstance, ServerData};
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::data_folder::DataFolder;
-
+use crate::infra::multiparty_backup::restore_multiparty_share;
 
 #[ignore]
 #[tokio::test]
@@ -261,6 +261,17 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
     let party = config.party.get_or_insert(Default::default());
     let external = config.external.get_or_insert(Default::default());
     party.party_config = ssh.server.party_config.clone();
+
+    let rpcs = external.rpcs.get_or_insert(Default::default());
+    if let Some((t,t2, t3)) = dpl_tuple.as_ref() {
+        if let Some(overrides) = t3.rpc_overrides.as_ref() {
+            let curs = overrides.iter().map(|r| r.currency).collect_vec();
+            rpcs.retain(|k| !curs.contains(&k.currency));
+            for r in overrides {
+                rpcs.push(r.clone())
+            }
+        }
+    }
 
     if ssh.server.index == 0 && nc.development_mode() {
         if nc.development_mode_main() {
@@ -779,7 +790,7 @@ pub async fn default_deploy(
             words_opt = Some(words_read);
         }
 
-        // restore_multiparty_share(node_config.clone(), ss.clone()).await?;
+        restore_multiparty_share(node_config.clone(), ss.clone()).await?;
 
         // let ssh = SSH::new_ssh(ss.host.clone(), None);
         let ssh = DeployMachine::new(ss, None, output_handler.clone());

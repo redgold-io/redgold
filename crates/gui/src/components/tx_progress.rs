@@ -193,8 +193,8 @@ impl TransactionProgressFlow {
         self.stage != TransactionStage::NotCreated
     }
     pub async fn make_transaction<T: ExternalNetworkResources, G>(
-        nc: &NodeConfig,
-        mut external_resources: &mut T,
+        _nc: &NodeConfig,
+        external_resources: &mut T,
         currency: &SupportedCurrency,
         from: &PublicKey,
         to_address: &Address,
@@ -321,7 +321,7 @@ impl TransactionProgressFlow {
     pub fn info_box_view_inner(&mut self, ui: &mut Ui, allowed_signing_methods: &Vec<XPubLikeRequestType>) {
 
         if self.stage != TransactionStage::NotCreated {
-            let mut box_label = self.stage.box_label();
+            let box_label = self.stage.box_label();
             let mut box_text = "";
             let mut txid = "";
             match self.stage {
@@ -349,7 +349,7 @@ impl TransactionProgressFlow {
             }
             if self.use_single_box {
                 ui.heading(box_label);
-                let mut string1 = box_text.clone().to_string();
+                let mut string1 = box_text.to_string();
                 if let Some(e) = self.stage_err.as_ref() {
                     string1 = e.clone();
                 }
@@ -373,7 +373,7 @@ impl TransactionProgressFlow {
                     }
                 }
                 // ui.label(extra_label);
-                data_item(ui, "TXID:", txid.clone());
+                data_item(ui, "TXID:", txid);
             });
         }
     }
@@ -417,7 +417,7 @@ impl TransactionProgressFlow {
                 option.file_input = self.file_input.clone();
 
                 let (s, r) = flume::unbounded();
-                let res = g.clone().sign_prepared_transaction(option, s).log_error();
+                let _ = g.clone().sign_prepared_transaction(option, s).log_error();
                 self.receiver = Some(r);
                 self.stage = TransactionStage::AwaitingSignatures;
                 self.rdg_broadcast_response = Arc::new(Mutex::new(None));
@@ -427,7 +427,7 @@ impl TransactionProgressFlow {
                 let arc = self.rdg_broadcast_response.clone();
                 let option = self.prepared_tx.as_mut().unwrap();
                 let (s, r) = flume::unbounded();
-                let res = g.clone().broadcast_prepared_transaction(option, s).log_error();
+                let _ = g.clone().broadcast_prepared_transaction(option, s).log_error();
                 self.awaiting_broadcast = true;
                 self.stage = TransactionStage::AwaitingBroadcastResponse;
 
@@ -536,7 +536,7 @@ impl TransactionProgressFlow {
             }
         }
 
-        let header = self.heading_details.get(&self.stage)
+        let _header = self.heading_details.get(&self.stage)
             .map(|h| h.clone()).unwrap_or(format!("{:?}", self.stage));
         //
         // ui.heading(header);

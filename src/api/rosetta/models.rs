@@ -1,5 +1,6 @@
-#![allow(unused_imports, unused_qualifications, unused_extern_crates)]
+#![allow(unused_imports, unused_qualifications, unused_extern_crates, unexpected_cfgs)]
 // extern crate chrono;
+
 
 use serde::ser::Serializer;
 

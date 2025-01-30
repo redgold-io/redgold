@@ -70,7 +70,7 @@ impl Address {
             currency: Redgold as i32,
         }
     }
-    pub fn from_eth(address: impl Into<String>) -> Address {
+    pub fn from_eth_direct(address: impl Into<String>) -> Address {
         let address = address.into();
         Self {
             address: bytes_data(address.clone().into_bytes()),
@@ -114,9 +114,9 @@ impl Address {
         ret
     }
 
-    pub fn from_eth_external(address: impl Into<String>) -> Address {
+    pub fn from_eth_external_exact(address: impl Into<String>) -> Address {
         let address = address.into();
-        let mut ret = Self::from_eth(address);
+        let mut ret = Self::from_eth_direct(address);
         ret.currency = SupportedCurrency::Ethereum as i32;
         ret
     }

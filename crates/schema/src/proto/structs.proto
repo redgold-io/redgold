@@ -1551,7 +1551,7 @@ enum SupportedCurrency {
 
 message CurrencyDescriptor {
   SupportedCurrency network_currency = 1;
-  Hash contract_hash = 2;
+  Address contract = 2;
 }
 
 message CurrencyId {

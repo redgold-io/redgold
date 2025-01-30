@@ -30,7 +30,7 @@ pub async fn test_safe_multisig() {
     let addrs = vec![addr.clone(), addr1.clone(), addr2.clone()];
     // let res = safe.create_safe(2, addrs).await.unwrap();
 
-    let safe_contract_addr = Address::from_eth_external("0x449F629b6bf816db771b69388E5b02b30ED86ACe");
+    let safe_contract_addr = Address::from_eth_external_exact("0x449F629b6bf816db771b69388E5b02b30ED86ACe");
 
     let eth_amount = CurrencyAmount::from_fractional_cur(0.001, SupportedCurrency::Ethereum).unwrap();
     let w = EthWalletWrapper::new(&pkh, &NetworkEnvironment::Dev).unwrap();

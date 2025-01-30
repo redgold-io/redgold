@@ -9,12 +9,13 @@ use num_bigint::{BigInt, Sign};
 use num_traits::{FromPrimitive, ToPrimitive};
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, CurrencyId, ErrorInfo, ExternalTransactionId, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use std::str::FromStr;
 use std::time::Duration;
-use tracing::info;
+use tracing::{error, info};
+use redgold_keys::address_support::AddressSupport;
 
 pub struct EthHistoricalClient {
     pub client: Client,
@@ -138,7 +139,7 @@ impl EthHistoricalClient {
 
     pub fn parse_address(value: &String) -> RgResult<structs::Address> {
         let addr: Address = value.parse().error_info("address parse failure")?;
-        Ok(structs::Address::from_eth(value))
+        Ok(structs::Address::from_eth_direct(value))
     }
 
     // Workaround for dealing with u64's etc, drop from e18 precision to e8 precision
@@ -239,7 +240,7 @@ impl EthHistoricalClient {
             //     if to_address == to.to_string() {
                     if let Some(c) = t.contract_address {
                         let addr = c.to_string();
-                        let addr = structs::Address::from_eth(&addr);
+                        let addr = structs::Address::from_eth_direct(&addr);
                         res.push(addr);
                     }
                 // }
@@ -254,8 +255,8 @@ impl EthHistoricalClient {
         start_block: Option<u64>
     ) -> RgResult<Vec<ExternalTimedTransaction>> {
 
-        let address = address.render_string()?;
-        let addr = address.parse().error_info("address parse failure")?;
+        let query_address_string = address.render_string()?;
+        let addr = query_address_string.clone().parse().error_info("address parse failure")?;
 
         let tx_params = if let Some(s) = start_block {
             Some(TxListParams::new(s, 1e16 as u64, 0, 0, Sort::Asc))
@@ -269,13 +270,62 @@ impl EthHistoricalClient {
 
         let mut res: Vec<ExternalTimedTransaction> = vec![];
         for t in txs.iter() {
-            let txid = hex::encode(t.hash.0);
+            let tx_id = hex::encode(t.hash.0);
             let to_opt = t.to.map(|h| h.to_string());
             let timestamp = t.time_stamp.parse::<u64>().ok().map(|t| t * 1000);
             let block_num = t.block_number.as_number().map(|b| b.as_limbs()[0].clone());
             let value_str = t.value.to_string();
-            // t.token_decimal
-            let amount = Self::translate_value(&value_str)?;
+            let decimals = t.token_decimal.clone();
+            let id = t.contract_address.to_string();
+            let contract_addr = structs::Address::from_eth_external_exact(&id);
+            let currency_id = CurrencyId::from_erc20(&contract_addr);
+            let currency_amount = CurrencyAmount::from_eth_network_bigint_string_currency_id_decimals(
+                value_str.clone(), currency_id.clone(), Some(decimals.clone()));
+            let amount_i64 = currency_amount.to_1e8();
+            let from = t.from.to_string();
+
+            let other_address = if from == query_address_string {
+                to_opt.clone().unwrap_or("".to_string())
+            } else {
+                from.clone()
+            };
+
+            let incoming = from != query_address_string;
+
+            let gas = BigInt::from_str(&*t.gas_used.to_string()).error_info("BigInt parse failure on gas used")?;
+            let gas_price = BigInt::from_str(&*t.gas_price.map(|g| g.to_string()).unwrap_or("0".to_string()))
+                .error_info("BigInt parse failure on gas price")?;
+            let fee = CurrencyAmount::from_eth_bigint(gas * gas_price);
+            if fee.is_zero() {
+                error!("Fee is zero for tx: {}", tx_id);
+            }
+
+            let to_dest = if let Some(t) = to_opt.clone() {
+                let a = t.parse_ethereum_address()?;
+                vec![(a, currency_amount.clone())]
+            } else {
+                vec![]
+            };
+            let ett = ExternalTimedTransaction {
+                tx_id,
+                timestamp,
+                other_address: other_address.clone(),
+                other_output_addresses: vec![],
+                amount: amount_i64 as u64,
+                bigint_amount: Some(value_str.clone()),
+                incoming,
+                currency: SupportedCurrency::Ethereum,
+                block_number: block_num,
+                price_usd: None,
+                fee: Some(fee),
+                self_address: Some(query_address_string.clone()),
+                currency_id: Some(currency_id),
+                currency_amount: Some(currency_amount.clone()),
+                from: from.parse_ethereum_address()?,
+                to: to_dest,
+                other: Some(other_address.parse_ethereum_address()?),
+            };
+            res.push(ett);
         }
         /*
 
@@ -403,9 +453,9 @@ impl EthHistoricalClient {
                     self_address,
                     currency_id: Some(SupportedCurrency::Ethereum.into()),
                     currency_amount: Some(amount_t.clone()),
-                    from: structs::Address::from_eth_external(&from),
-                    to: vec![(structs::Address::from_eth_external(&to), amount_t)],
-                    other: Some(structs::Address::from_eth_external(&other_address)),
+                    from: structs::Address::from_eth_external_exact(&from),
+                    to: vec![(structs::Address::from_eth_external_exact(&to), amount_t)],
+                    other: Some(structs::Address::from_eth_external_exact(&other_address)),
                 });
             }
         }

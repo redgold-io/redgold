@@ -743,12 +743,12 @@ async fn debug_send() {
 
     let eth = EthWalletWrapper::new(&dev_secret, &NetworkEnvironment::Dev).expect("works");
 
-    let a = structs::Address::from_eth(&dest.to_string());
+    let a = structs::Address::from_eth_direct(&dest.to_string());
     let amt = CurrencyAmount::stake_test_amount_typed();
 
     assert!(PartyEvents::meets_minimum_stake_amount(&amt));
     // eth.send_tx_typed(&a, &amt).await.expect("works");
-    let destination = Address::from_eth(dest);
+    let destination = Address::from_eth_direct(dest);
     let from = dev_kp.public_key().to_ethereum_address_typed().expect("");
     let tx = eth.create_transaction_typed_inner(
         &from,

@@ -149,9 +149,9 @@ impl EthereumWsProvider {
             self_address: Some(self_address),
             currency_id: Some(SupportedCurrency::Ethereum.into()),
             currency_amount: Some(amount.clone()),
-            from: structs::Address::from_eth_external(&from),
-            to: vec![(structs::Address::from_eth_external(&to), amount)],
-            other: Some(structs::Address::from_eth_external(&other_address)),
+            from: structs::Address::from_eth_external_exact(&from),
+            to: vec![(structs::Address::from_eth_external_exact(&to), amount)],
+            other: Some(structs::Address::from_eth_external_exact(&other_address)),
         })
     }
 }
