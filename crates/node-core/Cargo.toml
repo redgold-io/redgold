@@ -22,3 +22,4 @@ redgold-common = {workspace = true}
 tokio = {workspace = true}
 hex = {workspace = true}
 serde = { workspace = true}
+tracing = { workspace = true}

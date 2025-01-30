@@ -24,11 +24,11 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, SafeOption};
 use tokio::sync::Mutex;
 use tracing::{error, info};
-
-
+use redgold_gui::add;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgTopLevelSubcommand;
 use redgold_schema::config_data::ConfigData;
+use redgold_schema::observability::errors::Loggable;
 use redgold_schema::party::all_parties::AllParties;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
@@ -176,8 +176,10 @@ async fn main_dbg(node_config: Box<NodeConfig>) {
         .flat_map(|x| x.party_key.as_ref())
         .flat_map(|x| x.to_ethereum_address().ok())
         .collect_vec();
-    let addrs = WriteOneReadAll::new(addrs);
-    relay.eth_daq.daq.subscribed_address_filter = addrs.clone();
+    info!("Set active parties subscribe ethDAQ filter to: {:?}", addrs);
+    for addr in addrs {
+        relay.eth_daq.add_address_and_backfill_historical(addr.clone()).await.log_error();
+    }
     // TODO: Match on node_config external network resources impl
     // TODO: Tokio select better?
     let join_handles = if node_config.debug_id().is_none() {

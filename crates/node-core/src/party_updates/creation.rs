@@ -1,6 +1,7 @@
 use redgold_schema::parties::PartyMetadata;
 use redgold_schema::RgResult;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::structs::{Address, CurrencyAmount, SupportedCurrency};
@@ -45,9 +46,27 @@ pub async fn check_formations<E: ExternalNetworkResources>(
             // New party instance required:
             let fee = estimated_fee_min_balance_contract_multisig_establish(cur);
             let address = self_hot_addresses.iter().find(|a| a.currency() == cur);
+            let mut can_form = !SupportedCurrency::multisig_contract_fees().contains(&cur);
             if let (Some(f), Some(a)) = (fee, address) {
                 if let Ok(b) = ext.get_live_balance(a).await.log_error() {
-
+                    if b >= f {
+                        // Create new party instance
+                        can_form = true;
+                    } else {
+                        error!("Insufficient balance {} for party formation fee: {} {}", b.to_fractional(), f.to_fractional(), a.render_string().unwrap());
+                    }
+                }
+            }
+            if can_form {
+                match cur {
+                    SupportedCurrency::Redgold => {}
+                    SupportedCurrency::Bitcoin => {}
+                    SupportedCurrency::Ethereum => {}
+                    SupportedCurrency::Solana => {}
+                    SupportedCurrency::Monero => {}
+                    _ => {
+                        error!("Unsupported currency for party formation: {:?}", cur);
+                    }
                 }
             }
         }
