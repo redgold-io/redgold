@@ -17,9 +17,12 @@ redgold-schema = { workspace = true}
 redgold-data = { workspace = true}
 redgold-keys = { workspace = true}
 redgold-executor = { workspace = true}
+redgold-common-no-wasm = { workspace = true}
 redgold-rpc-integ = { workspace = true}
 redgold-common = {workspace = true}
 tokio = {workspace = true}
 hex = {workspace = true}
 serde = { workspace = true}
 tracing = { workspace = true}
+async-trait = {  workspace = true }
+flume = {  workspace = true }

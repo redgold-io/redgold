@@ -38,7 +38,7 @@ impl SolanaNetwork {
         let (stdout, stderr) = self.cmd(init, remainder).await?;
         println!("propose send stdout: {}", stdout);
         println!("propose send stderr: {}", stderr);
-        let (tx_idx) = Self::extract_multisig_send_stdout_tx_idx(stdout.clone())
+        let tx_idx = Self::extract_multisig_send_stdout_tx_idx(stdout.clone())
             .with_detail("stdout", stdout)
             .with_detail("stderr", stderr)?;
 

@@ -10,7 +10,7 @@ use bdk::miniscript::psbt::PsbtExt;
 use bdk::{FeeRate, SignOptions};
 use itertools::Itertools;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment};
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, PublicKey};
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -25,10 +25,9 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         Ok(address.to_string())
     }
 
-    pub fn get_address_from_descriptor(&self) -> RgResult<structs::Address> {
-
-        let addr = Default::default();
-        Ok(addr)
+    pub fn get_descriptor_address_typed(&self) -> RgResult<structs::Address> {
+        let res = structs::Address::from_bitcoin_external(&self.get_descriptor_address()?);
+        Ok(res)
     }
 
     pub fn create_multisig_transaction(
@@ -90,9 +89,9 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         psbt.inputs.iter().all(|input| input.final_script_sig.is_some() || input.final_script_witness.is_some())
     }
 
-    pub fn multisig_descriptor_create(pk_hex: String, peers: Vec<structs::PublicKey>, threshold: i64) -> RgResult<String> {
+    pub fn multisig_descriptor_create(self_public: &structs::PublicKey, peers: &Vec<structs::PublicKey>, threshold: i64) -> RgResult<String> {
         let mut keys = vec![];
-        keys.push(pk_hex);
+        keys.push(self_public.to_hex_direct_ecdsa()?);
         for pk in peers.iter() {
             keys.push(pk.to_hex_direct_ecdsa()?);
         }

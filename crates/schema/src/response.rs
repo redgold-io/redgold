@@ -55,7 +55,7 @@ impl Response {
         Ok(())
     }
 
-    pub fn with_error_info(&self) -> Result<&Self, ErrorInfo> {
+    pub fn with_error_info(self) -> Result<Self, ErrorInfo> {
         let res = self.response_metadata.safe_get()?;
         if let Some(e) = &res.error_info {
             return Err(e.clone());

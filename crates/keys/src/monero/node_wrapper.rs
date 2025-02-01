@@ -1,14 +1,15 @@
+use std::path::PathBuf;
 use crate::monero::rpc_core::MoneroRpcWrapper;
 use crate::monero::rpc_multisig::{ExchangeMultisigKeysResult, MakeMultisigResult};
 use crate::word_pass_support::WordsPassNodeConfig;
-use redgold_common_no_wasm::ssh_like::{SSHOrCommandLike, SSHProcessInvoke};
+use redgold_common_no_wasm::ssh_like::{LocalSSHLike, SSHOrCommandLike, SSHProcessInvoke};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, MultipartyIdentifier, RoomId, Weighting};
-use redgold_schema::util::lang_util::{AnyPrinter, WithMaxLengthString};
-use redgold_schema::{RgResult, SafeOption};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, MultipartyIdentifier, RoomId, SupportedCurrency, Weighting};
+use redgold_schema::util::lang_util::{AnyPrinter};
+use redgold_schema::{RgResult, SafeOption, ShortString};
 use serde::{Deserialize, Serialize};
 
 /// This is the main interface the internal node process uses to interact with the Monero network.
@@ -26,7 +27,16 @@ pub struct MoneroNodeRpcInterfaceWrapper<S: SSHOrCommandLike> {
     pub cmd: S,
     pub wallet_dir: String,
     pub allow_deletes: bool,
-    pub create_states: Vec<MoneroWalletMultisigRpcState>
+    pub create_states: Vec<MoneroWalletMultisigRpcState>,
+    pub history: Vec<StateHistoryItem>,
+}
+
+#[derive(Clone)]
+pub struct StateHistoryItem {
+    pub input_state: MoneroWalletMultisigRpcState,
+    pub output_state: MoneroWalletMultisigRpcState,
+    pub input_peer_strings: Option<Vec<String>>,
+    pub input_threshold: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -78,12 +88,22 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
             .filter(|s| !s.is_empty())
             .next()
     }
+
+    pub fn from_config_local(
+        nc: &NodeConfig,
+        wallet_dir: impl Into<String>,
+        allow_deletes: Option<bool>,
+    ) -> Option<RgResult<MoneroNodeRpcInterfaceWrapper<LocalSSHLike>>> {
+        let local_ssh_like = LocalSSHLike::new(None);
+        MoneroNodeRpcInterfaceWrapper::<LocalSSHLike>::from_config(nc, local_ssh_like, wallet_dir, allow_deletes)
+    }
+
     pub fn from_config(
         nc: &NodeConfig,
         cmd: S,
         wallet_dir: impl Into<String>,
         allow_deletes: Option<bool>,
-    ) -> Option<RgResult<Self>> {
+    ) -> Option<RgResult<MoneroNodeRpcInterfaceWrapper<S>>> {
         let allow_deletes = allow_deletes.unwrap_or(false);
         let wallet_dir = wallet_dir.into();
         // daemon
@@ -95,7 +115,7 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
             |daemon_result|
                 wallet_opt.map(|wallet_result|
                     wallet_result.and_then(|wallet| daemon_result.map(|daemon|
-                        Self {
+                        MoneroNodeRpcInterfaceWrapper::<S> {
                             wallet_rpc: wallet,
                             daemon_rpc: daemon,
                             state: MoneroWalletMultisigRpcState::Unknown,
@@ -104,6 +124,7 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
                             wallet_dir,
                             allow_deletes,
                             create_states: vec![],
+                            history: vec![],
                         }))
                     )
         )
@@ -117,6 +138,19 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         Some("multisig".to_string())
     }
 
+
+    pub async fn restore_from_history(&mut self, h: Vec<StateHistoryItem>, wallet_filename: &String) -> RgResult<()> {
+        self.prepare_wallet_fnm_and_set_multisig(wallet_filename).await?;
+        let mut m = self.wallet_rpc.get_multisig()?;
+        let is_ms = m.is_multisig().await?;
+        if is_ms.multisig {
+            return "Wallet is already multisig, did not reset properly".to_error();
+        }
+        for item in h.iter() {
+            self.multisig_create_next(item.input_peer_strings.clone(), item.input_threshold.clone(), wallet_filename).await?;
+        }
+        Ok(())
+    }
 
     /*
     The correct sequence for multisig wallet setup would now be:
@@ -134,6 +168,27 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
     submit_multisig() to broadcast it
      */
     pub async fn start_multisig_creation(&mut self, wallet_filename: &String) -> RgResult<String> {
+        self.prepare_wallet_fnm_and_set_multisig(wallet_filename).await?;
+
+        let mut m = self.wallet_rpc.get_multisig()?;
+        let is_ms = m.is_multisig().await?;
+        println!("Is multisig: {:?}", is_ms);
+        let prepare_result = if is_ms.multisig {
+            let ms_info = m.export_multisig_info().await?;
+            println!("Exported multisig info: {:?}", ms_info);
+            return "Wallet is already multisig".to_error();
+        } else {
+            m.prepare_multisig().await?
+        };
+        self.state = MoneroWalletMultisigRpcState::Prepared(prepare_result.clone());
+
+        // let ret = rpc.multisig_create_next(Some(peer_strs.clone()), Some(2), &mpi).await.unwrap();
+        println!("Created wallet for peer {:?}", prepare_result.clone());
+
+        Ok(prepare_result)
+    }
+
+    async fn prepare_wallet_fnm_and_set_multisig(&mut self, wallet_filename: &String) -> Result<(), ErrorInfo> {
         let p = self.wallet_dir.clone();
         self.wallet_rpc.close_wallet().await.log_error().ok();
         if self.allow_deletes {
@@ -155,32 +210,26 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         self.cmd.execute(format!("export filename={}; expect ~/wallet.exp", f), None).await?.print();
         println!("Worked!");
         self.wallet_rpc.open_wallet_filename(wallet_filename.clone()).await?;
-
-        let mut m = self.wallet_rpc.get_multisig()?;
-        let is_ms = m.is_multisig().await?;
-        println!("Is multisig: {:?}", is_ms);
-        let prepare_result = if is_ms.multisig {
-            let ms_info = m.export_multisig_info().await?;
-            println!("Exported multisig info: {:?}", ms_info);
-            return "Wallet is already multisig".to_error();
-        } else {
-            m.prepare_multisig().await?
-        };
-        self.state = MoneroWalletMultisigRpcState::Prepared(prepare_result.clone());
-
-        // let ret = rpc.multisig_create_next(Some(peer_strs.clone()), Some(2), &mpi).await.unwrap();
-        println!("Created wallet for peer {:?}", prepare_result.clone());
-
-        Ok(prepare_result)
+        Ok(())
     }
-    pub async fn multisig_create_next(&mut self, peer_strings: Option<Vec<String>>, threshold: Option<i64>, id: &MultipartyIdentifier) -> RgResult<MoneroWalletMultisigRpcState> {
 
-        let msig_id = Self::id_to_filename(id);
+    pub async fn multisig_create_next(
+        &mut self,
+        peer_strings: Option<Vec<String>>,
+        threshold: Option<i64>,
+        wallet_filename: &String
+    ) -> RgResult<MoneroWalletMultisigRpcState> {
 
+        let mut history_item = StateHistoryItem {
+            input_state: self.state.clone(),
+            output_state: MoneroWalletMultisigRpcState::Unknown,
+            input_peer_strings: peer_strings.clone(),
+            input_threshold: threshold.clone(),
+        };
         match self.state.clone() {
             MoneroWalletMultisigRpcState::Unknown => {
                 println!("starting");
-                self.start_multisig_creation(&msig_id).await?;
+                self.start_multisig_creation(&wallet_filename).await?;
                 println!("Finished preparing")
             }
             MoneroWalletMultisigRpcState::Prepared(_) => {
@@ -209,11 +258,14 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
             }
         }
         self.create_states.push(self.state.clone());
+        history_item.output_state = self.state.clone();
+        self.history.push(history_item);
         Ok(self.state.clone())
     }
 
     fn id_to_filename(id: &MultipartyIdentifier) -> String {
-        format!("{}_{}", Self::multisig_filename_prefix().unwrap(), id.proto_serialize_hex().last_n(12))
+        let string = id.proto_serialize_hex().last_n(12).unwrap();
+        format!("{}_{}", Self::multisig_filename_prefix().unwrap(), string)
     }
 
     pub async fn multisig_send(
@@ -248,7 +300,7 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
 }
 
 
-#[ignore]
+// #[ignore]
 #[tokio::test]
 async fn local_three_node() {
 
@@ -284,11 +336,24 @@ async fn local_three_node() {
     let mut rpc_vecs = vec![one_rpc.clone(), two_rpc.clone(), three_rpc.clone()];
     let mut peer_strs = vec![];
 
+    let fnm = mpi.proto_serialize_hex().first_n(12).unwrap();
+
+    let mut loop_vec = vec![];
     loop {
         let mut new_peer_strs = vec![];
         let mut last_ret = MoneroWalletMultisigRpcState::Unknown;
+        let mut i = 0;
         for rpc in rpc_vecs.iter_mut() {
-            let ret = rpc.multisig_create_next(Some(peer_strs.clone()), Some(2), &mpi).await.unwrap();
+            let ret = rpc.multisig_create_next(
+                Some(peer_strs.clone()),
+                Some(2),
+                &fnm
+            ).await.unwrap();
+
+            if i == 0 {
+                loop_vec.push(ret.clone());
+            }
+            i += 1;
             println!("DONE wallet for peer {:?}", ret);
             ret.multisig_info_string().map(|ss| new_peer_strs.push(ss));
             if let Some(a) = ret.multisig_address_str() {
@@ -307,6 +372,16 @@ async fn local_three_node() {
     for r in rpc_vecs.iter_mut() {
         println!("Multisig address: {:?}", r.any_multisig_addr_creation());
     }
+
+    let history = rpc_vecs[0].history.clone();
+
+    let mut one_rpc_replicated = MoneroNodeRpcInterfaceWrapper::from_config(
+        &one, s.clone(), "/disk/monerotw2", Some(true)
+    ).unwrap().unwrap();
+
+    one_rpc_replicated.restore_from_history(history, &"test_filename_differenet".to_string()).await.unwrap();
+
+    println!("Restored wallet address {}", one_rpc_replicated.any_multisig_addr_creation().unwrap());
 
     println!("Done");
 

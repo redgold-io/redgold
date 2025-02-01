@@ -1071,7 +1071,10 @@ message Request {
   PortOpenRequest port_open_request = 40;
   GuiInitRequest gui_init_request = 41;
   MultipartyCheckReadyRequest multiparty_check_ready_request = 42;
+  GetSolanaAddress get_solana_address = 43;
 }
+
+message GetSolanaAddress {}
 
 message MultipartyCheckReadyRequest {
   PublicKey party_key = 1;
@@ -1136,6 +1139,7 @@ message Response {
   KeepAliveResponse keep_alive_response = 29;
   PortOpenResponse port_open_response = 30;
   optional bool multiparty_check_ready_response = 31;
+  Address get_solana_address_response = 32;
 }
 
 message KeepAliveResponse {

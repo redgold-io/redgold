@@ -7,6 +7,13 @@ http:
       tls:
         certResolver: default
       service: redgold-io-www
+    post:
+      entryPoints:
+        - web-secure
+      rule: Host(`post.redgold.io`)
+      tls:
+        certResolver: default
+      service: post
     blog-redgold-io:
       entryPoints:
         - web-secure
@@ -85,3 +92,7 @@ http:
       loadBalancer:
         servers:
           - url: http://100.84.231.7:8050
+    post:
+      loadBalancer:
+        servers:
+          - url: http://100.90.221.125:5020

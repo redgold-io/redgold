@@ -179,8 +179,8 @@ impl SingleKeyBitcoinWallet<Tree> {
         let doing_multisig = opt_private_key_hex.is_some() && peer_multisig_pks.is_some() && threshold.is_some();
         let descr = if doing_multisig {
             Self::multisig_descriptor_create(
-                hex,
-                peer_multisig_pks.unwrap(),
+                &public_key,
+                &peer_multisig_pks.unwrap(),
                 threshold.unwrap(),
             )?
         } else {

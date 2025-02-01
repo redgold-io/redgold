@@ -2,6 +2,7 @@
 mod debug_fs_test;
 mod safe_testing;
 pub mod party_updates;
+pub mod services;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

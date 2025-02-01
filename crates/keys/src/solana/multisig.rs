@@ -87,23 +87,17 @@ Parameters
     pub async fn establish_multisig_party(&self, party_addrs_incl_self: Vec<Address>, threshold: i64
     ) -> RgResult<String> {
 
+        let mut addrs = party_addrs_incl_self
+            .iter().map(|a| a.render_string()).collect::<RgResult<Vec<String>>>()?;
+        addrs.sort();
         counter!("redgold_multisig_solana_establish").increment(1);
-
         let init = "multisig-create";
-        // multisig_create --keypair /path/to/keypair.json
-        // --members "Member1PubKey,Permission1" "Member2PubKey,Permission2" --threshold 2
         let remainder = format!(
             "--members '{}' \
             --threshold {}",
-            party_addrs_incl_self.iter()
-                .flat_map(|a| a.render_string().ok())
-                // .map(|a| format!("\"{},7\"", a))
+            addrs
+                .into_iter()
                 .map(|a| format!("{},7", a))
-                // .map(|a| MemberPermission {
-                //     address: a.clone(),
-                //     permissions: 7,
-                // })
-                // .collect::<Vec<MemberPermission>>().json_or(),
                 .collect::<Vec<String>>().join(" "),
             threshold
         );
@@ -126,7 +120,7 @@ Parameters
     pub fn extract_multisig_send_stdout_txhash(stdout: String) -> RgResult<(String, i64)> {
         let split = stdout.split("Transaction confirmed: ").collect_vec();
         let beginning = split.get(0).cloned().ok_msg("Missing before confirmed")?;
-        let mut config_split = beginning.split("Transaction Index:").collect_vec();
+        let config_split = beginning.split("Transaction Index:").collect_vec();
         let tx_idx = config_split.get(1).cloned().ok_msg("Transaction index not found")?;
         let vault_split = tx_idx.split("Vault Index:").collect_vec();
         let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?
@@ -143,7 +137,7 @@ Parameters
     pub fn extract_multisig_send_stdout_tx_idx(stdout: String) -> RgResult<i64> {
         let split = stdout.split("Transaction confirmed: ").collect_vec();
         let beginning = split.get(0).cloned().ok_msg("Missing before confirmed")?;
-        let mut config_split = beginning.split("Transaction Index:").collect_vec();
+        let config_split = beginning.split("Transaction Index:").collect_vec();
         let tx_idx = config_split.get(1).cloned().ok_msg("Transaction index not found")?;
         let vault_split = tx_idx.split("Vault Index:").collect_vec();
         let tx_idx = vault_split.get(0).cloned().ok_msg("Transaction index not found")?

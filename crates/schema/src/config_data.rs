@@ -99,6 +99,7 @@ pub struct RpcUrl {
     pub authentication: Option<String>,
     pub file_path: Option<String>,
     pub ws_only: Option<bool>,
+    pub ssh_host: Option<String>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]
