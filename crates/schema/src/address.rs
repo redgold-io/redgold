@@ -166,21 +166,22 @@ impl Address {
         Ok(addr)
     }
 
-    pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
-        Self::from_byte_calculate(&pk.vec())
-    }
-
     pub fn from_byte_calculate(vec: &Vec<u8>) -> Result<Address, ErrorInfo> {
         Self::from_bytes(Self::hash(&vec))
     }
 
+
+    pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
+        Self::from_byte_calculate(&pk.vec())
+    }
+
     pub fn from_multiple_public_keys(pks: &Vec<structs::PublicKey>) -> Result<Address, ErrorInfo> {
         let mut pks = pks.iter().map(|p| p.vec()).collect_vec();
-        pks.sort_by(|a, b| a.vec().cmp(&b.vec())); // Sort by raw bytes
+        pks.sort_by(|a, b| a.cmp(&b)); // Sort by raw bytes
 
         let mut bytes = Vec::new();
         for pk in pks {
-            bytes.extend(pk.vec());
+            bytes.extend(pk);
         }
         Self::from_byte_calculate(&bytes)
     }

@@ -9,6 +9,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, ErrorInfo, Hash, NetworkEnvironment, Proof, SupportedCurrency};
 use redgold_schema::{error_info, error_message, from_hex, signature_data, structs, RgResult, SafeOption};
 use std::collections::HashMap;
+use log::info;
 
 pub trait ProofSupport {
     fn verify(&self, hash: &Hash) -> RgResult<()>;
@@ -28,7 +29,7 @@ pub trait ProofSupport {
 impl ProofSupport for Proof {
     fn verify(&self, hash: &Hash) -> RgResult<()> {
         self.verify_inner(&hash)
-            .with_detail("hash", &hash.json_or())
+            .with_detail("hash", &hash.hex())
             .with_detail("public_key", &self.public_key.json_or())
             .with_detail("signature", &self.signature.json_or())
     }
@@ -63,8 +64,15 @@ impl ProofSupport for Proof {
         address: &Address,
     ) -> Result<(), ErrorInfo> {
         let all_addresses = Self::proofs_to_addresses(proofs)?;
+        // for a in all_addresses.iter() {
+        //     info!("Proofs_all_addresses {}", a.render_string().unwrap_or("".to_string()));
+        // }
         let proof_1 = proofs.get(0).expect("exists").clone();
+        // info!("current verifying address: {}", address.render_string().unwrap_or("".to_string()));
+        // info!("current verifying address hex: {}", address.hex());
+        // info!("current verifying hash hex: {}", hash.hex());
         if !all_addresses.contains(address) {
+
             return Err(error_message(
                 structs::ErrorCode::AddressPublicKeyProofMismatch,
                 "address mismatch in Proof::verify_proofs",
@@ -77,15 +85,16 @@ impl ProofSupport for Proof {
                                  .collect_vec()
                                  .json_or()
                 )
-                .with_detail("address", &address.json_or())
+                .with_detail("address_on_prior_output", &address.json_or())
                 .with_detail("address_hex_len", address.hex().len().to_string())
                 .with_detail("proof_1", &proof_1.json_or())
+                .with_detail("proof_vec_length", &proofs.len().to_string())
             ;
         }
         for proof in proofs {
             proof.verify(hash)?
         }
-        return Ok(());
+        Ok(())
     }
 
     fn public_key(&self) -> RgResult<structs::PublicKey> {

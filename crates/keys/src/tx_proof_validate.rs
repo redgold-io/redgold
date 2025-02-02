@@ -1,10 +1,12 @@
 use crate::transaction_support::InputSupport;
 use itertools::Itertools;
+use log::info;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::structs::{AddressType, NetworkEnvironment, SupportedCurrency, Transaction};
 use redgold_schema::tx_schema_validate::SchemaValidationSupport;
 use redgold_schema::{error_info, RgResult, SafeOption};
+use redgold_schema::proto_serde::ProtoSerde;
 
 pub trait TransactionProofValidator {
     fn validate_signatures(&self) -> RgResult<()>;
@@ -25,6 +27,11 @@ impl TransactionProofValidator for Transaction {
 fn validate_inner(tx: &Transaction) -> RgResult<()> {
     let hash = tx.signable_hash();
     for input in &tx.inputs {
+        // info!("Validate inner new func address: {}", input.address().unwrap().render_string().unwrap());
+        // info!("Validate inner proof length: {}", input.proof.len());
+        let pk = input.proof.get(0).cloned().unwrap().public_key.unwrap();
+        // info!("Validate inner proof 0 pk: {}", pk.hex());
+        // info!("Validate inner proof 0 pk address direct: {}", pk.address().unwrap().render_string().unwrap());
         if let Ok(a) = input.address() {
             input.verify_proof(&a, &hash).add(input.json_or()).add(hash.hex())?;
         }

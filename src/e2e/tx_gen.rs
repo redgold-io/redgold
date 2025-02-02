@@ -2,7 +2,7 @@
 use crate::schema::structs::{Transaction, UtxoEntry};
 use itertools::Itertools;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
-use redgold_keys::transaction_support::TransactionSupport;
+use redgold_keys::transaction_support::{InputSupport, TransactionSupport};
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_keys::KeyPair;
 use redgold_keys::TestConstants;
@@ -15,6 +15,7 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use std::hash::Hash;
 use tracing::info;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 
 #[derive(Clone, PartialEq)]
 pub struct SpendableUTXO {
@@ -96,11 +97,22 @@ impl TransactionGenerator {
         let kp = self.next_kp();
         let kp2 = kp.clone();
 
+
+        let entry = prev.utxo_entry;
+        let prev_addr_typed = entry.address().unwrap();
+        let prev_addr = prev_addr_typed.render_string().unwrap();
+        // info!("all_value_transaction prev_addr {prev_addr}");
+        let prev_kp = prev.key_pair.address_typed().render_string().unwrap();
+        // info!("all_value_transaction prev_kp {prev_kp}");
         let tx = TransactionBuilder::new(&self.node_config)
-            .with_utxo(&prev.utxo_entry.clone()).expect("Failed to build transaction")
-            .with_output(&kp.address_typed(), &CurrencyAmount::from(prev.utxo_entry.amount() as i64))
+            .with_utxo(&entry.clone()).expect("Failed to build transaction")
+            .with_output(&kp.address_typed(), &CurrencyAmount::from(entry.amount() as i64))
             .build().expect("Failed to build transaction")
             .sign(&prev.key_pair).expect("signed");
+        for i in tx.inputs.iter() {
+            // info!("Verifying proof with tx hash {}", tx.hash_hex());
+            i.verify_proof(prev_addr_typed, &tx.signable_hash()).expect("works");
+        }
         TransactionWithKey {
             transaction: tx,
             key_pairs: vec![kp2],
