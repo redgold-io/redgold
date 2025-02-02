@@ -9,12 +9,12 @@ services:
     network_mode: "host"
     environment:
       - RPC_LOGIN=${RPC_LOGIN:-username:password}
-      - DAEMON_HOST=${DAEMON_HOST:-http://127.0.0.1:28089}
+      - DAEMON_HOST=${DAEMON_HOST:-http://127.0.0.1:18089}
     command:
-      - --daemon-address=${DAEMON_HOST:-http://127.0.0.1:28089}
+      - --daemon-address=${DAEMON_HOST:-http://127.0.0.1:18089}
       - --rpc-bind-port=${WALLET_RPC_PORT:-28088}
       - --wallet-dir=/home/monero/wallets
       - --rpc-login=${RPC_LOGIN:-username:password}
       - --trusted-daemon
-      - --disable-rpc-ban
-      - --testnet
+#      - --disable-rpc-ban
+#      - --testnet

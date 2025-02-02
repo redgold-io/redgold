@@ -1,5 +1,5 @@
 #!/usr/bin/expect -f
-spawn ./monero-wallet-cli --testnet --wallet-file $env(filename) --daemon-address http://127.0.0.1:28089
+spawn monero-wallet-cli --wallet-file $env(filename) --daemon-address http://127.0.0.1:28089
 expect "Wallet password:"
 send "\r"
 expect "\[wallet*\]:"

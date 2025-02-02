@@ -13,6 +13,8 @@ use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, ShortString};
 use std::num::NonZeroU64;
 use std::str::FromStr;
 use std::time::Duration;
+use ethers::abi::Word;
+use crate::util::mnemonic_support::MnemonicSupport;
 
 #[derive(Clone, Debug)]
 pub struct MoneroRpcWrapper {
@@ -20,7 +22,7 @@ pub struct MoneroRpcWrapper {
     pub network: NetworkEnvironment,
     pub client: RpcClient,
     pub auth_str: Option<String>,
-    pub nc: NodeConfig
+    pub words: WordsPass
 }
 
 impl MoneroRpcWrapper {
@@ -35,7 +37,7 @@ impl MoneroRpcWrapper {
             .next();
         if let Some(rpc) = url {
             let network = cfg.network.clone();
-            let ret = MoneroRpcWrapper::new(rpc.url.clone(), network, None, cfg);
+            let ret = MoneroRpcWrapper::new(rpc.url.clone(), network, None, &cfg.words());
             Some(ret)
         } else {
             None
@@ -43,7 +45,7 @@ impl MoneroRpcWrapper {
     }
 
     pub fn self_address(&self) -> RgResult<redgold_schema::structs::Address> {
-        self.nc.words().monero_external_address(&self.nc.network)
+        self.words.monero_external_address(&self.network)
     }
 
     pub fn self_address_str(&self) -> RgResult<String> {
@@ -51,11 +53,11 @@ impl MoneroRpcWrapper {
     }
 
     pub fn view_key(&self) -> RgResult<String> {
-        self.nc.words().derive_monero_keys().map(|kp| kp.view.to_string())
+        self.words.derive_monero_keys().map(|kp| kp.view.to_string())
     }
 
     pub fn spend_key(&self) -> RgResult<String> {
-        self.nc.words().derive_monero_keys().map(|kp| kp.spend.to_string())
+        self.words.derive_monero_keys().map(|kp| kp.spend.to_string())
     }
 
 
@@ -66,14 +68,14 @@ impl MoneroRpcWrapper {
         if let Some(rpc) = url {
             let network = cfg.network.clone();
             // println!("rpc authed: {:?}", rpc);
-            let ret = MoneroRpcWrapper::new(rpc.url.clone(), network, rpc.authentication.clone(), cfg);
+            let ret = MoneroRpcWrapper::new(rpc.url.clone(), network, rpc.authentication.clone(), &cfg.words());
             Some(ret)
         } else {
             None
         }
     }
 
-    pub fn new(url: String, network: NetworkEnvironment, auth_str: Option<String>, nc: &NodeConfig) -> RgResult<Self> {
+    pub fn new(url: String, network: NetworkEnvironment, auth_str: Option<String>, words: &WordsPass) -> RgResult<Self> {
         let builder = RpcClientBuilder::new();
         let authed = if let Some(a) = auth_str.as_ref() {
             let user = a.split(":").next().unwrap_or("").to_string();
@@ -92,7 +94,7 @@ impl MoneroRpcWrapper {
             network,
             client,
             auth_str,
-            nc: nc.clone(),
+            words: words.clone()
         };
         // println!("new rpc: {:?}", ret);
         Ok(ret)
@@ -177,6 +179,7 @@ impl MoneroRpcWrapper {
             .map_err(|e| ErrorInfo::new(format!("Failed to register key {}", e.to_string())))?;
         // println!("response: {:?}", response);
         // .error_info("Failed to register Monero key")?;
+        println!("Wallet creation response {:?}", response);
         Ok(response)
     }
 
@@ -292,7 +295,7 @@ async fn check_rpc_wallet() {
         "http://server:28088".to_string(),
         NetworkEnvironment::Dev,
         Some("username:password".to_string()),
-        &NodeConfig::default()
+        &w
     ).expect("rpc"); // Some(kp.spend.to_string())
     let pfx = Some("randomtest".to_string());
     // let tx = rpc.register_dupe_ok(kp.view.to_string(), a.to_string(), None, None, pfx.clone()).await.expect("works");
@@ -337,7 +340,7 @@ async fn check_rpc_wallet() {
 #[ignore]
 #[tokio::test]
 async fn check_rpc_manually() {
-    let rpc = MoneroRpcWrapper::new("http://server:28089".to_string(), NetworkEnvironment::Dev, None, &NodeConfig::default()).expect("rpc");
+    let rpc = MoneroRpcWrapper::new("http://server:28089".to_string(), NetworkEnvironment::Dev, None, &WordsPass::test_words()).expect("rpc");
     let h = monero::Hash::from_str("f501643c8c2d16a7f1abff1cee4cc7b894edcc274b4117bf0b7ca98f3e4fc451")
     // let h = monero::Hash::from_str("eb266f3acb2e66c7510b3e2ee48d50ba3c2deba1a8647c36ff1bc72b72b2cbce")
         .unwrap();

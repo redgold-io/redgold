@@ -24,7 +24,8 @@ RUN echo \
 RUN apt update
 RUN apt install -y docker-ce-cli
 
-
+RUN wget https://redgold-public.s3.us-west-1.amazonaws.com/monero-wallet-cli -O /usr/bin/monero-wallet-cli
+RUN chmod +x /usr/bin/monero-wallet-cli
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
@@ -36,5 +37,5 @@ RUN chmod +x /redgold
 ENV REDGOLD_DOCKER=true
 ENV RUST_MIN_STACK=20485760
 
-EXPOSE 16179 16180 16181 16182 16183
+EXPOSE 16179 16180 16181 16182 16183 16184 16185 16186
 ENTRYPOINT ["/redgold"]

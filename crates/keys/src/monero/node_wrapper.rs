@@ -7,10 +7,13 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, MultipartyIdentifier, RoomId, SupportedCurrency, Weighting};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, MultipartyIdentifier, NetworkEnvironment, RoomId, SupportedCurrency, Weighting};
 use redgold_schema::util::lang_util::{AnyPrinter};
 use redgold_schema::{RgResult, SafeOption, ShortString};
 use serde::{Deserialize, Serialize};
+use crate::monero::to_address::ToMoneroAddress;
+use crate::TestConstants;
+use crate::util::mnemonic_support::MnemonicSupport;
 
 /// This is the main interface the internal node process uses to interact with the Monero network.
 /// It should primarily and only be used for multi-sig operations
@@ -23,9 +26,9 @@ pub struct MoneroNodeRpcInterfaceWrapper<S: SSHOrCommandLike> {
     pub wallet_rpc: MoneroRpcWrapper,
     pub daemon_rpc: MoneroRpcWrapper,
     pub state : MoneroWalletMultisigRpcState,
-    pub nc: NodeConfig,
     pub cmd: S,
     pub wallet_dir: String,
+    pub wallet_exp_path: String,
     pub allow_deletes: bool,
     pub create_states: Vec<MoneroWalletMultisigRpcState>,
     pub history: Vec<StateHistoryItem>,
@@ -92,16 +95,18 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
     pub fn from_config_local(
         nc: &NodeConfig,
         wallet_dir: impl Into<String>,
+        expect_path: impl Into<String>,
         allow_deletes: Option<bool>,
     ) -> Option<RgResult<MoneroNodeRpcInterfaceWrapper<LocalSSHLike>>> {
         let local_ssh_like = LocalSSHLike::new(None);
-        MoneroNodeRpcInterfaceWrapper::<LocalSSHLike>::from_config(nc, local_ssh_like, wallet_dir, allow_deletes)
+        MoneroNodeRpcInterfaceWrapper::<LocalSSHLike>::from_config(nc, local_ssh_like, wallet_dir, expect_path, allow_deletes)
     }
 
     pub fn from_config(
         nc: &NodeConfig,
         cmd: S,
         wallet_dir: impl Into<String>,
+        exp_path: impl Into<String>,
         allow_deletes: Option<bool>,
     ) -> Option<RgResult<MoneroNodeRpcInterfaceWrapper<S>>> {
         let allow_deletes = allow_deletes.unwrap_or(false);
@@ -110,7 +115,18 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         let daemon_opt = MoneroRpcWrapper::from_config(nc);
         // wallet
         let wallet_opt = MoneroRpcWrapper::authed_from_config(nc);
+        let exp = exp_path.into();
+        Self::from_daemons(cmd, allow_deletes, wallet_dir, exp, daemon_opt, wallet_opt)
+    }
 
+    fn from_daemons(
+        cmd: S,
+        allow_deletes: bool,
+        wallet_dir: String,
+        wallet_exp_path: String,
+        daemon_opt: Option<RgResult<MoneroRpcWrapper>>,
+        wallet_opt: Option<RgResult<MoneroRpcWrapper>>
+    ) -> Option<Result<MoneroNodeRpcInterfaceWrapper<S>, ErrorInfo>> {
         daemon_opt.and_then(
             |daemon_result|
                 wallet_opt.map(|wallet_result|
@@ -119,14 +135,14 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
                             wallet_rpc: wallet,
                             daemon_rpc: daemon,
                             state: MoneroWalletMultisigRpcState::Unknown,
-                            nc: nc.clone(),
                             cmd,
                             wallet_dir,
+                            wallet_exp_path,
                             allow_deletes,
                             create_states: vec![],
                             history: vec![],
                         }))
-                    )
+                )
         )
     }
 
@@ -207,7 +223,7 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         let f = f.replace("\n", "");
         println!("filename found on remote: {:?}", f.clone());
         // ret.multisig_info_string().map(|ss| peer_strs.push(ss));
-        self.cmd.execute(format!("export filename={}; expect ~/wallet.exp", f), None).await?.print();
+        self.cmd.execute(format!("export filename={}; expect {}", f, self.wallet_exp_path.clone()), None).await?.print();
         println!("Worked!");
         self.wallet_rpc.open_wallet_filename(wallet_filename.clone()).await?;
         Ok(())
@@ -300,89 +316,126 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
 }
 
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 async fn local_three_node() {
+
+    let ci = TestConstants::test_words_pass().unwrap();
+    let ci1 = ci.hash_derive_words("1").unwrap();
+    let ci2 = ci.hash_derive_words("2").unwrap();
+    let path = TestConstants::dev_ci_kp_path();
+    let pkh = ci.private_at(path.clone()).unwrap();
+    let pkh1 = ci1.private_at(path.clone()).unwrap();
+    let pkh2 = ci2.private_at(path.clone()).unwrap();
+    let net = NetworkEnvironment::Main;
+    // let addr = ci.public_at(path.clone()).unwrap().to_monero_address_from_monero_public_format(&net).unwrap();
+    // let addr1 = ci1.public_at(path.clone()).unwrap().to_monero_address_from_monero_public_format(&net).unwrap();
+    // let addr2 = ci2.public_at(path.clone()).unwrap().to_monero_address_from_monero_public_format(&net).unwrap();
 
     // temp testing only
     let mut s = SSHProcessInvoke::new("server", None);
     let user = std::env::var("USER").unwrap();
     s.user = Some(user.clone());
 
-    let one = NodeConfig::from_test_id(&(1 as u16));
-    let two = NodeConfig::from_test_id(&(2 as u16));
-    let three = NodeConfig::from_test_id(&(3 as u16));
+    let mut one = NodeConfig::from_test_id(&(1 as u16));
+    let mut two = NodeConfig::from_test_id(&(2 as u16));
+    let mut three = NodeConfig::from_test_id(&(3 as u16));
+    let mut four = NodeConfig::from_test_id(&(4 as u16));
+
+    one.set_words(ci.words.clone());
+    two.set_words(ci1.words.clone());
+    three.set_words(ci2.words.clone());
+    // let words_25 = std::env::var("MONERO_HOT_SEED").unwrap();
+    // let words_24 = words_25.split(" ").take(24).collect::<Vec<&str>>().join(" ");
+    four.set_words(ci.words.clone());
+    // four.set_words(words_24);
+    one.network = NetworkEnvironment::Main;
+    two.network = NetworkEnvironment::Main;
+    three.network = NetworkEnvironment::Main;
+    four.network = NetworkEnvironment::Main;
 
     let mut one_rpc = MoneroNodeRpcInterfaceWrapper::from_config(
-        &one, s.clone(), "/disk/monerotw2", Some(true)
+        &one, s.clone(), "/disk/monerotw2","~/wallet.exp".to_string(), Some(true),
     ).unwrap().unwrap();
     let mut two_rpc = MoneroNodeRpcInterfaceWrapper::from_config(
-        &two, s.clone(), "/disk/monerotw3", Some(true)).unwrap().unwrap();
+        &two, s.clone(), "/disk/monerotw3","~/wallet.exp".to_string(), Some(true)).unwrap().unwrap();
     let mut three_rpc = MoneroNodeRpcInterfaceWrapper::from_config(
-        &three, s.clone(), "/disk/monerotw4", Some(true)).unwrap().unwrap();
-
-    let pub_keys = vec![
-        one.public_key.clone(),
-        two.public_key.clone(),
-        three.public_key.clone()
-    ];
-    let mut mpi = MultipartyIdentifier::default();
-    mpi.party_keys = pub_keys.clone();
-    mpi.threshold = Some(Weighting::from_int_basis(2, 3));
-    mpi.room_id = Some(RoomId{
-        uuid: Some("test".to_string()),
-    });
-
-    let mut rpc_vecs = vec![one_rpc.clone(), two_rpc.clone(), three_rpc.clone()];
-    let mut peer_strs = vec![];
-
-    let fnm = mpi.proto_serialize_hex().first_n(12).unwrap();
-
-    let mut loop_vec = vec![];
-    loop {
-        let mut new_peer_strs = vec![];
-        let mut last_ret = MoneroWalletMultisigRpcState::Unknown;
-        let mut i = 0;
-        for rpc in rpc_vecs.iter_mut() {
-            let ret = rpc.multisig_create_next(
-                Some(peer_strs.clone()),
-                Some(2),
-                &fnm
-            ).await.unwrap();
-
-            if i == 0 {
-                loop_vec.push(ret.clone());
-            }
-            i += 1;
-            println!("DONE wallet for peer {:?}", ret);
-            ret.multisig_info_string().map(|ss| new_peer_strs.push(ss));
-            if let Some(a) = ret.multisig_address_str() {
-                if !a.is_empty() {
-                    println!("Multisig address: {}", a);
-                }
-            }
-           last_ret = ret;
-        }
-        peer_strs = new_peer_strs.clone();
-        if let MoneroWalletMultisigRpcState::MultisigReadyToSend = last_ret {
-            break;
-        }
-    }
-
-    for r in rpc_vecs.iter_mut() {
-        println!("Multisig address: {:?}", r.any_multisig_addr_creation());
-    }
-
-    let history = rpc_vecs[0].history.clone();
-
-    let mut one_rpc_replicated = MoneroNodeRpcInterfaceWrapper::from_config(
-        &one, s.clone(), "/disk/monerotw2", Some(true)
-    ).unwrap().unwrap();
-
-    one_rpc_replicated.restore_from_history(history, &"test_filename_differenet".to_string()).await.unwrap();
-
-    println!("Restored wallet address {}", one_rpc_replicated.any_multisig_addr_creation().unwrap());
-
-    println!("Done");
+        &three, s.clone(), "/disk/monerotw4","~/wallet.exp".to_string(), Some(true)).unwrap().unwrap();
+    let mut four_rpc = MoneroNodeRpcInterfaceWrapper::from_config(
+        &four, s.clone(), "/disk/monerow","~/wallet.exp".to_string(), Some(true)).unwrap().unwrap();
+    //
+    // let pub_keys = vec![
+    //     one.public_key.clone(),
+    //     two.public_key.clone(),
+    //     three.public_key.clone()
+    // ];
+    // let mut mpi = MultipartyIdentifier::default();
+    // mpi.party_keys = pub_keys.clone();
+    // mpi.threshold = Some(Weighting::from_int_basis(2, 3));
+    // mpi.room_id = Some(RoomId{
+    //     uuid: Some("test".to_string()),
+    // });
+    //
+    // let mut rpc_vecs = vec![one_rpc.clone(), two_rpc.clone(), three_rpc.clone()];
+    // let mut peer_strs = vec![];
+    //
+    // let fnm = mpi.proto_serialize_hex().first_n(12).unwrap();
+    //
+    // let mut loop_vec = vec![];
+    // loop {
+    //     let mut new_peer_strs = vec![];
+    //     let mut last_ret = MoneroWalletMultisigRpcState::Unknown;
+    //     let mut i = 0;
+    //     for rpc in rpc_vecs.iter_mut() {
+    //         let ret = rpc.multisig_create_next(
+    //             Some(peer_strs.clone()),
+    //             Some(2),
+    //             &fnm
+    //         ).await.unwrap();
+    //
+    //         if i == 0 {
+    //             loop_vec.push(ret.clone());
+    //         }
+    //         i += 1;
+    //         println!("DONE wallet for peer {:?}", ret);
+    //         ret.multisig_info_string().map(|ss| new_peer_strs.push(ss));
+    //         if let Some(a) = ret.multisig_address_str() {
+    //             if !a.is_empty() {
+    //                 println!("Multisig address: {}", a);
+    //             }
+    //         }
+    //        last_ret = ret;
+    //     }
+    //     peer_strs = new_peer_strs.clone();
+    //     if let MoneroWalletMultisigRpcState::MultisigReadyToSend = last_ret {
+    //         break;
+    //     }
+    // }
+    //
+    // for r in rpc_vecs.iter_mut() {
+    //     println!("Multisig address: {:?}", r.any_multisig_addr_creation());
+    // }
+    //
+    // let history = rpc_vecs[0].history.clone();
+    //
+    // let mut one_rpc_replicated = MoneroNodeRpcInterfaceWrapper::from_config(
+    //     &one, s.clone(), "/disk/monerotw2","~/wallet.exp".to_string(), Some(true)
+    // ).unwrap().unwrap();
+    //
+    // one_rpc_replicated.restore_from_history(history, &"test_filename_differenet".to_string()).await.unwrap();
+    //
+    // println!("Restored wallet address {}", one_rpc_replicated.any_multisig_addr_creation().unwrap());
+    //
+    // println!("Done");
+    //
+    four_rpc.wallet_rpc.register_self_activate_ok(Some("hot".to_string())).await.unwrap();
+    // four_rpc.wallet_rpc.sync_info()
+    let sync_info = four_rpc.wallet_rpc.refresh_sync_check_wallet().await.expect("refresh");
+    println!("sync info done: {:?}", sync_info);
+    // let refresh = rpc.client.clone().wallet().refresh(None).await.expect("refresh");
+    let b = four_rpc.wallet_rpc.get_balance().await.unwrap();
+    println!("Balance: {:?}", b);
+    println!("Balance: {:?}", b.to_fractional());
+    println!("Address {}", four_rpc.wallet_rpc.self_address_str().unwrap());
 
 }

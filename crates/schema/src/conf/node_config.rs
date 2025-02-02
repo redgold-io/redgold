@@ -166,6 +166,12 @@ impl NodeConfig {
 
 impl NodeConfig {
 
+    pub fn set_words(&mut self, words: String) {
+        let mut data = (*self.config_data).clone();
+        data.node.get_or_insert(Default::default()).words = Some(words);
+        self.config_data = Arc::new(data);
+    }
+
     pub fn mnemonic_words(&self) -> String {
         self.config_data.node.as_ref().and_then(|n| n.words.clone()).expect("mnemonic words")
     }

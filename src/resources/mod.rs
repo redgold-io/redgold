@@ -10,6 +10,7 @@ pub struct Resources {
     file_lookup: HashMap<String, Vec<u8>>,
     pub redgold_docker_compose: String,
     pub monero_rpc_wallet_compose: String,
+    pub monero_rpc_wallet_expect: String,
 }
 
 // Change this to list all files? For table scripts?
@@ -28,6 +29,7 @@ impl Default for Resources {
             file_lookup: HashMap::new(),
             redgold_docker_compose: include_str!("infra/redgold-only.yml").into(),
             monero_rpc_wallet_compose: include_str!("infra/monero/monero-rpc-wallet-template.yaml").into(),
+            monero_rpc_wallet_expect: include_str!("infra/monero/wallet.exp").into(),
         }
     }
 }

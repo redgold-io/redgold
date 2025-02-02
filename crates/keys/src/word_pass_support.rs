@@ -52,26 +52,28 @@ impl WordsPassNodeConfig for NodeConfig {
         let node_data = config_data.node.get_or_insert(Default::default());
         // This is only for manual testing
         let mut ext = config_data.external.get_or_insert(Default::default());
+
+        let password = std::env::var("MONERO_TEST_RPC_PASSWORD").expect("MONERO_TEST_RPC_PASSWORD");
         ext.rpcs = Some(vec![
             RpcUrl{
             currency: SupportedCurrency::Monero,
             url: format!("http://server:28{}88", seed_id),
-            network: NetworkEnvironment::Debug.to_std_string(),
+            network: NetworkEnvironment::Main.to_std_string(),
             wallet_only: Some(true),
-            authentication: Some("username:password".to_string()),
+            authentication: Some(format!("username:{}", password)),
                 file_path: None,
                 ws_only: None,
                 ssh_host: None,
             },
             RpcUrl{
             currency: SupportedCurrency::Monero,
-            url: "http://server:28089".to_string(),
-            network: NetworkEnvironment::Debug.to_std_string(),
+            url: "http://server:18089".to_string(),
+            network: NetworkEnvironment::Main.to_std_string(),
             wallet_only: Some(false),
             authentication: None,
                 file_path: None,
                 ws_only: None,
-                ssh_host: None,
+                ssh_host: Some("server".to_string()),
             },
         ]);
 

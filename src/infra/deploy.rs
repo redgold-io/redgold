@@ -402,18 +402,20 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
         compose_str = compose_str.replace("${CONTAINER_NAME:-monerotw}", container_name.as_str());
         let data_dir_path = format!("{}/monerow", path);
         compose_str = compose_str.replace("${WALLET_DATA_DIR:-/disk/monerotw}", data_dir_path.as_str());
-        let yaml_path = format!("{}/monero-wallet.yml", path);
         compose_str = compose_str.replace("${RPC_LOGIN:-username:password}", wallet_rpc.authentication.clone().unwrap().as_str());
         compose_str = compose_str.replace("${DAEMON_HOST:-http://127.0.0.1:28089}", daemon_rpc.url.as_str());
         compose_str = compose_str.replace("${WALLET_RPC_PORT:-28088}", wallet_rpc.url.as_str().split(":").last().unwrap());
         compose_str = compose_str.replace("wallet-dir=/home/monero/wallets", wallet_rpc.url.as_str().split(":").last().unwrap());
 
-        if network.is_main() {
-            compose_str = compose_str.replace("      - --testnet", "");
-            compose_str = compose_str.replace("      - --disable-rpc-ban", "");
-        }
+        // if network.is_main() {
+        //     compose_str = compose_str.replace("      - --testnet", "");
+        //     compose_str = compose_str.replace("      - --disable-rpc-ban", "");
+        // }
+        let yaml_path = format!("{}/monero-wallet.yml", path);
+        let wallet_exp_path = format!("{}/wallet.exp", path);
 
         ssh.copy_p(compose_str, yaml_path, p).await?;
+        ssh.copy_p(r.monero_rpc_wallet_expect, wallet_exp_path, p).await?;
 
     }
 
