@@ -44,7 +44,7 @@ def msg(
         tooldefs = default_tooldefs()
     try:
         message = client.messages.create(
-            model=model_settings.get('model', "claude-3-5-sonnet-20240620"),
+            model=model_settings.get('model', "claude-3-5-sonnet-20241022"),
             max_tokens=model_settings.get('max_tokens', 8192),
             temperature=model_settings.get('temperature', 0),
             system=system,
@@ -70,19 +70,26 @@ def main():
     }
     # Create a timestamp for the filename
     day_timestamp = datetime.now().strftime("%Y/%m/%d")
-
-    prefix = "./ignore-data/claude/"
+    print(f"Current timestamp: {day_timestamp}")  # Debug the actual date
+    
+    prefix = "./ignore-data/claude"
     day_prefix = f"{prefix}/{day_timestamp}"
+    print(f"Checking directory: {day_prefix}")
     dir_exists = os.path.isdir(day_prefix)
+    print(f"Directory exists: {dir_exists}")
     highest_int_folder_name = -1
 
     if dir_exists:
+        print(f"Listing contents of: {day_prefix}")
+        contents = os.listdir(day_prefix)
+        print(f"Directory contents: {contents}")
         count = [int(x) for x in os.listdir(day_prefix)]
         if count:
             highest_int_folder_name = max(count)
 
     timestamp = f"{day_prefix}/{highest_int_folder_name + 1}"
     active_dir = timestamp
+    print(f"Creating directory: {active_dir}")
     os.makedirs(active_dir, exist_ok=True)
 
     starting_prompt = "The issue you've been assigned to work on is listed below: \n\n"
@@ -95,14 +102,22 @@ def main():
     msg_count = 0
     last_loop = False
     while msg_count < max_runs:
-        # with open(f"{active_dir}/history.json", "w") as f:
-        #     f.write(json.dumps(history))
+        abs_path = os.path.abspath(active_dir)
+        print(f"Absolute path: {abs_path}")
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"File exists: {os.path.exists(f'{active_dir}/text.txt')}")
+        print(f"Directory exists: {os.path.exists(active_dir)}")
+        try:
+            print(f"Directory contents: {os.listdir(active_dir)}")
+            print(f"Directory permissions: {oct(os.stat(active_dir).st_mode)}")
+        except Exception as e:
+            print(f"Error checking directory: {e}")
+            
         with open(f"{active_dir}/text.txt", "w") as f:
             for h in history:
                 h: MessageParam = h
                 f.write(f"ROLE: {h['role']}\n")
                 f.write(f"CONTENT: \n{h['content']}\n")
-                #     f.write(json.dumps(history))
         with open(f"{active_dir}/assistant_messages.txt", "w") as f:
             for h in history:
                 if h['role'] == "assistant":

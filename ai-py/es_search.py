@@ -7,7 +7,7 @@ from repo_reader import AccumFileData
 
 def search(query_text):
     # Connect to Elasticsearch
-    es = Elasticsearch(["http://localhost:9201"])
+    es = Elasticsearch(["http://localhost:9202"])
 
 
     # Check Elasticsearch connection and version
