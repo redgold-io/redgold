@@ -172,6 +172,12 @@ impl NodeConfig {
         self.config_data = Arc::new(data);
     }
 
+    pub fn set_rpcs(&mut self, rpcs: Vec<RpcUrl>) {
+        let mut data = (*self.config_data).clone();
+        data.external.get_or_insert(Default::default()).rpcs = Some(rpcs);
+        self.config_data = Arc::new(data);
+    }
+
     pub fn mnemonic_words(&self) -> String {
         self.config_data.node.as_ref().and_then(|n| n.words.clone()).expect("mnemonic words")
     }

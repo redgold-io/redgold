@@ -11,6 +11,7 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransa
 use redgold_schema::util::lang_util::{AnyPrinter};
 use redgold_schema::{RgResult, SafeOption, ShortString};
 use serde::{Deserialize, Serialize};
+use redgold_schema::config_data::RpcUrl;
 use crate::monero::to_address::ToMoneroAddress;
 use crate::TestConstants;
 use crate::util::mnemonic_support::MnemonicSupport;
@@ -316,6 +317,33 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
 }
 
 
+pub fn rpcs(seed_id: i64) -> Vec<RpcUrl> {
+    let password = std::env::var("MONERO_TEST_RPC_PASSWORD").unwrap();
+    vec![
+        RpcUrl{
+            currency: SupportedCurrency::Monero,
+            url: format!("http://server:28{}88", seed_id),
+            network: NetworkEnvironment::Main.to_std_string(),
+            wallet_only: Some(true),
+            authentication: Some(format!("username:{}", password)),
+            file_path: None,
+            ws_only: None,
+            ssh_host: None,
+        },
+        RpcUrl{
+            currency: SupportedCurrency::Monero,
+            url: "http://server:18089".to_string(),
+            network: NetworkEnvironment::Main.to_std_string(),
+            wallet_only: Some(false),
+            authentication: None,
+            file_path: None,
+            ws_only: None,
+            ssh_host: Some("server".to_string()),
+        },
+    ]
+
+}
+
 #[ignore]
 #[tokio::test]
 async fn local_three_node() {
@@ -353,6 +381,12 @@ async fn local_three_node() {
     two.network = NetworkEnvironment::Main;
     three.network = NetworkEnvironment::Main;
     four.network = NetworkEnvironment::Main;
+
+    one.set_rpcs(rpcs(1));
+    two.set_rpcs(rpcs(2));
+    three.set_rpcs(rpcs(3));
+    four.set_rpcs(rpcs(4));
+
 
     let mut one_rpc = MoneroNodeRpcInterfaceWrapper::from_config(
         &one, s.clone(), "/disk/monerotw2","~/wallet.exp".to_string(), Some(true),
