@@ -19,12 +19,12 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
-use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, Transaction, TrustRatingLabel};
+use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, SupportedCurrency, Transaction, TrustRatingLabel};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{structs, ErrorInfoContext, RgResult};
 use std::io::prelude::*;
 use std::sync::Arc;
-
+use eframe::egui::TextBuffer;
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_bitcoin_standard_path;
 use crate::resources::Resources;
@@ -350,6 +350,73 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
             let toml_config = toml::to_string(&config2).error_info("toml config")?;
             ssh.copy_p(toml_config, format!("{}/config.toml", path), p).await?;
         }
+    }
+
+    // monero wallet rpc
+    let override_rpc = dpl_tuple.as_ref().and_then(|d| d.2.rpc_overrides.as_ref())
+        .and_then(|r| r.iter()
+            .filter(|x| {
+                x.currency == SupportedCurrency::Monero &&
+                    x.network == network.to_std_string() &&
+                    x.wallet_only == Some(true) &&
+                    x.ws_only == Some(false) &&
+                    x.authentication.is_some()
+            }).next()).cloned();
+
+    let default_rpc = nc.rpc_url(SupportedCurrency::Monero)
+        .iter()
+        .filter(|x| {
+            x.currency == SupportedCurrency::Monero &&
+                x.network == network.to_std_string() &&
+                x.wallet_only == Some(true) &&
+                x.ws_only == Some(false) &&
+                x.authentication.is_some()
+        }).next().cloned();
+
+    let wallet_rpc = override_rpc.or(default_rpc);
+
+    // monero wallet rpc
+    let override_rpc = dpl_tuple.as_ref().and_then(|d| d.2.rpc_overrides.as_ref())
+        .and_then(|r| r.iter()
+            .filter(|x| {
+                x.currency == SupportedCurrency::Monero &&
+                    x.network == network.to_std_string() &&
+                    x.ws_only == Some(false) &&
+                    x.wallet_only == Some(false)
+            }).next()).cloned();
+
+    let default_rpc = nc.rpc_url(SupportedCurrency::Monero)
+        .iter()
+        .filter(|x| {
+            x.currency == SupportedCurrency::Monero &&
+                x.network == network.to_std_string() &&
+                x.ws_only == Some(false) &&
+                x.wallet_only == Some(false)
+        }).next().cloned();
+
+    let daemon_rpc = override_rpc.or(default_rpc);
+
+    if let (Some(wallet_rpc), Some(daemon_rpc)) = (wallet_rpc, daemon_rpc) {
+        let mut compose_str = r.monero_rpc_wallet_compose;
+        let container_name = format!("monerow-{}", network.to_std_string());
+        compose_str = compose_str.replace("${CONTAINER_NAME:-monerotw}", container_name.as_str());
+        let data_dir_path = format!("{}/monerow", path);
+        compose_str = compose_str.replace("${WALLET_DATA_DIR:-/disk/monerotw}", data_dir_path.as_str());
+        compose_str = compose_str.replace("${RPC_LOGIN:-username:password}", wallet_rpc.authentication.clone().unwrap().as_str());
+        compose_str = compose_str.replace("${DAEMON_HOST:-http://127.0.0.1:28089}", daemon_rpc.url.as_str());
+        compose_str = compose_str.replace("${WALLET_RPC_PORT:-28088}", wallet_rpc.url.as_str().split(":").last().unwrap());
+        compose_str = compose_str.replace("wallet-dir=/home/monero/wallets", wallet_rpc.url.as_str().split(":").last().unwrap());
+
+        // if network.is_main() {
+        //     compose_str = compose_str.replace("      - --testnet", "");
+        //     compose_str = compose_str.replace("      - --disable-rpc-ban", "");
+        // }
+        let yaml_path = format!("{}/monero-wallet.yml", path);
+        let wallet_exp_path = format!("{}/wallet.exp", path);
+
+        ssh.copy_p(compose_str, yaml_path, p).await?;
+        ssh.copy_p(r.monero_rpc_wallet_expect, wallet_exp_path, p).await?;
+
     }
 
     Ok(())

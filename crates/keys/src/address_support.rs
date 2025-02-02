@@ -2,13 +2,14 @@ use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use bdk::database::MemoryDatabase;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::Address;
+use redgold_schema::structs::{Address, SupportedCurrency};
 use redgold_schema::{error_info, RgResult};
 
 pub trait AddressSupport {
     fn parse_address(&self) -> RgResult<Address>;
     fn parse_address_incl_raw(&self) -> RgResult<Address>;
     fn parse_ethereum_address(&self) -> RgResult<Address>;
+    fn parse_ethereum_address_external(&self) -> RgResult<Address>;
 }
 
 impl<T : Into<String> + Clone> AddressSupport for T {
@@ -41,6 +42,13 @@ impl<T : Into<String> + Clone> AddressSupport for T {
             return Err(error_info("Unable to parse address: ".to_string())).add(str_rep.clone());
         };
         Ok(result)
+    }
+
+    fn parse_ethereum_address_external(&self) -> RgResult<Address> {
+        self.parse_ethereum_address().map(|mut a| {
+            a.set_currency(SupportedCurrency::Ethereum);
+            a
+        })
     }
 }
 

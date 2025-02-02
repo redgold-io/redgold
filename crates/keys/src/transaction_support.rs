@@ -1,6 +1,7 @@
 use crate::proof_support::{ProofSupport, PublicKeySupport};
 use crate::KeyPair;
 use itertools::Itertools;
+use log::info;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
@@ -64,6 +65,8 @@ impl TransactionSupport for Transaction {
                 }
                 let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
                 if all_key_pair_addresses.contains(input_addr) {
+                    info!("Signing input address: {}", input_addr.render_string().unwrap_or("".to_string()));
+                    info!("Signing input hash {} with public key {}", hash.hex(), key_pair.public_key().hex());
                     let proof = Proof::from_keypair_hash(&hash, &key_pair);
                     i.proof.push(proof);
                     // signed = true;

@@ -1,8 +1,14 @@
 use async_trait::async_trait;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Response, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;
+use redgold_schema::keys::words_pass::WordsPass;
+
+#[async_trait]
+pub trait PeerBroadcast where Self: Sync {
+    async fn broadcast(&self, peers: &Vec<PublicKey>) -> Vec<RgResult<Response>>;
+}
 
 
 #[async_trait]
@@ -40,6 +46,20 @@ pub trait ExternalNetworkResources {
     async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId>;
 
     async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount>;
+
+    async fn btc_pubkeys_to_multisig_address(&self, pubkeys: &Vec<PublicKey>, thresh: i64) -> RgResult<Address>;
+    async fn create_multisig_party<B: PeerBroadcast>(
+        &self,
+        cur: &SupportedCurrency,
+        all_pks: &Vec<PublicKey>,
+        self_public_key: &PublicKey,
+        self_private_key_hex: &String,
+        network: &NetworkEnvironment,
+        words_pass: WordsPass,
+        threshold: i64,
+        peer_broadcast: &B,
+        peer_pks: &Vec<PublicKey>
+    ) -> RgResult<Address>;
 
 
 }

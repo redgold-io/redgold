@@ -5,11 +5,11 @@ use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 
 
 pub trait ToMoneroAddress {
-    fn to_monero_address(&self, net: &NetworkEnvironment) -> RgResult<structs::Address>;
+    fn to_monero_address_from_monero_public_format(&self, net: &NetworkEnvironment) -> RgResult<structs::Address>;
 }
 
 impl ToMoneroAddress for structs::PublicKey {
-    fn to_monero_address(&self, net: &NetworkEnvironment) -> RgResult<structs::Address> {
+    fn to_monero_address_from_monero_public_format(&self, net: &NetworkEnvironment) -> RgResult<structs::Address> {
         let spend = self.raw_bytes()?;
         let aux = self.aux_data.clone().ok_msg("Missing aux bytes")?.value;
         let public_spend = PublicKey::from_slice(&spend).error_info("Invalid spend key")?;

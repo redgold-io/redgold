@@ -353,15 +353,24 @@ where G: GuiDepends + Clone + Send + 'static {
 
     ui.horizontal(|ui| {
         editable_text_input_copy(ui, "Generate Offline Path", &mut state.generate_offline_path, 150.0);
+        editable_text_input_copy(ui, "Words", &mut state.generate_offline_words, 50.0);
+        editable_text_input_copy(ui, "Pass", &mut state.generate_offline_pass, 50.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
             let config1 = nc.clone();
             let option = servers.clone();
+            let string = state.generate_offline_words.clone();
+            let mut passoptstr = state.generate_offline_pass.clone();
+            let p = if passoptstr.is_empty() {
+                None
+            } else {
+                Some(passoptstr)
+            };
             tokio::spawn(deploy::offline_generate_keys_servers(
                 config1,
                 option,
                 PathBuf::from(state.generate_offline_path.clone()),
-                words.clone(),
-                passphrase.clone(),
+                string,
+                p,
             ));
         }
     });

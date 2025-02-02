@@ -251,6 +251,7 @@ impl SSHProcessInvoke {
 
 }
 
+#[derive(Clone)]
 pub struct LocalSSHLike {
     pub output_handler: Option<Sender<String>>
 }

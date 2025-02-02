@@ -6,6 +6,7 @@ RUN echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN cargo install squads-multisig-cli
 
+
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt install -y automake libtool libssl-dev \
  libxcb-xfixes0-dev libxcb1-dev libxcb-keysyms1-dev libpango1.0-dev libxcb-util0-dev \
@@ -16,7 +17,11 @@ RUN apt install -y automake libtool libssl-dev \
  sqlite3 libsqlite3-dev \
  nasm \
  ca-certificates \
- awscli
+ awscli wget
+
+
+RUN wget https://redgold-public.s3.us-west-1.amazonaws.com/monero-wallet-cli -O /usr/bin/monero-wallet-cli
+RUN chmod +x /usr/bin/monero-wallet-cli
 
 RUN update-ca-certificates
 

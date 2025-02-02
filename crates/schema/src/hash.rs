@@ -6,6 +6,16 @@ use crate::proto_serde::ProtoSerde;
 use sha3::{Digest, Sha3_256};
 
 
+pub trait ToHashed {
+    fn to_hashed(&self) -> Hash;
+}
+
+impl ToHashed for String {
+    fn to_hashed(&self) -> Hash {
+        Hash::from_string_calculate(&*self)
+    }
+}
+
 impl Hash {
 
     pub fn raw_bytes_hex(&self) -> RgResult<String> {

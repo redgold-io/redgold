@@ -2,9 +2,10 @@ anthropic
 simplematrixbotlib
 google-generativeai
 git+https://github.com/microsoft/monitors4codegen/archive/main.zip
-elasticsearch
-tree-sitter
-tree-sitter-rust
+elasticsearch==8.14.0
+tree-sitter==0.22.3
+tree-sitter-rust==0.21.2
 mypy-protobuf
 graphrag
 tiktoken
+numpy

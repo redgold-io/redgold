@@ -25,7 +25,7 @@ message PartyInstance {
     structs.Address address = 1;
     structs.Weighting threshold = 2;
     structs.PublicKey proposer = 3;
-    PartyInfo state = 4;
+    PartyState state = 4;
     optional int64 creation_time = 5;
     optional int64 last_update_time = 6;
     optional int64 expired_time = 7;
@@ -39,6 +39,7 @@ enum PartyState {
     PendingRemoval = 2;
     Inactive = 3;
     Starting = 4;
+    NotCreatedYet = 5;
 }
 
 message PartyInfo {

@@ -186,7 +186,7 @@ pub fn parse_mp_csv(contents: String) -> RgResult<Vec<PartyInfo>> {
     Ok(res)
 }
 
-// #[ignore]
+#[ignore]
 #[tokio::test]
 pub async fn debug_fix_server() {
 

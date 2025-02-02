@@ -1,3 +1,4 @@
+#[allow(deprecated)]
 use std::io::Cursor;
 
 use bdk::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};

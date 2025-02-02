@@ -24,6 +24,9 @@
         <a class="navbar-brand brand" href="https://grafana.redgold.io/d/pj3zzDu4z/redgold?orgId=1&from=now-30m&to=now">
           Grafana
         </a>
+        <a class="navbar-brand brand" href="https://blog.redgold.io">
+          Blog
+        </a>
         <div class="navbar-right-links">
           <a class="navbar-brand brand" href="https://dev.explorer.redgold.io">
             Dev

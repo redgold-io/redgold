@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use crate::structs::{Address, ErrorCode as RGError, ErrorInfo, Proof};
 
 use crate::proto_serde::ProtoSerde;
@@ -63,12 +64,9 @@ impl Proof {
     }
 
     pub fn multi_proofs_to_address(proofs: &Vec<Proof>) -> Result<Address, ErrorInfo> {
-        let mut addresses = Vec::new();
-        for proof in proofs {
-            addresses.extend(proof.public_key_proto_bytes()?);
-        }
-        let addr = Address::from_byte_calculate(&addresses)?;
-        return Ok(addr);
+        let pks = proofs.iter().flat_map(|p| p.public_key.clone()).collect_vec();
+        let addr = Address::from_multiple_public_keys(&pks)?;
+        Ok(addr)
     }
 
 

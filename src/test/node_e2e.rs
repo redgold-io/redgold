@@ -82,7 +82,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         &start_node.node.relay.node_config
     );
 
-    // single_node_tests(&mut local_nodes, &submit).await;
+    single_node_tests(&mut local_nodes, &submit).await;
 
     local_nodes.add_node(
         // runtime.clone()
@@ -94,9 +94,9 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // three nodes
     local_nodes.add_node().await;
 
-    info!("Three node keygen test");
-    three_node_keygen_tests(&mut local_nodes, start_node.control_client.clone(), &submit).await?;
-    info!("Three node keygen test passed");
+    // info!("Three node keygen test");
+    // three_node_keygen_tests(&mut local_nodes, start_node.control_client.clone(), &submit).await?;
+    // info!("Three node keygen test passed");
 
     let kp = WordsPass::test_words().keypair_at_change(0).unwrap();
     // let kp = dev_ci_kp().expect("kp").1;

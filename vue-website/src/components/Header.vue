@@ -12,6 +12,7 @@
           <a class="navbar-brand brand" href="https://dev.docs.redgold.io">Docs</a>
           <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">Discord</a>
           <a class="navbar-brand brand" href="https://github.com/redgold-io/redgold">GitHub</a>
+          <a class="navbar-brand brand" href="https://blog.redgold.io">Blog</a>
         </div>
       </div>
     </nav>

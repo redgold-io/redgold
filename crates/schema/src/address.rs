@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use crate::structs::{Address, AddressInfo, AddressType, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
 use crate::{bytes_data, error_info, from_hex, ErrorInfoContext, RgResult, SafeOption};
 use crate::structs;
@@ -110,7 +111,7 @@ impl Address {
 
     pub fn from_solana_external(address: &String) -> Address {
         let mut ret = Self::from_monero(address);
-        ret.currency = SupportedCurrency::Monero as i32;
+        ret.currency = SupportedCurrency::Solana as i32;
         ret
     }
 
@@ -165,12 +166,24 @@ impl Address {
         Ok(addr)
     }
 
+    pub fn from_byte_calculate(vec: &Vec<u8>) -> Result<Address, ErrorInfo> {
+        Self::from_bytes(Self::hash(&vec))
+    }
+
+
     pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
         Self::from_byte_calculate(&pk.vec())
     }
 
-    pub fn from_byte_calculate(vec: &Vec<u8>) -> Result<Address, ErrorInfo> {
-        Self::from_bytes(Self::hash(&vec))
+    pub fn from_multiple_public_keys(pks: &Vec<structs::PublicKey>) -> Result<Address, ErrorInfo> {
+        let mut pks = pks.iter().map(|p| p.vec()).collect_vec();
+        pks.sort_by(|a, b| a.cmp(&b)); // Sort by raw bytes
+
+        let mut bytes = Vec::new();
+        for pk in pks {
+            bytes.extend(pk);
+        }
+        Self::from_byte_calculate(&bytes)
     }
 
     pub fn with_checksum(bytes: Vec<u8>) -> Vec<u8> {

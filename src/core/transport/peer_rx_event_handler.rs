@@ -35,7 +35,8 @@ use crate::schema::structs::{Response, ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
-use redgold_keys::word_pass_support::NodeConfigKeyPair;
+use redgold_keys::solana::derive_solana::SolanaWordPassExt;
+use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::helpers::easy_json::json_or;
@@ -162,6 +163,10 @@ impl PeerRxEventHandler {
                     response.multiparty_check_ready_response = Some(true);
                 }
             }
+        }
+
+        if let Some(_) = &request.get_solana_address {
+            response.get_solana_address_response = Some(relay.node_config.words().solana_address()?);
         }
 
         if let Some(r) = &request.get_public_key_balance_request {
