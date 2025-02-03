@@ -106,9 +106,9 @@ impl LocalNodes {
     fn current_seed_id(&self) -> u16 {
         self.nodes.len() as u16
     }
-    fn seeds() -> Vec<Seed> {
+    pub fn seeds() -> Vec<Seed> {
         let mut seeds = vec![];
-        for idx in 0..3 {
+        for idx in 0..8 {
             let mut seed = NodeConfig::from_test_id(&idx).self_seed();
             seed.port_offset = Some(util::random_port() as u32);
             seeds.push(seed);

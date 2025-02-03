@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
+use futures::StreamExt;
 use itertools::Itertools;
 use log::info;
 use log::kv::Source;
@@ -14,7 +15,7 @@ use redgold_keys::transaction_support::TransactionSupport;
 use redgold_schema::{bytes_data, ErrorInfoContext, RgResult, SafeOption, structs};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
-use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
+use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PartyPurpose, Proof, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
 use crate::api::control_api::ControlClient;
 use crate::api::public_api::PublicClient;
 use crate::api::RgHttpClient;
@@ -27,6 +28,7 @@ use crate::node_config::NodeConfig;
 use crate::util;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
+use redgold_schema::seeds::seed;
 use redgold_schema::util::lang_util::AnyPrinter;
 use crate::core::transact::tx_builder_supports::{TransactionBuilder, TransactionBuilderSupport};
 use crate::infra::multiparty_backup::parse_mp_csv;
@@ -98,14 +100,19 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let path = std::env::var("REDGOLD_SECURE_PATH").expect("secure path");
     let path2 = format!("{path}/.rg/main/backups/1724045178");
-
+    let seeds = LocalNodes::seeds();
     for i in 0..8 {
         let mp_csv = format!("{path2}/{i}/multiparty.csv");
         let raw = tokio::fs::read_to_string(mp_csv).await.expect("read mp csv");
-        let result = parse_mp_csv(raw).ok();
-        for row in result.expect("parsed") {
-            info!("Row: {}", row.json_or());
-        }
+        let result = parse_mp_csv(raw).ok().unwrap();
+        info!("Total rows = {}", result.len());
+        let mut row = result.get(0).expect("row");
+        let init = row.initiate.as_mut().expect("initiate");
+        init.set_purpose(PartyPurpose::DebugPurpose);
+        let ident = init.identifier.as_mut().unwrap();
+
+        let party_keys = seeds.iter().map(|s| s.public_key.clone().unwrap()).collect_vec();
+        ident.party_keys =
     }
 
 
