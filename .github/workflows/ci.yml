@@ -222,6 +222,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
       refs/heads/dev
+      refs/heads/rel-25
       refs/heads/staging
       refs/heads/test
       refs/heads/main
@@ -243,6 +244,18 @@ jobs:
       - run: echo "${{ github.run_number }}" > src/resources/build_number
       - run: cargo build --release
       - run: cp ${{ env.BUILD_OUTPUT }} ./redgold_linux_ubuntu20
+
+      # AWS artifacts
+      - run: curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - run: unzip awscliv2.zip
+      - run: sudo ./aws/install --update
+      - run: aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS }}
+      - run: aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET }}
+
+      # AWS Docker image hash
+      - run: echo ${{ env.DOCKER_SHA256 }} > docker_sha256_checksum
+      - run: aws s3 cp redgold_linux_ubuntu20 s3://redgold-public/rel25ubuntu20"
+
       - uses: actions/upload-artifact@v3
         with:
           name: redgold_linux_ubuntu20
