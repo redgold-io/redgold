@@ -22,6 +22,7 @@ jobs:
         !contains('
           refs/heads/predev
           refs/heads/dev
+          refs/heads/rel-25
           refs/heads/staging
           refs/heads/test
           refs/heads/main
@@ -255,11 +256,11 @@ jobs:
       # AWS Docker image hash
       - run: echo ${{ env.DOCKER_SHA256 }} > docker_sha256_checksum
       - run: aws s3 cp redgold_linux_ubuntu20 s3://redgold-public/rel25ubuntu20"
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: redgold_linux_ubuntu20
-          path: ./redgold_linux_ubuntu20
+#
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: redgold_linux_ubuntu20
+#          path: ./redgold_linux_ubuntu20
   build-windows:
     if: ${{ github.event_name != 'pull_request_target' && contains('
       refs/heads/predev
