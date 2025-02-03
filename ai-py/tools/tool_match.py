@@ -33,7 +33,7 @@ def get_tool_responses(response) -> Iterable[ToolResultBlockParam]:
                     res = full_text_repo_search(block.input)
                     result['content'] = fmt_list(res)
                 elif n == "edit_file_replace_lines":
-                    edit_file(
+                    result['content'] = edit_file(
                         block.input['filename'],
                         block.input.get('starting_line'),
                         block.input.get('ending_line'),

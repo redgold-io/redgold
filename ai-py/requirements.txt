@@ -9,3 +9,8 @@ mypy-protobuf
 graphrag
 tiktoken
 numpy
+backoff
+sentence-transformers
+langsmith
+tenacity
+mcp

@@ -18,7 +18,8 @@ def file_exclusions():
         ".DS_Store", ".wasm",
         "graph_data.csv", "node-exporter-full_rev31.json",
         "api.json", "full_moon.csv", "models.rs", "grafana.ini",
-        "package-lock.json"
+        "package-lock.json",
+        "all_repo_contents.txt"
     ]
 
 def file_inclusions():

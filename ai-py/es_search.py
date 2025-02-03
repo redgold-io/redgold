@@ -1,13 +1,32 @@
+import backoff
 import numpy as np
 from elasticsearch import Elasticsearch
-from elasticsearch.helpers import bulk
+from elasticsearch.helpers import bulk, BulkIndexError
 
 from repo_reader import AccumFileData
 
 
+@backoff.on_exception(backoff.expo, Exception, max_tries=3)
+def bulk_index_with_retry(es, docs):
+    try:
+        success, failed = bulk(es, docs)
+        if failed:
+            print(f"Failed documents:")
+            for doc in failed:
+                print(f"Document ID: {doc.get('_id')}")
+                print(f"Error: {doc.get('error')}")
+        return success, failed
+    except BulkIndexError as e:
+        print(f"Bulk indexing error: {str(e)}")
+        print("Error details:")
+        for error in e.errors:
+            print(f"Document: {error}")
+        raise
+
+
 def search(query_text):
     # Connect to Elasticsearch
-    es = Elasticsearch(["http://localhost:9202"])
+    es = Elasticsearch(["http://server:9202"])
 
 
     # Check Elasticsearch connection and version
@@ -72,15 +91,17 @@ def search(query_text):
             }
         )
 
-    # Bulk index the documents
+    # Index the documents
+
     try:
-        success, failed = bulk(es, docs)
-        print(f"Indexed {success} documents successfully")
+        success, failed = bulk_index_with_retry(es, docs)
+        print(f"Indexed {success} documents")
         if failed:
             print(f"Failed to index {len(failed)} documents")
     except Exception as e:
-        print(f"Error during bulk indexing: {e}")
-        exit(1)
+        print(f"Fatal error during indexing: {e}")
+        return []
+
 
     # Force a refresh to ensure the documents are searchable
     es.indices.refresh(index=index_name)
