@@ -707,8 +707,6 @@ pub async fn offline_generate_keys_servers(
     Ok(())
 }
 
-#[asy]
-
 
 pub async fn default_deploy(
     deploy: &mut Deploy,
