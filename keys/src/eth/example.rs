@@ -6,7 +6,7 @@ use crate::{KeyPair, TestConstants};
 
 use crate::util::mnemonic_support::WordsPass;
 
-use alloy_chains::Chain;
+// use alloy_chains::Chain;
 use ethers::prelude::U256;
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::utils::Anvil;
@@ -38,105 +38,105 @@ fn eth_addr() -> String {
     "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string()
 }
 
-
-async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-
-    let key = std::env::var("ETHERSCAN_API_KEY").expect("api key");
-    let client = Client::new(Chain::sepolia(), key).expect("works");
-    // Or using environment variables
-    // let client = Client::new_from_env(Chain::mainnet())?;
-
-    let address = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".parse().expect("valid address");
-    let metadata = client.get_ether_balance_single(&address, None).await.expect("works");
-    // assert_eq!(metadata.items[0].contract_name, "DAO");
-    println!("balance: {}", metadata.balance);
-
-    let _txs = client.get_transactions(&address, None).await.expect("works");
-
-    let environment = NetworkEnvironment::Dev;
-    let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
-
-    let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
-    let txs = h.get_all_tx(&string_addr, None).await.expect("works");
-
-    println!("txs: {}", txs.json_or());
-
-    let tx_head = txs.get(0).expect("tx");
-    let _from = tx_head.other_address.clone();
-
-    let (dev_secret, _dev_kp) = dev_ci_kp().expect("works");
-
-    let _eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
-
-    let fee = "0.000108594791676".to_string();
-    let fee_value = EthHistoricalClient::translate_value(&fee.to_string()).expect("works") as u64;
-    let _amount = fee_value * 2;
-    // eth.create_transaction(&from, amount).await.expect("works");
-
-    Ok(())
-}
-
-// 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
-#[ignore]
-#[tokio::test]
-async fn main() {
-    foo().await.expect("works");
-
-    let _api_key = std::env::var("ETHERSCAN_API_KEY").expect("");
-
-    let testc = TestConstants::new();
-    // let _test_skhex = testc.key_pair().secret_key.to_hex();
-
-    let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
-
-    let bytes = hex::decode(dev_secret).expect("wtf");
-
-    let _eth = dev_kp.public_key().to_ethereum_address().expect("works").print();
-
-    let w = LocalWallet::from_bytes(&bytes).expect("works");
-    println!("Wallet btc: {}", w.address().to_string());
-
-    let anvil = Anvil::new().spawn();
-
-    let wallet: LocalWallet = anvil.keys()[0].clone().into();
-    let wallet2: LocalWallet = anvil.keys()[1].clone().into();
-
-    // connect to the network
-    let provider = Provider::<Http>::try_from(anvil.endpoint()).expect("works");
-
-
-    // connect the wallet to the provider
-    let wallet1 = wallet.with_chain_id(anvil.chain_id());
-    let client = SignerMiddleware::new(
-        provider, wallet1.clone()
-    );
-
-
-    let addr = wallet1.address();
-    let hexs = hex::encode(addr.0);
-    println!("Wallet 1 address: {}", hexs);
-
-    let balance = client.get_balance(wallet1.address(), None).await.expect("works");
-
-    println!("Wallet 1 balance: {}", balance);
-
-    // craft the transaction
-    let tx = TransactionRequest::new().to(wallet2.address()).value(10000);
-
-    // send it!
-    let pending_tx = client.send_transaction(tx, None).await.expect("works");
-
-    // get the mined tx
-    let receipt = pending_tx.await.expect("mined").expect("no error");
-    let tx = client.get_transaction(receipt.transaction_hash).await.expect("works");
-
-    println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
-    println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
-
-
-}
-// 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
+//
+// async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+//
+//     let key = std::env::var("ETHERSCAN_API_KEY").expect("api key");
+//     let client = Client::new(1u64, key).expect("works");
+//     // Or using environment variables
+//     // let client = Client::new_from_env(Chain::mainnet())?;
+//
+//     let address = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".parse().expect("valid address");
+//     let metadata = client.get_ether_balance_single(&address, None).await.expect("works");
+//     // assert_eq!(metadata.items[0].contract_name, "DAO");
+//     println!("balance: {}", metadata.balance);
+//
+//     let _txs = client.get_transactions(&address, None).await.expect("works");
+//
+//     let environment = NetworkEnvironment::Dev;
+//     let h = EthHistoricalClient::new(&environment).expect("works").expect("works");
+//
+//     let string_addr = "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string();
+//     let txs = h.get_all_tx(&string_addr, None).await.expect("works");
+//
+//     println!("txs: {}", txs.json_or());
+//
+//     let tx_head = txs.get(0).expect("tx");
+//     let _from = tx_head.other_address.clone();
+//
+//     let (dev_secret, _dev_kp) = dev_ci_kp().expect("works");
+//
+//     let _eth = EthWalletWrapper::new(&dev_secret, &environment).expect("works");
+//
+//     let fee = "0.000108594791676".to_string();
+//     let fee_value = EthHistoricalClient::translate_value(&fee.to_string()).expect("works") as u64;
+//     let _amount = fee_value * 2;
+//     // eth.create_transaction(&from, amount).await.expect("works");
+//
+//     Ok(())
+// }
+//
+// // 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
 // #[ignore]
+// #[tokio::test]
+// async fn main() {
+//     foo().await.expect("works");
+//
+//     let _api_key = std::env::var("ETHERSCAN_API_KEY").expect("");
+//
+//     let testc = TestConstants::new();
+//     // let _test_skhex = testc.key_pair().secret_key.to_hex();
+//
+//     let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
+//
+//     let bytes = hex::decode(dev_secret).expect("wtf");
+//
+//     let _eth = dev_kp.public_key().to_ethereum_address().expect("works").print();
+//
+//     let w = LocalWallet::from_bytes(&bytes).expect("works");
+//     println!("Wallet btc: {}", w.address().to_string());
+//
+//     let anvil = Anvil::new().spawn();
+//
+//     let wallet: LocalWallet = anvil.keys()[0].clone().into();
+//     let wallet2: LocalWallet = anvil.keys()[1].clone().into();
+//
+//     // connect to the network
+//     let provider = Provider::<Http>::try_from(anvil.endpoint()).expect("works");
+//
+//
+//     // connect the wallet to the provider
+//     let wallet1 = wallet.with_chain_id(anvil.chain_id());
+//     let client = SignerMiddleware::new(
+//         provider, wallet1.clone()
+//     );
+//
+//
+//     let addr = wallet1.address();
+//     let hexs = hex::encode(addr.0);
+//     println!("Wallet 1 address: {}", hexs);
+//
+//     let balance = client.get_balance(wallet1.address(), None).await.expect("works");
+//
+//     println!("Wallet 1 balance: {}", balance);
+//
+//     // craft the transaction
+//     let tx = TransactionRequest::new().to(wallet2.address()).value(10000);
+//
+//     // send it!
+//     let pending_tx = client.send_transaction(tx, None).await.expect("works");
+//
+//     // get the mined tx
+//     let receipt = pending_tx.await.expect("mined").expect("no error");
+//     let tx = client.get_transaction(receipt.transaction_hash).await.expect("works");
+//
+//     println!("Sent tx: {}\n", serde_json::to_string(&tx).expect("works"));
+//     println!("Tx receipt: {}", serde_json::to_string(&receipt).expect("works"));
+//
+//
+// }
+// // 0xA729F9430fc31Cda6173A0e81B55bBC92426f759
+// // #[ignore]
 
 
 #[tokio::test]

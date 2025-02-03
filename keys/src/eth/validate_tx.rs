@@ -18,7 +18,7 @@ impl EthWalletWrapper {
         network: &NetworkEnvironment
     ) -> RgResult<()> {
         let mut tx = typed_tx_payload.json_from::<TypedTransaction>()?;
-        tx.set_chain_id(EthHistoricalClient::chain_id(&network).id());
+        // tx.set_chain_id(EthHistoricalClient::chain_id(&network).id());
         let to = tx.to_addr().ok_msg("to address missing")?;
         let amount = tx.value().ok_msg("value missing")?;
         let amount_str = amount.to_string();

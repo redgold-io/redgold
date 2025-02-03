@@ -1,6 +1,6 @@
 use foundry_block_explorers::Client;
 use num_bigint::{BigInt, Sign};
-use alloy_chains::Chain;
+// use alloy_chains::Chain;
 use ethers::addressbook::Address;
 use ethers::prelude::U256;
 use foundry_block_explorers::account::{GenesisOption, Sort, TxListParams};
@@ -8,7 +8,7 @@ use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs
 use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use std::str::FromStr;
 use std::time::Duration;
-use log::info;
+use log::{error, info};
 use num_traits::{FromPrimitive, ToPrimitive};
 use redgold_schema::helpers::easy_json::EasyJson;
 use crate::address_external::ToEthereumAddress;
@@ -28,10 +28,11 @@ impl EthHistoricalClient {
     }
 
     pub fn new_from_key(network_environment: &NetworkEnvironment, k: String) -> Result<EthHistoricalClient, ErrorInfo> {
-        let chain = Self::chain_id(network_environment);
-        Client::new(chain, k)
-            .error_info("Client initialization failure")
-            .map(|c| EthHistoricalClient { client: c })
+        Err(error_info("Not implemented"))
+        // let chain = Self::chain_id(network_environment);
+        // Client::new(chain, k)
+        //     .error_info("Client initialization failure")
+        //     .map(|c| EthHistoricalClient { client: c })
     }
 
     // This doesn't appear to be working rn
@@ -50,15 +51,15 @@ impl EthHistoricalClient {
         // pub fn query_contract(&self) {
     //     self.client.
     // }
-
-    pub(crate) fn chain_id(network_environment: &NetworkEnvironment) -> Chain {
-        let chain = if network_environment.is_main() {
-            Chain::mainnet()
-        } else {
-            Chain::sepolia()
-        };
-        chain
-    }
+    //
+    // pub(crate) fn chain_id(network_environment: &NetworkEnvironment) -> Chain {
+    //     let chain = if network_environment.is_main() {
+    //         Chain::mainnet()
+    //     } else {
+    //         Chain::sepolia()
+    //     };
+    //     chain
+    // }
 
     pub async fn get_balance(&self, address: &String) -> RgResult<String> {
         let addr = address.parse().error_info("address parse failure")?;

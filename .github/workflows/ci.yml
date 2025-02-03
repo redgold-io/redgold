@@ -255,7 +255,7 @@ jobs:
 
       # AWS Docker image hash
       - run: echo ${{ env.DOCKER_SHA256 }} > docker_sha256_checksum
-      - run: aws s3 cp redgold_linux_ubuntu20 s3://redgold-public/rel25ubuntu20"
+      - run: aws s3 cp redgold_linux_ubuntu20 s3://redgold-public/rel25ubuntu20
 #
 #      - uses: actions/upload-artifact@v3
 #        with:

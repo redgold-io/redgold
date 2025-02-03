@@ -41,7 +41,7 @@ sha3 = {workspace = true}
 ethers = "2.0.13"
 #ethers-etherscan = "2.0.13"
 foundry-block-explorers = "0.2.3"
-alloy-chains = "0.1.12"
+#alloy-chains = "0.1.12"
 num-bigint = "0.4"
 num-traits = "0.2"
 log = "0.4.20"

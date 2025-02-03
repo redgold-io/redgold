@@ -35,7 +35,7 @@ impl EthWalletWrapper {
         } else {
             &providers::SEPOLIA
         }.provider();
-        let chain = EthHistoricalClient::chain_id(network).id();
+        let chain = 1u64; // EthHistoricalClient::chain_id(network).id();
 
         let wallet1 = w.with_chain_id(chain);
 
