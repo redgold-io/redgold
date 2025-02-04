@@ -16,3 +16,5 @@ tenacity
 mcp
 ollama
 langchain
+langchain_anthropic
+langgraph

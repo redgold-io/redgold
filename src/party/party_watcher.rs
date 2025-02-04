@@ -52,13 +52,13 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         self.relay.external_network_shared_data.write(shared_data.clone()).await;
         if self.relay.node_config.enable_party_mode() {
             // info!("Party watcher tick num parties total {} active {}", parties.len(), active.len());
-            self.tick_formations(&shared_data).await?;
+            // self.tick_formations(&shared_data).await?;
             // info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
-            for (pk, pid) in shared_data.iter() {
-                let mut pid2 = pid.clone();
-                pid2.clear_sensitive();
-                // info!("Party {} data {}", pk.hex(), pid2.json_or());
-            }
+            // for (pk, pid) in shared_data.iter() {
+            //     let mut pid2 = pid.clone();
+            //     pid2.clear_sensitive();
+            //     // info!("Party {} data {}", pk.hex(), pid2.json_or());
+            // }
         }
         Ok(())
     }

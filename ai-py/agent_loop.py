@@ -17,6 +17,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 divider = "\n" + ("-" * 80) + "\n"
 
 
+CLAUDE_HAIKU_LATEST="claude-3-5-haiku-20241022"
 @retry(
     retry=retry_if_exception_type(anthropic.RateLimitError),
     wait=wait_exponential(multiplier=1, min=4, max=60),  # Wait between 4-60 seconds, doubling each time
@@ -314,8 +315,15 @@ def wrap_text(text: str, width: int, initial_indent: str = '') -> str:
     return wrapper.fill(text)
 
 
+def show_models():
+    client = anthropic.Anthropic()
+    models = client.models.list()
+    for model in models:
+        print(model)
+
 if __name__ == '__main__':
-    main()
+    # main()
+    show_models()
 
 
 # https://github.com/microsoft/monitors4codegen#4-multilspy
