@@ -129,12 +129,14 @@ dhat = "0.3.3"
 redgold-crawler = {workspace = true}
 redgold-schema = {workspace = true}
 redgold-node-core = {workspace = true}
-
 redgold-gui = {workspace = true}
 redgold-common = {workspace = true}
 redgold-common-no-wasm = {workspace = true}
 redgold-ops = {workspace = true}
 redgold-rpc-integ = {workspace = true}
+
+crossterm = "0.25"
+
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
 flume = {workspace = true}

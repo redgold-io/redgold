@@ -12,7 +12,7 @@ use crate::core::relay::Relay;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::e2e::tx_submit::TransactionSubmitter;
-use crate::infra::deploy::default_deploy;
+use crate::infra::deploy::{default_deploy, offline_generate_keys_servers};
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use crate::test::daily_e2e::run_daily_e2e;
@@ -301,19 +301,61 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
 
     Ok(default_fun)
 }
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::event::{read, Event, KeyCode, KeyEvent};
 
-pub async fn get_input(prompt: impl Into<String>) -> RgResult<Option<String>> {
+pub async fn get_input(prompt: impl Into<String>, is_password: bool) -> RgResult<Option<String>> {
     println!("{}", prompt.into());
-    let mut input = String::new();
-    // TODO: Replace with tokio async read if necessary
-    std::io::stdin().read_line(&mut input).error_info("Failed to read line")?;
-    if input.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(input))
-    }
-}
 
+    if !is_password {
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).error_info("Failed to read line")?;
+        return if input.is_empty() { Ok(None) } else { Ok(Some(input)) };
+    }
+
+    // Password input handling
+    enable_raw_mode().error_info("Failed to enable raw mode")?;
+    let mut password = String::new();
+
+    loop {
+        match read().error_info("Failed to read event")? {
+            Event::Key(KeyEvent { code, .. }) => match code {
+                KeyCode::Enter => break,
+                KeyCode::Backspace => { password.pop(); },
+                KeyCode::Char(c) => {
+                    password.push(c);
+                    print!("*");
+                },
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    disable_raw_mode().error_info("Failed to disable raw mode")?;
+    println!(); // New line after password entry
+
+    Ok(Some(password))
+}
+//
+// pub async fn get_input_rpass(prompt: impl Into<String>, is_password: bool) -> RgResult<Option<String>> {
+//     let prompt = prompt.into();
+//
+//     if is_password {
+//         let password = rpassword::read_password_from_tty(Some(&prompt))
+//             .error_info("Failed to read password")?;
+//         Ok(Some(password))
+//     } else {
+//         println!("{}", prompt);
+//         let mut input = String::new();
+//         std::io::stdin().read_line(&mut input).error_info("Failed to read line")?;
+//         if input.is_empty() {
+//             Ok(None)
+//         } else {
+//             Ok(Some(input))
+//         }
+//     }
+// }
 // TODO: All this code is out of date, need to update it.
 // Move to own file
 pub async fn deploy_wizard(_deploy: &Deploy, _config: &NodeConfig) -> Result<(), ErrorInfo> {
@@ -530,7 +572,7 @@ pub async fn convert_metadata_xpub(path: &String) -> RgResult<()> {
     Ok(())
 }
 
-pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult<()> {
+pub async fn debug_commands(p0: &DebugCommand, nc: &Box<NodeConfig>) -> RgResult<()> {
     if let Some(cmd) = &p0.subcmd {
         match cmd {
             RgDebugCommand::GrafanaPublicDeploy(_) => {
@@ -547,7 +589,7 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 Ok(())
             }
             RgDebugCommand::DailyTest(d) => {
-                run_daily_e2e(p1).await
+                run_daily_e2e(nc).await
             }
             RgDebugCommand::S3UpDir(d) => {
                 let p = PathBuf::from(d.source.clone());
@@ -555,13 +597,32 @@ pub async fn debug_commands(p0: &DebugCommand, p1: &Box<NodeConfig>) -> RgResult
                 let split = dest.split("/").collect::<Vec<&str>>();
                 let bucket = split.get(0).expect("bucket").to_string();
                 let prefix = split.get(1).expect("prefix").to_string();
-                let relay = Relay::new(*p1.clone()).await;
+                let relay = Relay::new(*nc.clone()).await;
                 AwsBackup::new(&relay).s3_upload_directory(&p, bucket, prefix).await
             }
             RgDebugCommand::Usb(c) => {
-                copy_usb_info(p1).await?;
+                copy_usb_info(nc).await?;
                 Ok(())
             }
+            RgDebugCommand::ServerInfo(_) => {
+                let passphrase = if nc.config_data.cli.as_ref()
+                    .and_then(|c| c.passphrase.as_ref()).cloned().unwrap_or(false) {
+                    let res = get_input("Enter passphrase:", true).await?;
+                    Some(res.unwrap())
+                } else {
+                    None
+                };
+                let pids = offline_generate_keys_servers(
+                    (*nc.clone()), nc.servers_old(), PathBuf::from("servers"),
+                    nc.secure_words_or().words, passphrase.clone()
+                ).await.unwrap();
+
+                for (i,(pid_hex, npk_hex)) in pids.iter().enumerate() {
+                    println!("simple_seed(\n\"n{}.redgold.io\",\n\"{}\",\n\"{}\",\n{}),", i, pid_hex, npk_hex, passphrase.is_some());
+                }
+                Ok(())
+            }
+
             _ => {
                 Ok(())
             }

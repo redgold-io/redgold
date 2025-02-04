@@ -7,12 +7,14 @@ from typing import Iterable, Optional
 from claude_fmt import tool_format, user_text_content
 from git_scrape import get_one_ai_dev_issue
 from templates.agent_system import DEFAULT_SYSTEM_MESSAGE
-from tools.tool_match import get_tool_responses, default_tooldefs
+from tools.tool_match import get_tool_responses, default_tooldefs_claude
 
 from langsmith import traceable
 from langsmith import traceable, trace
 from langsmith.run_trees import RunTree
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+divider = "\n" + ("-" * 80) + "\n"
 
 
 @retry(
@@ -36,7 +38,7 @@ def claude(
     parent_run_id: Optional[str] = None
 ):
     client = anthropic.Anthropic()
-    client.messages.create()
+    # client.messages.create()
     with trace("claude_message", run_type="llm", parent_run_id=parent_run_id) as run:
         try:
             message = make_api_call(
@@ -130,7 +132,7 @@ def claude_message(
 
     # print("Attempting to send message: ", messages)
     if tooldefs is None:
-        tooldefs = default_tooldefs()
+        tooldefs = default_tooldefs_claude()
 
     return claude(
         content=content,
@@ -184,7 +186,11 @@ def main():
         starting_prompt = "The issue you've been assigned to work on is listed below: \n\n"
         starting_prompt += issue_text
         parent_run.inputs = {"initial_prompt": starting_prompt}
-        response = claude_message(starting_prompt, model_settings=settings, active_dir=active_dir, parent_run_id=parent_run_id)
+        response = claude_message(
+            starting_prompt,
+            model_settings=settings,
+            active_dir=active_dir,
+            parent_run_id=parent_run_id)
         total_tokens = response.usage.input_tokens
 
         max_runs = 1000
@@ -207,20 +213,28 @@ def main():
             with open(f"{active_dir}/text.txt", "w") as f:
                 for h in history:
                     text_output = get_text_output_from_message(h)
+                    text_output += divider
                     f.write(text_output)
             with open(f"{active_dir}/assistant_messages.txt", "w") as f:
                 for h in history:
                     if h['role'] == "assistant":
-                        f.write(f"{h['content']}\n")
+                        text_output = get_text_output_from_message(h)
+                        text_output += divider
+                        f.write(text_output)
             if last_loop:
                 print("Done with last loop after completion.")
                 break
-            print(response)
+
+            # print(response)
             msg_count += 1
-            history.append(MessageParam(content=response.content, role=response.role))
+            this_message = MessageParam(content=response.content, role=response.role)
+            text_output = get_text_output_from_message(this_message)
+            text_output += divider
+            print(divider)
+            print(f"TOKEN USAGE: {response.usage}")
+            history.append(this_message)
             tr = get_tool_responses(response)
             response = claude_message(tool_stuff=tr, history=history, model_settings=settings, active_dir=active_dir)
-
 
             # Update parent run with latest history
             parent_run.add_metadata({
@@ -276,7 +290,7 @@ def get_text_output_from_message(h):
                 if block.type == 'text':
                     start_str += block.text
                 elif block.type == "tool_use":
-                    tool_use.append(f"TOOL USE: f{block.name} {block.input}")
+                    tool_use.append(f"TOOL USE: {block.name} {block.input}")
         # Add other block types as needed
     text_output = start_str + "\n"
     if tool_use:
@@ -298,6 +312,7 @@ def wrap_text(text: str, width: int, initial_indent: str = '') -> str:
         replace_whitespace=False
     )
     return wrapper.fill(text)
+
 
 if __name__ == '__main__':
     main()

@@ -118,44 +118,84 @@ pub fn get_all_hardcoded_seeds() -> Vec<Seed> {
         //     false),
         simple_seed(
             "n0.redgold.io",
-            "0a250a230a210380584c41f3185a656d7af96d5f0c2d4dc423dd67a0eae96c3be45d94d2afdf8b",
-            "0a230a21029ddcbe05dd9430579bd280b190251ac50e840d5574c90454458fed53dd0b3118",
+            "0a250a230a2102ef6e72f7160edaf940d04790cf4e6ba9e6380672916cdb2ed01e25af8be849e7",
+            "0a230a21032b1b73342cc848b41d9b5a53ed67730be78222a6abf22650a22a4c079743d3f8",
             true),
         simple_seed(
             "n1.redgold.io",
-            "0a250a230a2102c38d01c59be615b53e80e1f31ed31a368be0ba45ed8360b94e52f293c561d22e",
-            "0a230a21024a345465ee1bcb042ce0fdf7f5686caae897681db8ca31a49d2bfba761ec49b5",
+            "0a250a230a210241f3e4dacd61bacc6bc4ea2731ac2d66431e676cc96b9dc238c362eb785b08ed",
+            "0a230a21024e866d93f75c46a9e3070d8d35af36946597ffaeced201b0e7158ac85008699d",
             true),
         simple_seed(
             "n2.redgold.io",
-            "0a250a230a21032b9aa677503a43565086d16a873b2489c40f35d0aa1f27d5db798ad1b256880e",
-            "0a230a2102c20b0b607c4864ac19681a4ec05b61185e674275bb8be84c2e49a4dfb7763839",
+            "0a250a230a2103bf103bb4fab013c55bfeaf386466a82d82fe61e5a453c3a9d6aca3e4dfd246b2",
+            "0a230a2103316ce5f955360c9c4e1597bc041d0f14fa3d4b9691209d3beb64eb246ac44102",
             true),
         simple_seed(
             "n3.redgold.io",
-            "0a250a230a2103cfa336db912bc5aec088e92f7b45e9de5f6b9f10fa801f889c2c6a05718ad442",
-            "0a230a210272af680bdab9dce33652ab488e66a5b8e6807a5ad1306ba34afa878229fafbd3",
+            "0a250a230a21021158dc186923ab8a1dba1b19e8cd5017e0d104ac7ed203723464218b8c6663d2",
+            "0a230a210217b3a710fbcc8ac68ad7b5a7e5910b189e071348cf560c3db853bef4afcdafc6",
             true),
         simple_seed(
             "n4.redgold.io",
-            "0a250a230a2103efaf6dbf77f2cdc158adb49b391bed72099cb4cb462cb3588218b4fe317d383f",
-            "0a230a210335a2e07f3fd60b6bcee6ae2e2699c5852ae59af456ca229509f2a60ab3ba1048",
+            "0a250a230a2103a744d97d4b509edc6020985720479f5804d630d6a9d707bf3fffd6790a5aa4ba",
+            "0a230a2103039218939094eeb8acafecb0a6387d1024b411d3b6341a3b1e73001b6d2e11f3",
             true),
         simple_seed(
             "n5.redgold.io",
-            "0a250a230a21034c787a31cb693c156a0377df2b37139de03ac278fa50e35f28d4d530d0a7b2f7",
-            "0a230a2103c52d3f451c8f8a255f4600686ea7203524519d30ef284676ef3c9bc76bb44ff2",
+            "0a250a230a2102661fd340f7ab50e4d33f23fedd040cafd70ade7cd0dec2eecbcdb6d6533597fd",
+            "0a230a2103787246687366699530545a73bfd5d66e6b5186924f363fe4bce27161e92de56f",
             true),
         simple_seed(
             "n6.redgold.io",
-            "0a250a230a2102537531c05b49853f65f7818c2fed4b503e1851faae93ff4dedae64fd746d91b4",
-            "0a230a21029d4e040957387d07be9ac566e19b8de1dc8c8e03b5d991a4aa2c85b66b88847e",
+            "0a250a230a2103b0b884f2f4d4df42b85c3c43acb8a122ae051ca0ceb735b791198bf9a6629a28",
+            "0a230a210207df4c1553162abcb9d018528d89619b77241676d9c352105fd92fd20cfa19d6",
             true),
         simple_seed(
             "n7.redgold.io",
-            "0a250a230a2103e193a617f42b30c349f5d27d176c8157aee480472f3217604e3c47d2e99b6ef8",
-            "0a230a21030d2402a8e3f5145d0e934992efb31c49664d10d0d0831096d02849436c382cb2",
+            "0a250a230a2103ac58ceacf822ef6208aeef0c439b66311cf7fc1108412a6d3378049977d939ad",
+            "0a230a2103ebcb86c597c5ab059077fe4bdfe7fe44dd9d1b6b63ffc2fb2af7e5448317cccb",
             true),
+        // simple_seed(
+        //     "n0.redgold.io",
+        //     "0a250a230a210380584c41f3185a656d7af96d5f0c2d4dc423dd67a0eae96c3be45d94d2afdf8b",
+        //     "0a230a21029ddcbe05dd9430579bd280b190251ac50e840d5574c90454458fed53dd0b3118",
+        //     true),
+        // simple_seed(
+        //     "n1.redgold.io",
+        //     "0a250a230a2102c38d01c59be615b53e80e1f31ed31a368be0ba45ed8360b94e52f293c561d22e",
+        //     "0a230a21024a345465ee1bcb042ce0fdf7f5686caae897681db8ca31a49d2bfba761ec49b5",
+        //     true),
+        // simple_seed(
+        //     "n2.redgold.io",
+        //     "0a250a230a21032b9aa677503a43565086d16a873b2489c40f35d0aa1f27d5db798ad1b256880e",
+        //     "0a230a2102c20b0b607c4864ac19681a4ec05b61185e674275bb8be84c2e49a4dfb7763839",
+        //     true),
+        // simple_seed(
+        //     "n3.redgold.io",
+        //     "0a250a230a2103cfa336db912bc5aec088e92f7b45e9de5f6b9f10fa801f889c2c6a05718ad442",
+        //     "0a230a210272af680bdab9dce33652ab488e66a5b8e6807a5ad1306ba34afa878229fafbd3",
+        //     true),
+        // simple_seed(
+        //     "n4.redgold.io",
+        //     "0a250a230a2103efaf6dbf77f2cdc158adb49b391bed72099cb4cb462cb3588218b4fe317d383f",
+        //     "0a230a210335a2e07f3fd60b6bcee6ae2e2699c5852ae59af456ca229509f2a60ab3ba1048",
+        //     true),
+        // simple_seed(
+        //     "n5.redgold.io",
+        //     "0a250a230a21034c787a31cb693c156a0377df2b37139de03ac278fa50e35f28d4d530d0a7b2f7",
+        //     "0a230a2103c52d3f451c8f8a255f4600686ea7203524519d30ef284676ef3c9bc76bb44ff2",
+        //     true),
+        // simple_seed(
+        //     "n6.redgold.io",
+        //     "0a250a230a2102537531c05b49853f65f7818c2fed4b503e1851faae93ff4dedae64fd746d91b4",
+        //     "0a230a21029d4e040957387d07be9ac566e19b8de1dc8c8e03b5d991a4aa2c85b66b88847e",
+        //     true),
+        // simple_seed(
+        //     "n7.redgold.io",
+        //     "0a250a230a2103e193a617f42b30c349f5d27d176c8157aee480472f3217604e3c47d2e99b6ef8",
+        //     "0a230a21030d2402a8e3f5145d0e934992efb31c49664d10d0d0831096d02849436c382cb2",
+        //     true),
     ]
 }
 

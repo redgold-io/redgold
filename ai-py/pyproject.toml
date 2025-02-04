@@ -1,0 +1,29 @@
+[project]
+name = "ai-py"
+version = "0.1.0"
+description = "AI tooling"
+requires-python = ">=3.8"
+dependencies = [
+    "anthropic",
+    "simplematrixbotlib",
+    "google-generativeai",
+    "elasticsearch==8.14.0",
+    "tree-sitter==0.22.3",
+    "tree-sitter-rust==0.21.2",
+    "mypy-protobuf",
+    "graphrag",
+    "tiktoken",
+    "numpy",
+    "backoff",
+    "sentence-transformers",
+    "langsmith",
+    "tenacity",
+    "mcp[cli]"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true

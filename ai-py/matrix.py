@@ -1,7 +1,7 @@
 import simplematrixbotlib as botlib
 from os import getenv
 
-import claude_dbg
+import agent_loop
 
 creds = botlib.Creds(getenv("MATRIX_HOMESERVER"), "ai", getenv("MATRIX_AI_PASSWORD"))
 bot = botlib.Bot(creds)

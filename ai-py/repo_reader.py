@@ -7,7 +7,8 @@ def directory_exclusions():
     return [
         ".git", "target", "node_modules", ".idea", "experiments", "venv", ".nuxt", ".output", "dist",
         ".sqlx",
-        "ignore-data"
+        "ignore-data",
+        ".venv"
     ]
 
 def endings_exclusions():

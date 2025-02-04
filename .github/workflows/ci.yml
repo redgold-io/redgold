@@ -536,6 +536,7 @@ jobs:
 
       # TODO: commit hash to file upload ${{ github.sha }}
       - run: aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux
+      - run: aws s3 cp redgold_linux_ubuntu20 ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux_ubuntu20
       - run: aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux_md5_checksum
       - run: aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux_sha256_checksum
       - run: aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/${{ env.BRANCH }}/redgold_linux_sha512_checksum
@@ -557,6 +558,7 @@ jobs:
           ', github.ref)
         run: |
           aws s3 cp redgold_linux ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux && 
+          aws s3 cp redgold_linux_ubuntu20 ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_ubuntu20 && 
           aws s3 cp md5_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_md5_checksum &&
           aws s3 cp sha256_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha256_checksum &&
           aws s3 cp sha512_checksum ${{ env.S3_RELEASE_PREFIX }}/v/${{env.VERSION}}/redgold_linux_sha512_checksum &&
@@ -574,12 +576,18 @@ jobs:
 #        id: build_changelog
 #        uses: mikepenz/release-changelog-builder-action@v4.0.0-rc04
 
-      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
-        with:
-          delete_release: true # default: false
-          tag_name: release/${{ env.BRANCH }} # tag name to delete
+
+      - name: Delete existing release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "release/${{ env.BRANCH }}" --cleanup-tag=false --yes || true
+#      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
+#        with:
+#          delete_release: true # default: false
+#          delete_tag: false
+#          tag_name: release/${{ env.BRANCH }} # tag name to delete
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Sleep for 5 seconds
         run: sleep 5
       # https://github.com/marketplace/actions/rust-release-binary these steps came from below
@@ -593,7 +601,7 @@ jobs:
             redgold.app.zip
             redgold.exe
             redgold_linux_ubuntu20
-          tag_name: "release/${{ env.BRANCH }}"
+#          tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
           # TODO: Make this body a step output
@@ -647,6 +655,7 @@ jobs:
             redgold_mac
             redgold.app.zip
             redgold.exe
+            redgold_linux_ubuntu20
           tag_name: "release/${{ env.VERSION }}"
           name: ${{ env.VERSION }}
           #           ${{steps.build_changelog.outputs.changelog}}

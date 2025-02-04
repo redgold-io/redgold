@@ -59,7 +59,7 @@ def get_tool_responses(response) -> Iterable[ToolResultBlockParam]:
     return tool_responses
 
 
-def default_tooldefs():
+def default_tooldefs_claude():
     return [
         commands.redgold_cargo_rust_compile_claude_tooldef(),
         full_text_repo_search_tooldef(),

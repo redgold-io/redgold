@@ -60,7 +60,7 @@ impl TransactionSignInfo {
 pub trait GuiDepends {
 
     fn seed_checksum(m: WordsPass) -> RgResult<String>;
-    fn hash_derive_words(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<WordsPass>;
+    fn hash_derive_words(m: WordsPass, concat: impl Into<String>) -> RgResult<WordsPass>;
     fn public_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<PublicKey>;
     fn private_at(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<String>;
     fn checksum_words(m: WordsPass) -> RgResult<String>;

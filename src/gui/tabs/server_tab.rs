@@ -353,9 +353,11 @@ where G: GuiDepends + Clone + Send + 'static {
 
     ui.horizontal(|ui| {
         editable_text_input_copy(ui, "Generate Offline Path", &mut state.generate_offline_path, 150.0);
-        editable_text_input_copy(ui, "Words", &mut state.generate_offline_words, 50.0);
         editable_text_input_copy(ui, "Pass", &mut state.generate_offline_pass, 50.0);
+        // editable_text_input_copy(ui, "Offset", &mut state.generate_offline_offset, 50.0);
         if ui.button("Generate Peer TXs / Words").clicked() {
+            // let offset = state.generate_offline_offset.parse::<u32>().unwrap_or(0);
+            // let w = G::hash_derive_words()
             let config1 = nc.clone();
             let option = servers.clone();
             let string = state.generate_offline_words.clone();
@@ -374,6 +376,7 @@ where G: GuiDepends + Clone + Send + 'static {
             ));
         }
     });
+    editable_text_input_copy(ui, "Words", &mut state.generate_offline_words, 300.0);
 
     ui.horizontal(|ui| {
         if ui.button("Backup Multiparty Local Shares").clicked() {
