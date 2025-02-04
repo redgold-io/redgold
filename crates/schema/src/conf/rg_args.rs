@@ -22,6 +22,7 @@ pub fn empty_args() -> RgArgs {
             path: None,
             verbose: false,
             quiet: false,
+            passphrase: false,
         },
         debug_args: DebugArgs {
             debug_id: None,
@@ -116,6 +117,9 @@ pub struct CliSettings {
     /// Remove CLI command outputs in favor of less info, ideally parse-able
     #[clap(long, env = "REDGOLD_CLI_QUIET")]
     pub quiet: bool,
+    /// Require passphrase for inputs on certain CLI operations
+    #[clap(long, env = "REDGOLD_CLI_PASSPHRASE")]
+    pub passphrase: bool,
 
 }
 
@@ -420,6 +424,7 @@ pub enum RgDebugCommand {
     // ConvertMetadataXpub(ConvertMetadataXpub),
     CopyData(CopyData),
     Usb(CopyUsb),
+    ServerInfo(ServerInfo),
 }
 
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
@@ -450,7 +455,15 @@ pub struct CopyData {
 
 /// S3 copy command
 #[derive(Args, Debug, Clone, Serialize, Deserialize)]
-pub struct CopyUsb {}
+pub struct CopyUsb {
+
+}
+
+/// S3 copy command
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct ServerInfo {
+
+}
 
 /// Debug Commands
 /// All commands that are used for development or debugging, not for primary end users.

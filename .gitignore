@@ -51,3 +51,7 @@ testdb
 testdb1
 testdb2
 all_repo_contents.txt
+venv
+ai-py/.venv
+ai-py/.idea
+.venv

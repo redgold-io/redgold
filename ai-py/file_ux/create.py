@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 def create_file():
@@ -8,6 +9,9 @@ def create_file():
         rel = str(rel_start.joinpath(rel))
         content: str = input['content']
         include_as_rust_pub_mod: bool = input.get('include_as_rust_pub_mod', True)
+        # Get parent directory path and create all necessary directories
+        parent_dir = Path(rel).parent
+        parent_dir.mkdir(parents=True, exist_ok=True)
 
         with open(rel, "w") as f:
             f.write(content)

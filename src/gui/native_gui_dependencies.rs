@@ -373,7 +373,7 @@ impl GuiDepends for NativeGuiDepends {
         m.checksum_words()
     }
 
-    fn hash_derive_words(m: WordsPass, derivation_path: impl Into<String>) -> RgResult<WordsPass> {
-        todo!()
+    fn hash_derive_words(m: WordsPass, concat: impl Into<String>) -> RgResult<WordsPass> {
+        m.hash_derive_words(concat.into())
     }
 }

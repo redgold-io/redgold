@@ -33,7 +33,7 @@ def get_tool_responses(response) -> Iterable[ToolResultBlockParam]:
                     res = full_text_repo_search(block.input)
                     result['content'] = fmt_list(res)
                 elif n == "edit_file_replace_lines":
-                    edit_file(
+                    result['content'] = edit_file(
                         block.input['filename'],
                         block.input.get('starting_line'),
                         block.input.get('ending_line'),
@@ -59,7 +59,7 @@ def get_tool_responses(response) -> Iterable[ToolResultBlockParam]:
     return tool_responses
 
 
-def default_tooldefs():
+def default_tooldefs_claude():
     return [
         commands.redgold_cargo_rust_compile_claude_tooldef(),
         full_text_repo_search_tooldef(),

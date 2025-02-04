@@ -36,57 +36,62 @@ def edit_file_replace_lines_tooldef():
 
 
 def edit_file(filename: str, starting_line: Optional[str], ending_line: Optional[str], replacement_lines: Optional[list[str]]=None):
-    if replacement_lines is None:
-        replacement_lines = []
+    try:
+        if replacement_lines is None:
+            replacement_lines = []
 
-    prefix = str(ai_working_dir())
-    if not filename.startswith("/"):
-        prefix += "/"
-    filename = prefix + filename
+        prefix = str(ai_working_dir())
+        if not filename.startswith("/"):
+            prefix += "/"
+        filename = prefix + filename
 
 
-    print(f"Editing file {filename}")
-    # check if the file exists, if its parents do not exist, create them as directories
-    if not os.path.exists(filename):
-        print(f"File {filename} does not exist, creating it")
-        parent_dir = os.path.dirname(filename)
-        if not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
-        with open(filename, "w") as f:
-            for line in replacement_lines:
-                f.write(line)
-            return
+        print(f"Editing file {filename}")
+        # check if the file exists, if its parents do not exist, create them as directories
+        if not os.path.exists(filename):
+            print(f"File {filename} does not exist, creating it")
+            parent_dir = os.path.dirname(filename)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+            with open(filename, "w") as f:
+                for line in replacement_lines:
+                    f.write(line)
+                return
 
-    processed_lines = []
+        processed_lines = []
 
-    with open(filename, "r") as f:
-        lines = f.readlines()
-        num_lines = len(lines)
-        max_idx = num_lines - 1
-        if starting_line is None or int(starting_line) < 0:
-            starting_line = 0
-        else:
-            starting_line = int(starting_line) - 1
-        if ending_line is None or int(ending_line) > max_idx:
-            ending_line = max_idx
-        else:
-            ending_line = int(ending_line)
-
-        added = False
-        print(f"Editing file with: {starting_line} to {ending_line} with num lines: {num_lines}")
-        print(f"L{starting_line}: {lines[starting_line]}")
-        for i, line in enumerate(lines):
-            if i < starting_line or i > ending_line:
-                processed_lines.append(line)
+        with open(filename, "r") as f:
+            lines = f.readlines()
+            num_lines = len(lines)
+            max_idx = num_lines - 1
+            if starting_line is None or int(starting_line) < 0:
+                starting_line = 0
             else:
-                if not added:
-                    for replacement_line in replacement_lines:
-                        processed_lines.append(replacement_line)
-                    added = True
+                starting_line = int(starting_line) - 1
+            if ending_line is None or int(ending_line) > max_idx:
+                ending_line = max_idx
+            else:
+                ending_line = int(ending_line)
 
-    with open(filename, "w") as f:
-        for line in processed_lines:
-            f.write(line)
+            added = False
+            print(f"Editing file with: {starting_line} to {ending_line} with num lines: {num_lines}")
+            print(f"L{starting_line}: {lines[starting_line]}")
+            for i, line in enumerate(lines):
+                if i < starting_line or i > ending_line:
+                    processed_lines.append(line)
+                else:
+                    if not added:
+                        for replacement_line in replacement_lines:
+                            processed_lines.append(replacement_line)
+                        added = True
+
+        with open(filename, "w") as f:
+            for line in processed_lines:
+                f.write(line)
+    except Exception as e:
+        print(f"Error editing file {filename}: {e}")
+        return f"error editing file {e}"
+    return f"Successfully edited file {filename}"
 
 # print(str(ai_working_dir()))
 

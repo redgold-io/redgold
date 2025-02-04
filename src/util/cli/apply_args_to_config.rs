@@ -67,6 +67,9 @@ pub fn apply_args_final(rg_args: Box<RgArgs>, config: Box<ConfigData>) -> Box<Co
     if rg_args.cli_settings.verbose {
         cli.verbose = Some(true);
     }
+    if rg_args.cli_settings.passphrase {
+        cli.passphrase = Some(true);
+    }
 
     config
 }

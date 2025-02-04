@@ -1,7 +1,7 @@
 import simplematrixbotlib as botlib
 from os import getenv
 
-import claude_dbg
+import agent_loop
 
 creds = botlib.Creds(getenv("MATRIX_HOMESERVER"), "ai", getenv("MATRIX_AI_PASSWORD"))
 bot = botlib.Bot(creds)
@@ -40,7 +40,7 @@ async def echo(room, message):
                 room.room_id, msg_contents
                 )
         elif match.event.sender == BOT_ADMIN:
-            response = claude_dbg.msg(regular_body, override_system=SYSTEM_PROMPT_START)
+            response = claude_dbg.claude_message(regular_body, override_system=SYSTEM_PROMPT_START)
             print(response)
             chat_msg = response.content[-1].text
             await bot.api.send_text_message(

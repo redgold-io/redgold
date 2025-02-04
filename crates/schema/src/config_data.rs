@@ -140,6 +140,7 @@ pub struct CliSettings {
     pub path: Option<String>,
     pub verbose: Option<bool>,
     pub quiet: Option<bool>,
+    pub passphrase: Option<bool>
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Default)]

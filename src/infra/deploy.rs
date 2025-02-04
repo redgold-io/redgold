@@ -21,7 +21,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::servers::ServerOldFormat;
 use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, PeerId, PeerMetadata, SupportedCurrency, Transaction, TrustRatingLabel};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use redgold_schema::{structs, ErrorInfoContext, RgResult};
+use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use std::io::prelude::*;
 use std::sync::Arc;
 use eframe::egui::TextBuffer;
@@ -640,7 +640,7 @@ pub async fn derive_mnemonic_and_peer_id(
             &mut peer_data,
             peer_id_index as i64,
             pkmap,
-            node_config.executable_checksum.clone().expect("exe"),
+            node_config.executable_checksum.clone().unwrap_or("".to_string()),
             net.clone(),
             reward_address.clone().and_then(|a| a.parse_address().ok()),
         );
@@ -674,8 +674,9 @@ pub async fn offline_generate_keys_servers(
     save_path: PathBuf,
     salt_mnemonic: String,
     passphrase: Option<String>
-) -> RgResult<()> {
+) -> RgResult<Vec<(String, String)>> {
     let mut pid_tx: HashMap<String, structs::Transaction> = HashMap::default();
+    let mut res = vec![];
     for ss in &servers {
         let (words, peer_id_hex) = derive_mnemonic_and_peer_id(
             &node_config,
@@ -692,6 +693,10 @@ pub async fn offline_generate_keys_servers(
             ss.reward_address.clone()
         ).await?;
         let peer_tx = pid_tx.get(&peer_id_hex).expect("").clone();
+        let pd = peer_tx.peer_data()?;
+        let nmd = pd.node_metadata.get(0).ok_msg("Missing node metadata")?;
+        let pk = nmd.public_key.as_ref().ok_msg("Missing public key")?;
+        let pub_hex = pk.hex();
         let peer_tx_ser = peer_tx.json_or();
         let save = save_path.clone();
         let server_index_path = save.join(format!("{}", ss.index));
@@ -700,8 +705,9 @@ pub async fn offline_generate_keys_servers(
         let words_path = server_index_path.join("mnemonic");
         std::fs::write(peer_tx_path, peer_tx_ser).expect("");
         std::fs::write(words_path, words).expect("");
+        res.push((peer_id_hex, pub_hex));
     }
-    Ok(())
+    Ok(res)
 }
 
 
