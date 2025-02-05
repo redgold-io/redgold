@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Response, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Request, Response, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;
@@ -7,7 +7,7 @@ use redgold_schema::keys::words_pass::WordsPass;
 
 #[async_trait]
 pub trait PeerBroadcast where Self: Sync {
-    async fn broadcast(&self, peers: &Vec<PublicKey>) -> Vec<RgResult<Response>>;
+    async fn broadcast(&self, peers: &Vec<PublicKey>, request: Request) -> Vec<RgResult<Response>>;
 }
 
 

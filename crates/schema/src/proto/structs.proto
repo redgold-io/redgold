@@ -1076,7 +1076,9 @@ message Request {
 }
 
 message MoneroMultisigFormationRequest {
-  repeated string peer_strings = 1;
+  repeated PublicKey public_keys = 1;
+  Weighting threshold = 2;
+  repeated string peer_strings = 3;
 }
 
 message GetSolanaAddress {}
@@ -1145,6 +1147,7 @@ message Response {
   PortOpenResponse port_open_response = 30;
   optional bool multiparty_check_ready_response = 31;
   Address get_solana_address_response = 32;
+  optional string monero_multisig_formation_response = 33;
 }
 
 message KeepAliveResponse {

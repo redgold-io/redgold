@@ -2,6 +2,7 @@ use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bdk::sled::Tree;
 use crossbeam::atomic::AtomicCell;
+use redgold_common::external_resources::PeerBroadcast;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
@@ -1278,3 +1279,14 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 }
 
 // https://doc.rust-lang.org/book/ch15-04-rc.html
+
+
+#[async_trait]
+impl PeerBroadcast for Relay {
+    async fn broadcast(&self, request: Request, nodes: Vec<PublicKey>) -> RgResult<Vec<RgResult<Response>>> {
+        Ok(self.broadcast_async(nodes, request, None).await?.into_iter()
+        .map(|i| i
+            .and_then (|r| r.with_error_info())
+        ).collect_vec())
+    }
+}
