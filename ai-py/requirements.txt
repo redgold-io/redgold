@@ -18,3 +18,5 @@ ollama
 langchain
 langchain_anthropic
 langgraph
+langchain-groq
+langchain-openrouter

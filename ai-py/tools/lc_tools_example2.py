@@ -21,11 +21,32 @@ from typing import Literal
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.prebuilt import ToolNode
+from langchain_core.messages import AIMessage
 
+# tools = [get_weather, get_coolest_cities]
+tool_node = ToolNode(tools)
 
-model_with_tools = ChatAnthropic(
-    model=CLAUDE_HAIKU_LATEST, temperature=0
-).bind_tools(tools)
+message_with_single_tool_call = AIMessage(
+    content="",
+    tool_calls=[
+        {
+            "name": "multiply_by_max",
+            "args": {"a": 5, "b": [1, 2]},
+            "id": "tool_call_id",
+            "type": "tool_call",
+        }
+    ],
+)
+
+result = tool_node.invoke({"messages": [message_with_single_tool_call]})
+print(result)
+
+#
+# model_with_tools = ChatAnthropic(
+#     model=CLAUDE_HAIKU_LATEST, temperature=0
+# ).bind_tools(tools)
+#
+
 
 
 

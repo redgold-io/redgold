@@ -384,24 +384,24 @@ pub struct TransferDestination {
     pub address: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct PrepareMultisigResult {
     pub multisig_txset: String,
     pub unsigned_txset: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct SignedMultisigTxset {
     pub tx_data_hex: String,
     pub tx_hash_list: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct ExchangeMultisigKeysResult {
     pub address: String,
     pub multisig_info: String
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct MakeMultisigResult {
     pub address: String,
     pub multisig_info: String,

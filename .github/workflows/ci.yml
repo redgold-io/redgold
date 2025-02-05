@@ -11,6 +11,8 @@ env:
   DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
 on:
   push:
+    paths:
+      - '.github/workflows/**'
   workflow_dispatch:
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -580,7 +582,7 @@ jobs:
       - name: Delete existing release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete "release/${{ env.BRANCH }}" --cleanup-tag=false --yes || true
+        run: gh release delete "release/${{ env.BRANCH }}" --cleanup-tag=true --yes || true
 #      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
 #        with:
 #          delete_release: true # default: false
@@ -601,7 +603,7 @@ jobs:
             redgold.app.zip
             redgold.exe
             redgold_linux_ubuntu20
-#          tag_name: "release/${{ env.BRANCH }}"
+          tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
           # TODO: Make this body a step output
@@ -628,7 +630,10 @@ jobs:
           
           "
           token: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Delete tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git push origin --delete "release/${{ env.BRANCH }}" || true
       - if:
           contains('
           refs/heads/staging

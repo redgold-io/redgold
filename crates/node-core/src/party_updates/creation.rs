@@ -7,6 +7,7 @@ use redgold_common::external_resources::{ExternalNetworkResources, PeerBroadcast
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
+use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, StateHistoryItem};
 use redgold_keys::solana::derive_solana::ToSolanaAddress;
 use redgold_keys::solana::wallet::SolanaNetwork;
 use redgold_schema::errors::into_error::ToErrorInfo;
@@ -16,9 +17,13 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, Request, Response, SupportedCurrency, Weighting};
 use redgold_schema::util::times::current_time_millis;
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-struct PartyUpdateEvents {
 
+
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+pub struct PartyUpdateEvents {
+    pub new_instances: Vec<PartyInstance>,
+    pub updated_metadata: Option<PartyMetadata>
 }
 
 pub fn estimated_fee_min_balance_contract_multisig_establish(
@@ -42,8 +47,6 @@ pub fn estimated_fee_min_balance_contract_multisig_establish(
     }
 }
 
-
-
 pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
     metadata: &PartyMetadata,
     ext: &E,
@@ -58,13 +61,12 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
 )
     -> RgResult<PartyUpdateEvents> {
 
-    let events = PartyUpdateEvents::default();
+    let mut event = PartyUpdateEvents::default();
 
     let mut all_pks = vec![self_public_key.clone()];
     all_pks.extend(party_peer_keys.clone());
 
     all_pks.sort_by(|a, b| a.vec().cmp(&b.vec()));
-
 
     let override_thresh_int = override_threshold.map(|w| {
         if let Some(b) = w.basis {
@@ -84,8 +86,6 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
         threshold = 2;
     }
 
-    let mut new_instances = vec![];
-
     for cur in SupportedCurrency::multisig_party_currencies() {
         if !metadata.has_instance(cur) {
             if let Ok(updated) = attempt_form_for_currency(
@@ -93,12 +93,17 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
                 network, &words_pass, &mut all_pks, threshold, &cur,
                 peer_broadcast
             ).await.log_error() {
-                new_instances.push(updated);
+                event.new_instances.push(updated);
             }
         }
     }
-
-    Ok(events)
+    if event.new_instances.len() > 0 {
+        let mut updated_metadata = metadata.clone();
+        event.new_instances.iter()
+        .for_each(|i| updated_metadata.add_instance_equal_members(i, &all_pks));
+        event.updated_metadata = Some(updated_metadata);
+    }
+    Ok(event)
 }
 
 async fn attempt_form_for_currency<E, B>(

@@ -33,6 +33,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
+use redgold_keys::monero::node_wrapper::MoneroNodeRpcInterfaceWrapper;
 use redgold_keys::solana::derive_solana::SolanaWordPassExt;
 use redgold_keys::solana::wallet::SolanaNetwork;
 use redgold_schema::hash::ToHashed;
@@ -361,13 +362,13 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         threshold: i64,
         peer_broadcast: &B,
         peer_pks: &Vec<PublicKey>
-    ) -> RgResult<Address> {
+    ) -> RgResult<Option<Address>> {
         let res = match cur.clone() {
             SupportedCurrency::Redgold => {
-                Address::from_multiple_public_keys(&all_pks)
+                Some(Address::from_multiple_public_keys(&all_pks)?)
             }
             SupportedCurrency::Bitcoin => {
-                self.btc_pubkeys_to_multisig_address(&peer_pks, threshold).await
+                Some(self.btc_pubkeys_to_multisig_address(&peer_pks, threshold).await?)
             }
             SupportedCurrency::Ethereum => {
                 let self_address = self_public_key.to_ethereum_address_typed()?;
@@ -377,7 +378,7 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                     .collect::<RgResult<Vec<Address>>>()?;
                 let creation_result = safe.create_safe(threshold, owners).await?;
                 info!("Created safe ethereum multisig contract @ {:?}", creation_result);
-                creation_result.safe_addr.parse_ethereum_address_external()
+                Some(creation_result.safe_addr.parse_ethereum_address_external()?)
             }
             SupportedCurrency::Solana => {
                 let sol = SolanaNetwork::new(network.clone(), Some(words_pass.clone()));
@@ -397,17 +398,23 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                 addrs.push(self_addr);
 
                 let res = sol.establish_multisig_party(addrs, threshold).await?;
-                Ok(Address::from_solana_external(&res))
+                Some(Address::from_solana_external(&res))
             }
             SupportedCurrency::Monero => {
-                "not supported".to_error()
+                let mw = MoneroNodeRpcInterfaceWrapper::from_config_local();
+                if let Some(r) = mw {
+                    let mut r = r?;
+                    let result = r.multisig_create_loop(&all_pks, threshold, peer_broadcast).await?;
+                }
+                "error".to_error()
+                None
             }
             _ => {
                 error!("Unsupported currency for party formation: {:?}", cur);
-                Err(error_info("Unsupported currency"))
+                Err(error_info("Unsupported currency"))?
             }
         };
-        res
+        Ok(res)
     }
 }
 

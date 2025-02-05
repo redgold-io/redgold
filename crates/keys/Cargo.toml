@@ -16,6 +16,7 @@ categories = {  workspace = true }
 # workspace = true caused an error here? maybe
 redgold-schema = { workspace = true}
 redgold-common-no-wasm = { workspace = true }
+redgold-common = { workspace = true }
 #redgold-rpc-integ = { workspace = true }
 # Make all the non-WASM dependencies optional
 tokio = { version = "1.36.0", features = ["rt"]}

@@ -1072,6 +1072,11 @@ message Request {
   GuiInitRequest gui_init_request = 41;
   MultipartyCheckReadyRequest multiparty_check_ready_request = 42;
   GetSolanaAddress get_solana_address = 43;
+  MoneroMultisigFormationRequest monero_multisig_formation_request = 44;
+}
+
+message MoneroMultisigFormationRequest {
+  repeated string peer_strings = 1;
 }
 
 message GetSolanaAddress {}

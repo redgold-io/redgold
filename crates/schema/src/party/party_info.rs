@@ -1,6 +1,6 @@
-use crate::structs;
+use crate::structs::{self, Weighting};
 use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PublicKey, SupportedCurrency};
-use crate::parties::{PartyState, PartyInfo, PartyMetadata};
+use crate::parties::{PartyInfo, PartyInstance, PartyMembership, PartyMetadata, PartyParticipation, PartyState};
 impl PartyInfo {
 
     pub fn active(&self) -> bool {
@@ -62,5 +62,30 @@ impl PartyMetadata {
         self.instances.iter()
             .flat_map(|i| i.address.as_ref())
             .any(|a| a.currency() == cur)
+    }
+    pub fn add_instance_equal_members(&mut self, instance: &PartyInstance, equal_members: &Vec<PublicKey>) {
+        let addr = instance.address.clone();
+        self.instances.push(instance.clone());
+        let mut missing = vec![];
+        let basis = equal_members.len() as i64;
+        let participate = PartyParticipation {
+            address: addr.clone(), 
+            weight: Some(Weighting::from_int_basis(1, basis))
+        };
+        for m in self.memberships.iter_mut() {
+            if let Some(pk) = m.public_key.as_ref() {
+                if !equal_members.contains(pk) {
+                    missing.push(pk.clone());
+                } else {
+                    m.participate.push(participate.clone());
+                }
+            }
+        }
+        for pk in missing {
+            self.memberships.push(PartyMembership {
+                public_key: Some(pk),
+                participate: vec![participate.clone()],
+            });
+        }
     }
 }
