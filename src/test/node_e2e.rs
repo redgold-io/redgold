@@ -1,23 +1,26 @@
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::time::Duration;
+use bdk::sled::Tree;
 use futures::StreamExt;
 use itertools::Itertools;
 use log::info;
 use log::kv::Source;
+use redgold_keys::util::btc_wallet::SingleKeyBitcoinWallet;
 use serde::Serialize;
-use redgold_keys::address_external::ToEthereumAddress;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::eth::example::dev_ci_kp;
 use redgold_keys::proof_support::ProofSupport;
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_keys::eth::eth_wallet::EthWalletWrapper;
 use redgold_keys::eth::historical_client::EthHistoricalClient;
 use redgold_keys::transaction_support::TransactionSupport;
-use redgold_schema::{bytes_data, ErrorInfoContext, RgResult, SafeOption, structs};
+use redgold_schema::{bytes_data, public_key, structs, ErrorInfoContext, RgResult, SafeOption};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PartyPurpose, Proof, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
 use crate::api::control_api::ControlClient;
-use crate::api::public_api::PublicClient;
+use crate::api::public_api::{self, PublicClient};
 use crate::api::RgHttpClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
@@ -26,6 +29,7 @@ use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
 use crate::node::Node;
 use crate::node_config::NodeConfig;
 use crate::util;
+use crate::util::keys::public_key_from_bytes;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::seeds::seed;
@@ -98,23 +102,6 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     util::init_logger_once();
     let _tc = TestConstants::new();
 
-    let path = std::env::var("REDGOLD_SECURE_PATH").expect("secure path");
-    let path2 = format!("{path}/.rg/main/backups/1724045178");
-    let seeds = LocalNodes::seeds();
-    for i in 0..8 {
-        let mp_csv = format!("{path2}/{i}/multiparty.csv");
-        let raw = tokio::fs::read_to_string(mp_csv).await.expect("read mp csv");
-        let result = parse_mp_csv(raw).ok().unwrap();
-        info!("Total rows = {}", result.len());
-        let mut row = result.get(0).expect("row");
-        let init = row.initiate.as_mut().expect("initiate");
-        init.set_purpose(PartyPurpose::DebugPurpose);
-        let ident = init.identifier.as_mut().unwrap();
-
-        let party_keys = seeds.iter().map(|s| s.public_key.clone().unwrap()).collect_vec();
-        ident.party_keys =
-    }
-
 
     let mut local_nodes = LocalNodes::new(None).await;
 
@@ -139,6 +126,87 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
                                                spend_utxos,
         &start_node.node.relay.node_config
     );
+
+    for i in 1..8 {
+        // local_nodes.add_node().await;
+    }
+
+
+    let path = std::env::var("REDGOLD_SECURE_PATH").expect("secure path");
+    let path2 = format!("{path}/.rg/main/backups/1724045178");
+    let seeds = LocalNodes::seeds();
+    let mut rows = vec![];
+    for i in 0..8 {
+        let mp_csv = format!("{path2}/{i}/multiparty.csv");
+        let raw = tokio::fs::read_to_string(mp_csv).await.expect("read mp csv");
+        let result = parse_mp_csv(raw).ok().unwrap();
+        info!("Total rows = {}", result.len());
+        let mut row = result.get(0).expect("row").clone();
+        let init = row.initiate.as_mut().expect("initiate");
+        init.set_purpose(PartyPurpose::DebugPurpose);
+        let ident = init.identifier.as_mut().unwrap();
+        let party_keys = seeds.iter().map(|s| s.public_key.clone().unwrap()).collect_vec();
+        ident.party_keys = party_keys;
+        // local_nodes.nodes.get(i).expect("node").node.relay.ds.multiparty_store.add_keygen(&row).await.expect("add keygen");
+        rows.push(row.clone())
+    }
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    let party_row = rows.get(0).cloned().unwrap();
+    let identifier = party_row.identifier().cloned().unwrap();
+    let public_key = party_row.party_key.clone().unwrap();
+
+
+    let btc_addr = public_key.to_bitcoin_address(&NetworkEnvironment::Main).unwrap();
+    let eth_addr = public_key.to_ethereum_address().unwrap();
+    println!("BTC addr: {}", btc_addr);
+    println!("ETH addr: {}", eth_addr);
+
+    let mut r2 = relay_start.clone();
+    r2.node_config.network = NetworkEnvironment::Main;
+
+    let mut w = SingleKeyBitcoinWallet::<Tree>::new_wallet_db_backed(
+        public_key.clone(), NetworkEnvironment::Main, true,
+        PathBuf::from("bdk_sled_test"),
+        None
+    ).unwrap();
+    let cur_balance = CurrencyAmount::from_btc(w.get_wallet_balance()?.confirmed as i64);
+    info!("Current btc balance: {}", cur_balance.to_fractional());
+    info!("Current btc balance usd: {}", cur_balance.to_fractional() * 100000.0);
+    let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Bitcoin, &NetworkEnvironment::Main).unwrap();
+    let dest = "bc1qrxdzt6v9yuu567j52cmla4v9kler3wzj0k44lk".to_string();
+    let amt = cur_balance.clone() - (fee.clone()*2);
+    let outputs = vec![(dest, amt.amount as u64)];
+
+
+    w.create_transaction_output_batch(outputs)?;
+    let hashes = w.signable_hashes()?.clone();
+
+    for (i, (data, hashtype)) in hashes.iter().enumerate() {
+            
+        // let signing_data = Hash::new_direct_transaction(data.clone());
+        // let signing_data = Hash::from_string_calculate("test");
+
+        let mut signing_request = ControlMultipartySigningRequest::default();
+        let mut init_signing = InitiateMultipartySigningRequest::default();
+        init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
+        // init_signing.data_to_sign = Some(signing_data.bytes.clone().unwrap());
+        init_signing.data_to_sign = bytes_data(data.clone());
+        init_signing.identifier = Some(identifier.clone());
+        signing_request.signing_request = Some(init_signing);
+        let res = client1.multiparty_signing(signing_request).await;
+        // println!("{:?}", res);
+        res.clone().unwrap();
+        let proof = res.expect("ok").proof.expect("prof");
+        w.affix_input_signature(i, &proof, hashtype);
+    
+        // proof.verify(&signing_data).expect("verified");
+        info!("Proof created for {:?}", hashtype);
+    };
+    w.sign()?;
+    w.broadcast_tx()?;
+    let string = w.txid()?;
+    info!("txid: {}", string);
 
     // submit.submit().await.expect("submit");
     //
@@ -188,77 +256,77 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // submit.submit_invalid_signature().await;
     // submit.submit_used_mismatched_utxo().await;
     // submit.submit_used_utxo().await;
-
-    local_nodes.verify_data_equivalent().await;
-
-    local_nodes.add_node(
-        // runtime.clone()
-    ).await;
-
-    local_nodes.verify_data_equivalent().await;
-    // tokio::time::sleep(Duration::from_secs(2)).await;
-    // let after_2_nodes = submit.submit().await.expect("submit");
-    // after_2_nodes.at_least_n(2).unwrap();
-
-    // local_nodes.verify_peers().await.expect("verify peers");
-
-
-    // let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
-
-    // tokio::time::sleep(Duration::from_secs(10)).await;
-
-    //
-    // let signing_data = Hash::from_string_calculate("hey");
-    // let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
-    //
-    // tracing::info!("After MP test");
-    //
-    // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
     //
     // local_nodes.verify_data_equivalent().await;
-
-    // three nodes
-    local_nodes.add_node().await;
+    //
+    // local_nodes.add_node(
+    //     // runtime.clone()
+    // ).await;
+    //
     // local_nodes.verify_data_equivalent().await;
-    // local_nodes.verify_peers().await?;
+    // // tokio::time::sleep(Duration::from_secs(2)).await;
+    // // let after_2_nodes = submit.submit().await.expect("submit");
+    // // after_2_nodes.at_least_n(2).unwrap();
+    //
+    // // local_nodes.verify_peers().await.expect("verify peers");
+    //
+    //
+    // // let keygen1 = client1.multiparty_keygen(None).await.log_error()?;
+    //
+    // // tokio::time::sleep(Duration::from_secs(10)).await;
+    //
     // //
-    // // This works but is really flaky for some reason?
-    // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+    // // let signing_data = Hash::from_string_calculate("hey");
+    // // let _result = do_signing(keygen1.clone(), signing_data.clone(), client1.clone()).await;
+    // //
+    // // tracing::info!("After MP test");
+    // //
+    // // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(2).unwrap();
+    // //
+    // // local_nodes.verify_data_equivalent().await;
     //
-    // submit.submit().await?.at_least_n(3).unwrap();
+    // // three nodes
+    // local_nodes.add_node().await;
+    // // local_nodes.verify_data_equivalent().await;
+    // // local_nodes.verify_peers().await?;
+    // // //
+    // // // This works but is really flaky for some reason?
+    // // submit.with_faucet().await.unwrap().submit_transaction_response.expect("").at_least_n(3).unwrap();
+    // //
+    // // submit.submit().await?.at_least_n(3).unwrap();
+    // //
+    // // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
+    // // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
+    // // let public = res.public_key.expect("public key");
+    // // let mp_eth_addr = public.to_ethereum_address().expect("eth address");
+    // //
+    // // let environment = NetworkEnvironment::Dev;
+    // //
+    // // // Manual test uses up funds.
     //
-    // let keygen2 = client1.multiparty_keygen(None).await.log_error()?;
-    // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone()).await;
-    // let public = res.public_key.expect("public key");
-    // let mp_eth_addr = public.to_ethereum_address().expect("eth address");
+    // // manual_eth_mp_signing_test(client1, keygen2, &mp_eth_addr, &environment).await;
+    // // TODO: AMM tests
     //
-    // let environment = NetworkEnvironment::Dev;
+    // // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
+    // // ETH support.
+    // // let ds = start_node.node.relay.ds.clone();
+    // //
+    // // let mut loaded = false;
+    // // for _ in 0..10 {
+    // //     let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
+    // //     if let Ok(Some(t)) = test_load {
+    // //         info!("Deposit watcher config: {}", t.json_or());
+    // //         loaded = true;
+    // //         break;
+    // //     }
+    // //     tokio::time::sleep(Duration::from_secs(2)).await;
+    // // }
+    // // assert!(loaded);
     //
-    // // Manual test uses up funds.
-
-    // manual_eth_mp_signing_test(client1, keygen2, &mp_eth_addr, &environment).await;
-    // TODO: AMM tests
-
-    // Not triggering in tests, confirmation time is too long for BTC for a proper test, need to wait for
-    // ETH support.
-    // let ds = start_node.node.relay.ds.clone();
-    //
-    // let mut loaded = false;
-    // for _ in 0..10 {
-    //     let test_load = ds.config_store.get_json::<DepositWatcherConfig>("deposit_watcher_config").await;
-    //     if let Ok(Some(t)) = test_load {
-    //         info!("Deposit watcher config: {}", t.json_or());
-    //         loaded = true;
-    //         break;
-    //     }
-    //     tokio::time::sleep(Duration::from_secs(2)).await;
-    // }
-    // assert!(loaded);
-
-    // Eth staking tests.
-    // ignore for now, too flakey.
-    // if false {
-    // eth_amm_e2e(start_node, relay_start, &submit).await.expect("works");
+    // // Eth staking tests.
+    // // ignore for now, too flakey.
+    // // if false {
+    // // eth_amm_e2e(start_node, relay_start, &submit).await.expect("works");
 
     info!("Test passed");
 
@@ -717,37 +785,37 @@ async fn e2e_dbg() {
     // runtime.block_on(e2e_async()).expect("e2e");
 }
 
-
-// #[ignore]
-#[tokio::test]
-async fn debug_send() {
-
-    let dest = "0xA13072d258b2dA7C825f1335F5aa5aA6a31E2829";
-
-    let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
-
-    let eth = EthWalletWrapper::new(&dev_secret, &NetworkEnvironment::Dev).expect("works");
-
-    let a = structs::Address::from_eth(&dest.to_string());
-    let amt = EthWalletWrapper::stake_test_amount_typed();
-
-    assert!(PartyEvents::meets_minimum_stake_amount(&amt));
-    // eth.send_tx_typed(&a, &amt).await.expect("works");
-    let destination = Address::from_eth(dest);
-    let from = dev_kp.public_key().to_ethereum_address_typed().expect("");
-    let tx = eth.create_transaction_typed_inner(
-        &from,
-        &destination,
-        amt,
-        None
-    ).await.expect("works");
-    let gas_cost = eth.get_gas_cost_estimate(&tx).await.expect("works");
-    let gas_price = eth.get_gas_price().await.expect("works");
-    let fee = gas_cost.clone() * gas_price.clone();
-
-    println!("Fee: {}", fee.json_or());
-    println!("Fee: {}", fee.to_fractional());
-    println!("Fee USD: {}", fee.to_fractional() * 2600.0);
-    println!("Gas cost: {}", gas_cost.json_or());
-    println!("Gas price: {}", gas_price.json_or());
-}
+//
+// // #[ignore]
+// #[tokio::test]
+// async fn debug_send() {
+//
+//     let dest = "0xA13072d258b2dA7C825f1335F5aa5aA6a31E2829";
+//
+//     let (dev_secret, dev_kp) = dev_ci_kp().expect("works");
+//
+//     let eth = EthWalletWrapper::new(&dev_secret, &NetworkEnvironment::Dev).expect("works");
+//
+//     let a = structs::Address::from_eth(&dest.to_string());
+//     let amt = EthWalletWrapper::stake_test_amount_typed();
+//
+//     assert!(PartyEvents::meets_minimum_stake_amount(&amt));
+//     // eth.send_tx_typed(&a, &amt).await.expect("works");
+//     let destination = Address::from_eth(dest);
+//     let from = dev_kp.public_key().to_ethereum_address_typed().expect("");
+//     let tx = eth.create_transaction_typed_inner(
+//         &from,
+//         &destination,
+//         amt,
+//         None
+//     ).await.expect("works");
+//     let gas_cost = eth.get_gas_cost_estimate(&tx).await.expect("works");
+//     let gas_price = eth.get_gas_price().await.expect("works");
+//     let fee = gas_cost.clone() * gas_price.clone();
+//
+//     println!("Fee: {}", fee.json_or());
+//     println!("Fee: {}", fee.to_fractional());
+//     println!("Fee USD: {}", fee.to_fractional() * 2600.0);
+//     println!("Gas cost: {}", gas_cost.json_or());
+//     println!("Gas price: {}", gas_price.json_or());
+// }

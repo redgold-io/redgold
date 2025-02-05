@@ -33,7 +33,7 @@ impl LocalTestNodeContext {
         node_config.port_offset = random_port_offset;
         if id == 0 {
             node_config.genesis = true;
-            node_config.opts.enable_party_mode = true;
+            node_config.opts.enable_party_mode = false;
         }
 
         node_config.seeds = seed.clone();
@@ -84,8 +84,8 @@ async fn throw_panic() {
 }
 
 pub struct LocalNodes {
-    nodes: Vec<LocalTestNodeContext>,
-    current_seed: Seed,
+    pub nodes: Vec<LocalTestNodeContext>,
+    pub current_seed: Seed,
     pub(crate) seeds: Vec<Seed>,
 }
 
