@@ -7,7 +7,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, NetworkEnvironment, PublicKey, Request, RoomId, SupportedCurrency, Weighting};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MoneroMultisigFormationRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, Request, RoomId, SupportedCurrency, Weighting};
 use redgold_schema::util::lang_util::{AnyPrinter};
 use redgold_schema::{RgResult, SafeOption, ShortString};
 use serde::{Deserialize, Serialize};
@@ -265,12 +265,26 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         threshold.to_le_bytes().iter().for_each(|b| wallet_ident.push(*b));
         let b = Hash::digest(wallet_ident).raw_bytes_hex()?;
         let wallet_filename = b;
-        let mut peer_strs = None;
+        let mut peer_strs = vec![];
         loop {
-            let next = self.multisig_create_next(peer_strs, Some(threshold), &wallet_filename).await?;
-            let info_str = next.multisig_info_string();
+            let next = self.multisig_create_next(
+                Some(peer_strs.clone()), Some(threshold), &wallet_filename).await?;
+            let info_str = next.multisig_info_string().ok_msg("No multisig info string from self")?;
             let mut req = Request::default();
+            req.monero_multisig_formation_request = Some(MoneroMultisigFormationRequest {
+                public_keys: all_pks.clone(),
+                threshold: Some(Weighting::from_int_basis(threshold, all_pks.len() as i64)),
+                peer_strings: peer_strs.clone(),
+            });
 
+            let mut new_peer_strs = vec![info_str];
+            // TODO: fix this with retries and or elimination of a particular peer that is failing.
+            for r in peer_broadcast.broadcast(&all_pks.clone(), req).await {
+                let r = r?; 
+                let r = r.monero_multisig_formation_response.ok_msg("No response from peer")?;
+                new_peer_strs.push(r);
+            }
+            peer_strs = new_peer_strs;
         }
         self.get_secret()
     }
