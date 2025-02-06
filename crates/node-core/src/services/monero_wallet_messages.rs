@@ -52,7 +52,8 @@ impl TryRecvForEach<MoneroWalletMessage> for MoneroWalletSyncWriter {
         // }
         match message {
             MoneroWalletMessage::MultisigCreateNext(m) => {
-                let result = self.wallet_interface.multisig_create_next(
+                let result = self.wallet_interface
+                .multisig_create_next(
                     m.peer_strings, m.threshold, &"".to_string()
                 ).await;
                 m.response.send_rg_err(result).log_error().ok();
