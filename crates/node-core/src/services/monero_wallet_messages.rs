@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_common_no_wasm::ssh_like::{LocalSSHLike, SSHOrCommandLike};
 use redgold_common_no_wasm::stream_handlers::{IntervalFoldOrReceive, TryRecvForEach};
-use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, MoneroWalletMultisigRpcState};
+use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, MoneroWalletMultisigRpcState, PartySecretInstanceData};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::RgResult;
+use redgold_schema::structs::PublicKey;
 
 #[derive(Clone)]
 pub struct ActiveOperation {
@@ -20,14 +21,22 @@ pub struct MoneroWalletSyncWriter {
 
 #[derive(Clone, Debug)]
 pub struct MultisigCreateNext {
-    peer_strings: Option<Vec<String>>,
+    peer_strings: Vec<String>,
     threshold: Option<i64>,
     response: flume::Sender<RgResult<MoneroWalletMultisigRpcState>>
 }
 
 #[derive(Clone, Debug)]
+pub struct CreateMultsigAsProposer {
+    peers: Vec<PublicKey>,
+    threshold: Option<i64>,
+    response: flume::Sender<RgResult<PartySecretInstanceData>>
+}
+
+#[derive(Clone, Debug)]
 pub enum MoneroWalletMessage {
-    MultisigCreateNext(MultisigCreateNext)
+    MultisigCreateNext(MultisigCreateNext),
+    CreateMultsigAsProposer(CreateMultsigAsProposer)
 }
 
 #[async_trait]
@@ -48,6 +57,12 @@ impl TryRecvForEach<MoneroWalletMessage> for MoneroWalletSyncWriter {
                 ).await;
                 m.response.send_rg_err(result).log_error().ok();
 
+            }
+            MoneroWalletMessage::CreateMultsigAsProposer(p) => {
+                let mut r = r?;
+                let result = r.multisig_create_loop(&all_pks, threshold, peer_broadcast).await?;
+                secret_json = Some(result.json_or());
+                Some(result.address)
             }
         }
         Ok(())

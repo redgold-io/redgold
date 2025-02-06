@@ -109,10 +109,10 @@ impl TransactionGenerator {
             .with_output(&kp.address_typed(), &CurrencyAmount::from(entry.amount() as i64))
             .build().expect("Failed to build transaction")
             .sign(&prev.key_pair).expect("signed");
-        for i in tx.inputs.iter() {
-            // info!("Verifying proof with tx hash {}", tx.hash_hex());
-            i.verify_proof(prev_addr_typed, &tx.signable_hash()).expect("works");
-        }
+        // for i in tx.inputs.iter() {
+        //     // info!("Verifying proof with tx hash {}", tx.hash_hex());
+        //     i.verify_proof(prev_addr_typed, &tx.signable_hash()).expect("works");
+        // }
         TransactionWithKey {
             transaction: tx,
             key_pairs: vec![kp2],

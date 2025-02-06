@@ -165,6 +165,10 @@ impl PeerRxEventHandler {
             }
         }
 
+        if let Some(r) = &request.monero_multisig_formation_request {
+            // relay.
+        }
+
         if let Some(_) = &request.get_solana_address {
             response.get_solana_address_response = Some(relay.node_config.words().solana_address()?);
         }

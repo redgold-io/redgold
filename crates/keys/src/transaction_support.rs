@@ -6,8 +6,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
 use redgold_schema::{structs, RgResult, SafeOption};
-
-
+use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::address_external::ToBitcoinAddress;
 use redgold_schema::util::times::current_time_millis;
 
@@ -129,30 +128,52 @@ impl TransactionSupport for Transaction {
 }
 
 pub trait InputSupport {
-    fn verify_proof(&self, address: &Address, hash: &Hash) -> Result<(), ErrorInfo>;
     // This does not verify the address on the prior output
     fn verify_signatures_only(&self, hash: &Hash) -> Result<(), ErrorInfo>;
-    fn verify(&self, hash: &Hash) -> Result<(), ErrorInfo>;
+    fn verify_assuming_enriched(&self, hash: &Hash) -> Result<(), ErrorInfo>;
+    fn to_multisig_address(&self, threshold: i64) -> Address;
 }
 
 impl InputSupport for Input {
 
-    fn verify_proof(&self, address: &Address, hash: &Hash) -> Result<(), ErrorInfo> {
-        Proof::verify_proofs(&self.proof, &hash, address)
-    }
 
     // This does not verify the address on the prior output
     fn verify_signatures_only(&self, hash: &Hash) -> Result<(), ErrorInfo> {
         for proof in &self.proof {
-            proof.verify(&hash)?
+            proof.verify_signature_only(&hash)?
         }
-        return Ok(());
+        Ok(())
     }
 
-    fn verify(&self, hash: &Hash) -> Result<(), ErrorInfo> {
+    fn verify_assuming_enriched(&self, hash: &Hash) -> RgResult<()> {
         let o = self.output.safe_get_msg("Missing enriched output on input for transaction verification")?;
-        let address = o.address.safe_get_msg("Missing address on enriched output for transaction verification")?;
-        self.verify_proof(&address, hash)?;
-        return Ok(());
+        let prev_addr = o.address.safe_get_msg("Missing address on enriched output for transaction verification")?;
+        if self.proof.len() == 1 {
+            let proof = self.proof.get(0).expect("exists");
+            proof.verify_signature_only(&hash)?;
+            proof.verify_single_public_key_address(prev_addr)?;
+        } else {
+            if !o.is_multisig() {
+                "Output not declared as multisig, but multiple proofs provided".to_error()?;
+            };
+            let threshold = o.multisig_threshold_naive().ok_msg("Missing threshold")?;
+            let address = self.to_multisig_address(threshold);
+            self.verify_signatures_only(&hash)?;
+            let this_addr = self.address.safe_get_msg("Missing address on input for multisig verification")?;
+            if address != *this_addr {
+                "Multisig address mismatch".to_error()?;
+            }
+        }
+        Ok(())
     }
+
+    fn to_multisig_address(&self, threshold: i64) -> Address {
+        Address::from_multisig_public_keys_and_threshold(
+            &self.proof.iter()
+                .flat_map(|p| p.public_key.clone())
+                .collect_vec(),
+            threshold
+        )
+    }
+
 }

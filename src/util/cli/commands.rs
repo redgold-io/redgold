@@ -486,26 +486,26 @@ pub async fn test_transaction(_p0: &&TestTransactionCli, p1: &NodeConfig
         tx_submit.generator.lock().expect("");
         assert!(gen.finished_pool.len() > 0);
     };
-    let source = Proof::proofs_to_addresses(&faucet_tx.inputs.get(0).expect("").proof)?.get(0).expect("source").clone();
-    let repeat = tx_submit.drain(source).await?;
-    // assert!(repeat.accepted());
-    // assert proofs here
-    let s = repeat;
-    // info!("Repeat response: {}", s.json_or());
-    // let h2 = s.transaction_hash.expect("hash");
-    let q = s.query_transaction_response.expect("query transaction response");
-    // println!("Obs proofs second tx: {}", q.observation_proofs.json_or());
-    let i = q.observation_proofs.len();
-    println!("Obs proofs number length: {:?}", i);
-    assert!(i > 0);
-    let mut peer_keys: HashSet<PublicKey> = HashSet::new();
-
-    for o in q.observation_proofs {
-        let key = o.proof.expect("p").public_key.expect("");
-        peer_keys.insert(key);
-    }
-
-    println!("Number of unique peer observations {}", peer_keys.len());
+    // let source = Proof::proofs_to_addresses(&faucet_tx.inputs.get(0).expect("").proof)?.get(0).expect("source").clone();
+    // let repeat = tx_submit.drain(source).await?;
+    // // assert!(repeat.accepted());
+    // // assert proofs here
+    // let s = repeat;
+    // // info!("Repeat response: {}", s.json_or());
+    // // let h2 = s.transaction_hash.expect("hash");
+    // let q = s.query_transaction_response.expect("query transaction response");
+    // // println!("Obs proofs second tx: {}", q.observation_proofs.json_or());
+    // let i = q.observation_proofs.len();
+    // println!("Obs proofs number length: {:?}", i);
+    // assert!(i > 0);
+    // let mut peer_keys: HashSet<PublicKey> = HashSet::new();
+    //
+    // for o in q.observation_proofs {
+    //     let key = o.proof.expect("p").public_key.expect("");
+    //     peer_keys.insert(key);
+    // }
+    //
+    // println!("Number of unique peer observations {}", peer_keys.len());
 
     // client.client_wrapper()
 

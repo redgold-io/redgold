@@ -535,6 +535,11 @@ message CodeExecutionContract {
   optional ExecutorBackend executor = 3;
 }
 
+message AddressDescriptor {
+  repeated PublicKey public_keys = 1;
+  OutputContract contract = 2;
+}
+
 message OutputContract {
   // hash references, same issue as other thing
   optional StandardContractType standard_contract_type = 1;
@@ -740,6 +745,7 @@ enum HashType {
   UNKNOWN = 5;
   Utxo_Id = 6;
   Contract = 7;
+  Proto = 8;
 }
 
 message Tombstone {
@@ -1242,6 +1248,7 @@ enum AddressType {
   Ethereum_External_String = 7;
   Monero_External_String = 8;
   Solana_External_String = 9;
+  MultisigContract = 10;
 }
 
 message Address {

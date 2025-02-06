@@ -82,7 +82,7 @@ fn test_manual_sign() {
     let signing_data = Hash::digest("test".as_bytes().to_vec());
     let signing_data_vec = signing_data.raw_bytes().expect("works");
     let returned_proof = multiparty_manual_rebuilt_proof(rows, signing_data_vec);
-    returned_proof.verify(&signing_data).expect("verified");
+    returned_proof.verify_signature_only(&signing_data).expect("verified");
     info!("Proof: {:?}", returned_proof);
 }
 

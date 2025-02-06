@@ -180,7 +180,7 @@ async fn three_node_keygen_tests(local_nodes: &mut LocalNodes, client1: ControlC
     // required to get the public key
     info!("Starting first signing round with ALL");
     let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone(), first_three, true).await;
-    res.verify(&signing_data.clone()).expect("verify");
+    res.verify_signature_only(&signing_data.clone()).expect("verify");
     // info!("Starting second signing round with ALL-1");
     // let res = do_signing(keygen2.clone(), signing_data.clone(), client1.clone(), first_two, false).await;
     // res.verify(&signing_data.clone()).expect("verify");
@@ -719,7 +719,7 @@ async fn do_signing(
     // println!("{:?}", res);
     // assert!(res.is_ok());
     let proof = res.proof.expect("prof");
-    proof.verify(&signing_data).expect("verified");
+    proof.verify_signature_only(&signing_data).expect("verified");
     proof
 
 }

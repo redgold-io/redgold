@@ -64,10 +64,9 @@ impl ResolvedInput {
         let prior_output = self.prior_output()?;
         // TODO: Actually verify parent transaction hash matches input here right ?
         // Or is this done already?
-        let address = prior_output.address.safe_get()?;
-        let signable_hash = &self.signable_hash;
-        self.input.verify_proof(address, signable_hash)?;
-
+        let mut input = self.input.clone();
+        input.output = Some(prior_output.clone());
+        input.verify_assuming_enriched(&self.signable_hash)?;
         Ok(())
     }
     pub fn amount(&self) -> Result<Option<i64>, ErrorInfo> {

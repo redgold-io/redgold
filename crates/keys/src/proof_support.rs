@@ -12,27 +12,47 @@ use std::collections::HashMap;
 use log::info;
 
 pub trait ProofSupport {
-    fn verify(&self, hash: &Hash) -> RgResult<()>;
+    fn verify_signature_only(&self, hash: &Hash) -> RgResult<()>;
     fn new(hash: &Hash, secret: &SecretKey, public: &PublicKey) -> Proof;
     fn from_keypair(hash: &Vec<u8>, keypair: KeyPair) -> Proof;
     fn from_keypair_hash(hash: &Hash, keypair: &KeyPair) -> Proof;
-    fn verify_proofs(
-        proofs: &Vec<Proof>,
-        hash: &Hash,
-        address: &Address,
-    ) -> Result<(), ErrorInfo>;
+
     fn public_key(&self) -> RgResult<structs::PublicKey>;
-    fn proofs_to_addresses(proofs: &Vec<Proof>) -> RgResult<Vec<Address>>;
     fn verify_inner(&self, hash: &Hash) -> RgResult<()>;
+    fn verify_single_public_key_address(&self, address: &Address) -> RgResult<()>;
 }
 
 impl ProofSupport for Proof {
-    fn verify(&self, hash: &Hash) -> RgResult<()> {
+    fn verify_signature_only(&self, hash: &Hash) -> RgResult<()> {
         self.verify_inner(&hash)
             .with_detail("hash", &hash.hex())
             .with_detail("public_key", &self.public_key.json_or())
             .with_detail("signature", &self.signature.json_or())
     }
+
+    fn verify_single_public_key_address(&self, address: &Address) -> RgResult<()> {
+        let public_key = self.public_key.safe_get_msg("Missing public key")?;
+        let all_addresses = public_key.to_all_addresses()?;
+        if !all_addresses.contains(address) {
+            return Err(error_message(
+                structs::ErrorCode::AddressPublicKeyProofMismatch,
+                "address mismatch in Proof::verify_proofs",
+            ))
+                .with_detail("all_addresses", all_addresses.json_or())
+                .with_detail("all_addresses_hex_lengths",
+                             all_addresses
+                                 .iter()
+                                 .map(|a| a.render_string().map(|r| r.len()).unwrap_or(0))
+                                 .collect_vec()
+                                 .json_or()
+                )
+                .with_detail("address_on_prior_output", &address.json_or())
+                .with_detail("address_hex_len", address.hex().len().to_string())
+        }
+        Ok(())
+    }
+
+
     fn new(hash: &Hash, secret: &SecretKey, public: &PublicKey) -> Proof {
         let signature = util::sign_hash(&hash, &secret).expect("signature works");
         return Proof {
@@ -58,62 +78,11 @@ impl ProofSupport for Proof {
         );
     }
 
-    fn verify_proofs(
-        proofs: &Vec<Proof>,
-        hash: &Hash,
-        address: &Address,
-    ) -> Result<(), ErrorInfo> {
-        let all_addresses = Self::proofs_to_addresses(proofs)?;
-        // for a in all_addresses.iter() {
-        //     info!("Proofs_all_addresses {}", a.render_string().unwrap_or("".to_string()));
-        // }
-        let proof_1 = proofs.get(0).expect("exists").clone();
-        // info!("current verifying address: {}", address.render_string().unwrap_or("".to_string()));
-        // info!("current verifying address hex: {}", address.hex());
-        // info!("current verifying hash hex: {}", hash.hex());
-        if !all_addresses.contains(address) {
-
-            return Err(error_message(
-                structs::ErrorCode::AddressPublicKeyProofMismatch,
-                "address mismatch in Proof::verify_proofs",
-            ))
-                .with_detail("all_addresses", all_addresses.json_or())
-                .with_detail("all_addresses_hex_lengths",
-                             all_addresses
-                                 .iter()
-                                 .map(|a| a.render_string().map(|r| r.len()).unwrap_or(0))
-                                 .collect_vec()
-                                 .json_or()
-                )
-                .with_detail("address_on_prior_output", &address.json_or())
-                .with_detail("address_hex_len", address.hex().len().to_string())
-                .with_detail("proof_1", &proof_1.json_or())
-                .with_detail("proof_vec_length", &proofs.len().to_string())
-            ;
-        }
-        for proof in proofs {
-            proof.verify(hash)?
-        }
-        Ok(())
-    }
 
     fn public_key(&self) -> RgResult<structs::PublicKey> {
         // TODO: RSV Signature public key reconstruction
         // self.signature.safe_get()?.;
         self.public_key.clone().ok_msg("Missing public key")
-    }
-
-    fn proofs_to_addresses(proofs: &Vec<Proof>) -> RgResult<Vec<Address>> {
-        if proofs.len() > 1 {
-            // Multisig support only for RDG address types, not external address types.
-            Self::multi_proofs_to_address(proofs).map(|a| vec![a])
-        } else if proofs.len() == 1 {
-            let proof = proofs.get(0).expect("proof");
-            proof.public_key.safe_get_msg("Missing public key")?
-                .to_all_addresses()
-        } else {
-            return Err(error_info("No proofs to convert to addresses"));
-        }
     }
 
     fn verify_inner(&self, hash: &Hash) -> RgResult<()> {
@@ -153,7 +122,7 @@ fn verify_single_signature_proof() {
     let tc = TestConstants::new();
 
     let proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
-    assert!(proof.verify(&tc.rhash_1).is_ok());
+    assert!(proof.verify_signature_only(&tc.rhash_1).is_ok());
 }
 
 #[test]
@@ -161,7 +130,7 @@ fn verify_invalid_single_signature_proof() {
     let tc = TestConstants::new();
     let mut proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
     proof.signature = signature_data(tc.hash_vec.clone());
-    assert!(proof.verify( &tc.rhash_1).is_err());
+    assert!(proof.verify_signature_only( &tc.rhash_1).is_err());
 }
 
 #[test]
@@ -169,7 +138,7 @@ fn verify_invalid_key_single_signature_proof() {
     let tc = TestConstants::new();
     let mut proof = Proof::new(&tc.rhash_1, &tc.secret, &tc.public);
     proof.public_key = public_key_ser(&tc.public2);
-    assert!(proof.verify(&tc.rhash_1).is_err());
+    assert!(proof.verify_signature_only(&tc.rhash_1).is_err());
 }
 
 }

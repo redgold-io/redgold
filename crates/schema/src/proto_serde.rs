@@ -1,4 +1,4 @@
-use crate::structs::{ErrorCode, Hash};
+use crate::structs::{ErrorCode, Hash, HashType};
 use crate::{ErrorInfoContext, HashClear, RgResult};
 use prost::Message;
 use std::fmt::Display;
@@ -18,6 +18,12 @@ pub trait ProtoSerde
     fn proto_deserialize_hex(s: impl Into<String>) -> RgResult<Self>;
     fn from_hex(s: impl Into<String>) -> RgResult<Self>;
     fn proto_deserialize_ref(bytes: &Vec<u8>) -> RgResult<Self>;
+
+    fn to_hashed(&self) -> Hash {
+        let mut h = Hash::digest(self.vec());
+        h.hash_type = HashType::Proto as i32;
+        h
+    }
 }
 
 impl<T> ProtoSerde for T

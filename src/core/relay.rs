@@ -1283,10 +1283,11 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 
 #[async_trait]
 impl PeerBroadcast for Relay {
-    async fn broadcast(&self, request: Request, nodes: Vec<PublicKey>) -> RgResult<Vec<RgResult<Response>>> {
-        Ok(self.broadcast_async(nodes, request, None).await?.into_iter()
-        .map(|i| i
-            .and_then (|r| r.with_error_info())
-        ).collect_vec())
+    async fn broadcast(&self, nodes: &Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>> {
+        let result = self.broadcast_async(nodes.clone(), request, None).await?.into_iter()
+            .map(|i| i
+                .and_then(|r| r.with_error_info())
+            ).collect_vec();
+        Ok(result)
     }
 }

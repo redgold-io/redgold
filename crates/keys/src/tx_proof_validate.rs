@@ -26,18 +26,9 @@ impl TransactionProofValidator for Transaction {
 }
 fn validate_inner(tx: &Transaction) -> RgResult<()> {
     let hash = tx.signable_hash();
-    for input in &tx.inputs {
-        // info!("Validate inner new func address: {}", input.address().unwrap().render_string().unwrap());
-        // info!("Validate inner proof length: {}", input.proof.len());
-        let pk = input.proof.get(0).cloned().unwrap().public_key.unwrap();
-        // info!("Validate inner proof 0 pk: {}", pk.hex());
-        // info!("Validate inner proof 0 pk address direct: {}", pk.address().unwrap().render_string().unwrap());
-        if let Ok(a) = input.address() {
-            input.verify_proof(&a, &hash).add(input.json_or()).add(hash.hex())?;
-        }
+    for i in &tx.inputs {
+        i.verify_signatures_only(&hash)?
     }
-    // TODO: Validate deposit proofs.
-
     Ok(())
 }
 

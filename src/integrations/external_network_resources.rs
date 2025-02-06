@@ -10,7 +10,7 @@ use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::{BatchDatabase, MemoryDatabase};
 use bdk::sled::Tree;
 use itertools::Itertools;
-use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter, PeerBroadcast};
+use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter, PartyCreationResult, PeerBroadcast};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
 use redgold_keys::word_pass_support::NodeConfigKeyPair;
@@ -362,10 +362,13 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         threshold: i64,
         peer_broadcast: &B,
         peer_pks: &Vec<PublicKey>
-    ) -> RgResult<Option<Address>> {
+    ) -> RgResult<Option<PartyCreationResult>> {
+
+        let mut secret_json = None;
+
         let res = match cur.clone() {
             SupportedCurrency::Redgold => {
-                Some(Address::from_multiple_public_keys(&all_pks)?)
+                Some(Address::from_multisig_public_keys_and_threshold(&all_pks, threshold))
             }
             SupportedCurrency::Bitcoin => {
                 Some(self.btc_pubkeys_to_multisig_address(&peer_pks, threshold).await?)
@@ -385,8 +388,8 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                 let mut req = Request::default();
                 let gs = GetSolanaAddress::default();
                 req.get_solana_address = Some(gs);
-                let responses = peer_broadcast.broadcast(peer_pks).await;
-                let mut addrs = responses
+                let responses = peer_broadcast.broadcast(peer_pks, req).await;
+                let mut addrs = responses?
                     .into_iter().map(|r| {
                     r.and_then(|resp| { resp.clone().with_error_info().clone()})
                         .and_then(|r|
@@ -401,20 +404,29 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                 Some(Address::from_solana_external(&res))
             }
             SupportedCurrency::Monero => {
-                let mw = MoneroNodeRpcInterfaceWrapper::from_config_local();
+                let mw = MoneroNodeRpcInterfaceWrapper::from_config_local(
+                    &self.node_config, &self.node_config.env_data_folder().monero_wallet_dir().to_str().unwrap().to_string(),
+                    &self.node_config.env_data_folder().monero_wallet_expect().to_str().unwrap().to_string(),
+                    Some(false)
+                );
                 if let Some(r) = mw {
                     let mut r = r?;
                     let result = r.multisig_create_loop(&all_pks, threshold, peer_broadcast).await?;
+                    secret_json = Some(result.json_or());
+                    Some(result.address)
+                } else {
+                    None
                 }
-                "error".to_error()
-                None
             }
             _ => {
                 error!("Unsupported currency for party formation: {:?}", cur);
                 Err(error_info("Unsupported currency"))?
             }
         };
-        Ok(res)
+        Ok(res.map(|a| PartyCreationResult {
+            address: a,
+            secret_json
+        }))
     }
 }
 
@@ -721,7 +733,7 @@ impl ExternalNetworkResources for MockExternalResources {
         todo!()
     }
 
-    async fn create_multisig_party<B: PeerBroadcast>(&self, cur: &SupportedCurrency, all_pks: &Vec<PublicKey>, self_public_key: &PublicKey, self_private_key_hex: &String, network: &NetworkEnvironment, words_pass: WordsPass, threshold: i64, peer_broadcast: &B, peer_pks: &Vec<PublicKey>) -> RgResult<Address> {
+    async fn create_multisig_party<B: PeerBroadcast>(&self, cur: &SupportedCurrency, all_pks: &Vec<PublicKey>, self_public_key: &PublicKey, self_private_key_hex: &String, network: &NetworkEnvironment, words_pass: WordsPass, threshold: i64, peer_broadcast: &B, peer_pks: &Vec<PublicKey>) -> RgResult<Option<PartyCreationResult>> {
         todo!()
     }
 }

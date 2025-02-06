@@ -7,9 +7,14 @@ use redgold_schema::keys::words_pass::WordsPass;
 
 #[async_trait]
 pub trait PeerBroadcast where Self: Sync {
-    async fn broadcast(&self, peers: &Vec<PublicKey>, request: Request) -> Vec<RgResult<Response>>;
+    async fn broadcast(&self, peers: &Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>>;
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PartyCreationResult {
+    pub address: Address,
+    pub secret_json: Option<String>
+}
 
 #[async_trait]
 pub trait ExternalNetworkResources {
@@ -59,7 +64,7 @@ pub trait ExternalNetworkResources {
         threshold: i64,
         peer_broadcast: &B,
         peer_pks: &Vec<PublicKey>
-    ) -> RgResult<Address>;
+    ) -> RgResult<Option<PartyCreationResult>>;
 
 
 }

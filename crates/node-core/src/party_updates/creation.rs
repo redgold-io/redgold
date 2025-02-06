@@ -3,14 +3,15 @@ use redgold_schema::parties::{PartyInstance, PartyMetadata, PartyState};
 use redgold_schema::RgResult;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
-use redgold_common::external_resources::{ExternalNetworkResources, PeerBroadcast};
+use redgold_common::external_resources::{ExternalNetworkResources, PartyCreationResult, PeerBroadcast};
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
-use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, StateHistoryItem};
+use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, PartySecretData, PartySecretInstanceData, StateHistoryItem};
 use redgold_keys::solana::derive_solana::ToSolanaAddress;
 use redgold_keys::solana::wallet::SolanaNetwork;
 use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
@@ -23,7 +24,8 @@ use redgold_schema::util::times::current_time_millis;
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct PartyUpdateEvents {
     pub new_instances: Vec<PartyInstance>,
-    pub updated_metadata: Option<PartyMetadata>
+    pub updated_metadata: Option<PartyMetadata>,
+    pub new_secrets: Vec<PartySecretInstanceData>,
 }
 
 pub fn estimated_fee_min_balance_contract_multisig_establish(
@@ -88,12 +90,16 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
 
     for cur in SupportedCurrency::multisig_party_currencies() {
         if !metadata.has_instance(cur) {
-            if let Ok(updated) = attempt_form_for_currency(
+            if let Ok(Some((instance, creation_result))) = attempt_form_for_currency(
                 ext, self_hot_addresses, self_public_key, self_private_key_hex,
                 network, &words_pass, &mut all_pks, threshold, &cur,
                 peer_broadcast
             ).await.log_error() {
-                event.new_instances.push(updated);
+                event.new_instances.push(instance);
+                if let Some(j) = creation_result.secret_json {
+                    let result = j.json_from::<PartySecretInstanceData>()?;
+                    event.new_secrets.push(result);
+                }
             }
         }
     }
@@ -117,7 +123,7 @@ async fn attempt_form_for_currency<E, B>(
     threshold: i64,
     cur: &SupportedCurrency,
     peer_broadcast: &B,
-) -> RgResult<PartyInstance> where E: ExternalNetworkResources, B: PeerBroadcast {
+) -> RgResult<Option<(PartyInstance, PartyCreationResult)>> where E: ExternalNetworkResources, B: PeerBroadcast {
         // New party instance required:
         let fee = estimated_fee_min_balance_contract_multisig_establish(cur.clone());
         let address = self_hot_addresses.iter().find(|a| &a.currency() == cur);
@@ -139,18 +145,15 @@ async fn attempt_form_for_currency<E, B>(
             new_instance.state = PartyState::Active as i32;
             new_instance.creation_time = Some(current_time_millis());
             new_instance.last_update_time = Some(current_time_millis());
-            let address = match cur {
-                SupportedCurrency::Redgold => {
-                    Address::from_multiple_public_keys(&all_pks)?
-                }
-                cur => {
-                    ext.create_multisig_party(
-                        cur, &all_pks, self_public_key, self_private_key_hex, network, words_pass.clone(), threshold, peer_broadcast, &all_pks
-                    ).await?
-                }
-            };
-            new_instance.address = Some(address);
-            Ok(new_instance)
+            let creation_result = ext.create_multisig_party(
+                cur, &all_pks, self_public_key, self_private_key_hex, network, words_pass.clone(), threshold, peer_broadcast, &all_pks
+            ).await?;
+            if let Some(c) = creation_result {
+                new_instance.address = Some(c.address.clone());
+                Ok(Some((new_instance, c)))
+            } else {
+                Ok(None)
+            }
         } else {
             "Insufficient balance for party formation".to_error()
         }

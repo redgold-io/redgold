@@ -40,7 +40,7 @@ pub struct MoneroNodeRpcInterfaceWrapper<S: SSHOrCommandLike> {
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct PartySecretInstanceData {
     pub address: Address,
-    pub monero_history: Vec<StateHistoryItem>,
+    pub monero_history: Option<Vec<StateHistoryItem>>,
 }
 
 
@@ -188,7 +188,7 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
     pub fn get_secret(&self) -> RgResult<PartySecretInstanceData> {
         Ok(PartySecretInstanceData {
             address: Address::from_monero_external(&self.any_multisig_addr_creation().ok_msg("No multisig address found")?),
-            monero_history: self.history.clone(),
+            monero_history: Some(self.history.clone()),
         })
     }
 
@@ -269,6 +269,9 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         loop {
             let next = self.multisig_create_next(
                 Some(peer_strs.clone()), Some(threshold), &wallet_filename).await?;
+            if next == MoneroWalletMultisigRpcState::MultisigReadyToSend {
+                break;
+            }
             let info_str = next.multisig_info_string().ok_msg("No multisig info string from self")?;
             let mut req = Request::default();
             req.monero_multisig_formation_request = Some(MoneroMultisigFormationRequest {
@@ -279,8 +282,8 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
 
             let mut new_peer_strs = vec![info_str];
             // TODO: fix this with retries and or elimination of a particular peer that is failing.
-            for r in peer_broadcast.broadcast(&all_pks.clone(), req).await {
-                let r = r?; 
+            for r in peer_broadcast.broadcast(&all_pks.clone(), req).await? {
+                let r = r?;
                 let r = r.monero_multisig_formation_response.ok_msg("No response from peer")?;
                 new_peer_strs.push(r);
             }

@@ -63,12 +63,6 @@ impl Proof {
             .clone())
     }
 
-    pub fn multi_proofs_to_address(proofs: &Vec<Proof>) -> Result<Address, ErrorInfo> {
-        let pks = proofs.iter().flat_map(|p| p.public_key.clone()).collect_vec();
-        let addr = Address::from_multiple_public_keys(&pks)?;
-        Ok(addr)
-    }
-
 
     pub fn from(public_key: structs::PublicKey, signature: structs::Signature) -> Self {
         Self {
