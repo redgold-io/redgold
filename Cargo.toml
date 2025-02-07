@@ -127,6 +127,7 @@ strum = {workspace = true}
 strum_macros = {workspace = true}
 dhat = "0.3.3"
 redgold-crawler = {workspace = true}
+redgold-crawler-native = {workspace = true}
 redgold-schema = {workspace = true}
 redgold-node-core = {workspace = true}
 redgold-gui = {workspace = true}

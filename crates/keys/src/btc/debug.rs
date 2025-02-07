@@ -123,7 +123,8 @@ async fn balance_test_mn() {
         Some("ssl://fulcrum.sethforprivacy.com:50002".to_string()),
         None,
         None,
-        None
+        None,
+        None,
     ).expect("worx");
     let balance = w.get_wallet_balance().expect("");
 

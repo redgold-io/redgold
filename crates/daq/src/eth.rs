@@ -3,12 +3,10 @@ use async_trait::async_trait;
 use futures::future::Either;
 use futures::TryStreamExt;
 use metrics::counter;
-use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_rpc_integ::eth::ws_rpc::{EthereumWsProvider, TimestampedEthereumTransaction};
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::structs::PublicKey;
 use redgold_schema::RgResult;
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,7 +37,7 @@ impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
                     &addrs, t
                 );
                 if let Ok(ett) = ett {
-                    if let Some(a) = ett.self_address.as_ref() {
+                    if let Some(_) = ett.self_address.as_ref() {
                     }
                 }
             }

@@ -89,7 +89,7 @@ impl ParquetExporter for DataStore {
 }
 
 impl DataStore {
-    fn write_part(path: &PathBuf, buf: &mut Vec<Transaction>, mut part: i32) -> RgResult<()> {
+    fn write_part(path: &PathBuf, buf: &mut Vec<Transaction>, part: i32) -> RgResult<()> {
         let part_fnm = index_to_part_file(part);
         let path_file = path.join(part_fnm);
         write_parquet_file(&path_file, &buf)?;

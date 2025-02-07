@@ -299,7 +299,7 @@ fn proceed_from_pk<G, E>(
                     .first_party
                     .as_ref()
                     .lock().ok()
-                    .and_then(|p| p.party_info.party_key.clone())
+                    .map(|p| p.proposer_key.clone())
                     .unwrap();
 
                 let map = data.price_map_usd_pair_incl_rdg.clone();

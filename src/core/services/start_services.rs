@@ -22,7 +22,7 @@ use crate::party::party_watcher::PartyWatcher;
 use crate::party::portfolio_fulfillment_agent::PortfolioFullfillmentAgent;
 use crate::sanity::recent_parity::RecentParityCheck;
 use crate::shuffle::shuffle_interval::Shuffle;
-use crate::{api, e2e};
+use crate::{api, e2e, node_config};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::stream_handlers::{run_interval_fold, run_interval_fold_or_recv, run_recv_concurrent, run_recv_single};
 use redgold_schema::error_info;
@@ -48,6 +48,11 @@ impl Node {
 
 
         let mut sjh = ServiceJoinHandles::default();
+
+        if node_config.enable_party_mode() {
+            sjh.add("CoinbaseWsStatus", 
+            tokio::spawn(redgold_crawler_native::coinbase_ws::run_coinbase_ws_status(relay.coinbase_ws_status.sender.clone())));
+        }
 
         let agent = PortfolioFullfillmentAgent::new(
             &relay, external_network_resources.clone());

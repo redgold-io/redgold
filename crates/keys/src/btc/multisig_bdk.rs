@@ -162,6 +162,7 @@ async fn balance_test_mn() {
         Some(pkh.clone()),
         Some(vec![pub1.clone(), pub2.clone()]),
         Some(2),
+        None
     ).expect("Failed to create wallet");
 
     let mut wm1 = SingleKeyBitcoinWallet::new_wallet_db_backed(
@@ -174,6 +175,7 @@ async fn balance_test_mn() {
         Some(pkh1),
         Some(vec![pub2.clone(), pub0.clone()]),
         Some(2),
+        None
     ).expect("Failed to create wallet");
 
     assert_eq!(wm.get_descriptor_address().unwrap(), wm1.get_descriptor_address().unwrap());

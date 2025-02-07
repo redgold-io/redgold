@@ -94,6 +94,7 @@ pub struct AddressBalance {
     pub rounded_balance: f64,
 }
 
+
 impl Transaction {
 
     pub fn with_pow(mut self) -> RgResult<Self> {
