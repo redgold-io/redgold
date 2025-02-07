@@ -24,12 +24,10 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, SafeOption};
 use tokio::sync::Mutex;
 use tracing::{error, info};
-use redgold_gui::add;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgTopLevelSubcommand;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::observability::errors::Loggable;
-use redgold_schema::party::all_parties::AllParties;
 
 async fn load_configs() -> (Box<NodeConfig>, bool) {
     let (nc, opts) = main_config();
