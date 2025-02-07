@@ -31,19 +31,19 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn handle_order_fulfillment(&mut self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
         for (key,v ) in data.iter_mut() {
             let v2 = v.clone();
-            if !v.party_info.self_initiated.unwrap_or(false) {
+            if !v.self_initiated_not_debug() {
                 continue;
             }
-            if v.party_info.successor_key.is_some() {
-                continue;
-            }
+            // if v.active_self().is_some() {
+            //     continue;
+            // }
             if let Some(ps) = v.party_events.as_ref() {
                 let key_address = key.address()?;
 
                 let cutoff_time = current_time_millis_i64() - (self.relay.node_config.order_cutoff_delay_time().as_millis() as i64); //
                 let orders = ps.orders();
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
-                let identifier = v.party_info.initiate.safe_get()?.identifier.safe_get().cloned()?;
+                // let identifier = v.party_info.initiate.safe_get()?.identifier.safe_get().cloned()?;
 
                 let balance = self.relay.ds.transaction_store.get_balance(&key_address).await?;
                 let rdg_ds_balance: i64 = balance.safe_get_msg("Missing balance").cloned().unwrap_or(0);
@@ -153,66 +153,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 // }
                 //
                 // Immediately update processed orders ^ to ensure no duplicate or no persistence failure
-                let pid = v.clone();
-                self.relay.ds.multiparty_store.update_party_data(&key, pid.to_party_data()).await?;
-                let network = self.relay.node_config.network.clone();
-                if let Some(b) = ps.balance_map.get(&SupportedCurrency::Ethereum) {
-                    let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Ethereum, &self.relay.node_config.network);
-                    if let Some(f) = fee {
-                        let dest = Address::from_eth_external_exact(&"0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string());
-                        let amt = b.clone() - (f.clone()*2);
-                        if amt.to_fractional() > f.to_fractional() {
-                            let fulfilled_amount = (amt.to_fractional() * 1e8) as u64;
-                            self.fulfill_individual_eth_order(&ps, &identifier, &v2, &dest, &OrderFulfillment {
-                                order_amount: 0,
-                                destination: dest.clone(),
-                                fulfilled_amount,
-                                is_ask_fulfillment_from_external_deposit: false,
-                                event_time: current_time_millis_i64(),
-                                tx_id_ref: None,
-                                stake_withdrawal_fulfilment_utxo_id: None,
-                                primary_event: AddressEvent::External(ExternalTimedTransaction::default()),
-                                prior_related_event: None,
-                                successive_related_event: None,
-                                is_stake_withdrawal: false,
-                                fulfillment_txid_external: None,
-                            }).await.log_error().ok();
-                        }
-                    }
-                }
-
-                if let Some(b) = ps.balance_map.get(&SupportedCurrency::Bitcoin) {
-                    let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Bitcoin, &network);
-                    if let Some(f) = fee {
-                        let dest = if network == NetworkEnvironment::Main {
-                            "bc1qrxdzt6v9yuu567j52cmla4v9kler3wzj0k44lk"
-                        } else {
-                            "tb1qrxdzt6v9yuu567j52cmla4v9kler3wzj9swxy9"
-                        };
-                        let amt = b.clone() - (f.clone()*2);
-                        if amt.to_fractional() > f.to_fractional() {
-                            let fulfilled_amount = amt.amount as u64;
-                            self.mp_send_btc(key, &identifier, vec![(dest.to_string(), fulfilled_amount)], ps)
-                                .await.log_error().ok();
-                        }
-                    }
-                }
-
-                if let Some(b) = ps.balance_map.get(&SupportedCurrency::Redgold) {
-                    let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Redgold, &network);
-                    if let Some(f) = fee {
-                        let dest = Address::from_hex("0a220a208435a7a6cdb08185736c4ce95384a945ca7ec6de010e328d259d8e3c35207b7d")?;
-                        let amt = b.clone() - (f.clone()*2);
-                        if amt.to_fractional() > f.to_fractional() {
-                            let mut tb = TransactionBuilder::new(&self.relay.node_config);
-                            tb.with_utxos(&utxos)?;
-                            tb.with_output(&dest, &amt);
-                            let tx = tb.build()?;
-                            self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
-                        }
-                    }
-                }
-
+               
                 // let rdg_fulfilled = self.fulfill_rdg_orders(&identifier, &utxos, ps, cutoff_time).await?;
                 // total_done_orders += rdg_fulfilled;
                 // gauge!("redgold_party_fulfilled_orders_now", &pk_label).set(total_done_orders as f64);

@@ -61,7 +61,7 @@ impl UtxoStore {
             utxo.output_index
         );
         let fetched_rows = DataStoreContext::map_err_sqlx(match tx_opt {
-            Some(mut tx) => {
+            Some(tx) => {
                 // If a transaction is provided, use it directly.
                 rows.fetch_optional(&mut **tx).await
             }
@@ -98,7 +98,7 @@ impl UtxoStore {
 
         // Decide whether to use the provided transaction or create a new pool.
         let fetched_rows = DataStoreContext::map_err_sqlx(match tx_opt {
-            Some(mut tx) => {
+            Some(tx) => {
                 // If a transaction is provided, use it directly.
                 rows.fetch_all(&mut **tx).await
             }
@@ -149,7 +149,7 @@ impl UtxoStore {
 
         // Decide whether to use the provided transaction or create a new pool.
         let fetched_rows = DataStoreContext::map_err_sqlx(match sqlite_tx {
-            Some(mut tx) => {
+            Some(tx) => {
                 // If a transaction is provided, use it directly.
                 rows.execute(&mut **tx).await
             }

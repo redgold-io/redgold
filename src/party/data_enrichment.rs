@@ -42,7 +42,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                         .cloned()
                         .unwrap_or_default();
                     btc.transactions.extend(prior.transactions);
-                    btc.transactions = btc.transactions.iter().unique_by(|t| t.tx_id.clone()).collect_vec();
+                    btc.transactions = btc.transactions.iter().unique_by(|t| t.tx_id.clone()).cloned().collect_vec();
                 }
                 if party_instance.currency() == SupportedCurrency::Ethereum {
                     let mut eth = self.get_public_key_eth_data(&this_instance_address, None).await?;
@@ -50,7 +50,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                         .cloned()
                         .unwrap_or_default();
                     eth.transactions.extend(prior.transactions);
-                    eth.transactions = eth.transactions.iter().unique_by(|t| t.tx_id.clone()).collect_vec();
+                    eth.transactions = eth.transactions.iter().unique_by(|t| t.tx_id.clone()).cloned().collect_vec();
                 }
                 if party_instance.currency() == SupportedCurrency::Redgold {
 
@@ -73,11 +73,11 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     }
                     let prior = party_internal_data.internal_data.clone();
                     txs.extend(prior);
-                    txs = txs.iter().unique().collect_vec();
-                    txs.sort_by_key(|t| t.time().unwrap_or(0));
+                    txs = txs.iter().unique_by(|t| t.hash_or().clone()).cloned().collect_vec();
+                    txs.sort_by_key(|t| t.time().cloned().unwrap_or(0));
                     party_internal_data.internal_data = txs;
                     address_events.extend(party_internal_data.internal_address_events.clone());
-                    party_internal_data.address_events = address_events.iter().unique();
+                    party_internal_data.address_events = address_events.iter().unique_by(|ae| ae.identifier()).cloned().collect_vec();
                 }
 
             }

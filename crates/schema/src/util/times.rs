@@ -8,6 +8,7 @@ pub fn current_time_millis() -> i64 {
 }
 
 pub trait ToTimeString {
+    fn to_year_month_utc(&self) -> String;
     fn to_time_string(&self) -> String;
     fn to_time_string_shorter(&self) -> String;
     fn to_time_string_shorter_no_seconds(&self) -> String;
@@ -56,6 +57,13 @@ impl ToTimeString for i64 {
         let utc_datetime = Utc.timestamp_millis_opt(*self).unwrap();
         let pacific_datetime: DateTime<Local> = utc_datetime.with_timezone(&Local);
         let formatted_datetime = pacific_datetime.format("%Y-%m-%d").to_string();
+        formatted_datetime
+    }
+
+    fn to_year_month_utc(&self) -> String {
+        let utc_datetime = Utc.timestamp_millis_opt(*self).unwrap();
+        let pacific_datetime: DateTime<Utc> = utc_datetime.with_timezone(&Utc);
+        let formatted_datetime = pacific_datetime.format("%Y_%m").to_string();
         formatted_datetime
     }
 

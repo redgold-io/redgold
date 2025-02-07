@@ -15,15 +15,10 @@ impl TransactionStore {
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM transactions"#
         )
-            .fetch_all(&mut *pool)
+            .fetch_one(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            res.push(row.count as i64);
-        }
-        let option = res.get(0).safe_get()?.clone().clone();
-        Ok(option)
+        Ok(rows_m.count as i64)
     }
 
 
@@ -45,15 +40,10 @@ impl TransactionStore {
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM utxo"#
         )
-            .fetch_all(&mut *pool)
+            .fetch_one(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            res.push(row.count as i64);
-        }
-        let option = res.get(0).safe_get()?.clone().clone();
-        Ok(option)
+        Ok(rows_m.count as i64)
     }
 
     pub async fn query_rejected_transaction(&self, hash: &Hash) -> RgResult<Option<(Transaction, ErrorInfo)>> {

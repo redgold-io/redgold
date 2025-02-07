@@ -103,7 +103,7 @@ impl DataStore {
         let mut part = 0;
 
         // info!("Starting export");
-        for (i, tx) in all2.into_iter().enumerate() {
+        for (_, tx) in all2.into_iter().enumerate() {
             let ser = tx.proto_serialize();
             // let mut write_condition = false;
             // if i % 2000 == 0 && i > 0 {
@@ -136,7 +136,7 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::util::timers::PerfTimer;
-use redgold_schema::util::times;
+use redgold_schema::util::times::{self, ToTimeString};
 use redgold_schema::util::times::current_time_millis;
 
 
@@ -169,7 +169,7 @@ fn write_parquet_file(path: &PathBuf, transactions: &Vec<Transaction>) -> RgResu
     Ok(())
 }
 
-fn as_dataframe(transactions: &Vec<Transaction>, schema_time: Option<i64>) -> RgResult<DataFrame> {
+fn as_dataframe(transactions: &Vec<Transaction>, _schema_time: Option<i64>) -> RgResult<DataFrame> {
     let schema = transaction_simple_parquet_schema(None);
     info!("Converting {} transactions to rows", transactions.len());
     let t = PerfTimer::named("as_dataframe_translate_tx");
@@ -188,9 +188,11 @@ fn index_to_part_file(index: i32) -> String {
 }
 
 fn millis_to_year_month(millis: i64) -> String {
-    let datetime = DateTime::<Utc>::from_utc(
-        chrono::NaiveDateTime::from_timestamp_millis(millis).unwrap(),
-        Utc,
-    );
-    datetime.format("%Y_%m").to_string()
+
+    millis.to_year_month_utc()
+    // let datetime = DateTime::<Utc>::from_utc(
+    //     chrono::NaiveDateTime::from_timestamp_millis(millis).unwrap(),
+    //     Utc,
+    // );
+    // datetime.format("%Y_%m").to_string()
 }

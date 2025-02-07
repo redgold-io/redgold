@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[allow(unused_imports)]
+
 mod debug_fs_test;
 
 pub fn add(left: u64, right: u64) -> u64 {

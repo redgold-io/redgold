@@ -95,7 +95,7 @@ impl AirgapSignerWindow {
                 _ => {}
             }
             match &self.transport {
-                AirgapTransport::Qr(pref_capture) => {
+                AirgapTransport::Qr(_pref_capture) => {
                     match &self.mode {
                         AirgapWindowMode::DisplayingMessage => {
                             if let Some(img) = &self.qr_image {
@@ -105,7 +105,7 @@ impl AirgapSignerWindow {
                             }
                         },
                         AirgapWindowMode::AwaitingDataReceipt => {
-                            if let Some(mut s) = self.capture_stream.as_mut() {
+                            if let Some(s) = self.capture_stream.as_mut() {
                                 let devs = s.get_device_names();
                                 if let Ok(devices) = devs {
                                     let name_to_index = devices.iter().enumerate().map(|(i, d)| (d.clone(), i)).collect::<HashMap<String, usize>>();
@@ -140,7 +140,7 @@ impl AirgapSignerWindow {
 
                                     ui.add(Image::new(sized_texture));
 
-                                    if let Ok((meta, data)) = res {
+                                    if let Ok((_meta, data)) = res {
                                         self.finish(data);
                                     }
                                 } else {
@@ -151,7 +151,7 @@ impl AirgapSignerWindow {
                         _ => {}
                     }
                 }
-                AirgapTransport::File(file_out_dir) => {
+                AirgapTransport::File(_file_out_dir) => {
                     match &self.mode {
                         AirgapWindowMode::DisplayingMessage => {
                             self.transport_selector_and_file_input_box(ui, false);
@@ -173,7 +173,7 @@ impl AirgapSignerWindow {
 
     fn completed_data_receipt<G>(&mut self, g: &G, sign_info: Option<&TransactionSignInfo>, ui: &mut Ui) where G: GuiDepends + Clone + Send {
         ui.label("Data Received");
-        let mut sign_info = sign_info.cloned();
+        let sign_info = sign_info.cloned();
 
         if let Some(mut tsi) = sign_info {
             bounded_text_area(ui, &mut self.rx_message.json_or());
@@ -285,7 +285,7 @@ impl AirgapSignerWindow {
 
     pub fn init_qr_image_render(&mut self) {
         match &self.transport {
-            AirgapTransport::Qr(c) => {
+            AirgapTransport::Qr(_c) => {
                 let h = self.msg.proto_serialize_hex();
                 let img = qr_encode_image(h);
                 self.qr_image = Some(img);
@@ -308,8 +308,8 @@ impl AirgapSignerWindow {
             AirgapTransport::File(f) => {
                 let buf = PathBuf::from(f);
                 let cur = current_time_millis().to_time_string_shorter_underscores();
-                let mut path = buf.join(format!("{}-{}", cur, Self::message_ending()));
-                let mut read_path = buf.join(format!("{}-{}", cur, Self::response_ending()));
+                let path = buf.join(format!("{}-{}", cur, Self::message_ending()));
+                let read_path = buf.join(format!("{}-{}", cur, Self::response_ending()));
                 self.file_write_reference = path.to_str().unwrap().to_string();
                 self.file_read_reference = read_path.to_str().unwrap().to_string();
             }

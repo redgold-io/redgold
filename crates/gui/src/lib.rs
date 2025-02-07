@@ -1,5 +1,6 @@
-#![allow(unused_imports)]
-
+#[allow(unused_imports)]
+#[allow(dead_code)]
+#[allow(unused_variables)]
 
 #[cfg(target_os = "linux")]
 pub mod image_capture;
