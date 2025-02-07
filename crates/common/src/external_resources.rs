@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use redgold_schema::keys::words_pass::WordsPass;
 
 #[async_trait]
-pub trait PeerBroadcast where Self: Sync {
+pub trait PeerBroadcast where Self: Sync + Clone + Send {
     async fn broadcast(&self, peers: &Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>>;
 }
 
@@ -21,6 +21,8 @@ pub trait ExternalNetworkResources {
 
     fn set_network(&mut self, network: &NetworkEnvironment);
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>>;
+    async fn get_all_tx_for_address(&self, address: &Address, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
+                                    -> RgResult<Vec<ExternalTimedTransaction>>;
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String>;
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
     async fn daily_historical_year(&self) -> RgResult<HashMap<SupportedCurrency, Vec<(i64, f64)>>>;

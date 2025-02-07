@@ -61,6 +61,14 @@ impl Address {
         match self.address_type() {
             AddressType::BitcoinExternalString => self.mark_bitcoin_external(),
             AddressType::EthereumExternalString => self.mark_ethereum_external(),
+            AddressType::SolanaExternalString => {
+                self.set_currency(SupportedCurrency::Solana);
+                self
+            },
+            AddressType::MoneroExternalString => {
+                self.set_currency(SupportedCurrency::Monero);
+                self
+            },
             _ => self
         }
     }

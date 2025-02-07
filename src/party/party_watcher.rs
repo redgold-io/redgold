@@ -6,12 +6,18 @@ use metrics::gauge;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
-use redgold_schema::party::all_parties::AllParties;
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::PublicKey;
 use redgold_schema::RgResult;
 use std::collections::HashMap;
+use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
+use redgold_keys::monero::node_wrapper::PartySecretData;
+use redgold_keys::proof_support::PublicKeySupport;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
+use redgold_node_core::party_updates::creation::check_formations;
+use redgold_schema::parties::PartyMetadata;
 
 // TODO: Future event streaming solution here
 #[derive(Clone)]
@@ -29,15 +35,48 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     }
     
     pub async fn tick(&mut self) -> RgResult<()> {
-        let parties = self.relay.ds.multiparty_store.all_party_info_with_key().await?;
 
-        let all_parties = AllParties::new(parties.clone());
-        let active = all_parties.active;
+        let mut party_metadata = self.relay.ds.config_store
+            .get_json::<PartyMetadata>("party_metadata").await?
+            .unwrap_or(Default::default());
+        let mut party_secrets = self.relay.ds.config_store
+            .get_json::<PartySecretData>("party_secret").await?
+            .unwrap_or(Default::default());
+
+        let update_events = check_formations(
+            &party_metadata,
+            &self.external_network_resources,
+            &self.relay.node_config.words().hot_addresses_all(&self.relay.node_config.network)?,
+            &self.relay.node_config.seeds_now_pk(),
+            &self.relay,
+            &self.relay.node_config.public_key(),
+            None,
+            &self.relay.node_config.keypair().to_private_hex(),
+            &self.relay.node_config.network,
+            self.relay.node_config.words().clone()
+        ).await.log_error().bubble_abort()?.ok();
+
+        if let Some(u) = update_events {
+            if let Some(m) = u.updated_metadata.as_ref() {
+                party_metadata = m.clone();
+                self.relay.ds.config_store.set_json("party_metadata", &party_metadata).await?;
+            }
+            for s in u.new_secrets.iter() {
+                party_secrets.instances.push(s.clone());
+            }
+            self.relay.ds.config_store.set_json("party_secrets", &party_secrets).await?;
+        }
+
+
+        // TODO: Check for historical public keys associated with self node?;
+        let active = party_metadata.active();
+
         gauge!("redgold_party_watcher_active_parties").set(active.len() as f64);
-        gauge!("redgold_party_watcher_total_parties").set(parties.len() as f64);
+        gauge!("redgold_party_watcher_active_self_proposed_parties").set(party_metadata
+            .active_proposed_by(&self.relay.node_config.public_key()).len() as f64);
+        gauge!("redgold_party_watcher_total_parties").set(party_metadata.instances.len() as f64);
 
-
-        let mut shared_data = self.enrich_prepare_data(active.clone()).await?;
+        let mut shared_data = self.enrich_prepare_data(party_metadata).await?;
         // TODO: self.merge_child_events
         self.calculate_party_stream_events(&mut shared_data).await?;
         if self.relay.node_config.enable_party_mode() {

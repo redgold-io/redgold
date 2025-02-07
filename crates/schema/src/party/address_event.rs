@@ -1,6 +1,6 @@
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
-use crate::structs::{ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
+use crate::structs::{Address, ObservationProof, PublicKey, State, SupportedCurrency, Transaction, ValidationLiveness};
 use crate::tx::external_tx::ExternalTimedTransaction;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -107,5 +107,6 @@ pub struct TransactionWithObservationsAndPrice {
     pub tx: Transaction,
     pub observations: Vec<ObservationProof>,
     pub price_usd: Option<f64>,
-    pub all_relevant_prices_usd: HashMap<SupportedCurrency, f64>
+    pub all_relevant_prices_usd: HashMap<SupportedCurrency, f64>,
+    pub queried_address: Address
 }

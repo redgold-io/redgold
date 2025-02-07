@@ -46,7 +46,7 @@ pub struct PartySecretInstanceData {
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct PartySecretData {
-    instances: Vec<PartySecretInstanceData>
+    pub instances: Vec<PartySecretInstanceData>
 }
 
 
@@ -70,6 +70,13 @@ pub enum MoneroWalletMultisigRpcState {
 }
 
 impl MoneroWalletMultisigRpcState {
+
+    pub fn is_before_final_state(&self) -> bool {
+        match &self {
+            MoneroWalletMultisigRpcState::Made(_) => true,
+            _ => false
+        }
+    }
     pub fn multisig_address_str(&self) -> Option<String> {
         match self {
             MoneroWalletMultisigRpcState::Unknown => None,
@@ -101,6 +108,12 @@ impl MoneroWalletMultisigRpcState {
 
 impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
 
+
+    pub fn reset(&mut self) {
+        self.create_states = vec![];
+        self.history = vec![];
+        self.state = MoneroWalletMultisigRpcState::Unknown;
+    }
 
     pub fn any_multisig_addr_creation(&self) -> Option<String> {
         self.create_states.iter()
@@ -260,10 +273,7 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         threshold: i64,
         peer_broadcast: &B
     ) -> RgResult<PartySecretInstanceData> where B: PeerBroadcast {
-        let mut wallet_ident = vec![];
-        all_pks.iter().for_each(|pk| wallet_ident.extend(pk.vec()));
-        threshold.to_le_bytes().iter().for_each(|b| wallet_ident.push(*b));
-        let b = Hash::digest(wallet_ident).raw_bytes_hex()?;
+        let b = Self::get_wallet_filename_id(all_pks, threshold);
         let wallet_filename = b;
         let mut peer_strs = vec![];
         loop {
@@ -292,6 +302,13 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         self.get_secret()
     }
 
+    pub fn get_wallet_filename_id(all_pks: &Vec<PublicKey>, threshold: i64) -> String {
+        let mut wallet_ident = vec![];
+        all_pks.iter().for_each(|pk| wallet_ident.extend(pk.vec()));
+        threshold.to_le_bytes().iter().for_each(|b| wallet_ident.push(*b));
+        let b = Hash::digest(wallet_ident).raw_bytes_hex().unwrap();
+        b
+    }
 
     pub async fn multisig_create_next(
         &mut self,

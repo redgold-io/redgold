@@ -190,6 +190,7 @@ def full_text_repo_search_tooldef():
     }
 
 
+
 def full_text_repo_search(input) -> list[str]:
     query = input['query']
     hits = search(query)

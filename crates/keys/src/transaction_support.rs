@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::proof_support::{ProofSupport, PublicKeySupport};
 use crate::KeyPair;
 use itertools::Itertools;
@@ -11,6 +13,10 @@ use crate::address_external::ToBitcoinAddress;
 use redgold_schema::util::times::current_time_millis;
 
 pub trait TransactionSupport {
+    fn output_rdg_amount_of_exclude_address(&self, address: &Address) -> CurrencyAmount;
+    fn outputs_of_exclude_address(&self, addr: &Address) -> impl Iterator<Item = &Output>;
+    fn output_rdg_amount_of_address(&self, address: &Address) -> CurrencyAmount;
+    fn outputs_of_address(&self, address: &Address) -> impl Iterator<Item = &Output>;
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
@@ -96,11 +102,19 @@ impl TransactionSupport for Transaction {
             .filter(move |o| o.address.as_ref().filter(|a| all.contains(a)).is_some()))
     }
 
+    fn outputs_of_address(&self, address: &Address) -> impl Iterator<Item=&Output> {
+        self.outputs.iter().filter( |o| o.address.as_ref() == Some(address))
+    }
+
     fn outputs_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>> {
         let all = pk.to_all_addresses()?;
         Ok(self.outputs.iter()
             .filter(move |o| o.address.as_ref().filter(|a| !all.contains(a)).is_some()))
     }
+    fn outputs_of_exclude_address(&self, addr: &Address) -> impl Iterator<Item=&Output> {
+        self.outputs.iter().filter(|o| o.address.as_ref() != Some(addr))
+    }
+
 
     fn output_rdg_amount_of_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
         Ok(self.outputs_of_pk(pk)?
@@ -109,12 +123,28 @@ impl TransactionSupport for Transaction {
             .sum::<CurrencyAmount>())
     }
 
+    fn output_rdg_amount_of_address(&self, address: &Address) -> CurrencyAmount {
+        self.outputs_of_address(address)
+            .filter_map(|a| a.opt_amount_typed())
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .sum::<CurrencyAmount>()
+    }
+
+    fn output_rdg_amount_of_exclude_address(&self, address: &Address) -> CurrencyAmount {
+        self.outputs_of_exclude_address(address)
+            .filter_map(|a| a.opt_amount_typed())
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .sum::<CurrencyAmount>()
+    }
+
     fn output_rdg_amount_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
         Ok(self.outputs_of_exclude_pk(pk)?
             .filter_map(|a| a.opt_amount_typed())
             .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
             .sum::<CurrencyAmount>())
     }
+
+
 
     fn first_input_address_to_btc_address(&self, network: &NetworkEnvironment) -> Option<String> {
         self.inputs.iter()

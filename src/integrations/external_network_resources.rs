@@ -29,19 +29,25 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{error, info};
+use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_common_no_wasm::ssh_like::LocalSSHLike;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
 use redgold_keys::monero::node_wrapper::MoneroNodeRpcInterfaceWrapper;
 use redgold_keys::solana::derive_solana::SolanaWordPassExt;
 use redgold_keys::solana::wallet::SolanaNetwork;
+use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage, MoneroWalletResponse};
 use redgold_schema::hash::ToHashed;
 use redgold_schema::keys::words_pass::WordsPass;
+use crate::core::internal_message::RecvAsyncErrorInfoTimeout;
 
 #[derive(Clone)]
 pub struct ExternalNetworkResourcesImpl {
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
+    pub addr_btc_wallets: Arc<tokio::sync::Mutex<HashMap<Address, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub multisig_btc_wallets: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub node_config: Arc<NodeConfig>,
     pub self_secret_key: String,
@@ -57,6 +63,7 @@ impl ExternalNetworkResourcesImpl {
         let dummy_secret_key = "25474115328e46e8e636edf6b6f1c90cbd997ae24f5a043fd8ecf2381118e22f".to_string();
         Ok(ExternalNetworkResourcesImpl {
             btc_wallets,
+            addr_btc_wallets: Arc::new(Default::default()),
             multisig_btc_wallets: Arc::new(Default::default()),
             node_config: Arc::new(node_config.clone()),
             self_secret_key: node_config.keypair().to_private_hex(),
@@ -80,6 +87,7 @@ impl ExternalNetworkResourcesImpl {
                     None,
                     None,
                     None,
+                    None,
                     None
                 )?;
                 // println!("New wallet created");
@@ -90,6 +98,35 @@ impl ExternalNetworkResourcesImpl {
         };
         Ok(mutex)
     }
+
+    pub async fn btc_wallet_for_address(&self, addr: &Address) -> RgResult<Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>> {
+        let mut guard = self.addr_btc_wallets.lock().await;
+        let result = guard.get(addr);
+        let mutex = match result {
+            Some(w) => {
+                w.clone()
+            }
+            None => {
+                let buf = self.node_config.env_data_folder().bdk_sled_path();
+                let path = buf.join(addr.render_string()?);
+                let new_wallet = SingleKeyBitcoinWallet::new_wallet_db_backed(
+                    self.self_public.clone(), self.node_config.network.clone(), true,
+                    path,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(addr.clone())
+                )?;
+                // println!("New wallet created");
+                let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
+                guard.insert(addr.clone(), w.clone());
+                w
+            }
+        };
+        Ok(mutex)
+    }
+
     pub async fn btc_multisig_wallet(
         &self,
         peer_pks: &Vec<PublicKey>,
@@ -116,7 +153,8 @@ impl ExternalNetworkResourcesImpl {
                     None,
                     Some(self.self_secret_key.clone()),
                     Some(peer_pks.clone()),
-                    Some(threshold)
+                    Some(threshold),
+                    None
                 )?;
                 // println!("New wallet created");
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
@@ -167,6 +205,37 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                     info!("EthDaq all tx comparison: {} vs {} equality: {} missing hashes: {:?}", all_tx.len(), all_tx2_comparison.len(), equality, missing_hashes);
                 }
 
+                Ok(all_tx)
+            }
+            _ => Err(error_info("Unsupported currency"))
+        }
+    }
+
+    async fn get_all_tx_for_address(&self, address: &Address, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
+                               -> RgResult<Vec<ExternalTimedTransaction>> {
+        match currency {
+            SupportedCurrency::Bitcoin => {
+                let arc = self.btc_wallet_for_address(address).await?;
+                let guard = arc.lock().await;
+                guard.get_all_tx()
+            },
+            SupportedCurrency::Ethereum => {
+                let eth = EthHistoricalClient::new(&self.node_config.network).ok_msg("eth client creation")??;
+                let eth_addr = address.clone();
+                let eth_addr_str = eth_addr.render_string()?;
+
+                // Ignoring for now to debug
+                let start_block_arg = None;
+                // let start_block_arg = start_block;
+                let all_tx= eth.get_all_tx_with_retries(&eth_addr_str, start_block_arg, None, None).await?;
+                if let Some(r) = self.relay.as_ref() {
+                    let all_tx2_comparison = r.eth_daq.daq.all_tx_for(&eth_addr_str);
+                    let missing_hashes = all_tx.iter().filter(|tx| {
+                        !all_tx2_comparison.iter().any(|tx2| tx2.tx_id == tx.tx_id)
+                    }).map(|tx| tx.tx_id.clone()).collect_vec();
+                    let equality = all_tx.iter().zip(all_tx2_comparison.iter()).all(|(tx1, tx2)| tx1 == tx2);
+                    info!("EthDaq all tx comparison: {} vs {} equality: {} missing hashes: {:?}", all_tx.len(), all_tx2_comparison.len(), equality, missing_hashes);
+                }
                 Ok(all_tx)
             }
             _ => Err(error_info("Unsupported currency"))
@@ -404,19 +473,30 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
                 Some(Address::from_solana_external(&res))
             }
             SupportedCurrency::Monero => {
-                let mw = MoneroNodeRpcInterfaceWrapper::from_config_local(
-                    &self.node_config, &self.node_config.env_data_folder().monero_wallet_dir().to_str().unwrap().to_string(),
-                    &self.node_config.env_data_folder().monero_wallet_expect().to_str().unwrap().to_string(),
-                    Some(false)
-                );
-                if let Some(r) = mw {
-                    let mut r = r?;
-                    let result = r.multisig_create_loop(&all_pks, threshold, peer_broadcast).await?;
-                    secret_json = Some(result.json_or());
-                    Some(result.address)
-                } else {
-                    None
-                }
+
+                let (s, r) =
+                    flume::bounded::<RgResult<MoneroWalletResponse>>(1);
+                self.relay.safe_get_msg("Missing relay")?.monero_wallet_messages
+                    .sender.send_rg_err(MoneroSyncInteraction{
+                    message: MoneroWalletMessage::MultisigCreateNext,
+                    wallet_id: MoneroNodeRpcInterfaceWrapper::<LocalSSHLike>::get_wallet_filename_id(
+                        all_pks, threshold
+                    ),
+                    all_pks: all_pks.clone(),
+                    peer_strings: vec![],
+                    threshold,
+                    response: s,
+                    operation_initialization: true,
+                })?;
+                let result = r.recv_async_err_timeout(Duration::from_secs(120)).await??;
+                let mw = match result {
+                    MoneroWalletResponse::PeerCreate(_) => { None}
+                    MoneroWalletResponse::InstanceCreate(i) => {
+                        secret_json = Some(i.json_or());
+                        Some(i.address)
+                    }
+                };
+                mw
             }
             _ => {
                 error!("Unsupported currency for party formation: {:?}", cur);
@@ -482,11 +562,17 @@ impl MockExternalResources {
     }
 
 }
-
 #[async_trait]
 impl ExternalNetworkResources for MockExternalResources {
     fn set_network(&mut self, network: &NetworkEnvironment) {
         self.node_config.network = network.clone();
+    }
+
+    async fn get_all_tx_for_address(&self, address: &Address, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>> {
+        let arc = self.external_transactions.lock().await;
+        let option = arc.get(&currency);
+        let option1 = option.cloned();
+        Ok(option1.unwrap_or_default())
     }
 
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)

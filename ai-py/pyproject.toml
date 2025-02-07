@@ -18,7 +18,8 @@ dependencies = [
     "sentence-transformers",
     "langsmith",
     "tenacity",
-    "mcp[cli]"
+    "mcp[cli]",
+    "gitpython"
 ]
 
 [build-system]

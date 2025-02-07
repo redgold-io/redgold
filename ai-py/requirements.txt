@@ -20,3 +20,6 @@ langchain_anthropic
 langgraph
 langchain-groq
 langchain-openrouter
+openai
+gitpython
+PyGithub

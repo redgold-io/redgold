@@ -312,9 +312,7 @@ impl RgHttpClient {
         let pid = self.json_get::<Vec<PartyInternalData>>("v1/party/data").await?;
         let mut hm = HashMap::new();
         for pd in pid {
-            if let Some(k) = pd.party_info.party_key.as_ref() {
-                hm.insert(k.clone(), pd);
-            }
+            hm.insert(pd.proposer_key.clone(), pd);
         }
         Ok(hm)
     }

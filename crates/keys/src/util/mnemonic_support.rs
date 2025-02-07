@@ -16,7 +16,7 @@ use redgold_schema::constants::{default_node_internal_derivation_path, redgold_k
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Hash, NetworkEnvironment, PeerId};
+use redgold_schema::structs::{Address, Hash, NetworkEnvironment, PeerId};
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 
 use crate::address_external::{ToBitcoinAddress, ToEthereumAddress};
@@ -24,6 +24,8 @@ use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use crate::proof_support::PublicKeySupport;
 use crate::xpub_wrapper::ValidateDerivationPath;
 use crate::KeyPair;
+use crate::monero::key_derive::MoneroSeedBytes;
+use crate::solana::derive_solana::SolanaWordPassExt;
 
 pub trait MnemonicSupport {
     fn metadata(&self) -> RgResult<WordsPassMetadata>;
@@ -58,6 +60,7 @@ pub trait MnemonicSupport {
     fn default_peer_id(&self) -> RgResult<PeerId>;
     fn default_public_key(&self) -> RgResult<structs::PublicKey>;
     fn test_words() -> Self;
+    fn hot_addresses_all(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>>;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -93,6 +96,16 @@ impl WordsPassMetadata {
 }
 
 impl MnemonicSupport for WordsPass {
+
+    fn hot_addresses_all(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>> {
+        Ok(vec![
+            self.default_public_key()?.address()?,
+            self.default_public_key()?.to_bitcoin_address_typed(&net)?.as_external(),
+            self.default_public_key()?.to_ethereum_address_typed()?.as_external(),
+            self.solana_address()?.as_external(),
+            self.monero_external_address(&NetworkEnvironment::Main)?.as_external()
+        ])
+    }
 
     fn metadata(&self) -> RgResult<WordsPassMetadata> {
         let default_calc = 20;

@@ -192,7 +192,9 @@ pub struct Relay {
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub btc_multisig_wallets: Arc<tokio::sync::Mutex<HashMap<Address, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub peer_info: PeerInfo,
-    pub eth_daq: EthDaq
+    pub eth_daq: EthDaq,
+    pub monero_wallet_messages: Channel<MoneroSyncInteraction>,
+    pub coinbase_ws_status: Channel<String>,
     // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
 }
 
@@ -263,7 +265,7 @@ impl Relay {
         let data = self.external_network_shared_data.clone_read().await;
         let cleared = data.iter().filter(|(k, v)| {
             v.active_self()
-        }).flat_map(|(k, v)| v.party_info.party_key.clone())
+        }).map(|(k, v)| k.clone())
             .next();
         cleared
     }
@@ -311,6 +313,7 @@ impl Relay {
                     None,
                     None,
                     None,
+                    None
                 )?;
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
                 guard.insert(pk.clone(), w.clone());
@@ -470,6 +473,7 @@ are instantiated by the node
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_daq::eth::EthDaq;
 use redgold_keys::address_external::ToEthereumAddress;
+use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage};
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::party_events::PartyEvents;
@@ -1026,6 +1030,9 @@ impl Relay {
     ) -> RgResult<Vec<RgResult<Response>>> {
         let mut results = vec![];
         for p in nodes {
+            if self.node_config.public_key() == p {
+                continue;
+            }
             let req = request.clone();
             let timeout = Some(timeout.unwrap_or(Duration::from_secs(60)));
             let res = self.send_message_async(&req, &p, timeout).await?;
@@ -1250,6 +1257,8 @@ impl Relay {
             peer_info: Default::default(),
             // eth_daq: Default::default(),
             eth_daq: Default::default(),
+            monero_wallet_messages: Default::default(),
+            coinbase_ws_status: flume_send_help::new_channel::<String>(),
         }
     }
 }
@@ -1283,7 +1292,7 @@ impl<T> SafeLock<T> for tokio::sync::Mutex<T> where T: ?Sized + std::marker::Sen
 
 #[async_trait]
 impl PeerBroadcast for Relay {
-    async fn broadcast<'a>(&'a self, nodes: &'a Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>> {
+    async fn broadcast(&self, nodes: &Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>> {
         let result = self.broadcast_async(nodes.clone(), request, None).await?.into_iter()
             .map(|i| i
                 .and_then(|r| r.with_error_info())

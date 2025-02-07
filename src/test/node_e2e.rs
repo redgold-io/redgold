@@ -300,361 +300,353 @@ async fn single_node_tests(local_nodes: &mut LocalNodes, submit: &TransactionSub
 //     let raw = EthWalletWrapper::process_signature(sig, &mut tx).expect("works");
 //     eth.broadcast_tx(raw).await.expect("works");
 // }
-
-async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submit: &TransactionSubmitter) -> RgResult<()> {
-    if let Some((secret, kp)) = dev_ci_kp() {
-
-
-        // Await party formation
-        let mut retries = 0;
-        loop {
-            if let Some((party_public_key, pid)) = relay_start.external_network_shared_data.clone_read().await
-                .into_iter().filter(|(k, v)| {
-                v.self_initiated_not_debug()
-            }).next() {
-                info!("Party formation pk: {}", party_public_key.json_or());
-                let all_in = pid.party_info.initiate.expect("init").identifier.expect("id").party_keys.len() == 3;
-                if all_in {
-                    break;
-                } else {
-                    panic!("Not all parties in formation");
-                }
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            retries += 1;
-            if retries > 60 {
-                panic!("Party formation not completed in expected time");
-            }
-        }
-
-        // TODO: Mock request for API to get pool information.
-        let (party_public_key, pid) = relay_start.external_network_shared_data.clone_read().await
-            .into_iter().filter(|(k, v)| {
-            v.self_initiated_not_debug()
-        }).next().expect("works");
-        let config = start_node.node.relay.node_config.clone();
-
-        let party_rdg_address = party_public_key.address().expect("works");
-        let dev_ci_rdg_address = kp.address_typed();
-
-        // First send some funds to pay for fees.
-        let utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
-        let amt = utxos.iter().map(|u| u.output.as_ref().expect("works").amount_i64()).sum::<i64>();
-        let internal_stake_amount = CurrencyAmount::from_rdg(amt - (amt / 10));
-        assert!(!utxos.is_empty());
-
-
-        // Then send the internal RDG stake
-        let signed_internal_stake_tx = config.tx_builder().with_utxos(&utxos).expect("works")
-            .with_internal_stake_usd_bounds(
-                None, None, &dev_ci_rdg_address, &party_rdg_address, &internal_stake_amount,
-            ).build().expect("works").sign(&kp).expect("works");
-
-        info!("Sending internal stake");
-
-        submit.send_tx(&signed_internal_stake_tx).await.expect("works");
-        info!("Finished internal stake");
-
-        let txs = relay_start.ds.transaction_store.get_all_tx_for_address(&party_rdg_address, 1e9 as i64, 0).await.expect("works");
-        txs.iter().filter(|tx| tx.hash_or() == signed_internal_stake_tx.hash_or()).next().expect("works");
-
-
-        let all_utxo_internal_stake = signed_internal_stake_tx.to_utxo_address(&dev_ci_rdg_address);
-        let stake_internal_utxo_for_withdrawal = all_utxo_internal_stake.iter()
-            .filter(|u| u.output.as_ref().expect("works").stake_request().is_some())
-            .cloned()
-            .next()
-            .expect("works");
-
-        let mut retries = 0;
-        loop {
-            if let Some((_, pid)) = relay_start.external_network_shared_data.clone_read().await
-                .into_iter().filter(|(k, v)| {
-                v.self_initiated_not_debug()
-            }).next() {
-                if let Some(pe) = pid.party_events {
-                    if pe.internal_staking_events.len() > 0 {
-                        info!("Found internal stake event");
-                        break;
-                    }
-                }
-            }
-            info!("Awaiting internal stake event");
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            retries += 1;
-            if retries > 8 {
-                panic!("No internal stake event found");
-            }
-        }
-
-
-        // Then send the external ETH stake registration request
-
-        info!("Getting utxos for external stake test");
-        let test_tx = submit.send_to(&dev_ci_rdg_address).await.expect("works").transaction.expect("works");
-        info!("Got utxos for external stake test");
-        // info!("Test tx: {}", test_tx.json_or());
-        // info!("Test tx time: {}", test_tx.time().expect("time").to_string());
-        let utxos_tx_external_stake = test_tx.to_utxo_address(&dev_ci_rdg_address);
-
-        let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
-        let exact_eth_stake_amount = CurrencyAmount::stake_test_amount_typed();
-        let party_fee_amount = CurrencyAmount::from_rdg(100000);
-
-        let tx_stake = config.tx_builder().with_utxos(&utxos_tx_external_stake)?
-            .with_external_stake_usd_bounds(
-                None,
-                None,
-                &dev_ci_rdg_address,
-                &dev_ci_eth_addr,
-                &exact_eth_stake_amount,
-                &party_rdg_address,
-                &party_fee_amount
-            ).build().expect("works").sign(&kp).expect("works");
-
-        // info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
-        // info!("tx_stake tx: {}", tx_stake.json_or());
-
-        let res = submit.send_tx(&tx_stake).await.expect("works");
-
-        // verify internal tx for external stake is present
-        let mut retries = 0;
-        loop {
-            if let Some((_, pid)) = relay_start.external_network_shared_data.clone_read().await
-                .into_iter().filter(|(k, v)| {
-                v.self_initiated_not_debug()
-            }).next() {
-                if let Some(pe) = pid.party_events {
-                    if pe.pending_external_staking_txs.len() > 0 {
-                        info!("Found pending external stake event"); //: {}", pe.external_unfulfilled_staking_txs.json_or());
-                        break;
-                    }
-                }
-            }
-            info!("Awaiting internal pending external stake event");
-            tokio::time::sleep(Duration::from_secs(10)).await;
-            retries += 1;
-            if retries > 10 {
-                panic!("No internal pending external stake event found");
-            }
-        }
-
-
-        let stake_external_utxo_for_withdrawal = tx_stake.to_utxo_address(&dev_ci_rdg_address).iter()
-            .filter(|u| u.output.as_ref().expect("works").stake_request().is_some())
-            .cloned()
-            .next()
-            .expect("works");
-
-        assert!(relay_start.ds.utxo.utxo_id_valid(
-            stake_external_utxo_for_withdrawal.utxo_id.as_ref().expect("u")).await.expect("works"));
-        // Then send the ETH stake
-        let party_eth_address = party_public_key.to_ethereum_address_typed().expect("works");
-
-        info!("Sending eth stake to party address");
-        let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
-        info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
-        info!("Fee fixed {}", CurrencyAmount::eth_fee_fixed_normal_testnet().json_or());
-        let res = tokio::time::timeout(
-            Duration::from_secs(120), eth.send(
-                &party_eth_address, &exact_eth_stake_amount, None)
-        ).await.expect("works").expect("works");
-        info!("Eth txid: {}", res);
-        let mut retries = 0;
-        loop {
-            info!("Sent eth stake to party address, awaiting receipt");
-
-            let (ppk, pid) = relay_start.external_network_shared_data.clone_read().await
-                .into_iter().filter(|(k, v)| {
-                v.party_info.not_debug() && v.party_info.self_initiated()
-            }).next().expect("works");
-            if let Some(pev) = pid.party_events.as_ref() {
-                let balance = pev.balance_map.get(&SupportedCurrency::Ethereum);
-                if let Some(b) = balance {
-                    info!("Party balance after eth stake: {}", b.json_or());
-                    break;
-                }
-            }
-            tokio::time::sleep(Duration::from_secs(10)).await;
-            retries += 1;
-            if retries > 20 {
-                panic!("Failed to receive ETH stake");
-            }
-        }
-
-        let key = std::env::var("ETHERSCAN_API_KEY2").expect("works");
-        let eth_h = EthHistoricalClient::new_from_key(&config.network, key).expect("works");
-        // From here we need to wrap everything in a function, so that we can catch failures to withdraw this stake.
-        //
-        let maybe_err = proceed_swap_test_from_eth_send(
-            &config,
-            &party_rdg_address,
-            &dev_ci_rdg_address,
-            &dev_ci_eth_addr,
-            &kp,
-            &eth,
-            &submit,
-            &party_eth_address,
-            &relay_start,
-            &eth_h
-        ).await.log_error();
-
-
-        info!("Finished proceed_swap_test_from_eth_send");
-
-        let new_utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
-
-        info!("Got UTXOs for final eth stake withdrawal");
-        for u in new_utxos.iter() {
-            assert!(relay_start.ds.utxo.utxo_id_valid(u.utxo_id.as_ref().expect("u")).await.expect("works"));
-        };
-
-        tokio::time::sleep(Duration::from_secs(20)).await;
-        let eth_withdrawal = config.tx_builder().with_utxos(&new_utxos).expect("works")
-            .with_stake_withdrawal(
-                &dev_ci_eth_addr,
-                &party_rdg_address,
-                &party_fee_amount,
-                &stake_external_utxo_for_withdrawal.utxo_id.unwrap()
-            ).build().expect("works").sign(&kp).expect("works");
-
-        info!("Sending eth withdrawal {}", eth_withdrawal.json_or());
-        info!("Sending eth withdrawal hash {}", eth_withdrawal.hash_hex());
-
-        let res = submit.send_tx(&eth_withdrawal).await.expect("works");
-        let tx = res.transaction.expect("works");
-
-        let mut retries = 0;
-        let original_eth_balance = eth_h.get_balance_typed(&dev_ci_eth_addr).await?;
-        let amount_orig = original_eth_balance.amount_i64_or();
-        loop {
-            tokio::time::sleep(Duration::from_secs(10)).await;
-            info!("Awaiting receipt of ETH stake withdrawal");
-            let new_balance = eth_h.get_balance_typed(&dev_ci_eth_addr).await?;
-            let new_amount = new_balance.amount_i64_or();
-            if new_amount > amount_orig {
-                break;
-            }
-            retries += 1;
-            if retries > 10 {
-                return Err(ErrorInfo::error_info("Failed to receive ETH stake withdrawal"));
-            }
-        };
-
-
-        let new_utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
-
-        info!("Preparing RDG withdrawal after ETH withdrawal success?");
-        let rdg_withdrawal = config.tx_builder().with_utxos(&new_utxos).expect("works")
-            .with_stake_withdrawal(
-                &dev_ci_rdg_address,
-                &party_rdg_address,
-                &party_fee_amount,
-                &stake_internal_utxo_for_withdrawal.utxo_id.unwrap()
-            ).build().expect("works").sign(&kp).expect("works");
-
-        let res = submit.send_tx(&rdg_withdrawal).await.expect("works");
-        info!("Finished RDG withdrawal success");
-
-        maybe_err.expect("works");
-    };
-    Ok(())
-}
-
-async fn proceed_swap_test_from_eth_send(
-    config: &NodeConfig,
-    party_rdg_address: &Address,
-    dev_ci_rdg_address: &Address,
-    dev_ci_eth_addr: &Address,
-    kp: &KeyPair,
-    eth: &EthWalletWrapper,
-    submit: &TransactionSubmitter,
-    party_eth_address: &Address,
-    relay: &Relay,
-    h: &EthHistoricalClient
-) -> RgResult<()> {
-    //
-    // // This is sending RDG to receive ETH
-    // info!("Getting UTXOs for test send rdg_receive_eth");
-    // let utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
-    // let bal = utxos.iter().flat_map(|u| u.opt_amount()).map(|a| a.amount).sum::<i64>();
-    // let amount = CurrencyAmount::from_rdg(bal - bal / 10);
-    // let original_eth_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
-    // let amount_orig = original_eth_balance.amount_i64_or();
-    // let send_rdg_receive_eth = config.tx_builder()
-    //     .with_utxos(&utxos).expect("works")
-    //     .with_swap(
-    //         &dev_ci_eth_addr,
-    //         &amount,
-    //         party_rdg_address,
-    //     )?
-    //     .build()?
-    //     .sign(&kp).expect("works");
-    // info!("Submitting send_rdg_receive_eth");
-    //
-    // let res = submit.send_tx(&send_rdg_receive_eth).await?;
-    // let mut retries = 0;
-    // loop {
-    //     tokio::time::sleep(Duration::from_secs(10)).await;
-    //     info!("Awaiting receipt of ETH swap after sending RDG");
-    //     let new_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
-    //     let new_amount = new_balance.amount_i64_or();
-    //     if new_amount > amount_orig {
-    //         break;
-    //     }
-    //     retries += 1;
-    //     if retries > 10 {
-    //         return Err(ErrorInfo::error_info("Failed to receive ETH swap"));
-    //     }
-    // };
-    //
-    // let rdg_balance = relay.ds.transaction_store
-    //     .get_balance(&party_rdg_address).await?.ok_msg("works")?;
-
-    info!("Submitting eth direct deposit to RDG swap");
-
-    // TODO: Should we use SwapRequest to represent an external event? Not necessary for now
-    // since this will just directly issue a swap.
-
-    eth.send(
-        &party_eth_address,
-        &CurrencyAmount::test_send_amount_typed(),
-        None
-    ).await?;
-    // let fee_amount_pool = CurrencyAmount::from_rdg(10000);
-
-    let mut receive_addr = dev_ci_eth_addr.clone();
-    receive_addr.set_currency(SupportedCurrency::Redgold);
-    let rdg_eth_receive_addr_bal = relay.ds.transaction_store
-        .get_balance(&receive_addr).await?.unwrap_or(0);
-
-    let mut retries = 0;
-    loop {
-        tokio::time::sleep(Duration::from_secs(10)).await;
-        info!("Awaiting receipt of RDG from swap after sending ETH");
-        let new_bal = relay.ds.transaction_store
-            .get_balance(&receive_addr).await?.unwrap_or(0);
-        if new_bal > rdg_eth_receive_addr_bal {
-            break;
-        }
-        retries += 1;
-        if retries > 10 {
-            return Err(ErrorInfo::error_info("Failed to receive RDG swap"));
-        }
-    };
-
-    info!("Swap success of RDG from sent eth");
-
-    Ok(())
-}
-
-#[ignore]
-#[test]
-fn env_var_parse_test() {
-
-    println!("Env var test")
-
-}
+//
+// async fn eth_amm_e2e(start_node: LocalTestNodeContext, relay_start: Relay, submit: &TransactionSubmitter) -> RgResult<()> {
+//     if let Some((secret, kp)) = dev_ci_kp() {
+//
+//
+//         // Await party formation
+//         let mut retries = 0;
+//         loop {
+//             if let Some((party_public_key, pid)) = relay_start.external_network_shared_data.clone_read().await
+//                 .into_iter().filter(|(k, v)| {
+//                 v.self_initiated_not_debug()
+//             }).next() {
+//                 info!("Party formation pk: {}", party_public_key.json_or());
+//                 let all_in = pid.party_info.initiate.expect("init").identifier.expect("id").party_keys.len() == 3;
+//                 if all_in {
+//                     break;
+//                 } else {
+//                     panic!("Not all parties in formation");
+//                 }
+//             }
+//             tokio::time::sleep(Duration::from_secs(1)).await;
+//             retries += 1;
+//             if retries > 60 {
+//                 panic!("Party formation not completed in expected time");
+//             }
+//         }
+//
+//         // TODO: Mock request for API to get pool information.
+//         let (party_public_key, pid) = relay_start.external_network_shared_data.clone_read().await
+//             .into_iter().filter(|(k, v)| {
+//             v.self_initiated_not_debug()
+//         }).next().expect("works");
+//         let config = start_node.node.relay.node_config.clone();
+//
+//         let party_rdg_address = party_public_key.address().expect("works");
+//         let dev_ci_rdg_address = kp.address_typed();
+//
+//         // First send some funds to pay for fees.
+//         let utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
+//         let amt = utxos.iter().map(|u| u.output.as_ref().expect("works").amount_i64()).sum::<i64>();
+//         let internal_stake_amount = CurrencyAmount::from_rdg(amt - (amt / 10));
+//         assert!(!utxos.is_empty());
+//
+//
+//         // Then send the internal RDG stake
+//         let signed_internal_stake_tx = config.tx_builder().with_utxos(&utxos).expect("works")
+//             .with_internal_stake_usd_bounds(
+//                 None, None, &dev_ci_rdg_address, &party_rdg_address, &internal_stake_amount,
+//             ).build().expect("works").sign(&kp).expect("works");
+//
+//         info!("Sending internal stake");
+//
+//         submit.send_tx(&signed_internal_stake_tx).await.expect("works");
+//         info!("Finished internal stake");
+//
+//         let txs = relay_start.ds.transaction_store.get_all_tx_for_address(&party_rdg_address, 1e9 as i64, 0).await.expect("works");
+//         txs.iter().filter(|tx| tx.hash_or() == signed_internal_stake_tx.hash_or()).next().expect("works");
+//
+//
+//         let all_utxo_internal_stake = signed_internal_stake_tx.to_utxo_address(&dev_ci_rdg_address);
+//         let stake_internal_utxo_for_withdrawal = all_utxo_internal_stake.iter()
+//             .filter(|u| u.output.as_ref().expect("works").stake_request().is_some())
+//             .cloned()
+//             .next()
+//             .expect("works");
+//
+//         let mut retries = 0;
+//         loop {
+//             if let Some((_, pid)) = relay_start.external_network_shared_data.clone_read().await
+//                 .into_iter().filter(|(k, v)| {
+//                 v.self_initiated_not_debug()
+//             }).next() {
+//                 if let Some(pe) = pid.party_events {
+//                     if pe.internal_staking_events.len() > 0 {
+//                         info!("Found internal stake event");
+//                         break;
+//                     }
+//                 }
+//             }
+//             info!("Awaiting internal stake event");
+//             tokio::time::sleep(Duration::from_secs(5)).await;
+//             retries += 1;
+//             if retries > 8 {
+//                 panic!("No internal stake event found");
+//             }
+//         }
+//
+//
+//         // Then send the external ETH stake registration request
+//
+//         info!("Getting utxos for external stake test");
+//         let test_tx = submit.send_to(&dev_ci_rdg_address).await.expect("works").transaction.expect("works");
+//         info!("Got utxos for external stake test");
+//         // info!("Test tx: {}", test_tx.json_or());
+//         // info!("Test tx time: {}", test_tx.time().expect("time").to_string());
+//         let utxos_tx_external_stake = test_tx.to_utxo_address(&dev_ci_rdg_address);
+//
+//         let dev_ci_eth_addr = kp.public_key().to_ethereum_address_typed().expect("works");
+//         let exact_eth_stake_amount = CurrencyAmount::stake_test_amount_typed();
+//         let party_fee_amount = CurrencyAmount::from_rdg(100000);
+//
+//         let tx_stake = config.tx_builder().with_utxos(&utxos_tx_external_stake)?
+//             .with_external_stake_usd_bounds(
+//                 None,
+//                 None,
+//                 &dev_ci_rdg_address,
+//                 &dev_ci_eth_addr,
+//                 &exact_eth_stake_amount,
+//                 &party_rdg_address,
+//                 &party_fee_amount
+//             ).build().expect("works").sign(&kp).expect("works");
+//
+//         // info!("tx_stake tx time: {}", tx_stake.time().expect("time").to_string());
+//         // info!("tx_stake tx: {}", tx_stake.json_or());
+//
+//         let res = submit.send_tx(&tx_stake).await.expect("works");
+//
+//         // verify internal tx for external stake is present
+//         let mut retries = 0;
+//         loop {
+//             if let Some((_, pid)) = relay_start.external_network_shared_data.clone_read().await
+//                 .into_iter().filter(|(k, v)| {
+//                 v.self_initiated_not_debug()
+//             }).next() {
+//                 if let Some(pe) = pid.party_events {
+//                     if pe.pending_external_staking_txs.len() > 0 {
+//                         info!("Found pending external stake event"); //: {}", pe.external_unfulfilled_staking_txs.json_or());
+//                         break;
+//                     }
+//                 }
+//             }
+//             info!("Awaiting internal pending external stake event");
+//             tokio::time::sleep(Duration::from_secs(10)).await;
+//             retries += 1;
+//             if retries > 10 {
+//                 panic!("No internal pending external stake event found");
+//             }
+//         }
+//
+//
+//         let stake_external_utxo_for_withdrawal = tx_stake.to_utxo_address(&dev_ci_rdg_address).iter()
+//             .filter(|u| u.output.as_ref().expect("works").stake_request().is_some())
+//             .cloned()
+//             .next()
+//             .expect("works");
+//
+//         assert!(relay_start.ds.utxo.utxo_id_valid(
+//             stake_external_utxo_for_withdrawal.utxo_id.as_ref().expect("u")).await.expect("works"));
+//         // Then send the ETH stake
+//         let party_eth_address = party_public_key.to_ethereum_address_typed().expect("works");
+//
+//         info!("Sending eth stake to party address");
+//         let eth = EthWalletWrapper::new(&secret, &config.network).expect("works");
+//         info!("Fee estimate {}", eth.get_fee_estimate().await.expect("works").json_or());
+//         info!("Fee fixed {}", CurrencyAmount::eth_fee_fixed_normal_testnet().json_or());
+//         let res = tokio::time::timeout(
+//             Duration::from_secs(120), eth.send(
+//                 &party_eth_address, &exact_eth_stake_amount, None)
+//         ).await.expect("works").expect("works");
+//         info!("Eth txid: {}", res);
+//         let mut retries = 0;
+//         loop {
+//             info!("Sent eth stake to party address, awaiting receipt");
+//
+//             let (ppk, pid) = relay_start.external_network_shared_data.clone_read().await
+//                 .into_iter().filter(|(k, v)| {
+//                 v.party_info.not_debug() && v.party_info.self_initiated()
+//             }).next().expect("works");
+//             if let Some(pev) = pid.party_events.as_ref() {
+//                 let balance = pev.balance_map.get(&SupportedCurrency::Ethereum);
+//                 if let Some(b) = balance {
+//                     info!("Party balance after eth stake: {}", b.json_or());
+//                     break;
+//                 }
+//             }
+//             tokio::time::sleep(Duration::from_secs(10)).await;
+//             retries += 1;
+//             if retries > 20 {
+//                 panic!("Failed to receive ETH stake");
+//             }
+//         }
+//
+//         let key = std::env::var("ETHERSCAN_API_KEY2").expect("works");
+//         let eth_h = EthHistoricalClient::new_from_key(&config.network, key).expect("works");
+//         // From here we need to wrap everything in a function, so that we can catch failures to withdraw this stake.
+//         //
+//         let maybe_err = proceed_swap_test_from_eth_send(
+//             &config,
+//             &party_rdg_address,
+//             &dev_ci_rdg_address,
+//             &dev_ci_eth_addr,
+//             &kp,
+//             &eth,
+//             &submit,
+//             &party_eth_address,
+//             &relay_start,
+//             &eth_h
+//         ).await.log_error();
+//
+//
+//         info!("Finished proceed_swap_test_from_eth_send");
+//
+//         let new_utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
+//
+//         info!("Got UTXOs for final eth stake withdrawal");
+//         for u in new_utxos.iter() {
+//             assert!(relay_start.ds.utxo.utxo_id_valid(u.utxo_id.as_ref().expect("u")).await.expect("works"));
+//         };
+//
+//         tokio::time::sleep(Duration::from_secs(20)).await;
+//         let eth_withdrawal = config.tx_builder().with_utxos(&new_utxos).expect("works")
+//             .with_stake_withdrawal(
+//                 &dev_ci_eth_addr,
+//                 &party_rdg_address,
+//                 &party_fee_amount,
+//                 &stake_external_utxo_for_withdrawal.utxo_id.unwrap()
+//             ).build().expect("works").sign(&kp).expect("works");
+//
+//         info!("Sending eth withdrawal {}", eth_withdrawal.json_or());
+//         info!("Sending eth withdrawal hash {}", eth_withdrawal.hash_hex());
+//
+//         let res = submit.send_tx(&eth_withdrawal).await.expect("works");
+//         let tx = res.transaction.expect("works");
+//
+//         let mut retries = 0;
+//         let original_eth_balance = eth_h.get_balance_typed(&dev_ci_eth_addr).await?;
+//         let amount_orig = original_eth_balance.amount_i64_or();
+//         loop {
+//             tokio::time::sleep(Duration::from_secs(10)).await;
+//             info!("Awaiting receipt of ETH stake withdrawal");
+//             let new_balance = eth_h.get_balance_typed(&dev_ci_eth_addr).await?;
+//             let new_amount = new_balance.amount_i64_or();
+//             if new_amount > amount_orig {
+//                 break;
+//             }
+//             retries += 1;
+//             if retries > 10 {
+//                 return Err(ErrorInfo::error_info("Failed to receive ETH stake withdrawal"));
+//             }
+//         };
+//
+//
+//         let new_utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
+//
+//         info!("Preparing RDG withdrawal after ETH withdrawal success?");
+//         let rdg_withdrawal = config.tx_builder().with_utxos(&new_utxos).expect("works")
+//             .with_stake_withdrawal(
+//                 &dev_ci_rdg_address,
+//                 &party_rdg_address,
+//                 &party_fee_amount,
+//                 &stake_internal_utxo_for_withdrawal.utxo_id.unwrap()
+//             ).build().expect("works").sign(&kp).expect("works");
+//
+//         let res = submit.send_tx(&rdg_withdrawal).await.expect("works");
+//         info!("Finished RDG withdrawal success");
+//
+//         maybe_err.expect("works");
+//     };
+//     Ok(())
+// }
+//
+// async fn proceed_swap_test_from_eth_send(
+//     config: &NodeConfig,
+//     party_rdg_address: &Address,
+//     dev_ci_rdg_address: &Address,
+//     dev_ci_eth_addr: &Address,
+//     kp: &KeyPair,
+//     eth: &EthWalletWrapper,
+//     submit: &TransactionSubmitter,
+//     party_eth_address: &Address,
+//     relay: &Relay,
+//     h: &EthHistoricalClient
+// ) -> RgResult<()> {
+//     //
+//     // // This is sending RDG to receive ETH
+//     // info!("Getting UTXOs for test send rdg_receive_eth");
+//     // let utxos = submit.send_to_return_utxos(&dev_ci_rdg_address).await.expect("works");
+//     // let bal = utxos.iter().flat_map(|u| u.opt_amount()).map(|a| a.amount).sum::<i64>();
+//     // let amount = CurrencyAmount::from_rdg(bal - bal / 10);
+//     // let original_eth_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
+//     // let amount_orig = original_eth_balance.amount_i64_or();
+//     // let send_rdg_receive_eth = config.tx_builder()
+//     //     .with_utxos(&utxos).expect("works")
+//     //     .with_swap(
+//     //         &dev_ci_eth_addr,
+//     //         &amount,
+//     //         party_rdg_address,
+//     //     )?
+//     //     .build()?
+//     //     .sign(&kp).expect("works");
+//     // info!("Submitting send_rdg_receive_eth");
+//     //
+//     // let res = submit.send_tx(&send_rdg_receive_eth).await?;
+//     // let mut retries = 0;
+//     // loop {
+//     //     tokio::time::sleep(Duration::from_secs(10)).await;
+//     //     info!("Awaiting receipt of ETH swap after sending RDG");
+//     //     let new_balance = h.get_balance_typed(&dev_ci_eth_addr).await?;
+//     //     let new_amount = new_balance.amount_i64_or();
+//     //     if new_amount > amount_orig {
+//     //         break;
+//     //     }
+//     //     retries += 1;
+//     //     if retries > 10 {
+//     //         return Err(ErrorInfo::error_info("Failed to receive ETH swap"));
+//     //     }
+//     // };
+//     //
+//     // let rdg_balance = relay.ds.transaction_store
+//     //     .get_balance(&party_rdg_address).await?.ok_msg("works")?;
+//
+//     info!("Submitting eth direct deposit to RDG swap");
+//
+//     // TODO: Should we use SwapRequest to represent an external event? Not necessary for now
+//     // since this will just directly issue a swap.
+//
+//     eth.send(
+//         &party_eth_address,
+//         &CurrencyAmount::test_send_amount_typed(),
+//         None
+//     ).await?;
+//     // let fee_amount_pool = CurrencyAmount::from_rdg(10000);
+//
+//     let mut receive_addr = dev_ci_eth_addr.clone();
+//     receive_addr.set_currency(SupportedCurrency::Redgold);
+//     let rdg_eth_receive_addr_bal = relay.ds.transaction_store
+//         .get_balance(&receive_addr).await?.unwrap_or(0);
+//
+//     let mut retries = 0;
+//     loop {
+//         tokio::time::sleep(Duration::from_secs(10)).await;
+//         info!("Awaiting receipt of RDG from swap after sending ETH");
+//         let new_bal = relay.ds.transaction_store
+//             .get_balance(&receive_addr).await?.unwrap_or(0);
+//         if new_bal > rdg_eth_receive_addr_bal {
+//             break;
+//         }
+//         retries += 1;
+//         if retries > 10 {
+//             return Err(ErrorInfo::error_info("Failed to receive RDG swap"));
+//         }
+//     };
+//
+//     info!("Swap success of RDG from sent eth");
+//
+//     Ok(())
+// }
 
 #[ignore]
 #[tokio::test]

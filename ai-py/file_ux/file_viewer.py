@@ -1,4 +1,4 @@
-from commands import ai_working_dir
+from tools.commands import ai_working_dir
 
 
 def read_file_tooldef():

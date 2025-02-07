@@ -30,6 +30,7 @@ message PartyInstance {
     optional int64 last_update_time = 6;
     optional int64 expired_time = 7;
     structs.Address successor = 8;
+    repeated structs.Address priors = 9;
 }
 
 

@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
+use redgold_schema::proto_serde::ProtoSerde;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, EnumIter, EnumString)]
 pub enum SwapStage {
@@ -436,9 +437,7 @@ impl SwapState {
         if let Some(pa) = data.first_party.as_ref()
             .lock()
             .ok()
-            .and_then(|p| p.party_info.party_key.clone())
-            .and_then(|p| g.form_btc_address(&p).ok())
-            .and_then(|p| p.render_string().ok())
+            .map(|p| p.proposer_key.clone().hex())
         {
             ui.hyperlink_to("Party Explorer Link", net.explorer_hash_link(pa));
         }
