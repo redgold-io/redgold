@@ -128,7 +128,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     );
 
     for i in 1..8 {
-        // local_nodes.add_node().await;
+        local_nodes.add_node().await;
     }
 
 
@@ -147,7 +147,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         let ident = init.identifier.as_mut().unwrap();
         let party_keys = seeds.iter().map(|s| s.public_key.clone().unwrap()).collect_vec();
         ident.party_keys = party_keys;
-        // local_nodes.nodes.get(i).expect("node").node.relay.ds.multiparty_store.add_keygen(&row).await.expect("add keygen");
+        local_nodes.nodes.get(i).expect("node").node.relay.ds.multiparty_store.add_keygen(&row).await.expect("add keygen");
         rows.push(row.clone())
     }
 
@@ -159,54 +159,86 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let btc_addr = public_key.to_bitcoin_address(&NetworkEnvironment::Main).unwrap();
     let eth_addr = public_key.to_ethereum_address().unwrap();
+    let eth_addr_typed = public_key.to_ethereum_address_typed().unwrap();
     println!("BTC addr: {}", btc_addr);
     println!("ETH addr: {}", eth_addr);
 
     let mut r2 = relay_start.clone();
     r2.node_config.network = NetworkEnvironment::Main;
 
-    let mut w = SingleKeyBitcoinWallet::<Tree>::new_wallet_db_backed(
-        public_key.clone(), NetworkEnvironment::Main, true,
-        PathBuf::from("bdk_sled_test"),
-        None
-    ).unwrap();
-    let cur_balance = CurrencyAmount::from_btc(w.get_wallet_balance()?.confirmed as i64);
-    info!("Current btc balance: {}", cur_balance.to_fractional());
-    info!("Current btc balance usd: {}", cur_balance.to_fractional() * 100000.0);
-    let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Bitcoin, &NetworkEnvironment::Main).unwrap();
-    let dest = "bc1qrxdzt6v9yuu567j52cmla4v9kler3wzj0k44lk".to_string();
-    let amt = cur_balance.clone() - (fee.clone()*2);
-    let outputs = vec![(dest, amt.amount as u64)];
+    let dest = Address::from_eth_external(&"0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string());
+    let amt = CurrencyAmount::from_eth_fractional(0.04421014057362884f64);
+    let w = EthWalletWrapper::new(&config.keypair().to_private_hex(), &NetworkEnvironment::Main).unwrap();
+
+    let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Ethereum, &NetworkEnvironment::Main).unwrap();
+    let amt = amt.clone() - (fee.clone()*2);
+
+    let mut tx = w.create_transaction_typed(&eth_addr_typed, &dest, amt, None).await.unwrap();
 
 
-    w.create_transaction_output_batch(outputs)?;
-    let hashes = w.signable_hashes()?.clone();
+    let data = EthWalletWrapper::signing_data(&tx).unwrap();
+        
+    // let signing_data = Hash::new_direct_transaction(data.clone());
+    // let signing_data = Hash::from_string_calculate("test");
 
-    for (i, (data, hashtype)) in hashes.iter().enumerate() {
+    let mut signing_request = ControlMultipartySigningRequest::default();
+    let mut init_signing = InitiateMultipartySigningRequest::default();
+    init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
+    // init_signing.data_to_sign = Some(signing_data.bytes.clone().unwrap());
+    init_signing.data_to_sign = bytes_data(data.clone());
+    init_signing.identifier = Some(identifier.clone());
+    signing_request.signing_request = Some(init_signing);
+    let res = client1.multiparty_signing(signing_request).await;
+    // println!("{:?}", res);
+    res.clone().unwrap();
+    let proof = res.expect("ok").proof.expect("prof");
+
+    let res = EthWalletWrapper::process_signature(proof.signature.unwrap(), &mut tx).unwrap();
+    w.broadcast_tx(res).await.unwrap();
+    info!("done:");
+
+    // let mut w = SingleKeyBitcoinWallet::<Tree>::new_wallet_db_backed(
+    //     public_key.clone(), NetworkEnvironment::Main, true,
+    //     PathBuf::from("bdk_sled_test"),
+    //     None
+    // ).unwrap();
+    // let cur_balance = CurrencyAmount::from_btc(w.get_wallet_balance()?.confirmed as i64);
+    // info!("Current btc balance: {}", cur_balance.to_fractional());
+    // info!("Current btc balance usd: {}", cur_balance.to_fractional() * 100000.0);
+    // let fee = PartyEvents::expected_fee_amount(SupportedCurrency::Bitcoin, &NetworkEnvironment::Main).unwrap();
+    // let dest = "bc1qrxdzt6v9yuu567j52cmla4v9kler3wzj0k44lk".to_string();
+    // let amt = cur_balance.clone() - (fee.clone()*2);
+    // let outputs = vec![(dest, amt.amount as u64)];
+
+
+    // w.create_transaction_output_batch(outputs)?;
+    // let hashes = w.signable_hashes()?.clone();
+
+    // for (i, (data, hashtype)) in hashes.iter().enumerate() {
             
-        // let signing_data = Hash::new_direct_transaction(data.clone());
-        // let signing_data = Hash::from_string_calculate("test");
+    //     // let signing_data = Hash::new_direct_transaction(data.clone());
+    //     // let signing_data = Hash::from_string_calculate("test");
 
-        let mut signing_request = ControlMultipartySigningRequest::default();
-        let mut init_signing = InitiateMultipartySigningRequest::default();
-        init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
-        // init_signing.data_to_sign = Some(signing_data.bytes.clone().unwrap());
-        init_signing.data_to_sign = bytes_data(data.clone());
-        init_signing.identifier = Some(identifier.clone());
-        signing_request.signing_request = Some(init_signing);
-        let res = client1.multiparty_signing(signing_request).await;
-        // println!("{:?}", res);
-        res.clone().unwrap();
-        let proof = res.expect("ok").proof.expect("prof");
-        w.affix_input_signature(i, &proof, hashtype);
+    //     let mut signing_request = ControlMultipartySigningRequest::default();
+    //     let mut init_signing = InitiateMultipartySigningRequest::default();
+    //     init_signing.signing_room_id = default_room_id_signing(&identifier.room_id.clone().expect("rid")).ok();
+    //     // init_signing.data_to_sign = Some(signing_data.bytes.clone().unwrap());
+    //     init_signing.data_to_sign = bytes_data(data.clone());
+    //     init_signing.identifier = Some(identifier.clone());
+    //     signing_request.signing_request = Some(init_signing);
+    //     let res = client1.multiparty_signing(signing_request).await;
+    //     // println!("{:?}", res);
+    //     res.clone().unwrap();
+    //     let proof = res.expect("ok").proof.expect("prof");
+    //     w.affix_input_signature(i, &proof, hashtype);
     
-        // proof.verify(&signing_data).expect("verified");
-        info!("Proof created for {:?}", hashtype);
-    };
-    w.sign()?;
-    w.broadcast_tx()?;
-    let string = w.txid()?;
-    info!("txid: {}", string);
+    //     // proof.verify(&signing_data).expect("verified");
+    //     info!("Proof created for {:?}", hashtype);
+    // };
+    // w.sign()?;
+    // w.broadcast_tx()?;
+    // let string = w.txid()?;
+    // info!("txid: {}", string);
 
     // submit.submit().await.expect("submit");
     //
