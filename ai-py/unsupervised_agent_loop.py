@@ -5,6 +5,7 @@ from prompts import UNSUPERVISED_PROMPT
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from typing import List, Dict, Any
 import tiktoken
+from langchain.agents import AgentExecutor
 
 
 # Import relevant functionality
@@ -19,11 +20,14 @@ def count_tokens(text: str) -> int:
     encoding = tiktoken.encoding_for_model("claude-3-haiku-20240307")
     return len(encoding.encode(text))
 
+
 def get_summary(model: ChatAnthropic, messages: List[Dict[str, Any]]) -> str:
-    summary_request = "Please summarize this conversation and provide information to the next agent invocation which will not have access to this message history"
+    summary_request = "Please summarize this conversation and provide information to " \
+                      "the next agent invocation which will not have access to this message history"
     messages.append(HumanMessage(content=summary_request))
     response = model.invoke(messages)
     return response.content
+
 
 def main():
 
@@ -38,11 +42,15 @@ def main():
     # search = TavilySearchResults(max_results=2)
     tools = TOOLS
     # tools.append(search)
+    max_model_runs = 300
 
-    agent_executor = create_react_agent(model, tools, checkpointer=memory)
+    agent_executor = create_react_agent(
+        model, tools, checkpointer=memory
+    )
+    # agent = AgentExecutor(agent=model, tools=tools, memory=memory)
 
     # Use the agent
-    config = {"configurable": {"thread_id": "abc123"}}
+    config = {"configurable": {"thread_id": "abc123"}, "recursion_limit": max_model_runs}
 
     initial_messages = [
         SystemMessage(content=UNSUPERVISED_PROMPT),
@@ -53,13 +61,12 @@ def main():
     messages = []
     messages.extend(initial_messages)
     i = 0
-    max_model_runs = 100
 
     total_token_usage = 0
     max_tokens_before_summary = 50000
 
     for chunk in agent_executor.stream(
-        {"messages": messages}, config
+        {"messages": messages}, config,
     ):
         if isinstance(chunk, dict) and "actions" in chunk:
             # Track tokens from the response

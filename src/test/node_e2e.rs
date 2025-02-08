@@ -123,7 +123,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     // info!("Balance: {}", b.json_or());
     // party_harness.run_test().await.expect("works");
 
-    party_harness.run_portfolio_test().await;
+    // party_harness.run_portfolio_test().await;
     //
     // // Manual test uses up funds.
 

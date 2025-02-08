@@ -43,6 +43,8 @@ use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage, MoneroWalletResponse};
 use redgold_schema::hash::ToHashed;
 use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::util::times::ToTimeString;
 use crate::core::internal_message::RecvAsyncErrorInfoTimeout;
 
 #[derive(Clone)]
@@ -717,17 +719,17 @@ impl ExternalNetworkResources for MockExternalResources {
     }
 
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
-        match currency {
-            SupportedCurrency::Bitcoin => {
-                let price = 60_000.0;
-                Ok(price)
-            },
-            SupportedCurrency::Ethereum => {
-                let price = 3_000.0;
-                Ok(price)
-            }
-            _ => Err(error_info("Unsupported currency"))
-        }
+        let res = match currency {
+            SupportedCurrency::Bitcoin => 60_000.0,
+            SupportedCurrency::Ethereum => 3_000.0,
+            SupportedCurrency::Monero => 200.0,
+            SupportedCurrency::Solana => 250.0,
+            SupportedCurrency::Redgold => 100.0,
+            _ => "Unsupported currency for query price".to_error()
+                .with_detail("currency", format!("{:?}", currency))
+                .with_detail("time", time.to_time_string_shorter_underscores())?
+        };
+        Ok(res)
     }
 
     async fn daily_historical_year(&self) -> RgResult<HashMap<SupportedCurrency, Vec<(i64, f64)>>> {

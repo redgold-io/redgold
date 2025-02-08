@@ -691,7 +691,7 @@ impl TransactionProcessContext {
         // let hm: HashMap<String, String> = HashMap::new();
         // hm
         let counts = submit_response.count_unique_by_state()?;
-
+        //
         tracing::info!("Finished processing transaction \
         num_observation_proofs {} self_signed_pending {:?} num_pending: {:?} num_accepted: {:?}",
             observation_proofs.len(), self_signed_pending, counts.get(&(State::Pending as i32)).unwrap_or(&0),
