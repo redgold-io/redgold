@@ -727,7 +727,9 @@ pub async fn cold_mix(c: ColdWordMixer, nc: &NodeConfig) -> RgResult<()> {
     let m_cost= 65536;
     let p_cost= 2;
     let t_cost= c.iterations as u32;
-    let m = WordsPass::new(&words, None).validate().unwrap();
+    let sec_words = WordsPass::new(&words, None);
+    let words_from = sec_words.validate();
+    let m = words_from.unwrap();
     let seed = m.seed();
     let salt = seed.expect("works").to_vec();
     let result = argon2d_hash(salt, pass.as_bytes().to_vec(), m_cost, t_cost, p_cost).unwrap();

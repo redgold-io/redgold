@@ -28,3 +28,4 @@ langchain-postgres
 watchdog
 pathspec
 google-search-results
+python-dotenv
