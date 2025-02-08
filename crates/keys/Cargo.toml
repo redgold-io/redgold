@@ -69,8 +69,9 @@ metrics = {workspace = true}
 regex = "1.10.6"
 
 redgold-safe-bindings = { workspace = true}
+sequoia-openpgp = { version = "1.21.2", optional = true }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-sequoia-openpgp = "1.21.2"
+[features]
+gpg = ["sequoia-openpgp"]
 
 

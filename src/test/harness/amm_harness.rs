@@ -42,6 +42,7 @@ pub struct PartyTestHarness {
     pub last_balance: CurrencyAmount,
     pub client: RgHttpClient,
     pub mock_folders: Vec<PathBuf>,
+    pub data: PartyInternalData,
 }
 
 impl PartyTestHarness {
@@ -57,6 +58,11 @@ impl PartyTestHarness {
         let client = opt_client.unwrap();
         let amm_public_key = client
             .active_party_key().await.unwrap();
+        let party_data = client.party_data().await.unwrap();
+        for (k, v) in party_data.iter() {
+            info!("party data: {} {}", k.json_or(), v.json_or());
+        }
+        let data = party_data.get(&amm_public_key).unwrap().clone();
         Self {
             network: node_config.network.clone(),
             private_key,
@@ -66,7 +72,8 @@ impl PartyTestHarness {
             mock_accepted,
             last_balance: CurrencyAmount::zero(SupportedCurrency::Redgold),
             client,
-            mock_folders
+            mock_folders,
+            data
         }
     }
 
@@ -152,10 +159,15 @@ impl PartyTestHarness {
         stake_tx.broadcast_from(&self.node_config).await.expect("broadcast").json_or().print();
     }
 
+
+    pub fn amm_address(&self, cur: SupportedCurrency) -> Option<Address> {
+        self.data.metadata.latest_instance_by(cur).and_then(|i| i.address.clone())
+    }
+
     pub async fn send_internal_rdg_stake(&self) -> RgResult<()> {
         let internal_stake_amount = CurrencyAmount::from_fractional(7.0).expect("works");
         let rdg_address = self.self_rdg_address();
-        let amm_rdg_address = self.amm_public_key.address().expect("address");
+        let amm_rdg_address = self.amm_address(SupportedCurrency::Redgold).expect("works");
         let internal_stake_tx = self.tx_builder().await
             .with_internal_stake_usd_bounds(
                 None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,

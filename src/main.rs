@@ -78,6 +78,9 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
             RgTopLevelSubcommand::Swap(s) =>  {
                 cli_swap(s, &nc).await.unwrap();
             }
+            RgTopLevelSubcommand::ColdMix(c) => {
+                commands::cold_mix(c, &nc).await.unwrap();
+            }
             _ => {}
         }
     }

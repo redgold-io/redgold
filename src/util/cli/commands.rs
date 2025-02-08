@@ -16,6 +16,7 @@ use crate::infra::deploy::{default_deploy, offline_generate_keys_servers};
 use crate::infra::grafana_public_manual_deploy::manual_deploy_grafana_public;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig, EnvDefaultNodeConfig};
 use crate::test::daily_e2e::run_daily_e2e;
+use crate::util::argon_kdf::argon2d_hash;
 use crate::util::metadata::read_metadata_json;
 use redgold_common::flume_send_help::{Channel, RecvAsyncErrorInfo};
 use redgold_common_no_wasm::cmd::run_cmd;
@@ -31,7 +32,7 @@ use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_keys::KeyPair;
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::conf::rg_args::{AddServer, BalanceCli, DebugCommand, Deploy, FaucetCli, GenerateMnemonic, QueryCli, RgDebugCommand, TestTransactionCli, WalletAddress, WalletSend};
+use redgold_schema::conf::rg_args::{AddServer, BalanceCli, DebugCommand, Deploy, FaucetCli, ColdWordMixer, QueryCli, RgDebugCommand, TestTransactionCli, WalletAddress, WalletSend};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::easy_json::{json, json_from, json_pretty};
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
@@ -116,7 +117,7 @@ pub async fn list_servers(config: &NodeConfig) -> Result<Vec<ServerOldFormat>, E
     Ok(servers)
 }
 
-pub fn generate_mnemonic(_generate_mnemonic: &GenerateMnemonic) -> RgResult<()> {
+pub fn generate_mnemonic(_generate_mnemonic: &ColdWordMixer) -> RgResult<()> {
     let wp = WordsPass::generate().expect("works");
     println!("{}", wp.words);
     Ok(())
@@ -303,6 +304,7 @@ pub async fn deploy(deploy: &Deploy, node_config: &NodeConfig) -> RgResult<JoinH
 }
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use crossterm::event::{read, Event, KeyCode, KeyEvent};
+use crate::util::current_time_millis;
 
 pub async fn get_input(prompt: impl Into<String>, is_password: bool) -> RgResult<Option<String>> {
     println!("{}", prompt.into());
@@ -713,5 +715,26 @@ async fn copy_usb_info(p1: &Box<NodeConfig>) -> RgResult<()> {
         info!("Could not find any of the specified USB drives");
     }
 
+    Ok(())
+}
+
+pub async fn cold_mix(c: ColdWordMixer, nc: &NodeConfig) -> RgResult<()> {
+    let words = nc.secure_mnemonic_words().unwrap();
+    let pass = get_input("Enter mixing password:", true).await.unwrap().unwrap();
+    // let phrase = get_input("Enter wallet passphrase:", true).await?;
+    let start = current_time_millis();
+
+    let m_cost= 65536;
+    let p_cost= 2;
+    let t_cost= c.iterations as u32;
+    let m = WordsPass::new(&words, None).validate().unwrap();
+    let seed = m.seed();
+    let salt = seed.expect("works").to_vec();
+    let result = argon2d_hash(salt, pass.as_bytes().to_vec(), m_cost, t_cost, p_cost).unwrap();
+    let w = WordsPass::from_bytes(&*result).ok().unwrap();
+    let end = current_time_millis();
+    let delta_seconds = ((end - start) as f64) / 1000.0;
+    tracing::info!("Argon2d took {} seconds", delta_seconds.clone());
+    println!("{}", w.words);
     Ok(())
 }

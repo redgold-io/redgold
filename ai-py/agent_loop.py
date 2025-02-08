@@ -18,6 +18,7 @@ divider = "\n" + ("-" * 80) + "\n"
 
 
 CLAUDE_HAIKU_LATEST="claude-3-5-haiku-20241022"
+CLAUDE_SONNET="claude-3-5-sonnet-20241022"
 @retry(
     retry=retry_if_exception_type(anthropic.RateLimitError),
     wait=wait_exponential(multiplier=1, min=4, max=60),  # Wait between 4-60 seconds, doubling each time

@@ -82,7 +82,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
         &start_node.node.relay.node_config
     );
 
-    single_node_tests(&mut local_nodes, &submit).await;
+    // single_node_tests(&mut local_nodes, &submit).await;
 
     local_nodes.add_node(
         // runtime.clone()
@@ -111,7 +111,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     config2.load_balancer_url = string;
     let vec = local_nodes.ext.clone();
 
-    let party_harness = PartyTestHarness::from(
+    let mut party_harness = PartyTestHarness::from(
         &config2, kp, vec![vec], Some(client.client_wrapper()), vec![]).await;
 
     let address = party_harness.self_rdg_address();
@@ -121,7 +121,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     //
     // let b = client.balance(address).await.expect("works");
     // info!("Balance: {}", b.json_or());
-    // party_harness.run_test().await.expect("works");
+    party_harness.run_test().await.expect("works");
 
     // party_harness.run_portfolio_test().await;
     //

@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 from typing import Annotated, Optional
 import os
 import git
@@ -68,7 +69,7 @@ def active_workspace_read_file(
 @tool
 def active_workspace_create_file(
     repository_relative_path: Annotated[str, "The relative path of the file to create within the current repository"],
-    content: Annotated[str, "The content of the file"],
+    file_text_to_insert_to_new_file: Annotated[str, "The content of the file"],
     include_as_rust_pub_mod: Annotated[bool, "Whether to include the file as a Rust pub mod"] = True
 ) -> Annotated[str, "Status message indicating success or error"]:
     """
@@ -83,7 +84,7 @@ def active_workspace_create_file(
     parent_dir.mkdir(parents=True, exist_ok=True)
 
     with open(rel, "w") as f:
-        f.write(content)
+        f.write(file_text_to_insert_to_new_file)
         print(f"File created at {rel}")
     if include_as_rust_pub_mod:
         # first check if libs.rs exists in the same parent directory
@@ -203,6 +204,79 @@ def create_pr(
     
     except Exception as e:
         return f"Error creating PR: {str(e)}"
+    
+
+
+@tool
+def get_my_active_pull_requests() -> Annotated[list[str], "The active pull requests for the current user"]:
+    """
+    Get the active pull requests for the current user, including PR body, status, and conversations.
+    Returns a list of formatted strings containing detailed PR information.
+    """
+    token = os.getenv('REDGOLD_AI_TOKEN')
+    if not token:
+        return "Error: REDGOLD_AI_TOKEN environment variable not found"
+    
+    g = Github(token)
+    gh_repo = g.get_repo("redgold-io/redgold")
+    prs = gh_repo.get_pulls(state='open')
+    
+    detailed_prs = []
+    for pr in prs:
+        # Get PR status checks
+        status = pr.get_commits().reversed[0].get_combined_status()
+        status_str = f"Status: {status.state}" if status else "Status: No status checks"
+        
+        # Get PR conversations
+        comments = []
+        for comment in pr.get_issue_comments():
+            comments.append(f"  {comment.user.login}: {comment.body}")
+        
+        # Format PR details
+        pr_details = [
+            f"PR #{pr.number}: {pr.title}",
+            f"Status: {status_str}",
+            f"Created by: {pr.user.login}",
+            f"Branch: {pr.head.ref} → {pr.base.ref}",
+            "",
+            "Description:",
+            pr.body if pr.body else "No description provided",
+            "",
+            "Comments:" if comments else "No comments"
+        ]
+        pr_details.extend(comments)
+        
+        detailed_prs.append("\n".join(pr_details))
+    
+    return detailed_prs if detailed_prs else ["No active pull requests found"]
+
+@tool
+def run_e2e_test() -> Annotated[str, "The output logs of the e2e test"]:
+    """
+    Run a subprocess of ./bin/e2e.sh which runs the e2e test for the current branch.
+    """
+    # chdir to current directory workspace
+    os.chdir(WORKSPACE_PATH)
+    return subprocess.check_output(['./bin/e2e.sh']).decode('utf-8')
+
+@tool
+def respond_to_pr_comment(
+    pr_number: Annotated[int, "The number of the pull request to respond to"],
+    response: Annotated[str, "The response to the comment"]
+) -> Annotated[str, "The status message indicating success or error"]:
+    """
+    Respond to a comment on a pull request.
+    """
+    token = os.getenv('REDGOLD_AI_TOKEN')
+    if not token:
+        return "Error: REDGOLD_AI_TOKEN environment variable not found"
+    
+    g = Github(token)
+    gh_repo = g.get_repo("redgold-io/redgold")
+    pr = gh_repo.get_pull(pr_number)    
+    comment = pr.create_issue_comment(response)
+    return f"Successfully responded to PR #{pr_number} with comment ID {comment.id}"
+
 
 TOOLS = [
     active_workspace_redgold_cargo_rust_compile,
@@ -216,5 +290,8 @@ TOOLS = [
     create_fresh_dev_branch,
     commit_and_push_changes,
     create_pr,
+    get_my_active_pull_requests,
+    run_e2e_test,
+    respond_to_pr_comment,
 ]
 

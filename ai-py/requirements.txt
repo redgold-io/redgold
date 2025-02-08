@@ -24,3 +24,6 @@ openai
 gitpython
 PyGithub
 langchain-community
+langchain-postgres
+watchdog
+pathspec

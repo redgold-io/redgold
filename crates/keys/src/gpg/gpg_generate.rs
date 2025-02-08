@@ -1,4 +1,6 @@
+#[cfg(feature = "gpg")]
 use redgold_schema::RgResult;
+#[cfg(feature = "gpg")]
 use sequoia_openpgp::packet::key::Key4;
 use sequoia_openpgp::packet::prelude::SignatureBuilder;
 use sequoia_openpgp::packet::UserID;
@@ -7,9 +9,12 @@ use sequoia_openpgp::types::{Features, HashAlgorithm, KeyFlags, SignatureType, S
 use sequoia_openpgp::{Cert, Packet};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+#[cfg(feature = "gpg")]
 fn system_time_from_millis(millis: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_millis(millis)
 }
+
+#[cfg(feature = "gpg")]
 pub fn gpg_from_entropy(entropy: &[u8; 32], user_name: String, email: Option<String>) -> RgResult<Vec<u8>> {
 
     let reproducible_time = 1731180346404u64;
@@ -76,6 +81,7 @@ pub fn gpg_from_entropy(entropy: &[u8; 32], user_name: String, email: Option<Str
     Ok(out)
 }
 
+#[cfg(feature = "gpg")]
 fn sig_builder(creation_time: SystemTime, flags: &KeyFlags) -> SignatureBuilder {
     SignatureBuilder::new(SignatureType::DirectKey)
         // GnuPG wants at least a 512-bit hash for P521 keys.
@@ -94,3 +100,14 @@ fn sig_builder(creation_time: SystemTime, flags: &KeyFlags) -> SignatureBuilder 
         ]).expect("signature set_preferred_symmetric_algorithms time")
 }
 
+
+#[cfg(feature = "gpg")]
+#[test]
+pub fn gpg_test() {
+    let tc = TestConstants::new();
+    let entropy = tc.secret.secret_bytes();
+    let user_name = "test".to_string();
+    let email = Some("test@test.com".to_string());
+    let out = gpg_from_entropy(&entropy, user_name, email).expect("gpg_from_entropy");
+    println!("out: {:?}", out);
+}

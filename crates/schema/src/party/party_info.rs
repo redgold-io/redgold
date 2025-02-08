@@ -122,6 +122,17 @@ impl PartyMetadata {
             .flat_map(|i| i.address.as_ref())
             .any(|a| a.currency() == cur)
     }
+
+    pub fn instances_of(&self, cur: &SupportedCurrency) -> impl Iterator<Item=&PartyInstance> {
+        let cur = cur.clone() as i32;
+        self.instances.iter()
+            .filter(move |i| i.address.as_ref().map(|a| a.currency == cur).unwrap_or(false))
+    }
+
+    pub fn latest_instance_by(&self, cur: SupportedCurrency) -> Option<&PartyInstance> {
+        self.instances_of(&cur).max_by_key(|i| i.creation_time)
+    }
+
     pub fn add_instance_equal_members(&mut self, instance: &PartyInstance, equal_members: &Vec<PublicKey>) {
         let addr = instance.address.clone();
         self.instances.push(instance.clone());

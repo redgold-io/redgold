@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use async_trait::async_trait;
+use metrics::{counter, gauge};
 use redgold_schema::parties::{PartyInstance, PartyMetadata, PartyState};
 use redgold_schema::RgResult;
 use serde::{Deserialize, Serialize};
@@ -63,7 +65,25 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
 )
     -> RgResult<PartyUpdateEvents> {
 
+    counter!("redgold_party_formation_tick").increment(1);
     let mut event = PartyUpdateEvents::default();
+    let currencies = SupportedCurrency::multisig_party_currencies();
+
+    let current_currencies = metadata.instances_proposed_by(self_public_key).iter()
+        .map(|a| a.currency())
+        .collect::<HashSet<SupportedCurrency>>();
+    gauge!("redgold_party_formation_current_currencies").set(current_currencies.len() as f64);
+
+
+    let missing = currencies.iter()
+        .filter(|c| !current_currencies.contains(c))
+        .collect::<Vec<&SupportedCurrency>>();
+
+    gauge!("redgold_party_formation_missing_currencies").set(missing.len() as f64);
+
+    if missing.is_empty() {
+        return Ok(event);
+    }
 
     let mut all_pks = vec![self_public_key.clone()];
     all_pks.extend(party_peer_keys.clone());
@@ -88,7 +108,8 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
         threshold = 2;
     }
 
-    for cur in SupportedCurrency::multisig_party_currencies() {
+
+    for cur in currencies {
         if !metadata.has_instance(cur) {
             if let Ok(Some((instance, creation_result))) = attempt_form_for_currency(
                 ext, self_hot_addresses, self_public_key, self_private_key_hex,

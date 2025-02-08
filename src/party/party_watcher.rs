@@ -8,9 +8,10 @@ use redgold_common_no_wasm::stream_handlers::IntervalFold;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
-use redgold_schema::structs::PublicKey;
+use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 use redgold_schema::RgResult;
 use std::collections::HashMap;
+use tracing::info;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::monero::node_wrapper::PartySecretData;
 use redgold_keys::proof_support::PublicKeySupport;
@@ -36,6 +37,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     
     pub async fn tick(&mut self) -> RgResult<()> {
 
+
+        info!("Party watcher tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
         let mut party_metadata = self.relay.ds.config_store
             .get_json::<PartyMetadata>("party_metadata").await?
             .unwrap_or(Default::default());
@@ -43,11 +46,21 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             .get_json::<PartySecretData>("party_secret").await?
             .unwrap_or(Default::default());
 
+        let mut other_seeds = self.relay.node_config.non_self_seeds_pk();
+        gauge!("redgold_party_initial_formation_non_self_peers").set(other_seeds.len() as f64);
+        if self.relay.node_config.network == NetworkEnvironment::Local {
+            other_seeds = self.relay.ds.peer_store.active_nodes(None).await.unwrap_or(vec![]);
+        }
+        if other_seeds.len() < 2 {
+            info!("Not enough peers in local network for party formation");
+            return Ok(())
+        }
+
         let update_events = check_formations(
             &party_metadata,
             &self.external_network_resources,
             &self.relay.node_config.words().to_all_addresses_default(&self.relay.node_config.network)?,
-            &self.relay.node_config.seeds_now_pk(),
+            &other_seeds,
             &self.relay,
             &self.relay.node_config.public_key(),
             None,
@@ -76,21 +89,17 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             .active_proposed_by(&self.relay.node_config.public_key()).len() as f64);
         gauge!("redgold_party_watcher_total_parties").set(party_metadata.instances.len() as f64);
 
-        let mut shared_data = self.enrich_prepare_data(party_metadata).await?;
+        let mut shared_data = self.enrich_prepare_data(party_metadata.clone()).await?;
         // TODO: self.merge_child_events
         self.calculate_party_stream_events(&mut shared_data).await?;
         if self.relay.node_config.enable_party_mode() {
             self.handle_order_fulfillment(&mut shared_data).await?;
         }
-        self.handle_key_rotations(&mut shared_data).await?;
+        // self.handle_key_rotations(&mut shared_data).await?;
 
-        // Persist shared data
-        for (pk, pid) in shared_data.iter() {
-            self.relay.ds.multiparty_store.update_party_data(&pk, pid.to_party_data()).await?;
-        }
         self.relay.external_network_shared_data.write(shared_data.clone()).await;
         if self.relay.node_config.enable_party_mode() {
-            // info!("Party watcher tick num parties total {} active {}", parties.len(), active.len());
+        info!("Party watcher tick num parties total {} active {}", party_metadata.clone().instances.len(), active.len());
             // self.tick_formations(&shared_data).await?;
             // info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
             // for (pk, pid) in shared_data.iter() {

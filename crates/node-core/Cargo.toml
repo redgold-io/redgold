@@ -26,3 +26,4 @@ serde = { workspace = true}
 tracing = { workspace = true}
 async-trait = {  workspace = true }
 flume = {  workspace = true }
+metrics = {  workspace = true }
