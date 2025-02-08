@@ -27,11 +27,12 @@ async fn debug_events2() -> RgResult<()> {
         .and_then(|pd| pd.json_party_internal_data)
         .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
 
+
     let pev = data.party_events.clone().expect("v");
 
     let ev = pev.events.clone();
 
-    let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
+    let mut duplicate = PartyEvents::new(&NetworkEnvironment::Dev, &relay, data.metadata.address_by_currency());
     convert_events(&data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
 
     // this matches

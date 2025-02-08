@@ -30,16 +30,16 @@ async fn debug_events2() -> RgResult<()> {
     let pev = data.party_events.clone().expect("v");
 
     let ev = pev.events.clone();
-
-    let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
-    convert_events(&data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
-
-    // this matches
-    for e in &ev {
-        duplicate.process_event(e).await.expect("works");
-    }
-    let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
-
+    //
+    // let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
+    // convert_events(&data.clone(), &relay.node_config).expect("convert").json_pretty_or().print();
+    //
+    // // this matches
+    // for e in &ev {
+    //     duplicate.process_event(e).await.expect("works");
+    // }
+    // let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
+    //
 
 
     //

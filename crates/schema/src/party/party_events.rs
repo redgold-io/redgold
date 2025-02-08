@@ -22,8 +22,9 @@ pub enum AddressEventExtendedType {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PartyEvents where {
     pub network: NetworkEnvironment,
-    pub key_address: Address,
-    pub party_public_key: PublicKey,
+    pub party_addresses: HashMap<SupportedCurrency, Vec<Address>>,
+    // pub key_address: Address,
+    // pub party_public_key: PublicKey,
     pub events: Vec<AddressEvent>,
     pub balance_map: HashMap<SupportedCurrency, CurrencyAmount>,
     pub balance_pending_order_deltas_map: HashMap<SupportedCurrency, CurrencyAmount>,
@@ -51,7 +52,7 @@ pub struct PartyEvents where {
     pub portfolio_request_events: PortfolioRequestEvents,
     pub default_fee_addrs: Vec<Address>,
     pub seeds: Vec<PublicKey>,
-    pub party_pk_all_address: Vec<Address>,
+    // pub party_pk_all_address: Vec<Address>,
 }
 
 impl PartyEvents {
@@ -107,13 +108,21 @@ impl PartyEvents {
     }
 
     pub fn address_for_currency(&self, cur: &SupportedCurrency) -> Option<Address> {
-        self.party_pk_all_address.iter().find_map(|a| {
-            if a.as_external().currency_or() == *cur {
-                Some(a.clone())
-            } else {
-                None
-            }
-        })
+        self.party_addresses.get(cur).and_then(|a| {
+            a.last()
+        }).cloned()
+    }
+
+    pub fn all_party_address(&self) -> Vec<Address> {
+        self.party_addresses.clone().into_iter().flat_map(|(a,v)| {
+            v
+        }).collect()
+    }
+
+    pub fn key_address(&self) -> Option<Address> {
+        self.party_addresses.get(&SupportedCurrency::Redgold).and_then(|a| {
+            a.last()
+        }).cloned()
     }
 
     pub fn staking_balances(&self,

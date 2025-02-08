@@ -30,6 +30,9 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         for (pk, pmd) in group_by.iter() {
 
             let mut party_internal_data = data.get(&pk).cloned().unwrap_or_default();
+            party_internal_data.self_key = self.relay.node_config.public_key();
+            party_internal_data.proposer_key = pk.clone();
+            party_internal_data.metadata = pmd.clone();
             let earliest_time = pmd.earliest_time();
 
             for party_instance in pmd.instances.iter() {

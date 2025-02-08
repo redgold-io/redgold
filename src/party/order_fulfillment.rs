@@ -219,69 +219,69 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         Ok(0)
     }
 
-
-    pub async fn fulfill_eth(&mut self, pes: &PartyEvents, ident: &MultipartyIdentifier, v: PartyInternalData)
-                             -> RgResult<Vec<OrderFulfillment>> {
-        let orders = pes.orders();
-        let eth_orders = orders.iter()
-            .filter(|o| o.destination.currency_or() == SupportedCurrency::Ethereum)
-            .collect_vec();
-        let mp_eth_addr = pes.party_public_key.to_ethereum_address_typed()?;
-
-        let mut fulfilled = vec![];
-
-        for order in eth_orders {
-            let res = self.fulfill_individual_eth_order(pes, ident, &v, &mp_eth_addr, order).await.log_error().ok();
-            if res.is_some() {
-                fulfilled.push(order.clone());
-            }
-        }
-        Ok(fulfilled)
-    }
-
-    async fn fulfill_individual_eth_order(
-        &mut self, pes: &PartyEvents, ident: &MultipartyIdentifier, v: &PartyInternalData, mp_eth_addr: &Address, order: &OrderFulfillment
-    ) -> RgResult<()> {
-        let eth = self.relay.eth_wallet()?;
-
-        if order.destination.currency_or() != SupportedCurrency::Ethereum {
-            error!("Invalid currency for fulfillment: {}", order.json_or());
-            return Ok(())
-        }
-        let dest = order.destination.clone();
-        let network_balance = pes.balance_with_deltas_applied.get(&SupportedCurrency::Ethereum)
-            .map(|d| d.string_amount());
-        let fulfilled_currency = order.fulfilled_currency_amount();
-        info!("Attempting to fulfill ETH network_balance: {} balances: {} order {} fulfilled_currency {}",
-                network_balance.json_or(), pes.balance_map.json_or(), order.json_or(),
-                fulfilled_currency.json_or()
-            );
-        // let mut tx = eth.create_transaction_typed(
-        //     &mp_eth_addr, &dest, fulfilled_currency, None
-        // ).await
-        let (data, valid, tx_ser) = self.external_network_resources
-            .eth_tx_payload(&mp_eth_addr, &dest, &fulfilled_currency, None).await
-            .with_detail("network_balance", network_balance.json_or())
-            .with_detail("party_balance", pes.balance_map.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or(""))
-            .with_detail("order", order.json_or())
-            .with_detail("party_delta_balance", pes.balance_with_deltas_applied.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or(""))
-            ?;
-        // let data = EthWalletWrapper::signing_data(&tx)?;
-        // let tx_ser = tx.json_or();
-        // let mut valid = structs::PartySigningValidation::default();
-        // valid.json_payload = Some(tx_ser);
-        // valid.currency = SupportedCurrency::Ethereum as i32;
-        let res = initiate_mp_keysign(
-            self.relay.clone(), ident.clone(), BytesData::from(data), ident.party_keys.clone(), None,
-            Some(valid)
-        ).await?;
-        let sig = res.proof.signature.ok_msg("Missing keysign result signature")?;
-        let raw = EthWalletWrapper::process_signature_ser(sig, tx_ser, eth.chain_id, !self.relay.node_config.network.is_main_stage_network())?;
-        // let raw = EthWalletWrapper::process_signature(sig, &mut tx)?;
-        // eth.broadcast_tx(raw).await?;
-        self.external_network_resources.broadcast(&pes.party_public_key, SupportedCurrency::Ethereum, EncodedTransactionPayload::BytesPayload(raw.to_vec())).await?;
-        Ok(())
-    }
+    //
+    // pub async fn fulfill_eth(&mut self, pes: &PartyEvents, ident: &MultipartyIdentifier, v: PartyInternalData)
+    //                          -> RgResult<Vec<OrderFulfillment>> {
+    //     let orders = pes.orders();
+    //     let eth_orders = orders.iter()
+    //         .filter(|o| o.destination.currency_or() == SupportedCurrency::Ethereum)
+    //         .collect_vec();
+    //     let mp_eth_addr = pes.party_public_key.to_ethereum_address_typed()?;
+    //
+    //     let mut fulfilled = vec![];
+    //
+    //     for order in eth_orders {
+    //         let res = self.fulfill_individual_eth_order(pes, ident, &v, &mp_eth_addr, order).await.log_error().ok();
+    //         if res.is_some() {
+    //             fulfilled.push(order.clone());
+    //         }
+    //     }
+    //     Ok(fulfilled)
+    // }
+    //
+    // async fn fulfill_individual_eth_order(
+    //     &mut self, pes: &PartyEvents, ident: &MultipartyIdentifier, v: &PartyInternalData, mp_eth_addr: &Address, order: &OrderFulfillment
+    // ) -> RgResult<()> {
+    //     let eth = self.relay.eth_wallet()?;
+    //
+    //     if order.destination.currency_or() != SupportedCurrency::Ethereum {
+    //         error!("Invalid currency for fulfillment: {}", order.json_or());
+    //         return Ok(())
+    //     }
+    //     let dest = order.destination.clone();
+    //     let network_balance = pes.balance_with_deltas_applied.get(&SupportedCurrency::Ethereum)
+    //         .map(|d| d.string_amount());
+    //     let fulfilled_currency = order.fulfilled_currency_amount();
+    //     info!("Attempting to fulfill ETH network_balance: {} balances: {} order {} fulfilled_currency {}",
+    //             network_balance.json_or(), pes.balance_map.json_or(), order.json_or(),
+    //             fulfilled_currency.json_or()
+    //         );
+    //     // let mut tx = eth.create_transaction_typed(
+    //     //     &mp_eth_addr, &dest, fulfilled_currency, None
+    //     // ).await
+    //     let (data, valid, tx_ser) = self.external_network_resources
+    //         .eth_tx_payload(&mp_eth_addr, &dest, &fulfilled_currency, None).await
+    //         .with_detail("network_balance", network_balance.json_or())
+    //         .with_detail("party_balance", pes.balance_map.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or(""))
+    //         .with_detail("order", order.json_or())
+    //         .with_detail("party_delta_balance", pes.balance_with_deltas_applied.get(&SupportedCurrency::Ethereum).map(|b| b.string_amount()).unwrap_or(""))
+    //         ?;
+    //     // let data = EthWalletWrapper::signing_data(&tx)?;
+    //     // let tx_ser = tx.json_or();
+    //     // let mut valid = structs::PartySigningValidation::default();
+    //     // valid.json_payload = Some(tx_ser);
+    //     // valid.currency = SupportedCurrency::Ethereum as i32;
+    //     let res = initiate_mp_keysign(
+    //         self.relay.clone(), ident.clone(), BytesData::from(data), ident.party_keys.clone(), None,
+    //         Some(valid)
+    //     ).await?;
+    //     let sig = res.proof.signature.ok_msg("Missing keysign result signature")?;
+    //     let raw = EthWalletWrapper::process_signature_ser(sig, tx_ser, eth.chain_id, !self.relay.node_config.network.is_main_stage_network())?;
+    //     // let raw = EthWalletWrapper::process_signature(sig, &mut tx)?;
+    //     // eth.broadcast_tx(raw).await?;
+    //     self.external_network_resources.broadcast(&pes.party_public_key, SupportedCurrency::Ethereum, EncodedTransactionPayload::BytesPayload(raw.to_vec())).await?;
+    //     Ok(())
+    // }
 
     // pub async fn payloads_and_validation(&self, outputs: Vec<(String, u64)>, public_key: &PublicKey, ps: &PartyEvents)
     //                                      -> RgResult<(Vec<(Vec<u8>, EcdsaSighashType)>, PartySigningValidation)> {

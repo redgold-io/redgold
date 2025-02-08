@@ -38,7 +38,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn tick(&mut self) -> RgResult<()> {
 
 
-        info!("Party watcher tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
+        // info!("Party watcher tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
         let mut party_metadata = self.relay.ds.config_store
             .get_json::<PartyMetadata>("party_metadata").await?
             .unwrap_or(Default::default());
@@ -99,7 +99,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
         self.relay.external_network_shared_data.write(shared_data.clone()).await;
         if self.relay.node_config.enable_party_mode() {
-        info!("Party watcher tick num parties total {} active {}", party_metadata.clone().instances.len(), active.len());
+        // info!("Party watcher tick num parties total {} active {}", party_metadata.clone().instances.len(), active.len());
             // self.tick_formations(&shared_data).await?;
             // info!("Completed party tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
             // for (pk, pid) in shared_data.iter() {
@@ -114,7 +114,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
     async fn calculate_party_stream_events(&self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
         for (k,v ) in data.iter_mut() {
-            let mut pe = PartyEvents::new(k, &self.relay.node_config.network, &self.relay);
+            let mut pe = PartyEvents::new(&self.relay.node_config.network, &self.relay, v.metadata.address_by_currency());
             for e in v.address_events.iter() {
                 pe.process_event(e).await?;
             }

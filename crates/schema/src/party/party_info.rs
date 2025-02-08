@@ -61,6 +61,16 @@ impl PartyInfo {
 
 impl PartyMetadata {
 
+    pub fn address_by_currency(&self) -> HashMap<SupportedCurrency, Vec<Address>> {
+        self.instances.iter()
+            .group_by(|a| a.address.as_ref().map(|a| a.currency()))
+            .into_iter()
+            .filter(|(k, _)| k.is_some())
+            .map(|(k, v)| (k.clone().unwrap(), v
+                .map(|a| a.address.as_ref().unwrap()).cloned().collect()))
+            .collect()
+    }
+
     pub fn earliest_time(&self) -> i64 {
         self.instances.iter().filter_map(|i| i.creation_time).min().unwrap_or(0)
     }

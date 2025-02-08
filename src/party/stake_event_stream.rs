@@ -103,7 +103,7 @@ impl StakeMethods for PartyEvents {
     }
 
     fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
-        let addrs = self.party_public_key.to_all_addresses()?;
+        let addrs = self.all_party_address();
         let amt = Some(addrs.iter().map(|a| tx.output_rdg_amount_of(a)).sum::<i64>())
             .filter(|a| *a > 0)
             .map(|a| CurrencyAmount::from(a));

@@ -12,14 +12,14 @@ use redgold_schema::party::address_event::AddressEvent::External;
 use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
 use redgold_schema::party::central_price::CentralPricePair;
 use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::times::current_time_millis;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use std::collections::HashMap;
 
 pub trait PartyEventBuilder {
-    fn new(party_public_key: &PublicKey, network: &NetworkEnvironment, relay: &Relay) -> Self;
+    fn new(network: &NetworkEnvironment, relay: &Relay, addresses: HashMap<SupportedCurrency, Vec<Address>>) -> Self;
     fn orders(&self) -> Vec<OrderFulfillment>;
     fn validate_rdg_swap_fulfillment_transaction(&self, tx: &Transaction) -> RgResult<()>;
     fn fulfillment_orders(&self, c: SupportedCurrency) -> Vec<OrderFulfillment>;
@@ -177,10 +177,11 @@ impl PartyEventBuilder for PartyEvents {
     fn handle_internal_event(&mut self, e: &AddressEvent, time: i64, ec: AddressEvent, t: &TransactionWithObservationsAndPrice) -> RgResult<()> {
         let mut amount = CurrencyAmount::from_rdg(0);
         // TODO: Does this need to be a detect on all addresses?
-        let incoming = !t.tx.input_addresses().contains(&self.key_address);
+        let party_key_rdg_address = self.key_address().ok_msg("key address")?;
+        let incoming = !t.tx.input_addresses().contains(&party_key_rdg_address);
 
         if incoming {
-            amount = t.tx.output_rdg_amount_of_pk(&self.party_public_key)?;
+            amount = t.tx.output_rdg_amount_of_address(&party_key_rdg_address);
             // Is Swap
             let dest = t.tx.swap_destination();
             if let Some(swap_destination) = dest {
@@ -198,7 +199,7 @@ impl PartyEventBuilder for PartyEvents {
                 self.handle_portfolio_request(e, time, &t.tx)?;
             }
         } else {
-            let outgoing_amount = t.tx.output_rdg_amount_of_exclude_pk(&self.party_public_key)?;
+            let outgoing_amount = t.tx.output_rdg_amount_of_exclude_address(&party_key_rdg_address);
             amount = outgoing_amount;
             // This is an outgoing transaction representing a deposit fulfillment receipt
             for tx_id in t.tx.output_external_txids() {
@@ -374,15 +375,16 @@ impl PartyEventBuilder for PartyEvents {
         filtered_orders
     }
 
-    fn new(party_public_key: &PublicKey, network: &NetworkEnvironment, relay: &Relay) -> Self {
+    fn new(
+        network: &NetworkEnvironment,
+        relay: &Relay,
+        party_addresses: HashMap<SupportedCurrency, Vec<Address>>
+    ) -> Self {
         // let btc_rdg = get_btc_per_rdg_starting_min_ask(0);
         // let min_ask = btc_rdg;
         // let price = 1f64 / btc_rdg;
-        let party_pk_all_address = party_public_key.to_all_addresses().unwrap();
         Self {
             network: network.clone(),
-            key_address: party_public_key.address().expect("works").clone(),
-            party_public_key: party_public_key.clone(),
             events: vec![],
             balance_map: Default::default(),
             balance_pending_order_deltas_map: Default::default(),
@@ -409,7 +411,7 @@ impl PartyEventBuilder for PartyEvents {
             portfolio_request_events: Default::default(),
             default_fee_addrs: relay.default_fee_addrs(),
             seeds: relay.node_config.seeds_now_pk(),
-            party_pk_all_address
+            party_addresses,
         }
     }
 }
