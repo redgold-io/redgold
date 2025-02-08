@@ -278,6 +278,71 @@ def respond_to_pr_comment(
     return f"Successfully responded to PR #{pr_number} with comment ID {comment.id}"
 
 
+@tool 
+def get_pr_failing_test_logs(
+    pr_number: Annotated[int, "The number of the pull request to get the failing test logs for"]
+) -> Annotated[str, "The actions info"]:
+    """
+    Get the failing test logs from GitHub Actions for a specific PR.
+    Filters out lines that begin with "Compiling ".
+    """
+    token = os.getenv('REDGOLD_AI_TOKEN')
+    if not token:
+        return "Error: REDGOLD_AI_TOKEN environment variable not found"
+    
+    try:
+        g = Github(token)
+        gh_repo = g.get_repo("redgold-io/redgold")
+        pr = gh_repo.get_pull(pr_number)
+        
+        # Get the latest commit
+        latest_commit = list(pr.get_commits())[-1]
+        
+        # Get workflow runs for this commit
+        runs = gh_repo.get_workflow_runs(head_sha=latest_commit.sha)
+        
+        failing_logs = []
+        for run in runs:
+            if run.conclusion == "failure":
+                # Get jobs for the failed run
+                for job in run.jobs():
+                    if job.conclusion == "failure":
+                        # Get the logs using the GitHub API directly
+                        headers = {
+                            "Authorization": f"token {token}",
+                            "Accept": "application/vnd.github.v3+json"
+                        }
+                        logs_url = f"https://api.github.com/repos/redgold-io/redgold/actions/jobs/{job.id}/logs"
+                        import requests
+                        response = requests.get(logs_url, headers=headers)
+                        if response.status_code == 200:
+                            logs = response.text
+                            # Filter out lines starting with "Compiling "
+                            filtered_logs = "\n".join([
+                                line for line in logs.split("\n")
+                                if not line.strip().startswith("Compiling ")
+                            ])
+                            failing_logs.append(f"Failed Job: {job.name}\n{filtered_logs}")
+                        else:
+                            failing_logs.append(f"Failed to get logs for job {job.name}: {response.status_code}")
+        
+        if failing_logs:
+            return "\n\n".join(failing_logs)
+        return "No failing tests found"
+        
+    except Exception as e:
+        return f"Error getting failing test logs: {str(e)}"
+
+
+from langchain.agents import load_tools, get_all_tool_names
+
+
+BUILTIN_TOOLS = load_tools(
+    [
+        "serpapi"
+    ]
+)
+
 TOOLS = [
     active_workspace_redgold_cargo_rust_compile,
     index_and_full_text_repo_search,

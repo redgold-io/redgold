@@ -27,3 +27,4 @@ langchain-community
 langchain-postgres
 watchdog
 pathspec
+google-search-results
