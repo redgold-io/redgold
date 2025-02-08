@@ -14,8 +14,8 @@ use foundry_block_explorers::Client;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_keys::{KeyPair, TestConstants};
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::lang_util::AnyPrinter;
 
 //  Has faucet bitcoin test funds

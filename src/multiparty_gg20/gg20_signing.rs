@@ -59,7 +59,7 @@ async fn signing_original(
     relay: Relay,
 ) -> Result<SignatureRecid> {
 
-    let mut local_share: LocalKey<curv::elliptic::curves::Secp256k1> = serde_json::from_str(&local_share).context("parse local share")?;
+    let local_share: LocalKey<curv::elliptic::curves::Secp256k1> = serde_json::from_str(&local_share).context("parse local share")?;
     // let orig_local_share = local_share.i.clone();
     // local_share.i = self_index as u16;
     // let n = local_share.n;

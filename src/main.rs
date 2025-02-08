@@ -165,19 +165,6 @@ async fn main_dbg(node_config: Box<NodeConfig>) {
     let mut relay = Relay::new(*node_config.clone()).await;
     Node::prelim_setup(relay.clone()).await.expect("prelim");
 
-    let parties = relay.ds.multiparty_store.all_party_info_with_key()
-        .await
-        .expect("Party DS query failed");
-    let all_parties = AllParties::new(parties.clone());
-    let active = all_parties.active;
-    let addrs = active.iter()
-        .flat_map(|x| x.party_key.as_ref())
-        .flat_map(|x| x.to_ethereum_address().ok())
-        .collect_vec();
-    info!("Set active parties subscribe ethDAQ filter to: {:?}", addrs);
-    for addr in addrs {
-        relay.eth_daq.add_address_and_backfill_historical(addr.clone()).await.log_error();
-    }
     // TODO: Match on node_config external network resources impl
     // TODO: Tokio select better?
     let join_handles = if node_config.debug_id().is_none() {

@@ -416,7 +416,7 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         let arc = self.btc_multisig_wallet(
             peer_keys, thresh
         ).await?;
-        let mut w = arc.lock().await;
+        let w = arc.lock().await;
         w.get_descriptor_address_typed()
     }
 

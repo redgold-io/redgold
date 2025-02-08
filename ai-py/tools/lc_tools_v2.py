@@ -34,7 +34,7 @@ def index_and_full_text_repo_search(
     :param query: The query to search for.
     :return: A list of results.
     """
-    return full_text_repo_search(query)
+    return full_text_repo_search({"query": query})
 
 
 @tool
@@ -67,14 +67,42 @@ def active_workspace_read_file(
 
 @tool
 def active_workspace_create_file(
-    filename: Annotated[str, "The relative path of the file to create within the current repository"],
-    content: Annotated[str, "The content of the file"]
+    repository_relative_path: Annotated[str, "The relative path of the file to create within the current repository"],
+    content: Annotated[str, "The content of the file"],
+    include_as_rust_pub_mod: Annotated[bool, "Whether to include the file as a Rust pub mod"] = True
 ) -> Annotated[str, "Status message indicating success or error"]:
     """
     Create a new file in the current workspace with the given content.
     If the file already exists, it will be overwritten.
     """
-    return create_file()[1](filename, content)
+    rel_start = Path.home().joinpath("ai/redgold")
+    rel: str = repository_relative_path
+    rel = str(rel_start.joinpath(rel))
+    # Get parent directory path and create all necessary directories
+    parent_dir = Path(rel).parent
+    parent_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(rel, "w") as f:
+        f.write(content)
+        print(f"File created at {rel}")
+    if include_as_rust_pub_mod:
+        # first check if libs.rs exists in the same parent directory
+        # if not, check for mod.rs
+        rel_p = Path(rel)
+        fnm = rel_p.name
+        cur = rel_p.parent
+        lib = cur.joinpath("lib.rs")
+        mod = cur.joinpath("mod.rs")
+        export_str = f"\npub mod {fnm.split('.')[0]};\n"
+        if lib.exists():
+            with open(lib, "a") as f:
+                f.write(export_str)
+        elif mod.exists():
+            with open(mod, "a") as f:
+                f.write(export_str)
+        else:
+            print("No lib.rs or mod.rs found in the parent directory, not adding the export line")
+        
 
 
 @tool

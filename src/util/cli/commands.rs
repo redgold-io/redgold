@@ -613,7 +613,7 @@ pub async fn debug_commands(p0: &DebugCommand, nc: &Box<NodeConfig>) -> RgResult
                     None
                 };
                 let pids = offline_generate_keys_servers(
-                    (*nc.clone()), nc.servers_old(), PathBuf::from("servers"),
+                    *nc.clone(), nc.servers_old(), PathBuf::from("servers"),
                     nc.secure_words_or().words, passphrase.clone()
                 ).await.unwrap();
 

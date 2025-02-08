@@ -23,9 +23,10 @@ def main():
     )
     #.bind_tools(TOOLS)
 
-    search = TavilySearchResults(max_results=2)
+    # search = TavilySearchResults(max_results=2)
     tools = TOOLS
-    tools.append(search)
+    # tools.append(search)
+    
     agent_executor = create_react_agent(model, tools, checkpointer=memory)
 
     # Use the agent

@@ -361,7 +361,7 @@ where G: GuiDepends + Clone + Send + 'static {
             let config1 = nc.clone();
             let option = servers.clone();
             let string = state.generate_offline_words.clone();
-            let mut passoptstr = state.generate_offline_pass.clone();
+            let passoptstr = state.generate_offline_pass.clone();
             let p = if passoptstr.is_empty() {
                 None
             } else {
