@@ -39,6 +39,7 @@ use redgold_keys::eth::safe_multisig::SafeMultisig;
 use redgold_keys::monero::node_wrapper::MoneroNodeRpcInterfaceWrapper;
 use redgold_keys::solana::derive_solana::SolanaWordPassExt;
 use redgold_keys::solana::wallet::SolanaNetwork;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage, MoneroWalletResponse};
 use redgold_schema::hash::ToHashed;
 use redgold_schema::keys::words_pass::WordsPass;
@@ -409,7 +410,29 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
     }
 
     async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount> {
-        todo!()
+        match address.currency_or() {
+            SupportedCurrency::Bitcoin => {
+                let arc = self.btc_wallet_for_address(address).await?;
+                let w = arc.lock().await;
+                w.balance()
+            },
+            SupportedCurrency::Redgold => {
+                self.relay.safe_get_msg("Missing relay")?.ds.utxo
+                    .get_balance_for_addresses(vec![address.clone()]).await
+            },
+            SupportedCurrency::Ethereum => {
+                let eth = EthHistoricalClient::new(&self.node_config.network).ok_msg("eth client creation")??;
+                let eth_addr = address.clone();
+                let amount = eth.get_balance_typed(&eth_addr).await?;
+                Ok(amount)
+            }
+            SupportedCurrency::Solana => {
+                let sol = SolanaNetwork::new(self.node_config.network.clone(), None);
+                let balance = sol.get_balance(address.clone()).await?;
+                Ok(balance)
+            },
+            _ => Err(error_info("Unsupported currency"))
+        }
     }
 
     async fn btc_pubkeys_to_multisig_address(&self, peer_keys: &Vec<PublicKey>, thresh: i64) -> RgResult<Address> {
@@ -812,15 +835,36 @@ impl ExternalNetworkResources for MockExternalResources {
     }
 
     async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount> {
-        todo!()
+        let cur = address.currency_or();
+        let usd_price = cur.price_default();
+        let amount = 1000f64 / usd_price;
+        CurrencyAmount::from_fractional_cur(amount, cur)
     }
 
     async fn btc_pubkeys_to_multisig_address(&self, pubkeys: &Vec<PublicKey>, thresh: i64) -> RgResult<Address> {
-        todo!()
+        pubkeys.get(0).clone().ok_msg("btc")?.to_bitcoin_address_typed(&self.node_config.network)
     }
 
-    async fn create_multisig_party<B: PeerBroadcast>(&self, cur: &SupportedCurrency, all_pks: &Vec<PublicKey>, self_public_key: &PublicKey, self_private_key_hex: &String, network: &NetworkEnvironment, words_pass: WordsPass, threshold: i64, peer_broadcast: &B, peer_pks: &Vec<PublicKey>) -> RgResult<Option<PartyCreationResult>> {
-        todo!()
+    async fn create_multisig_party<B: PeerBroadcast>(
+        &self,
+        cur: &SupportedCurrency,
+        all_pks: &Vec<PublicKey>,
+        self_public_key: &PublicKey,
+        self_private_key_hex: &String,
+        network: &NetworkEnvironment,
+        words_pass: WordsPass,
+        threshold: i64,
+        peer_broadcast: &B,
+        peer_pks: &Vec<PublicKey>
+    ) -> RgResult<Option<PartyCreationResult>> {
+        let tw = TestConstants::new().words_pass;
+        let addrs = tw.to_all_addresses_default(&network)?;
+        let addr = addrs.iter().filter(|a| &a.currency_or() == cur)
+            .next()
+            .ok_msg("Missing currency")?;
+        let mut result = PartyCreationResult::default();
+        result.address = addr.clone();
+        Ok(Some(result))
     }
 }
 

@@ -117,7 +117,7 @@ def process_file(file, accum, file_exclusions, file_inclusions, endings_exclusio
 
 def scan_tld(scan_config=None):
     current_dir = Path.cwd()
-    print("Current directory: ", current_dir)
+    # print("Current directory: ", current_dir)
     parent_dir = current_dir.parent
 
     accum = AccumFileData()
@@ -164,7 +164,7 @@ def scan_dir(
                 if not should_proceed:
                     skip = True
             if not skip:
-                print("Processing file: ", entry)
+                # print("Processing file: ", entry)
                 process_file(entry, accum, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions)
         elif entry.is_dir():
             scan_dir(entry, accum, directory_exclusions, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions, directory_inclusions)

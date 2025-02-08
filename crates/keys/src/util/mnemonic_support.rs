@@ -60,7 +60,7 @@ pub trait MnemonicSupport {
     fn default_peer_id(&self) -> RgResult<PeerId>;
     fn default_public_key(&self) -> RgResult<structs::PublicKey>;
     fn test_words() -> Self;
-    fn hot_addresses_all(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>>;
+    fn to_all_addresses_default(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>>;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -97,7 +97,7 @@ impl WordsPassMetadata {
 
 impl MnemonicSupport for WordsPass {
 
-    fn hot_addresses_all(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>> {
+    fn to_all_addresses_default(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>> {
         Ok(vec![
             self.default_public_key()?.address()?,
             self.default_public_key()?.to_bitcoin_address_typed(&net)?.as_external(),

@@ -46,7 +46,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         let update_events = check_formations(
             &party_metadata,
             &self.external_network_resources,
-            &self.relay.node_config.words().hot_addresses_all(&self.relay.node_config.network)?,
+            &self.relay.node_config.words().to_all_addresses_default(&self.relay.node_config.network)?,
             &self.relay.node_config.seeds_now_pk(),
             &self.relay,
             &self.relay.node_config.public_key(),

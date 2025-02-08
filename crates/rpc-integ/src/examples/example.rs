@@ -2,7 +2,7 @@ use ethers::{core::types::TransactionRequest,
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, signers::{LocalWallet, Signer}};
 
 
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::{helpers::easy_json::EasyJsonDeser, keys::words_pass::WordsPass, structs::CurrencyAmount};
 
 use crate::eth::eth_wallet::EthWalletWrapper;
 use crate::eth::historical_client::EthHistoricalClient;

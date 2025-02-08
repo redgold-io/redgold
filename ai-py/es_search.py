@@ -32,7 +32,7 @@ def search(query_text):
     # Check Elasticsearch connection and version
     try:
         info = es.info()
-        print(f"Connected to Elasticsearch {info['version']['number']}")
+        # print(f"Connected to Elasticsearch {info['version']['number']}")
     except Exception as e:
         print(f"Error connecting to Elasticsearch: {e}")
         exit(1)
@@ -60,9 +60,9 @@ def search(query_text):
     try:
         if es.indices.exists(index=index_name):
             es.indices.delete(index=index_name)
-            print(f"Deleted existing index '{index_name}'")
+            # print(f"Deleted existing index '{index_name}'")
         es.indices.create(index=index_name, body=mapping)
-        print(f"Created index '{index_name}' with mapping")
+        # print(f"Created index '{index_name}' with mapping")
     except Exception as e:
         print(f"Error creating index: {e}")
         exit(1)
@@ -95,7 +95,7 @@ def search(query_text):
 
     try:
         success, failed = bulk_index_with_retry(es, docs)
-        print(f"Indexed {success} documents")
+        # print(f"Indexed {success} documents")
         if failed:
             print(f"Failed to index {len(failed)} documents")
     except Exception as e:

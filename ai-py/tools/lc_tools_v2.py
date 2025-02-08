@@ -55,9 +55,9 @@ def edit_active_workspace_file(
 @tool
 def active_workspace_read_file(
     filename: Annotated[str, "The relative path of the file to read within the current repository"],
-    starting_line: Annotated[Optional[str], "The (inclusive) 1-indexed starting line number to begin reading. If None, starts at beginning"],
-    ending_line: Annotated[Optional[str], "The (inclusive) 1-indexed ending line number to stop reading. If None, goes to end of file"]
-) -> Annotated[str, "The content of the file"]:
+    starting_line: Annotated[Optional[int], "The (inclusive) 1-indexed starting line number to begin reading. If None, starts at beginning"],
+    ending_line: Annotated[Optional[int], "The (inclusive) 1-indexed ending line number to stop reading. If None, goes to end of file"]
+) -> Annotated[list[str], "The content of the file"]:
     """
     Read a file in the current workspace by returning the lines between starting_line and ending_line.
     Line numbers are 1-indexed and inclusive.
@@ -102,6 +102,7 @@ def active_workspace_create_file(
                 f.write(export_str)
         else:
             print("No lib.rs or mod.rs found in the parent directory, not adding the export line")
+    return "Success"
         
 
 
