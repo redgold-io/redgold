@@ -7,7 +7,10 @@ use sqlx::pool::PoolConnection;
 use sqlx::{Sqlite, SqlitePool};
 use std::sync::Arc;
 
+use crate::error_convert::ResultErrorInfoExt;
+
 pub use redgold_schema as schema;
+
 pub mod peer;
 pub mod config;
 pub mod servers;
@@ -24,6 +27,7 @@ pub mod transaction_insert;
 pub mod address_transaction;
 pub mod transaction_observability;
 mod price_time;
+pub mod error_convert;
 
 #[derive(Clone)]
 pub struct DataStoreContext {
@@ -33,41 +37,25 @@ pub struct DataStoreContext {
 }
 
 impl DataStoreContext {
-
     pub async fn pool(&self) -> Result<PoolConnection<Sqlite>, ErrorInfo> {
-        DataStoreContext::map_err_sqlx(self.pool.acquire().await)
+        self.pool.acquire().await.map_err_to_info()
     }
 
     pub async fn run_migrations(&self) -> Result<(), ErrorInfo> {
         sqlx::migrate!("./migrations")
             .run(&*self.pool)
             .await
-            .map_err(|e| error_message(schema::structs::ErrorCode::InternalDatabaseError, e.to_string()))
+            .map_err_to_info()
     }
 
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use .map_err_to_info() from ResultErrorInfoExt trait instead"
+    )]
     pub fn map_err_sqlx<A>(error: Result<A, sqlx::Error>) -> Result<A, ErrorInfo> {
-        error.map_err(|e| error_message(schema::structs::ErrorCode::InternalDatabaseError, e.to_string()))
+        error.map_err_to_info()
     }
-
-    // This doesn't seem to work due to the Record type here
-    // pub async fn run_query<'a, T: Send + Unpin, J>(
-    //     &self,
-    //     sqlx_macro_query: Map<'a, Sqlite, fn(SqliteRow) -> Result<T, Error>, SqliteArguments<'a>>,
-    //     handle_result: fn(T) -> Result<J, ErrorInfo>
-    // )
-    // -> Result<Vec<J>, ErrorInfo> {
-    //     let mut pool = self.pool().await?;
-    //     let rows = sqlx_macro_query.fetch_all(&mut *pool).await;
-    //     let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-    //     let mut res = vec![];
-    //     for row in rows_m {
-    //         res.push(handle_result(row)?);
-    //     }
-    //     Ok(res)
-    // }
-
 }
-
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
