@@ -407,7 +407,8 @@ impl SwapState {
                 };
 
                 let x = pair_value * 1e8;
-                let fulfilled_amt = cp.dummy_fulfill(x as u64, is_ask, &net, get_prices_of_currency);
+                let oat = CurrencyAmount::from_fractional_cur(pair_value, self.currency_input_box.input_currency.clone()).unwrap();
+                let fulfilled_amt = cp.dummy_fulfill(oat, x as u64, is_ask, &net, get_prices_of_currency);
                 if fulfilled_amt == 0.0 {
                     self.swap_valid = false;
                     self.invalid_reason = "Order below minimum amount, or insufficient party liquidity".to_string();

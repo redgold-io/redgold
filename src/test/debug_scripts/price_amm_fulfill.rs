@@ -11,8 +11,8 @@ async fn debug() {
     let p = party_data.into_iter().next().unwrap().1;
     let p = p.party_events.unwrap().central_prices.get(&SupportedCurrency::Ethereum).cloned().unwrap();
     let amt = (0.04143206 * 1e8) as u64;
-    let result = p.dummy_fulfill(amt, false, &nc.network, SupportedCurrency::Ethereum);
-    println!("Result: {:?}", result);
+    // let result = p.dummy_fulfill(amt, false, &nc.network, SupportedCurrency::Ethereum);
+    // println!("Result: {:?}", result);
 }
 
 

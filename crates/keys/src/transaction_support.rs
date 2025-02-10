@@ -26,6 +26,8 @@ pub trait TransactionSupport {
     fn output_rdg_amount_of_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount>;
     fn outputs_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>>;
     fn output_rdg_amount_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount>;
+    // Simple signing function, this won't work for multi-sig, construct separately
+    fn sign_multisig(&mut self, key_pair: &KeyPair, party_address: &Address) -> RgResult<Transaction>;
 }
 
 #[test]
@@ -81,6 +83,19 @@ impl TransactionSupport for Transaction {
         // if !signed {
         //     return Err(error_info("Couldn't find appropriate input address to sign"));
         // }
+        let x = self.with_hash();
+        x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
+        Ok(x.clone())
+    }
+    // Simple signing function, this won't work for multi-sig, construct separately
+    fn sign_multisig(&mut self, key_pair: &KeyPair, party_address: &Address) -> RgResult<Transaction> {
+        let hash = self.signable_hash();
+        for i in self.inputs.iter_mut() {
+            if i.address.as_ref() == Some(party_address) {
+                let proof = Proof::from_keypair_hash(&hash, &key_pair);
+                i.proof.push(proof);
+            }
+        }
         let x = self.with_hash();
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())

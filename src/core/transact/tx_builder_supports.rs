@@ -36,9 +36,17 @@ impl TxBuilderApiConvert for TransactionBuilder {
 #[async_trait]
 impl TxBuilderApiSupport for TxBuilderApiWrapper {
     async fn with_auto_utxos(&mut self) -> RgResult<&mut TransactionBuilder> {
-        if let Some(nc) = self.0.nc.as_ref() {
+        if let Some(nc) = self.0.nc.clone() {
             if self.0.input_addresses.len() > 0 {
                 let response = nc.api_client().query_address(self.0.input_addresses.clone()).await?;
+                if let Some(qar) = response.query_addresses_response {
+                    self.0.with_utxos(&qar.utxo_entries)?;
+                }
+            }
+            if self.0.input_addresses_descriptors.len() > 0 {
+                let response = nc.api_client().query_address(
+                    self.0.input_addresses_descriptors.iter().map(|x| x.to_address()).collect()
+                ).await?;
                 if let Some(qar) = response.query_addresses_response {
                     self.0.with_utxos(&qar.utxo_entries)?;
                 }

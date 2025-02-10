@@ -7,6 +7,7 @@ use futures::channel::mpsc::Receiver;
 use futures::prelude::*;
 use itertools::Itertools;
 use metrics::{counter, histogram};
+use rocket::yansi::Paint;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_schema::helpers::easy_json::EasyJson;
@@ -19,7 +20,7 @@ use tokio::task::JoinHandle;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
 use tracing::{debug, error, info, trace};
-
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::api::about;
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::get_address_info_public_key;
@@ -48,15 +49,17 @@ use redgold_schema::structs::BatchTransactionResolveResponse;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::util::timers::PerfTimer;
 
-pub struct PeerRxEventHandler {
+#[derive(Clone)]
+pub struct PeerRxEventHandler<E> where E: ExternalNetworkResources + Send {
     relay: Relay,
+    ext: E,
     // rt: Arc<Runtime>
 }
 
-impl PeerRxEventHandler {
+impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static {
 
     pub async fn handle_incoming_message(
-        relay: Relay, pm: PeerMessage
+        relay: Relay, pm: PeerMessage, e: E
         // , rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
 
@@ -84,7 +87,7 @@ impl PeerRxEventHandler {
 
         // Handle the request
         // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone(), pm.socket_addr).await
+        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone(), pm.socket_addr, e).await
             .map_err(|e| Response::from_error_info(e)).combine()
             .with_metadata(relay.node_metadata().await?)
             .with_auth(&relay.node_config.keypair())
@@ -117,7 +120,8 @@ impl PeerRxEventHandler {
         relay: Relay,
         request: Request,
         verified: RgResult<PublicKey>,
-        origin_ip: Option<SocketAddr>
+        origin_ip: Option<SocketAddr>,
+        e: E
     ) -> RgResult<Response> {
 
 
@@ -156,6 +160,15 @@ impl PeerRxEventHandler {
 
         let auth_required = request.auth_required();
 
+        if let Some(r) = &request.multisig_request {
+            let hm = relay.external_network_shared_data.clone_read().await;
+            if let Some(k) = r.proposer_party_key.as_ref()
+                .and_then(|k| hm.get(k))
+                .and_then(|k| k.party_events.as_ref()) {
+
+            }
+
+        }
         if let Some(r) = &request.multiparty_check_ready_request {
             response.multiparty_check_ready_response = Some(false);
             if let Some(r) = r.party_key.as_ref() {
@@ -406,22 +419,28 @@ impl PeerRxEventHandler {
     async fn run(&mut self) -> Result<(), ErrorInfo> {
         let receiver = self.relay.peer_message_rx.receiver.clone();
         let relay = self.relay.clone();
+        let e = self.ext.clone();
         receiver.into_stream().map(|r| Ok(r)).try_for_each_concurrent(10, |pm| {
             // info!("Received peer message");
-            Self::handle_incoming_message(relay.clone(), pm)
+            Self::handle_incoming_message(relay.clone(), pm, e.clone())
         }).await
     }
 
 
     // https://stackoverflow.com/questions/63347498/tokiospawn-borrowed-value-does-not-live-long-enough-argument-requires-tha
     pub fn new(relay: Relay,
+               ext: E
                // arc: Arc<Runtime>
     ) -> JoinHandle<Result<(), ErrorInfo>> {
         let mut b = Self {
             relay,
             // rt: arc.clone()
+            ext,
         };
-        tokio::spawn(async move { b.run().await })
+        tokio::spawn(async move {
+            let mut b2 = b.clone();
+            b2.run().await
+        })
     }
 }
 

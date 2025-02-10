@@ -79,7 +79,8 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
     }
 
     pub fn extract_ett(&self, transaction_details: &TransactionDetails) -> Result<Option<ExternalTimedTransaction>, ErrorInfo> {
-        let self_addr = self.address()?;
+        let self_addr_typed = self.get_descriptor_address_typed()?;
+        let self_addr = self_addr_typed.render_string()?;
 
         let tx = transaction_details.transaction.safe_get_msg("Error getting transaction")?;
         let output_amounts = self.outputs_convert(&tx.output);
@@ -138,6 +139,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                 from: from,
                 to: to,
                 other: Some(structs::Address::from_bitcoin_external(&a)),
+                queried_address: Some(self_addr_typed.clone()),
             })
         } else {
             None

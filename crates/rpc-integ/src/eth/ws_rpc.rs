@@ -146,12 +146,13 @@ impl EthereumWsProvider {
             block_number: tx.block_number.map(|b| b.0[0]),
             price_usd: None,
             fee: Some(g_amount),
-            self_address: Some(self_address),
+            self_address: Some(self_address.clone()),
             currency_id: Some(SupportedCurrency::Ethereum.into()),
             currency_amount: Some(amount.clone()),
             from: structs::Address::from_eth_external_exact(&from),
             to: vec![(structs::Address::from_eth_external_exact(&to), amount)],
             other: Some(structs::Address::from_eth_external_exact(&other_address)),
+            queried_address: Some(structs::Address::from_eth_external_exact(&self_address)),
         })
     }
 }

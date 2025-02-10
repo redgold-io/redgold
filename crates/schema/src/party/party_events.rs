@@ -317,6 +317,7 @@ impl PartyEvents {
             };
             if let Some(cp) = self.central_prices.get(&currency) {
                 let of = cp.fulfill_taker_order(
+                    amount.clone(),
                     amount.amount_i64_or() as u64, is_ask, event_time, tx_id, &destination, primary_event,
                     &self.network
                 );
@@ -333,6 +334,7 @@ impl PartyEvents {
             }
         } else {
             let of = OrderFulfillment {
+                order_amount_typed: amount.clone(),
                 order_amount: amount.amount_i64_or() as u64,
                 fulfilled_amount: amount.amount_i64_or() as u64,
                 is_ask_fulfillment_from_external_deposit: false,
@@ -462,7 +464,8 @@ pub struct OrderFulfillment {
     pub primary_event: AddressEvent,
     pub prior_related_event: Option<AddressEvent>,
     pub successive_related_event: Option<AddressEvent>,
-    pub fulfillment_txid_external: Option<ExternalTransactionId>
+    pub fulfillment_txid_external: Option<ExternalTransactionId>,
+    pub order_amount_typed: CurrencyAmount,
 }
 
 impl OrderFulfillment {

@@ -93,6 +93,7 @@ impl CentralPricePair {
 
     pub fn dummy_fulfill(
         &self,
+        order_amount_typed: CurrencyAmount,
         order_amount: u64,
         is_ask: bool,
         network: &NetworkEnvironment,
@@ -101,6 +102,7 @@ impl CentralPricePair {
         let mut address = Address::default();
         address.currency = currency as i32;
         self.fulfill_taker_order(
+            order_amount_typed,
             order_amount,
             is_ask,
             0,
@@ -113,6 +115,7 @@ impl CentralPricePair {
 
     pub fn fulfill_taker_order(
         &self,
+        order_amount_typed: CurrencyAmount,
         order_amount: u64,
         is_ask: bool,
         event_time: i64,
@@ -196,6 +199,7 @@ impl CentralPricePair {
                 prior_related_event: None,
                 successive_related_event: None,
                 fulfillment_txid_external: None     ,
+                order_amount_typed,
             })
         }
     }

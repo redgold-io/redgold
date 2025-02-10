@@ -21,10 +21,10 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::party::party_events::PartyEvents;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, GetSolanaAddress, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Request, Response, SupportedCurrency, Transaction};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, GetSolanaAddress, Hash, MultisigRequest, MultisigResponse, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Request, Response, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::lang_util::AnyPrinter;
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
+use redgold_schema::{bytes_data, error_info, structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -34,6 +34,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_common_no_wasm::ssh_like::LocalSSHLike;
+use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
 use redgold_keys::monero::node_wrapper::MoneroNodeRpcInterfaceWrapper;
@@ -43,9 +44,13 @@ use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage, MoneroWalletResponse};
 use redgold_schema::hash::ToHashed;
 use redgold_schema::keys::words_pass::WordsPass;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::times::ToTimeString;
 use crate::core::internal_message::RecvAsyncErrorInfoTimeout;
+use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
+use crate::observability::metrics_help::WithMetrics;
+use crate::util;
 
 #[derive(Clone)]
 pub struct ExternalNetworkResourcesImpl {
@@ -173,7 +178,6 @@ impl ExternalNetworkResourcesImpl {
 
 }
 
-
 #[async_trait]
 impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
     fn set_network(&mut self, network: &NetworkEnvironment) {
@@ -182,7 +186,85 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         self.node_config = Arc::new(nc);
     }
 
-    async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
+    async fn execute_external_multisig_send<B: PeerBroadcast>(
+        &self,
+        destination_amounts: Vec<(Address, CurrencyAmount)>,
+        party_address: &Address,
+        peer_pks: &Vec<PublicKey>,
+        broadcast: &B,
+        threshold: i64
+    ) -> RgResult<ExternalTransactionId> {
+        let (destination, amount) = destination_amounts.get(0).unwrap().clone();
+        let currency = destination.currency_or();
+        let req = Request::default();
+        let mut mreq = MultisigRequest::default();
+        mreq.set_currency(currency);
+        mreq.amount = Some(amount.clone());
+        mreq.destination = Some(destination.clone());
+        mreq.mp_address = Some(party_address.clone());
+        mreq.proposer_party_key = Some(self.self_public.clone());
+        let res = match &currency {
+            SupportedCurrency::Bitcoin => {
+                let wallet = self.btc_multisig_wallet(
+                    peer_pks,
+                    threshold
+                ).await?;
+                let mut guard = wallet.lock().await;
+                let result = guard.create_multisig_transaction(destination_amounts, party_address)?;
+                let req = Request::default();
+                let mut mreq = MultisigRequest::default();
+                mreq.set_currency(currency);
+                mreq.encoded_tx = Some(result.json_or());
+                let results = broadcast.broadcast(peer_pks, req).await?;
+                let fixed = results.into_iter().flat_map(|r| r
+                    .and_then(|r| r.multisig_response.ok_msg("Missing multisig response"))
+                    .and_then(|r| r.encoded_tx.ok_msg("Missing encoded tx"))
+                    .and_then(|r| r.json_from::<PartiallySignedTransaction>())
+                    .log_error()
+                    .with_err_count("redgold_external_party_response_failure").ok()
+                ).collect_vec();
+
+                if fixed.len() >= (threshold - 1) as usize {
+                    let psbt = guard.combine_psbts(result, fixed)?;
+                    let res = guard.finalize_and_broadcast_psbt(psbt)?;
+                    res
+                } else {
+                    "insufficient signatures".to_error()?
+                }
+            },
+            SupportedCurrency::Ethereum => {
+                let pkh1 =  self.node_config.keypair().to_private_hex();
+                let w1 = EthWalletWrapper::new(&pkh1, &self.node_config.network).unwrap();
+                let (tx_hash, bytes) = w1.sign_safe_tx(
+                    &party_address,
+                    &destination,
+                    &amount
+                ).await?;
+
+                mreq.bytes_encoded_tx = bytes_data(tx_hash.to_vec());
+                let results = broadcast.broadcast(peer_pks, req).await?;
+                let fixed = results.into_iter().flat_map(|r| r
+                    .and_then(|r| r.multisig_response.ok_msg("Missing multisig response"))
+                    .and_then(|r| r.bytes_encoded_tx.ok_msg("Missing encoded tx"))
+                    .map(|r| r.value)
+                    .log_error()
+                    .with_err_count("redgold_external_party_response_failure").ok()
+                ).collect_vec();
+
+                let mut all = vec![bytes.to_vec()];
+                all.extend(fixed);
+
+                w1.execute_safe_transaction(&party_address, &destination, &amount, all, tx_hash).await?
+            }
+            _ => Err(error_info("Unsupported currency for multisig"))?
+    };
+    Ok(ExternalTransactionId{
+        identifier: res,
+        currency: currency as i32,
+    })
+}
+
+async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
                                -> RgResult<Vec<ExternalTimedTransaction>> {
         match currency {
             SupportedCurrency::Bitcoin => {
@@ -403,13 +485,6 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
         gui_trezor_sign(public, derivation_path, &mut t).await
     }
 
-    async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation {
-        todo!()
-    }
-
-    async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId> {
-        todo!()
-    }
 
     async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount> {
         match address.currency_or() {
@@ -533,6 +608,50 @@ impl ExternalNetworkResources for ExternalNetworkResourcesImpl {
             secret_json
         }))
     }
+
+    async fn participate_multisig_send(
+        &self,
+        mr: MultisigRequest,
+        peer_pks: &Vec<PublicKey>,
+        threshold: i64
+    ) -> RgResult<MultisigResponse> {
+        let dest = mr.destination.safe_get_msg("Missing destination")?;
+        let party = mr.mp_address.safe_get_msg("Missing party address")?;
+        let amount = mr.amount.safe_get_msg("Missing amount")?;
+        match dest.currency_or() {
+            SupportedCurrency::Bitcoin => {
+                let addr = self.btc_multisig_wallet(
+                    &peer_pks, threshold
+                ).await?;
+                let mut guard = addr.lock().await;
+                let psbt = mr.encoded_tx.safe_get_msg("Missing encoded tx")?;
+                let psbt = psbt.json_from::<PartiallySignedTransaction>()?;
+                let result = guard.sign_multisig_psbt(psbt)?;
+                Ok(MultisigResponse{
+                    tx: None,
+                    encoded_tx: Some(result.json_or()),
+                    bytes_encoded_tx: None,
+                    currency: dest.currency_or() as i32,
+                })
+            }
+            SupportedCurrency::Ethereum => {
+                let eth = EthWalletWrapper::new(&self.self_secret_key, &self.node_config.network)?;
+                let bytes = mr.bytes_encoded_tx.safe_get_msg("Missing encoded tx")?;
+                let bytes = bytes.value.clone();
+                let (hash, sigbytes) = eth.sign_safe_tx(&party, dest, amount).await?;
+                if hash.to_vec() != bytes {
+                    error!("Hash mismatch: {:?} vs {:?}", hash, bytes);
+                }
+                Ok(MultisigResponse{
+                    tx: None,
+                    encoded_tx: None,
+                    bytes_encoded_tx: bytes_data(sigbytes.to_vec()),
+                    currency: dest.currency_or() as i32,
+                })
+            }
+                _ => Err(error_info("Unsupported currency"))?
+        }
+    }
 }
 
 
@@ -596,8 +715,10 @@ impl ExternalNetworkResources for MockExternalResources {
     async fn get_all_tx_for_address(&self, address: &Address, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>> {
         let arc = self.external_transactions.lock().await;
         let option = arc.get(&currency);
-        let option1 = option.cloned();
-        Ok(option1.unwrap_or_default())
+        let option1 = option.cloned().into_iter().flat_map(|x|
+        x.into_iter().filter(|y| y.queried_address.as_ref() == Some(address))
+        ).collect_vec();
+        Ok(option1)
     }
 
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
@@ -663,10 +784,11 @@ impl ExternalNetworkResources for MockExternalResources {
                     self_address: None,
                     currency_id: Some(SupportedCurrency::Bitcoin.into()),
                     currency_amount: Some(CurrencyAmount::from_btc(other_amount as i64)),
-                    from: this_btc_addr,
+                    from: this_btc_addr.clone(),
                     to: other_outputs.iter().map(|(ad, amt)|
                         (Address::from_bitcoin_external(ad), CurrencyAmount::from_btc(amt.clone() as i64))).collect_vec(),
                     other: Some(Address::from_bitcoin_external(&other_address)),
+                    queried_address: Some(this_btc_addr.clone()),
                 };
                 ett
             },
@@ -701,6 +823,7 @@ impl ExternalNetworkResources for MockExternalResources {
                     from: Address::from_eth_external_exact(&tx.from.to_string()),
                     to: vec![(Address::from_eth_external_exact(&other_addr.clone()), CurrencyAmount::from_eth_bigint_string(value_str))],
                     other: Some(Address::from_eth_external_exact(&other_addr)),
+                    queried_address: Some(Address::from_eth_external_exact(&tx.from.to_string())),
                 }
             }
             _ => Err(error_info("Unsupported currency"))?
@@ -828,14 +951,6 @@ impl ExternalNetworkResources for MockExternalResources {
     }
 
 
-    async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation {
-        todo!()
-    }
-
-    async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId> {
-        todo!()
-    }
-
     async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount> {
         let cur = address.currency_or();
         let usd_price = cur.price_default();
@@ -867,6 +982,57 @@ impl ExternalNetworkResources for MockExternalResources {
         let mut result = PartyCreationResult::default();
         result.address = addr.clone();
         Ok(Some(result))
+    }
+
+    async fn execute_external_multisig_send<B: PeerBroadcast>(
+        &self,
+        destination_amounts: Vec<(Address, CurrencyAmount)>,
+        party_address: &Address,
+        peer_pks: &Vec<PublicKey>,
+        broadcast: &B,
+        threshold: i64
+    ) -> RgResult<ExternalTransactionId> {
+        let currency = party_address.currency_or();
+        let (destination, amount) = destination_amounts.get(0).cloned().unwrap();
+        let amountu64 = (amount.to_fractional() * 1e8) as u64;
+        // TODO: May need to fill out other fields here?
+        let ts = util::current_time_millis_i64();
+        let mut mocked = ExternalTimedTransaction {
+            tx_id: Hash::from_string_calculate(&*ts.to_string()).hex(),
+            timestamp: Some(ts as u64),
+            other_address: destination.render_string().unwrap(),
+            other_output_addresses: vec![],
+            amount: amountu64,
+            bigint_amount: amount.string_amount.clone(),
+            incoming: true,
+            currency: currency.clone(),
+            block_number: Some(0),
+            price_usd: None,
+            fee: Some(PartyEvents::expected_fee_amount(currency, &self.node_config.network).expect("fee")),
+            self_address: Some(party_address.render_string().unwrap()),
+            currency_id: Some(currency.to_currency_id()),
+            currency_amount: Some(amount.clone()),
+            from: party_address.clone(),
+            to: vec![(destination.clone(), amount.clone())],
+            other: Some(destination.clone()),
+            queried_address: Some(party_address.clone()),
+        };
+
+        let mut arc = self.external_transactions.lock().await;
+        let vec = arc.get_mut(&currency);
+        if let Some(v) = vec {
+            v.push(mocked.clone());
+        } else {
+            arc.insert(currency.clone(), vec![mocked.clone()]);
+        }
+        Ok(ExternalTransactionId{
+            identifier: mocked.tx_id.clone(),
+            currency: currency as i32,
+        })
+    }
+
+    async fn participate_multisig_send(&self, mr: MultisigRequest, peer_pks: &Vec<PublicKey>, threshold: i64) -> RgResult<MultisigResponse> {
+        Ok(MultisigResponse::default())
     }
 }
 

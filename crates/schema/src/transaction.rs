@@ -76,11 +76,18 @@ impl WithMetadataHashableFields for Transaction {
     }
 }
 
+impl HashClear for Input {
+    fn hash_clear(&mut self) {
+        self.address = None;
+        self.output = None;
+    }
+}
+
 impl HashClear for Transaction {
     fn hash_clear(&mut self) {
         // TODO: Implement hashclear for inputs
         for x in self.inputs.iter_mut() {
-            x.output = None;
+            x.hash_clear();
         }
         if let Some(s) = self.struct_metadata_opt() {
             s.hash_clear();
@@ -96,6 +103,17 @@ pub struct AddressBalance {
 
 
 impl Transaction {
+
+    pub fn combine_multisig_proofs(&mut self, other: &Transaction, address: &Address) -> RgResult<Transaction> {
+        let mut updated = self.clone();
+        for (idx, input) in updated.inputs.iter_mut().enumerate() {
+            if input.address.as_ref() == Some(address) {
+                let other_input = other.inputs.get(idx).ok_msg("Missing input")?;
+                input.proof.extend(other_input.proof.clone());
+            }
+        }
+        Ok(updated)
+    }
 
     pub fn with_pow(mut self) -> RgResult<Self> {
         let hash = self.signable_hash();

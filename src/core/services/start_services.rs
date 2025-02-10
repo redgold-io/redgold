@@ -103,6 +103,7 @@ impl Node {
 
         sjh.add("PeerRxEventHandler", PeerRxEventHandler::new(
             relay.clone(),
+            external_network_resources.clone()
         ));
 
         sjh.add("public_api", public_api::start_server(relay.clone()));

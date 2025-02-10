@@ -31,6 +31,12 @@ impl AddressDescriptor {
         descriptor.contract = Some(contract);
         descriptor
     }
+
+    pub fn to_address(&self) -> Address {
+        Address::from_multisig_public_keys_and_threshold(
+            &self.public_keys, self.contract.as_ref().unwrap().threshold.as_ref().unwrap().value
+        )
+    }
 }
 
 

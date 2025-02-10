@@ -324,6 +324,7 @@ impl EthHistoricalClient {
                 from: from.parse_ethereum_address()?,
                 to: to_dest,
                 other: Some(other_address.parse_ethereum_address()?),
+                queried_address: Some(address.clone()),
             };
             res.push(ett);
         }
@@ -456,6 +457,7 @@ impl EthHistoricalClient {
                     from: structs::Address::from_eth_external_exact(&from),
                     to: vec![(structs::Address::from_eth_external_exact(&to), amount_t)],
                     other: Some(structs::Address::from_eth_external_exact(&other_address)),
+                    queried_address: Some(structs::Address::from_eth_external_exact(address)),
                 });
             }
         }

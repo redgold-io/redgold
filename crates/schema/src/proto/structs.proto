@@ -120,11 +120,14 @@ message Input {
   ProductId product_id = 4;
   FloatingUtxoId floating_utxo_id = 6;
   optional InputType input_type = 7;
+  // For multisig or more complex inputs, how to reconstruct the original address to verify against the proofs.
+  AddressDescriptor address_descriptor = 9;
 
   // Enriched / calculated field from proof -- not necessary to store, must recalculate this always;
   Address address = 8;
   // Hydration purposes only! Not used for hashes, this represents the previous output.
   Output output = 5;
+
 
 }
 
@@ -1079,6 +1082,19 @@ message Request {
   MultipartyCheckReadyRequest multiparty_check_ready_request = 42;
   GetSolanaAddress get_solana_address = 43;
   MoneroMultisigFormationRequest monero_multisig_formation_request = 44;
+  MultisigRequest multisig_request = 45;
+}
+
+message MultisigRequest {
+
+  Transaction tx = 1;
+  optional string encoded_tx = 2;
+  optional BytesData bytes_encoded_tx = 3;
+  SupportedCurrency currency = 4;
+  Address destination = 5;
+  CurrencyAmount amount = 6;
+  PublicKey proposer_party_key = 7;
+  Address mp_address = 8;
 }
 
 message MoneroMultisigFormationRequest {
@@ -1154,6 +1170,14 @@ message Response {
   optional bool multiparty_check_ready_response = 31;
   Address get_solana_address_response = 32;
   optional string monero_multisig_formation_response = 33;
+  MultisigResponse multisig_response = 34;
+}
+
+message MultisigResponse {
+  Transaction tx = 1;
+  optional string encoded_tx = 2;
+  optional BytesData bytes_encoded_tx = 3;
+  SupportedCurrency currency = 4;
 }
 
 message KeepAliveResponse {

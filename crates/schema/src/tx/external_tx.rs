@@ -20,7 +20,8 @@ pub struct ExternalTimedTransaction {
     pub currency_amount: Option<CurrencyAmount>,
     pub from: Address,
     pub to: Vec<(Address, CurrencyAmount)>,
-    pub other: Option<Address>
+    pub other: Option<Address>,
+    pub queried_address: Option<Address>
 }
 
 // Manual Eq implementation that ignores the f64 field

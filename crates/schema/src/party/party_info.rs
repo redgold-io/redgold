@@ -61,6 +61,13 @@ impl PartyInfo {
 
 impl PartyMetadata {
 
+
+    pub fn members_of(&self, address: &Address) -> Vec<PublicKey> {
+        self.memberships.iter()
+            .filter(|m| m.participate.iter().any(|p| p.address.as_ref() == Some(address)))
+            .map(|m| m.public_key.clone().unwrap())
+            .collect()
+    }
     pub fn address_by_currency(&self) -> HashMap<SupportedCurrency, Vec<Address>> {
         self.instances.iter()
             .group_by(|a| a.address.as_ref().map(|a| a.currency()))
@@ -137,6 +144,10 @@ impl PartyMetadata {
         let cur = cur.clone() as i32;
         self.instances.iter()
             .filter(move |i| i.address.as_ref().map(|a| a.currency == cur).unwrap_or(false))
+    }
+
+    pub fn instances_of_address(&self, addr: &Address) -> Option<&PartyInstance> {
+        self.instances.iter().find(|i| i.address.as_ref() == Some(addr))
     }
 
     pub fn latest_instance_by(&self, cur: SupportedCurrency) -> Option<&PartyInstance> {

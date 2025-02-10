@@ -1,5 +1,6 @@
 use crate::party::portfolio_request::PortfolioEventMethods;
 use itertools::Itertools;
+use log::info;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::external_tx_support::ExternalTxSupport;
 use redgold_keys::proof_support::PublicKeySupport;
@@ -8,6 +9,7 @@ use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalS
 use redgold_schema::structs::{CurrencyAmount, DepositRequest, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
 use redgold_schema::RgResult;
 use rocket::form::validate::Contains;
+use redgold_schema::helpers::easy_json::EasyJson;
 
 pub trait StakeMethods {
     fn check_external_event_pending_stake(&mut self, event_o: &AddressEvent) -> bool;
@@ -30,8 +32,14 @@ impl StakeMethods for PartyEvents {
             let amt = event.currency_amount();
             let oa = event.other_address_typed();
             if let Ok(addr) = oa {
+                info!("Event: {}", event.json_or());
+                info!("Pending external stake txs: {}", self.pending_external_staking_txs.json_or());
                 let matching = self.pending_external_staking_txs.iter()
-                    .filter(|s| s.amount == amt && s.external_address == addr)
+                    .filter(|s| {
+                        info!("Comparing amounts: {} == {}", s.amount.json_or(), amt.json_or());
+                        info!("Comparing addresses: {} == {}", s.external_address.render_string().unwrap(), addr.render_string().unwrap());
+                        s.amount == amt && s.external_address == addr
+                    })
                     .next()
                     .cloned();
                 if let Some(m) = matching {
@@ -76,17 +84,7 @@ impl StakeMethods for PartyEvents {
         &mut self, event: &AddressEvent, tx: &Transaction, deposit_inner: &DepositRequest, liquidity_deposit: &StakeDeposit,
         utxo_id: UtxoId) {
         if let Some(amt) = deposit_inner.amount.as_ref() {
-            let pk_first = tx.first_input_proof_public_key();
-            if let Some(pk) = pk_first {
-                if let Some(addr) = match amt.currency_or() {
-                    SupportedCurrency::Bitcoin => {
-                        pk.to_bitcoin_address_typed(&self.network).ok()
-                    }
-                    SupportedCurrency::Ethereum => {
-                        pk.to_ethereum_address_typed().ok()
-                    }
-                    _ => None
-                } {
+            if let Some(addr) = deposit_inner.address.as_ref() {
                     self.pending_external_staking_txs.push(PendingExternalStakeEvent {
                         event: event.clone(),
                         tx: tx.clone(),
@@ -98,7 +96,6 @@ impl StakeMethods for PartyEvents {
                         utxo_id
                     })
                 }
-            }
         }
     }
 

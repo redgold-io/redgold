@@ -29,14 +29,17 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tracing::info;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use redgold_schema::keys::words_pass::WordsPass;
 // https://stackoverflow.com/questions/75533630/how-to-write-a-retry-function-in-rust-that-involves-async
 
 
 pub struct PartyTestHarness {
+    pub words: WordsPass,
     pub network: NetworkEnvironment,
     pub private_key: String,
     pub keypair: KeyPair,
-    pub amm_public_key: PublicKey,
     pub node_config: NodeConfig,
     pub mock_accepted: Vec<Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>>,
     pub last_balance: CurrencyAmount,
@@ -59,15 +62,15 @@ impl PartyTestHarness {
         let amm_public_key = client
             .active_party_key().await.unwrap();
         let party_data = client.party_data().await.unwrap();
-        for (k, v) in party_data.iter() {
-            info!("party data: {} {}", k.json_or(), v.json_or());
-        }
+        // for (k, v) in party_data.iter() {
+        //     info!("party data: {} {}", k.json_or(), v.json_or());
+        // }
         let data = party_data.get(&amm_public_key).unwrap().clone();
         Self {
+            words: node_config.words(),
             network: node_config.network.clone(),
             private_key,
             keypair,
-            amm_public_key,
             node_config: node_config.clone(),
             mock_accepted,
             last_balance: CurrencyAmount::zero(SupportedCurrency::Redgold),
@@ -101,16 +104,20 @@ impl PartyTestHarness {
         self.self_public().to_ethereum_address_typed().expect("address")
     }
 
+    pub fn address_of(&self, cur: &SupportedCurrency) -> Address {
+        self.data.metadata.address_by_currency().get(cur).unwrap().get(0).unwrap().clone()
+    }
+
     pub fn amm_btc_address(&self) -> Address {
-        self.amm_public_key.to_bitcoin_address_typed(&self.network).expect("address")
+        self.address_of(&SupportedCurrency::Bitcoin)
     }
 
     pub fn amm_eth_address(&self) -> Address {
-        self.amm_public_key.to_ethereum_address_typed().expect("address")
+        self.address_of(&SupportedCurrency::Ethereum)
     }
 
     pub fn amm_rdg_address(&self) -> Address {
-        self.amm_public_key.address().expect("address")
+        self.address_of(&SupportedCurrency::Redgold)
     }
 
     pub fn btc_swap_amount() -> CurrencyAmount {
@@ -149,19 +156,29 @@ impl PartyTestHarness {
 
     pub async fn create_external_stake_internal_tx(&self, external_address: &Address, amount: CurrencyAmount) {
         let stake_tx = self.tx_builder().await
-            .with_external_stake_usd_bounds(None, None, &self.self_rdg_address(),
-                                            external_address, &amount,
-                                            &self.amm_rdg_address(), &Self::party_fee_amount())
+            .with_external_stake_usd_bounds(
+                None,
+                None,
+                &self.self_rdg_address(),
+                external_address,
+                &amount,
+                &self.amm_rdg_address(),
+                &Self::party_fee_amount())
             .build()
             .expect("build")
             .sign(&self.keypair)
             .expect("sign");
-        stake_tx.broadcast_from(&self.node_config).await.expect("broadcast").json_or().print();
+        stake_tx.broadcast_from(&self.node_config).await.expect("broadcast");
     }
 
 
     pub fn amm_address(&self, cur: SupportedCurrency) -> Option<Address> {
         self.data.metadata.latest_instance_by(cur).and_then(|i| i.address.clone())
+    }
+
+    pub fn self_address(&self, cur: SupportedCurrency) -> Option<Address> {
+        self.words.to_all_addresses_default(&self.network).unwrap_or_default().into_iter()
+            .filter(|a| a.currency_or() == cur).next()
     }
 
     pub async fn send_internal_rdg_stake(&self) -> RgResult<()> {
@@ -186,55 +203,32 @@ impl PartyTestHarness {
     pub async fn send_external(&self, amount: CurrencyAmount) {
         let not_mock = !self.is_mock();
         let currency = amount.currency_or();
-
-        let amountu64 = if currency == SupportedCurrency::Ethereum {
-            let option = amount.string_amount.clone();
-            EthHistoricalClient::translate_value(&option.unwrap()).expect("works")
-        } else {
-            amount.amount
-        };
-
+        let self_addr = self.self_address(currency).expect("works");
+        let amm_addr = self.amm_address(currency).expect("works");
+        let amountu64 = (amount.to_fractional() * 1e8) as u64;
         // TODO: May need to fill out other fields here?
         let ts = util::current_time_millis_i64();
         let mut mocked = ExternalTimedTransaction {
             tx_id: Hash::from_string_calculate(&*ts.to_string()).hex(),
             timestamp: Some(ts as u64),
-            other_address: "".to_string(),
+            other_address: self_addr.render_string().unwrap(),
             other_output_addresses: vec![],
-            amount: amountu64 as u64,
+            amount: amountu64,
             bigint_amount: amount.string_amount.clone(),
             incoming: true,
             currency: currency.clone(),
             block_number: Some(0),
             price_usd: None,
             fee: Some(PartyEvents::expected_fee_amount(currency, &self.network).expect("fee")),
-            self_address: None,
-            currency_id: None,
+            self_address: Some(amm_addr.render_string().unwrap()),
+            currency_id: Some(currency.to_currency_id()),
             currency_amount: Some(amount.clone()),
-            from: Default::default(),
-            to: vec![],
-            other: None,
+            from: self_addr.clone(),
+            to: vec![(amm_addr.clone(), amount.clone())],
+            other: Some(self_addr),
+            queried_address: Some(amm_addr.clone()),
         };
 
-        match currency {
-            SupportedCurrency::Bitcoin => {
-                // let mut w =
-                //     SingleKeyBitcoinWallet::new_wallet(self.self_public(), self.network.clone(), not_mock)
-                //         .expect("w");
-                //
-                // let dest = self.amm_btc_address();
-                //
-                // let txid = w.send(&dest, &amount, self.private_key.clone(), not_mock).unwrap();
-                mocked.other_address = self.self_btc_address().render_string().unwrap();
-            }
-            SupportedCurrency::Ethereum => {
-                // let w = EthWalletWrapper::new(&self.private_key, &self.network).unwrap();
-                // let (txid, _) = w.send_or_form_fake(&self.amm_eth_address(), &amount, &self.keypair, not_mock).await.unwrap();
-                // mocked.tx_id = txid;
-                mocked.other_address = self.self_eth_address().render_string().unwrap();
-            }
-            _ => panic!("unsupported currency attempt")
-        }
         if self.is_mock() {
             for x in self.mock_accepted.iter() {
                 let mut arc = x.lock().await;
@@ -254,7 +248,9 @@ impl PartyTestHarness {
     }
 
     pub async fn party_internal_data(&self) -> RgResult<PartyInternalData> {
-        self.client().party_data().await?.get(&self.amm_public_key).ok_msg("party data").cloned()
+        let pd = self.client().party_data().await?;
+        let (_pk, pd) = pd.into_iter().next().unwrap();
+        Ok(pd)
     }
 
     pub async fn party_events(&self) -> RgResult<PartyEvents> {
@@ -392,17 +388,25 @@ impl PartyTestHarness {
     pub async fn run_test(&mut self) -> RgResult<()> {
         // Spawn thread to check and replicate external TX.
 
+        info!("Sending internal stake");
         self.send_internal_rdg_stake().await?;
+        info!("Verifying internal stake AMM test");
         retry!(self.verify_internal_stake())?;
         info!("Internal stake confirmed, attempting to stake externally now");
         self.create_external_stake_internal_tx(&self.self_btc_address(), Self::btc_stake_amount()).await;
+        info!("Sent external stake tx for BTC");
         self.send_external(Self::btc_stake_amount()).await;
+        info!("Sent external tx");
         retry!(self.verify_external_stake_internal_tx_1())?;
+        info!("External stake verify_external_stake_internal_tx_1, attempting to stake externally now");
         self.create_external_stake_internal_tx(&self.self_eth_address(), Self::eth_stake_amount()).await;
+        info!("created internal for eth");
         self.send_external(Self::eth_stake_amount()).await;
+        info!("created eth tx");
         retry!(self.verify_external_stake_internal_tx())?;
-
+        info!("External stake verify_external_stake_internal_tx2, attempting to send swaps now");
         self.swap_post_stake_test().await?;
+        info!("Finished with swaps");
 
         Ok(())
     }

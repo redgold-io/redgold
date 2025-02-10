@@ -65,6 +65,7 @@ impl CurrencyAmount {
             SupportedCurrency::Bitcoin => {Self::from_fractional(into)}
             SupportedCurrency::Ethereum => {Ok(Self::from_eth_fractional(into))}
             SupportedCurrency::Solana => {Self::from_fractional_basis(into, NANO_DECIMAL_MULTIPLIER)}
+            SupportedCurrency::Monero => {Self::from_fractional_basis(into, PICO_DECIMAL_MULTIPLIER)}
             _ => Err(ErrorInfo::error_info("Invalid currency"))
         }?;
         res.currency = Some(cur as i32);
