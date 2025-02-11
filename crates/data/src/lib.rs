@@ -1,33 +1,27 @@
-#![allow(unused_imports)]
-#![allow(dead_code)]
-
-use redgold_schema::error_message;
-use redgold_schema::structs::ErrorInfo;
-use sqlx::pool::PoolConnection;
-use sqlx::{Sqlite, SqlitePool};
 use std::sync::Arc;
-
+use sqlx::{Pool, Sqlite, SqlitePool, PoolConnection};
+use redgold_schema::structs::ErrorInfo;
 use crate::error_convert::ResultErrorInfoExt;
 
-pub use redgold_schema as schema;
-
+pub mod data_store;
+pub mod error_convert;
+pub mod transaction_store;
+pub mod utxo_store;
+pub mod transaction_observability;
+pub mod price_time;
+pub mod state_store;
+pub mod mp_store;
+pub mod servers;
 pub mod peer;
 pub mod config;
-pub mod servers;
-pub mod transaction_store;
-pub mod mp_store;
 pub mod observation_store;
-pub mod data_store;
-pub mod state_store;
-pub mod utxo_store;
 pub mod parquet_export;
 pub mod parquet_min_index;
 pub mod parquet_full_index;
 pub mod transaction_insert;
 pub mod address_transaction;
-pub mod transaction_observability;
-mod price_time;
-pub mod error_convert;
+
+pub use redgold_schema as schema;
 
 #[derive(Clone)]
 pub struct DataStoreContext {
@@ -56,18 +50,46 @@ impl DataStoreContext {
         error.map_err_to_info()
     }
 }
+        since = "0.1.0",
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+        note = "Use .map_err_to_info() from ResultErrorInfoExt trait instead"
+
+    )]
+
+    pub fn map_err_sqlx<A>(error: Result<A, sqlx::Error>) -> Result<A, ErrorInfo> {
+
+        error.map_err_to_info()
+
+    }
+
 }
 
+
+
+pub fn add(left: usize, right: usize) -> usize {
+
+    left + right
+
+}
+
+
+
 #[cfg(test)]
+
 mod tests {
+
     use super::*;
 
+
+
     #[test]
+
     fn it_works() {
+
         let result = add(2, 2);
+
         assert_eq!(result, 4);
+
     }
+
 }
