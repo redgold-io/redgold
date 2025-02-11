@@ -26,7 +26,7 @@ use tracing::{debug, info, trace};
 use crate::core::relay::{ObservationMetadataInternalSigning, Relay};
 use crate::schema::structs::ErrorInfo;
 use crate::schema::structs::GossipObservationRequest;
-use crate::schema::structs::Request;
+use crate::schema::message::Request;
 use crate::schema::structs::{Observation, ObservationMetadata};
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;

@@ -12,9 +12,10 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo, Response};
+use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, GetPeersInfoRequest, NodeMetadata, PeerNodeInfo};
+use redgold_schema::message::Response;
 use redgold_schema::util::lang_util::WithMaxLengthString;
-use redgold_schema::{structs, RgResult, SafeOption};
+use redgold_schema::{message, structs, RgResult, SafeOption};
 use std::collections::HashSet;
 use std::time::Duration;
 use tokio::task::JoinHandle;
@@ -22,6 +23,7 @@ use tokio_stream::wrappers::IntervalStream;
 use tracing::{debug, error};
 // use libp2p::request_response::RequestResponseMessage::Request;
 use tracing::{info, trace};
+use redgold_schema::message::Request;
 
 /**
 Big question here is should discovery happen as eager push on Observation buffer
@@ -52,7 +54,7 @@ impl IntervalFold for Discovery {
         // Should we first query to make sure this node is still valid?
         // We need to make sure this hostname is unique, i.e. the stored peer we know about
         // Compare the data store against the actual node.
-        let mut req = structs::Request::default();
+        let mut req = Request::default();
         req.get_peers_info_request = Some(GetPeersInfoRequest::default());
         for (r, node_tx_original) in self.relay.broadcast_async(
             peers.clone(), req, None).await?.iter().zip(node_tx_all.clone()) {
@@ -143,7 +145,7 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
     // TODO: Ensure discovery message is not for self
     async fn try_recv_for_each(&mut self, message: DiscoveryMessage) -> RgResult<()> {
         counter!("redgold.peer.discovery.recv_for_each").increment(1);
-        let mut request = structs::Request::default();
+        let mut request = message::Request::default();
         request.about_node_request = Some(structs::AboutNodeRequest::default());
         // message.dynamic_node_metadata
         let nmd = message.node_metadata.clone();

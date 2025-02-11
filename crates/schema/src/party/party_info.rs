@@ -61,6 +61,29 @@ impl PartyInfo {
 
 impl PartyMetadata {
 
+    pub fn combine(&mut self, other: &PartyMetadata) {
+        for inst in other.instances.iter() {
+            if let Some(a) = inst.address.as_ref() {
+                if self.instance_of_address(a).is_none() {
+                    self.instances.push(inst.clone());
+                }
+            }
+        }
+        for member in other.memberships.iter() {
+            if let Some(pk) = member.public_key.as_ref() {
+                if let Some(existing) = self.memberships.iter_mut()
+                    .find(|m| m.public_key.as_ref() == Some(pk)) {
+                    for part in member.participate.iter() {
+                        if existing.participate.iter().find(|p| p.address == part.address).is_none() {
+                            existing.participate.push(part.clone());
+                        }
+                    }
+                } else {
+                    self.memberships.push(member.clone());
+                }
+            }
+        }
+    }
 
     pub fn members_of(&self, address: &Address) -> Vec<PublicKey> {
         self.memberships.iter()
@@ -146,7 +169,7 @@ impl PartyMetadata {
             .filter(move |i| i.address.as_ref().map(|a| a.currency == cur).unwrap_or(false))
     }
 
-    pub fn instances_of_address(&self, addr: &Address) -> Option<&PartyInstance> {
+    pub fn instance_of_address(&self, addr: &Address) -> Option<&PartyInstance> {
         self.instances.iter().find(|i| i.address.as_ref() == Some(addr))
     }
 
@@ -157,26 +180,26 @@ impl PartyMetadata {
     pub fn add_instance_equal_members(&mut self, instance: &PartyInstance, equal_members: &Vec<PublicKey>) {
         let addr = instance.address.clone();
         self.instances.push(instance.clone());
-        let mut missing = vec![];
+        self.add_members(equal_members, addr);
+
+    }
+
+    pub fn add_members(&mut self, equal_members: &Vec<PublicKey>, addr: Option<Address>) {
         let basis = equal_members.len() as i64;
         let participate = PartyParticipation {
-            address: addr.clone(), 
+            address: addr.clone(),
             weight: Some(Weighting::from_int_basis(1, basis))
         };
-        for m in self.memberships.iter_mut() {
-            if let Some(pk) = m.public_key.as_ref() {
-                if !equal_members.contains(pk) {
-                    missing.push(pk.clone());
-                } else {
-                    m.participate.push(participate.clone());
-                }
+        for member in equal_members.iter() {
+            if let Some(existing) = self.memberships.iter_mut()
+                .find(|m| m.public_key.as_ref() == Some(member)) {
+                existing.participate.push(participate.clone());
+            } else {
+                self.memberships.push(PartyMembership {
+                    public_key: Some(member.clone()),
+                    participate: vec![participate.clone()],
+                });
             }
-        }
-        for pk in missing {
-            self.memberships.push(PartyMembership {
-                public_key: Some(pk),
-                participate: vec![participate.clone()],
-            });
         }
     }
 }

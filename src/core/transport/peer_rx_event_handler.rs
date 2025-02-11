@@ -12,7 +12,8 @@ use rocket::yansi::Paint;
 use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
+use redgold_schema::message::{GetPartyMetadataResponse, Request, Response};
 use redgold_schema::{error_info, structs, RgResult, SafeOption};
 // use svg::Node;
 use tokio::runtime::Runtime;
@@ -32,7 +33,7 @@ use crate::data::download::process_download_request;
 use crate::multiparty_gg20::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::observability::metrics_help::WithMetrics;
 use crate::schema::response_metadata;
-use crate::schema::structs::{Response, ResponseMetadata};
+use crate::schema::structs::{ResponseMetadata};
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
@@ -48,6 +49,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::BatchTransactionResolveResponse;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::util::timers::PerfTimer;
+use crate::party::order_fulfillment::handle_multisig_request;
 
 #[derive(Clone)]
 pub struct PeerRxEventHandler<E> where E: ExternalNetworkResources + Send {
@@ -161,14 +163,24 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
         let auth_required = request.auth_required();
 
         if let Some(r) = &request.multisig_request {
-            let hm = relay.external_network_shared_data.clone_read().await;
-            if let Some(k) = r.proposer_party_key.as_ref()
-                .and_then(|k| hm.get(k))
-                .and_then(|k| k.party_events.as_ref()) {
-
-            }
-
+            response.multisig_response = Some(handle_multisig_request(r, &relay, &e).await.log_error()?);
         }
+        if let Some(r) = &request.notify_multisig_creation_request {
+            if let Ok(pk) = &verified {
+                if relay.node_config.non_self_seeds_pk().contains(&pk) {
+                    if let Some(pmd) = r.party_metadata.as_ref() {
+                        relay.new_multisig_metadata.lock().await.push((pk.clone(), pmd.clone()));
+                    }
+                }
+            }
+        }
+        if let Some(r) = &request.get_party_metadata_request {
+            let option = relay.ds.config_store.get_json("party_metadata").await?.clone();
+            let mut resp = GetPartyMetadataResponse::default();
+            resp.party_metadata = option;
+            response.get_party_metadata_response = Some(resp);
+        }
+
         if let Some(r) = &request.multiparty_check_ready_request {
             response.multiparty_check_ready_response = Some(false);
             if let Some(r) = r.party_key.as_ref() {

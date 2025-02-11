@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::node_config::ApiNodeConfig;
 use crate::observability::send_email::email_default;
@@ -37,20 +38,27 @@ pub async fn run_daily_e2e(nc: &Box<NodeConfig>) -> RgResult<()> {
     res
 }
 pub async fn run_daily_e2e_inner(nc: &Box<NodeConfig>) -> RgResult<()> {
+    let mut nc = (*nc.clone()).clone();
+
     let d = nc.config_data.debug.clone().ok_msg("No debug data")?;
     let w = d.words.ok_msg("No words")?;
+    nc.set_words(w.clone());
     let (private, kp) = words_to_ci_keypair(w);
     let api = nc.api_rg_client();
     let party_key = api.active_party_key().await?;
-    let party_addr = party_key.address()?;
     let all_party = api.party_data().await?;
     let party = all_party.get(&party_key).ok_msg("No party")?;
     let pev = party.clone().party_events.ok_msg("No party events")?;
+    let party_inst = party.metadata.latest_instance_by(SupportedCurrency::Ethereum).ok_msg("No eth instance")?;
+    let party_addr = party_inst.address.as_ref().ok_msg("No party address")?.clone();
+
     let cpe = pev.central_prices.get(&SupportedCurrency::Ethereum).ok_msg("No eth price")?;
 
+
+    // TODO: Change the words input here to the node config to the debug words
     let w = EthWalletWrapper::new(&private, &nc.network).expect("wallet");
     let mut party_harness = PartyTestHarness::from(
-        &nc, kp, vec![], Some(api.clone()), vec![]).await;
+        &nc, vec![], Some(api.clone()), vec![]).await;
 
     let result = w.send(&party_key.to_ethereum_address_typed().unwrap(), &CurrencyAmount::from_eth_fractional(0.00028914f64), None).await.unwrap();
     info!("Send txid for eth {result}");

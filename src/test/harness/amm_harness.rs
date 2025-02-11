@@ -52,11 +52,11 @@ impl PartyTestHarness {
 
     pub async fn from(
         node_config: &NodeConfig,
-        keypair: KeyPair,
         mock_accepted: Vec<Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>>,
         opt_client: Option<RgHttpClient>,
         mock_folders: Vec<std::path::PathBuf>,
     ) -> Self {
+        let keypair = node_config.words().default_kp().unwrap();
         let private_key = keypair.to_private_hex();
         let client = opt_client.unwrap();
         let amm_public_key = client
@@ -88,20 +88,16 @@ impl PartyTestHarness {
         self.client.clone()
     }
 
-    pub fn self_public(&self) -> PublicKey {
-        self.keypair.public_key().clone()
-    }
-
     pub fn self_rdg_address(&self) -> Address {
-        self.self_public().address().expect("address")
+        self.self_address(SupportedCurrency::Redgold).expect("address")
     }
 
     pub fn self_btc_address(&self) -> Address {
-        self.self_public().to_bitcoin_address_typed(&self.network).expect("address")
+        self.self_address(SupportedCurrency::Bitcoin).expect("address")
     }
 
     pub fn self_eth_address(&self) -> Address {
-        self.self_public().to_ethereum_address_typed().expect("address")
+        self.self_address(SupportedCurrency::Ethereum).expect("address")
     }
 
     pub fn address_of(&self, cur: &SupportedCurrency) -> Address {
@@ -155,6 +151,7 @@ impl PartyTestHarness {
     }
 
     pub async fn create_external_stake_internal_tx(&self, external_address: &Address, amount: CurrencyAmount) {
+        info!("Creating external stake tx for external address {}", external_address.render_string().unwrap());
         let stake_tx = self.tx_builder().await
             .with_external_stake_usd_bounds(
                 None,
@@ -174,6 +171,10 @@ impl PartyTestHarness {
 
     pub fn amm_address(&self, cur: SupportedCurrency) -> Option<Address> {
         self.data.metadata.latest_instance_by(cur).and_then(|i| i.address.clone())
+    }
+
+    pub fn self_public(&self) -> PublicKey {
+        self.words.default_public_key().unwrap()
     }
 
     pub fn self_address(&self, cur: SupportedCurrency) -> Option<Address> {
@@ -312,7 +313,8 @@ impl PartyTestHarness {
     }
 
     pub async fn balance(&mut self, update_self: bool) -> RgResult<CurrencyAmount> {
-        let balance = self.client().balance_pk(&self.self_public()).await?;
+        let balance = self.client().balance(&self.self_rdg_address()).await?;
+        let balance = CurrencyAmount::from_rdg(balance);
         info!("balance rdg check: {}", balance.amount);
         if update_self {
             info!("updating self balance");

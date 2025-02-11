@@ -112,7 +112,7 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
     let vec = local_nodes.ext.clone();
 
     let mut party_harness = PartyTestHarness::from(
-        &config2, kp, vec![vec], Some(client.client_wrapper()), vec![]).await;
+        &config2, vec![vec], Some(client.client_wrapper()), vec![]).await;
 
     let address = party_harness.self_rdg_address();
     submit.send_to(&address).await.expect("works");

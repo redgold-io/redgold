@@ -18,7 +18,8 @@ use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::price_volume::PriceVolume;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, AddressDescriptor, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, MultisigRequest, MultisigResponse, NetworkEnvironment, PartySigningValidation, PublicKey, Request, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
+use redgold_schema::structs::{Address, AddressDescriptor, BytesData, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MultipartyIdentifier, MultisigRequest, MultisigResponse, NetworkEnvironment, PartySigningValidation, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction, UtxoEntry, UtxoId};
+use redgold_schema::message::Request;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{error_info, structs, RgResult, SafeOption};
@@ -29,6 +30,7 @@ use tracing::{error, info};
 use redgold_keys::transaction_support::TransactionSupport;
 use redgold_keys::word_pass_support::NodeConfigKeyPair;
 use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::core::relay::Relay;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use crate::util;
@@ -60,8 +62,8 @@ impl OrderFilPriceCalcOracle for OrderFulfillment {
 
 
 pub async fn handle_multisig_request<E: ExternalNetworkResources>(
-    multisig_request: MultisigRequest,
-    relay: Relay,
+    multisig_request: &MultisigRequest,
+    relay: &Relay,
     ext: &E
 ) -> RgResult<MultisigResponse> {
     let pk = multisig_request.proposer_party_key.safe_get_msg("Missing proposer party key")?;
@@ -69,7 +71,7 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
     let party = data.get(&pk).ok_msg("Missing party")?;
     let party_events = party.party_events.as_ref().ok_msg("Missing party events")?;
     let party_address = multisig_request.mp_address.safe_get_msg("Missing mp address")?;
-    let party_instance = party.metadata.instances_of_address(party_address).ok_msg("Missing instances of address")?;
+    let party_instance = party.metadata.instance_of_address(party_address).ok_msg("Missing instances of address")?;
     let party_members = party.metadata.members_of(party_address);
 
     let dest = multisig_request.destination.safe_get_msg("Missing destination")?;
@@ -95,10 +97,11 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
 
     let cur = dest.currency_or();
     let mut response = ext.participate_multisig_send(
-                multisig_request,
+                multisig_request.clone(),
                 &party_members,
                 party_instance.threshold.safe_get_msg("Missing threshold")?.value
     ).await?;
+    response.currency = cur as i32;
     Ok(response)
 }
 
@@ -250,7 +253,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                         let peers = all_members.clone()
                             .into_iter().filter(|pk| pk != key)
                             .collect_vec();
-                        let option = v2.metadata.instances_of_address(&amm_addr).ok_msg("Missing instances of address")?;
+                        let option = v2.metadata.instance_of_address(&amm_addr).ok_msg("Missing instances of address")?;
                         let thresh = option.threshold.as_ref().ok_msg("Missing threshold")?;
                         let threshold = thresh.value;
                         let descriptor = AddressDescriptor::from_multisig_public_keys_and_threshold(&all_members, threshold);
@@ -258,11 +261,9 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                             for (dest, amt, o) in o {
                                 let mut builder = TransactionBuilder::new(&self.relay.node_config);
                                 let mut wrapper = builder
-                                    .with_input_address_descriptor(&descriptor)
-                                    .into_api_wrapper();
+                                    .with_input_address_descriptor(&descriptor);
                                 let mut b = wrapper
-                                    .with_auto_utxos()
-                                    .await?;
+                                    .with_utxos(&utxos)?;
                                 b.with_output(&dest, &amt);
                                 if let Some(u) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
                                     b.with_last_output_stake_withdrawal_fulfillment(u)?;
@@ -273,25 +274,38 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
                                 let mut req = Request::default();
                                 let mut mreq = MultisigRequest::default();
+                                mreq.proposer_party_key = Some(key.clone());
+                                mreq.destination = Some(dest.clone());
+                                mreq.amount = Some(amt.clone());
+                                mreq.mp_address = Some(amm_addr.clone());
+                                mreq.currency = cur as i32;
                                 mreq.tx = Some(orig_tx.clone());
                                 req.multisig_request = Some(mreq);
                                 let responses = self.relay.broadcast_async(peers.clone(), req, None).await?;
                                 let mut merged_tx = orig_tx.clone();
-                                for r in responses {
-                                    if let Ok(resp) = r {
-                                        if let Some(r) = resp.multisig_response {
-                                            if let Some(tx) = r.tx {
-                                                merged_tx = merged_tx.combine_multisig_proofs(&tx, &amm_addr)?;
-                                            }
-                                        }
+                                let mut valid_peer_responses = 0;
+                                for r in responses.into_iter() {
+                                    if let Ok(tx) = r
+                                        .and_then(|r| r.multisig_response.clone().ok_msg("Missing multisig response"))
+                                        .and_then(|r| r.tx.clone().ok_msg("Missing tx")) {
+                                        merged_tx = merged_tx.combine_multisig_proofs(&tx, &amm_addr)?;
+                                        valid_peer_responses += 1;
                                     }
                                 }
                                 let met_thresh = merged_tx.inputs.iter()
-                                    .find(|x| x.address.as_ref() == Some(&amm_addr) && x.proof.len() > threshold as usize)
+                                    .find(|x| x.address.as_ref() == Some(&amm_addr) && x.proof.len() >= threshold as usize)
                                     .is_some();
+                                let input_proof_len = merged_tx.inputs.iter().map(|x| x.proof.len()).next().unwrap_or(0);
                                 if !met_thresh {
-                                    error!("Failed to meet threshold for multisig tx: {}", merged_tx.json_or());
+                                    error!(
+                                        "Failed to meet threshold for multisig tx: {} out of {} and {} peer responses",
+                                        input_proof_len,
+                                        threshold,
+                                        valid_peer_responses
+                                    );
+                                    error!("Broke here");
                                 } else {
+                                    info!("Submitting multisig tx for rdg: {}", merged_tx.hash_hex());
                                     self.relay.submit_transaction_sync(&merged_tx).await?;
                                 }
                             }

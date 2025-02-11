@@ -10,7 +10,7 @@ pub trait ExternalTxSupport {
 impl ExternalTxSupport for ExternalTimedTransaction {
 
     fn other_address_typed(&self) -> RgResult<structs::Address> {
-        let mut addr = self.other_address.parse_address()?;
+        let mut addr = self.other_address.parse_address()?.as_external();
         Ok(addr)
     }
 

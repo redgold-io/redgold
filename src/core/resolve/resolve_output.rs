@@ -1,7 +1,9 @@
 use crate::core::relay::Relay;
 use itertools::Itertools;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NodeMetadata, ObservationProof, Output, PublicKey, Request, ResolveCodeResponse, Response, Transaction};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, NodeMetadata, ObservationProof, Output, PublicKey, ResolveCodeResponse, Transaction};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::util::xor_distance::XorfConvDistanceSubset;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use std::collections::HashSet;

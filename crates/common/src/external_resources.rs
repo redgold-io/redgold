@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, MultisigRequest, MultisigResponse, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Request, Response, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, MultisigRequest, MultisigResponse, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;

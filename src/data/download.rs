@@ -3,8 +3,10 @@ use crate::core::relay::Relay;
 use crate::observability::metrics_help::WithMetrics;
 // use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{
-    DownloadDataType, DownloadRequest, DownloadResponse, NodeState, Request, Response,
+    DownloadDataType, DownloadRequest, DownloadResponse, NodeState
 };
+use crate::schema::message::{ Response};
+use crate::schema::message::Request;
 use crate::util;
 use futures::StreamExt;
 use itertools::Itertools;

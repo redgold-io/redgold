@@ -9,8 +9,9 @@ use crate::core::relay::Relay;
 use crate::schema::structs::MultipartyAuthenticationRequest;
 use redgold_keys::request_support::RequestSupport;
 use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::structs::{Request, RoomId};
+use redgold_schema::structs::{RoomId};
 use round_based::Msg;
+use redgold_schema::message::Request;
 
 pub async fn join_computation<M>(
     address: surf::Url,

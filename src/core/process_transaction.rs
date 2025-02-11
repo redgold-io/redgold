@@ -7,8 +7,10 @@ use flume::{Sender, TryRecvError};
 use futures::{TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use metrics::{counter, histogram};
-use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, Request, Response, UtxoId, ValidationType};
-use redgold_schema::{struct_metadata_new, structs, RgResult, SafeOption};
+use redgold_schema::structs::{ContentionKey, ContractStateMarker, ExecutionInput, ExecutorBackend, GossipTransactionRequest, Hash, PublicResponse, QueryObservationProofRequest, UtxoId, ValidationType};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
+use redgold_schema::{message, struct_metadata_new, structs, RgResult, SafeOption};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::{JoinError, JoinHandle};
@@ -275,7 +277,7 @@ impl TransactionProcessContext {
         // Use this as whether or not the request was successful
         let mut metadata = ResponseMetadata::default();
         // Change these to raw Response instead of public response
-        let mut pr = structs::Response::default();
+        let mut pr = message::Response::default();
         match result_or_error.log_error() {
             Ok(o) => {
                 metadata.success = true;

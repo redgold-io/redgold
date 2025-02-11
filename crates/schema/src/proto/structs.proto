@@ -1038,53 +1038,6 @@ message PortOpenRequest {
   TransportBackend transport = 3;
 }
 
-message Request {
-  optional GossipTransactionRequest gossip_transaction_request = 1;
-  optional GossipObservationRequest gossip_observation_request = 2;
-  optional ResolveHashRequest resolve_hash_request = 3;
-  optional DownloadRequest download_request = 4;
-  AboutNodeRequest about_node_request = 5;
-  Proof proof = 7;
-  NodeMetadata node_metadata = 8;
-  GetPeersInfoRequest get_peers_info_request = 9;
-  InitiateMultipartyKeygenRequest initiate_keygen = 10;
-  InitiateMultipartySigningRequest initiate_signing = 17;
-  SubmitTransactionRequest submit_transaction_request = 11;
-  UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
-  QueryObservationProofRequest query_observation_proof_request = 13;
-  HashSearchRequest hash_search_request = 14;
-  optional string trace_id = 15;
-  optional bool trace = 16;
-  MultipartyAuthenticationRequest multiparty_authentication_request = 18;
-  HealthRequest health_request = 19;
-  GetNodeTransactionRequest get_node_transaction_request = 20;
-  GetContractStateMarkerRequest get_contract_state_marker_request = 21;
-  Address resolve_code_request = 22;
-  AbridgedNodeMetadata abridged_node_metadata = 23;
-  repeated ObservationProof gossip_observation_proof = 24;
-  UtxoId utxo_valid_request = 25;
-  RecentDiscoveryTransactionsRequest recent_transactions_request = 26;
-  Hash lookup_transaction_request = 27;
-  RecentTransactionAndObservationRequest recent_transaction_and_observation_request = 28;
-  GenesisRequest genesis_request = 29;
-  FaucetRequest faucet_request = 30;
-  GetPartiesInfoRequest get_parties_info_request = 31;
-  optional string origin = 32;
-  BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
-  PublicKey get_address_info_public_key_request = 34;
-  GetActivePartyKeyRequest get_active_party_key_request = 35;
-  GetSeedsRequest get_seeds_request = 36;
-  PublicKey get_public_key_balance_request = 37;
-  KeepAliveRequest keep_alive_request = 38;
-  Response response = 39;
-  PortOpenRequest port_open_request = 40;
-  GuiInitRequest gui_init_request = 41;
-  MultipartyCheckReadyRequest multiparty_check_ready_request = 42;
-  GetSolanaAddress get_solana_address = 43;
-  MoneroMultisigFormationRequest monero_multisig_formation_request = 44;
-  MultisigRequest multisig_request = 45;
-}
-
 message MultisigRequest {
 
   Transaction tx = 1;
@@ -1131,46 +1084,6 @@ message UtxoValidResponse {
 
 message PortOpenResponse {
   bool open = 1;
-}
-
-message Response {
-  ResponseMetadata response_metadata = 1;
-  // Pull in other response classes if needed.
-  optional ResolveHashResponse resolve_hash_response = 2;
-  optional DownloadResponse download_response = 3;
-  AboutNodeResponse about_node_response = 4;
-  GetPeersInfoResponse get_peers_info_response = 5;
-  NodeMetadata node_metadata = 6;
-  Proof proof = 7;
-
-  InitiateMultipartyKeygenResponse initiate_keygen_response = 8;
-  InitiateMultipartySigningResponse initiate_signing_response = 13;
-
-  SubmitTransactionResponse submit_transaction_response = 9;
-  UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
-  QueryObservationProofResponse query_observation_proof_response = 11;
-  HashSearchResponse hash_search_response = 12;
-  HealthResponse health_response = 14;
-  ContractStateMarker get_contract_state_marker_response = 15;
-  ResolveCodeResponse resolve_code_response = 16;
-  UtxoValidResponse utxo_valid_response = 17;
-  RecentDiscoveryTransactionsResponse recent_discovery_transactions_response = 18;
-  Transaction lookup_transaction_response = 19;
-  repeated TransactionAndObservations recent_transaction_and_observation_response = 20;
-  Transaction genesis_response = 21;
-  FaucetResponse faucet_response = 22;
-  GetPartiesInfoResponse get_parties_info_response = 23;
-  BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
-  AddressInfo get_address_info_public_key_response = 25;
-  PublicKey get_active_party_key_response = 26;
-  repeated Seed get_seeds_response = 27;
-  CurrencyAmount get_public_key_balance_response = 28;
-  KeepAliveResponse keep_alive_response = 29;
-  PortOpenResponse port_open_response = 30;
-  optional bool multiparty_check_ready_response = 31;
-  Address get_solana_address_response = 32;
-  optional string monero_multisig_formation_response = 33;
-  MultisigResponse multisig_response = 34;
 }
 
 message MultisigResponse {

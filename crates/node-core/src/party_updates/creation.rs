@@ -17,7 +17,9 @@ use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, Request, Response, SupportedCurrency, Weighting};
+use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency, Weighting};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::util::times::current_time_millis;
 
 

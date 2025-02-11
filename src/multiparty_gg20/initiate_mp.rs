@@ -3,7 +3,9 @@ use std::time::Duration;
 use tracing::{error, info};
 
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption, structs};
-use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartySigningValidation, Proof, PublicKey, Request, Response, RoomId, Weighting};
+use redgold_schema::structs::{BytesData, ErrorInfo, InitiateMultipartyKeygenRequest, InitiateMultipartyKeygenResponse, InitiateMultipartySigningRequest, InitiateMultipartySigningResponse, LocalKeyShare, MultipartyIdentifier, PartySigningValidation, Proof, PublicKey, RoomId, Weighting};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_common::flume_send_help::SendErrorInfo;
 use crate::core::relay::Relay;
 use futures::{StreamExt, TryFutureExt};

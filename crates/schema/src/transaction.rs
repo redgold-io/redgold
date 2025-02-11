@@ -107,10 +107,8 @@ impl Transaction {
     pub fn combine_multisig_proofs(&mut self, other: &Transaction, address: &Address) -> RgResult<Transaction> {
         let mut updated = self.clone();
         for (idx, input) in updated.inputs.iter_mut().enumerate() {
-            if input.address.as_ref() == Some(address) {
-                let other_input = other.inputs.get(idx).ok_msg("Missing input")?;
-                input.proof.extend(other_input.proof.clone());
-            }
+            let other_input = other.inputs.get(idx).ok_msg("Missing input")?;
+            input.proof.extend(other_input.proof.clone());
         }
         Ok(updated)
     }

@@ -12,7 +12,7 @@ use redgold_keys::request_support::RequestSupport;
 use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs;
+use redgold_schema::{message, structs};
 use redgold_schema::structs::RoomId;
 use rocket::data::ToByteUnit;
 use rocket::http::Status;
@@ -61,7 +61,7 @@ async fn subscribe(
 fn verify_message(room_id: &str, message: String, db: &State<Db>) -> Option<(usize, Option<String>)> {
     // info!("Attempting to verify message: {}", message.clone());
     let room_id = RoomId::from(room_id.to_string());
-    let decoded = message.json_from::<structs::Request>().log_error();
+    let decoded = message.json_from::<message::Request>().log_error();
     let mut ret = None;
     if let Ok(d) = &decoded {
         if let Some(m) = &d.multiparty_authentication_request {

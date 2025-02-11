@@ -32,13 +32,18 @@ impl StakeMethods for PartyEvents {
             let amt = event.currency_amount();
             let oa = event.other_address_typed();
             if let Ok(addr) = oa {
-                info!("Event: {}", event.json_or());
-                info!("Pending external stake txs: {}", self.pending_external_staking_txs.json_or());
+                // info!("Event: {}", event.json_or());
+                // info!("Pending external stake txs: {}", self.pending_external_staking_txs.json_or());
                 let matching = self.pending_external_staking_txs.iter()
                     .filter(|s| {
-                        info!("Comparing amounts: {} == {}", s.amount.json_or(), amt.json_or());
-                        info!("Comparing addresses: {} == {}", s.external_address.render_string().unwrap(), addr.render_string().unwrap());
-                        s.amount == amt && s.external_address == addr
+                        // info!("Comparing amounts: {} == {}", s.amount.json_or(), amt.json_or());
+                        // info!("Comparing addresses: {} == {}", s.external_address.render_string().unwrap(), addr.render_string().unwrap());
+                        // info!("Comparing addresses: {} == {}", s.external_address.json_or(), addr.json_or());
+                        let amount_equal = s.amount == amt;
+                        let address_equal = s.external_address == addr;
+                        // info!("Amount equal: {}", amount_equal);
+                        // info!("Address equal: {}", address_equal);
+                        amount_equal && address_equal
                     })
                     .next()
                     .cloned();
