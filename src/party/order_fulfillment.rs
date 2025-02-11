@@ -287,7 +287,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                 for r in responses.into_iter() {
                                     if let Ok(tx) = r
                                         .and_then(|r| r.multisig_response.clone().ok_msg("Missing multisig response"))
-                                        .and_then(|r| r.tx.clone().ok_msg("Missing tx")) {
+                                        .and_then(|r| r.tx.clone().ok_msg("Missing tx")).log_error() {
                                         merged_tx = merged_tx.combine_multisig_proofs(&tx, &amm_addr)?;
                                         valid_peer_responses += 1;
                                     }
