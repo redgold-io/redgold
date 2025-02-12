@@ -196,9 +196,9 @@ impl StakeMethods for PartyEvents {
             };
             self.pending_stake_withdrawals.push(w);
             if is_external {
-                self.unfulfilled_external_withdrawals.push((of, event.clone()));
+                self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals.push((of, event.clone()));
             } else {
-                self.unfulfilled_rdg_orders.push((of, event.clone()));
+                self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.push((of, event.clone()));
             }
         }
         Ok(())

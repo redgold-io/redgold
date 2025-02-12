@@ -77,7 +77,7 @@ impl PartyEventBuilder for PartyEvents {
             //     info!("Eth outgoing");
             // }
 
-            self.unfulfilled_external_withdrawals.retain(|(of, d)| {
+            self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals.retain(|(of, d)| {
                 let res = Self::retain_unfulfilled_withdrawals(t, d);
                 if !res {
                     // This represents and outgoing BTC fulfillment of an incoming RDG tx
@@ -205,7 +205,7 @@ impl PartyEventBuilder for PartyEvents {
             for tx_id in t.tx.output_external_txids() {
                 self.remove_unconfirmed_event(e);
                 let mut found_match = false;
-                self.unfulfilled_rdg_orders.retain(|(of, d)| {
+                self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.retain(|(of, d)| {
                     let res = Self::retain_unfulfilled_deposits(tx_id, d);
                     if !res {
                         let fulfillment = (of.clone(), d.clone(), ec.clone());
@@ -223,7 +223,7 @@ impl PartyEventBuilder for PartyEvents {
             for f in t.tx.stake_withdrawal_fulfillments() {
                 if let Some(utxo_id) = f.stake_withdrawal_request.as_ref() {
                     let mut found_match = false;
-                    self.unfulfilled_rdg_orders.retain(|(of, d)| {
+                    self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.retain(|(of, d)| {
                         match d {
                             External(_) => { true }
                             AddressEvent::Internal(tx) => {
@@ -313,7 +313,8 @@ impl PartyEventBuilder for PartyEvents {
 
         let rdg_extern_txids = self.unconfirmed_rdg_output_btc_txid_refs();
 
-        for (of, ae) in self.unfulfilled_rdg_orders.iter() {
+        //
+        for (of, ae) in self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.iter() {
             match ae {
                 AddressEvent::External(t) => {
                     // Since this is a BTC incoming transaction,
@@ -326,7 +327,7 @@ impl PartyEventBuilder for PartyEvents {
             }
         }
 
-        for (of, ae) in &self.unfulfilled_external_withdrawals {
+        for (of, ae) in &self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals {
             // Disable stake withdrawals temporarily on mainnet
             if of.is_stake_withdrawal && self.network.is_main() {
                 continue;
@@ -335,7 +336,7 @@ impl PartyEventBuilder for PartyEvents {
                 .next().is_some();
             match ae {
                 AddressEvent::Internal(t) => {
-                    // Since this is a RDG incoming transaction, which we'll fulfill with BTC,
+                    // Since this is a RDG incoming transaction, which we'll fulfill with BTC / pair,
                     // We need to know it's corresponding BTC address to see if an unconfirmed output matches it
                     // (i.e. it's already been unconfirmed fulfilled.)
                     t.tx.first_input_address_to_btc_address(&self.network).map(|addr| {
@@ -389,8 +390,8 @@ impl PartyEventBuilder for PartyEvents {
             balance_map: Default::default(),
             balance_pending_order_deltas_map: Default::default(),
             balance_with_deltas_applied: Default::default(),
-            unfulfilled_rdg_orders: vec![],
-            unfulfilled_external_withdrawals: vec![],
+            unfulfilled_incoming_external_amount_to_outgoing_rdg_orders: vec![],
+            unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals: vec![],
             // price,
             // bid_ask: BidAsk::generate_default(
             //     0, 0, price, min_ask

@@ -29,8 +29,8 @@ pub struct PartyEvents where {
     pub balance_map: HashMap<SupportedCurrency, CurrencyAmount>,
     pub balance_pending_order_deltas_map: HashMap<SupportedCurrency, CurrencyAmount>,
     pub balance_with_deltas_applied: HashMap<SupportedCurrency, CurrencyAmount>,
-    pub unfulfilled_rdg_orders: Vec<(OrderFulfillment, AddressEvent)>,
-    pub unfulfilled_external_withdrawals: Vec<(OrderFulfillment, AddressEvent)>,
+    pub unfulfilled_incoming_external_amount_to_outgoing_rdg_orders: Vec<(OrderFulfillment, AddressEvent)>,
+    pub unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals: Vec<(OrderFulfillment, AddressEvent)>,
     // pub price: f64,
     // pub bid_ask: BidAsk,
     pub unconfirmed_events: Vec<AddressEvent>,
@@ -323,9 +323,9 @@ impl PartyEvents {
                 );
                 if let Some(of) = of.as_ref() {
                     if is_ask {
-                        self.unfulfilled_rdg_orders.push((of.clone(), event.clone()));
+                        self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.push((of.clone(), event.clone()));
                     } else {
-                        self.unfulfilled_external_withdrawals.push((of.clone(), event.clone()));
+                        self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals.push((of.clone(), event.clone()));
                     }
                 }
                 of

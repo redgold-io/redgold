@@ -297,8 +297,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
         let num_events = ps.events.len();
         let num_unconfirmed = ps.unconfirmed_events.len();
-        let num_unfulfilled_deposits = ps.unfulfilled_rdg_orders.len();
-        let num_unfulfilled_withdrawals = ps.unfulfilled_external_withdrawals.len();
+        let num_unfulfilled_deposits = ps.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.len();
+        let num_unfulfilled_withdrawals = ps.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals.len();
         let utxos = if let Some(a) = rdg_address.as_ref() {
             self.relay.ds.transaction_store.query_utxo_address(&a).await?
         } else {
@@ -526,7 +526,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
     pub async fn mp_send_btc(&mut self, public_key: &PublicKey, identifier: &MultipartyIdentifier,
                              outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<ExternalTransactionId> {
-        return Err("error".to_error());
+        return "error".to_error();
         // TODO: Split this lock into a separate function?
 
         // let (hashes, validation) = self.payloads_and_validation(outputs, public_key, ps).await?;
