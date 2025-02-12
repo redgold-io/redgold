@@ -123,7 +123,9 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
 
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn handle_order_fulfillment(&mut self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
+
         for (key,v ) in data.iter_mut() {
+            let mut done_orders = vec![];
             let v2 = v.clone();
 
 
@@ -135,7 +137,6 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             // }
             if let Some(ps) = v.party_events.as_ref() {
                 // let key_address = key.address()?;
-
                 let cutoff_time = current_time_millis_i64() - (self.relay.node_config.order_cutoff_delay_time().as_millis() as i64); //
                 let orders = ps.orders();
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
@@ -229,18 +230,24 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                     error!("Broke here");
                                 } else {
                                     info!("Submitting multisig tx for rdg: {}", merged_tx.hash_hex());
-                                    self.relay.submit_transaction_sync(&merged_tx).await?;
+                                    let submitted = self.relay.submit_transaction_sync(&merged_tx).await.log_error();
+                                    if submitted.is_ok() {
+                                        done_orders.push(o.clone());
+                                    }
                                 }
                             }
                         } else { // if cur.only_one_destination_per_tx()
-                            for (dest, amt, _o) in o {
-                                self.external_network_resources
+                            for (dest, amt, o) in o {
+                                let result = self.external_network_resources
                                     .execute_external_multisig_send(
                                         vec![(dest, amt)], &amm_addr,
                                         &peers,
                                         &self.relay,
                                         threshold
-                                    ).await?;
+                                    ).await.log_error();
+                                if result.is_ok() {
+                                    done_orders.push(o.clone());
+                                }
                             }
                         }
                         // else {
@@ -262,12 +269,12 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 //
                 // let mut total_done_orders = done_orders.len();
                 //
-                // // ps.process_locally_fulfilled_orders(done_orders);
-                // if let Some(lfo) = v.locally_fulfilled_orders.as_mut() {
-                //     lfo.extend(done_orders);
-                // } else {
-                //     v.locally_fulfilled_orders = Some(done_orders.clone());
-                // }
+                // ps.process_locally_fulfilled_orders(done_orders);
+                if let Some(lfo) = v.locally_fulfilled_orders.as_mut() {
+                    lfo.extend(done_orders);
+                } else {
+                    v.locally_fulfilled_orders = Some(done_orders.clone());
+                }
                 //
                 // Immediately update processed orders ^ to ensure no duplicate or no persistence failure
                

@@ -358,7 +358,7 @@ impl PartyTestHarness {
     pub async fn rdg_to_eth_swap(&self) -> RgResult<()> {
         // test rdg->btc swap
         self.tx_builder().await
-            .with_swap(&self.self_eth_address().as_internal(), &CurrencyAmount::from_fractional(0.2).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_eth_address().as_internal(), &CurrencyAmount::from_fractional(0.05).unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()
@@ -369,8 +369,9 @@ impl PartyTestHarness {
     }
 
     async fn rdg_to_btc_swap(&self) {
+        let result = CurrencyAmount::from_fractional(0.08);
         self.tx_builder().await
-            .with_swap(&self.self_btc_address().as_internal(), &CurrencyAmount::from_fractional(0.4).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_btc_address().as_internal(), &result.unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()
@@ -447,6 +448,8 @@ impl PartyTestHarness {
         self.send_external(Self::eth_swap_amount()).await;
         retry!(self.verify_balance_increased())?;
         retry!(async { self.verify_fulfillment_history(2).await })?;
+
+        let party_data = self.party_events().await?;
         info!("Finished with deposit swaps, attempting to send internal withdrawal swaps now");
         self.rdg_to_btc_swap().await;
         info!("Send rdg_to_btc_swap deposit swaps");

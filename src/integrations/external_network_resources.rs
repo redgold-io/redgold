@@ -847,10 +847,10 @@ impl ExternalNetworkResources for MockExternalResources {
 
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64> {
         let res = match currency {
-            SupportedCurrency::Bitcoin => 60_000.0,
+            SupportedCurrency::Bitcoin => 100_000.0,
             SupportedCurrency::Ethereum => 3_000.0,
             SupportedCurrency::Monero => 200.0,
-            SupportedCurrency::Solana => 250.0,
+            SupportedCurrency::Solana => 200.0,
             SupportedCurrency::Redgold => 100.0,
             _ => "Unsupported currency for query price".to_error()
                 .with_detail("currency", format!("{:?}", currency))
