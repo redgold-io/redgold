@@ -27,6 +27,7 @@ use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use std::path::PathBuf;
 use std::time::Duration;
+use itertools::Itertools;
 use tokio::task::JoinHandle;
 use tracing::info;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
@@ -178,14 +179,28 @@ impl PartyTestHarness {
     }
 
     pub fn self_address(&self, cur: SupportedCurrency) -> Option<Address> {
-        self.words.to_all_addresses_default(&self.network).unwrap_or_default().into_iter()
+        self.self_all_address().into_iter()
             .filter(|a| a.currency_or() == cur).next()
+    }
+
+    fn self_all_address(&self) -> Vec<Address> {
+        self.words.to_all_addresses_default(&self.network).unwrap_or_default()
+            .into_iter()
+            .collect_vec()
+    }
+
+    fn self_all_address_internal(&self) -> Vec<Address> {
+        self.words.to_all_addresses_default(&self.network).unwrap_or_default()
+            .into_iter()
+            .map(|x| x.as_internal())
+            .collect_vec()
     }
 
     pub async fn send_internal_rdg_stake(&self) -> RgResult<()> {
         let internal_stake_amount = CurrencyAmount::from_fractional(7.0).expect("works");
         let rdg_address = self.self_rdg_address();
         let amm_rdg_address = self.amm_address(SupportedCurrency::Redgold).expect("works");
+        info!("Sending internal rdg stake to AMM RDG address : {}", amm_rdg_address.json_or());
         let internal_stake_tx = self.tx_builder().await
             .with_internal_stake_usd_bounds(
                 None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
@@ -206,6 +221,10 @@ impl PartyTestHarness {
         let currency = amount.currency_or();
         let self_addr = self.self_address(currency).expect("works");
         let amm_addr = self.amm_address(currency).expect("works");
+
+        info!("Mock sending external tx for currency: {} amount: {} to destination {}",
+            currency.to_display_string(), amount.to_fractional(), amm_addr.render_string().unwrap()
+        );
         let amountu64 = (amount.to_fractional() * 1e8) as u64;
         // TODO: May need to fill out other fields here?
         let ts = util::current_time_millis_i64();
@@ -313,7 +332,11 @@ impl PartyTestHarness {
     }
 
     pub async fn balance(&mut self, update_self: bool) -> RgResult<CurrencyAmount> {
-        let balance = self.client().balance(&self.self_rdg_address()).await?;
+        let addrs = self.self_all_address_internal();
+        let mut balance = 0;
+        for addr in addrs {
+            balance += self.client().balance(&addr).await.unwrap_or(0);
+        }
         let balance = CurrencyAmount::from_rdg(balance);
         info!("balance rdg check: {}", balance.amount);
         if update_self {
@@ -335,7 +358,7 @@ impl PartyTestHarness {
     pub async fn rdg_to_eth_swap(&self) -> RgResult<()> {
         // test rdg->btc swap
         self.tx_builder().await
-            .with_swap(&self.self_eth_address(), &CurrencyAmount::from_fractional(0.2).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_eth_address().as_internal(), &CurrencyAmount::from_fractional(0.2).unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()
@@ -347,7 +370,7 @@ impl PartyTestHarness {
 
     async fn rdg_to_btc_swap(&self) {
         self.tx_builder().await
-            .with_swap(&self.self_btc_address(), &CurrencyAmount::from_fractional(0.4).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_btc_address().as_internal(), &CurrencyAmount::from_fractional(0.4).unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()

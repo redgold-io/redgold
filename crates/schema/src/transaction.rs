@@ -108,7 +108,13 @@ impl Transaction {
         let mut updated = self.clone();
         for (idx, input) in updated.inputs.iter_mut().enumerate() {
             let other_input = other.inputs.get(idx).ok_msg("Missing input")?;
-            input.proof.extend(other_input.proof.clone());
+            for proof in other_input.proof.iter() {
+                if input.proof.iter().any(|p| p.public_key == proof.public_key) {
+                    continue;
+                } else {
+                    input.proof.push(proof.clone());
+                }
+            }
         }
         Ok(updated)
     }

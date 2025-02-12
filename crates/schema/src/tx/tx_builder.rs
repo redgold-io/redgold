@@ -9,6 +9,7 @@ use crate::transaction::amount_data;
 use crate::tx_schema_validate::SchemaValidationSupport;
 use crate::{bytes_data, error_info, structs, RgResult, SafeOption};
 use itertools::Itertools;
+use log::info;
 
 #[derive(Clone)]
 pub struct TransactionBuilder {
@@ -465,6 +466,22 @@ impl TransactionBuilder {
 
         let address_descriptors = self.input_addresses_descriptors.iter()
             .map(|a| (a.to_address(), a.clone())).collect::<HashMap<Address, AddressDescriptor>>();
+
+        if address_descriptors.len() > 0 {
+            info!("Address descriptors");
+            for (k,v) in address_descriptors.iter() {
+                info!("{}: {}", k.json_or(), v.json_or());
+            }
+            for u in &self.utxos {
+                if let Ok(a) = u.address() {
+                    info!("UTXO address {}", a.json_or());
+                    if !address_descriptors.contains_key(&a) {
+                        info!("Missing address descriptor for {}", a.render_string().expect("works"));
+                        info!("Broke");
+                    }
+                }
+            }
+        }
 
         for u in self.utxos.clone() {
 

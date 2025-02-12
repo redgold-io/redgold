@@ -24,10 +24,12 @@ impl Into<Address> for Vec<u8> {
 
 impl AddressDescriptor {
     pub fn from_multisig_public_keys_and_threshold(public_keys: &Vec<PublicKey>, threshold: i64) -> AddressDescriptor {
+        let mut pks = public_keys.clone();
+        pks.sort_by_key(|k| k.vec());
         let mut descriptor = AddressDescriptor::default();
-        descriptor.public_keys = public_keys.clone();
+        descriptor.public_keys = pks.clone();
         let mut contract = OutputContract::default();
-        contract.threshold = Some(Weighting::from_int_basis(threshold, public_keys.len() as i64));
+        contract.threshold = Some(Weighting::from_int_basis(threshold, pks.len() as i64));
         descriptor.contract = Some(contract);
         descriptor
     }
@@ -83,6 +85,12 @@ impl Address {
         let mut address = self.clone();
         address.mark_external();
         address.clone()
+    }
+
+    pub fn as_internal(&self) -> Address {
+        let mut address = self.clone();
+        address.set_currency(Redgold);
+        address
     }
 
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {

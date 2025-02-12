@@ -16,3 +16,4 @@ categories.workspace = true
 redgold-schema = {workspace = true}
 async-trait = { workspace = true }
 flume = { workspace = true }
+serde = { workspace = true }

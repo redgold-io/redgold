@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::info;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
+use redgold_schema::structs::{Address, AddressDescriptor, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
 use redgold_schema::{structs, RgResult, SafeOption};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::address_external::ToBitcoinAddress;
@@ -91,10 +91,8 @@ impl TransactionSupport for Transaction {
     fn sign_multisig(&mut self, key_pair: &KeyPair, party_address: &Address) -> RgResult<Transaction> {
         let hash = self.signable_hash();
         for i in self.inputs.iter_mut() {
-            if i.address.as_ref() == Some(party_address) {
-                let proof = Proof::from_keypair_hash(&hash, &key_pair);
-                i.proof.push(proof);
-            }
+            let proof = Proof::from_keypair_hash(&hash, &key_pair);
+            i.proof.push(proof);
         }
         let x = self.with_hash();
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
@@ -198,16 +196,25 @@ impl InputSupport for Input {
             proof.verify_signature_only(&hash)?;
             proof.verify_single_public_key_address(prev_addr)?;
         } else {
-            if !o.is_multisig() {
-                "Output not declared as multisig, but multiple proofs provided".to_error()?;
-            };
-            let threshold = o.multisig_threshold_naive().ok_msg("Missing threshold")?;
-            let address = self.to_multisig_address(threshold);
-            self.verify_signatures_only(&hash)?;
-            let this_addr = self.address.safe_get_msg("Missing address on input for multisig verification")?;
-            if address != *this_addr {
-                "Multisig address mismatch".to_error()?;
+            // if !o.is_multisig() {
+            //     "Output not declared as multisig, but multiple proofs provided".to_error()?;
+            // };
+            match self.address_descriptor.as_ref() {
+                None => {
+                    "Missing address descriptor on multisig input".to_error()?;
+                }
+                Some(d) => {
+                    let c = d.contract.as_ref().ok_msg("Missing contract")?;
+                    let t = c.threshold.as_ref().ok_msg("Missing threshold")?;
+                    let threshold = t.value;
+                    let address = d.to_address();
+                    self.verify_signatures_only(&hash)?;
+                    if address != *prev_addr {
+                        "Multisig address mismatch".to_error()?;
+                    }
+                }
             }
+
         }
         Ok(())
     }

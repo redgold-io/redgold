@@ -135,11 +135,11 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             self.handle_order_fulfillment(&mut shared_data).await?;
         }
         // self.handle_key_rotations(&mut shared_data).await?;
-
-        info!("nodeid: {}, Party watcher tick num parties total {} active {} keys {}",
-            self.relay.node_config.short_id().expect("Node ID"),
-            party_metadata.clone().instances.len(), active.len(),
-        shared_data.keys().collect_vec().json_or());
+        //
+        // info!("nodeid: {}, Party watcher tick num parties total {} active {} keys {}",
+        //     self.relay.node_config.short_id().expect("Node ID"),
+        //     party_metadata.clone().instances.len(), active.len(),
+        // shared_data.keys().collect_vec().json_or());
         self.relay.external_network_shared_data.write(shared_data.clone()).await;
 
         self.relay.ds.config_store

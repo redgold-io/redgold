@@ -96,6 +96,16 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
     }
 
     let cur = dest.currency_or();
+
+    if cur == SupportedCurrency::Redgold {
+        let mut tx = multisig_request.tx.safe_get_msg("Missing tx")?.clone();
+        tx = tx.sign_multisig(&relay.node_config.keypair(), party_address)?;
+        let mut mr = MultisigResponse::default();
+        mr.tx = Some(tx.clone());
+        mr.currency = cur as i32;
+        return Ok(mr)
+    }
+
     let mut response = ext.participate_multisig_send(
                 multisig_request.clone(),
                 &party_members,
@@ -270,6 +280,9 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                 } else if let Some(txid) = o.tx_id_ref.as_ref() {
                                     b.with_last_output_deposit_swap_fulfillment(txid.clone())?;
                                 }
+                                info!("Sending multisig tx to destination {} with amount {}", dest.render_string().unwrap(), amt.to_fractional());
+                                info!("Building multisig tx for rdg party aaddress: {}", rdg_address.json_or());
+                                info!("Building multisig tx for rdg party aaddress amm addr: {}", amm_addr.json_or());
                                 let orig_tx = b.build()?.sign_multisig(&self.relay.node_config.keypair(), &amm_addr)?;
 
                                 let mut req = Request::default();
@@ -293,7 +306,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                     }
                                 }
                                 let met_thresh = merged_tx.inputs.iter()
-                                    .find(|x| x.address.as_ref() == Some(&amm_addr) && x.proof.len() >= threshold as usize)
+                                    .find(|x| x.proof.len() >= threshold as usize)
                                     .is_some();
                                 let input_proof_len = merged_tx.inputs.iter().map(|x| x.proof.len()).next().unwrap_or(0);
                                 if !met_thresh {

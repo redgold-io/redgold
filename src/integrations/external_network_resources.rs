@@ -539,7 +539,9 @@ async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, f
 
         let res = match cur.clone() {
             SupportedCurrency::Redgold => {
-                Some(Address::from_multisig_public_keys_and_threshold(&all_pks, threshold))
+                let address = Address::from_multisig_public_keys_and_threshold(&all_pks, threshold);
+                info!("Created redgold multisig address @ {}", address.json_or());
+                Some(address)
             }
             SupportedCurrency::Bitcoin => {
                 Some(self.btc_pubkeys_to_multisig_address(&peer_pks, threshold).await?)
@@ -981,8 +983,16 @@ impl ExternalNetworkResources for MockExternalResources {
         let addr = addrs.iter().filter(|a| &a.currency_or() == cur)
             .next()
             .ok_msg("Missing currency")?;
+        addr.as_external();
         let mut result = PartyCreationResult::default();
         result.address = addr.clone();
+        match cur {
+            SupportedCurrency::Redgold => {
+                result.address = Address::from_multisig_public_keys_and_threshold(all_pks, threshold)
+            }
+            _ => {
+            }
+        }
         Ok(Some(result))
     }
 

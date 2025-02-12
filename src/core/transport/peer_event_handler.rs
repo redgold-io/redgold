@@ -60,10 +60,10 @@ impl PeerOutgoingEventHandler {
                 // error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);
             }
         } else if let Some(nmd) = &message.node_metadata {
-            debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",
-                nmd.json_or(),
-                ser_msgp
-            );
+            // debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",
+            //     nmd.json_or(),
+            //     ser_msgp
+            // );
             Self::send_message_rest(message.clone(), nmd.clone(), &relay).await?;
             // TODO: if node metadata in message then attempt to send there to unknown peer, falling back to other types
             // Do we also need dynamic node metadata here too for UDP?

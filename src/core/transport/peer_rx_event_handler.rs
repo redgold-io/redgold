@@ -78,7 +78,7 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
                 relay.ds.peer_store.update_last_seen(&pk).await.ok();
             } else {
                 if let Some(nmd) = &pm.request.node_metadata {
-                    info!("Attempting immediate discovery on peer {}", pk.short_id());
+                    // info!("Attempting immediate discovery on peer {}", pk.short_id());
                     relay.discovery.sender.send_rg_err(
                         DiscoveryMessage::new(nmd.clone(), pm.dynamic_node_metadata.clone())
                     ).log_error().ok();
@@ -356,7 +356,7 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
         }
 
         if let Some(r) = request.about_node_request {
-            info!("Received about request");
+            // info!("Received about request");
             response.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
         }
 

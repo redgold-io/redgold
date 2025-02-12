@@ -6,13 +6,14 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;
 use redgold_schema::keys::words_pass::WordsPass;
+use serde::{Deserialize, Serialize};
 
 #[async_trait]
 pub trait PeerBroadcast where Self: Sync + Clone + Send {
     async fn broadcast(&self, peers: &Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>>;
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartyCreationResult {
     pub address: Address,
     pub secret_json: Option<String>

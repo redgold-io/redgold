@@ -153,7 +153,7 @@ impl TryRecvForEach<DiscoveryMessage> for Discovery {
         // Should we add metrics here on timeouts or some other way to handle repeatedly
         // making requests to a dead peer?
         // Maybe that should only really happen on the background process where we can track that internally in mem
-        tracing::debug!("Sending discovery message to peer: {}", message.node_metadata.long_identifier());
+        // tracing::debug!("Sending discovery message to peer: {}", message.node_metadata.long_identifier());
         let result = self.relay.send_message_sync_pm(msg, None).await;
         let done = match result {
             Ok(r) => {
