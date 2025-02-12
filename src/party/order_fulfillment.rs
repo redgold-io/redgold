@@ -566,18 +566,5 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         // txid.currency = SupportedCurrency::Bitcoin as i32;
         // Ok(txid)
     }
-    pub async fn mp_send_rdg_tx(&self, tx: &mut Transaction, identifier: MultipartyIdentifier) -> RgResult<SubmitTransactionResponse> {
-        let mut validation = structs::PartySigningValidation::default();
-        validation.transaction = Some(tx.clone());
-        validation.currency = SupportedCurrency::Redgold as i32;
-
-        let hash = tx.signable_hash();
-        let result = initiate_mp_keysign(self.relay.clone(), identifier.clone(),
-                                         hash.bytes.safe_get()?.clone(), identifier.party_keys.clone(), None,
-                                         Some(validation.clone())
-        ).await?;
-        tx.add_proof_per_input(&result.proof);
-        self.relay.submit_transaction_sync(tx).await
-    }
 
 }
