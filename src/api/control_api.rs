@@ -24,7 +24,6 @@ use warp::{Filter, Rejection};
 // use crate::util::to_libp2p_peer_id;
 
 use crate::core::relay::Relay;
-use crate::multiparty_gg20::initiate_mp::{fill_identifier, find_multiparty_key_pairs, initiate_mp_keygen, initiate_mp_keysign};
 use crate::schema::structs::{
     ControlRequest, ControlResponse, ResponseMetadata,
 };
@@ -95,69 +94,7 @@ impl ControlServer {
     )-> Result<ControlResponse, ErrorInfo> {
         metrics::counter!("redgold.api.control.num_requests").increment(1);
         info!("Control request received");
-
-        let mut response = ControlResponse::empty();
-
-        if relay.node_config.network.is_local_debug() {
-            // TODO: Shouldn't both of these really be in the initiate function?
-            if let Some(mps) = request.control_multiparty_keygen_request {
-                info!("Initiate multiparty request: {}", json_or(&mps));
-                let result = initiate_mp_keygen(
-                    relay.clone(),
-                    mps.multiparty_identifier.clone(),
-                    true,
-                    None,
-                    true,
-                    vec![],
-                ).await?;
-                let mut resp = ControlMultipartyKeygenResponse::default();
-                if mps.return_local_share {
-                    resp.local_share = Some(result.local_share);
-                }
-                resp.multiparty_identifier = Some(result.identifier);
-                response.control_multiparty_keygen_response = Some(resp);
-            }
-
-            if let Some(req) = request.control_multiparty_signing_request {
-                let req = req.signing_request.safe_get_msg("Missing signing request")?;
-                let result = initiate_mp_keysign(
-                    relay.clone(),
-                    req.identifier.safe_get_msg("Missing identifier")?.clone(),
-                    req.data_to_sign.safe_get_msg("Missing data to sign")?.clone(),
-                    req.signing_party_keys.clone(),
-                    req.signing_room_id.clone(),
-                    None,
-                ).await?;
-                let mut res = ControlMultipartySigningResponse::default();
-                res.identifier = req.identifier.clone();
-                res.proof = Some(result.proof.clone());
-                response.control_multiparty_signing_response = Some(res);
-            }
-        }
-        // if add_peer_full_request.is_some() {
-        //     let add: AddPeerFullRequest = add_peer_full_request.unwrap();
-        //     let res = relay.ds.insert_peer_single(
-        //         &add.id,
-        //         add.trust,
-        //         &add.public_key,
-        //         add.address.clone(),
-        //     );
-        //     success = res.is_ok();
-        //     if res.is_ok() {
-        //         if add.connect_to_peer {
-        //             info!("Dialing address: {}", add.address.clone());
-        //             // block_on(p2p_client2.dial(
-        //             //     to_libp2p_peer_id(
-        //             //         &PublicKey::from_slice(&*add.public_key).unwrap(),
-        //             //     ),
-        //             //     add.address.parse().unwrap(),
-        //             // ))
-        //             // .expect("done");
-        //         }
-        //     } else {
-        //         error!("Error {}", res.err().unwrap());
-        //     }
-        // }
+        let response = ControlResponse::empty();
         Ok(response)
     }
 

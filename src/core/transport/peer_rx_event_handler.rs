@@ -26,14 +26,12 @@ use crate::api::about;
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::get_address_info_public_key;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
-// use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::data::download::process_download_request;
-use crate::multiparty_gg20::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::observability::metrics_help::WithMetrics;
 use crate::schema::response_metadata;
-use crate::schema::structs::{ResponseMetadata};
+use crate::schema::structs::ResponseMetadata;
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
@@ -390,36 +388,7 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
         if auth_required {
             match verified {
                 Ok(pk) => {
-                    if let Some(r) = &request.initiate_keygen {
-                        // TODO Track future with loop poll pattern
-                        // oh wait can we remove this spawn entirely?
-                        // info!("Received MP request on peer rx: {}", json_or(&r));
-                        let rel2 = relay.clone();
-                        // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                        // tokio::spawn(async move {
-                        let result1 = initiate_mp_keygen_follower(
-                            rel2.clone(), r.clone(), &pk).await;
-                        let mp_response: String = result1.clone()
-                            .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                        // info!("Multiparty response from follower: {}", mp_response);
-
-                        response.initiate_keygen_response = Some(result1?);
-
-                        // });
-                    }
-                    if let Some(k) = &request.initiate_signing {
-                        let rel2 = relay.clone();
-                        // info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
-                        // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                        // tokio::spawn(async move {
-                        let result1 = initiate_mp_keysign_follower(rel2.clone(), k.clone(), &pk).await
-                            .log_error();
-                        let mp_response: String = result1.clone()
-                            .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                        // info!("Multiparty signing response from follower: {}", mp_response);
-                        response.initiate_signing_response = Some(result1?);
-                        // });
-                    }
+                    
                 }
                 Err(e) => { return Err(e).add("Unable to process request, authorization required and failed").log_error(); }
             }

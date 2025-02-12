@@ -1,4 +1,3 @@
-use crate::multiparty_gg20::initiate_mp::initiate_mp_keysign;
 use crate::party::party_stream::PartyEventBuilder;
 use crate::party::party_watcher::PartyWatcher;
 use crate::util::current_time_millis_i64;
@@ -527,44 +526,45 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
     pub async fn mp_send_btc(&mut self, public_key: &PublicKey, identifier: &MultipartyIdentifier,
                              outputs: Vec<(String, u64)>, ps: &PartyEvents) -> RgResult<ExternalTransactionId> {
+        return Err("error".to_error());
         // TODO: Split this lock into a separate function?
 
         // let (hashes, validation) = self.payloads_and_validation(outputs, public_key, ps).await?;
 
-        let (hashes, validation) = self.external_network_resources.btc_payloads(outputs.clone(), &public_key).await?;
+        // let (hashes, validation) = self.external_network_resources.btc_payloads(outputs.clone(), &public_key).await?;
 
-        let mut results = vec![];
+        // let mut results = vec![];
 
-        for (hash, _) in hashes.iter() {
+        // for (hash, _) in hashes.iter() {
 
-            let result = initiate_mp_keysign(self.relay.clone(), identifier.clone(),
-                                             BytesData::from(hash.clone()),
-                                             identifier.party_keys.clone(), None,
-                                             Some(validation.clone())
-            ).await?;
+        //     let result = initiate_mp_keysign(self.relay.clone(), identifier.clone(),
+        //                                      BytesData::from(hash.clone()),
+        //                                      identifier.party_keys.clone(), None,
+        //                                      Some(validation.clone())
+        //     ).await?;
 
-            results.push(result);
-        }
-
-        let res = self.external_network_resources.btc_add_signatures(&public_key, validation.json_payload.unwrap(),
-                                                           results.into_iter().map(|r| r.proof).collect_vec(),
-                                                           hashes
-        ).await?;
-        // let arc = self.relay.btc_wallet(public_key).await?;
-        // let mut w = arc.lock().await;
-        // for (i, ((_, hash_type), result)) in
-        // hashes.iter().zip(results.iter()).enumerate() {
-        //     w.affix_input_signature(i, &result.proof, hash_type);
+        //     results.push(result);
         // }
-        // w.sign()?;
-        // self.external_network_resources.broadcast(public_key, SupportedCurrency::Bitcoin, EncodedTransactionPayload::JsonPayload(w.psbt.clone().json_or())).await?;
-        let string = self.external_network_resources.broadcast(public_key, SupportedCurrency::Bitcoin, res).await?;
-        // w.broadcast_tx()?;
-        // let string = w.txid()?;
-        let mut txid = ExternalTransactionId::default();
-        txid.identifier = string.clone();
-        txid.currency = SupportedCurrency::Bitcoin as i32;
-        Ok(txid)
+
+        // let res = self.external_network_resources.btc_add_signatures(&public_key, validation.json_payload.unwrap(),
+        //                                                    results.into_iter().map(|r| r.proof).collect_vec(),
+        //                                                    hashes
+        // ).await?;
+        // // let arc = self.relay.btc_wallet(public_key).await?;
+        // // let mut w = arc.lock().await;
+        // // for (i, ((_, hash_type), result)) in
+        // // hashes.iter().zip(results.iter()).enumerate() {
+        // //     w.affix_input_signature(i, &result.proof, hash_type);
+        // // }
+        // // w.sign()?;
+        // // self.external_network_resources.broadcast(public_key, SupportedCurrency::Bitcoin, EncodedTransactionPayload::JsonPayload(w.psbt.clone().json_or())).await?;
+        // let string = self.external_network_resources.broadcast(public_key, SupportedCurrency::Bitcoin, res).await?;
+        // // w.broadcast_tx()?;
+        // // let string = w.txid()?;
+        // let mut txid = ExternalTransactionId::default();
+        // txid.identifier = string.clone();
+        // txid.currency = SupportedCurrency::Bitcoin as i32;
+        // Ok(txid)
     }
     pub async fn mp_send_rdg_tx(&self, tx: &mut Transaction, identifier: MultipartyIdentifier) -> RgResult<SubmitTransactionResponse> {
         let mut validation = structs::PartySigningValidation::default();

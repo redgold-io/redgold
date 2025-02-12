@@ -3,7 +3,6 @@ use crate::api::client::rest::RgHttpClient;
 use crate::api::control_api::ControlClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
-use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
 use crate::node::Node;
 use crate::node_config::ToTransactionBuilder;
 use crate::observability::metrics_registry;

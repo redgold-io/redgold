@@ -30,8 +30,6 @@ use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::infra::multiparty_backup::check_updated_multiparty_csv;
 use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
-use crate::multiparty_gg20::gg20_sm_manager;
-use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
 // use crate::multiparty_gg20::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::party::party_watcher::PartyWatcher;

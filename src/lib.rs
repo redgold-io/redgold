@@ -25,7 +25,6 @@ pub mod test;
 pub mod scrape;
 pub mod sanity;
 pub mod party;
-pub mod multiparty_gg20;
 
 pub use redgold_data as datas;
 pub use redgold_schema as schema;
