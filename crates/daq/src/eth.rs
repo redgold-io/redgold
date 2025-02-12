@@ -13,6 +13,7 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;
+use redgold_schema::helpers::easy_json::EasyJson;
 
 #[derive(Clone, Default)]
 pub struct EthDaq {
@@ -21,22 +22,24 @@ pub struct EthDaq {
 }
 
 
+
 #[async_trait]
 impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
     async fn interval_fold_or_recv(&mut self, message: Either<TimestampedEthereumTransaction, ()>) -> RgResult<()> {
         match message {
             Either::Left(t) => {
                 let addrs = self.daq.subscribed_address_filter.read();
-                let t_addrs = t.addrs();
-                if !t_addrs.iter().any(|a| addrs.contains(a)) {
-                    counter!("redgold_daq_eth_skipped_tx").increment(1);
-                    return Ok(());
-                }
+                // let t_addrs = t.addrs();
+                // if !t_addrs.iter().any(|a| addrs.contains(a)) {
+                //     counter!("redgold_daq_eth_skipped_tx").increment(1);
+                //     return Ok(());
+                // }
                 counter!("redgold_daq_eth_tx").increment(1);
                 let ett = EthereumWsProvider::convert_transaction(
                     &addrs, t
                 );
                 if let Ok(ett) = ett {
+                    print!("{}", ett.json_or());
                     if let Some(_) = ett.self_address.as_ref() {
                     }
                 }
@@ -116,4 +119,25 @@ impl EthDaq {
             None
         }
     }
+}
+
+#[ignore]
+#[tokio::test]
+pub async fn test_eth_daq() {
+
+    let provider = EthereumWsProvider::sepolioa().await;
+    let daq = EthDaq::default();
+    let duration = Duration::from_secs(60);
+    let result = daq.from_eth_provider_stream(Ok(provider), duration).await.unwrap();
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+
+    //
+    // let p = EthereumWsProvider::new("ws://server:8556").await.expect("ws provider creation failed");
+    // let mut daq = EthDaq::default();
+    // let mut eth = EthereumWsProvider::default();
+    // let duration = Duration::from_secs(60);
+    // let result = daq.from_eth_provider_stream(Ok(eth), duration);
+    // assert!(result.is_ok());
 }

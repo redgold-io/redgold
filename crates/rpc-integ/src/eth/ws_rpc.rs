@@ -13,6 +13,8 @@ use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
+use ethers::prelude::test_provider::TestProvider;
+use ethers::providers;
 
 pub struct EthereumWsProvider {
     pub provider: Arc<Provider<Ws>>,
@@ -70,6 +72,13 @@ impl EthereumWsProvider {
             provider,
             url
         })
+    }
+
+    pub async fn sepolioa() -> EthereumWsProvider {
+        Self {
+            provider: Arc::new(providers::SEPOLIA.ws().await),
+            url: "".to_string()
+        }
     }
 
 

@@ -347,6 +347,7 @@ impl PartyEvents {
                 prior_related_event,
                 successive_related_event: None,
                 fulfillment_txid_external: None,
+                fulfilled_amount_typed: amount.clone(),
             };
 
             Some(of)
@@ -466,6 +467,7 @@ pub struct OrderFulfillment {
     pub successive_related_event: Option<AddressEvent>,
     pub fulfillment_txid_external: Option<ExternalTransactionId>,
     pub order_amount_typed: CurrencyAmount,
+    pub fulfilled_amount_typed: CurrencyAmount,
 }
 
 impl OrderFulfillment {
