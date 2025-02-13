@@ -1,10 +1,7 @@
-from typing import Annotated, List
-from langchain.tools import tool
 import os
 import subprocess
 
 
-# this is wrong
 def run_cargo_check(directory):
     original_dir = os.getcwd()
 
@@ -45,18 +42,6 @@ def run_cargo_check(directory):
         os.chdir(original_dir)
 
 
-def redgold_cargo_rust_compile():
-# Specify the directory
-    cargo_dir = ai_working_dir()
-# Run the function
-    errors = run_cargo_check(cargo_dir)
-    return errors
-
-
-def ai_working_dir():
-    return os.path.expanduser("~/ai/redgold")
-
-
 def redgold_cargo_rust_compile_claude_tooldef():
     return {
         "name": "redgold_cargo_rust_compile",
@@ -79,13 +64,6 @@ def empty_input_schema():
         "required": []
     }
 
-
-def main():
-    print(redgold_cargo_rust_compile())
-
-
-if __name__ == "__main__":
-    main()
 
 
 #print(f"Success: {success}")

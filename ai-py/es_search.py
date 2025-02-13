@@ -24,7 +24,7 @@ def bulk_index_with_retry(es, docs):
         raise
 
 
-def search(query_text):
+def search(query_text, num_results=10, context_lines_returned=5):
     # Connect to Elasticsearch
     es = Elasticsearch(["http://server:9202"])
 
@@ -34,8 +34,8 @@ def search(query_text):
         info = es.info()
         # print(f"Connected to Elasticsearch {info['version']['number']}")
     except Exception as e:
-        print(f"Error connecting to Elasticsearch: {e}")
-        exit(1)
+        return [f"Error connecting to Elasticsearch: {e}"]
+        
 
     # Define the index name and mapping
     index_name = "code_index"
@@ -99,14 +99,14 @@ def search(query_text):
         if failed:
             print(f"Failed to index {len(failed)} documents")
     except Exception as e:
-        print(f"Fatal error during indexing: {e}")
-        return []
+        return[f"Fatal error during indexing: {e}"]
+        
 
 
     # Force a refresh to ensure the documents are searchable
     es.indices.refresh(index=index_name)
 
-    def search_code(query_text, context_lines=2):
+    def search_code(query_text, context_lines=context_lines_returned):
         query = {
             "query": {
                 "bool": {
@@ -146,7 +146,7 @@ def search(query_text):
 
         llm_hits = []
 
-        for hit in results['hits']['hits']:
+        for hit in results['hits']['hits'][:num_results]:
             filename = hit['_source']['filename']
             # print(f"\nFile: {filename}")
 
@@ -168,7 +168,7 @@ def search(query_text):
                 llm_hit_text += f"\nHighlighted: {highlighted_line}"
                 llm_hits.append(llm_hit_text)
         return llm_hits
-    return search_code(query_text)
+    return search_code(query_text, context_lines_returned)
 
 
 def full_text_repo_search_tooldef():

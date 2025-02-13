@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 from typing import Annotated, Optional
@@ -7,27 +8,136 @@ from github import Github
 
 from langchain_core.tools import tool
 
-from es_search import full_text_repo_search
+from es_search import full_text_repo_search, search
 from file_ux.create import create_file
-from file_ux.edit_files import edit_file
 from file_ux.file_viewer import read_file
 from file_ux.git_diffs import get_git_diff
 from git_scrape import redgold_issue_by_number, redgold_issues_brief
-from tools.commands import redgold_cargo_rust_compile
+from tools.commands import ai_working_dir, redgold_cargo_rust_compile
+from langchain_core.tools import InjectedToolArg
+
+
+@dataclass
+class ToolInjections:
+    working_directory: Path = Path.home() / "ai" / "redgold"
 
 
 @tool
-def active_workspace_redgold_cargo_rust_compile() -> list[str]:
+def active_workspace_redgold_cargo_rust_compile(
+    inject: Annotated[ToolInjections, InjectedToolArg]
+) -> Annotated[str, "Error messages if any, or compiler output, otherwise list with success messages"]:
     """
-    Compile the current Redgold Rust project stored in ~/ai/redgold.
-    :return:
+    Compile the current Redgold Rust project stored in typical working data defaults to ~/ai/redgold.
+    :return: List of error messages if any, otherwise list with success messages.
     """
-    return redgold_cargo_rust_compile()
+    
+    cargo_dir = inject.working_directory
+    original_dir = os.getcwd()
+
+    try:
+        os.chdir(cargo_dir)
+
+        # rustflags disable warnings
+        env = os.environ.copy()
+        env['RUSTFLAGS'] = '-A warnings'
+        result = subprocess.run(['cargo', 'check'],
+                                capture_output=True,
+                                text=True,
+                                env=env)
+
+        if result.returncode == 0:
+            return [f"Cargo check completed successfully in {cargo_dir}"]
+        else:
+            output = result.stderr
+            lines = output.split("\n")
+            output = []
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped.startswith("Checking") or stripped.startswith("Compiling") or stripped.startswith("warning"):
+                    continue
+                output.append(line)
+            return "\n".join(output)
+    finally:
+        os.chdir(original_dir)
+
+
+
+def create_file_helper(
+        working_dir: Path, 
+        relative_path: str, 
+        content: str,
+        include_as_rust_pub_mod: bool = True
+):
+    rel = working_dir / relative_path
+    parent_dir = rel.parent
+    parent_dir.mkdir(parents=True, exist_ok=True)
+    rel.write_text(content)
+    if include_as_rust_pub_mod and rel.name.endswith(".rs"):
+        # first check if libs.rs exists in the same parent directory
+        # if not, check for mod.rs
+        rel_p = Path(rel)
+        fnm = rel_p.name
+        cur = rel_p.parent
+        lib = cur / "lib.rs"
+        mod = cur / "mod.rs"
+        export_str = f"\npub mod {fnm.split('.')[0]};\n"
+        if lib.exists():
+            lib.write_text(export_str, append=True)
+        elif mod.exists():
+            mod.write_text(export_str, append=True)
+        else:
+            return "No lib.rs or mod.rs found in the parent directory, not adding the export line"
+    return "Success created file with content"
+        
+
+@tool
+def add_text_to_top_or_bottom_of_file(
+    text: Annotated[str, "The text to add to the top of the file, please include newlines if required including at end of text"],
+    relative_path: Annotated[str, "The relative path of the file to add the text to"],
+    inject: Annotated[ToolInjections, InjectedToolArg],
+    top: Annotated[bool, "Whether to add the text to the top or bottom of the file"]
+) -> Annotated[str, "Success or error message"]:
+    """
+    Add text to the top of a file. Useful to avoid having to edit particular lines. Will auto-create file if it doesn't exist.
+    """
+    
+    cargo_dir = inject.working_directory
+    rel = cargo_dir / relative_path
+    if not rel.exists():
+        create_file_helper(cargo_dir, relative_path, text)
+    else:
+        existing = rel.read_text()
+        if top:
+            new = text + "\n" + existing
+        else:
+            new = existing + "\n" + text
+        rel.write_text(new)
+    return "Success"
+
+
+@tool
+def get_git_diff_relative_to_dev(
+    inject: Annotated[ToolInjections, InjectedToolArg]
+) -> Annotated[str, "The git diff of the current repository relative to the dev branch"]:
+    """
+    Get the git diff of the current repository relative to the dev branch.
+    """
+    os.chdir(inject.working_directory)
+    return subprocess.check_output(['git', 'diff', 'dev', '--unified=0'], text=True).strip()
+
+injectable_tools = [
+    "active_workspace_redgold_cargo_rust_compile",
+    "add_text_to_top_or_bottom_of_file",
+    "get_git_diff_relative_to_dev",
+    "edit_active_workspace_file"
+]
 
 
 @tool
 def index_and_full_text_repo_search(
-        query: Annotated[str, "Text to search for"]
+    query: Annotated[str, "Text to search for"],
+    num_results: Annotated[Optional[int], "The number of results to return. If None, defaults to 10"] = 10,
+    context_lines_returned: Annotated[Optional[int], "The number of lines of context to return. If None, defaults to 5"] = 5
 ) -> Annotated[list[str], "List of results"]:
     """
     Search the entire Redgold repository for the given query. Rebuilds an update to date
@@ -35,22 +145,71 @@ def index_and_full_text_repo_search(
     :param query: The query to search for.
     :return: A list of results.
     """
-    return full_text_repo_search({"query": query})
+    hits = search(query, num_results, context_lines_returned)
+    if not hits:
+        hits = ["No results found"]
+    return hits
 
 
 @tool
 def edit_active_workspace_file(
-    filename: Annotated[str, "The relative path of the file to edit within the current repository"],
-    starting_line: Annotated[Optional[str], "The (inclusive) 1-indexed starting line number to begin replacing. If None, starts at beginning"],
-    ending_line: Annotated[Optional[str], "The (inclusive) 1-indexed ending line number to stop replacing. If None, goes to end of file"],
-    replacement_lines: Annotated[Optional[list[str]], "The new lines to insert. If None, defaults to empty list"] = None
+    inject: Annotated[ToolInjections, InjectedToolArg],
+    filename: Annotated[str, "Relative path"],
+    starting_line: Annotated[Optional[int], "The (inclusive) 1-indexed starting line number to begin replacing. If None, starts at beginning"],
+    ending_line: Annotated[Optional[int], "The (inclusive) 1-indexed ending line number to stop replacing. If None, goes to end of file"],
+    replacement_text: Annotated[str, "The new text to insert. Please include \n newlines for it to work correctly"] = "",
 ) -> Annotated[str, "Status message indicating success or error"]:
     """
     Edit a file in the current workspace by replacing lines between starting_line and ending_line with replacement_lines.
-    If the file doesn't exist, it will be created along with any necessary parent directories.
+    If the file doesn't exist, it will be created along with any necessary parent directories. 
+    If lines exceed bounds, it will overwrite / remove them.
     Line numbers are 1-indexed and inclusive.
     """
-    return edit_file(filename, starting_line, ending_line, replacement_lines)
+    if replacement_text is None:
+        replacement_text = ""
+
+    rel = inject.working_directory / filename
+
+    print(f"Editing file {rel}")
+    # check if the file exists, if its parents do not exist, create them as directories
+    if not os.path.exists(rel):
+        create_file_helper(inject.working_directory, filename, replacement_text)
+        return "Successfully created file and wrote to it"
+
+    lines = rel.read_text().splitlines()
+
+    if starting_line is None:
+        start = 0
+    elif starting_line < 1:
+        start = 0
+    else: 
+        start = starting_line - 1
+    
+    if ending_line is None:
+        end = len(lines)
+    elif ending_line < 1:
+        end = 0
+    else:
+        end = ending_line
+    
+    if ending_line >= len(lines):
+        end = end
+
+    if start >= len(lines):
+        return "\n".join(lines) + "\n" + replacement_text
+    
+    before = lines[:start]
+    after = lines[end:]
+
+    # Split replacement text into lines to properly handle multi-line replacements
+    replacement_lines = replacement_text.splitlines()
+    new_lines = before + replacement_lines + after
+    
+    # Write the modified content back to the file
+    rel.write_text('\n'.join(new_lines) + '\n')
+
+    return f"Successfully edited file {filename}"
+
 
 
 @tool
@@ -58,52 +217,68 @@ def active_workspace_read_file(
     filename: Annotated[str, "The relative path of the file to read within the current repository"],
     starting_line: Annotated[Optional[int], "The (inclusive) 1-indexed starting line number to begin reading. If None, starts at beginning"],
     ending_line: Annotated[Optional[int], "The (inclusive) 1-indexed ending line number to stop reading. If None, goes to end of file"]
-) -> Annotated[list[str], "The content of the file"]:
+) -> Annotated[str, "The content of the file, with line numbers added"]:
     """
     Read a file in the current workspace by returning the lines between starting_line and ending_line.
     Line numbers are 1-indexed and inclusive.
     """
-    return read_file(filename, starting_line, ending_line)
+    prefix = str(ai_working_dir())
+    if not filename.startswith("/"):
+        prefix += "/"
+    filename = prefix + filename
+    print(f"Reading file: {filename} from {prefix} with starting_line {starting_line} and ending_line {ending_line}")
+    with open(filename, "r") as f:
+        lines = f.readlines()
+        processed_lines = []
+        for i, line in enumerate(lines):
+            line = f"{i+1}: {line}"
+            if starting_line is not None and i < starting_line:
+                continue
+            if ending_line is not None and i > ending_line:
+                break
+            processed_lines.append(line)
+    print(f"Finished reading lines {len(processed_lines)}")    
+    return "\n".join(processed_lines)
 
 
-@tool
-def active_workspace_create_file(
-    repository_relative_path: Annotated[str, "The relative path of the file to create within the current repository"],
-    file_text_to_insert_to_new_file: Annotated[str, "The content of the file"],
-    include_as_rust_pub_mod: Annotated[bool, "Whether to include the file as a Rust pub mod"] = True
-) -> Annotated[str, "Status message indicating success or error"]:
-    """
-    Create a new file in the current workspace with the given content.
-    If the file already exists, it will be overwritten.
-    """
-    rel_start = Path.home().joinpath("ai/redgold")
-    rel: str = repository_relative_path
-    rel = str(rel_start.joinpath(rel))
-    # Get parent directory path and create all necessary directories
-    parent_dir = Path(rel).parent
-    parent_dir.mkdir(parents=True, exist_ok=True)
+# @tool
+# def active_workspace_create_file(
+#     repository_relative_path: Annotated[str, "The relative path of the file to create within the current repository"],
+#     file_text_to_insert_to_new_file: Annotated[str, "The content of the file"],
+#     include_as_rust_pub_mod: Annotated[bool, "Whether to include the file as a Rust pub mod"] = True
+# ) -> Annotated[str, "Status message indicating success or error"]:
+#     """
+#     Create a new file in the current workspace with the given content.
+#     If the file already exists, it will be overwritten.
+#     """
+#     rel_start = Path.home().joinpath("ai/redgold")
+#     rel: str = repository_relative_path
+#     rel = str(rel_start.joinpath(rel))
+#     # Get parent directory path and create all necessary directories
+#     parent_dir = Path(rel).parent
+#     parent_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(rel, "w") as f:
-        f.write(file_text_to_insert_to_new_file)
-        print(f"File created at {rel}")
-    if include_as_rust_pub_mod:
-        # first check if libs.rs exists in the same parent directory
-        # if not, check for mod.rs
-        rel_p = Path(rel)
-        fnm = rel_p.name
-        cur = rel_p.parent
-        lib = cur.joinpath("lib.rs")
-        mod = cur.joinpath("mod.rs")
-        export_str = f"\npub mod {fnm.split('.')[0]};\n"
-        if lib.exists():
-            with open(lib, "a") as f:
-                f.write(export_str)
-        elif mod.exists():
-            with open(mod, "a") as f:
-                f.write(export_str)
-        else:
-            print("No lib.rs or mod.rs found in the parent directory, not adding the export line")
-    return "Success"
+#     with open(rel, "w") as f:
+#         f.write(file_text_to_insert_to_new_file)
+#         print(f"File created at {rel}")
+#     if include_as_rust_pub_mod:
+#         # first check if libs.rs exists in the same parent directory
+#         # if not, check for mod.rs
+#         rel_p = Path(rel)
+#         fnm = rel_p.name
+#         cur = rel_p.parent
+#         lib = cur.joinpath("lib.rs")
+#         mod = cur.joinpath("mod.rs")
+#         export_str = f"\npub mod {fnm.split('.')[0]};\n"
+#         if lib.exists():
+#             with open(lib, "a") as f:
+#                 f.write(export_str)
+#         elif mod.exists():
+#             with open(mod, "a") as f:
+#                 f.write(export_str)
+#         else:
+#             print("No lib.rs or mod.rs found in the parent directory, not adding the export line")
+#     return "Success"
         
 
 
@@ -175,7 +350,6 @@ def create_pr(
 ) -> Annotated[str, "The status message indicating success or error"]:
     """
     Create a PR for the current branch against the dev branch.
-    Uses REDGOLD_AI_TOKEN environment variable for authentication.
     """
     token = os.getenv('REDGOLD_AI_TOKEN')
     if not token:
@@ -223,6 +397,10 @@ def get_my_active_pull_requests() -> Annotated[list[str], "The active pull reque
     
     detailed_prs = []
     for pr in prs:
+        # Skip PRs not created by redgold-ai
+        if pr.user.login != 'redgold-ai':
+            continue
+            
         # Get PR status checks
         status = pr.get_commits().reversed[0].get_combined_status()
         status_str = f"Status: {status.state}" if status else "Status: No status checks"
@@ -248,7 +426,7 @@ def get_my_active_pull_requests() -> Annotated[list[str], "The active pull reque
         
         detailed_prs.append("\n".join(pr_details))
     
-    return detailed_prs if detailed_prs else ["No active pull requests found"]
+    return detailed_prs if detailed_prs else ["No active pull requests found for redgold-ai"]
 
 @tool
 def run_e2e_test() -> Annotated[str, "The output logs of the e2e test"]:
@@ -334,21 +512,22 @@ def get_pr_failing_test_logs(
         return f"Error getting failing test logs: {str(e)}"
 
 
-from langchain.agents import load_tools, get_all_tool_names
+from langchain_community.agent_toolkits.load_tools import load_tools
 
 
-BUILTIN_TOOLS = load_tools(
-    [
-        "serpapi"
-    ]
-)
+# BUILTIN_TOOLS = load_tools(
+    # [
+        # "serpapi"
+    # ]
+# )
 
-TOOLS = [
+def get_tools():
+    TOOLS = [
     active_workspace_redgold_cargo_rust_compile,
     index_and_full_text_repo_search,
     edit_active_workspace_file,
     active_workspace_read_file,
-    active_workspace_create_file,
+    # active_workspace_create_file,
     active_workspace_get_git_diff,
     get_git_issues,
     get_git_issue_by_number,
@@ -358,5 +537,159 @@ TOOLS = [
     get_my_active_pull_requests,
     run_e2e_test,
     respond_to_pr_comment,
-]
+    ]
 
+    from langchain_community.agent_toolkits.load_tools import _BASE_TOOLS, _EXTRA_OPTIONAL_TOOLS, _EXTRA_LLM_TOOLS, _LLM_TOOLS, DANGEROUS_TOOLS
+    # rn (
+    #         list(_BASE_TOOLS)
+    #         + list(_EXTRA_OPTIONAL_TOOLS)
+    #         + list(_EXTRA_LLM_TOOLS)
+    #         + list(_LLM_TOOLS)
+    #         + list(DANGEROUS_TOOLS)
+    #     )
+
+    tool_names = []
+    # tool_names.extend(list(_BASE_TOOLS.keys()))
+    # tool_names.extend(list(_EXTRA_OPTIONAL_TOOLS.keys()))
+    # tool_names.extend(list(_EXTRA_LLM_TOOLS.keys()))
+    # tool_names.extend(list(_LLM_TOOLS.keys()))
+    tool_names.extend(list(DANGEROUS_TOOLS.keys()))
+    tool_names = [k for k in tool_names if k != "requests"]
+
+    TOOLS.extend(load_tools(tool_names, allow_dangerous_tools=True))
+
+    # from langchain_community.tools.shell import ShellTool
+    # shell_tool = ShellTool()
+    # TOOLS.append(shell_tool)
+
+
+    # now do tavily:
+    from langchain_community.tools.tavily_search import TavilySearchResults
+    tavily_tool = TavilySearchResults(max_results=5)
+    TOOLS.append(tavily_tool)
+
+    # and theo ther tavily thing.
+    from langchain_community.tools.tavily_search import TavilyAnswer
+    tavily_answer_tool = TavilyAnswer()
+    TOOLS.append(tavily_answer_tool)
+
+
+    from langchain_community.tools.file_management.copy import CopyFileTool
+    from langchain_community.tools.file_management.delete import DeleteFileTool
+    from langchain_community.tools.file_management.file_search import FileSearchTool
+    from langchain_community.tools.file_management.list_dir import ListDirectoryTool
+    from langchain_community.tools.file_management.move import MoveFileTool
+    from langchain_community.tools.file_management.read import ReadFileTool
+    from langchain_community.tools.file_management.write import WriteFileTool
+
+    # Initialize file management tools
+    file_management_tools = [
+        CopyFileTool(),
+        DeleteFileTool(),
+        FileSearchTool(),
+        ListDirectoryTool(),
+        MoveFileTool(),
+        ReadFileTool(),
+        WriteFileTool()
+    ]
+
+    for tool in file_management_tools:
+        tool.root_dir = str(WORKSPACE_PATH)
+
+    # Add file management tools to TOOLS list
+    TOOLS.extend(file_management_tools)
+
+
+    # from langchain_community.tools.playwright import (
+    #     ClickTool,
+    #     CurrentWebPageTool,
+    #     ExtractHyperlinksTool,
+    #     ExtractTextTool,
+    #     GetElementsTool,
+    #     NavigateBackTool,
+    #     NavigateTool,
+    # )
+    # from playwright.sync_api import sync_playwright
+
+    # # Initialize the browser
+    # playwright = sync_playwright().start()
+    # browser = playwright.chromium.launch(headless=True)
+    # page = browser.new_page()
+
+    # # Create Playwright tools with the initialized browser
+    # playwright_tools = [
+    #     ClickTool(sync_browser=browser),
+    #     CurrentWebPageTool(sync_browser=browser),
+    #     ExtractHyperlinksTool(sync_browser=browser),
+    #     ExtractTextTool(sync_browser=browser),
+    #     GetElementsTool(sync_browser=browser),
+    #     NavigateBackTool(sync_browser=browser),
+    #     NavigateTool(sync_browser=browser),
+    # ]
+
+    # TOOLS.extend(playwright_tools)
+
+
+    # from langchain_community.agent_toolkits.github.toolkit import GitHubToolkit
+    # from langchain_community.utilities.github import GitHubAPIWrapper
+
+    # # Initialize GitHub API wrapper
+    # github = GitHubAPIWrapper(
+    #     github_repository="redgold-io/redgold",
+    #     github_app_id='1138915',
+    #     github_app_private_key='./github-app.pem'
+    # )
+    # # print("Debug: GitHubAPIWrapper initialized")
+    # toolkit = GitHubToolkit.from_github_api_wrapper(github)
+    # # print("Debug: GitHubToolkit created")
+
+    # # Get tools and rename them to be compliant
+    # github_tools = toolkit.get_tools()
+    # name_mapping = {
+    #     "Get Issues": "github_get_issues",
+    #     "Get Issue": "github_get_issue",
+    #     "Comment on Issue": "github_comment_on_issue",
+    #     "List open pull requests (PRs)": "github_list_open_prs",
+    #     "Get Pull Request": "github_get_pr",
+    #     "Overview of files included in PR": "github_get_pr_files",
+    #     "Create Pull Request": "github_create_pr",
+    #     "List Pull Requests' Files": "github_list_pr_files",
+    #     "Create File": "github_create_file",
+    #     "Read File": "github_read_file",
+    #     "Update File": "github_update_file",
+    #     "Delete File": "github_delete_file",
+    #     "Overview of existing files in Main branch": "github_list_main_files",
+    #     "Overview of files in current working branch": "github_list_working_files",
+    #     "List branches in this repository": "github_list_branches",
+    #     "Set active branch": "github_set_branch",
+    #     "Create a new branch": "github_create_branch",
+    #     "Get files from a directory": "github_list_directory",
+    #     "Search issues and pull requests": "github_search_issues_prs",
+    #     "Search code": "github_search_code",
+    #     "Create review request": "github_request_review"
+    # }
+
+    # for tool in github_tools:
+    #     if tool.name in name_mapping:
+    #         tool.name = name_mapping[tool.name]
+
+
+    # banned_tools = ["github_list_main_files"]
+    # github_tools = [t for t in github_tools if t.name not in banned_tools]
+
+    # # print("Debug: Renamed GitHub tools")
+    # TOOLS.extend(github_tools)
+    # print("Debug: Extended TOOLS with renamed GitHub tools")
+
+
+    uniques = []
+    used_names = []
+    for tool in TOOLS:
+        if tool.name in used_names:
+            pass
+#            print(tool.name)
+        else:
+            used_names.append(tool.name)
+            uniques.append(tool)
+
+    return uniques

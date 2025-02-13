@@ -2,13 +2,18 @@ import dataclasses
 import tiktoken
 from pathlib import Path
 
+from file_ux.fs_watcher import GitignoreFilter
+
 
 def directory_exclusions():
     return [
         ".git", "target", "node_modules", ".idea", "experiments", "venv", ".nuxt", ".output", "dist",
         ".sqlx",
         "ignore-data",
-        ".venv"
+        ".venv",
+        "safe-bindings",
+        "debug_scripts",
+        "tests_backup"
     ]
 
 def endings_exclusions():
@@ -20,11 +25,15 @@ def file_exclusions():
         "graph_data.csv", "node-exporter-full_rev31.json",
         "api.json", "full_moon.csv", "models.rs", "grafana.ini",
         "package-lock.json",
-        "all_repo_contents.txt"
+        "all_repo_contents.txt",
+        "structs_pb2.py",
+        "safe.json",
+        "repo_summary.txt",
+        ".env"
     ]
 
 def file_inclusions():
-    return [".env", ".gitignore", "Dockerfile", "NOTICE", "certificate_renewal"]
+    return [".gitignore", "Dockerfile", "NOTICE", "certificate_renewal"]
 
 def endings_inclusions():
     return [
@@ -42,7 +51,7 @@ class FileData:
 
 class AccumFileData:
     def __init__(self):
-        self.good_files = []
+        self.good_files: list[Path] = []
         self.unknown_files = []
         self.root = Path.cwd().parent
 
@@ -72,7 +81,8 @@ class AccumFileData:
         for gf in self.good_files:
             with open(gf, 'r') as file:
                 contents = file.read()
-            all_content += f"\nTEXT BELOW FROM FILE PATH: {gf}\n{contents}"
+                if contents.strip() != "":
+                    all_content += f"\nTEXT BELOW FROM FILE PATH: {gf}\n{contents}"
         return all_content
 
     def token_count_all(self):
@@ -113,10 +123,14 @@ def process_file(file, accum, file_exclusions, file_inclusions, endings_exclusio
             accum.good_files.append(file)
             return
     accum.unknown_files.append(file)
+    
+WORKSPACE_PATH = Path.home().joinpath("ai/redgold")
 
 
 def scan_tld(scan_config=None):
-    current_dir = Path.cwd()
+
+    git_ignore = GitignoreFilter(str(WORKSPACE_PATH))
+    current_dir = WORKSPACE_PATH
     # print("Current directory: ", current_dir)
     parent_dir = current_dir.parent
 
