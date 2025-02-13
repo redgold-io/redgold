@@ -93,6 +93,7 @@ impl CentralPricePair {
 
     pub fn dummy_fulfill(
         &self,
+        order_amount_typed: CurrencyAmount,
         order_amount: u64,
         is_ask: bool,
         network: &NetworkEnvironment,
@@ -101,6 +102,7 @@ impl CentralPricePair {
         let mut address = Address::default();
         address.currency = currency as i32;
         self.fulfill_taker_order(
+            order_amount_typed,
             order_amount,
             is_ask,
             0,
@@ -113,6 +115,7 @@ impl CentralPricePair {
 
     pub fn fulfill_taker_order(
         &self,
+        order_amount_typed: CurrencyAmount,
         order_amount: u64,
         is_ask: bool,
         event_time: i64,
@@ -121,6 +124,64 @@ impl CentralPricePair {
         primary_event: AddressEvent,
         network: &NetworkEnvironment
     ) -> Option<OrderFulfillment> {
+        let from_rdg = order_amount_typed.currency_or() == SupportedCurrency::Redgold;
+        let fulfilled_amount_usd = if from_rdg {
+            order_amount_typed.to_fractional() * 100.0f64
+        } else {
+            order_amount_typed.to_fractional() * self.pair_quote_price_estimate * 0.98f64
+        };
+
+        let fulfilled_amt_cur = if from_rdg {
+            fulfilled_amount_usd / self.pair_quote_price_estimate
+        } else {
+            fulfilled_amount_usd / 100.0f64
+        };
+
+        let fulfilled_cur = if from_rdg {
+            destination.currency_or()
+        } else {
+            SupportedCurrency::Redgold
+        };
+        let fulfilled = CurrencyAmount::from_fractional_cur(fulfilled_amt_cur, fulfilled_cur).ok();
+        if fulfilled.is_none() {
+            return None
+        }
+        let f = fulfilled.unwrap();
+        let vol = if from_rdg {
+            self.pair_quote_volume.clone()
+        } else {
+            self.base_volume.clone()
+        };
+
+        if f >= vol {
+            return None
+        }
+        let fee = PartyEvents::expected_fee_amount(fulfilled_cur, network).unwrap();
+
+        if f < fee || f.to_fractional() <= 0.0f64 {
+            return None
+        }
+
+        let of = OrderFulfillment {
+            order_amount,
+            fulfilled_amount: (f.to_fractional() * 1e8) as u64,
+            is_ask_fulfillment_from_external_deposit: is_ask,
+            event_time,
+            tx_id_ref: tx_id.clone(),
+            destination: destination.clone(),
+            is_stake_withdrawal: false,
+            stake_withdrawal_fulfilment_utxo_id: None,
+            primary_event,
+            prior_related_event: None,
+            successive_related_event: None,
+            fulfillment_txid_external: None,
+            order_amount_typed,
+            fulfilled_amount_typed: f.clone(),
+        };
+        Some(of)
+    }
+
+    fn old_fulfill(&self, order_amount_typed: CurrencyAmount, order_amount: u64, is_ask: bool, event_time: i64, tx_id: Option<ExternalTransactionId>, destination: &Address, primary_event: AddressEvent, network: &NetworkEnvironment) -> Option<OrderFulfillment> {
         let mut remaining_order_amount = order_amount.clone();
         let mut fulfilled_amount: u64 = 0;
         let mut pv_curve = if is_ask {
@@ -195,7 +256,9 @@ impl CentralPricePair {
                 primary_event,
                 prior_related_event: None,
                 successive_related_event: None,
-                fulfillment_txid_external: None     ,
+                fulfillment_txid_external: None,
+                order_amount_typed,
+                fulfilled_amount_typed: Default::default(),
             })
         }
     }

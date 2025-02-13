@@ -25,7 +25,9 @@ use redgold_common::flume_send_help;
 use redgold_common::flume_send_help::{new_channel, Channel};
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, Request, ResolveHashRequest, Response, RoomId, State, SupportedCurrency, SupportedCurrencyIter, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::structs::{AboutNodeRequest, Address, ContentionKey, ContractStateMarker, CurrencyAmount, DynamicNodeMetadata, GossipTransactionRequest, Hash, HashType, HealthRequest, InitiateMultipartyKeygenRequest, InitiateMultipartySigningRequest, MultipartyIdentifier, NetworkEnvironment, NodeMetadata, ObservationProof, Output, PartitionInfo, PartyId, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, ResolveHashRequest, RoomId, State, SupportedCurrency, SupportedCurrencyIter, Transaction, TransportBackend, TrustData, UtxoEntry, UtxoId, ValidationType};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
 use rocket::form::FromForm;
@@ -189,6 +191,7 @@ pub struct Relay {
     pub tx_writer: Channel<TxWriterMessage>,
     pub peer_send_failures: Arc<tokio::sync::Mutex<HashMap<PublicKey, (ErrorInfo, i64)>>>,
     pub external_network_shared_data: ReadManyWriteOne<HashMap<PublicKey, PartyInternalData>>,
+    pub new_multisig_metadata: Arc<tokio::sync::Mutex<Vec<(PublicKey, PartyMetadata)>>>,
     pub btc_wallets: Arc<tokio::sync::Mutex<HashMap<PublicKey, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub btc_multisig_wallets: Arc<tokio::sync::Mutex<HashMap<Address, Arc<tokio::sync::Mutex<SingleKeyBitcoinWallet<Tree>>>>>>,
     pub peer_info: PeerInfo,
@@ -475,6 +478,7 @@ use redgold_daq::eth::EthDaq;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage};
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
+use redgold_schema::parties::PartyMetadata;
 use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
@@ -1252,6 +1256,7 @@ impl Relay {
             tx_writer: new_channel(),
             peer_send_failures: Arc::new(Default::default()),
             external_network_shared_data: Default::default(),
+            new_multisig_metadata: Arc::new(Default::default()),
             btc_wallets: Arc::new(Default::default()),
             btc_multisig_wallets: Arc::new(Default::default()),
             peer_info: Default::default(),

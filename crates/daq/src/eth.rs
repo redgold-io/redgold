@@ -13,12 +13,14 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;
+use redgold_schema::helpers::easy_json::EasyJson;
 
 #[derive(Clone, Default)]
 pub struct EthDaq {
     pub daq: ExternalDaq,
     pub historical_access_api_key: String
 }
+
 
 
 #[async_trait]
@@ -37,6 +39,7 @@ impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
                     &addrs, t
                 );
                 if let Ok(ett) = ett {
+                    // print!("{}", ett.json_or());
                     if let Some(_) = ett.self_address.as_ref() {
                     }
                 }
@@ -116,4 +119,25 @@ impl EthDaq {
             None
         }
     }
+}
+
+#[ignore]
+#[tokio::test]
+pub async fn test_eth_daq() {
+
+    let provider = EthereumWsProvider::sepolioa_infura_test().await;
+    let daq = EthDaq::default();
+    let duration = Duration::from_secs(60);
+    let result = daq.from_eth_provider_stream(Ok(provider), duration).await.unwrap();
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+
+    //
+    // let p = EthereumWsProvider::new("ws://server:8556").await.expect("ws provider creation failed");
+    // let mut daq = EthDaq::default();
+    // let mut eth = EthereumWsProvider::default();
+    // let duration = Duration::from_secs(60);
+    // let result = daq.from_eth_provider_stream(Ok(eth), duration);
+    // assert!(result.is_ok());
 }

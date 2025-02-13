@@ -1,4 +1,5 @@
 use crate::structs::{ExecutionResult, ResponseMetadata};
+use crate::message::Response;
 
 impl ExecutionResult {
     pub fn from_error(error: crate::structs::ErrorInfo) -> Self {

@@ -49,7 +49,7 @@ pub async fn test_safe_multisig() {
     // println!("Actual addresses: {}", addrs.iter().map(|x| x.render_string().unwrap()).collect::<Vec<String>>().join(", "));
     //
     //
-    let res = w.execute_safe_transaction(
-        &safe_contract_addr, &to, &eth_amount, vec![res, res1], tx_hash).await.unwrap();
+    // let res = w.execute_safe_transaction(
+    //     &safe_contract_addr, &to, &eth_amount, vec![res, res1], tx_hash).await.unwrap();
 
 }

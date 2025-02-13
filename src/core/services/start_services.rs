@@ -14,7 +14,6 @@ use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::core::transact::tx_writer::TxWriter;
 use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::multiparty_gg20::gg20_sm_manager;
 use crate::node::Node;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::observability::metrics_registry;
@@ -103,6 +102,7 @@ impl Node {
 
         sjh.add("PeerRxEventHandler", PeerRxEventHandler::new(
             relay.clone(),
+            external_network_resources.clone()
         ));
 
         sjh.add("public_api", public_api::start_server(relay.clone()));
@@ -114,11 +114,7 @@ impl Node {
 
         let sm_port = relay.node_config.mparty_port();
         let sm_relay = relay.clone();
-        sjh.add("gg20_sm_manager", tokio::spawn(async move {
-            gg20_sm_manager::run_server(sm_port, sm_relay)
-                .await.map_err(|e| error_info(e.to_string()))
-        }));
-
+        
         let c_config = relay.clone();
         if node_config.e2e_enabled() {
             // TODO: Distinguish errors here

@@ -1,6 +1,5 @@
 use crate::core::relay::Relay;
 use crate::party::party_stream::PartyEventBuilder;
-use crate::party::party_wallet_validator::PartyWalletMethods;
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::structs::{PartySigningValidation, SupportedCurrency};
 use redgold_schema::{error_info, RgResult, SafeOption};

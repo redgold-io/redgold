@@ -147,9 +147,11 @@ impl EthWalletWrapper {
         safe_addr: &structs::Address,
         to: &structs::Address,
         amount: &CurrencyAmount,
-        signatures: Vec<Bytes>,
+        signatures: Vec<Vec<u8>>,
         message_hash: [u8; 32],
     ) -> RgResult<String> {
+
+        let signatures = signatures.into_iter().map(Bytes::from).collect::<Vec<_>>();
         let safe = self.safe(safe_addr).await?;
 
 

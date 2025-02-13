@@ -1,5 +1,6 @@
 use crate::helpers::easy_json::EasyJson;
 use crate::structs::{ErrorDetails, ErrorInfo, ResponseMetadata};
+use crate::message::Response;
 use crate::{structs, HashClear, RgResult};
 use log::{error, Level};
 use tracing::field::FieldSet;

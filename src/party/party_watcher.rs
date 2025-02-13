@@ -9,15 +9,18 @@ use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
-use redgold_schema::RgResult;
+use redgold_schema::{message, RgResult};
 use std::collections::HashMap;
+use itertools::Itertools;
 use tracing::info;
+use warp::http::Request;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::monero::node_wrapper::PartySecretData;
 use redgold_keys::proof_support::PublicKeySupport;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_node_core::party_updates::creation::check_formations;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::parties::PartyMetadata;
 
 // TODO: Future event streaming solution here
@@ -37,16 +40,45 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     
     pub async fn tick(&mut self) -> RgResult<()> {
 
+        let mut other_seeds = self.relay.node_config.non_self_seeds_pk();
 
         // info!("Party watcher tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
         let mut party_metadata = self.relay.ds.config_store
             .get_json::<PartyMetadata>("party_metadata").await?
             .unwrap_or(Default::default());
+
+        {
+            let mut res = self.relay.new_multisig_metadata.lock().await;
+            if res.len() > 0 {
+                let mut new_metadata = res.clone();
+                res.clear();
+                for (pk, nm) in new_metadata.iter() {
+                    if other_seeds.contains(pk) {
+                        party_metadata.combine(nm);
+                        self.relay.ds.config_store.set_json("party_metadata", &party_metadata).await?;
+                    }
+                }
+            }
+        }
+
+        let mut req = message::Request::default();
+        req.get_party_metadata_request = Some(message::GetPartyMetadataRequest {});
+        let responses = self.relay.broadcast_async(other_seeds.clone(), req, None).await?;
+        for r in responses {
+            if let Ok(r) = r {
+                if let Some(r) = &r.get_party_metadata_response {
+                    if let Some(pmd) = r.party_metadata.as_ref() {
+                        party_metadata.combine(&pmd);
+                        self.relay.ds.config_store.set_json("party_metadata", &party_metadata).await?;
+                    }
+                }
+            }
+        }
+
         let mut party_secrets = self.relay.ds.config_store
             .get_json::<PartySecretData>("party_secret").await?
             .unwrap_or(Default::default());
 
-        let mut other_seeds = self.relay.node_config.non_self_seeds_pk();
         gauge!("redgold_party_initial_formation_non_self_peers").set(other_seeds.len() as f64);
         if self.relay.node_config.network == NetworkEnvironment::Local {
             other_seeds = self.relay.ds.peer_store.active_nodes(None).await.unwrap_or(vec![]);
@@ -56,28 +88,35 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             return Ok(())
         }
 
-        let update_events = check_formations(
-            &party_metadata,
-            &self.external_network_resources,
-            &self.relay.node_config.words().to_all_addresses_default(&self.relay.node_config.network)?,
-            &other_seeds,
-            &self.relay,
-            &self.relay.node_config.public_key(),
-            None,
-            &self.relay.node_config.keypair().to_private_hex(),
-            &self.relay.node_config.network,
-            self.relay.node_config.words().clone()
-        ).await.log_error().bubble_abort()?.ok();
+        if self.relay.node_config.enable_party_mode() {
+            let update_events = check_formations(
+                &party_metadata,
+                &self.external_network_resources,
+                &self.relay.node_config.words().to_all_addresses_default(&self.relay.node_config.network)?,
+                &other_seeds,
+                &self.relay,
+                &self.relay.node_config.public_key(),
+                None,
+                &self.relay.node_config.keypair().to_private_hex(),
+                &self.relay.node_config.network,
+                self.relay.node_config.words().clone()
+            ).await.log_error().bubble_abort()?.ok();
 
-        if let Some(u) = update_events {
-            if let Some(m) = u.updated_metadata.as_ref() {
-                party_metadata = m.clone();
-                self.relay.ds.config_store.set_json("party_metadata", &party_metadata).await?;
+            if let Some(u) = update_events {
+                if let Some(m) = u.updated_metadata.as_ref() {
+                    party_metadata = m.clone();
+                    self.relay.ds.config_store.set_json("party_metadata", &party_metadata).await?;
+                }
+                for s in u.new_secrets.iter() {
+                    party_secrets.instances.push(s.clone());
+                }
+                self.relay.ds.config_store.set_json("party_secrets", &party_secrets).await?;
+                let mut req = message::Request::default();
+                req.notify_multisig_creation_request = Some(message::NotifyMultisigCreationRequest {
+                    party_metadata: Some(party_metadata.clone()),
+                });
+                self.relay.broadcast_async(other_seeds, req, None).await?;
             }
-            for s in u.new_secrets.iter() {
-                party_secrets.instances.push(s.clone());
-            }
-            self.relay.ds.config_store.set_json("party_secrets", &party_secrets).await?;
         }
 
 
@@ -96,8 +135,16 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
             self.handle_order_fulfillment(&mut shared_data).await?;
         }
         // self.handle_key_rotations(&mut shared_data).await?;
-
+        //
+        // info!("nodeid: {}, Party watcher tick num parties total {} active {} keys {}",
+        //     self.relay.node_config.short_id().expect("Node ID"),
+        //     party_metadata.clone().instances.len(), active.len(),
+        // shared_data.keys().collect_vec().json_or());
         self.relay.external_network_shared_data.write(shared_data.clone()).await;
+
+        self.relay.ds.config_store
+            .set_json("party_internal_data", shared_data).await;
+
         if self.relay.node_config.enable_party_mode() {
         // info!("Party watcher tick num parties total {} active {}", party_metadata.clone().instances.len(), active.len());
             // self.tick_formations(&shared_data).await?;

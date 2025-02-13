@@ -1,6 +1,6 @@
 {
   "includes": ["src/proto"],
-  "files": ["src/proto/structs.proto", "src/proto/execution.proto", "src/proto/airgap.proto", "src/proto/parties.proto"],
+  "files": ["src/proto/structs.proto", "src/proto/execution.proto", "src/proto/airgap.proto", "src/proto/parties.proto", "src/proto/message.proto"],
   "output": "build",
   "opts": [
     {
@@ -8,6 +8,11 @@
       "description": "serde support for message",
       "attr": "#[serde_with::serde_as]\n#[derive(serde::Serialize, serde::Deserialize, Eq, std::hash::Hash)]",
       "paths": [
+        "message.GetPartyMetadataRequest",
+        "message.GetPartyMetadataResponse",
+        "message.NotifyMultisigCreationRequest",
+        "structs.MultisigResponse",
+        "structs.MultisigRequest",
         "structs.AddressDescriptor",
         "structs.GetSolanaAddress",
         "structs.MoneroMultisigFormationRequest",
@@ -93,7 +98,7 @@
         "structs.ObservationMetadata", "structs.Observation",
         "structs.MerkleNode", "structs.MerkleProof", "structs.MerkleProofElement",
         "structs.ResponseMetadata", "structs.ErrorInfo", "structs.ErrorDetails",
-        "structs.Request", "structs.Response",
+        "message.Request", "message.Response",
         "structs.ControlRequest", "structs.ControlResponse",
         "structs.PublicRequest", "structs.PublicResponse",
         "structs.SubmitTransactionRequest", "structs.SubmitTransactionResponse",

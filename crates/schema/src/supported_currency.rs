@@ -97,10 +97,25 @@ impl SupportedCurrency {
         }
     }
 
-    pub fn as_currency_id(&self) -> CurrencyId {
+    pub fn to_currency_id(&self) -> CurrencyId {
         let mut cid = CurrencyId::default();
         cid.set_supported_currency(self.clone());
         cid
+    }
+
+    pub fn only_one_destination_per_tx(&self) -> bool {
+        match self {
+            SupportedCurrency::Ethereum => true,
+            SupportedCurrency::UsdcEth => true,
+            SupportedCurrency::UsdtEth => true,
+            SupportedCurrency::WrappedRedgoldEthereum => true,
+            // double check these?
+            SupportedCurrency::Solana => true,
+            SupportedCurrency::Monero => true,
+            SupportedCurrency::Cardano => true,
+            SupportedCurrency::WrappedRedgoldSolana => true,
+            _ => { false}
+        }
     }
 
 }

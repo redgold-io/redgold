@@ -46,14 +46,16 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                         .unwrap_or_default();
                     btc.transactions.extend(prior.transactions);
                     btc.transactions = btc.transactions.iter().unique_by(|t| t.tx_id.clone()).cloned().collect_vec();
+                    party_internal_data.network_data.insert(SupportedCurrency::Bitcoin, btc);
                 }
                 if party_instance.currency() == SupportedCurrency::Ethereum {
-                    let mut eth = self.get_public_key_eth_data(&this_instance_address, None).await?;
+                    let mut eth = self.get_address_eth_data(&this_instance_address, None).await?;
                     let prior = party_internal_data.network_data.get(&SupportedCurrency::Ethereum)
                         .cloned()
                         .unwrap_or_default();
                     eth.transactions.extend(prior.transactions);
                     eth.transactions = eth.transactions.iter().unique_by(|t| t.tx_id.clone()).cloned().collect_vec();
+                    party_internal_data.network_data.insert(SupportedCurrency::Ethereum, eth);
                 }
                 if party_instance.currency() == SupportedCurrency::Redgold {
 
@@ -80,7 +82,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                     txs.sort_by_key(|t| t.time().cloned().unwrap_or(0));
                     party_internal_data.internal_data = txs;
                     address_events.extend(party_internal_data.internal_address_events.clone());
-                    party_internal_data.address_events = address_events.iter().unique_by(|ae| ae.identifier()).cloned().collect_vec();
+                    party_internal_data.internal_address_events = address_events.iter().unique_by(|ae| ae.identifier()).cloned().collect_vec();
                 }
 
             }
@@ -105,6 +107,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
             // info!("events with prices: {}", address_events.json_or());
             party_internal_data.price_data.daily_enrichment(&self.external_network_resources, &self.relay.ds).await?;
+            party_internal_data.address_events = new_events;
 
             data.insert(pk.clone(), party_internal_data.clone());
         }
@@ -131,7 +134,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         Ok(end)
     }
 
-    pub async fn get_public_key_eth_data(&self, address: &Address, start_block: Option<u64>) -> RgResult<ExternalNetworkData> {
+    pub async fn get_address_eth_data(&self, address: &Address, start_block: Option<u64>) -> RgResult<ExternalNetworkData> {
         // let eth = EthHistoricalClient::new(&self.relay.node_config.network).ok_msg("eth client creation")??;
         // let eth_addr = pk.to_ethereum_address_typed()?;
         // let amount = eth.get_balance_typed(&eth_addr).await?;

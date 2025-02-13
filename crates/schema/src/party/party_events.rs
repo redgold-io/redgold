@@ -10,6 +10,7 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use log::info;
 use strum_macros::{EnumIter, EnumString};
 
 
@@ -29,8 +30,8 @@ pub struct PartyEvents where {
     pub balance_map: HashMap<SupportedCurrency, CurrencyAmount>,
     pub balance_pending_order_deltas_map: HashMap<SupportedCurrency, CurrencyAmount>,
     pub balance_with_deltas_applied: HashMap<SupportedCurrency, CurrencyAmount>,
-    pub unfulfilled_rdg_orders: Vec<(OrderFulfillment, AddressEvent)>,
-    pub unfulfilled_external_withdrawals: Vec<(OrderFulfillment, AddressEvent)>,
+    pub unfulfilled_incoming_external_amount_to_outgoing_rdg_orders: Vec<(OrderFulfillment, AddressEvent)>,
+    pub unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals: Vec<(OrderFulfillment, AddressEvent)>,
     // pub price: f64,
     // pub bid_ask: BidAsk,
     pub unconfirmed_events: Vec<AddressEvent>,
@@ -241,7 +242,7 @@ impl PartyEvents {
         }).flatten().collect()
     }
 
-    pub fn unconfirmed_btc_output_other_addresses(&self) -> HashSet<String> {
+    pub fn unconfirmed_output_other_addresses(&self) -> HashSet<String> {
         let mut hs = HashSet::new();
 
         for e in self.unconfirmed_events.iter() {
@@ -317,14 +318,15 @@ impl PartyEvents {
             };
             if let Some(cp) = self.central_prices.get(&currency) {
                 let of = cp.fulfill_taker_order(
+                    amount.clone(),
                     amount.amount_i64_or() as u64, is_ask, event_time, tx_id, &destination, primary_event,
                     &self.network
                 );
                 if let Some(of) = of.as_ref() {
                     if is_ask {
-                        self.unfulfilled_rdg_orders.push((of.clone(), event.clone()));
+                        self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.push((of.clone(), event.clone()));
                     } else {
-                        self.unfulfilled_external_withdrawals.push((of.clone(), event.clone()));
+                        self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals.push((of.clone(), event.clone()));
                     }
                 }
                 of
@@ -333,6 +335,7 @@ impl PartyEvents {
             }
         } else {
             let of = OrderFulfillment {
+                order_amount_typed: amount.clone(),
                 order_amount: amount.amount_i64_or() as u64,
                 fulfilled_amount: amount.amount_i64_or() as u64,
                 is_ask_fulfillment_from_external_deposit: false,
@@ -345,6 +348,7 @@ impl PartyEvents {
                 prior_related_event,
                 successive_related_event: None,
                 fulfillment_txid_external: None,
+                fulfilled_amount_typed: amount.clone(),
             };
 
             Some(of)
@@ -361,6 +365,7 @@ impl PartyEvents {
         match d {
             AddressEvent::External(t2) => {
                 let receipt_match = t2.tx_id == tx_id.identifier;
+                // info!("External TXID on multisig thing: {} vs txid on deposit
                 !receipt_match
             }
             AddressEvent::Internal(_) => {
@@ -462,7 +467,9 @@ pub struct OrderFulfillment {
     pub primary_event: AddressEvent,
     pub prior_related_event: Option<AddressEvent>,
     pub successive_related_event: Option<AddressEvent>,
-    pub fulfillment_txid_external: Option<ExternalTransactionId>
+    pub fulfillment_txid_external: Option<ExternalTransactionId>,
+    pub order_amount_typed: CurrencyAmount,
+    pub fulfilled_amount_typed: CurrencyAmount,
 }
 
 impl OrderFulfillment {

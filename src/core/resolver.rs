@@ -1,5 +1,7 @@
 use crate::core::relay::Relay;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, Request, ResolveHashRequest, Response, Transaction};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, ResolveHashRequest, Transaction};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;

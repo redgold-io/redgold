@@ -13,11 +13,13 @@ use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, PartySec
 use redgold_keys::solana::derive_solana::ToSolanaAddress;
 use redgold_keys::solana::wallet::SolanaNetwork;
 use redgold_schema::errors::into_error::ToErrorInfo;
-use redgold_schema::helpers::easy_json::EasyJsonDeser;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, Request, Response, SupportedCurrency, Weighting};
+use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency, Weighting};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::util::times::current_time_millis;
 
 
@@ -116,6 +118,8 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
                 network, &words_pass, &mut all_pks, threshold, &cur,
                 peer_broadcast
             ).await.log_error() {
+                info!("Created new party instance {} for currency: {}",
+                    instance.address.clone().unwrap().render_string().unwrap(), cur.to_display_string());
                 event.new_instances.push(instance);
                 if let Some(j) = creation_result.secret_json {
                     let result = j.json_from::<PartySecretInstanceData>()?;
