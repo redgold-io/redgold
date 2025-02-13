@@ -141,13 +141,32 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                 let cutoff_orders = ps.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect_vec();
                 // let identifier = v.party_info.initiate.safe_get()?.identifier.safe_get().cloned()?;
 
-                let (rdg_address, utxos) = self.metrics(
+                self.metrics(
                     key.clone(), v.clone(), ps.clone(), orders.clone(), cutoff_orders.clone()
                 ).await?;
 
-
                 if cutoff_orders.len() > 0 {
                     info!("Party {} has orders: {}", key.hex(), cutoff_orders.len());
+
+                    for (i,o) in ps.events.iter().enumerate() {
+                        let ident = o.identifier();
+                        let t = o.internal_external_str();
+                        let inc = o.incoming();
+                        let other = o.other_swap_address().unwrap_or("".to_string());
+                        info!("Party event {i} type:{t} ident {ident}  inc {inc} other {other}")
+                    }
+
+                    for (i,o) in cutoff_orders.iter().enumerate() {
+                        let event_id = o.primary_event.identifier();
+                        let other = o.primary_event.other_swap_address().unwrap();
+                        let destination = o.destination.render_string().unwrap();
+                        let cur = o.order_amount_typed.currency_or().abbreviated();
+                        let ocur = o.destination.currency_or().abbreviated();
+                        let am = o.fulfilled_amount_typed.to_fractional();
+                        let iam = o.order_amount_typed.to_fractional();
+                        info!("Order {i} from {cur} to {ocur} with amount {iam} to {destination} fulfilled amount {am} event {event_id} other {other}");
+
+                    }
 
                     let o2 = cutoff_orders.clone();
                     let grouped = o2.iter()
@@ -182,6 +201,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                 let mut builder = TransactionBuilder::new(&self.relay.node_config);
                                 let mut wrapper = builder
                                     .with_input_address_descriptor(&descriptor);
+                                let utxos = self.relay.ds.transaction_store.query_utxo_address(&amm_addr).await?;
                                 let mut b = wrapper
                                     .with_utxos(&utxos)?;
                                 b.with_output(&dest, &amt);
@@ -191,8 +211,8 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                     b.with_last_output_deposit_swap_fulfillment(txid.clone())?;
                                 }
                                 info!("Sending multisig tx to destination {} with amount {}", dest.render_string().unwrap(), amt.to_fractional());
-                                info!("Building multisig tx for rdg party aaddress: {}", rdg_address.json_or());
-                                info!("Building multisig tx for rdg party aaddress amm addr: {}", amm_addr.json_or());
+                                // info!("Building multisig tx for rdg party aaddress: {}", rdg_address.json_or());
+                                // info!("Building multisig tx for rdg party aaddress amm addr: {}", amm_addr.json_or());
                                 let orig_tx = b.build()?.sign_multisig(&self.relay.node_config.keypair(), &amm_addr)?;
 
                                 let mut req = Request::default();
@@ -239,7 +259,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                             for (dest, amt, o) in o {
                                 let result = self.external_network_resources
                                     .execute_external_multisig_send(
-                                        vec![(dest, amt)], &amm_addr,
+                                        vec![(dest.clone(), amt.clone())], &amm_addr,
                                         &peers,
                                         &self.relay,
                                         threshold
@@ -247,6 +267,9 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
                                 if result.is_ok() {
                                     done_orders.push(o.clone());
                                 }
+                                info!("Sent multisig external tx to destination {} with amount {} and txid {}",
+                                    dest.render_string().unwrap(), amt.to_fractional(), result.ok().map(|x| x.identifier).unwrap_or("".to_string())
+                                );
                             }
                         }
                         // else {
@@ -286,7 +309,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         Ok(())
     }
 
-    async fn metrics(&self, key: PublicKey, v: PartyInternalData, ps: PartyEvents, orders: Vec<OrderFulfillment>, cutoff_orders: Vec<OrderFulfillment>) -> Result<(Option<Address>, Vec<UtxoEntry>), ErrorInfo> {
+    async fn metrics(&self, key: PublicKey, v: PartyInternalData, ps: PartyEvents, orders: Vec<OrderFulfillment>, cutoff_orders: Vec<OrderFulfillment>) -> Result<(), ErrorInfo> {
         let rdg_address = ps.address_for_currency(&SupportedCurrency::Redgold);
         let balance = if let Some(a) = rdg_address.as_ref() {
             self.relay.ds.transaction_store.get_balance(a).await?
@@ -383,7 +406,7 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
         for (k, v) in ps.portfolio_request_events.current_rdg_allocations.iter() {
             gauge!("redgold_party_portfolio_rdg_allocations", &cur_label(k.clone())).set(v.to_fractional());
         }
-        Ok((rdg_address, utxos))
+        Ok(())
     }
 
     async fn fulfill_btc_orders(&mut self, key: &PublicKey, identifier: &MultipartyIdentifier, ps: &PartyEvents, cutoff_time: i64) -> RgResult<Vec<OrderFulfillment>> {

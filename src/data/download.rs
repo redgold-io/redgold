@@ -238,7 +238,7 @@ pub async fn download(relay: Relay, bootstrap_pks: Vec<structs::PublicKey>) -> R
     //
     let secs = perf_timer.millis() / 1000;
     gauge!("redgold.download.time_seconds", &relay.node_config.gauge_id()).set(secs as f64);
-    info!("Download time seconds {}", secs);
+    // info!("Download time seconds {}", secs);
 
     Ok(())
 }

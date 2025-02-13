@@ -108,7 +108,7 @@ impl IntervalFold for Discovery {
                 if pk != self.relay.node_config.public_key() {
                     let known = self.relay.ds.peer_store.query_public_key_node(&pk).await?.is_some();
                     if !known {
-                        debug!("Batch Discovery sending discovery query to new peer {}", pk.hex());
+                        // debug!("Batch Discovery sending discovery query to new peer {}", pk.hex());
                         // TODO: we need to validate this peerNodeInfo first BEFORE adding it to peer store
                         // For now just dropping errors to log
                         // TODO: Query trust for this peerId first, before updating trust score.
@@ -230,7 +230,7 @@ impl Discovery {
         // TODO: Validate message and so on here.
         // Are we verifying auth on the response somewhere else?
         self.relay.ds.peer_store.add_peer_new(res, &self.relay.node_config.public_key()).await?;
-        tracing::debug!("Added new peer from immediate discovery: {}", short_peer_id);
+        // tracing::debug!("Added new peer from immediate discovery: {}", short_peer_id);
 
         Ok(())
     }

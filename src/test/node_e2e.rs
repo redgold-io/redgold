@@ -105,8 +105,8 @@ async fn e2e_async(contract_tests: bool) -> Result<(), ErrorInfo> {
 
     let mut config2 = config.clone();
     let string = client.client_wrapper().url();
-    info!("setting test harness to {} ", string.clone());
-    info!("active party key {}", client.client_wrapper().active_party_key().await.expect("works").json_or());
+    // info!("setting test harness to {} ", string.clone());
+    // info!("active party key {}", client.client_wrapper().active_party_key().await.expect("works").json_or());
     config2.load_balancer_url = string;
     let vec = local_nodes.ext.clone();
 

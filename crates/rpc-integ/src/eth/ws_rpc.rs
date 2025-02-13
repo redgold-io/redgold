@@ -74,11 +74,16 @@ impl EthereumWsProvider {
         })
     }
 
-    pub async fn sepolioa() -> EthereumWsProvider {
+    pub async fn sepolioa_infura_test() -> EthereumWsProvider {
         Self {
             provider: Arc::new(providers::SEPOLIA.ws().await),
             url: "".to_string()
         }
+    }
+
+
+    pub async fn sepolioa_blastapi() -> RgResult<EthereumWsProvider> {
+        Self::new("wss://eth-sepolia.public.blastapi.io").await
     }
 
 

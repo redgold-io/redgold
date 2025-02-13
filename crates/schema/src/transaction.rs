@@ -790,22 +790,39 @@ impl Transaction {
         }
     }
 
+    #[deprecated]
     pub fn addresses(&self) -> Vec<Address> {
         self.outputs.iter().filter_map(|o| o.address.clone()).collect_vec()
     }
 
+    #[deprecated]
     pub fn input_addresses(&self) -> Vec<Address> {
         self.inputs.iter().filter_map(|o| o.address().ok()).collect_vec()
     }
 
+    pub fn input_address_descriptor_address_or_public_key(&self) -> Vec<Address> {
+        self.inputs.iter().filter_map(|i| {
+            if let Some(d) = i.address_descriptor.as_ref() {
+                Some(d.to_address())
+            } else {
+                i.proof.get(0)
+                    .and_then(|p| p.public_key.as_ref())
+                    .and_then(|pk| pk.address().ok())
+            }
+        }).collect_vec()
+    }
+
+    #[deprecated]
     pub fn input_address_set(&self) -> HashSet<Address> {
         self.inputs.iter().filter_map(|o| o.address().ok()).collect()
     }
 
+    #[deprecated]
     pub fn first_input_address(&self) -> Option<Address> {
         self.inputs.iter().flat_map(|o| o.address().ok()).next()
     }
 
+    #[deprecated]
     pub fn first_input_proof_public_key(&self) -> Option<&structs::PublicKey> {
         self.inputs.first()
             .and_then(|o| o.proof.get(0))

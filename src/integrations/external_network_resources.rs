@@ -1016,7 +1016,7 @@ impl ExternalNetworkResources for MockExternalResources {
             other_output_addresses: vec![],
             amount: amountu64,
             bigint_amount: amount.string_amount.clone(),
-            incoming: true,
+            incoming: false,
             currency: currency.clone(),
             block_number: Some(0),
             price_usd: None,

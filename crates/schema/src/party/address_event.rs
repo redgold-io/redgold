@@ -12,8 +12,40 @@ pub enum AddressEvent {
     Internal(TransactionWithObservationsAndPrice)
 }
 
+// is this the right model?
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub enum AddressEventType {
+    SwapRequest,
+    ImplicitSwapRequest,
+    StakeInternalDeposit,
+    StakeExternalRequest,
+    StakeExternalFill,
+    SwapFulfillment,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct EnrichedAddressEvent {
+    event: AddressEvent,
+
+}
+
 
 impl AddressEvent {
+
+    pub fn incoming(&self) -> bool {
+        match self {
+            AddressEvent::External(e) => e.incoming,
+            AddressEvent::Internal(t) => !t.tx
+                .input_address_descriptor_address_or_public_key().contains(&t.queried_address)
+        }
+    }
+
+    pub fn internal_external_str(&self) -> String {
+        match self {
+            AddressEvent::External(_) => "external".to_string(),
+            AddressEvent::Internal(_) => "internal".to_string()
+        }
+    }
 
     pub fn other_swap_address(&self) -> Option<String> {
         match self {

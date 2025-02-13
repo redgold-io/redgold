@@ -10,6 +10,7 @@ use itertools::Itertools;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use log::info;
 use strum_macros::{EnumIter, EnumString};
 
 
@@ -241,7 +242,7 @@ impl PartyEvents {
         }).flatten().collect()
     }
 
-    pub fn unconfirmed_btc_output_other_addresses(&self) -> HashSet<String> {
+    pub fn unconfirmed_output_other_addresses(&self) -> HashSet<String> {
         let mut hs = HashSet::new();
 
         for e in self.unconfirmed_events.iter() {
@@ -364,6 +365,7 @@ impl PartyEvents {
         match d {
             AddressEvent::External(t2) => {
                 let receipt_match = t2.tx_id == tx_id.identifier;
+                // info!("External TXID on multisig thing: {} vs txid on deposit
                 !receipt_match
             }
             AddressEvent::Internal(_) => {

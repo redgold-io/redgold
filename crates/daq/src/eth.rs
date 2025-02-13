@@ -125,7 +125,7 @@ impl EthDaq {
 #[tokio::test]
 pub async fn test_eth_daq() {
 
-    let provider = EthereumWsProvider::sepolioa().await;
+    let provider = EthereumWsProvider::sepolioa_infura_test().await;
     let daq = EthDaq::default();
     let duration = Duration::from_secs(60);
     let result = daq.from_eth_provider_stream(Ok(provider), duration).await.unwrap();

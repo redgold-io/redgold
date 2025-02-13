@@ -118,8 +118,8 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
                 network, &words_pass, &mut all_pks, threshold, &cur,
                 peer_broadcast
             ).await.log_error() {
-                info!("Created new party instance {} for currency: {} {}",
-                    instance.address.clone().unwrap().render_string().unwrap(), cur.to_display_string(), instance.json_or());
+                info!("Created new party instance {} for currency: {}",
+                    instance.address.clone().unwrap().render_string().unwrap(), cur.to_display_string());
                 event.new_instances.push(instance);
                 if let Some(j) = creation_result.secret_json {
                     let result = j.json_from::<PartySecretInstanceData>()?;

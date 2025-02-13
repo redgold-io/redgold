@@ -141,7 +141,7 @@ impl ObservationBuffer {
             .map(|a| a.hash_or())
             .collect_vec();
 
-        debug!("Starting observation buffer with latest observation hash: {}", latest.hash_or().hex());
+        trace!("Starting observation buffer with latest observation hash: {}", latest.hash_or().hex());
 
         let interval1 = tokio::time::interval(relay.node_config.observation_formation_millis.clone());
         let mut o = Self {

@@ -17,13 +17,13 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::times::current_time_millis;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use std::collections::HashMap;
+use log::info;
 
 pub trait PartyEventBuilder {
     fn new(network: &NetworkEnvironment, relay: &Relay, addresses: HashMap<SupportedCurrency, Vec<Address>>) -> Self;
     fn orders(&self) -> Vec<OrderFulfillment>;
     fn validate_rdg_swap_fulfillment_transaction(&self, tx: &Transaction) -> RgResult<()>;
     fn fulfillment_orders(&self, c: SupportedCurrency) -> Vec<OrderFulfillment>;
-    fn orders_default_cutoff(&self) -> Vec<OrderFulfillment>;
     fn handle_internal_event(&mut self, e: &AddressEvent, time: i64, ec: AddressEvent, t: &TransactionWithObservationsAndPrice) -> RgResult<()>;
     async fn process_confirmed_event(&mut self, e: &AddressEvent, time: i64) -> Result<(), ErrorInfo>;
     async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()>;
@@ -40,12 +40,12 @@ impl PartyEventBuilder for PartyEvents {
 
     fn handle_external_event(&mut self, e: &AddressEvent, time: i64, ec: &AddressEvent, t: &ExternalTimedTransaction) -> RgResult<()> {
 
-        if t.incoming {
+        if ec.incoming() {
 
             // First check if this matches a pending stake event.
             if !self.check_external_event_expected(e) {
 
-                // Then assume this is a deposit/swap ASK requested fulfillment
+                // Then assume this is a swap for external pair to RDG.
                 let mut other_addr = t.other_address_typed().expect("addr");
                 // Since this is an ask fulfillment, we are receiving some external event currency
                 // And using the address from that deposit as the fulfillment address denominated in
@@ -178,9 +178,9 @@ impl PartyEventBuilder for PartyEvents {
         let mut amount = CurrencyAmount::from_rdg(0);
         // TODO: Does this need to be a detect on all addresses?
         let party_key_rdg_address = self.key_address().ok_msg("key address")?;
-        let incoming = !t.tx.input_addresses().contains(&party_key_rdg_address);
+        let incoming = ec.incoming();
 
-        if incoming {
+        if ec.incoming() {
             amount = t.tx.output_rdg_amount_of_address(&party_key_rdg_address);
             // Is Swap
             let dest = t.tx.swap_destination();
@@ -199,6 +199,7 @@ impl PartyEventBuilder for PartyEvents {
                 self.handle_portfolio_request(e, time, &t.tx)?;
             }
         } else {
+            // this is where problem is
             let outgoing_amount = t.tx.output_rdg_amount_of_exclude_address(&party_key_rdg_address);
             amount = outgoing_amount;
             // This is an outgoing transaction representing a deposit fulfillment receipt
@@ -298,11 +299,6 @@ impl PartyEventBuilder for PartyEvents {
     }
 
 
-    fn orders_default_cutoff(&self) -> Vec<OrderFulfillment> {
-        let cutoff_time = current_time_millis() - 30_000; //
-        self.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect()
-    }
-
 
     fn fulfillment_orders(&self, c: SupportedCurrency) -> Vec<OrderFulfillment> {
         self.orders().iter().filter(|o| o.destination.currency_or() == c).cloned().collect()
@@ -317,8 +313,11 @@ impl PartyEventBuilder for PartyEvents {
         for (of, ae) in self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.iter() {
             match ae {
                 AddressEvent::External(t) => {
+
+                    // info!("External event id: {} {}", t.tx_id.clone(), t.clone().other.unwrap().render_string().unwrap_or("".to_string()));
                     // Since this is a BTC incoming transaction,
                     // we need to check for unconfirmed events that have the txid in one of the output refs
+                    // info!("On match statement for ")
                     if !rdg_extern_txids.contains(&t.tx_id) {
                         orders.push(of.clone());
                     }
@@ -339,8 +338,13 @@ impl PartyEventBuilder for PartyEvents {
                     // Since this is a RDG incoming transaction, which we'll fulfill with BTC / pair,
                     // We need to know it's corresponding BTC address to see if an unconfirmed output matches it
                     // (i.e. it's already been unconfirmed fulfilled.)
-                    t.tx.first_input_address_to_btc_address(&self.network).map(|addr| {
-                        if !self.unconfirmed_btc_output_other_addresses().contains(&addr) {
+                    //. TODO this is wrong
+                    let fulfillment_destination =
+                        t.tx.swap_destination().or(t.tx.stake_withdrawal_destination())
+                            .and_then(|a| a.render_string().ok());
+
+                    fulfillment_destination.map(|addr| {
+                        if !self.unconfirmed_output_other_addresses().contains(&addr) {
                             if mpc_claims_fulfillment {
                                 Err::<(), ErrorInfo>(error_info("MPC claims event fulfillment but external TXID not yet recognized as unconfirmed"))
                                     .with_detail("txid", t.tx.hash_hex())
