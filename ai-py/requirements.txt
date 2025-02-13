@@ -1,19 +1,20 @@
 anthropic
 simplematrixbotlib
 google-generativeai
-# git+https://github.com/microsoft/monitors4codegen/archive/main.zip
+multilspy
 elasticsearch==8.14.0
 tree-sitter==0.22.3
 tree-sitter-rust==0.21.2
 mypy-protobuf
-graphrag
+pydantic
+# graphrag
 tiktoken
 numpy
 backoff
 sentence-transformers
 langsmith
 tenacity
-mcp
+# mcp<1.0.0
 ollama
 langchain
 langchain_anthropic
@@ -29,3 +30,11 @@ watchdog
 pathspec
 google-search-results
 python-dotenv
+langchain-experimental
+playwright
+beautifulsoup4
+llama-index
+langchain-google-genai
+langchain-openai
+matrix-nio
+matrix-nio[e2e]

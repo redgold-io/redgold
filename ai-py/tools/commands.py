@@ -4,6 +4,7 @@ import os
 import subprocess
 
 
+# this is wrong
 def run_cargo_check(directory):
     original_dir = os.getcwd()
 
