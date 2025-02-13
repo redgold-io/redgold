@@ -35,7 +35,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tracing::info;
-
+use redgold_rpc_integ::examples::example::dev_ci_kp;
 
 /// Main entry point for end to end testing.
 /// Workaround used to avoid config related overflow caused by clap et al.
