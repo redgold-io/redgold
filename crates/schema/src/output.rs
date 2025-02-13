@@ -20,6 +20,15 @@ impl Output {
         self.output_type == Some(OutputType::RequestCall as i32)
     }
 
+    pub fn is_multisig(&self) -> bool {
+        self.contract.as_ref().map(|c| c.threshold.is_some()).unwrap_or(false)
+    }
+
+    pub fn multisig_threshold_naive(&self) -> Option<i64> {
+        self.contract.as_ref().and_then(|c| c.threshold.as_ref())
+            .map(|x| x.value)
+    }
+
     pub fn is_deploy(&self) -> bool {
         self.output_type == Some(OutputType::Deploy as i32)
     }

@@ -1,21 +1,31 @@
 use async_trait::async_trait;
-use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, Response, SupportedCurrency};
+use redgold_schema::structs::{Address, CurrencyAmount, ExternalTransactionId, MultisigRequest, MultisigResponse, NetworkEnvironment, PartySigningValidation, Proof, PublicKey, SupportedCurrency};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{structs, RgResult};
 use std::collections::HashMap;
 use redgold_schema::keys::words_pass::WordsPass;
+use serde::{Deserialize, Serialize};
 
 #[async_trait]
-pub trait PeerBroadcast where Self: Sync {
-    async fn broadcast(&self, peers: &Vec<PublicKey>) -> Vec<RgResult<Response>>;
+pub trait PeerBroadcast where Self: Sync + Clone + Send {
+    async fn broadcast(&self, peers: &Vec<PublicKey>, request: Request) -> RgResult<Vec<RgResult<Response>>>;
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartyCreationResult {
+    pub address: Address,
+    pub secret_json: Option<String>
+}
 
 #[async_trait]
-pub trait ExternalNetworkResources {
+pub trait ExternalNetworkResources where Self : Send + Clone + Sync {
 
     fn set_network(&mut self, network: &NetworkEnvironment);
     async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, filter: Option<NetworkDataFilter>) -> RgResult<Vec<ExternalTimedTransaction>>;
+    async fn get_all_tx_for_address(&self, address: &Address, currency: SupportedCurrency, filter: Option<NetworkDataFilter>)
+                                    -> RgResult<Vec<ExternalTimedTransaction>>;
     async fn broadcast(&mut self, pk: &PublicKey, currency: SupportedCurrency, payload: EncodedTransactionPayload) -> RgResult<String>;
     async fn query_price(&self, time: i64, currency: SupportedCurrency) -> RgResult<f64>;
     async fn daily_historical_year(&self) -> RgResult<HashMap<SupportedCurrency, Vec<(i64, f64)>>>;
@@ -40,10 +50,20 @@ pub trait ExternalNetworkResources {
         Self: Sync;
 
     async fn trezor_sign(&self, public: PublicKey, derivation_path: String, t: structs::Transaction) -> RgResult<structs::Transaction>;
-
-    async fn prepare_multisig(&self, destination_amounts: Vec<(&Address, &CurrencyAmount)>) -> PartySigningValidation;
-
-    async fn broadcast_multisig(&mut self, contract_or_party_address: &Address, payload: EncodedTransactionPayload) -> RgResult<ExternalTransactionId>;
+    async fn participate_multisig_send(
+        &self,
+        mr: MultisigRequest,
+        peer_pks: &Vec<PublicKey>,
+        threshold: i64
+    ) -> RgResult<MultisigResponse>;
+    async fn execute_external_multisig_send<B: PeerBroadcast>(
+        &self,
+        destination_amounts: Vec<(Address, CurrencyAmount)>,
+        party_address: &Address,
+        peer_pks: &Vec<PublicKey>,
+        broadcast: &B,
+        threshold: i64
+    ) -> RgResult<ExternalTransactionId>;
 
     async fn get_live_balance(&self, address: &Address) -> RgResult<CurrencyAmount>;
 
@@ -59,7 +79,7 @@ pub trait ExternalNetworkResources {
         threshold: i64,
         peer_broadcast: &B,
         peer_pks: &Vec<PublicKey>
-    ) -> RgResult<Address>;
+    ) -> RgResult<Option<PartyCreationResult>>;
 
 
 }

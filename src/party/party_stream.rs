@@ -12,18 +12,17 @@ use redgold_schema::party::address_event::AddressEvent::External;
 use redgold_schema::party::address_event::{AddressEvent, TransactionWithObservationsAndPrice};
 use redgold_schema::party::central_price::CentralPricePair;
 use redgold_schema::party::party_events::{OrderFulfillment, PartyEvents};
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, NetworkEnvironment, PublicKey, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::util::times::current_time_millis;
 use redgold_schema::{error_info, RgResult, SafeOption};
 use std::collections::HashMap;
+use log::info;
 
 pub trait PartyEventBuilder {
-    fn new(party_public_key: &PublicKey, network: &NetworkEnvironment, relay: &Relay) -> Self;
+    fn new(network: &NetworkEnvironment, relay: &Relay, addresses: HashMap<SupportedCurrency, Vec<Address>>) -> Self;
     fn orders(&self) -> Vec<OrderFulfillment>;
-    fn validate_rdg_swap_fulfillment_transaction(&self, tx: &Transaction) -> RgResult<()>;
     fn fulfillment_orders(&self, c: SupportedCurrency) -> Vec<OrderFulfillment>;
-    fn orders_default_cutoff(&self) -> Vec<OrderFulfillment>;
     fn handle_internal_event(&mut self, e: &AddressEvent, time: i64, ec: AddressEvent, t: &TransactionWithObservationsAndPrice) -> RgResult<()>;
     async fn process_confirmed_event(&mut self, e: &AddressEvent, time: i64) -> Result<(), ErrorInfo>;
     async fn process_event(&mut self, e: &AddressEvent) -> RgResult<()>;
@@ -40,12 +39,12 @@ impl PartyEventBuilder for PartyEvents {
 
     fn handle_external_event(&mut self, e: &AddressEvent, time: i64, ec: &AddressEvent, t: &ExternalTimedTransaction) -> RgResult<()> {
 
-        if t.incoming {
+        if ec.incoming() {
 
             // First check if this matches a pending stake event.
             if !self.check_external_event_expected(e) {
 
-                // Then assume this is a deposit/swap ASK requested fulfillment
+                // Then assume this is a swap for external pair to RDG.
                 let mut other_addr = t.other_address_typed().expect("addr");
                 // Since this is an ask fulfillment, we are receiving some external event currency
                 // And using the address from that deposit as the fulfillment address denominated in
@@ -77,7 +76,7 @@ impl PartyEventBuilder for PartyEvents {
             //     info!("Eth outgoing");
             // }
 
-            self.unfulfilled_external_withdrawals.retain(|(of, d)| {
+            self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals.retain(|(of, d)| {
                 let res = Self::retain_unfulfilled_withdrawals(t, d);
                 if !res {
                     // This represents and outgoing BTC fulfillment of an incoming RDG tx
@@ -177,10 +176,11 @@ impl PartyEventBuilder for PartyEvents {
     fn handle_internal_event(&mut self, e: &AddressEvent, time: i64, ec: AddressEvent, t: &TransactionWithObservationsAndPrice) -> RgResult<()> {
         let mut amount = CurrencyAmount::from_rdg(0);
         // TODO: Does this need to be a detect on all addresses?
-        let incoming = !t.tx.input_addresses().contains(&self.key_address);
+        let party_key_rdg_address = self.key_address().ok_msg("key address")?;
+        let incoming = ec.incoming();
 
-        if incoming {
-            amount = t.tx.output_rdg_amount_of_pk(&self.party_public_key)?;
+        if ec.incoming() {
+            amount = t.tx.output_rdg_amount_of_address(&party_key_rdg_address);
             // Is Swap
             let dest = t.tx.swap_destination();
             if let Some(swap_destination) = dest {
@@ -198,13 +198,14 @@ impl PartyEventBuilder for PartyEvents {
                 self.handle_portfolio_request(e, time, &t.tx)?;
             }
         } else {
-            let outgoing_amount = t.tx.output_rdg_amount_of_exclude_pk(&self.party_public_key)?;
+            // this is where problem is
+            let outgoing_amount = t.tx.output_rdg_amount_of_exclude_address(&party_key_rdg_address);
             amount = outgoing_amount;
             // This is an outgoing transaction representing a deposit fulfillment receipt
             for tx_id in t.tx.output_external_txids() {
                 self.remove_unconfirmed_event(e);
                 let mut found_match = false;
-                self.unfulfilled_rdg_orders.retain(|(of, d)| {
+                self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.retain(|(of, d)| {
                     let res = Self::retain_unfulfilled_deposits(tx_id, d);
                     if !res {
                         let fulfillment = (of.clone(), d.clone(), ec.clone());
@@ -222,7 +223,7 @@ impl PartyEventBuilder for PartyEvents {
             for f in t.tx.stake_withdrawal_fulfillments() {
                 if let Some(utxo_id) = f.stake_withdrawal_request.as_ref() {
                     let mut found_match = false;
-                    self.unfulfilled_rdg_orders.retain(|(of, d)| {
+                    self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.retain(|(of, d)| {
                         match d {
                             External(_) => { true }
                             AddressEvent::Internal(tx) => {
@@ -254,55 +255,6 @@ impl PartyEventBuilder for PartyEvents {
     }
 
 
-    fn validate_rdg_swap_fulfillment_transaction(&self, tx: &Transaction) -> RgResult<()> {
-        // let rdg_orders = self.orders().into_iter()
-        //     .filter(|e| e.fulfilled_currency_amount().currency_or() == SupportedCurrency::Redgold)
-        //     .collect_vec();
-        //
-        // // TODO: add stake withdrawal fulfillment here too.
-        // for o in tx.outputs.iter() {
-        //     if let Some(amt) = o.opt_amount_typed() {
-        //         let a = o.address.safe_get_msg("Missing address")?;
-        //         if self.party_pk_all_address.contains(&a) {
-        //             continue;
-        //         }
-        //         if o.is_fee() && self.default_fee_addrs.contains(&a) {
-        //             continue;
-        //         }
-        //         let withdrawal = rdg_orders.iter().find(|o|
-        //             o.is_stake_withdrawal && &o.destination == a && o.fulfilled_currency_amount() == amt);
-        //         if withdrawal.is_some() {
-        //             continue;
-        //         }
-        //         let ful = o.swap_fulfillment();
-        //         let f = ful.safe_get_msg("Missing swap fulfillment")?;
-        //         let txid = f.external_transaction_id.safe_get_msg("Missing txid")?;
-        //         let order = rdg_orders.iter()
-        //             .find(|o| {
-        //                 let order_i64_amt = o.fulfilled_currency_amount().amount_i64_or();
-        //                 let tx_i64_amount = amt.amount_i64_or();
-        //                 let rdg_sats_tolerance = 1_000_000;
-        //                 let within_reasonable_range = i64::abs(order_i64_amt - tx_i64_amount) < rdg_sats_tolerance;
-        //                 o.tx_id_ref.as_ref() == Some(txid) && within_reasonable_range
-        //             });
-        //         if order.is_none() {
-        //             return Err(error_info("Invalid fulfillment for output"))
-        //                 .with_detail("output", o.json_or())
-        //                 .with_detail("rdg_orders", rdg_orders.json_or());
-        //         }
-        //     }
-        // }
-
-        Ok(())
-    }
-
-
-    fn orders_default_cutoff(&self) -> Vec<OrderFulfillment> {
-        let cutoff_time = current_time_millis() - 30_000; //
-        self.orders().iter().filter(|o| o.event_time < cutoff_time).cloned().collect()
-    }
-
-
     fn fulfillment_orders(&self, c: SupportedCurrency) -> Vec<OrderFulfillment> {
         self.orders().iter().filter(|o| o.destination.currency_or() == c).cloned().collect()
     }
@@ -312,11 +264,15 @@ impl PartyEventBuilder for PartyEvents {
 
         let rdg_extern_txids = self.unconfirmed_rdg_output_btc_txid_refs();
 
-        for (of, ae) in self.unfulfilled_rdg_orders.iter() {
+        //
+        for (of, ae) in self.unfulfilled_incoming_external_amount_to_outgoing_rdg_orders.iter() {
             match ae {
                 AddressEvent::External(t) => {
+
+                    // info!("External event id: {} {}", t.tx_id.clone(), t.clone().other.unwrap().render_string().unwrap_or("".to_string()));
                     // Since this is a BTC incoming transaction,
                     // we need to check for unconfirmed events that have the txid in one of the output refs
+                    // info!("On match statement for ")
                     if !rdg_extern_txids.contains(&t.tx_id) {
                         orders.push(of.clone());
                     }
@@ -325,7 +281,7 @@ impl PartyEventBuilder for PartyEvents {
             }
         }
 
-        for (of, ae) in &self.unfulfilled_external_withdrawals {
+        for (of, ae) in &self.unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals {
             // Disable stake withdrawals temporarily on mainnet
             if of.is_stake_withdrawal && self.network.is_main() {
                 continue;
@@ -334,11 +290,16 @@ impl PartyEventBuilder for PartyEvents {
                 .next().is_some();
             match ae {
                 AddressEvent::Internal(t) => {
-                    // Since this is a RDG incoming transaction, which we'll fulfill with BTC,
+                    // Since this is a RDG incoming transaction, which we'll fulfill with BTC / pair,
                     // We need to know it's corresponding BTC address to see if an unconfirmed output matches it
                     // (i.e. it's already been unconfirmed fulfilled.)
-                    t.tx.first_input_address_to_btc_address(&self.network).map(|addr| {
-                        if !self.unconfirmed_btc_output_other_addresses().contains(&addr) {
+                    //. TODO this is wrong
+                    let fulfillment_destination =
+                        t.tx.swap_destination().or(t.tx.stake_withdrawal_destination())
+                            .and_then(|a| a.render_string().ok());
+
+                    fulfillment_destination.map(|addr| {
+                        if !self.unconfirmed_output_other_addresses().contains(&addr) {
                             if mpc_claims_fulfillment {
                                 Err::<(), ErrorInfo>(error_info("MPC claims event fulfillment but external TXID not yet recognized as unconfirmed"))
                                     .with_detail("txid", t.tx.hash_hex())
@@ -374,21 +335,22 @@ impl PartyEventBuilder for PartyEvents {
         filtered_orders
     }
 
-    fn new(party_public_key: &PublicKey, network: &NetworkEnvironment, relay: &Relay) -> Self {
+    fn new(
+        network: &NetworkEnvironment,
+        relay: &Relay,
+        party_addresses: HashMap<SupportedCurrency, Vec<Address>>
+    ) -> Self {
         // let btc_rdg = get_btc_per_rdg_starting_min_ask(0);
         // let min_ask = btc_rdg;
         // let price = 1f64 / btc_rdg;
-        let party_pk_all_address = party_public_key.to_all_addresses().unwrap();
         Self {
             network: network.clone(),
-            key_address: party_public_key.address().expect("works").clone(),
-            party_public_key: party_public_key.clone(),
             events: vec![],
             balance_map: Default::default(),
             balance_pending_order_deltas_map: Default::default(),
             balance_with_deltas_applied: Default::default(),
-            unfulfilled_rdg_orders: vec![],
-            unfulfilled_external_withdrawals: vec![],
+            unfulfilled_incoming_external_amount_to_outgoing_rdg_orders: vec![],
+            unfulfilled_internal_tx_requiring_external_outgoing_mpc_withdrawals: vec![],
             // price,
             // bid_ask: BidAsk::generate_default(
             //     0, 0, price, min_ask
@@ -409,106 +371,7 @@ impl PartyEventBuilder for PartyEvents {
             portfolio_request_events: Default::default(),
             default_fee_addrs: relay.default_fee_addrs(),
             seeds: relay.node_config.seeds_now_pk(),
-            party_pk_all_address
+            party_addresses,
         }
     }
-}
-
-#[ignore]
-#[tokio::test]
-async fn debug_event_stream2() {
-    debug_events2().await.unwrap();
-}
-
-async fn debug_events2() -> RgResult<()> {
-
-
-    let relay = Relay::dev_default().await;
-    relay.ds.run_migrations().await?;
-
-    let res = relay.ds.multiparty_store.all_party_info_with_key().await?;
-    let pi = res.get(0).expect("head");
-
-    let key = pi.party_key.clone().expect("key");
-    // let data = relay.ds.multiparty_store.party_data(&key).await.expect("data")
-    //     .and_then(|pd| pd.json_party_internal_data)
-    //     .and_then(|pid| pid.json_from::<PartyInternalData>().ok()).expect("pid");
-    //
-    // let pev = data.party_events.clone().expect("v");
-    //
-    // let ev = pev.events.clone();
-    //
-    // let mut duplicate = PartyEvents::new(&key, &NetworkEnvironment::Dev, &relay);
-    //
-    // // this matches
-    // for e in &ev {
-    //     duplicate.process_event(e).await.expect("works");
-    //
-    // }
-    // let past_orders = pev.fulfillment_history.iter().map(|x| x.0.clone()).collect_vec();
-    //
-    // past_orders.clone().json_pretty_or().print();
-    //
-    // //
-    // let mut tb = relay.node_config.tx_builder();
-    // tb.with_input_address(&key.address().expect("works"))
-    //     .with_auto_utxos().await.expect("works");
-    //
-    // for o in past_orders.iter()
-    //     // .filter(|e| e.event_time < cutoff_time)
-    //     .filter(|e| e.destination.currency_or() == SupportedCurrency::Redgold) {
-    //     tb.with_output(&o.destination, &o.fulfilled_currency_amount());
-    //     if let Some(a) = o.stake_withdrawal_fulfilment_utxo_id.as_ref() {
-    //         tb.with_last_output_stake_withdrawal_fulfillment(a).expect("works");
-    //     } else {
-    //         tb.with_last_output_deposit_swap_fulfillment(o.tx_id_ref.clone().expect("Missing tx_id")).expect("works");
-    //     };
-    // }
-    //
-    // if tb.transaction.outputs.len() > 0 {
-    //     let tx = tb.build()?;
-    //     // pev.validate_rdg_swap_fulfillment_transaction(&tx)?;
-    //     // info!("Sending RDG fulfillment transaction: {}", tx.json_or());
-    //     // self.mp_send_rdg_tx(&mut tx.clone(), identifier.clone()).await.log_error().ok();
-    //     // info!("Sent RDG fulfillment transaction: {}", tx.json_or());
-    // }
-    // tb.transaction.json_pretty_or().print();
-    // Ok(())
-
-    // pev.json_pretty_or().print();
-    // not this
-    //
-    // let cent = pev.central_prices.get(&SupportedCurrency::Bitcoin).expect("redgold");
-    //
-    //     cent.json_pretty_or().print();
-    // cent.fulfill_taker_order(10_000, true, 1722524343044, None, &Address::default()).json_pretty_or().print();
-    Ok(())
-    // let pk_hex = "024cfc97a479af32fcb9d7b59c0e1273832817bf0bb264227e56e449d1a6b30e8e";
-    // let pk_address = PublicKey::from_hex_direct(pk_hex).expect("pk");
-    //
-    // let eth_addr = "0x7D464545F9E9E667bbb1A907121bccb49Dc39160".to_string();
-    // let eth = EthHistoricalClient::new(&NetworkEnvironment::Dev).expect("").expect("");
-    // let tx = eth.get_all_tx(&eth_addr, None).await.expect("");
-    //
-    // let mut events = vec![];
-    // for e in &tx {
-    //     events.push(External(e.clone()));
-    // };
-    //
-    // let mut pq = PriceDataPointUsdQuery::new();
-    // pq.enrich_address_events(&mut events, &relay.ds).await.expect("works");
-    //
-    // let mut pe = PartyEvents::new(&pk_address, &NetworkEnvironment::Dev, &relay);
-    //
-    //
-    // for e in &events {
-    //
-    //     pe.process_event(e).await?;
-    // }
-    //
-    //
-    // println!("{}", pe.json_or());
-    //
-    // Ok(())
-
 }

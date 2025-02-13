@@ -16,3 +16,16 @@ tenacity
 mcp
 ollama
 langchain
+langchain_anthropic
+langgraph
+langchain-groq
+langchain-openrouter
+openai
+gitpython
+PyGithub
+langchain-community
+langchain-postgres
+watchdog
+pathspec
+google-search-results
+python-dotenv

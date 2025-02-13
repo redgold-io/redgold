@@ -10,7 +10,8 @@ use std::future::Future;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, Request, Response, SignatureType, StateSelector};
+use crate::structs::{AboutNodeRequest, BytesDecoder, ContentionKey, NetworkEnvironment, NodeMetadata, PeerId, PeerMetadata, PublicKey, PublicRequest, PublicResponse, SignatureType, StateSelector};
+use crate::message::{Request, Response};
 use crate::util::task_local::task_local_impl::task_local_error_details;
 use observability::errors::EnhanceErrorInfo;
 use proto_serde::{ProtoHashable, ProtoSerde};
@@ -34,6 +35,10 @@ pub mod airgap {
 
 pub mod parties {
     include!(concat!(env!("OUT_DIR"), "/parties.rs"));
+}
+
+pub mod message {
+    include!(concat!(env!("OUT_DIR"), "/message.rs"));
 }
 
 pub mod address;

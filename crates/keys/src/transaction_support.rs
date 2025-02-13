@@ -1,17 +1,22 @@
+use std::ops::Add;
+
 use crate::proof_support::{ProofSupport, PublicKeySupport};
 use crate::KeyPair;
 use itertools::Itertools;
 use log::info;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
+use redgold_schema::structs::{Address, AddressDescriptor, CurrencyAmount, DebugSerChange, DebugSerChange2, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, PublicKey, SupportedCurrency, TimeSponsor, Transaction, TransactionOptions};
 use redgold_schema::{structs, RgResult, SafeOption};
-
-
+use redgold_schema::errors::into_error::ToErrorInfo;
 use crate::address_external::ToBitcoinAddress;
 use redgold_schema::util::times::current_time_millis;
 
 pub trait TransactionSupport {
+    fn output_rdg_amount_of_exclude_address(&self, address: &Address) -> CurrencyAmount;
+    fn outputs_of_exclude_address(&self, addr: &Address) -> impl Iterator<Item = &Output>;
+    fn output_rdg_amount_of_address(&self, address: &Address) -> CurrencyAmount;
+    fn outputs_of_address(&self, address: &Address) -> impl Iterator<Item = &Output>;
     fn time_sponsor(&mut self, key_pair: KeyPair) -> RgResult<Transaction>;
     fn sign(&mut self, key_pair: &KeyPair) -> Result<Transaction, ErrorInfo>;
     // TODO: Move all of this to TransactionBuilder
@@ -21,6 +26,8 @@ pub trait TransactionSupport {
     fn output_rdg_amount_of_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount>;
     fn outputs_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>>;
     fn output_rdg_amount_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount>;
+    // Simple signing function, this won't work for multi-sig, construct separately
+    fn sign_multisig(&mut self, key_pair: &KeyPair, party_address: &Address) -> RgResult<Transaction>;
 }
 
 #[test]
@@ -65,8 +72,8 @@ impl TransactionSupport for Transaction {
                 }
                 let input_addr = o.address.safe_get_msg("Missing address on enriched output during signing")?;
                 if all_key_pair_addresses.contains(input_addr) {
-                    info!("Signing input address: {}", input_addr.render_string().unwrap_or("".to_string()));
-                    info!("Signing input hash {} with public key {}", hash.hex(), key_pair.public_key().hex());
+                    // info!("Signing input address: {}", input_addr.render_string().unwrap_or("".to_string()));
+                    // info!("Signing input hash {} with public key {}", hash.hex(), key_pair.public_key().hex());
                     let proof = Proof::from_keypair_hash(&hash, &key_pair);
                     i.proof.push(proof);
                     // signed = true;
@@ -76,6 +83,17 @@ impl TransactionSupport for Transaction {
         // if !signed {
         //     return Err(error_info("Couldn't find appropriate input address to sign"));
         // }
+        let x = self.with_hash();
+        x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
+        Ok(x.clone())
+    }
+    // Simple signing function, this won't work for multi-sig, construct separately
+    fn sign_multisig(&mut self, key_pair: &KeyPair, party_address: &Address) -> RgResult<Transaction> {
+        let hash = self.signable_hash();
+        for i in self.inputs.iter_mut() {
+            let proof = Proof::from_keypair_hash(&hash, &key_pair);
+            i.proof.push(proof);
+        }
         let x = self.with_hash();
         x.struct_metadata.as_mut().expect("sm").signed_hash = Some(x.hash_or());
         Ok(x.clone())
@@ -97,11 +115,19 @@ impl TransactionSupport for Transaction {
             .filter(move |o| o.address.as_ref().filter(|a| all.contains(a)).is_some()))
     }
 
+    fn outputs_of_address(&self, address: &Address) -> impl Iterator<Item=&Output> {
+        self.outputs.iter().filter( |o| o.address.as_ref() == Some(address))
+    }
+
     fn outputs_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<impl Iterator<Item=&Output>> {
         let all = pk.to_all_addresses()?;
         Ok(self.outputs.iter()
             .filter(move |o| o.address.as_ref().filter(|a| !all.contains(a)).is_some()))
     }
+    fn outputs_of_exclude_address(&self, addr: &Address) -> impl Iterator<Item=&Output> {
+        self.outputs.iter().filter(|o| o.address.as_ref() != Some(addr))
+    }
+
 
     fn output_rdg_amount_of_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
         Ok(self.outputs_of_pk(pk)?
@@ -110,12 +136,28 @@ impl TransactionSupport for Transaction {
             .sum::<CurrencyAmount>())
     }
 
+    fn output_rdg_amount_of_address(&self, address: &Address) -> CurrencyAmount {
+        self.outputs_of_address(address)
+            .filter_map(|a| a.opt_amount_typed())
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .sum::<CurrencyAmount>()
+    }
+
+    fn output_rdg_amount_of_exclude_address(&self, address: &Address) -> CurrencyAmount {
+        self.outputs_of_exclude_address(address)
+            .filter_map(|a| a.opt_amount_typed())
+            .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
+            .sum::<CurrencyAmount>()
+    }
+
     fn output_rdg_amount_of_exclude_pk(&self, pk: &PublicKey) -> RgResult<CurrencyAmount> {
         Ok(self.outputs_of_exclude_pk(pk)?
             .filter_map(|a| a.opt_amount_typed())
             .filter(|a| a.currency_or() == SupportedCurrency::Redgold)
             .sum::<CurrencyAmount>())
     }
+
+
 
     fn first_input_address_to_btc_address(&self, network: &NetworkEnvironment) -> Option<String> {
         self.inputs.iter()
@@ -129,30 +171,61 @@ impl TransactionSupport for Transaction {
 }
 
 pub trait InputSupport {
-    fn verify_proof(&self, address: &Address, hash: &Hash) -> Result<(), ErrorInfo>;
     // This does not verify the address on the prior output
     fn verify_signatures_only(&self, hash: &Hash) -> Result<(), ErrorInfo>;
-    fn verify(&self, hash: &Hash) -> Result<(), ErrorInfo>;
+    fn verify_assuming_enriched(&self, hash: &Hash) -> Result<(), ErrorInfo>;
+    fn to_multisig_address(&self, threshold: i64) -> Address;
 }
 
 impl InputSupport for Input {
 
-    fn verify_proof(&self, address: &Address, hash: &Hash) -> Result<(), ErrorInfo> {
-        Proof::verify_proofs(&self.proof, &hash, address)
-    }
 
     // This does not verify the address on the prior output
     fn verify_signatures_only(&self, hash: &Hash) -> Result<(), ErrorInfo> {
         for proof in &self.proof {
-            proof.verify(&hash)?
+            proof.verify_signature_only(&hash)?
         }
-        return Ok(());
+        Ok(())
     }
 
-    fn verify(&self, hash: &Hash) -> Result<(), ErrorInfo> {
+    fn verify_assuming_enriched(&self, hash: &Hash) -> RgResult<()> {
         let o = self.output.safe_get_msg("Missing enriched output on input for transaction verification")?;
-        let address = o.address.safe_get_msg("Missing address on enriched output for transaction verification")?;
-        self.verify_proof(&address, hash)?;
-        return Ok(());
+        let prev_addr = o.address.safe_get_msg("Missing address on enriched output for transaction verification")?;
+        if self.proof.len() == 1 {
+            let proof = self.proof.get(0).expect("exists");
+            proof.verify_signature_only(&hash)?;
+            proof.verify_single_public_key_address(prev_addr)?;
+        } else {
+            // if !o.is_multisig() {
+            //     "Output not declared as multisig, but multiple proofs provided".to_error()?;
+            // };
+            match self.address_descriptor.as_ref() {
+                None => {
+                    "Missing address descriptor on multisig input".to_error()?;
+                }
+                Some(d) => {
+                    let c = d.contract.as_ref().ok_msg("Missing contract")?;
+                    let t = c.threshold.as_ref().ok_msg("Missing threshold")?;
+                    let threshold = t.value;
+                    let address = d.to_address();
+                    self.verify_signatures_only(&hash)?;
+                    if address != *prev_addr {
+                        "Multisig address mismatch".to_error()?;
+                    }
+                }
+            }
+
+        }
+        Ok(())
     }
+
+    fn to_multisig_address(&self, threshold: i64) -> Address {
+        Address::from_multisig_public_keys_and_threshold(
+            &self.proof.iter()
+                .flat_map(|p| p.public_key.clone())
+                .collect_vec(),
+            threshold
+        )
+    }
+
 }

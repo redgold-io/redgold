@@ -315,16 +315,12 @@ impl DataStore {
 
     pub async fn resolve_transaction_hash(&self, hash: &Hash) -> RgResult<Option<TransactionInfo>> {
         let maybe_transaction = self.transaction_store.query_maybe_transaction(&hash).await?;
-        let mut observation_proofs = vec![];
-        let mut transaction = None;
-        let mut rejection_reason = None;
-        let mut state = TransactionState::ObservedPending;
         let mut transaction_info: Option<TransactionInfo> = None;
 
         if let Some((t, e)) = maybe_transaction.clone() {
-            observation_proofs = self.observation.select_observation_edge(&hash.clone()).await?;
-            transaction = Some(t);
-            rejection_reason = e;
+            let observation_proofs = self.observation.select_observation_edge(&hash.clone()).await?;
+            let transaction = Some(t);
+            let rejection_reason = e;
             // Query UTXO by hash only for all valid outputs.
             let valid_utxo_output_ids = self.utxo
                 .query_utxo_output_index(&hash)
@@ -332,11 +328,11 @@ impl DataStore {
 
             let accepted = rejection_reason.is_none();
 
-            if accepted {
-                state = TransactionState::ObservedAccepted;
+            let state = if accepted {
+                TransactionState::ObservedAccepted
             } else {
-                state = TransactionState::Rejected
-            }
+                TransactionState::Rejected
+            };
 
             let mut tx_info = TransactionInfo::default();
             tx_info.transaction = transaction.clone();

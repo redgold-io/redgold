@@ -1,5 +1,4 @@
 pub mod party_info;
-pub mod all_parties;
 pub mod external_data;
 pub mod address_event;
 pub mod party_events;

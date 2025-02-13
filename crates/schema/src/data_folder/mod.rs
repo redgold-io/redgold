@@ -32,6 +32,14 @@ impl EnvDataFolder {
         self.path.join("bdk_sled")
     }
 
+    pub fn monero_wallet_dir(&self) -> PathBuf {
+        self.path.join("monerow")
+    }
+
+    pub fn monero_wallet_expect(&self) -> PathBuf {
+        self.path.join("wallet.exp")
+    }
+
     pub fn bdk_sled_path2(&self) -> PathBuf {
         self.path.join("bdk_sled2")
     }

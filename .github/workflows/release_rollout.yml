@@ -11,7 +11,7 @@ on:
 
 jobs:
   release-rollout:
-    if: ${{ vars.RELEASE_ROLLOUT == 'true' }}
+    if: ${{ vars.RELEASE_ROLLOUT == 'true' && github.hostname == 'github.com' }}
     runs-on: ubuntu-latest-m
     timeout-minutes: 120
     steps:

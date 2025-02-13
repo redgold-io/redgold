@@ -27,6 +27,7 @@ pub mod gpg;
 pub mod word_pass_support;
 pub mod eth;
 pub mod btc;
+pub mod yubikey;
 
 pub struct TestConstants {
     pub secret: bdk::bitcoin::secp256k1::SecretKey,

@@ -13,7 +13,8 @@ use redgold_keys::public_key_parse_support::PublicKeyParseSupport;
 use redgold_schema::explorer::DetailedAddress;
 use redgold_schema::party::search_events::PartyEventSearch;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{CurrencyAmount, Request, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, SupportedCurrency};
+use redgold_schema::message::Request;
 use redgold_schema::{RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
 use sha3::digest::generic_array::functional::FunctionalSequence;
@@ -190,7 +191,7 @@ pub fn v1_api_routes(r: Arc<Relay>) -> impl Filter<Extract = (impl warp::Reply +
             let data = api_data.relay.external_network_shared_data.clone_read().await;
             let cleared = data.iter().filter(|(k, v)| {
                 v.active_self()
-            }).flat_map(|(k, v)| v.party_info.party_key.clone())
+            }).map(|(k, v)| k.hex())
                 .map(|k| k.hex())
                 .next();
             Ok(cleared)

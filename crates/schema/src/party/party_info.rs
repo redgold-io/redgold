@@ -1,6 +1,8 @@
-use crate::structs;
+use std::collections::{HashMap, HashSet};
+use itertools::Itertools;
+use crate::structs::{self, Address, Weighting};
 use crate::structs::{InitiateMultipartyKeygenRequest, LocalKeyShare, MultipartyIdentifier, PublicKey, SupportedCurrency};
-use crate::parties::{PartyState, PartyInfo, PartyMetadata};
+use crate::parties::{PartyInfo, PartyInstance, PartyMembership, PartyMetadata, PartyParticipation, PartyState};
 impl PartyInfo {
 
     pub fn active(&self) -> bool {
@@ -58,9 +60,156 @@ impl PartyInfo {
 
 
 impl PartyMetadata {
+
+    pub fn combine(&mut self, other: &PartyMetadata) {
+        for inst in other.instances.iter() {
+            if let Some(a) = inst.address.as_ref() {
+                if self.instance_of_address(a).is_none() {
+                    self.instances.push(inst.clone());
+                }
+            }
+        }
+        for member in other.memberships.iter() {
+            if let Some(pk) = member.public_key.as_ref() {
+                if let Some(existing) = self.memberships.iter_mut()
+                    .find(|m| m.public_key.as_ref() == Some(pk)) {
+                    for part in member.participate.iter() {
+                        if existing.participate.iter().find(|p| p.address == part.address).is_none() {
+                            existing.participate.push(part.clone());
+                        }
+                    }
+                } else {
+                    self.memberships.push(member.clone());
+                }
+            }
+        }
+    }
+
+    pub fn members_of(&self, address: &Address) -> Vec<PublicKey> {
+        self.memberships.iter()
+            .filter(|m| m.participate.iter().any(|p| p.address.as_ref() == Some(address)))
+            .map(|m| m.public_key.clone().unwrap())
+            .collect()
+    }
+    pub fn address_by_currency(&self) -> HashMap<SupportedCurrency, Vec<Address>> {
+        self.instances.iter()
+            .group_by(|a| a.address.as_ref().map(|a| a.currency()))
+            .into_iter()
+            .filter(|(k, _)| k.is_some())
+            .map(|(k, v)| (k.clone().unwrap(), v
+                .map(|a| a.address.as_ref().unwrap()).cloned().collect()))
+            .collect()
+    }
+
+    pub fn earliest_time(&self) -> i64 {
+        self.instances.iter().filter_map(|i| i.creation_time).min().unwrap_or(0)
+    }
+
+    pub fn group_by_proposer(&self) -> HashMap<PublicKey, PartyMetadata> {
+        self.instances.iter()
+            .filter_map(|i| i.proposer.as_ref())
+            .unique()
+            .map(|p| (p.clone(), self.filter_by_proposer(p)))
+            .collect()
+    }
+
+    pub fn filter_by_proposer(&self, key: &PublicKey) -> PartyMetadata {
+        let mut ret = self.clone();
+        ret.instances = self.instances_proposed_by(key);
+        let address = ret.instances.iter()
+            .flat_map(|i| i.address.as_ref())
+            .collect::<HashSet<&Address>>();
+
+        ret.memberships = self.memberships.iter()
+            .map(|m| {
+                let mut updated = m.clone();
+                updated.participate = updated.participate
+                    .iter()
+                    .filter(|p| p.address.as_ref().map(|a| address.contains(a)).unwrap_or(false))
+                    .cloned()
+                    .collect();
+                updated
+            })
+            .collect_vec();
+        ret.memberships.retain(|m| m.participate.len() > 0);
+        ret
+    }
+
+    pub fn instances_proposed_by(&self, key: &PublicKey) -> Vec<PartyInstance> {
+        self.instances.iter()
+            .filter(|i| i.proposer.as_ref() == Some(key))
+            .cloned()
+            .collect()
+    }
+
+    pub fn active_proposed_by(&self, key: &PublicKey) -> Vec<PartyInstance> {
+        self.instances.iter()
+            .filter(|i| i.proposer.as_ref() == Some(key))
+            .filter(|x| x.is_active())
+            .cloned()
+            .collect()
+    }
+
+    pub fn active(&self) -> Vec<PartyInstance> {
+        self.instances.iter()
+            .filter(|i| i.is_active())
+            .cloned()
+            .collect()
+    }
+
     pub fn has_instance(&self, cur: SupportedCurrency) -> bool {
         self.instances.iter()
             .flat_map(|i| i.address.as_ref())
             .any(|a| a.currency() == cur)
+    }
+
+    pub fn instances_of(&self, cur: &SupportedCurrency) -> impl Iterator<Item=&PartyInstance> {
+        let cur = cur.clone() as i32;
+        self.instances.iter()
+            .filter(move |i| i.address.as_ref().map(|a| a.currency == cur).unwrap_or(false))
+    }
+
+    pub fn instance_of_address(&self, addr: &Address) -> Option<&PartyInstance> {
+        self.instances.iter().find(|i| i.address.as_ref() == Some(addr))
+    }
+
+    pub fn latest_instance_by(&self, cur: SupportedCurrency) -> Option<&PartyInstance> {
+        self.instances_of(&cur).max_by_key(|i| i.creation_time)
+    }
+
+    pub fn add_instance_equal_members(&mut self, instance: &PartyInstance, equal_members: &Vec<PublicKey>) {
+        let addr = instance.address.clone();
+        self.instances.push(instance.clone());
+        self.add_members(equal_members, addr);
+
+    }
+
+    pub fn add_members(&mut self, equal_members: &Vec<PublicKey>, addr: Option<Address>) {
+        let basis = equal_members.len() as i64;
+        let participate = PartyParticipation {
+            address: addr.clone(),
+            weight: Some(Weighting::from_int_basis(1, basis))
+        };
+        for member in equal_members.iter() {
+            if let Some(existing) = self.memberships.iter_mut()
+                .find(|m| m.public_key.as_ref() == Some(member)) {
+                existing.participate.push(participate.clone());
+            } else {
+                self.memberships.push(PartyMembership {
+                    public_key: Some(member.clone()),
+                    participate: vec![participate.clone()],
+                });
+            }
+        }
+    }
+}
+
+impl PartyInstance {
+    pub fn is_active(&self) -> bool {
+        self.state() == PartyState::Active
+    }
+
+    pub fn currency(&self) -> SupportedCurrency {
+        self.address.as_ref().map(|a| a.currency()).unwrap_or(SupportedCurrency::Redgold)
     }
 }

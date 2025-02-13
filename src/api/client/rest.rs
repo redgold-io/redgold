@@ -8,7 +8,9 @@ use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, CurrencyAmount, ErrorInfo, GetActivePartyKeyRequest, GetPeersInfoRequest, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, Request, Response, Seed, SubmitTransactionRequest, SubmitTransactionResponse, Transaction};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, Address, AddressInfo, CurrencyAmount, ErrorInfo, GetActivePartyKeyRequest, GetPeersInfoRequest, HashSearchRequest, HashSearchResponse, NetworkEnvironment, PublicKey, Seed, SubmitTransactionRequest, SubmitTransactionResponse, Transaction};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use reqwest::ClientBuilder;
@@ -312,9 +314,7 @@ impl RgHttpClient {
         let pid = self.json_get::<Vec<PartyInternalData>>("v1/party/data").await?;
         let mut hm = HashMap::new();
         for pd in pid {
-            if let Some(k) = pd.party_info.party_key.as_ref() {
-                hm.insert(k.clone(), pd);
-            }
+            hm.insert(pd.proposer_key.clone(), pd);
         }
         Ok(hm)
     }

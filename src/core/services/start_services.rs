@@ -14,7 +14,6 @@ use crate::core::transact::contention_conflicts::ContentionConflictManager;
 use crate::core::transact::tx_writer::TxWriter;
 use crate::core::transport::peer_event_handler::PeerOutgoingEventHandler;
 use crate::core::transport::peer_rx_event_handler::PeerRxEventHandler;
-use crate::multiparty_gg20::gg20_sm_manager;
 use crate::node::Node;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::observability::metrics_registry;
@@ -22,7 +21,7 @@ use crate::party::party_watcher::PartyWatcher;
 use crate::party::portfolio_fulfillment_agent::PortfolioFullfillmentAgent;
 use crate::sanity::recent_parity::RecentParityCheck;
 use crate::shuffle::shuffle_interval::Shuffle;
-use crate::{api, e2e};
+use crate::{api, e2e, node_config};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::stream_handlers::{run_interval_fold, run_interval_fold_or_recv, run_recv_concurrent, run_recv_single};
 use redgold_schema::error_info;
@@ -48,6 +47,11 @@ impl Node {
 
 
         let mut sjh = ServiceJoinHandles::default();
+
+        if node_config.enable_party_mode() {
+            sjh.add("CoinbaseWsStatus", 
+            tokio::spawn(redgold_crawler_native::coinbase_ws::run_coinbase_ws_status(relay.coinbase_ws_status.sender.clone())));
+        }
 
         let agent = PortfolioFullfillmentAgent::new(
             &relay, external_network_resources.clone());
@@ -98,6 +102,7 @@ impl Node {
 
         sjh.add("PeerRxEventHandler", PeerRxEventHandler::new(
             relay.clone(),
+            external_network_resources.clone()
         ));
 
         sjh.add("public_api", public_api::start_server(relay.clone()));
@@ -109,11 +114,7 @@ impl Node {
 
         let sm_port = relay.node_config.mparty_port();
         let sm_relay = relay.clone();
-        sjh.add("gg20_sm_manager", tokio::spawn(async move {
-            gg20_sm_manager::run_server(sm_port, sm_relay)
-                .await.map_err(|e| error_info(e.to_string()))
-        }));
-
+        
         let c_config = relay.clone();
         if node_config.e2e_enabled() {
             // TODO: Distinguish errors here

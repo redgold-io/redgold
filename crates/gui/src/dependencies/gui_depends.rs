@@ -57,6 +57,7 @@ impl TransactionSignInfo {
     }
 }
 
+#[allow(async_fn_in_trait)]
 pub trait GuiDepends {
 
     fn seed_checksum(m: WordsPass) -> RgResult<String>;

@@ -66,7 +66,7 @@ impl TransactionTable {
             data.push(row);
         }
         let mode = self.stake_mode.clone();
-        let func = move |ui: &mut Ui, row: usize, col: usize, val: &String| {
+        let func = move |ui: &mut Ui, _row: usize, col: usize, val: &String| {
             let mut column_idxs = (0..3).into_iter().collect::<Vec<usize>>();
             if mode {
                 column_idxs = (0..1).into_iter().collect::<Vec<usize>>();
@@ -140,7 +140,7 @@ impl TransactionTable {
 
                         // Todo: info on swaps, num RDG swaps. num stake tx
                         // should there be an endpoint specific to a particular public key?
-                        let next_table = vec![vec!["Swaps", "Stake TX"].iter().map(|x| x.to_string()).collect::<Vec<String>>()];
+                        let _next_table = vec![vec!["Swaps", "Stake TX"].iter().map(|x| x.to_string()).collect::<Vec<String>>()];
 
                     });
             });

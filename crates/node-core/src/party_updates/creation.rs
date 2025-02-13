@@ -1,24 +1,35 @@
+use std::collections::HashSet;
 use async_trait::async_trait;
+use metrics::{counter, gauge};
 use redgold_schema::parties::{PartyInstance, PartyMetadata, PartyState};
 use redgold_schema::RgResult;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
-use redgold_common::external_resources::{ExternalNetworkResources, PeerBroadcast};
+use redgold_common::external_resources::{ExternalNetworkResources, PartyCreationResult, PeerBroadcast};
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::eth::safe_multisig::SafeMultisig;
+use redgold_keys::monero::node_wrapper::{MoneroNodeRpcInterfaceWrapper, PartySecretData, PartySecretInstanceData, StateHistoryItem};
 use redgold_keys::solana::derive_solana::ToSolanaAddress;
 use redgold_keys::solana::wallet::SolanaNetwork;
 use redgold_schema::errors::into_error::ToErrorInfo;
+use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, Request, Response, SupportedCurrency, Weighting};
+use redgold_schema::structs::{Address, CurrencyAmount, NetworkEnvironment, PublicKey, SupportedCurrency, Weighting};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::util::times::current_time_millis;
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-struct PartyUpdateEvents {
 
+
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+pub struct PartyUpdateEvents {
+    pub new_instances: Vec<PartyInstance>,
+    pub updated_metadata: Option<PartyMetadata>,
+    pub new_secrets: Vec<PartySecretInstanceData>,
 }
 
 pub fn estimated_fee_min_balance_contract_multisig_establish(
@@ -42,8 +53,6 @@ pub fn estimated_fee_min_balance_contract_multisig_establish(
     }
 }
 
-
-
 pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
     metadata: &PartyMetadata,
     ext: &E,
@@ -58,13 +67,30 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
 )
     -> RgResult<PartyUpdateEvents> {
 
-    let events = PartyUpdateEvents::default();
+    counter!("redgold_party_formation_tick").increment(1);
+    let mut event = PartyUpdateEvents::default();
+    let currencies = SupportedCurrency::multisig_party_currencies();
+
+    let current_currencies = metadata.instances_proposed_by(self_public_key).iter()
+        .map(|a| a.currency())
+        .collect::<HashSet<SupportedCurrency>>();
+    gauge!("redgold_party_formation_current_currencies").set(current_currencies.len() as f64);
+
+
+    let missing = currencies.iter()
+        .filter(|c| !current_currencies.contains(c))
+        .collect::<Vec<&SupportedCurrency>>();
+
+    gauge!("redgold_party_formation_missing_currencies").set(missing.len() as f64);
+
+    if missing.is_empty() {
+        return Ok(event);
+    }
 
     let mut all_pks = vec![self_public_key.clone()];
     all_pks.extend(party_peer_keys.clone());
 
     all_pks.sort_by(|a, b| a.vec().cmp(&b.vec()));
-
 
     let override_thresh_int = override_threshold.map(|w| {
         if let Some(b) = w.basis {
@@ -84,21 +110,31 @@ pub async fn check_formations<E: ExternalNetworkResources, B: PeerBroadcast>(
         threshold = 2;
     }
 
-    let mut new_instances = vec![];
 
-    for cur in SupportedCurrency::multisig_party_currencies() {
+    for cur in currencies {
         if !metadata.has_instance(cur) {
-            if let Ok(updated) = attempt_form_for_currency(
+            if let Ok(Some((instance, creation_result))) = attempt_form_for_currency(
                 ext, self_hot_addresses, self_public_key, self_private_key_hex,
                 network, &words_pass, &mut all_pks, threshold, &cur,
                 peer_broadcast
             ).await.log_error() {
-                new_instances.push(updated);
+                info!("Created new party instance {} for currency: {}",
+                    instance.address.clone().unwrap().render_string().unwrap(), cur.to_display_string());
+                event.new_instances.push(instance);
+                if let Some(j) = creation_result.secret_json {
+                    let result = j.json_from::<PartySecretInstanceData>()?;
+                    event.new_secrets.push(result);
+                }
             }
         }
     }
-
-    Ok(events)
+    if event.new_instances.len() > 0 {
+        let mut updated_metadata = metadata.clone();
+        event.new_instances.iter()
+        .for_each(|i| updated_metadata.add_instance_equal_members(i, &all_pks));
+        event.updated_metadata = Some(updated_metadata);
+    }
+    Ok(event)
 }
 
 async fn attempt_form_for_currency<E, B>(
@@ -112,7 +148,7 @@ async fn attempt_form_for_currency<E, B>(
     threshold: i64,
     cur: &SupportedCurrency,
     peer_broadcast: &B,
-) -> RgResult<PartyInstance> where E: ExternalNetworkResources, B: PeerBroadcast {
+) -> RgResult<Option<(PartyInstance, PartyCreationResult)>> where E: ExternalNetworkResources, B: PeerBroadcast {
         // New party instance required:
         let fee = estimated_fee_min_balance_contract_multisig_establish(cur.clone());
         let address = self_hot_addresses.iter().find(|a| &a.currency() == cur);
@@ -134,18 +170,15 @@ async fn attempt_form_for_currency<E, B>(
             new_instance.state = PartyState::Active as i32;
             new_instance.creation_time = Some(current_time_millis());
             new_instance.last_update_time = Some(current_time_millis());
-            let address = match cur {
-                SupportedCurrency::Redgold => {
-                    Address::from_multiple_public_keys(&all_pks)?
-                }
-                cur => {
-                    ext.create_multisig_party(
-                        cur, &all_pks, self_public_key, self_private_key_hex, network, words_pass.clone(), threshold, peer_broadcast, &all_pks
-                    ).await?
-                }
-            };
-            new_instance.address = Some(address);
-            Ok(new_instance)
+            let creation_result = ext.create_multisig_party(
+                cur, &all_pks, self_public_key, self_private_key_hex, network, words_pass.clone(), threshold, peer_broadcast, &all_pks
+            ).await?;
+            if let Some(c) = creation_result {
+                new_instance.address = Some(c.address.clone());
+                Ok(Some((new_instance, c)))
+            } else {
+                Ok(None)
+            }
         } else {
             "Insufficient balance for party formation".to_error()
         }

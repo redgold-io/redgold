@@ -7,10 +7,12 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
-use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, MultipartyIdentifier, NetworkEnvironment, RoomId, SupportedCurrency, Weighting};
+use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, ExternalTransactionId, Hash, MoneroMultisigFormationRequest, MultipartyIdentifier, NetworkEnvironment, PublicKey, RoomId, SupportedCurrency, Weighting};
+use redgold_schema::message::Request;
 use redgold_schema::util::lang_util::{AnyPrinter};
 use redgold_schema::{RgResult, SafeOption, ShortString};
 use serde::{Deserialize, Serialize};
+use redgold_common::external_resources::PeerBroadcast;
 use redgold_schema::config_data::RpcUrl;
 use crate::monero::to_address::ToMoneroAddress;
 use crate::TestConstants;
@@ -35,7 +37,21 @@ pub struct MoneroNodeRpcInterfaceWrapper<S: SSHOrCommandLike> {
     pub history: Vec<StateHistoryItem>,
 }
 
-#[derive(Clone)]
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+pub struct PartySecretInstanceData {
+    pub address: Address,
+    pub monero_history: Option<Vec<StateHistoryItem>>,
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+pub struct PartySecretData {
+    pub instances: Vec<PartySecretInstanceData>
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct StateHistoryItem {
     pub input_state: MoneroWalletMultisigRpcState,
     pub output_state: MoneroWalletMultisigRpcState,
@@ -43,8 +59,9 @@ pub struct StateHistoryItem {
     pub input_threshold: Option<i64>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub enum MoneroWalletMultisigRpcState {
+    #[default]
     Unknown,
     Prepared(String),
     Made(MakeMultisigResult),
@@ -54,6 +71,13 @@ pub enum MoneroWalletMultisigRpcState {
 }
 
 impl MoneroWalletMultisigRpcState {
+
+    pub fn is_before_final_state(&self) -> bool {
+        match &self {
+            MoneroWalletMultisigRpcState::Made(_) => true,
+            _ => false
+        }
+    }
     pub fn multisig_address_str(&self) -> Option<String> {
         match self {
             MoneroWalletMultisigRpcState::Unknown => None,
@@ -85,6 +109,12 @@ impl MoneroWalletMultisigRpcState {
 
 impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
 
+
+    pub fn reset(&mut self) {
+        self.create_states = vec![];
+        self.history = vec![];
+        self.state = MoneroWalletMultisigRpcState::Unknown;
+    }
 
     pub fn any_multisig_addr_creation(&self) -> Option<String> {
         self.create_states.iter()
@@ -169,6 +199,13 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         Ok(())
     }
 
+    pub fn get_secret(&self) -> RgResult<PartySecretInstanceData> {
+        Ok(PartySecretInstanceData {
+            address: Address::from_monero_external(&self.any_multisig_addr_creation().ok_msg("No multisig address found")?),
+            monero_history: Some(self.history.clone()),
+        })
+    }
+
     /*
     The correct sequence for multisig wallet setup would now be:
 
@@ -228,6 +265,50 @@ impl<S: SSHOrCommandLike> MoneroNodeRpcInterfaceWrapper<S> {
         println!("Worked!");
         self.wallet_rpc.open_wallet_filename(wallet_filename.clone()).await?;
         Ok(())
+    }
+
+
+    pub async fn multisig_create_loop<B>(
+        &mut self,
+        all_pks: &Vec<PublicKey>,
+        threshold: i64,
+        peer_broadcast: &B
+    ) -> RgResult<PartySecretInstanceData> where B: PeerBroadcast {
+        let b = Self::get_wallet_filename_id(all_pks, threshold);
+        let wallet_filename = b;
+        let mut peer_strs = vec![];
+        loop {
+            let next = self.multisig_create_next(
+                Some(peer_strs.clone()), Some(threshold), &wallet_filename).await?;
+            if next == MoneroWalletMultisigRpcState::MultisigReadyToSend {
+                break;
+            }
+            let info_str = next.multisig_info_string().ok_msg("No multisig info string from self")?;
+            let mut req = Request::default();
+            req.monero_multisig_formation_request = Some(MoneroMultisigFormationRequest {
+                public_keys: all_pks.clone(),
+                threshold: Some(Weighting::from_int_basis(threshold, all_pks.len() as i64)),
+                peer_strings: peer_strs.clone(),
+            });
+
+            let mut new_peer_strs = vec![info_str];
+            // TODO: fix this with retries and or elimination of a particular peer that is failing.
+            for r in peer_broadcast.broadcast(&all_pks.clone(), req).await? {
+                let r = r?;
+                let r = r.monero_multisig_formation_response.ok_msg("No response from peer")?;
+                new_peer_strs.push(r);
+            }
+            peer_strs = new_peer_strs;
+        }
+        self.get_secret()
+    }
+
+    pub fn get_wallet_filename_id(all_pks: &Vec<PublicKey>, threshold: i64) -> String {
+        let mut wallet_ident = vec![];
+        all_pks.iter().for_each(|pk| wallet_ident.extend(pk.vec()));
+        threshold.to_le_bytes().iter().for_each(|b| wallet_ident.push(*b));
+        let b = Hash::digest(wallet_ident).raw_bytes_hex().unwrap();
+        b
     }
 
     pub async fn multisig_create_next(

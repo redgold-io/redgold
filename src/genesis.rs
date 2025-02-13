@@ -1,11 +1,11 @@
 use crate::node_config::EnvDefaultNodeConfig;
 use crate::schema::structs::Transaction;
-use crate::test::external_amm_integration::dev_ci_kp;
 use itertools::Itertools;
 use redgold_common_no_wasm::tx_new::TransactionBuilderSupport;
 use redgold_keys::address_support::AddressSupport;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_keys::TestConstants;
+use redgold_rpc_integ::examples::example::dev_ci_kp;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::constants::{EARLIEST_TIME, MAX_COIN_SUPPLY};
 use redgold_schema::keys::words_pass::WordsPass;

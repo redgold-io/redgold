@@ -65,7 +65,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
     local_state.external_network_resources.set_network(&local_state.node_config.network);
     g.set_network(&local_state.node_config.network);
     if local_state.data.get_mut(&local_state.node_config.network).is_none() {
-        let mut d = DataQueryInfo::new(&local_state.external_network_resources);
+        let d = DataQueryInfo::new(&local_state.external_network_resources);
         local_state.data.insert(local_state.node_config.network.clone(), d);
         g.initial_queries_prices_parties_etc(
             local_state.local_messages.sender.clone(),

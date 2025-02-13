@@ -43,7 +43,7 @@ pub struct DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + '
 
 
 impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync {
-    pub fn refresh_swap_history(&self, p0: &PublicKey) {
+    pub fn refresh_swap_history(&self, _p0: &PublicKey) {
 
     }
     pub fn party_keys(&self) -> Vec<PublicKey> {
@@ -67,9 +67,9 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync
 
     pub fn recent_tx<G>(
         &self, pubkey_filter: Option<&PublicKey>, limit: Option<usize>, include_ext: bool,
-        currency_filter: Option<SupportedCurrency>, g: &G) -> Vec<BriefTransaction> where G: GuiDepends + Send + Clone + 'static {
+        _currency_filter: Option<SupportedCurrency>, g: &G) -> Vec<BriefTransaction> where G: GuiDepends + Send + Clone + 'static {
         let addrs = self.detailed_address.lock().unwrap().clone();
-        let mut brief = addrs.iter()
+        let brief = addrs.iter()
             .filter(|(pk, _)| pubkey_filter.map(|f| f == *pk).unwrap_or(true))
             .flat_map(|x| x.1.iter())
             .flat_map(|x| x.recent_transactions.clone())
@@ -84,7 +84,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync
                 .flat_map(|((pk, _), x)| x.iter().map(|ett| (pk.clone(), ett)))
             {
                 let mut transaction = ett.to_brief();
-                parties.iter().for_each(|(pk, party)| {
+                parties.iter().for_each(|(_, party)| {
                     if let Some(pev) = party.party_events.as_ref() {
                         if let Some(ev) = pev.determine_event_type(&transaction.hash) {
                             transaction.address_event_type = Some(ev);
@@ -330,7 +330,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync
         let g2 = g.clone();
         g.spawn(async move {
             let party_data = g2.party_data().await.log_error().map(|mut r| {
-                r.iter_mut().for_each(|(k, v)| {
+                r.iter_mut().for_each(|(_k, v)| {
                     v.party_events.as_mut().map(|pev| {
                         pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
                     });
@@ -340,7 +340,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync
             if let Ok(party_data) = party_data {
                 if let Some(pd) = party_data.iter().next().clone() {
                     let mut a2 = arc2.lock().unwrap();
-                    let mut data = pd.1.clone();
+                    let data = pd.1.clone();
                     let mut total = 0.0;
                     if let Some(bm) = data.party_events.as_ref()
                         .map(|pev| pev.balance_map.clone()) {
@@ -372,7 +372,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync
         let pm = self.price_map_usd_pair_incl_rdg.clone();
 
         let mut party_data = prices_party_info_and_delta.party_info.clone();
-        party_data.iter_mut().for_each(|(k, v)| {
+        party_data.iter_mut().for_each(|(_k, v)| {
             v.party_events.as_mut().map(|pev| {
                 pev.portfolio_request_events.enriched_events = Some(pev.portfolio_request_events.calculate_current_fulfillment_by_event());
             });
@@ -380,7 +380,7 @@ impl<T> DataQueryInfo<T> where T: ExternalNetworkResources + Clone + Send + Sync
 
         if let Some(pd) = party_data.iter().next().clone() {
             let mut a2 = arc2.lock().unwrap();
-            let mut data = pd.1.clone();
+            let data = pd.1.clone();
             let mut total = 0.0;
             if let Some(bm) = data.party_events.as_ref()
                 .map(|pev| pev.balance_map.clone()) {

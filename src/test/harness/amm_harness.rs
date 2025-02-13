@@ -27,46 +27,57 @@ use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use std::path::PathBuf;
 use std::time::Duration;
+use itertools::Itertools;
 use tokio::task::JoinHandle;
 use tracing::info;
+use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use redgold_keys::word_pass_support::WordsPassNodeConfig;
+use redgold_schema::keys::words_pass::WordsPass;
 // https://stackoverflow.com/questions/75533630/how-to-write-a-retry-function-in-rust-that-involves-async
 
 
 pub struct PartyTestHarness {
+    pub words: WordsPass,
     pub network: NetworkEnvironment,
     pub private_key: String,
     pub keypair: KeyPair,
-    pub amm_public_key: PublicKey,
     pub node_config: NodeConfig,
     pub mock_accepted: Vec<Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>>,
     pub last_balance: CurrencyAmount,
     pub client: RgHttpClient,
     pub mock_folders: Vec<PathBuf>,
+    pub data: PartyInternalData,
 }
 
 impl PartyTestHarness {
 
     pub async fn from(
         node_config: &NodeConfig,
-        keypair: KeyPair,
         mock_accepted: Vec<Arc<Mutex<HashMap<SupportedCurrency, Vec<ExternalTimedTransaction>>>>>,
         opt_client: Option<RgHttpClient>,
         mock_folders: Vec<std::path::PathBuf>,
     ) -> Self {
+        let keypair = node_config.words().default_kp().unwrap();
         let private_key = keypair.to_private_hex();
         let client = opt_client.unwrap();
         let amm_public_key = client
             .active_party_key().await.unwrap();
+        let party_data = client.party_data().await.unwrap();
+        // for (k, v) in party_data.iter() {
+        //     info!("party data: {} {}", k.json_or(), v.json_or());
+        // }
+        let data = party_data.get(&amm_public_key).unwrap().clone();
         Self {
+            words: node_config.words(),
             network: node_config.network.clone(),
             private_key,
             keypair,
-            amm_public_key,
             node_config: node_config.clone(),
             mock_accepted,
             last_balance: CurrencyAmount::zero(SupportedCurrency::Redgold),
             client,
-            mock_folders
+            mock_folders,
+            data
         }
     }
 
@@ -78,32 +89,32 @@ impl PartyTestHarness {
         self.client.clone()
     }
 
-    pub fn self_public(&self) -> PublicKey {
-        self.keypair.public_key().clone()
-    }
-
     pub fn self_rdg_address(&self) -> Address {
-        self.self_public().address().expect("address")
+        self.self_address(SupportedCurrency::Redgold).expect("address")
     }
 
     pub fn self_btc_address(&self) -> Address {
-        self.self_public().to_bitcoin_address_typed(&self.network).expect("address")
+        self.self_address(SupportedCurrency::Bitcoin).expect("address")
     }
 
     pub fn self_eth_address(&self) -> Address {
-        self.self_public().to_ethereum_address_typed().expect("address")
+        self.self_address(SupportedCurrency::Ethereum).expect("address")
+    }
+
+    pub fn address_of(&self, cur: &SupportedCurrency) -> Address {
+        self.data.metadata.address_by_currency().get(cur).unwrap().get(0).unwrap().clone()
     }
 
     pub fn amm_btc_address(&self) -> Address {
-        self.amm_public_key.to_bitcoin_address_typed(&self.network).expect("address")
+        self.address_of(&SupportedCurrency::Bitcoin)
     }
 
     pub fn amm_eth_address(&self) -> Address {
-        self.amm_public_key.to_ethereum_address_typed().expect("address")
+        self.address_of(&SupportedCurrency::Ethereum)
     }
 
     pub fn amm_rdg_address(&self) -> Address {
-        self.amm_public_key.address().expect("address")
+        self.address_of(&SupportedCurrency::Redgold)
     }
 
     pub fn btc_swap_amount() -> CurrencyAmount {
@@ -141,21 +152,55 @@ impl PartyTestHarness {
     }
 
     pub async fn create_external_stake_internal_tx(&self, external_address: &Address, amount: CurrencyAmount) {
+        info!("Creating external stake tx for external address {}", external_address.render_string().unwrap());
         let stake_tx = self.tx_builder().await
-            .with_external_stake_usd_bounds(None, None, &self.self_rdg_address(),
-                                            external_address, &amount,
-                                            &self.amm_rdg_address(), &Self::party_fee_amount())
+            .with_external_stake_usd_bounds(
+                None,
+                None,
+                &self.self_rdg_address(),
+                external_address,
+                &amount,
+                &self.amm_rdg_address(),
+                &Self::party_fee_amount())
             .build()
             .expect("build")
             .sign(&self.keypair)
             .expect("sign");
-        stake_tx.broadcast_from(&self.node_config).await.expect("broadcast").json_or().print();
+        stake_tx.broadcast_from(&self.node_config).await.expect("broadcast");
+    }
+
+
+    pub fn amm_address(&self, cur: SupportedCurrency) -> Option<Address> {
+        self.data.metadata.latest_instance_by(cur).and_then(|i| i.address.clone())
+    }
+
+    pub fn self_public(&self) -> PublicKey {
+        self.words.default_public_key().unwrap()
+    }
+
+    pub fn self_address(&self, cur: SupportedCurrency) -> Option<Address> {
+        self.self_all_address().into_iter()
+            .filter(|a| a.currency_or() == cur).next()
+    }
+
+    fn self_all_address(&self) -> Vec<Address> {
+        self.words.to_all_addresses_default(&self.network).unwrap_or_default()
+            .into_iter()
+            .collect_vec()
+    }
+
+    fn self_all_address_internal(&self) -> Vec<Address> {
+        self.words.to_all_addresses_default(&self.network).unwrap_or_default()
+            .into_iter()
+            .map(|x| x.as_internal())
+            .collect_vec()
     }
 
     pub async fn send_internal_rdg_stake(&self) -> RgResult<()> {
         let internal_stake_amount = CurrencyAmount::from_fractional(7.0).expect("works");
         let rdg_address = self.self_rdg_address();
-        let amm_rdg_address = self.amm_public_key.address().expect("address");
+        let amm_rdg_address = self.amm_address(SupportedCurrency::Redgold).expect("works");
+        info!("Sending internal rdg stake to AMM RDG address : {}", amm_rdg_address.json_or());
         let internal_stake_tx = self.tx_builder().await
             .with_internal_stake_usd_bounds(
                 None, None, &rdg_address, &amm_rdg_address, &internal_stake_amount,
@@ -174,55 +219,36 @@ impl PartyTestHarness {
     pub async fn send_external(&self, amount: CurrencyAmount) {
         let not_mock = !self.is_mock();
         let currency = amount.currency_or();
+        let self_addr = self.self_address(currency).expect("works");
+        let amm_addr = self.amm_address(currency).expect("works");
 
-        let amountu64 = if currency == SupportedCurrency::Ethereum {
-            let option = amount.string_amount.clone();
-            EthHistoricalClient::translate_value(&option.unwrap()).expect("works")
-        } else {
-            amount.amount
-        };
-
+        info!("Mock sending external tx for currency: {} amount: {} to destination {}",
+            currency.to_display_string(), amount.to_fractional(), amm_addr.render_string().unwrap()
+        );
+        let amountu64 = (amount.to_fractional() * 1e8) as u64;
         // TODO: May need to fill out other fields here?
         let ts = util::current_time_millis_i64();
         let mut mocked = ExternalTimedTransaction {
             tx_id: Hash::from_string_calculate(&*ts.to_string()).hex(),
             timestamp: Some(ts as u64),
-            other_address: "".to_string(),
+            other_address: self_addr.render_string().unwrap(),
             other_output_addresses: vec![],
-            amount: amountu64 as u64,
+            amount: amountu64,
             bigint_amount: amount.string_amount.clone(),
             incoming: true,
             currency: currency.clone(),
             block_number: Some(0),
             price_usd: None,
             fee: Some(PartyEvents::expected_fee_amount(currency, &self.network).expect("fee")),
-            self_address: None,
-            currency_id: None,
+            self_address: Some(amm_addr.render_string().unwrap()),
+            currency_id: Some(currency.to_currency_id()),
             currency_amount: Some(amount.clone()),
-            from: Default::default(),
-            to: vec![],
-            other: None,
+            from: self_addr.clone(),
+            to: vec![(amm_addr.clone(), amount.clone())],
+            other: Some(self_addr),
+            queried_address: Some(amm_addr.clone()),
         };
 
-        match currency {
-            SupportedCurrency::Bitcoin => {
-                // let mut w =
-                //     SingleKeyBitcoinWallet::new_wallet(self.self_public(), self.network.clone(), not_mock)
-                //         .expect("w");
-                //
-                // let dest = self.amm_btc_address();
-                //
-                // let txid = w.send(&dest, &amount, self.private_key.clone(), not_mock).unwrap();
-                mocked.other_address = self.self_btc_address().render_string().unwrap();
-            }
-            SupportedCurrency::Ethereum => {
-                // let w = EthWalletWrapper::new(&self.private_key, &self.network).unwrap();
-                // let (txid, _) = w.send_or_form_fake(&self.amm_eth_address(), &amount, &self.keypair, not_mock).await.unwrap();
-                // mocked.tx_id = txid;
-                mocked.other_address = self.self_eth_address().render_string().unwrap();
-            }
-            _ => panic!("unsupported currency attempt")
-        }
         if self.is_mock() {
             for x in self.mock_accepted.iter() {
                 let mut arc = x.lock().await;
@@ -242,7 +268,9 @@ impl PartyTestHarness {
     }
 
     pub async fn party_internal_data(&self) -> RgResult<PartyInternalData> {
-        self.client().party_data().await?.get(&self.amm_public_key).ok_msg("party data").cloned()
+        let pd = self.client().party_data().await?;
+        let (_pk, pd) = pd.into_iter().next().unwrap();
+        Ok(pd)
     }
 
     pub async fn party_events(&self) -> RgResult<PartyEvents> {
@@ -304,7 +332,12 @@ impl PartyTestHarness {
     }
 
     pub async fn balance(&mut self, update_self: bool) -> RgResult<CurrencyAmount> {
-        let balance = self.client().balance_pk(&self.self_public()).await?;
+        let addrs = self.self_all_address_internal();
+        let mut balance = 0;
+        for addr in addrs {
+            balance += self.client().balance(&addr).await.unwrap_or(0);
+        }
+        let balance = CurrencyAmount::from_rdg(balance);
         info!("balance rdg check: {}", balance.amount);
         if update_self {
             info!("updating self balance");
@@ -325,7 +358,7 @@ impl PartyTestHarness {
     pub async fn rdg_to_eth_swap(&self) -> RgResult<()> {
         // test rdg->btc swap
         self.tx_builder().await
-            .with_swap(&self.self_eth_address(), &CurrencyAmount::from_fractional(0.2).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_eth_address().as_internal(), &CurrencyAmount::from_fractional(0.05).unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()
@@ -336,8 +369,9 @@ impl PartyTestHarness {
     }
 
     async fn rdg_to_btc_swap(&self) {
+        let result = CurrencyAmount::from_fractional(0.08);
         self.tx_builder().await
-            .with_swap(&self.self_btc_address(), &CurrencyAmount::from_fractional(0.4).unwrap(), &self.amm_rdg_address())
+            .with_swap(&self.self_btc_address().as_internal(), &result.unwrap(), &self.amm_rdg_address())
             .unwrap()
             .build()
             .unwrap()
@@ -380,17 +414,25 @@ impl PartyTestHarness {
     pub async fn run_test(&mut self) -> RgResult<()> {
         // Spawn thread to check and replicate external TX.
 
+        info!("Sending internal stake");
         self.send_internal_rdg_stake().await?;
+        info!("Verifying internal stake AMM test");
         retry!(self.verify_internal_stake())?;
         info!("Internal stake confirmed, attempting to stake externally now");
         self.create_external_stake_internal_tx(&self.self_btc_address(), Self::btc_stake_amount()).await;
+        info!("Sent external stake tx for BTC");
         self.send_external(Self::btc_stake_amount()).await;
+        info!("Sent external tx");
         retry!(self.verify_external_stake_internal_tx_1())?;
+        info!("External stake verify_external_stake_internal_tx_1, attempting to stake externally now");
         self.create_external_stake_internal_tx(&self.self_eth_address(), Self::eth_stake_amount()).await;
+        info!("created internal for eth");
         self.send_external(Self::eth_stake_amount()).await;
+        info!("created eth tx");
         retry!(self.verify_external_stake_internal_tx())?;
-
+        info!("External stake verify_external_stake_internal_tx2, attempting to send swaps now");
         self.swap_post_stake_test().await?;
+        info!("Finished with swaps");
 
         Ok(())
     }
@@ -406,6 +448,8 @@ impl PartyTestHarness {
         self.send_external(Self::eth_swap_amount()).await;
         retry!(self.verify_balance_increased())?;
         retry!(async { self.verify_fulfillment_history(2).await })?;
+
+        let party_data = self.party_events().await?;
         info!("Finished with deposit swaps, attempting to send internal withdrawal swaps now");
         self.rdg_to_btc_swap().await;
         info!("Send rdg_to_btc_swap deposit swaps");

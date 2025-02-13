@@ -8,8 +8,9 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use metrics::counter;
 use redgold_common::flume_send_help::SendErrorInfo;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, Request, TransportBackend};
-use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
+use redgold_schema::structs::{DynamicNodeMetadata, ErrorInfo, NetworkEnvironment, NodeMetadata, PeerMetadata, TransportBackend};
+use redgold_schema::message::Request;
+use redgold_schema::{error_info, message, structs, ErrorInfoContext, RgResult, SafeOption};
 use tokio::runtime::Runtime;
 use tokio::select;
 use tokio::task::JoinHandle;
@@ -20,7 +21,8 @@ use tracing::{error, info};
 use crate::api::client::rest::RgHttpClient;
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
-use crate::schema::structs::{Response, ResponseMetadata};
+use crate::schema::structs::{ ResponseMetadata};
+use crate::schema::message::{Response};
 use crate::util;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::port_offsets::PortOffsetHelpers;
@@ -58,10 +60,10 @@ impl PeerOutgoingEventHandler {
                 // error!("Node metadata not found for peer public key to send message to {} contents: {}", pk.hex(), ser_msgp);
             }
         } else if let Some(nmd) = &message.node_metadata {
-            debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",
-                nmd.json_or(),
-                ser_msgp
-            );
+            // debug!("PeerOutgoingEventHandler send message to node metadata {} with public key unregistered {}",
+            //     nmd.json_or(),
+            //     ser_msgp
+            // );
             Self::send_message_rest(message.clone(), nmd.clone(), &relay).await?;
             // TODO: if node metadata in message then attempt to send there to unknown peer, falling back to other types
             // Do we also need dynamic node metadata here too for UDP?
@@ -153,7 +155,7 @@ impl PeerOutgoingEventHandler {
         Ok(())
     }
 
-    pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<Response, ErrorInfo> {
+    pub async fn send_message_rest_ret_err(message: &mut PeerMessage, nmd: NodeMetadata, relay: &Relay) -> Result<message::Response, ErrorInfo> {
         let port = nmd.port_or(relay.node_config.network) + 1;
         let request = message.request.clone();
         let pk = nmd.public_key.safe_get_msg("Missing public key on node metadata in outgoing request")?;

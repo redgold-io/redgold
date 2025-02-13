@@ -1,0 +1,111 @@
+syntax = "proto3";
+package message;
+
+import "structs.proto";
+import "parties.proto";
+
+
+message Request {
+  structs.GossipTransactionRequest gossip_transaction_request = 1;
+  structs.GossipObservationRequest gossip_observation_request = 2;
+  structs.ResolveHashRequest resolve_hash_request = 3;
+  structs.DownloadRequest download_request = 4;
+  structs.AboutNodeRequest about_node_request = 5;
+  structs.Proof proof = 7;
+  structs.NodeMetadata node_metadata = 8;
+  structs.GetPeersInfoRequest get_peers_info_request = 9;
+  structs.InitiateMultipartyKeygenRequest initiate_keygen = 10;
+  structs.InitiateMultipartySigningRequest initiate_signing = 17;
+  structs.SubmitTransactionRequest submit_transaction_request = 11;
+  structs.UtxoConflictResolveRequest utxo_conflict_resolve_request = 12;
+  structs.QueryObservationProofRequest query_observation_proof_request = 13;
+  structs.HashSearchRequest hash_search_request = 14;
+  optional string trace_id = 15;
+  optional bool trace = 16;
+  structs.MultipartyAuthenticationRequest multiparty_authentication_request = 18;
+  structs.HealthRequest health_request = 19;
+  structs.GetNodeTransactionRequest get_node_transaction_request = 20;
+  structs.GetContractStateMarkerRequest get_contract_state_marker_request = 21;
+  structs.Address resolve_code_request = 22;
+  structs.AbridgedNodeMetadata abridged_node_metadata = 23;
+  repeated structs.ObservationProof gossip_observation_proof = 24;
+  structs.UtxoId utxo_valid_request = 25;
+  structs.RecentDiscoveryTransactionsRequest recent_transactions_request = 26;
+  structs.Hash lookup_transaction_request = 27;
+  structs.RecentTransactionAndObservationRequest recent_transaction_and_observation_request = 28;
+  structs.GenesisRequest genesis_request = 29;
+  structs.FaucetRequest faucet_request = 30;
+  structs.GetPartiesInfoRequest get_parties_info_request = 31;
+  optional string origin = 32;
+  structs.BatchTransactionResolveRequest batch_transaction_resolve_request = 33;
+  structs.PublicKey get_address_info_public_key_request = 34;
+  structs.GetActivePartyKeyRequest get_active_party_key_request = 35;
+  structs.GetSeedsRequest get_seeds_request = 36;
+  structs.PublicKey get_public_key_balance_request = 37;
+  structs.KeepAliveRequest keep_alive_request = 38;
+  Response response = 39;
+  structs.PortOpenRequest port_open_request = 40;
+  structs.GuiInitRequest gui_init_request = 41;
+  structs.MultipartyCheckReadyRequest multiparty_check_ready_request = 42;
+  structs.GetSolanaAddress get_solana_address = 43;
+  structs.MoneroMultisigFormationRequest monero_multisig_formation_request = 44;
+  structs.MultisigRequest multisig_request = 45;
+  NotifyMultisigCreationRequest notify_multisig_creation_request = 46;
+  GetPartyMetadataRequest get_party_metadata_request = 47;
+}
+
+
+message Response {
+  structs.ResponseMetadata response_metadata = 1;
+  // Pull in other response classes if needed.
+  structs.ResolveHashResponse resolve_hash_response = 2;
+  structs.DownloadResponse download_response = 3;
+  structs.AboutNodeResponse about_node_response = 4;
+  structs.GetPeersInfoResponse get_peers_info_response = 5;
+  structs.NodeMetadata node_metadata = 6;
+  structs.Proof proof = 7;
+
+  structs.InitiateMultipartyKeygenResponse initiate_keygen_response = 8;
+  structs.InitiateMultipartySigningResponse initiate_signing_response = 13;
+
+  structs.SubmitTransactionResponse submit_transaction_response = 9;
+  structs.UtxoConflictResolveResponse utxo_conflict_resolve_response = 10;
+  structs.QueryObservationProofResponse query_observation_proof_response = 11;
+  structs.HashSearchResponse hash_search_response = 12;
+  structs.HealthResponse health_response = 14;
+  structs.ContractStateMarker get_contract_state_marker_response = 15;
+  structs.ResolveCodeResponse resolve_code_response = 16;
+  structs.UtxoValidResponse utxo_valid_response = 17;
+  structs.RecentDiscoveryTransactionsResponse recent_discovery_transactions_response = 18;
+  structs.Transaction lookup_transaction_response = 19;
+  repeated structs.TransactionAndObservations recent_transaction_and_observation_response = 20;
+  structs.Transaction genesis_response = 21;
+  structs.FaucetResponse faucet_response = 22;
+  structs.GetPartiesInfoResponse get_parties_info_response = 23;
+  structs.BatchTransactionResolveResponse batch_transaction_resolve_response = 24;
+  structs.AddressInfo get_address_info_public_key_response = 25;
+  structs.PublicKey get_active_party_key_response = 26;
+  repeated structs.Seed get_seeds_response = 27;
+  structs.CurrencyAmount get_public_key_balance_response = 28;
+  structs.KeepAliveResponse keep_alive_response = 29;
+  structs.PortOpenResponse port_open_response = 30;
+  optional bool multiparty_check_ready_response = 31;
+  structs.Address get_solana_address_response = 32;
+  optional string monero_multisig_formation_response = 33;
+  structs.MultisigResponse multisig_response = 34;
+  GetPartyMetadataResponse get_party_metadata_response = 35;
+}
+
+
+message GetPartyMetadataRequest {
+  
+}
+
+message GetPartyMetadataResponse {
+  parties.PartyMetadata party_metadata = 1;
+}
+
+message NotifyMultisigCreationRequest {
+  parties.PartyMetadata party_metadata = 1;
+}
+

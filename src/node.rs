@@ -30,8 +30,6 @@ use crate::e2e::tx_submit::TransactionSubmitter;
 use crate::genesis::{genesis_transaction, genesis_tx_from, GenesisDistribution};
 use crate::infra::multiparty_backup::check_updated_multiparty_csv;
 use crate::integrations::external_network_resources::{ExternalNetworkResourcesImpl, MockExternalResources};
-use crate::multiparty_gg20::gg20_sm_manager;
-use crate::multiparty_gg20::initiate_mp::default_room_id_signing;
 // use crate::multiparty_gg20::watcher::DepositWatcher;
 use crate::observability::dynamic_prometheus::update_prometheus_configs;
 use crate::party::party_watcher::PartyWatcher;
@@ -66,7 +64,8 @@ use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::TransactionState::Mempool;
-use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Request, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
+use redgold_schema::structs::{ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, GetPeersInfoRequest, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, PeerId, PeerNodeInfo, Seed, State, TestContractInternalState, Transaction, TrustData, ValidationType};
+use redgold_schema::message::Request;
 use redgold_schema::util::lang_util::WithMaxLengthString;
 use redgold_schema::{bytes_data, error_info, structs, ErrorInfoContext, RgResult, SafeOption, ShortString};
 use std::collections::{HashMap, HashSet};
@@ -188,7 +187,7 @@ impl Node {
             Self::genesis_start(&relay, &node_config).await?;
         } else {
 
-            info!("Starting from seed nodes");
+            // info!("Starting from seed nodes");
 
             let all_seeds = if node_config.main_stage_network() {
                 relay.node_config.seeds_now().clone()
@@ -236,15 +235,15 @@ impl Node {
             for result in &seed_results {
                 relay.ds.peer_store.add_peer_new(result, &relay.node_config.public_key()).await?;
             }
-            info!("Added seed peers, attempting download");
+            // trace!("Added seed peers, attempting download");
 
             // This triggers peer exploration immediately
-            tracing::info!("Attempting discovery process of peers on startup for node");
+            // tracing::trace!("Attempting discovery process of peers on startup for node");
             let mut discovery = Discovery::new(relay.clone()).await;
             discovery.interval_fold().await?;
 
             tokio::time::sleep(Duration::from_secs(3)).await;
-            info!("Now starting download after discovery has run.");
+            // info!("Now starting download after discovery has run.");
             // TODO Change this invocation to an .into() in a non-schema key module
             if node_config.config_data.debug.as_ref().and_then(
                 |c| c.bypass_download.clone()).unwrap_or(false) {
@@ -285,7 +284,7 @@ impl Node {
     async fn query_seed(relay: &Relay, node_config: &NodeConfig, seed: Seed) -> Result<PeerNodeInfo, ErrorInfo> {
         let api_port = seed.port_or(node_config.port_offset) + 1;
         let client = PublicClient::from(seed.external_address.clone(), api_port, Some(relay.clone()));
-        info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, api_port);
+        // info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, api_port);
         let response = client.about().await?;
         let result = response.peer_node_info.safe_get()?;
         Ok(result.clone())

@@ -3,24 +3,24 @@ use async_trait::async_trait;
 use futures::future::Either;
 use futures::TryStreamExt;
 use metrics::counter;
-use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
 use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_rpc_integ::eth::ws_rpc::{EthereumWsProvider, TimestampedEthereumTransaction};
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::structs::PublicKey;
 use redgold_schema::RgResult;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;
+use redgold_schema::helpers::easy_json::EasyJson;
 
 #[derive(Clone, Default)]
 pub struct EthDaq {
     pub daq: ExternalDaq,
     pub historical_access_api_key: String
 }
+
 
 
 #[async_trait]
@@ -39,7 +39,8 @@ impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
                     &addrs, t
                 );
                 if let Ok(ett) = ett {
-                    if let Some(a) = ett.self_address.as_ref() {
+                    // print!("{}", ett.json_or());
+                    if let Some(_) = ett.self_address.as_ref() {
                     }
                 }
             }
@@ -118,4 +119,25 @@ impl EthDaq {
             None
         }
     }
+}
+
+#[ignore]
+#[tokio::test]
+pub async fn test_eth_daq() {
+
+    let provider = EthereumWsProvider::sepolioa_infura_test().await;
+    let daq = EthDaq::default();
+    let duration = Duration::from_secs(60);
+    let result = daq.from_eth_provider_stream(Ok(provider), duration).await.unwrap();
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+
+    //
+    // let p = EthereumWsProvider::new("ws://server:8556").await.expect("ws provider creation failed");
+    // let mut daq = EthDaq::default();
+    // let mut eth = EthereumWsProvider::default();
+    // let duration = Duration::from_secs(60);
+    // let result = daq.from_eth_provider_stream(Ok(eth), duration);
+    // assert!(result.is_ok());
 }

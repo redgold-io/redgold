@@ -1,6 +1,6 @@
 use crate::errors::into_error::ToErrorInfo;
 use crate::observability::errors::EnhanceErrorInfo;
-use crate::structs::{ErrorInfo, SupportedCurrency};
+use crate::structs::{CurrencyId, ErrorInfo, SupportedCurrency};
 use strum::IntoEnumIterator;
 
 
@@ -28,8 +28,8 @@ impl SupportedCurrency {
             SupportedCurrency::Redgold,
             SupportedCurrency::Bitcoin,
             SupportedCurrency::Ethereum,
-            SupportedCurrency::Solana,
-            SupportedCurrency::Monero,
+            // SupportedCurrency::Solana,
+            // SupportedCurrency::Monero,
         ]
     }
 
@@ -96,4 +96,26 @@ impl SupportedCurrency {
             SupportedCurrency::WrappedRedgoldSolana => 100.0,
         }
     }
+
+    pub fn to_currency_id(&self) -> CurrencyId {
+        let mut cid = CurrencyId::default();
+        cid.set_supported_currency(self.clone());
+        cid
+    }
+
+    pub fn only_one_destination_per_tx(&self) -> bool {
+        match self {
+            SupportedCurrency::Ethereum => true,
+            SupportedCurrency::UsdcEth => true,
+            SupportedCurrency::UsdtEth => true,
+            SupportedCurrency::WrappedRedgoldEthereum => true,
+            // double check these?
+            SupportedCurrency::Solana => true,
+            SupportedCurrency::Monero => true,
+            SupportedCurrency::Cardano => true,
+            SupportedCurrency::WrappedRedgoldSolana => true,
+            _ => { false}
+        }
+    }
+
 }

@@ -141,7 +141,7 @@ impl PortfolioEventMethods for PartyEvents {
     }
 
     fn handle_portfolio_request(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()> {
-        let portfolio_rdg_amount = tx.outputs_of_pk(&self.party_public_key)?.filter_map(|o| o.opt_amount())
+        let portfolio_rdg_amount = tx.outputs_of_address(&self.address_for_currency(&SupportedCurrency::Redgold).unwrap()).filter_map(|o| o.opt_amount())
             .sum::<i64>();
         let portfolio_rdg_amount = CurrencyAmount::from(portfolio_rdg_amount);
         let prices = match event {

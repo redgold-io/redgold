@@ -21,15 +21,10 @@ impl ObservationStore {
         let rows = sqlx::query!(
             r#"SELECT COUNT(*) as count FROM observation"#
         )
-            .fetch_all(&mut *pool)
+            .fetch_one(&mut *pool)
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
-        let mut res = vec![];
-        for row in rows_m {
-            res.push(row.count as i64);
-        }
-        let option = res.get(0).safe_get()?.clone().clone();
-        Ok(option)
+        Ok(rows_m.count as i64)
     }
 
     pub async fn select_latest_observation(&self, peer_key: PublicKey) -> Result<Option<Transaction>, ErrorInfo> {
@@ -43,7 +38,7 @@ impl ObservationStore {
             .await;
         let rows_m = DataStoreContext::map_err_sqlx(rows)?;
         let mut res = None;
-        for row in rows_m {
+        if let Some(row) = rows_m {
             let option1 = row.observation_proto;
             let deser = Transaction::proto_deserialize(option1)?;
             res = Some(deser);

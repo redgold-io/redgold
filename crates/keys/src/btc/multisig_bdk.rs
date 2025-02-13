@@ -32,24 +32,27 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
 
     pub fn create_multisig_transaction(
         &mut self,
-        destination: &structs::Address,
-        amount: &CurrencyAmount,
+        destination_amounts: Vec<(structs::Address, CurrencyAmount)>,
+        party_address: &structs::Address,
     ) -> Result<PartiallySignedTransaction, ErrorInfo> {
         // Sync wallet first to ensure UTXOs are up to date
         self.sync()?;
-
-        let destination = destination.render_string()?;
-
-        let destination_address = Address::from_str(&destination)
-            .error_info("Invalid destination address")?;
-
         let mut builder = self.wallet.build_tx();
-
         builder
-            .add_recipient(destination_address.script_pubkey(), amount.amount as u64)
             .enable_rbf()
             .fee_rate(FeeRate::from_sat_per_vb(self.sat_per_vbyte));
 
+
+        for (destination, amount) in destination_amounts.iter() {
+            let destination = destination.render_string()?;
+
+            let destination_address = Address::from_str(&destination)
+                .error_info("Invalid destination address")?;
+
+            builder
+                .add_recipient(destination_address.script_pubkey(), amount.amount as u64);
+
+        };
         let (psbt, details) = builder
             .finish()
             .error_info("Failed to build transaction")?;
@@ -162,6 +165,7 @@ async fn balance_test_mn() {
         Some(pkh.clone()),
         Some(vec![pub1.clone(), pub2.clone()]),
         Some(2),
+        None
     ).expect("Failed to create wallet");
 
     let mut wm1 = SingleKeyBitcoinWallet::new_wallet_db_backed(
@@ -174,6 +178,7 @@ async fn balance_test_mn() {
         Some(pkh1),
         Some(vec![pub2.clone(), pub0.clone()]),
         Some(2),
+        None
     ).expect("Failed to create wallet");
 
     assert_eq!(wm.get_descriptor_address().unwrap(), wm1.get_descriptor_address().unwrap());

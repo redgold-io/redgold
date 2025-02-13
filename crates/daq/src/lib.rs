@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+
 pub mod eth;
 pub mod external_net_daq;
 

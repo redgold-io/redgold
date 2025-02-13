@@ -32,7 +32,8 @@ use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::party::price_volume::PriceVolume;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::PartyInfoAbridged;
-use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, Request, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::structs::{Address, AddressInfo, CurrencyAmount, ErrorInfo, FaucetRequest, FaucetResponse, HashType, NetworkEnvironment, NodeType, Observation, ObservationMetadata, PeerId, PeerIdInfo, PeerNodeInfo, PublicKey, QueryTransactionResponse, State, SubmitTransactionResponse, SupportedCurrency, Transaction, TransactionInfo, TrustRatingLabel, UtxoEntry, ValidationType};
+use redgold_schema::message::Request;
 use redgold_schema::transaction::{rounded_balance, rounded_balance_i64};
 use redgold_schema::tx::currency_amount::RenderCurrencyAmountDecimals;
 use redgold_schema::util::times::ToTimeString;
@@ -70,11 +71,11 @@ pub async fn get_address_pool_info(r: Relay) -> RgResult<Option<AddressPoolInfo>
     let data = r.external_network_shared_data.clone_read().await;
     let pid = data
         .iter()
-        .filter(|(k, v)| v.party_info.self_initiated())
+        .filter(|(k, v)| v.self_initiated_not_debug())
         .next()
         .map(|x| x.1);
     if let Some(d) = pid {
-        let pk = d.party_info.party_key.safe_get_msg("Missing party key")?;
+        let pk = d.proposer_key.clone();
         let public_key =
             pk.hex();
         if let Some(pe) = d.party_events.as_ref() {
@@ -134,9 +135,9 @@ pub fn format_currency_balances(balances: HashMap<SupportedCurrency, CurrencyAmo
     }).collect::<Vec<(String, String)>>()
 }
 
-pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedPartyEvent>> {
+pub fn convert_events(pid: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<DetailedPartyEvent>> {
     let mut res = vec![];
-    for x in p0.address_events.iter() {
+    for x in pid.address_events.iter() {
         let mut de = DetailedPartyEvent {
             event_type: "".to_string(),
             extended_type: "".to_string(),
@@ -157,7 +158,7 @@ pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<D
         match x {
             AddressEvent::External(ett) => {
                 de.event_type = "External".to_string();
-                if let Some(ps) = p0.party_events.as_ref() {
+                if let Some(ps) = pid.party_events.as_ref() {
                     de.extended_type = {
                         let swap = ps.fulfillment_history.iter().filter(|h| h.1 == x2).next();
                         let stake_fulfill = ps.external_staking_events.iter().filter(|e| e.event == x2).next();
@@ -197,17 +198,14 @@ pub fn convert_events(p0: &PartyInternalData, nc: &NodeConfig) -> RgResult<Vec<D
                         "Unknown"
                     }
                 }.to_string();
-                let party_key = p0.party_info.party_key.clone().expect("k");
-                let party_address = party_key.address().expect("address");
+                let party_address = i.queried_address.clone();
                 let inc = !i.tx.inputs_match_pk_address(&party_address);
                 de.incoming = format!("{}", inc);
                 de.amount = {
                     if inc {
-                        i.tx.output_rdg_amount_of_pk(&party_key).map(|a| a.to_fractional())
-                            .unwrap_or(0f64)
+                        i.tx.output_rdg_amount_of_address(&party_address).to_fractional()
                     } else {
-                        i.tx.output_rdg_amount_of_exclude_pk(&party_key).map(|a| a.to_fractional())
-                            .unwrap_or(0f64)
+                        i.tx.output_rdg_amount_of_exclude_address(&party_address).to_fractional()
                     }
                 };
                 de.other_address = {
@@ -517,9 +515,7 @@ pub async fn handle_explorer_hash(hash_input: String, r: Relay, pagination: Pagi
                 if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == hash_input).next() {
                     let mut external_txid_info = ExternalTxidInfo {
                         external_explorer_link: "".to_string(),
-                        party_address: pid.party_info.party_key.as_ref()
-                            .and_then(|k| k.address().ok())
-                            .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
+                        party_address: pid.proposer_key.hex(),
                         event: ev.clone(),
                         swap_info: None,
                     };
@@ -709,9 +705,7 @@ async fn convert_detailed_transaction(r: &Relay, t: &TransactionInfo) -> Result<
         if let Ok(ev) = convert_events(&pid, &r.node_config) {
             if let Some(ev) = ev.iter().filter(|ev| ev.tx_hash == detailed.info.hash).next() {
                 detailed.party_related_info = Some(PartyRelatedInfo {
-                    party_address: pid.party_info.party_key.as_ref()
-                        .and_then(|k| k.address().ok())
-                        .and_then(|k| k.render_string().ok()).unwrap_or("".to_string()),
+                    party_address: pid.proposer_key.hex(),
                     event: Some(ev.clone()),
                 });
             }

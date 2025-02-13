@@ -1,4 +1,4 @@
-import commands
+from tools import commands
 from anthropic.types import ToolResultBlockParam
 from claude_fmt import fmt_list
 from es_search import full_text_repo_search, full_text_repo_search_tooldef

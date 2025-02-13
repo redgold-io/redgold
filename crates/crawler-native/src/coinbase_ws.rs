@@ -42,6 +42,23 @@ async fn run_websocket_stream(url: String, initial_subscribe_message: String, me
 
 }
 
+pub async fn run_coinbase_ws_status(messages: flume::Sender<String>) -> RgResult<()> {
+
+    let url = "wss://ws-feed.exchange.coinbase.com".to_string();
+    // Subscribe to the status channel
+    let subscribe_message = json!({
+        "type": "subscribe",
+        "channels": [{ "name": "status" }]
+    });
+
+    run_websocket_stream_inf(
+        url,
+        subscribe_message.to_string(),
+        messages
+    ).await
+}
+
+
 #[tokio::test]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -67,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Message::Text(text)) => {
                 println!("Received: {}", text);
                 // You can parse and process the JSON message here
+                break;
             }
             Ok(Message::Close(..)) => {
                 println!("WebSocket closed");

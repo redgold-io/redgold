@@ -145,7 +145,7 @@ pub fn bounded_text_area_size(ui: &mut Ui, string1: &mut String, width: f32, hei
 pub fn bounded_text_area_size_id(ui: &mut Ui, string1: &mut String, width: f32, height: usize, id_source: impl Into<String>) {
     ui.horizontal(|ui| {
         let _area = egui::ScrollArea::vertical()
-            .id_source(id_source.into())
+            .id_salt(id_source.into())
             .max_height(height as f32 * 100.)
             .show(ui, |ui| {
             egui::TextEdit::multiline(string1)
@@ -162,7 +162,7 @@ pub fn bounded_text_area_size_focus(ui: &mut Ui, string1: &mut String, width: f3
         let area1 = egui::ScrollArea::vertical();
         let height_lines = 25.0 * height as f32;
         let area = area1.stick_to_bottom(true)
-            .id_source("bounded_text_area_size_focus")
+            .id_salt("bounded_text_area_size_focus")
             .max_height(height_lines)
             .min_scrolled_height(height_lines/2.0);
             // .max_width(width)

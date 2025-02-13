@@ -36,7 +36,7 @@ pub async fn apply_migrations(relay: &Relay) -> RgResult<()> {
             migrations.push(m.clone())
         });
 
-    relay.ds.config_store.insert_update_json("migrations", migrations).await?;
+    relay.ds.config_store.set_json("migrations", migrations).await?;
 
     Ok(())
 }

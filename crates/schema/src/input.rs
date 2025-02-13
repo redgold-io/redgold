@@ -1,9 +1,11 @@
+use crate::SafeOption;
 use crate::structs::{Address, AddressSelector, ErrorInfo, FloatingUtxoId, Input, Proof};
 
 impl Input {
 
     pub fn address(&self) -> Result<Address, ErrorInfo> {
-        Proof::multi_proofs_to_address(&self.proof)
+        let result = self.output.as_ref().ok_msg("Missing output")?;
+        result.address.clone().ok_msg("Missing address")
     }
 
     pub fn predicate_filter(address: &Address) -> Self {

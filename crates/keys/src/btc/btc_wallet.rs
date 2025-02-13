@@ -146,7 +146,8 @@ impl SingleKeyBitcoinWallet<Tree> {
         electrum_mn_backend: Option<String>,
         opt_private_key_hex: Option<String>,
         peer_multisig_pks: Option<Vec<structs::PublicKey>>,
-        threshold: Option<i64>
+        threshold: Option<i64>,
+        address_only_descriptor: Option<structs::Address>
     ) -> Result<Self, ErrorInfo> {
         let backend = electrum_mn_backend.unwrap_or_else(|| network_to_backends(&network_environment).get(0).unwrap().clone());
         let network = network_to_bdk_network(&network_environment);
@@ -183,6 +184,9 @@ impl SingleKeyBitcoinWallet<Tree> {
                 &peer_multisig_pks.unwrap(),
                 threshold.unwrap(),
             )?
+        } else if let Some(addr) = address_only_descriptor.as_ref() {
+            let addr = addr.render_string()?;
+            format!("addr({})", addr)
         } else {
             format!("wpkh({})", hex)
         };
@@ -212,7 +216,12 @@ impl SingleKeyBitcoinWallet<Tree> {
             doing_multisig,
             address: "".to_string(),
         };
-        bitcoin_wallet.address = bitcoin_wallet.get_descriptor_address().unwrap();
+
+        if let Some(a) = address_only_descriptor.as_ref() {
+            bitcoin_wallet.address = a.render_string()?;
+        } else {
+            bitcoin_wallet.address = bitcoin_wallet.get_descriptor_address().unwrap();
+        }
 
         if !doing_multisig {
             // Adding the multiparty signer to the BDK wallet

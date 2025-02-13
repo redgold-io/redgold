@@ -58,7 +58,7 @@ impl ConfigStore {
         Ok(rows_m.last_insert_rowid())
     }
 
-    pub async fn insert_update_json<T: Serialize, S: Into<String>>(
+    pub async fn set_json<T: Serialize, S: Into<String>>(
         &self,
         key: S,
         value: T
@@ -174,7 +174,7 @@ impl ConfigStore {
     }
 
     pub async fn update_stored_state(&self, local_stored_state: LocalStoredState) -> RgResult<()> {
-        self.insert_update_json("local_stored_state", local_stored_state).await.map(|_| ())
+        self.set_json("local_stored_state", local_stored_state).await.map(|_| ())
     }
 
     pub async fn store_genesis(&self, gen: &Transaction) -> RgResult<i64> {

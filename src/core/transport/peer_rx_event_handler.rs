@@ -7,11 +7,13 @@ use futures::channel::mpsc::Receiver;
 use futures::prelude::*;
 use itertools::Itertools;
 use metrics::{counter, histogram};
+use rocket::yansi::Paint;
 // use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, Request, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
+use redgold_schema::message::{GetPartyMetadataResponse, Request, Response};
 use redgold_schema::{error_info, structs, RgResult, SafeOption};
 // use svg::Node;
 use tokio::runtime::Runtime;
@@ -19,19 +21,17 @@ use tokio::task::JoinHandle;
 // use libp2p::{Multiaddr, PeerId};
 // use libp2p::request_response::ResponseChannel;
 use tracing::{debug, error, info, trace};
-
+use redgold_common::external_resources::ExternalNetworkResources;
 use crate::api::about;
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::get_address_info_public_key;
 use crate::core::discover::peer_discovery::DiscoveryMessage;
-// use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
 use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::data::download::process_download_request;
-use crate::multiparty_gg20::initiate_mp::{initiate_mp_keygen, initiate_mp_keygen_follower, initiate_mp_keysign, initiate_mp_keysign_follower};
 use crate::observability::metrics_help::WithMetrics;
 use crate::schema::response_metadata;
-use crate::schema::structs::{Response, ResponseMetadata};
+use crate::schema::structs::ResponseMetadata;
 use crate::util::keys::ToPublicKeyFromLib;
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
@@ -47,16 +47,19 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::BatchTransactionResolveResponse;
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::util::timers::PerfTimer;
+use crate::party::order_fulfillment::handle_multisig_request;
 
-pub struct PeerRxEventHandler {
+#[derive(Clone)]
+pub struct PeerRxEventHandler<E> where E: ExternalNetworkResources + Send {
     relay: Relay,
+    ext: E,
     // rt: Arc<Runtime>
 }
 
-impl PeerRxEventHandler {
+impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static {
 
     pub async fn handle_incoming_message(
-        relay: Relay, pm: PeerMessage
+        relay: Relay, pm: PeerMessage, e: E
         // , rt: Arc<Runtime>
     ) -> Result<(), ErrorInfo> {
 
@@ -73,7 +76,7 @@ impl PeerRxEventHandler {
                 relay.ds.peer_store.update_last_seen(&pk).await.ok();
             } else {
                 if let Some(nmd) = &pm.request.node_metadata {
-                    info!("Attempting immediate discovery on peer {}", pk.short_id());
+                    // info!("Attempting immediate discovery on peer {}", pk.short_id());
                     relay.discovery.sender.send_rg_err(
                         DiscoveryMessage::new(nmd.clone(), pm.dynamic_node_metadata.clone())
                     ).log_error().ok();
@@ -84,7 +87,7 @@ impl PeerRxEventHandler {
 
         // Handle the request
         // tracing::debug!("Peer Rx Event Handler received request {}", json(&pm.request)?);
-        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone(), pm.socket_addr).await
+        let response = Self::request_response(relay.clone(), pm.request.clone(), verified.clone(), pm.socket_addr, e).await
             .map_err(|e| Response::from_error_info(e)).combine()
             .with_metadata(relay.node_metadata().await?)
             .with_auth(&relay.node_config.keypair())
@@ -117,7 +120,8 @@ impl PeerRxEventHandler {
         relay: Relay,
         request: Request,
         verified: RgResult<PublicKey>,
-        origin_ip: Option<SocketAddr>
+        origin_ip: Option<SocketAddr>,
+        e: E
     ) -> RgResult<Response> {
 
 
@@ -156,6 +160,25 @@ impl PeerRxEventHandler {
 
         let auth_required = request.auth_required();
 
+        if let Some(r) = &request.multisig_request {
+            response.multisig_response = Some(handle_multisig_request(r, &relay, &e).await.log_error()?);
+        }
+        if let Some(r) = &request.notify_multisig_creation_request {
+            if let Ok(pk) = &verified {
+                if relay.node_config.non_self_seeds_pk().contains(&pk) {
+                    if let Some(pmd) = r.party_metadata.as_ref() {
+                        relay.new_multisig_metadata.lock().await.push((pk.clone(), pmd.clone()));
+                    }
+                }
+            }
+        }
+        if let Some(r) = &request.get_party_metadata_request {
+            let option = relay.ds.config_store.get_json("party_metadata").await?.clone();
+            let mut resp = GetPartyMetadataResponse::default();
+            resp.party_metadata = option;
+            response.get_party_metadata_response = Some(resp);
+        }
+
         if let Some(r) = &request.multiparty_check_ready_request {
             response.multiparty_check_ready_response = Some(false);
             if let Some(r) = r.party_key.as_ref() {
@@ -163,6 +186,10 @@ impl PeerRxEventHandler {
                     response.multiparty_check_ready_response = Some(true);
                 }
             }
+        }
+
+        if let Some(r) = &request.monero_multisig_formation_request {
+            // relay.
         }
 
         if let Some(_) = &request.get_solana_address {
@@ -327,7 +354,7 @@ impl PeerRxEventHandler {
         }
 
         if let Some(r) = request.about_node_request {
-            info!("Received about request");
+            // info!("Received about request");
             response.about_node_response = Some(about::handle_about_node(r, relay.clone()).await?);
         }
 
@@ -361,36 +388,7 @@ impl PeerRxEventHandler {
         if auth_required {
             match verified {
                 Ok(pk) => {
-                    if let Some(r) = &request.initiate_keygen {
-                        // TODO Track future with loop poll pattern
-                        // oh wait can we remove this spawn entirely?
-                        // info!("Received MP request on peer rx: {}", json_or(&r));
-                        let rel2 = relay.clone();
-                        // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                        // tokio::spawn(async move {
-                        let result1 = initiate_mp_keygen_follower(
-                            rel2.clone(), r.clone(), &pk).await;
-                        let mp_response: String = result1.clone()
-                            .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                        // info!("Multiparty response from follower: {}", mp_response);
-
-                        response.initiate_keygen_response = Some(result1?);
-
-                        // });
-                    }
-                    if let Some(k) = &request.initiate_signing {
-                        let rel2 = relay.clone();
-                        // info!("Received MP signing request on peer rx: {}", json_or(&k.clone()));
-                        // TODO: Can we remove this spawn now that we have the spawn inside the initiate from main?
-                        // tokio::spawn(async move {
-                        let result1 = initiate_mp_keysign_follower(rel2.clone(), k.clone(), &pk).await
-                            .log_error();
-                        let mp_response: String = result1.clone()
-                            .map(|x| json_or(&x)).map_err(|x| json_or(&x)).combine();
-                        // info!("Multiparty signing response from follower: {}", mp_response);
-                        response.initiate_signing_response = Some(result1?);
-                        // });
-                    }
+                    
                 }
                 Err(e) => { return Err(e).add("Unable to process request, authorization required and failed").log_error(); }
             }
@@ -402,22 +400,28 @@ impl PeerRxEventHandler {
     async fn run(&mut self) -> Result<(), ErrorInfo> {
         let receiver = self.relay.peer_message_rx.receiver.clone();
         let relay = self.relay.clone();
+        let e = self.ext.clone();
         receiver.into_stream().map(|r| Ok(r)).try_for_each_concurrent(10, |pm| {
             // info!("Received peer message");
-            Self::handle_incoming_message(relay.clone(), pm)
+            Self::handle_incoming_message(relay.clone(), pm, e.clone())
         }).await
     }
 
 
     // https://stackoverflow.com/questions/63347498/tokiospawn-borrowed-value-does-not-live-long-enough-argument-requires-tha
     pub fn new(relay: Relay,
+               ext: E
                // arc: Arc<Runtime>
     ) -> JoinHandle<Result<(), ErrorInfo>> {
         let mut b = Self {
             relay,
             // rt: arc.clone()
+            ext,
         };
-        tokio::spawn(async move { b.run().await })
+        tokio::spawn(async move {
+            let mut b2 = b.clone();
+            b2.run().await
+        })
     }
 }
 

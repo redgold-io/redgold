@@ -22,7 +22,9 @@ pub fn empty_args() -> RgArgs {
             path: None,
             verbose: false,
             quiet: false,
-            passphrase: false,
+            pass: false,
+            interactive: false,
+            non_interactive: false,
         },
         debug_args: DebugArgs {
             debug_id: None,
@@ -118,8 +120,14 @@ pub struct CliSettings {
     #[clap(long, env = "REDGOLD_CLI_QUIET")]
     pub quiet: bool,
     /// Require passphrase for inputs on certain CLI operations
-    #[clap(long, env = "REDGOLD_CLI_PASSPHRASE")]
-    pub passphrase: bool,
+    #[clap(long, env = "REDGOLD_CLI_PASS")]
+    pub pass: bool,
+    /// Explicitly require interactive input for certain CLI operations (default depends on command)
+    #[clap(short, long, env = "REDGOLD_CLI_INTERACTIVE")]
+    pub interactive: bool,
+    /// Explicitly require non-interactive input for certain CLI operations (default depends on command)
+    #[clap(long, env = "REDGOLD_CLI_NON_INTERACTIVE")]
+    pub non_interactive: bool,
 
 }
 
@@ -188,7 +196,7 @@ pub enum RgTopLevelSubcommand {
     // DebugCanary(DebugCanary),
     Deploy(Deploy),
     // TODO: Re-enable this with argon2d and salt
-    // GenerateWords(GenerateMnemonic),
+    ColdMix(ColdWordMixer),
     GenerateRandomWords(GenerateRandomWords),
     Send(WalletSend),
     Address(WalletAddress),
@@ -512,15 +520,15 @@ pub struct Swap {
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)
 /// Recommended to use the GUI instead of the CLI for this command, for more
 /// settings.
-#[derive(Args, Debug, Clone)]
-pub struct GenerateMnemonic {
-    /// Seed generation password primarily used for cold mixing to prevent leaking passphrase from hot computer
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct ColdWordMixer {
+    /// Seed generation password primarily used for cold mixing to prevent leaking
+    /// passphrase from hot computer
+    /// It's recommended to use interactive input for this command
     #[clap(short, long)]
-    password: Option<String>,
-    #[clap(short, long, default_value = "10000")]
-    rounds: i32,
-    #[clap(short, long)]
-    use_random_seed: bool
+    pub password: Option<String>,
+    #[clap(short, long, default_value = "100")]
+    pub iterations: i32,
 }
 
 /// Generate a mnemonic word list from random entropy

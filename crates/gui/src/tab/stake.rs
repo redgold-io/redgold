@@ -174,18 +174,21 @@ impl StakeState {
                             let mut b = g.tx_builder();
                             b.with_input_address(&addr);
                             b.with_address_info(ai.unwrap()).unwrap();
+                            let party_rdg_address = pev.address_for_currency(&SupportedCurrency::Redgold).unwrap();
                             if self.currency_input.input_currency == SupportedCurrency::Redgold {
                                 b = b.with_internal_stake_usd_bounds(
-                                    None, None, &addr, &pev.key_address, &self.currency_input.input_currency_amount(&d.price_map_usd_pair_incl_rdg)
+                                    None, None, &addr,
+                                    &party_rdg_address,
+                                    &self.currency_input.input_currency_amount(&d.price_map_usd_pair_incl_rdg)
                                 ).clone();
                             } else {
                                 let amount = self.currency_input.input_currency_amount(&d.price_map_usd_pair_incl_rdg);
                                 let cur = self.currency_input.input_currency;
-                                let party_addr = pev.party_pk_all_address.iter().filter(|a| {
-                                    a.as_external().currency_or() == cur
-                                }).next().cloned().unwrap();
+                                let party_addr = pev.address_for_currency(&cur).unwrap();
+                                let party_key_addr = pev.address_for_currency(&SupportedCurrency::Redgold).unwrap();
                                 b = b.with_external_stake_usd_bounds(
-                                    None, None, &addr, &party_addr, &amount, &pev.key_address, &CurrencyAmount::from_rdg(100_000)
+                                    None, None, &addr, &party_addr, &amount, &party_key_addr,
+                                    &CurrencyAmount::from_rdg(100_000)
                                 ).clone();
                             }
                             // TODO: Capture TX builder errors here, ideally with RgResult on tx progress flow
@@ -243,7 +246,7 @@ impl StakeState {
                             }
                             // TODO: err indication here.
                             if let (Some(utxo_id), Some(withdrawal_addr)) = (utxo_id, withdrawal_addr) {
-                                b.with_stake_withdrawal(&withdrawal_addr, &pev.key_address, &CurrencyAmount::from_rdg(100_000), &utxo_id);
+                                b.with_stake_withdrawal(&withdrawal_addr, &pev.address_for_currency(&SupportedCurrency::Redgold).unwrap(), &CurrencyAmount::from_rdg(100_000), &utxo_id);
                                 let tx = b.build();
                                 self.withdrawal.with_built_rdg_tx(tx);
                             }

@@ -1,4 +1,6 @@
-use crate::schema::structs::{ErrorInfo, Request, Response, Transaction};
+use crate::schema::structs::{ErrorInfo, Transaction};
+use redgold_schema::message::{Response};
+use redgold_schema::message::{Request};
 use async_trait::async_trait;
 use bdk::bitcoin::secp256k1::PublicKey;
 use redgold_common::flume_send_help::RecvAsyncErrorInfo;

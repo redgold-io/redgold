@@ -340,7 +340,7 @@ impl PortfolioState {
                         .with_portfolio_request(
                             ports,
                             &CurrencyAmount::from_rdg(100_000),
-                            &pev.key_address,
+                            &pev.key_address().unwrap(),
                             &self.portfolio_input_name
                         )
                         .build();

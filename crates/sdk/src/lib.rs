@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, dead_code)]
 pub mod example;
 pub mod entry;
 
@@ -43,7 +43,7 @@ struct TestOutput {
 //
 
 pub fn proto_example_inner(input: Vec<u8>) -> RgResult<ExecutionResult> {
-    let input = ExecutionInput::proto_deserialize(input)?;
+    let _input = ExecutionInput::proto_deserialize(input)?;
     let mut res = ExecutionResult::default();
     res.valid = true;
     res.data = amount_data(1);
@@ -84,7 +84,7 @@ pub fn entry(input: Vec<u8>) -> FnResult<Vec<u8>> {
 }
 
 #[plugin_fn]
-pub fn entrypoint3(input: Vec<u8>) -> FnResult<Vec<u8>> {
+pub fn entrypoint3(_input: Vec<u8>) -> FnResult<Vec<u8>> {
     Ok(vec![])
 }
 

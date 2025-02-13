@@ -1,13 +1,15 @@
+use std::collections::HashMap;
 use crate::conf::node_config::NodeConfig;
 use crate::fee_validator::{TransactionFeeValidator, MIN_RDG_SATS_FEE};
 use crate::helpers::easy_json::EasyJson;
 use crate::helpers::with_metadata_hashable::WithMetadataHashable;
 use crate::observability::errors::EnhanceErrorInfo;
-use crate::structs::{Address, AddressInfo, CodeExecutionContract, CurrencyAmount, DepositRequest, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, LiquidityRange, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StakeDeposit, StakeRequest, StakeWithdrawal, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, UtxoId};
+use crate::structs::{Address, AddressDescriptor, AddressInfo, CodeExecutionContract, CurrencyAmount, DepositRequest, ErrorInfo, ExecutorBackend, ExternalTransactionId, Input, LiquidityRange, NetworkEnvironment, NodeMetadata, Observation, Output, OutputContract, OutputType, PeerMetadata, PoWProof, StakeDeposit, StakeRequest, StakeWithdrawal, StandardContractType, StandardData, StandardRequest, StandardResponse, SupportedCurrency, Transaction, TransactionData, TransactionOptions, UtxoEntry, UtxoId};
 use crate::transaction::amount_data;
 use crate::tx_schema_validate::SchemaValidationSupport;
 use crate::{bytes_data, error_info, structs, RgResult, SafeOption};
 use itertools::Itertools;
+use log::info;
 
 #[derive(Clone)]
 pub struct TransactionBuilder {
@@ -20,6 +22,7 @@ pub struct TransactionBuilder {
     pub fee_addrs: Vec<Address>,
     pub allow_bypass_fee: bool,
     pub input_addresses: Vec<Address>,
+    pub input_addresses_descriptors: Vec<AddressDescriptor>,
     pub zero_fee_requested: bool
 }
 
@@ -29,6 +32,11 @@ impl TransactionBuilder {
         self.input_addresses.push(p0.clone());
         self
     }
+    pub fn with_input_address_descriptor(&mut self, p0: &AddressDescriptor) -> &mut TransactionBuilder {
+        self.input_addresses_descriptors.push(p0.clone());
+        self
+    }
+
 }
 
 impl TransactionBuilder {
@@ -416,10 +424,21 @@ impl TransactionBuilder {
 
         // Aha heres the issue, we're expecting output to be populated here
     // Remove this assumption elsewhere
+        /// TODO: investigate if this enriched output is causing a problem on the input
     pub fn with_unsigned_input(&mut self, utxo: UtxoEntry) -> Result<&mut Self, ErrorInfo> {
         let input = utxo.to_input();
         let output = utxo.output.safe_get()?;
         let _data = output.data.safe_get()?;
+        // if let Some(a) = data.amount {
+        //     self.balance += a;
+        // }
+        self.used_utxos.push(utxo.clone());
+        self.transaction.inputs.push(input);
+        Ok(self)
+    }
+    pub fn with_unsigned_input_address_descriptor(&mut self, utxo: UtxoEntry, ad: &AddressDescriptor) -> Result<&mut Self, ErrorInfo> {
+        let mut input = utxo.to_input();
+        input.address_descriptor = Some(ad.clone());
         // if let Some(a) = data.amount {
         //     self.balance += a;
         // }
@@ -445,12 +464,36 @@ impl TransactionBuilder {
         // In order for that we'd need to raise transaction size limit
         self.utxos.sort_by(|a, b| a.amount().cmp(&b.amount()));
 
+        let address_descriptors = self.input_addresses_descriptors.iter()
+            .map(|a| (a.to_address(), a.clone())).collect::<HashMap<Address, AddressDescriptor>>();
+
+        if address_descriptors.len() > 0 {
+            // info!("Address descriptors");
+            // for (k,v) in address_descriptors.iter() {
+            //     info!("{}: {}", k.json_or(), v.json_or());
+            // }
+            for u in &self.utxos {
+                if let Ok(a) = u.address() {
+                    // info!("UTXO address {}", a.json_or());
+                    if !address_descriptors.contains_key(&a) {
+                        // info!("Missing address descriptor for {}", a.render_string().expect("works"));
+                        // info!("Broke");
+                    }
+                }
+            }
+        }
+
         for u in self.utxos.clone() {
+
             if self.balance() > 0 {
                 break
             }
             if u.opt_amount().is_some() {
-                self.with_unsigned_input(u.clone())?;
+                if let Some(v) = u.address().ok().and_then(|a| address_descriptors.get(&a)) {
+                    self.with_unsigned_input_address_descriptor(u.clone(), v)?;
+                } else {
+                    self.with_unsigned_input(u.clone())?;
+                }
             }
         }
 

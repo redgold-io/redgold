@@ -76,11 +76,18 @@ impl WithMetadataHashableFields for Transaction {
     }
 }
 
+impl HashClear for Input {
+    fn hash_clear(&mut self) {
+        self.address = None;
+        self.output = None;
+    }
+}
+
 impl HashClear for Transaction {
     fn hash_clear(&mut self) {
         // TODO: Implement hashclear for inputs
         for x in self.inputs.iter_mut() {
-            x.output = None;
+            x.hash_clear();
         }
         if let Some(s) = self.struct_metadata_opt() {
             s.hash_clear();
@@ -94,7 +101,23 @@ pub struct AddressBalance {
     pub rounded_balance: f64,
 }
 
+
 impl Transaction {
+
+    pub fn combine_multisig_proofs(&mut self, other: &Transaction, address: &Address) -> RgResult<Transaction> {
+        let mut updated = self.clone();
+        for (idx, input) in updated.inputs.iter_mut().enumerate() {
+            let other_input = other.inputs.get(idx).ok_msg("Missing input")?;
+            for proof in other_input.proof.iter() {
+                if input.proof.iter().any(|p| p.public_key == proof.public_key) {
+                    continue;
+                } else {
+                    input.proof.push(proof.clone());
+                }
+            }
+        }
+        Ok(updated)
+    }
 
     pub fn with_pow(mut self) -> RgResult<Self> {
         let hash = self.signable_hash();
@@ -767,22 +790,39 @@ impl Transaction {
         }
     }
 
+    #[deprecated]
     pub fn addresses(&self) -> Vec<Address> {
         self.outputs.iter().filter_map(|o| o.address.clone()).collect_vec()
     }
 
+    #[deprecated]
     pub fn input_addresses(&self) -> Vec<Address> {
         self.inputs.iter().filter_map(|o| o.address().ok()).collect_vec()
     }
 
+    pub fn input_address_descriptor_address_or_public_key(&self) -> Vec<Address> {
+        self.inputs.iter().filter_map(|i| {
+            if let Some(d) = i.address_descriptor.as_ref() {
+                Some(d.to_address())
+            } else {
+                i.proof.get(0)
+                    .and_then(|p| p.public_key.as_ref())
+                    .and_then(|pk| pk.address().ok())
+            }
+        }).collect_vec()
+    }
+
+    #[deprecated]
     pub fn input_address_set(&self) -> HashSet<Address> {
         self.inputs.iter().filter_map(|o| o.address().ok()).collect()
     }
 
+    #[deprecated]
     pub fn first_input_address(&self) -> Option<Address> {
         self.inputs.iter().flat_map(|o| o.address().ok()).next()
     }
 
+    #[deprecated]
     pub fn first_input_proof_public_key(&self) -> Option<&structs::PublicKey> {
         self.inputs.first()
             .and_then(|o| o.proof.get(0))

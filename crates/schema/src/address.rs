@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use crate::structs::{Address, AddressInfo, AddressType, ErrorInfo, Hash, SupportedCurrency, UtxoEntry};
+use crate::structs::{Address, AddressDescriptor, AddressInfo, AddressType, ErrorInfo, Hash, OutputContract, PublicKey, SupportedCurrency, UtxoEntry, Weighting};
 use crate::{bytes_data, error_info, from_hex, ErrorInfoContext, RgResult, SafeOption};
 use crate::structs;
 use sha3::Sha3_224;
@@ -22,7 +22,38 @@ impl Into<Address> for Vec<u8> {
 }
 
 
+impl AddressDescriptor {
+    pub fn from_multisig_public_keys_and_threshold(public_keys: &Vec<PublicKey>, threshold: i64) -> AddressDescriptor {
+        let mut pks = public_keys.clone();
+        pks.sort_by_key(|k| k.vec());
+        let mut descriptor = AddressDescriptor::default();
+        descriptor.public_keys = pks.clone();
+        let mut contract = OutputContract::default();
+        contract.threshold = Some(Weighting::from_int_basis(threshold, pks.len() as i64));
+        descriptor.contract = Some(contract);
+        descriptor
+    }
+
+    pub fn to_address(&self) -> Address {
+        Address::from_multisig_public_keys_and_threshold(
+            &self.public_keys, self.contract.as_ref().unwrap().threshold.as_ref().unwrap().value
+        )
+    }
+}
+
+
 impl Address {
+
+    pub fn from_multisig_public_keys_and_threshold(public_keys: &Vec<PublicKey>, threshold: i64) -> Address {
+        let descriptor = AddressDescriptor::from_multisig_public_keys_and_threshold(public_keys, threshold);
+        let bytes = descriptor.to_hashed().bytes;
+
+        Self {
+            address: bytes,
+            address_type: AddressType::MultisigContract as i32,
+            currency: Redgold as i32,
+        }
+    }
 
     pub fn mark_bitcoin_external(&mut self) -> &mut Self {
         self.currency = SupportedCurrency::Bitcoin as i32;
@@ -38,6 +69,14 @@ impl Address {
         match self.address_type() {
             AddressType::BitcoinExternalString => self.mark_bitcoin_external(),
             AddressType::EthereumExternalString => self.mark_ethereum_external(),
+            AddressType::SolanaExternalString => {
+                self.set_currency(SupportedCurrency::Solana);
+                self
+            },
+            AddressType::MoneroExternalString => {
+                self.set_currency(SupportedCurrency::Monero);
+                self
+            },
             _ => self
         }
     }
@@ -46,6 +85,12 @@ impl Address {
         let mut address = self.clone();
         address.mark_external();
         address.clone()
+    }
+
+    pub fn as_internal(&self) -> Address {
+        let mut address = self.clone();
+        address.set_currency(Redgold);
+        address
     }
 
     pub fn script_hash(input: impl AsRef<[u8]>) -> RgResult<Self> {
@@ -173,17 +218,6 @@ impl Address {
 
     pub fn from_struct_public(pk: &structs::PublicKey) -> Result<Address, ErrorInfo> {
         Self::from_byte_calculate(&pk.vec())
-    }
-
-    pub fn from_multiple_public_keys(pks: &Vec<structs::PublicKey>) -> Result<Address, ErrorInfo> {
-        let mut pks = pks.iter().map(|p| p.vec()).collect_vec();
-        pks.sort_by(|a, b| a.cmp(&b)); // Sort by raw bytes
-
-        let mut bytes = Vec::new();
-        for pk in pks {
-            bytes.extend(pk);
-        }
-        Self::from_byte_calculate(&bytes)
     }
 
     pub fn with_checksum(bytes: Vec<u8>) -> Vec<u8> {

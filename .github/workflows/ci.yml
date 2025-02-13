@@ -11,6 +11,8 @@ env:
   DATABASE_URL: "sqlite:///home/runner/work/redgold-core/redgold-core/.rg/sqlx/data_store.sqlite"
 on:
   push:
+#    paths:
+#      - '.github/workflows/**'
   workflow_dispatch:
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -366,12 +368,17 @@ jobs:
       - run: echo "${{ github.run_number }}" > crates/schema/src/resources/build_number
       - run: echo "asdf" > ./redgold_mac
       - run: echo "asdf" > ./redgold.app.zip
-      - name: Install GMP
-        run: brew install gmp
-      - name: Set GMP environment variables
+      - name: Install mac dependencies
+        run: brew install nettle pkg-config gmp
+      - name: Set environment variables
         run: |
           echo "LIBRARY_PATH=$(brew --prefix gmp)/lib" >> $GITHUB_ENV
           echo "CPATH=$(brew --prefix gmp)/include" >> $GITHUB_ENV
+          export NETTLE_PATH=$(find /opt/homebrew/Cellar/nettle -name "nettle.pc" | xargs dirname)
+          echo "PKG_CONFIG_PATH=$NETTLE_PATH:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          GMP_PATH=$(find /opt/homebrew/Cellar/gmp -name "gmp.h" | head -n1 | xargs dirname)
+          echo "C_INCLUDE_PATH=$GMP_PATH:$C_INCLUDE_PATH" >> $GITHUB_ENV
+
       - if:
           contains('
           refs/heads/staging
@@ -580,7 +587,7 @@ jobs:
       - name: Delete existing release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete "release/${{ env.BRANCH }}" --cleanup-tag=false --yes || true
+        run: gh release delete "release/${{ env.BRANCH }}" --cleanup-tag=true --yes || true
 #      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
 #        with:
 #          delete_release: true # default: false
@@ -601,7 +608,7 @@ jobs:
             redgold.app.zip
             redgold.exe
             redgold_linux_ubuntu20
-#          tag_name: "release/${{ env.BRANCH }}"
+          tag_name: "release/${{ env.BRANCH }}"
           name: ${{ env.BRANCH }}
           #           ${{steps.build_changelog.outputs.changelog}}
           # TODO: Make this body a step output
@@ -628,7 +635,10 @@ jobs:
           
           "
           token: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Delete tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git push origin --delete "release/${{ env.BRANCH }}" || true
       - if:
           contains('
           refs/heads/staging

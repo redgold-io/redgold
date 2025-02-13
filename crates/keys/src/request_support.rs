@@ -3,7 +3,9 @@ use crate::{KeyPair, TestConstants};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
-use redgold_schema::structs::{AboutNodeResponse, NodeMetadata, Proof, PublicKey, Request, Response};
+use redgold_schema::structs::{AboutNodeResponse, NodeMetadata, Proof, PublicKey};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use redgold_schema::{error_info, RgResult, SafeOption};
 
 pub trait RequestSupport {
@@ -18,7 +20,7 @@ impl RequestSupport for Request {
         let hash = self.calculate_hash();
         // println!("with_auth hash: {:?}", hash.hex());
         let proof = Proof::from_keypair_hash(&hash, &key_pair);
-        proof.verify(&hash).expect("immediate verify");
+        proof.verify_signature_only(&hash).expect("immediate verify");
         self.proof = Some(proof);
         self
     }
@@ -34,7 +36,7 @@ impl RequestSupport for Request {
         let nmd = self.node_metadata.safe_get_msg("Missing node metadata on request authentication verification")?;
         let nmd_pk = nmd.public_key.safe_get_msg("Missing public key on node metadata request authentication verification")?;
         let pk = proof.public_key.safe_get_msg("Missing public key on request authentication verification")?;
-        let proof_ver = proof.verify(&hash);
+        let proof_ver = proof.verify_signature_only(&hash);
         // if proof_ver.is_err() {
         //     let sig_bytes = proof.clone().signature.unwrap().bytes;
         //     let b = sig_bytes.safe_bytes().expect("");
@@ -95,7 +97,7 @@ impl ResponseSupport for Response {
         Ok(self)
     }
     fn proceed_from_proof_pk(&self, intended_pk: Option<&PublicKey>, nmd_pk: &PublicKey, proof: &Proof, proof_pk: &PublicKey) -> RgResult<()> {
-        proof.verify(&self.calculate_hash()).add("proof verification failure on response")?;
+        proof.verify_signature_only(&self.calculate_hash()).add("proof verification failure on response")?;
         if nmd_pk != proof_pk {
             return Err(error_info("Node metadata public key and proof public key mismatch on response authentication verification"));
         }

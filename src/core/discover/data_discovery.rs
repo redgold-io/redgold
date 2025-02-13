@@ -3,7 +3,8 @@ use crate::core::relay::Relay;
 use async_trait::async_trait;
 use redgold_common::flume_send_help::{RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_common_no_wasm::stream_handlers::IntervalFold;
-use redgold_schema::structs::{RecentDiscoveryTransactionsRequest, Request};
+use redgold_schema::structs::{RecentDiscoveryTransactionsRequest};
+use redgold_schema::message::Request;
 use redgold_schema::RgResult;
 use std::time::Duration;
 

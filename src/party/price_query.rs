@@ -29,6 +29,8 @@ impl PriceDataPointQueryImpl for PriceDataPointUsdQuery {
 
         self.query_price(recent, SupportedCurrency::Bitcoin, ds, t).await?;
         self.query_price(recent, SupportedCurrency::Ethereum, ds, t).await?;
+        self.query_price(recent, SupportedCurrency::Monero, ds, t).await?;
+        self.query_price(recent, SupportedCurrency::Solana, ds, t).await?;
         Ok(())
     }
 

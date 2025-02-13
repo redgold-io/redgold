@@ -95,6 +95,7 @@ class ScanConfig:
     def __init__(self):
         self.exclude_vue = False
         self.exclude_docs = False
+        self.docs_only = False
 
 
 def process_file(file, accum, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions):
@@ -116,7 +117,7 @@ def process_file(file, accum, file_exclusions, file_inclusions, endings_exclusio
 
 def scan_tld(scan_config=None):
     current_dir = Path.cwd()
-    print("Current directory: ", current_dir)
+    # print("Current directory: ", current_dir)
     parent_dir = current_dir.parent
 
     accum = AccumFileData()
@@ -128,24 +129,45 @@ def scan_tld(scan_config=None):
     endings_excl = endings_exclusions()
     endings_incl = endings_inclusions()
 
+    directory_inclusions=None
+
     if scan_config:
         if scan_config.exclude_vue:
             directory_excl.extend(["vue-website", "vue-explorer"])
         if scan_config.exclude_docs:
             directory_excl.append("docs")
+        if scan_config.docs_only:
+            directory_inclusions = ["docs/content/3.whitepaper"]
 
-    scan_dir(parent_dir, accum, directory_excl, file_excl, file_incl, endings_excl, endings_incl)
+    scan_dir(parent_dir, accum, directory_excl, file_excl, file_incl, endings_excl, endings_incl, directory_inclusions)
     return accum
 
 
-def scan_dir(dir_path, accum, directory_exclusions, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions):
+def scan_dir(
+        dir_path,
+        accum,
+        directory_exclusions,
+        file_exclusions,
+        file_inclusions,
+        endings_exclusions,
+        endings_inclusions,
+        directory_inclusions=None
+):
     if dir_path.name in directory_exclusions:
         return
-    for entry in dir_path.iterdir():
+    for entry in sorted(dir_path.iterdir()):
         if entry.is_file():
-            process_file(entry, accum, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions)
+            skip = False
+            if directory_inclusions is not None:
+                full_path = str(entry.absolute())
+                should_proceed = any([d in full_path for d in directory_inclusions])
+                if not should_proceed:
+                    skip = True
+            if not skip:
+                # print("Processing file: ", entry)
+                process_file(entry, accum, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions)
         elif entry.is_dir():
-            scan_dir(entry, accum, directory_exclusions, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions)
+            scan_dir(entry, accum, directory_exclusions, file_exclusions, file_inclusions, endings_exclusions, endings_inclusions, directory_inclusions)
 
 
 def count_lines(file_path):
@@ -167,21 +189,20 @@ def all_repo_contents():
 # Test function
 def test_scan_tld():
     config = ScanConfig()
+    config.docs_only = True
     ac = AccumFileData.from_config(config)
     # print(f"Token count: {ac.token_count_all()}")
-    lc = ac.line_counts()
-    tlc = sum(count for _, count in lc)
+    # lc = ac.line_counts()
+    # tlc = sum(count for _, count in lc)
     # print(f"Total line count: {tlc}")
     # print(f"Line counts: {lc}")
     # print(f"Token counts: {ac.token_counts()}")
-    for k in ac.indexed_files():
-        root = ac.root
-        print(k.path[len(str(root)):])
-        print(root)
+    # for k in ac.indexed_files():
+    #     root = ac.root
+    #     print(k.path[len(str(root)):])
+    #     print(root)
     with open("all_repo_contents.txt", "w") as f:
         f.write(ac.contents_all())
-
-
 
 
 if __name__ == "__main__":

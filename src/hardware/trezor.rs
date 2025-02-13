@@ -334,7 +334,7 @@ pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Re
     let signature = sign_message(path, msg)?;
     let sig = signature.signature();
     let proof = Proof::from(public, sig);
-    proof.verify(hash)?;
+    proof.verify_signature_only(hash)?;
     Ok(proof)
 }
 
@@ -342,7 +342,7 @@ pub fn trezor_proof(hash: &Hash, public: structs::PublicKey, path: String) -> Re
 
 pub async fn sign_transaction(transaction: &mut Transaction, public: structs::PublicKey, path: String)
     -> Result<Transaction, ErrorInfo> {
-    let hash: Hash = transaction.hash_or();
+    let hash: Hash = transaction.signable_hash();
     let ser_transaction = transaction.json_or();
     let all_addrs = public.to_all_addresses()?;
 
@@ -358,7 +358,7 @@ pub async fn sign_transaction(transaction: &mut Transaction, public: structs::Pu
             let proof = trezor_proof(&hash, public.clone(), path.clone())?;
             let proof1 = proof.clone();
             i.proof.push(proof1);
-            i.verify_proof(&output_enriched_address, &hash)?;
+            i.verify_assuming_enriched(&hash)?;
         }
     }
     Ok(transaction.clone())
@@ -372,10 +372,10 @@ pub async fn sign_bitcoin_transaction(json_str: String) -> Result<String, ErrorI
 pub async fn sign_input(i: &mut Input, public: &structs::PublicKey, path: String, hash: &Hash)
     -> Result<Input, ErrorInfo> {
     let proof = trezor_proof(&hash, public.clone(), path.clone())?;
-    let addr = public.address()?;
+    // let addr = public.address()?;
     let proof1 = proof.clone();
     i.proof.push(proof1);
-    i.verify_proof(&addr, hash)?;
+    // i.verify_proof(&addr, hash)?;
     Ok(i.clone())
 }
 

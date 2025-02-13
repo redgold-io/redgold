@@ -405,7 +405,6 @@ pub async fn deploy_redgold<T: SSHOrCommandLike>(
         compose_str = compose_str.replace("${RPC_LOGIN:-username:password}", wallet_rpc.authentication.clone().unwrap().as_str());
         compose_str = compose_str.replace("${DAEMON_HOST:-http://127.0.0.1:28089}", daemon_rpc.url.as_str());
         compose_str = compose_str.replace("${WALLET_RPC_PORT:-28088}", wallet_rpc.url.as_str().split(":").last().unwrap());
-        compose_str = compose_str.replace("wallet-dir=/home/monero/wallets", wallet_rpc.url.as_str().split(":").last().unwrap());
 
         // if network.is_main() {
         //     compose_str = compose_str.replace("      - --testnet", "");

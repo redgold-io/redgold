@@ -13,6 +13,8 @@ use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
+use ethers::prelude::test_provider::TestProvider;
+use ethers::providers;
 
 pub struct EthereumWsProvider {
     pub provider: Arc<Provider<Ws>>,
@@ -70,6 +72,18 @@ impl EthereumWsProvider {
             provider,
             url
         })
+    }
+
+    pub async fn sepolioa_infura_test() -> EthereumWsProvider {
+        Self {
+            provider: Arc::new(providers::SEPOLIA.ws().await),
+            url: "".to_string()
+        }
+    }
+
+
+    pub async fn sepolioa_blastapi() -> RgResult<EthereumWsProvider> {
+        Self::new("wss://eth-sepolia.public.blastapi.io").await
     }
 
 
@@ -146,12 +160,13 @@ impl EthereumWsProvider {
             block_number: tx.block_number.map(|b| b.0[0]),
             price_usd: None,
             fee: Some(g_amount),
-            self_address: Some(self_address),
+            self_address: Some(self_address.clone()),
             currency_id: Some(SupportedCurrency::Ethereum.into()),
             currency_amount: Some(amount.clone()),
             from: structs::Address::from_eth_external_exact(&from),
             to: vec![(structs::Address::from_eth_external_exact(&to), amount)],
             other: Some(structs::Address::from_eth_external_exact(&other_address)),
+            queried_address: Some(structs::Address::from_eth_external_exact(&self_address)),
         })
     }
 }

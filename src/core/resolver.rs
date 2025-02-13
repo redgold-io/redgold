@@ -1,5 +1,7 @@
 use crate::core::relay::Relay;
-use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, Request, ResolveHashRequest, Response, Transaction};
+use redgold_schema::structs::{Address, ErrorInfo, Hash, Input, ObservationProof, Output, PartitionInfo, PublicKey, ResolveHashRequest, Transaction};
+use redgold_schema::message::Response;
+use redgold_schema::message::Request;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
@@ -64,10 +66,9 @@ impl ResolvedInput {
         let prior_output = self.prior_output()?;
         // TODO: Actually verify parent transaction hash matches input here right ?
         // Or is this done already?
-        let address = prior_output.address.safe_get()?;
-        let signable_hash = &self.signable_hash;
-        self.input.verify_proof(address, signable_hash)?;
-
+        let mut input = self.input.clone();
+        input.output = Some(prior_output.clone());
+        input.verify_assuming_enriched(&self.signable_hash)?;
         Ok(())
     }
     pub fn amount(&self) -> Result<Option<i64>, ErrorInfo> {

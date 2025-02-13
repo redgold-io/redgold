@@ -82,10 +82,10 @@ impl PortfolioTabState {
                     "".to_string()
                 }
             })
-            .x_axis_formatter(|value, range| {
+            .x_axis_formatter(|value, _range| {
                 (value.value as i64).to_time_string_day()
             })
-            .y_axis_formatter(|value, range| {
+            .y_axis_formatter(|value, _range| {
                 format_dollar_amount_brief_with_prefix_and_suffix(value.value)
             })
             .show(ui, |plot_ui| {

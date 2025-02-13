@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(unused_variables)]
 
 use redgold_schema::error_message;
 use redgold_schema::structs::ErrorInfo;

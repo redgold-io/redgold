@@ -6,7 +6,7 @@ use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::Transaction;
 use redgold_schema::RgResult;
 
-pub fn transaction_simple_parquet_schema(time: Option<i64>) -> Schema {
+pub fn transaction_simple_parquet_schema(_time: Option<i64>) -> Schema {
     Schema::from_iter(vec![
         Field::new("time", DataType::Datetime(TimeUnit::Milliseconds, None)),
         Field::new("hash", DataType::Binary),

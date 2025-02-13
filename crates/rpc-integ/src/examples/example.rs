@@ -2,7 +2,7 @@ use ethers::{core::types::TransactionRequest,
              middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, signers::{LocalWallet, Signer}};
 
 
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::{helpers::easy_json::EasyJsonDeser, keys::words_pass::WordsPass, structs::CurrencyAmount};
 
 use crate::eth::eth_wallet::EthWalletWrapper;
 use crate::eth::historical_client::EthHistoricalClient;
@@ -14,8 +14,8 @@ use foundry_block_explorers::Client;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_keys::{KeyPair, TestConstants};
-use redgold_schema::helpers::easy_json::{EasyJson, EasyJsonDeser};
-use redgold_schema::structs::{CurrencyAmount, NetworkEnvironment};
+use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::structs::NetworkEnvironment;
 use redgold_schema::util::lang_util::AnyPrinter;
 
 //  Has faucet bitcoin test funds
@@ -31,6 +31,15 @@ pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
     } else {
         None
     }
+}
+pub fn dev_ci_kp_from_w(w: String) -> (String, KeyPair) {
+    let w = WordsPass::new(w, None);
+    // This is wrong for ethereum, but we just need the secret key to match other
+    // faucet funds for 'same' key.
+    let path = "m/84'/0'/0'/0/0";
+    let privk = w.private_at(path.to_string()).expect("private key");
+    let keypair = w.keypair_at(path.to_string()).expect("private key");
+    (privk, keypair)
 }
 
 fn eth_addr() -> String {
