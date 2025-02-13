@@ -7,7 +7,6 @@ use crate::node::Node;
 use crate::node_config::ToTransactionBuilder;
 use crate::observability::metrics_registry;
 use crate::party::stake_event_stream::StakeMethods;
-use crate::test::external_amm_integration::dev_ci_kp;
 use crate::test::harness::amm_harness::PartyTestHarness;
 use crate::test::local_test_context::{LocalNodes, LocalTestNodeContext};
 use crate::util;

@@ -32,6 +32,15 @@ pub fn dev_ci_kp() -> Option<(String, KeyPair)> {
         None
     }
 }
+pub fn dev_ci_kp_from_w(w: String) -> (String, KeyPair) {
+    let w = WordsPass::new(w, None);
+    // This is wrong for ethereum, but we just need the secret key to match other
+    // faucet funds for 'same' key.
+    let path = "m/84'/0'/0'/0/0";
+    let privk = w.private_at(path.to_string()).expect("private key");
+    let keypair = w.keypair_at(path.to_string()).expect("private key");
+    (privk, keypair)
+}
 
 fn eth_addr() -> String {
     "0xA729F9430fc31Cda6173A0e81B55bBC92426f759".to_string()

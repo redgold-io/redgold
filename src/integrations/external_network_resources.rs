@@ -2,8 +2,9 @@ use crate::core::relay::Relay;
 use crate::gui::tabs::transact::hardware_signing::gui_trezor_sign;
 use crate::scrape::crypto_compare::{crypto_compare_point_query, daily_one_year};
 use crate::scrape::okx_point;
-use crate::test::external_amm_integration::dev_ci_kp;
 use crate::util::current_time_millis_i64;
+
+
 use async_trait::async_trait;
 use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::bitcoin::EcdsaSighashType;
@@ -44,6 +45,7 @@ use redgold_keys::solana::derive_solana::SolanaWordPassExt;
 use redgold_keys::solana::wallet::SolanaNetwork;
 use redgold_keys::util::mnemonic_support::MnemonicSupport;
 use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage, MoneroWalletResponse};
+use redgold_rpc_integ::examples::example::dev_ci_kp;
 use redgold_schema::hash::ToHashed;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
