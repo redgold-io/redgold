@@ -29,17 +29,17 @@ impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
         match message {
             Either::Left(t) => {
                 let addrs = self.daq.subscribed_address_filter.read();
-                // let t_addrs = t.addrs();
-                // if !t_addrs.iter().any(|a| addrs.contains(a)) {
-                //     counter!("redgold_daq_eth_skipped_tx").increment(1);
-                //     return Ok(());
-                // }
+                let t_addrs = t.addrs();
+                if !t_addrs.iter().any(|a| addrs.contains(a)) {
+                    counter!("redgold_daq_eth_skipped_tx").increment(1);
+                    return Ok(());
+                }
                 counter!("redgold_daq_eth_tx").increment(1);
                 let ett = EthereumWsProvider::convert_transaction(
                     &addrs, t
                 );
                 if let Ok(ett) = ett {
-                    print!("{}", ett.json_or());
+                    // print!("{}", ett.json_or());
                     if let Some(_) = ett.self_address.as_ref() {
                     }
                 }
