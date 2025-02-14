@@ -1,4 +1,4 @@
-use crate::gui::app_loop::LocalState;
+use redgold_gui::state::local_state::LocalState;
 use crate::node_config::ApiNodeConfig;
 use eframe::{egui, Frame};
 use redgold_common::external_resources::ExternalNetworkResources;
@@ -12,7 +12,6 @@ pub mod top_panel;
 pub mod webcam;
 pub mod qr_render;
 pub mod components;
-pub mod qr_window;
 pub mod native_gui_dependencies;
 pub mod lock_screen;
 pub mod ls_ext;

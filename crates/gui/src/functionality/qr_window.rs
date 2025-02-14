@@ -1,13 +1,12 @@
-use crate::gui::app_loop::LocalState;
 // use crate::gui::image_capture::{CaptureStream, default_stream};
-use crate::gui::qr_render::qr_encode;
 use eframe::egui;
-use eframe::egui::Context;
+use eframe::egui::{Context, Image};
 use egui_extras::RetainedImage;
 use image::DynamicImage;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::common::bounded_text_area;
+use crate::common::bounded_text_area;
 use rqrr::MetaData;
+use crate::functionality::qr_render::qr_encode_image;
 
 pub fn clone_option_retained_image(opt: &Option<RetainedImage>) -> Option<RetainedImage> {
     None
@@ -25,7 +24,7 @@ pub struct QrState {
     pub metadata: Option<MetaData>,
     // #[derivative(Clone(clone_with = "clone_option_retained_image"))]
     // #[derivative(Clone(bound=""))]
-    pub retained_image: Option<RetainedImage>
+    pub retained_image: Option<Image<'static>>
 }
 
 impl Clone for QrState {
@@ -56,7 +55,7 @@ impl Clone for QrShowState {
 pub struct QrShowState {
     pub show_window: bool,
     // #[derivative(Clone(clone_with = "clone_option_retained_image"))]
-    pub qr_image: Option<RetainedImage>,
+    pub qr_image: Option<Image<'static>>,
     pub qr_text: Option<String>
 }
 
@@ -65,7 +64,7 @@ impl QrShowState {
         self.show_window = true;
         let string = content.into();
         self.qr_text = Some(string.clone());
-        let enc = qr_encode(string);
+        let enc = qr_encode_image(string);
         self.qr_image = Some(enc);
     }
 }
@@ -128,46 +127,60 @@ impl QrState {
 }
 
 
-pub fn qr_window<E>(
-    ctx: &Context, state: &mut LocalState<E>
-) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
-    if state.qr_state.show_window {
-        state.qr_state.read_tick();
-    }
 
-    egui::Window::new("QR Code Camera Parser")
-        .open(&mut state.qr_state.show_window)
-        .resizable(false)
-        .collapsible(false)
-        .min_width(500.0)
-        .default_width(500.0)
-        .show(ctx, |ui| {
-            ui.vertical(|ui| {
-                if let Some(i) = state.qr_state.retained_image.as_ref() {
-                    i.show_scaled(ui, 0.2);
-                }
+impl QrState {
+    pub fn qr_window<E>(&mut self, ctx: &Context)
+    where
+        E: ExternalNetworkResources + Clone + Send + Sync + 'static
+    {
+        if self.show_window {
+            self.read_tick();
+        }
+        let mut show = self.show_window;
+        egui::Window::new("QR Code Camera Parser")
+            .open(&mut show)
+            .resizable(false)
+            .collapsible(false)
+            .min_width(500.0)
+            .default_width(500.0)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    if let Some(i) = self.retained_image.as_ref() {
+                        // i.show_scaled(ui, 0.2);
+                    }
+                });
             });
-        });
+        self.show_window = show;
+    }
 }
+impl QrShowState {
 pub fn qr_show_window<E>(
-    ctx: &Context, state: &mut LocalState<E>
-) where E: ExternalNetworkResources + Clone + Send + Sync + 'static {
-    egui::Window::new("QR Code")
-        .open(&mut state.qr_show_state.show_window)
-        .resizable(false)
-        .default_pos(egui::Pos2::new(0.0, 0.0))
-        .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(0.0, 0.0))
-        .collapsible(false)
-        .min_width(500.0)
-        .default_width(500.0)
-        .show(ctx, |ui| {
-            ui.vertical(|ui| {
-                if let Some(i) = state.qr_show_state.qr_image.as_ref() {
-                    i.show_scaled(ui, 1.0);
-                }
-                if let Some(t) = &mut state.qr_show_state.qr_text.clone() {
-                    bounded_text_area(ui, t);
-                }
+        &mut self,
+        ctx: &Context
+    ) where
+        E: ExternalNetworkResources + Clone + Send + Sync + 'static
+    {
+
+        let mut show = self.show_window;
+        egui::Window::new("QR Code")
+            .open(&mut show)
+            .resizable(false)
+            .default_pos(egui::Pos2::new(0.0, 0.0))
+            .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(0.0, 0.0))
+            .collapsible(false)
+            .min_width(500.0)
+            .default_width(500.0)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    if let Some(i) = self.qr_image.as_ref() {
+                        // i.show_scaled(ui, 1.0);
+                    }
+                    if let Some(t) = &mut self.qr_text.clone() {
+                        bounded_text_area(ui, t);
+                    }
+                });
             });
-        });
+
+        self.show_window = show;
+    }
 }

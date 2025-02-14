@@ -100,13 +100,13 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         }
         keys.sort();
 
-        println!("keys: {:?}", keys);
+        // println!("keys: {:?}", keys);
 
         // Create descriptor with proper format for BDK
         let keys_str = keys.join(",");
         let descriptor_str = format!("wsh(multi({},{}))", threshold, keys_str);
 
-        println!("descriptor_str: {:?}", descriptor_str);
+        // println!("descriptor_str: {:?}", descriptor_str);
 
         // Use BDK's descriptor parser to get proper checksum
         let descriptor = bdk::descriptor::Descriptor::<bdk::bitcoin::PublicKey>::from_str(&descriptor_str)

@@ -1,4 +1,4 @@
-use crate::gui::app_loop::LocalStateAddons;
+
 use crate::gui::{top_panel, ClientApp};
 use eframe::egui;
 use eframe::egui::{Align, ScrollArea, TextStyle};
@@ -7,17 +7,14 @@ use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::extract_public::ExtractorPublicKey;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, MnemonicWordsAndPassphrasePath, TransactionSignInfo};
-use redgold_gui::state::local_state::LocalStateUpdate;
+use redgold_gui::state::local_state::{LocalStateAddons, LocalStateUpdate};
 use redgold_gui::tab::tabs::Tab;
 use redgold_gui::tab::transact::swap::SwapStage;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::structs::SupportedCurrency;
 use std::sync::Once;
 use strum::IntoEnumIterator;
-
-use crate::gui::qr_window::{qr_show_window, qr_window};
-use crate::gui::tabs::keys::keys_tab::keys_tab;
-use crate::gui::tabs::otp_tab::otp_tab;
+use redgold_gui::tab::keys::keymanage::keys_tab;
 use crate::gui::tabs::server_tab;
 use crate::gui::tabs::transact::wallet_tab::wallet_screen;
 use crate::util;
@@ -225,7 +222,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
                 wallet_screen(ui, ctx, local_state, has_changed_tab, g, &d);
             }
             Tab::Identity => {
-                crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
+                // crate::gui::tabs::identity_tab::identity_tab(ui, ctx, local_state);
             }
             Tab::Address => {
                 let updated = local_state.address_state.address_tab(ui, ctx, g);
@@ -240,7 +237,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
                 }
             },
             Tab::OTP => {
-                otp_tab(ui, ctx, local_state);
+                // otp_tab(ui, ctx, local_state);
             }
             Tab::Airgap => {
                 // local_state.wallet.active_hot_mnemonic
@@ -262,7 +259,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
         });
     });
 
-    qr_window(ctx, local_state);
-    qr_show_window(ctx, local_state);
+    // qr_window(ctx, local_state);
+    // qr_show_window(ctx, local_state);
 
 }

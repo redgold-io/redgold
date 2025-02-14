@@ -343,6 +343,12 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay, skip_recent_observat
         }
     }
 
+
+    let address_pool_info = get_address_pool_info(_r.clone()).await?
+        .filter(|p| p.public_key == pk.hex());
+
+    // let all_addrs = pk.to_all_addresses_for_network_by_currency(&_r.node_config.network)?;
+
     Ok(DetailedPeerNode{
         external_address: nmd.external_address()?,
         public_key: pk.hex(),
@@ -361,6 +367,7 @@ pub async fn handle_peer_node(p: &PeerNodeInfo, _r: &Relay, skip_recent_observat
             .map(|p| p.hex()).unwrap_or("".to_string()),
         nat_restricted: nmd.transport_info.as_ref().and_then(|t| t.nat_restricted).unwrap_or(false),
         recent_observations: obs,
+        address_pool_info,
     })
 }
 

@@ -5,7 +5,7 @@ use flume::Sender;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::keys::words_pass::{WordsPass, WordsPassMetadata};
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
@@ -59,6 +59,13 @@ impl TransactionSignInfo {
 
 #[allow(async_fn_in_trait)]
 pub trait GuiDepends {
+
+    fn mnemonic_builder_from_str_rounds(str: &String, rounds: usize) -> WordsPass;
+    fn mnemonic_to_seed(w: WordsPass) -> Vec<u8>;
+
+    fn words_pass_metadata(w: WordsPass) -> WordsPassMetadata;
+    fn generate_random_mnemonic() -> WordsPass;
+    fn get_cold_xpub(dp: String) -> RgResult<String>;
 
     fn seed_checksum(m: WordsPass) -> RgResult<String>;
     fn hash_derive_words(m: WordsPass, concat: impl Into<String>) -> RgResult<WordsPass>;
@@ -121,5 +128,13 @@ pub trait GuiDepends {
 
     fn backup_data_stores(&self) -> RgResult<()>;
     fn restore_data_stores(&self, filter: Option<Vec<i64>>) -> RgResult<()>;
+
+    fn validate_mnemonic(w: WordsPass) -> RgResult<()>;
+    fn argon2d_hash(salt: Vec<u8>, nonce: Vec<u8>, m_cost: u32, t_cost: u32, p_cost: u32) -> RgResult<Vec<u8>>;
+    fn words_pass_from_bytes(bytes: &[u8]) -> RgResult<WordsPass>;
+
+    fn as_account_path(path: impl Into<String>) -> Option<String>;
+
+    fn get_xpub_string_path(w: WordsPass, path: impl Into<String>) -> RgResult<String>;
 
 }

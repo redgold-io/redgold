@@ -1,14 +1,14 @@
-use crate::gui::app_loop::LocalState;
+use crate::state::local_state::LocalState;
 use eframe::egui;
 use eframe::egui::Context;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, medium_data_item};
-use redgold_keys::xpub_wrapper::ValidateDerivationPath;
+use crate::common::{bounded_text_area_size, copy_to_clipboard, medium_data_item};
 use redgold_schema::conf::local_stored_state::AccountKeySource;
+use crate::dependencies::gui_depends::GuiDepends;
 
-pub(crate) fn show_xpub_window<E>(
-    ctx: &Context, ls: &mut LocalState<E>, xpub: AccountKeySource
-) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
+pub fn show_xpub_window<E, G>(
+    ctx: &Context, ls: &mut LocalState<E>, xpub: AccountKeySource, g: &G
+) where E: ExternalNetworkResources + 'static + Sync + Send + Clone, G: GuiDepends {
 
     egui::Window::new("XPub")
         .open(&mut ls.keytab_state.show_xpub)
@@ -19,7 +19,7 @@ pub(crate) fn show_xpub_window<E>(
         .show(ctx, |ui| {
             ui.vertical(|ui| {
                 medium_data_item(ui, "Name", xpub.name.clone());
-                medium_data_item(ui, "Derivation Path", xpub.derivation_path.as_account_path().expect("acc"));
+                medium_data_item(ui, "Derivation Path", G::as_account_path(xpub.derivation_path).unwrap_or("".to_string()));
                 if let Some(ho) = xpub.hot_offset {
                     medium_data_item(ui, "Hot Offset", ho);
                 }

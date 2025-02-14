@@ -1,4 +1,10 @@
-pub mod keys_tab;
-pub mod keygen_subtab;
-pub mod show_xpub_window;
-pub mod xpub_csv_loader;
+use redgold_keys::xpub_wrapper::XpubWrapper;
+use redgold_schema::RgResult;
+use crate::hardware::trezor;
+
+pub fn get_cold_xpub(dp: String) -> RgResult<String> {
+    let node = trezor::get_public_node(dp)?;
+    let w = XpubWrapper::new(node.xpub);
+    w.public_at(0, 0)?;
+    Ok(w.xpub)
+}

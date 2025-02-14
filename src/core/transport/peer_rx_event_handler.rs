@@ -3,25 +3,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::channel::mpsc::Receiver;
-use futures::prelude::*;
-use itertools::Itertools;
-use metrics::{counter, histogram};
-use rocket::yansi::Paint;
-// use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
-use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
-use redgold_schema::helpers::easy_json::EasyJson;
-use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
-use redgold_schema::message::{GetPartyMetadataResponse, Request, Response};
-use redgold_schema::{error_info, structs, RgResult, SafeOption};
-// use svg::Node;
-use tokio::runtime::Runtime;
-use tokio::task::JoinHandle;
-// use libp2p::{Multiaddr, PeerId};
-// use libp2p::request_response::ResponseChannel;
-use tracing::{debug, error, info, trace};
-use redgold_common::external_resources::ExternalNetworkResources;
 use crate::api::about;
 use crate::api::faucet::faucet_request;
 use crate::api::hash_query::get_address_info_public_key;
@@ -30,9 +11,17 @@ use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::data::download::process_download_request;
 use crate::observability::metrics_help::WithMetrics;
+use crate::party::order_fulfillment::handle_multisig_request;
 use crate::schema::response_metadata;
 use crate::schema::structs::ResponseMetadata;
 use crate::util::keys::ToPublicKeyFromLib;
+use futures::channel::mpsc::Receiver;
+use futures::prelude::*;
+use itertools::Itertools;
+use metrics::{counter, histogram};
+use redgold_common::external_resources::ExternalNetworkResources;
+// use crate::api::p2p_io::rgnetwork::{Client, Event, PeerResponse};
+use redgold_common::flume_send_help::{new_channel, RecvAsyncErrorInfo, SendErrorInfo};
 use redgold_data::data_store::DataStore;
 use redgold_keys::request_support::{RequestSupport, ResponseSupport};
 use redgold_keys::solana::derive_solana::SolanaWordPassExt;
@@ -40,14 +29,25 @@ use redgold_keys::word_pass_support::{NodeConfigKeyPair, WordsPassNodeConfig};
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::easy_json::json;
 use redgold_schema::helpers::easy_json::json_or;
+use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
+use redgold_schema::message::{GetPartyMetadataResponse, Request, Response};
+use redgold_schema::observability::errors::EnhanceErrorInfo;
 // use crate::multiparty_gg20::watcher::DepositWatcher;
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::BatchTransactionResolveResponse;
+use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, GetPartiesInfoResponse, GetPeersInfoRequest, GetPeersInfoResponse, Hash, PublicKey, QueryObservationProofResponse, RecentDiscoveryTransactionsResponse, ResolveCodeResponse, SubmitTransactionRequest, TransactionEntry, UtxoId, UtxoValidResponse};
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::util::timers::PerfTimer;
-use crate::party::order_fulfillment::handle_multisig_request;
+use redgold_schema::{error_info, structs, RgResult, SafeOption};
+use rocket::yansi::Paint;
+// use svg::Node;
+use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
+// use libp2p::{Multiaddr, PeerId};
+// use libp2p::request_response::ResponseChannel;
+use tracing::{debug, error, info, trace};
 
 #[derive(Clone)]
 pub struct PeerRxEventHandler<E> where E: ExternalNetworkResources + Send {
@@ -160,18 +160,6 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
 
         let auth_required = request.auth_required();
 
-        if let Some(r) = &request.multisig_request {
-            response.multisig_response = Some(handle_multisig_request(r, &relay, &e).await.log_error()?);
-        }
-        if let Some(r) = &request.notify_multisig_creation_request {
-            if let Ok(pk) = &verified {
-                if relay.node_config.non_self_seeds_pk().contains(&pk) {
-                    if let Some(pmd) = r.party_metadata.as_ref() {
-                        relay.new_multisig_metadata.lock().await.push((pk.clone(), pmd.clone()));
-                    }
-                }
-            }
-        }
         if let Some(r) = &request.get_party_metadata_request {
             let option = relay.ds.config_store.get_json("party_metadata").await?.clone();
             let mut resp = GetPartyMetadataResponse::default();
@@ -388,7 +376,18 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
         if auth_required {
             match verified {
                 Ok(pk) => {
-                    
+                    if let Some(r) = &request.multisig_request {
+                        if relay.node_config.non_self_seeds_pk().contains(&pk) {
+                            response.multisig_response = Some(handle_multisig_request(r, &relay, &e).await.log_error()?);
+                        }
+                    }
+                    if let Some(r) = &request.notify_multisig_creation_request {
+                        if relay.node_config.non_self_seeds_pk().contains(&pk) {
+                            if let Some(pmd) = r.party_metadata.as_ref() {
+                                relay.new_multisig_metadata.lock().await.push((pk.clone(), pmd.clone()));
+                            }
+                        }
+                    }
                 }
                 Err(e) => { return Err(e).add("Unable to process request, authorization required and failed").log_error(); }
             }

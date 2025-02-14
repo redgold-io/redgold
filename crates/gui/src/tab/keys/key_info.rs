@@ -1,18 +1,15 @@
-use crate::gui::app_loop::LocalState;
-use crate::gui::components::explorer_links::rdg_explorer_links;
 use eframe::egui::Ui;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::common::{data_item, data_item_hyperlink};
-use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::util::mnemonic_support::MnemonicSupport;
-use redgold_keys::xpub_wrapper::XpubWrapper;
-use redgold_keys::KeyPair;
+use crate::common::{data_item, data_item_hyperlink};
+use crate::dependencies::gui_depends::GuiDepends;
+
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey, SupportedCurrency};
 use redgold_schema::{error_info, RgResult};
 use serde::{Deserialize, Serialize};
+use crate::functionality::explorer_links::rdg_explorer_links;
+use crate::state::local_state::LocalState;
 
 const DEFAULT_DP: &str = "m/44'/0'/50'/0/0";
 
@@ -35,15 +32,9 @@ pub struct KeyInfo {
     pub secret_key: Option<String>,
 }
 
-
-impl Default for KeyInfo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 impl KeyInfo {
 
-    pub fn new() -> Self {
+    pub fn new<G>(g: &G) -> Self where G: GuiDepends {
         let mut ki = KeyInfo {
             key: None,
             public_key: "".to_string(),
@@ -54,23 +45,21 @@ impl KeyInfo {
             derivation_path: DEFAULT_DP.to_string(),
             secret_key: None,
         };
-        ki.update_public_key_info();
+        ki.update_public_key_info(g);
         ki
     }
 
-    pub fn public_key(&self) -> RgResult<PublicKey> {
+    pub fn public_key<G>(&self, g: &G) -> RgResult<PublicKey> where G: GuiDepends {
         if let Some(k) = self.key.as_ref() {
             match k {
                 GuiKey::DirectPrivateKey(k) => {
-                    KeyPair::from_private_hex(k.clone()).map(|h| h.public_key())
+                    g.private_hex_to_public_key(k.clone())
                 }
                 GuiKey::Mnemonic(m) => {
-                    m.public_at(self.derivation_path.clone())
+                    G::public_at(m.clone(), self.derivation_path.clone())
                 }
                 GuiKey::XPub(xpub) => {
-                    let w = XpubWrapper::new(xpub.clone());
-                    let public = w.public_at_dp(&self.derivation_path);
-                    public
+                    g.xpub_public(xpub.clone(), self.derivation_path.clone())
                 }
             }
         } else {
@@ -78,14 +67,16 @@ impl KeyInfo {
         }
     }
 
-    fn update_public_key_info(&mut self) {
-        if let Ok(pk) = self.public_key() {
+    fn update_public_key_info<G>(&mut self, g: &G) where G: GuiDepends {
+        if let Ok(pk) = self.public_key(g) {
             self.public_key = pk.hex();
             self.address = pk.address()
                 .and_then(|a| a.render_string())
                 .unwrap_or("Address failure".to_string());
-            self.btc_address = pk.to_bitcoin_address(&self.network).unwrap_or("".to_string());
-            self.eth_address = pk.to_ethereum_address().unwrap_or("".to_string());
+            g.form_btc_address(&pk)
+                .map(|a| self.btc_address = a.render_string().unwrap_or("".to_string()));
+            g.form_eth_address(&pk)
+                .map(|a| self.eth_address = a.render_string().unwrap_or("".to_string()));
 
             // info!("Public key found in update_public_key_info {}", self.btc_address);
         } else {
@@ -93,21 +84,22 @@ impl KeyInfo {
         }
     }
 
-    pub fn update_fields(&mut self,
+    pub fn update_fields<G>(&mut self,
                          network_environment: &NetworkEnvironment,
                          derivation_path: String,
-                         key: GuiKey
-    ) {
+                         key: GuiKey,
+                            g: &G
+    ) where G: GuiDepends {
         // info!("Updating fields called");
         self.network = network_environment.clone();
         self.derivation_path = derivation_path;
         self.key = Some(key);
-        self.update_public_key_info();
+        self.update_public_key_info(g);
     }
 
-    pub fn view(&mut self, ui: &mut Ui, option: Option<PublicKey>, environment: NetworkEnvironment) {
+    pub fn view<G>(&mut self, ui: &mut Ui, option: Option<PublicKey>, environment: NetworkEnvironment, g: &G) where G: GuiDepends {
 
-        let links = option.map(|pk| rdg_explorer_links(&environment, &pk)).unwrap_or_default();
+        let links = option.map(|pk| rdg_explorer_links(&environment, &pk, g)).unwrap_or_default();
         let rdg_link = links.get(&SupportedCurrency::Redgold);
         let btc_link = links.get(&SupportedCurrency::Bitcoin);
         let eth_link = links.get(&SupportedCurrency::Ethereum);
@@ -150,18 +142,20 @@ where G: GuiDepends + Clone + Send + 'static + Sync, E: ExternalNetworkResources
     ls.keytab_state.keys_key_info.update_fields(
         &ls.node_config.network,
         ls.keytab_state.key_derivation_path_input.derivation_path.clone(),
-        gui_key
+        gui_key,g
+
     );
 }
 
-pub fn update_xpub_key_info<E>(ls: &mut LocalState<E>) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
+pub fn update_xpub_key_info<E, G>(ls: &mut LocalState<E>, g: &G) where E: ExternalNetworkResources + 'static + Sync + Send + Clone, G: GuiDepends {
     let xpub = ls.local_stored_state.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name));
     if let Some(xpub) = xpub {
         let gui_key = GuiKey::XPub(xpub.xpub.clone());
         ls.keytab_state.xpub_key_info.update_fields(
             &ls.node_config.network,
             ls.keytab_state.derivation_path_xpub_input_account.derivation_path(),
-            gui_key
+            gui_key,
+            g
         );
     }
 

@@ -1,8 +1,9 @@
-use crate::gui::app_loop::LocalState;
+
 use eframe::egui::{ComboBox, Ui};
 use itertools::Either;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::dependencies::gui_depends::GuiDepends;
+use crate::dependencies::gui_depends::GuiDepends;
+use crate::state::local_state::LocalState;
 
 pub fn key_source<E, G>(
     ui: &mut Ui, ls: &mut LocalState<E>, g: &G
@@ -51,8 +52,3 @@ G: GuiDepends + 'static + Sync + Send + Clone {
     has_changed
 }
 
-pub fn add_new_key_button<E>(ls: &mut LocalState<E>, ui: &mut Ui) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
-    if ui.button("Add Hot Mnemonic / Private Key").clicked() {
-        ls.wallet.add_new_key_window = true;
-    }
-}

@@ -1,4 +1,4 @@
-use crate::gui::app_loop::LocalState;
+use redgold_gui::state::local_state::LocalState;
 use crate::node_config::ApiNodeConfig;
 use flume::Sender;
 use redgold_common::flume_send_help::SendErrorInfo;

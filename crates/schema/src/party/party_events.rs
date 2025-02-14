@@ -20,7 +20,7 @@ pub enum AddressEventExtendedType {
 }
 
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PartyEvents where {
     pub network: NetworkEnvironment,
     pub party_addresses: HashMap<SupportedCurrency, Vec<Address>>,

@@ -1,14 +1,12 @@
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-
-use crate::gui::tabs::transact::wallet_tab;
 use eframe::egui;
 use eframe::egui::{ScrollArea, Ui, Widget};
 use itertools::Itertools;
+use log::info;
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::conf::local_stored_state::AccountKeySource;
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, RgResult};
-use tracing::info;
+use crate::state::local_state::{LocalState, LocalStateAddons};
 
 fn parse_xpub_rows(str: &str) -> RgResult<Vec<AccountKeySource>> {
     let mut rdr = csv::Reader::from_reader(str.as_bytes());
@@ -89,3 +87,6 @@ pub fn window_xpub_loader<E>(
         ls.wallet.show_xpub_loader_window = false;
     }
 }
+
+
+

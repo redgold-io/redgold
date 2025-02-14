@@ -1,5 +1,62 @@
 use itertools::Itertools;
-use strum_macros::EnumString;
+use serde::{Deserialize, Serialize};
+use strum_macros::{EnumIter, EnumString};
+use redgold_schema::constants::default_node_internal_derivation_path;
+use redgold_schema::keys::words_pass::WordsPass;
+use crate::components::account_deriv_sel::AccountDerivationPathInputState;
+use crate::components::derivation_path_sel::DerivationPathInputState;
+use crate::dependencies::gui_depends::GuiDepends;
+use crate::tab::keys::key_info::KeyInfo;
+use crate::tab::keys::xpub_req::RequestXpubState;
+
+
+
+impl KeyTabState {
+    pub fn new<G>(g: &G) -> Self where G: GuiDepends {
+        KeyTabState {
+            keygen_subtab: KeygenSubTab::Manage,
+            subsubtab: KeygenSubSubTab::XPubs,
+            show_private_key_window: false,
+            show_xpub: false,
+            key_derivation_path_input: Default::default(),
+            derivation_path_xpub_input_account: Default::default(),
+            request_xpub: Default::default(),
+            keys_key_info: KeyInfo::new(g),
+            xpub_key_info: KeyInfo::new(g),
+            save_xpub_account_name: "".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
+#[repr(i32)]
+pub enum KeygenSubTab {
+    Manage,
+    Generate,
+}
+
+#[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
+#[repr(i32)]
+pub enum KeygenSubSubTab {
+    Keys,
+    XPubs
+}
+
+#[derive(Clone)]
+pub struct KeyTabState {
+    pub keygen_subtab: KeygenSubTab,
+    pub subsubtab: KeygenSubSubTab,
+    pub show_private_key_window: bool,
+    pub show_xpub: bool,
+    pub key_derivation_path_input: DerivationPathInputState,
+    pub derivation_path_xpub_input_account: AccountDerivationPathInputState,
+    pub request_xpub: RequestXpubState,
+    pub keys_key_info: KeyInfo,
+    pub xpub_key_info: KeyInfo,
+    pub save_xpub_account_name: String
+}
+
+
 #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize, Clone, EnumString)]
 // #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum KeyDerivation {
@@ -40,6 +97,47 @@ pub struct MnemonicWindowState {
     pub save_name: String,
     pub persist_disk: bool,
     pub set_hot_mnemonic: bool
+}
+
+impl MnemonicWindowState {
+
+    pub(crate) fn get_private_key_hex<G>(&self, g: &G) -> String where G: GuiDepends {
+        // self.mnemonic_words().private_hex(self.hd_path.clone()).unwrap_or("err".to_string())
+        G::private_at(self.words_pass(), self.hd_path.clone()).unwrap_or("err".to_string())
+    }
+
+    fn words_pass(&self) -> WordsPass {
+        let w = WordsPass::new(
+            self.words.clone(), self.passphrase.clone()
+        );
+        w
+    }
+
+    pub(crate) fn set_words_from_passphrase<G>(&mut self, g: &G) where G: GuiDepends {
+        let passphrase = self.passphrase.clone();
+        let wp = WordsPass::new(
+            self.words.clone(), passphrase.clone()
+        );
+        let md = G::words_pass_metadata(wp.clone());
+
+        self.bitcoin_p2wpkh_84 = md.btc_84h_0h_0h_0_0_address;
+        self.ethereum_address_44 = md.eth_44h_60h_0h_0_0_address;
+        self.words_checksum = G::checksum_words(wp.clone()).unwrap();
+        self.seed_checksum = G::seed_checksum(wp.clone()).ok();
+
+        self.redgold_node_address= G::public_at(wp.clone(), default_node_internal_derivation_path(0))
+            .unwrap().address().unwrap().render_string().unwrap();
+        let hw_addr = G::public_at(wp.clone(), "m/44/0/50/0/0")
+            .unwrap().address().unwrap().render_string().unwrap();
+        self.redgold_hardware_default_address = hw_addr;
+    }
+
+    pub(crate) fn set_words<G>(&mut self, words: impl Into<String>, label: impl Into<String>, g: &G) where G: GuiDepends {
+        self.open = true;
+        self.words = words.into();
+        self.label = label.into();
+        self.set_words_from_passphrase(g);
+    }
 }
 
 
