@@ -9,6 +9,7 @@ use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::helpers::easy_json::EasyJson;
 use serde::{Deserialize, Serialize};
 
+// https://docs.getmonero.org/rpc-library/wallet-rpc/#prepare_multisig
 // https://docs.getmonero.org/rpc-library/wallet-rpc/#introduction
 pub struct MoneroWalletRpcMultisigClient {
     addr: String,
@@ -368,6 +369,66 @@ impl MoneroWalletRpcMultisigClient {
         })
 
     }
+
+    /// Create a multisig transaction that needs to be signed by other participants
+    ///
+    /// # Arguments
+    /// * `destinations` - Vector of (address, amount) pairs for transaction outputs
+    /// * `priority` - Transaction priority (1-4, default 2)
+    /// * `ring_size` - Number of outputs to mix with (default 11)
+    ///
+    /// # Returns
+    /// * Result containing the transaction information including the multisig_txset
+    pub async fn transfer_split(
+        &mut self,
+        destinations: Vec<(String, u64)>,
+        priority: Option<u32>,
+        ring_size: Option<u32>,
+    ) -> RgResult<TransferSplitResult> {
+        let mut params: Map<String, Value> = Default::default();
+        let priority = priority.unwrap_or(2);
+        
+        let destinations: Vec<Map<String, Value>> = destinations
+            .into_iter()
+            .map(|(address, amount)| {
+                let mut map = Map::new();
+                map.insert("address".to_string(), json!(address));
+                map.insert("amount".to_string(), json!(amount));
+                map
+            })
+            .collect();
+
+        params.insert("destinations".to_string(), json!(destinations));
+        params.insert("priority".to_string(), json!(priority));
+        if let Some(size) = ring_size {
+            params.insert("ring_size".to_string(), json!(size));
+        }
+
+        let response = self.json_rpc_call("transfer_split", Params::Map(params)).await?;
+        
+        Ok(serde_json::from_value(response)
+            .error_info("Failed to parse transfer_split response")?)
+    }
+
+    /// Get a description of a multisig transaction before signing
+    ///
+    /// # Arguments
+    /// * `unsigned_txset` - The unsigned transaction set to describe
+    ///
+    /// # Returns
+    /// * Result containing the transaction description
+    pub async fn describe_transfer(
+        &mut self,
+        unsigned_txset: String,
+    ) -> RgResult<DescribeTransferResult> {
+        let mut params: Map<String, Value> = Default::default();
+        params.insert("unsigned_txset".to_string(), json!(unsigned_txset));
+
+        let response = self.json_rpc_call("describe_transfer", Params::Map(params)).await?;
+        
+        Ok(serde_json::from_value(response)
+            .error_info("Failed to parse describe_transfer response")?)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -382,6 +443,30 @@ pub struct IsMultisigResponse {
 pub struct TransferDestination {
     pub amount: u64,
     pub address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransferSplitResult {
+    pub tx_hash_list: Vec<String>,
+    pub tx_key_list: Vec<String>,
+    pub amount_list: Vec<u64>,
+    pub fee_list: Vec<u64>,
+    pub tx_blob_list: Vec<String>,
+    pub tx_metadata_list: Vec<String>,
+    pub multisig_txset: String,
+    pub unsigned_txset: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DescribeTransferResult {
+    pub desc: Vec<String>,
+    pub amount_in: u64,
+    pub amount_out: u64,
+    pub recipients: Vec<TransferDestination>,
+    pub fee: u64,
+    pub ring_size: u64,
+    pub unlock_time: u64,
+    pub dummy_outputs: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]

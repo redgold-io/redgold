@@ -1,4 +1,4 @@
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::api::rosetta;
 use crate::api::rosetta::handlers::*;
 use crate::api::rosetta::models;

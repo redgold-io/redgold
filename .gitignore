@@ -59,4 +59,5 @@ venv
 ai-py/.venv
 ai-py/.idea
 .venv
+coinbase_ws_output.txt
 bdk_sled_test

@@ -34,6 +34,7 @@ itertools = "0.10.5"
 toml = "0.8.19"
 derivative = "2.2"
 hex = { workspace = true }
+csv = "1.3.0"
 
 
 # web:

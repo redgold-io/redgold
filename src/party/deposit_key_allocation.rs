@@ -1,6 +1,6 @@
 use redgold_schema::structs::{CurrencyAmount, InitiateMultipartyKeygenRequest, PartyId, PublicKey};
 use redgold_schema::{RgResult, SafeOption};
-use rocket::serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DepositKeyAllocation {

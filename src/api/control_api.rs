@@ -1,4 +1,4 @@
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::api::rosetta::models::Error;
 use crate::api::warp_helpers::as_warp_json_response;
 use bdk::bitcoin::secp256k1::PublicKey;

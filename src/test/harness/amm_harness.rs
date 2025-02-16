@@ -1,4 +1,4 @@
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::core::transact::tx_broadcast_support::TxBroadcastSupport;
 use crate::util;
 use redgold_keys::address_external::{ToBitcoinAddress, ToEthereumAddress};

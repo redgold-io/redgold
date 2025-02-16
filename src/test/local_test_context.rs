@@ -1,5 +1,5 @@
 use crate::api::client::public_client::PublicClient;
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::api::control_api::ControlClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
@@ -79,7 +79,7 @@ impl LocalTestNodeContext {
             id,
             port_offset: random_port_offset,
             node: node.clone(),
-            public_client: PublicClient::local(node.relay.node_config.public_port(), Some(relay.clone())),
+            public_client: PublicClient::local(node.relay.node_config.public_port(), Some(Box::new(relay.clone()))),
             control_client: ControlClient::local(node.relay.node_config.control_port()),
             // futures
         }

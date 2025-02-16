@@ -26,7 +26,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::explorer::DetailedAddress;
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::keys::words_pass::{WordsPass, WordsPassMetadata};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, ErrorInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
@@ -36,6 +36,10 @@ use redgold_schema::{RgResult, SafeOption};
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
+use redgold_keys::util::mnemonic_builder;
+use crate::gui::tabs::keys::get_cold_xpub;
+use crate::util::argon_kdf::argon2d_hash;
+use crate::util::cli::commands::generate_random_mnemonic;
 
 #[derive(Clone)]
 pub struct NativeGuiDepends {
@@ -375,5 +379,46 @@ impl GuiDepends for NativeGuiDepends {
 
     fn hash_derive_words(m: WordsPass, concat: impl Into<String>) -> RgResult<WordsPass> {
         m.hash_derive_words(concat.into())
+    }
+
+    fn get_cold_xpub(dp: String) -> RgResult<String> {
+        get_cold_xpub(dp)
+    }
+
+    fn generate_random_mnemonic() -> WordsPass {
+        generate_random_mnemonic()
+    }
+
+    fn words_pass_metadata(w: WordsPass) -> WordsPassMetadata {
+        w.metadata().unwrap()
+    }
+
+    fn mnemonic_builder_from_str_rounds(str: &String, rounds: usize) -> WordsPass {
+        let w = mnemonic_builder::from_str_rounds(str, rounds);
+        WordsPass::new(w, None)
+    }
+
+    fn mnemonic_to_seed(w: WordsPass) -> Vec<u8> {
+        w.seed().unwrap().to_vec()
+    }
+
+    fn validate_mnemonic(w: WordsPass) -> RgResult<()> {
+        w.mnemonic().map(|_| ())
+    }
+
+    fn argon2d_hash(salt: Vec<u8>, nonce: Vec<u8>, m_cost: u32, t_cost: u32, p_cost: u32) -> RgResult<Vec<u8>> {
+        argon2d_hash(salt, nonce, m_cost, t_cost, p_cost)
+    }
+
+    fn words_pass_from_bytes(bytes: &[u8]) -> RgResult<WordsPass> {
+        WordsPass::from_bytes(bytes)
+    }
+
+    fn as_account_path(path: impl Into<String>) -> Option<String> {
+        path.into().as_account_path()
+    }
+
+    fn get_xpub_string_path(w: WordsPass, path: impl Into<String>) -> RgResult<String> {
+        w.xpub_str(path.into())
     }
 }

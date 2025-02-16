@@ -8,7 +8,6 @@ use redgold_schema::party::address_event::AddressEvent;
 use redgold_schema::party::party_events::{ConfirmedExternalStakeEvent, InternalStakeEvent, PartyEvents, PendingExternalStakeEvent, PendingWithdrawalStakeEvent};
 use redgold_schema::structs::{CurrencyAmount, DepositRequest, StakeDeposit, StakeWithdrawal, SupportedCurrency, Transaction, UtxoId};
 use redgold_schema::RgResult;
-use rocket::form::validate::Contains;
 use redgold_schema::helpers::easy_json::EasyJson;
 
 pub trait StakeMethods {
@@ -20,7 +19,7 @@ pub trait StakeMethods {
         utxo_id: UtxoId);
     fn handle_stake_requests(&mut self, event: &AddressEvent, time: i64, tx: &Transaction) -> RgResult<()>;
     fn process_stake_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal, time: i64, id: UtxoId) -> RgResult<()>;
-    fn retain_external_stake(&mut self, utxo_ids: &Vec<&UtxoId>, w_currency: SupportedCurrency) -> Option<CurrencyAmount>;
+    fn retain_external_stake(&mut self, utxo_ids: &Vec<UtxoId>, w_currency: SupportedCurrency) -> Option<CurrencyAmount>;
     fn internal_liquidity_stake(&mut self, event: &AddressEvent, tx: &Transaction, amt: Option<CurrencyAmount>, deposit: &StakeDeposit, utxo_id: UtxoId);
 }
 
@@ -32,17 +31,10 @@ impl StakeMethods for PartyEvents {
             let amt = event.currency_amount();
             let oa = event.other_address_typed();
             if let Ok(addr) = oa {
-                // info!("Event: {}", event.json_or());
-                // info!("Pending external stake txs: {}", self.pending_external_staking_txs.json_or());
                 let matching = self.pending_external_staking_txs.iter()
                     .filter(|s| {
-                        // info!("Comparing amounts: {} == {}", s.amount.json_or(), amt.json_or());
-                        // info!("Comparing addresses: {} == {}", s.external_address.render_string().unwrap(), addr.render_string().unwrap());
-                        // info!("Comparing addresses: {} == {}", s.external_address.json_or(), addr.json_or());
                         let amount_equal = s.amount == amt;
                         let address_equal = s.external_address == addr;
-                        // info!("Amount equal: {}", amount_equal);
-                        // info!("Address equal: {}", address_equal);
                         amount_equal && address_equal
                     })
                     .next()
@@ -84,7 +76,6 @@ impl StakeMethods for PartyEvents {
         }
     }
 
-
     fn handle_external_liquidity_deposit(
         &mut self, event: &AddressEvent, tx: &Transaction, deposit_inner: &DepositRequest, liquidity_deposit: &StakeDeposit,
         utxo_id: UtxoId) {
@@ -110,15 +101,11 @@ impl StakeMethods for PartyEvents {
             .filter(|a| *a > 0)
             .map(|a| CurrencyAmount::from(a));
         let opt_stake_request_utxo_id = tx.stake_requests();
-        // let opt_stake_request_utxo_id = addrs.iter().flat_map(|a| tx.liquidity_of(a)).next();
         for (utxo_id, req) in opt_stake_request_utxo_id {
             if let Some(deposit) = req.deposit.as_ref() {
-                // This represents an external deposit.
                 if let Some(deposit_inner) = deposit.deposit.as_ref() {
-                    // deposit_inner.address
                     self.handle_external_liquidity_deposit(event, tx, deposit_inner, deposit, utxo_id.clone());
                 } else {
-                    // Mark this as an internal staking event with some balance due to the amount being present
                     self.internal_liquidity_stake(event, tx, amt.clone(), deposit, utxo_id.clone());
                 }
             } else if let Some(withdrawal) = req.withdrawal.as_ref() {
@@ -129,9 +116,7 @@ impl StakeMethods for PartyEvents {
     }
 
     fn process_stake_withdrawal(&mut self, event: &AddressEvent, tx: &Transaction, withdrawal: &StakeWithdrawal, time: i64, id: UtxoId) -> RgResult<()> {
-        let input_utxo_ids = tx.input_utxo_ids().collect_vec();
-        // Find inputs corresponding to staking events.
-        // This represents a withdrawal, either external or internal
+        let input_utxo_ids: Vec<UtxoId> = tx.input_utxo_ids().map(|u| u.clone()).collect_vec();
 
         if let Some(d) = withdrawal.destination.as_ref() {
             let w_currency = d.currency_or();
@@ -151,8 +136,7 @@ impl StakeMethods for PartyEvents {
             };
             if let Some(amt) = amount {
                 if let Some(existing) = self.balance_map.get(&amt.currency_or()) {
-                    let minimum_amt = Self::minimum_stake_amount_total(amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or())
-                    );
+                    let minimum_amt = Self::minimum_stake_amount_total(amt.currency_or()).unwrap_or(CurrencyAmount::zero(amt.currency_or()));
                     if let Some(fee) = Self::expected_fee_amount(amt.currency_or(), &self.network) {
                         let expected_fee = fee.clone();
                         let delta = existing.clone() - amt.clone() - minimum_amt.clone() - (expected_fee.clone() * 2);
@@ -172,9 +156,9 @@ impl StakeMethods for PartyEvents {
                         };
                         if let Some(order_amt) = order_amt {
                             self.fulfill_order(order_amt.clone(),
-                                               false, time, None, &d, true, event, Some(id.clone()), w_currency,
-                            event.clone(),
-                            None
+                                false, time, None, &d, true, event, Some(id.clone()), w_currency,
+                                event.clone(),
+                                None
                             )?;
                         }
                     }
@@ -186,7 +170,6 @@ impl StakeMethods for PartyEvents {
         }
         if let Some(of) = self.event_fulfillment.clone() {
             let is_external = of.is_stake_withdrawal && of.destination.currency_or() != SupportedCurrency::Redgold;
-            // Is this even being used anymore?
             let w = PendingWithdrawalStakeEvent {
                 address: withdrawal.destination.clone().expect("destination"),
                 amount: of.fulfilled_currency_amount(),
@@ -204,7 +187,7 @@ impl StakeMethods for PartyEvents {
         Ok(())
     }
 
-    fn retain_external_stake(&mut self, utxo_ids: &Vec<&UtxoId>, w_currency: SupportedCurrency) -> Option<CurrencyAmount> {
+    fn retain_external_stake(&mut self, utxo_ids: &Vec<UtxoId>, w_currency: SupportedCurrency) -> Option<CurrencyAmount> {
         if let Some(ev) = self.external_staking_events.iter()
             .filter(|s| utxo_ids.contains(&s.pending_event.utxo_id) &&
                 s.pending_event.external_currency == w_currency)

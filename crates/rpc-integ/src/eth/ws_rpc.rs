@@ -8,7 +8,7 @@ use num_traits::ToPrimitive;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, SupportedCurrency};
+use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -16,6 +16,7 @@ use std::sync::Arc;
 use ethers::prelude::test_provider::TestProvider;
 use ethers::providers;
 
+#[derive(Clone)]
 pub struct EthereumWsProvider {
     pub provider: Arc<Provider<Ws>>,
     pub url: String
@@ -45,16 +46,36 @@ impl TimestampedEthereumTransaction {
 
 impl EthereumWsProvider {
 
-    pub async fn new_from_config(config: &NodeConfig) -> Option<RgResult<EthereumWsProvider>> {
-        let url = config.config_data.external.as_ref()
-        .and_then(|e| e.rpcs.as_ref())
-        .and_then(|r| r.iter()
+
+    pub fn providers_for_network(net: &NetworkEnvironment) -> Vec<String> {
+        match net {
+            NetworkEnvironment::Main => {
+                vec![
+                    "wss://eth-mainnet.public.blastapi.io",
+                    "wss://mainnet.infura.io/ws/v3/15e8aaed6f894d63a0f6a0206c006cdd", // test keys from ethers
+                ]
+            }
+            _ => {
+                vec![
+                    "wss://eth-sepolia.public.blastapi.io",
+                    "wss://mainnet.infura.io/ws/v3/15e8aaed6f894d63a0f6a0206c006cdd", // test keys from ethers
+                ]
+            }
+        }.iter().map(|s| s.to_string()).collect()
+    }
+
+    pub fn config_to_rpc_urls(config: &NodeConfig) -> Vec<String> {
+        config.config_data.external.as_ref()
+            .and_then(|e| e.rpcs.as_ref())
+            .map(|r| r.iter()
                 .filter(|r| r.currency == SupportedCurrency::Ethereum)
                 .filter(|r| r.url.starts_with("ws"))
-                .filter(|r| r.ws_only.unwrap_or(false))
-                .map(|r| r.url.clone())
-                .next()
-        );
+                .map(|r| r.url.clone()).collect::<Vec<String>>()
+            ).unwrap_or_default()
+    }
+
+    pub async fn new_from_config(config: &NodeConfig) -> Option<RgResult<EthereumWsProvider>> {
+        let url = Self::config_to_rpc_urls(config).first().cloned();
         match url {
             Some(url) => Some(EthereumWsProvider::new(url).await),
             None => None
@@ -90,7 +111,7 @@ impl EthereumWsProvider {
 
     pub async fn subscribe_transactions(
         &self
-    ) -> RgResult<impl Stream<Item=TimestampedEthereumTransaction> + '_> {
+    ) -> RgResult<impl Stream<Item=RgResult<TimestampedEthereumTransaction>> + '_> {
         let block_stream = self.provider
             .subscribe_blocks().await
             .error_info("block subscription failed")?;
@@ -98,19 +119,27 @@ impl EthereumWsProvider {
         let tx_stream = block_stream.flat_map(move |block| {
             stream::once(async move {
                 let block_number = block.number.unwrap_or_default();
-                match self.provider.get_block_with_txs(block_number).await {
-                    Ok(Some(block_with_txs)) => {
-                        let ts = block_with_txs.timestamp.clone();
-                        block_with_txs.transactions
-                            .into_iter().map(|x| {
-                            TimestampedEthereumTransaction {
-                                timestamp: ts.clone(),
-                                tx: x
-                            }
-                        })
-                            .collect::<Vec<_>>()
-                    },
-                    _ => vec![]
+                // First get the block with transactions
+                let with_tx = match self.provider.get_block_with_txs(block_number).await.error_info("bogus block request") {
+                    Ok(block) => block,
+                    Err(e) => return vec![Err(e)],
+                };
+
+                // Then process the block if we got it
+                match with_tx {
+                    Some(block) => {
+                        // Create timestamped transactions, each wrapped in Ok
+                        block.transactions
+                            .into_iter()
+                            .map(|tx| {
+                                Ok(TimestampedEthereumTransaction {
+                                    timestamp: block.timestamp,
+                                    tx,
+                                })
+                            })
+                            .collect()
+                    }
+                    None => vec![Err(ErrorInfo::new("Block not found"))]
                 }
             })
                 .flat_map(stream::iter)
@@ -178,9 +207,9 @@ use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 pub async fn ws_stream_test() {
     let p = EthereumWsProvider::new("ws://server:8556").await.expect("ws provider creation failed");
     let s = p.subscribe_transactions().await.unwrap();
-    let mut s = s.take(10).collect::<Vec<TimestampedEthereumTransaction>>().await;
-    println!("Subscribed to new transactions");
-    for tx in s.iter() {
+    // let mut s = s.take(10).collect::<RgResult<Vec<TimestampedEthereumTransaction>>>().await;
+    // println!("Subscribed to new transactions");
+    // for tx in s.iter() {
         // println!("Transaction hash: {:?}", tx.hash);
         // println!("From: {:?}", tx.from);
         // println!("To: {:?}", tx.to);
@@ -189,7 +218,7 @@ pub async fn ws_stream_test() {
         // let cbor = tx.to_cbor().unwrap();
         // let from_cbor = Transaction::from_cbor(cbor).unwrap();
         // assert_eq!(tx, &from_cbor);
-    }
+    // }
 
     // Serde cbor
 

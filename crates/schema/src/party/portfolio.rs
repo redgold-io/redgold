@@ -6,7 +6,7 @@ use itertools::Either::{Left, Right};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct PortfolioRequestEvents {
     pub events: Vec<PortfolioRequestEventInstance>,
     pub external_stake_balance_deltas: HashMap<SupportedCurrency, CurrencyAmount>,
@@ -102,7 +102,7 @@ impl PortfolioRequestEvents {
 }
 
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct PortfolioRequestEventInstance {
     pub event: AddressEvent,
     pub tx: Transaction,

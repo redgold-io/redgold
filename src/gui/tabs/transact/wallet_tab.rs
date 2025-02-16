@@ -1,18 +1,15 @@
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
 use bdk::bitcoin::bech32::ToBase32;
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
 use flume::Sender;
 use itertools::{Either, Itertools};
-use rocket::form::validate::Contains;
 use serde::Deserialize;
 use std::future::Future;
 use std::time::Instant;
 
-use crate::gui::components::explorer_links::rdg_explorer;
-use crate::gui::components::xpub_req;
+use redgold_gui::functionality::explorer_links::rdg_explorer;
+use redgold_gui::tab::keys::xpub_req;
 use crate::gui::ls_ext::create_swap_tx;
-use crate::gui::tabs::keys::keys_tab::internal_stored_xpubs;
 use crate::gui::tabs::transact::{address_query, broadcast_tx, cold_wallet, hardware_signing, hot_wallet, portfolio_transact, prepare_tx, prepared_tx_view};
 use crate::hardware::trezor;
 use crate::hardware::trezor::trezor_list_devices;
@@ -59,7 +56,8 @@ use strum::IntoEnumIterator;
 // 0.17.1
 use strum_macros::{EnumIter, EnumString};
 use tracing::{error, info};
-
+use redgold_gui::state::local_state::{LocalState, LocalStateAddons};
+use redgold_gui::tab::keys::keymanage::internal_stored_xpubs;
 
 pub trait DeviceListTrezorNative {
     fn poll() -> Self;
@@ -115,7 +113,7 @@ pub fn wallet_screen_scrolled<G, E>(ui: &mut Ui, ctx: &egui::Context, ls: &mut L
             // Are either of these even used?
             // ls.wallet_state.active_xpub = x.xpub.clone();
             // ls.wallet_state.active_derivation_path = ls.keytab_state.derivation_path_xpub_input_account.derivation_path();
-            if let Ok(pk) = ls.keytab_state.xpub_key_info.public_key() {
+            if let Ok(pk) = ls.keytab_state.xpub_key_info.public_key(g) {
                 ls.wallet.public_key = Some(pk.clone());
                 if is_hot {
                     if check_assign_hot_key(ls, &x, &pk).is_err() {
@@ -207,39 +205,6 @@ fn check_assign_hot_key<E>(ls: &mut LocalState<E>, x: &AccountKeySource, pk: &Pu
         }
     };
     Ok(())
-}
-
-pub fn hot_passphrase_section<E, G>(ui: &mut Ui, ls: &mut LocalState<E>, g: &G) -> bool
-where E: ExternalNetworkResources + Clone + Send + 'static + Sync, G: GuiDepends + Clone + Send + 'static + Sync {
-
-    let mut update_clicked = false;
-
-    if &ls.wallet.hot_passphrase_last != &ls.wallet.hot_passphrase.clone() {
-        ls.wallet.hot_passphrase_last = ls.wallet.hot_passphrase.clone();
-        update_clicked = true;
-    }
-    if &ls.wallet.hot_offset_last != &ls.wallet.hot_offset.clone() {
-        ls.wallet.hot_offset_last = ls.wallet.hot_offset.clone();
-        update_clicked = true;
-    }
-
-        ui.horizontal(|ui| {
-            ui.label("Passphrase:");
-            egui::TextEdit::singleline(&mut ls.wallet.hot_passphrase)
-                .desired_width(150f32)
-                .password(true).show(ui);
-            ui.label("Offset:");
-            egui::TextEdit::singleline(&mut ls.wallet.hot_offset)
-                .desired_width(150f32)
-                .show(ui);
-            if ui.button("Update").clicked() {
-                update_clicked = true;
-            };
-        });
-    if update_clicked {
-        ls.wallet.update_hot_mnemonic_or_key_info(g);
-    };
-    update_clicked
 }
 
 fn proceed_from_pk<G, E>(

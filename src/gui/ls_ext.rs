@@ -1,6 +1,5 @@
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
+
 use crate::gui::components::tx_signer::{TxBroadcastProgress, TxSignerProgress};
-use crate::gui::tabs::identity_tab::IdentityState;
 use crate::integrations::external_network_resources::ExternalNetworkResourcesImpl;
 use crate::node_config::{ApiNodeConfig, DataStoreNodeConfig};
 use crate::util;
@@ -15,9 +14,9 @@ use redgold_gui::components::balance_table::queryable_balances;
 use redgold_gui::components::tx_progress::{PreparedTransaction, TransactionProgressFlow};
 use redgold_gui::data_query::data_query::DataQueryInfo;
 use redgold_gui::dependencies::gui_depends::{GuiDepends, TransactionSignInfo};
-use redgold_gui::state::local_state::LocalStateUpdate;
+use redgold_gui::state::local_state::{LocalState, LocalStateAddons, LocalStateUpdate};
 use redgold_gui::tab::home::HomeState;
-use redgold_gui::tab::keys::keygen::KeygenState;
+use redgold_gui::tab::keys::keygen::{KeyTabState, KeygenState};
 use redgold_gui::tab::settings_tab::SettingsState;
 use redgold_gui::tab::tabs::Tab;
 use redgold_gui::tab::transact::wallet_state::WalletState;
@@ -41,7 +40,7 @@ use tokio::task::JoinHandle;
 pub async fn local_state_from<G, E>(
     node_config: Box<NodeConfig>,
     res: E,
-    gui_depends: G,
+    g: G,
     party_data: HashMap<PublicKey, PartyInternalData>
 ) -> Result<LocalState<E>, ErrorInfo>
 where G: Send + Clone + GuiDepends, E: ExternalNetworkResources + Send + Sync + 'static + Clone {
@@ -49,12 +48,12 @@ where G: Send + Clone + GuiDepends, E: ExternalNetworkResources + Send + Sync + 
 
     let hot_mnemonic = node_config.secure_mnemonic_words_or();
 
-    let config = gui_depends.get_config();
+    let config = g.get_config();
     let local_stored_state = config.local.unwrap_or_default();
 
     let ss = redgold_gui::tab::deploy::deploy_state::ServersState::default();
 
-    let n = gui_depends.get_network();
+    let n = g.get_network();
     let mut dhm = HashMap::new();
     dhm.insert(n, DataQueryInfo::new(&res));
 
@@ -73,15 +72,15 @@ where G: Send + Clone + GuiDepends, E: ExternalNetworkResources + Send + Sync + 
         wallet: WalletState::new(hot_mnemonic, local_stored_state.keys.as_ref().and_then(|x| x.first())),
         qr_state: Default::default(),
         qr_show_state: Default::default(),
-        identity_state: IdentityState::new(),
+        // identity_state: IdentityState::new(),
         settings_state: SettingsState::new(
             &node_config.config_data
         ),
         address_state: Default::default(),
-        otp_state: Default::default(),
+        // otp_state: Default::default(),
         local_stored_state,
         // updates: new_channel(),
-        keytab_state: Default::default(),
+        keytab_state: KeyTabState::new(&g),
         is_mac: env::consts::OS == "macos",
         is_linux: env::consts::OS == "linux",
         is_wasm: false,
@@ -155,7 +154,7 @@ where G: Send + Clone + GuiDepends, E: ExternalNetworkResources + Send + Sync + 
             if let Ok(xpub) = w.xpub_str(&dp_btc_faucet.as_account_path().expect("acc")) {
                 let pk = XpubWrapper::new(xpub.clone()).public_at(0, 0).unwrap();
                 let mut named = AccountKeySource::default();
-                named.all_address = Some(gui_depends.to_all_address(&pk));
+                named.all_address = Some(g.to_all_address(&pk));
                 let key_into = key_name.clone();
                 named.name = format!("{}_840", key_into);
                 named.xpub = xpub;
@@ -269,34 +268,3 @@ pub fn create_swap_tx<G,E>(
 
     })
 }
-// pub fn sign_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-//     let ups = ls.updates.sender.clone();
-//     let res = ls.external_network_resources.clone();
-//     tokio::spawn(async move {
-//         let res = tx.sign(res).await;
-//         send_update_sender(&ups, move |lss| {
-//             let (err, tx) = match &res {
-//                 Ok(tx) => (None, Some(tx)),
-//                 Err(e) => (Some(e.json_or()), None)
-//             };
-//             lss.swap_state.tx_progress.signed(tx.cloned(), err);
-//             lss.swap_state.changing_stages = false;
-//         });
-//     });
-// }
-//
-// pub fn broadcast_swap(ls: &mut LocalState, tx: PreparedTransaction) {
-//     let ups = ls.updates.sender.clone();
-//     let res = ls.external_network_resources.clone();
-//     tokio::spawn(async move {
-//         let res = tx.broadcast(res).await;
-//         send_update_sender(&ups, move |lss| {
-//             let (err, tx) = match &res {
-//                 Ok(tx) => (None, Some(tx)),
-//                 Err(e) => (Some(e.json_or()), None)
-//             };
-//             lss.swap_state.tx_progress.broadcast(tx.cloned(), err);
-//             lss.swap_state.changing_stages = false;
-//         });
-//     });
-// }

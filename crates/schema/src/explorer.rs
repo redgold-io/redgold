@@ -169,7 +169,7 @@ pub struct DetailedPartyEvent {
     pub other_tx_hash: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AddressPoolInfo{
     pub public_key: String,
     // currency to address
@@ -263,7 +263,8 @@ pub struct DetailedPeerNode {
     pub node_name: String,
     pub peer_id: String,
     pub nat_restricted: bool,
-    pub recent_observations: Vec<DetailedObservation>
+    pub recent_observations: Vec<DetailedObservation>,
+    pub address_pool_info: Option<AddressPoolInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]

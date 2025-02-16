@@ -6,7 +6,7 @@ use flume::{Receiver, Sender};
 use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_schema::config_data::ConfigData;
 use redgold_schema::explorer::DetailedAddress;
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::keys::words_pass::{WordsPass, WordsPassMetadata};
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{AboutNodeResponse, Address, AddressInfo, NetworkEnvironment, PublicKey, SubmitTransactionResponse, SupportedCurrency, Transaction};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
@@ -21,6 +21,26 @@ pub struct WasmGuiDepends {
 }
 
 impl GuiDepends for WasmGuiDepends {
+    fn mnemonic_builder_from_str_rounds(str: &String, rounds: usize) -> WordsPass {
+        todo!()
+    }
+
+    fn mnemonic_to_seed(w: WordsPass) -> Vec<u8> {
+        todo!()
+    }
+
+    fn words_pass_metadata(w: WordsPass) -> WordsPassMetadata {
+        todo!()
+    }
+
+    fn generate_random_mnemonic() -> WordsPass {
+        todo!()
+    }
+
+    fn get_cold_xpub(dp: String) -> RgResult<String> {
+        todo!()
+    }
+
     fn seed_checksum(m: WordsPass) -> RgResult<String> {
         todo!()
     }
@@ -187,5 +207,25 @@ impl GuiDepends for WasmGuiDepends {
 
     fn restore_data_stores(&self, filter: Option<Vec<i64>>) -> RgResult<()> {
         Ok(())
+    }
+
+    fn validate_mnemonic(w: WordsPass) -> RgResult<()> {
+        todo!()
+    }
+
+    fn argon2d_hash(salt: Vec<u8>, nonce: Vec<u8>, m_cost: u32, t_cost: u32, p_cost: u32) -> RgResult<Vec<u8>> {
+        todo!()
+    }
+
+    fn words_pass_from_bytes(bytes: &[u8]) -> RgResult<WordsPass> {
+        todo!()
+    }
+
+    fn as_account_path(path: impl Into<String>) -> Option<String> {
+        todo!()
+    }
+
+    fn get_xpub_string_path(w: WordsPass, path: impl Into<String>) -> RgResult<String> {
+        todo!()
     }
 }

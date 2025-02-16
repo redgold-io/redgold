@@ -1,23 +1,8 @@
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use crate::gui::components::key_info::{extract_gui_key, update_keys_key_info, update_xpub_key_info, GuiKey, KeyInfo};
-use crate::gui::components::key_source_sel::{add_new_key_button, key_source};
-use crate::gui::components::save_key_window;
-use crate::gui::components::xpub_req::RequestXpubState;
-use crate::gui::tabs::keys::keygen_subtab;
-use crate::gui::tabs::keys::keygen_subtab::MnemonicWindowStateWordSupport;
-use crate::gui::tabs::keys::show_xpub_window::show_xpub_window;
-use crate::gui::tabs::keys::xpub_csv_loader::window_xpub_loader;
-use crate::gui::tabs::transact::wallet_tab::hot_passphrase_section;
-use bdk::bitcoin::bech32::ToBase32;
+
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, ScrollArea, TextEdit, Ui};
+use log::info;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, data_item, editable_text_input_copy, medium_data_item, medium_data_item_vertical};
-use redgold_gui::components::account_deriv_sel::AccountDerivationPathInputState;
-use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
-use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_keys::util::mnemonic_support::MnemonicSupport;
-use redgold_keys::xpub_wrapper::{ValidateDerivationPath, XpubWrapper};
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::observability::errors::Loggable;
@@ -26,59 +11,29 @@ use redgold_schema::structs::PublicKey;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, EnumString};
-use tracing::info;
-use tracing::Instrument;
+use crate::common::{copy_to_clipboard, editable_text_input_copy, medium_data_item};
+use crate::components::account_deriv_sel::AccountDerivationPathInputState;
+use crate::components::derivation_path_sel::DerivationPathInputState;
+use crate::dependencies::gui_depends::GuiDepends;
+use crate::state::local_state::{LocalState, LocalStateAddons};
+use crate::tab::keys::key_info::{update_keys_key_info, update_xpub_key_info, KeyInfo};
+use crate::tab::keys::keygen::KeygenSubTab;
+use crate::tab::keys::{keygen_subtab, save_key_window};
+use crate::tab::keys::key_source_sel::key_source;
+use crate::tab::keys::show_xpub_window::show_xpub_window;
+use crate::tab::keys::xpub_csv_loader::window_xpub_loader;
+use crate::tab::keys::xpub_req::RequestXpubState;
 
 
-#[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
-#[repr(i32)]
-pub enum KeygenSubTab {
-    Manage,
-    Generate,
-}
-
-#[derive(Debug, EnumIter, Clone, Serialize, Deserialize, EnumString)]
-#[repr(i32)]
-pub enum KeygenSubSubTab {
-    Keys,
-    XPubs
-}
-
-#[derive(Clone)]
-pub struct KeyTabState {
-    pub keygen_subtab: KeygenSubTab,
-    pub subsubtab: KeygenSubSubTab,
-    pub show_private_key_window: bool,
-    pub show_xpub: bool,
-    pub key_derivation_path_input: DerivationPathInputState,
-    pub derivation_path_xpub_input_account: AccountDerivationPathInputState,
-    pub request_xpub: RequestXpubState,
-    pub keys_key_info: KeyInfo,
-    pub xpub_key_info: KeyInfo,
-    pub save_xpub_account_name: String
-}
-
-impl Default for KeyTabState {
-    fn default() -> Self {
-        KeyTabState {
-            keygen_subtab: KeygenSubTab::Manage,
-            subsubtab: KeygenSubSubTab::XPubs,
-            show_private_key_window: false,
-            show_xpub: false,
-            key_derivation_path_input: Default::default(),
-            derivation_path_xpub_input_account: Default::default(),
-            request_xpub: Default::default(),
-            keys_key_info: Default::default(),
-            xpub_key_info: Default::default(),
-            save_xpub_account_name: "".to_string(),
-        }
+pub fn add_new_key_button<E>(ls: &mut LocalState<E>, ui: &mut Ui) where E: ExternalNetworkResources + 'static + Sync + Send + Clone {
+    if ui.button("Add Hot Mnemonic / Private Key").clicked() {
+        ls.wallet.add_new_key_window = true;
     }
 }
 
-
 pub fn manage_view<G, E>(ui: &mut Ui, ctx: &egui::Context, ls: &mut LocalState<E>, first_init: bool, g: &G)
 where G: GuiDepends + Clone + Send + 'static + Sync,
-    E: ExternalNetworkResources + Send + Sync + 'static + Clone {
+      E: ExternalNetworkResources + Send + Sync + 'static + Clone {
     ui.add_space(10.0);
 
     // Add New Stuff buttons
@@ -86,7 +41,8 @@ where G: GuiDepends + Clone + Send + 'static + Sync,
         ui.heading("Add");
         add_new_key_button(ls, ui);
         add_xpub_csv_button(ls, ui, ctx);
-        let res = ls.keytab_state.request_xpub.view(ui, ctx, ls.local_messages.sender.clone(), ls.wallet.device_list_status.device_output.clone(), g);
+        let res = ls.keytab_state.request_xpub
+            .view(ui, ctx, ls.local_messages.sender.clone(), ls.wallet.device_list_status.device_output.clone(), g);
         if !res.is_empty() {
             ls.add_named_xpubs(true, res, false).log_error().ok();
             ls.persist_local_state_store();
@@ -94,13 +50,13 @@ where G: GuiDepends + Clone + Send + 'static + Sync,
 
     });
 
-    save_key_window::save_key_window(ui, ls, ctx);
+    save_key_window::save_key_window(ui, ls, ctx, g);
 
     if ls.wallet.public_key.is_none() {
         ls.wallet.update_hot_mnemonic_or_key_info(g);
     }
 
-    keygen_subtab::mnemonic_window(ctx, ls);
+    keygen_subtab::mnemonic_window(ctx, ls, g);
     show_private_key_window(ctx, ls);
     ui.separator();
     ui.spacing();
@@ -110,9 +66,44 @@ where G: GuiDepends + Clone + Send + 'static + Sync,
 
 }
 
+
+pub fn hot_passphrase_section<E, G>(ui: &mut Ui, ls: &mut LocalState<E>, g: &G) -> bool
+where E: ExternalNetworkResources + Clone + Send + 'static + Sync, G: GuiDepends + Clone + Send + 'static + Sync {
+
+    let mut update_clicked = false;
+
+    if &ls.wallet.hot_passphrase_last != &ls.wallet.hot_passphrase.clone() {
+        ls.wallet.hot_passphrase_last = ls.wallet.hot_passphrase.clone();
+        update_clicked = true;
+    }
+    if &ls.wallet.hot_offset_last != &ls.wallet.hot_offset.clone() {
+        ls.wallet.hot_offset_last = ls.wallet.hot_offset.clone();
+        update_clicked = true;
+    }
+
+    ui.horizontal(|ui| {
+        ui.label("Passphrase:");
+        egui::TextEdit::singleline(&mut ls.wallet.hot_passphrase)
+            .desired_width(150f32)
+            .password(true).show(ui);
+        ui.label("Offset:");
+        egui::TextEdit::singleline(&mut ls.wallet.hot_offset)
+            .desired_width(150f32)
+            .show(ui);
+        if ui.button("Update").clicked() {
+            update_clicked = true;
+        };
+    });
+    if update_clicked {
+        ls.wallet.update_hot_mnemonic_or_key_info(g);
+    };
+    update_clicked
+}
+
+
 fn internal_stored_keys<G, E>(ui: &mut Ui, ls: &mut LocalState<E>, first_init: bool, g: &G)
 where G: GuiDepends + Clone + Send + 'static + Sync,
-E : ExternalNetworkResources + Send + Sync + 'static + Clone {
+      E : ExternalNetworkResources + Send + Sync + 'static + Clone {
     let mut need_keys_update = false;
     ui.horizontal(|ui| {
         ui.heading("Internal Stored Keys");
@@ -124,6 +115,7 @@ E : ExternalNetworkResources + Send + Sync + 'static + Clone {
                 ls.keygen_state.mnemonic_window_state.set_words(
                     ls.wallet.hot_mnemonic(g).words,
                     ls.wallet.selected_key_name.clone(),
+                    g
                 );
             } else {
                 ls.keytab_state.show_private_key_window = true;
@@ -148,23 +140,26 @@ E : ExternalNetworkResources + Send + Sync + 'static + Clone {
         medium_data_item(ui,"Seed Checksum: ", ls.wallet.seed_checksum.as_ref().unwrap_or(&"".to_string()));
     }
 
-    ls.keytab_state.keys_key_info.view(ui, None, ls.node_config.network.clone());
+    ls.keytab_state.keys_key_info.view(ui, None, ls.node_config.network.clone(), g);
 
     if ls.wallet.active_hot_private_key_hex.is_none() {
         ui.horizontal(|ui| {
             editable_text_input_copy(ui, "Save XPub Account Name:", &mut ls.keytab_state.save_xpub_account_name, 150.0);
             if ui.button("Save").clicked() {
-                let derivation_path = ls.keytab_state.key_derivation_path_input.derivation_path.as_account_path();
+                let derivation_path = G::as_account_path(ls.keytab_state.key_derivation_path_input.derivation_path.clone());
                 if let Some(derivation_account_path) = derivation_path {
                     let m = ls.wallet.hot_mnemonic(g);
-                    if let Ok(xpub) = m.xpub_str(&derivation_account_path) {
+                    if let Ok(xpub) = G::get_xpub_string_path(m.clone(), &derivation_account_path) {
                         let dp2 = ls.keytab_state.key_derivation_path_input.derivation_path.clone();
-                        let check = m.checksum().unwrap_or("".to_string());
-                        let pk = m.public_at(&dp2).expect("Public at failed");
+                        let check = G::checksum_words(m.clone()).unwrap_or("".to_string());
+                        // let check = m.checksum().unwrap_or("".to_string());
+                        let pk = G::public_at(m.clone(), &dp2).expect("Public at failed");
+                        // let pk = m.public_at(&dp2).expect("Public at failed");
                         let all = g.to_all_address(&pk);
                         let words_public = pk.hex();
-                        let xpub_w = XpubWrapper::new(xpub.clone());
-                        let xpub_public = xpub_w.public_at_dp(&dp2).expect("Public at DP failed").hex();
+                        let xpub_public = g.xpub_public(xpub.clone(), dp2.clone()).log_error().ok().unwrap().hex();
+                        // let xpub_w = XpubWrapper::new(xpub.clone());
+                        // let xpub_public = xpub_w.public_at_dp(&dp2).expect("Public at DP failed").hex();
                         let equal = words_public == xpub_public;
                         info!("Adding xpub to local state from keys tab with words pass \
                         checksum: {check} equal {equal} words public: {words_public} xpub public: {xpub_public}");
@@ -194,15 +189,15 @@ E : ExternalNetworkResources + Send + Sync + 'static + Clone {
 
 pub fn keys_tab<G, E>(ui: &mut Ui, ctx: &egui::Context, local_state: &mut LocalState<E>, first_init: bool, g: &G)
 where G: GuiDepends + Clone + Send + 'static + Sync,
- E : ExternalNetworkResources + Send + Sync + 'static + Clone{
+      E : ExternalNetworkResources + Send + Sync + 'static + Clone{
 
     ui.horizontal(|ui| {
         ui.heading("Keys");
         KeygenSubTab::iter().for_each(|subtab| {
-        if ui.button(format!("{:?}", subtab)).clicked() {
-            local_state.keytab_state.keygen_subtab = subtab;
-        }
-    })
+            if ui.button(format!("{:?}", subtab)).clicked() {
+                local_state.keytab_state.keygen_subtab = subtab;
+            }
+        })
     });
     ui.separator();
 
@@ -211,7 +206,7 @@ where G: GuiDepends + Clone + Send + 'static + Sync,
             manage_view(ui, ctx, local_state, first_init, g);
         }
         KeygenSubTab::Generate => {
-            keygen_subtab::keys_screen(ui, ctx, local_state);
+            keygen_subtab::keys_screen(ui, ctx, local_state, g);
         }
     }
 }
@@ -273,7 +268,7 @@ pub fn internal_stored_xpubs<G, E>(
                                     "Select Account".to_string(), "Select Account".to_string());
             });
         xpub = ls.local_stored_state.keys.as_ref().and_then(|x| x.iter().find(|x| x.name == ls.wallet.selected_xpub_name)
-                .cloned());
+            .cloned());
         if let Some(xp) = &xpub {
             let i = xp.xpub.len();
             if let Some(slice) = xp.xpub.get((i -8)..i) {
@@ -293,10 +288,10 @@ pub fn internal_stored_xpubs<G, E>(
 
     if ls.wallet.view_additional_xpub_details {
         if let Some(xp) = xpub.as_ref() {
-            show_xpub_window(ctx, ls, xp.clone());
+            show_xpub_window(ctx, ls, xp.clone(), g);
 
             ui.horizontal(|ui| {
-                if let Some(ap) = xp.derivation_path.as_account_path() {
+                if let Some(ap) = G::as_account_path(xp.derivation_path.clone()) {
                     ls.keytab_state.derivation_path_xpub_input_account.account_derivation_path = ap;
                     // medium_data_item(ui, "Account:", ap);
                 }
@@ -328,10 +323,10 @@ pub fn internal_stored_xpubs<G, E>(
         }
 
         if update || first_init {
-            update_xpub_key_info(ls);
+            update_xpub_key_info(ls, g);
         }
 
-        ls.keytab_state.xpub_key_info.view(ui, option, ls.node_config.network.clone());
+        ls.keytab_state.xpub_key_info.view(ui, option, ls.node_config.network.clone(), g);
     }
 
     (update, xpub)

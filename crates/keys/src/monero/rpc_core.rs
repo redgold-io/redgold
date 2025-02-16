@@ -2,14 +2,17 @@ use crate::monero::key_derive::MoneroSeedBytes;
 use crate::monero::rpc_multisig::MoneroWalletRpcMultisigClient;
 use crate::word_pass_support::WordsPassNodeConfig;
 use monero::util::address::Address;
+use monero::Amount;
 use monero_rpc::monero::PrivateKey;
-use monero_rpc::{GenerateFromKeysArgs, GetBlockHeaderSelector, GetTransfersCategory, GetTransfersSelector, RpcAuthentication, RpcClient, RpcClientBuilder, TransferHeight, WalletCreation};
+use monero_rpc::{GenerateFromKeysArgs, GetBlockHeaderSelector, GetTransfersCategory, GetTransfersSelector, RpcAuthentication, RpcClient, RpcClientBuilder, TransferHeight, TransferOptions, TransferPriority, WalletCreation};
 use redgold_schema::conf::node_config::NodeConfig;
+use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::keys::words_pass::WordsPass;
 use redgold_schema::observability::errors::EnhanceErrorInfo;
-use redgold_schema::structs::{CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
+use redgold_schema::structs::{self, CurrencyAmount, ErrorInfo, NetworkEnvironment, SupportedCurrency};
 use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption, ShortString};
+use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::str::FromStr;
 use std::time::Duration;
@@ -267,6 +270,30 @@ impl MoneroRpcWrapper {
             .map_err(|e| ErrorInfo::new(format!("Failed to get balance {}", e.to_string())))?;
         println!("balance: {:?}", b);
         Ok(CurrencyAmount::from_currency(b.balance.as_pico() as i64, SupportedCurrency::Monero))
+    }
+
+    pub async fn send(&self, destinations: Vec<(structs::Address, CurrencyAmount)>) -> RgResult<String> {
+
+        let mut to = HashMap::new();
+        for (a, b) in destinations {
+            if b.currency_or() != SupportedCurrency::Monero {
+                "Invalid amount currency".to_error()?;
+            }
+            let address = Address::from_str(&a.render_string()?)
+                .error_info("Invalid Monero address")?;
+            let amount = Amount::from_pico(b.amount as u64);
+            to.insert(address, amount);
+        }
+        let res = self.client.clone().wallet().transfer(
+            to,
+            TransferPriority::Default,
+            TransferOptions {
+                do_not_relay: Some(true),
+                ..Default::default()
+            }
+        ).await
+            .map_err(|e| ErrorInfo::new(format!("Failed to send {}", e.to_string())))?;
+        Ok(res.tx_hash.to_string())
     }
 
 

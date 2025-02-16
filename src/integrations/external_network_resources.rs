@@ -53,7 +53,7 @@ use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::util::times::ToTimeString;
 use crate::core::internal_message::RecvAsyncErrorInfoTimeout;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
-use crate::observability::metrics_help::WithMetrics;
+use redgold_schema::errors::helpers::WithMetrics;
 use crate::util;
 
 #[derive(Clone)]
