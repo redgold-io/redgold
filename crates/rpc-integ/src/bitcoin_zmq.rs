@@ -1,6 +1,6 @@
 use bitcoin::consensus::encode;
-use bitcoin::Transaction;
-use bitcoincore_rpc::{Auth, Client};
+use bitcoin::{Block, Transaction};
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use std::collections::HashMap;
@@ -75,8 +75,10 @@ impl BitcoinZmqSubscriber {
         // Setup RPC client
         let rpc_url = format!("http://{}:{}", self.config.host, self.config.rpc_port);
         let _rpc_client = Client::new(&rpc_url, Auth::None)
-            .error_info("Failed to create RPC client")?;
-            
+            .unwrap();
+        
+        // _rpc_client.get_block_stats(height)
+
         loop {
 
             // Use tmq's async recv
@@ -99,6 +101,9 @@ impl BitcoinZmqSubscriber {
                     }
                 }
             } else if topic.starts_with(b"rawblock") {
+
+                let block = encode::deserialize::<Block>(&content).unwrap();
+                let _block_hash = block.block_hash().to_string();
                 // When we receive a new block, increment confirmation count for all tracked transactions
                 if let Ok(mut tracker) = tracker.lock() {
                     for count in tracker.values_mut() {
@@ -145,8 +150,8 @@ mod tests {
         let subscriber_clone = subscriber.clone();
         info!("Running subscriber");
         
-        let handle = std::thread::spawn(move || {
-            subscriber_clone.run();
+        let _handle = std::thread::spawn(move || {
+            subscriber_clone.run().ok();
         });
 
         for i in 0..5 {
