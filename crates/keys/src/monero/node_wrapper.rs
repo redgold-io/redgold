@@ -602,7 +602,7 @@ async fn local_three_node() {
     //
     // let destinations = vec![
     //     (Address::from_monero_external(&addr),
-    //     CurrencyAmount::from_fractional_cur(0.05f64, SupportedCurrency::Monero).unwrap())
+    //     CurrencyAmount::from_fractional_cur(0.002f64, SupportedCurrency::Monero).unwrap())
     // ];
     // let tx = four_rpc.wallet_rpc.send(destinations).await.unwrap();
     // println!("Tx: {}", tx);

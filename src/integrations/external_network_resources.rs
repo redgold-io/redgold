@@ -155,7 +155,9 @@ impl ExternalNetworkResourcesImpl {
         let all_pks_unique = all_pks.iter().unique().cloned().collect_vec();
 
         let peer_pks = all_pks_unique.iter().filter(|pk| pk != &&self_pk).cloned().collect_vec();
-        info!("Btc multisig wallet called with all_pks len {} and unique len {} and peer key len {}", all_pks.len(), all_pks_unique.len());
+        info!("Btc multisig wallet called with all_pks len {} and unique len {} and peer key len {}",
+            all_pks.len(), all_pks_unique.len(), peer_pks.len()
+        );
         let mut guard = self.multisig_btc_wallets.lock().await;
         let result = guard.get(&descriptor);
         let mutex = match result {
