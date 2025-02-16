@@ -32,5 +32,7 @@ serde_cbor = { workspace = true }
 serde = {workspace = true}
 #arrow = "54.0.0"
 #serde_par
-#bitcoincore-rpc = "0.19.0"
-#bitcoin = "0.32.5"
+bitcoincore-rpc = "0.19.0"
+bitcoin = "0.32.5"
+zmq = "0.10"
+flume = "0.11"
