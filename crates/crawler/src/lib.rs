@@ -1,5 +1,7 @@
 pub mod coinbase_ws;
 
+pub mod coinbase;
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }

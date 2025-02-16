@@ -1,4 +1,4 @@
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::infra::deploy::default_deploy;
 use crate::infra::{deploy, multiparty_backup};
 use eframe::egui;
@@ -35,7 +35,7 @@ impl ServerClient for ServerOldFormat {
         } else {
             self.host.clone()
         };
-        RgHttpClient::from_env(h, network_environment)
+        RgHttpClient::from_env(h, network_environment, None)
     }
 }
 

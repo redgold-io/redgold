@@ -3,7 +3,6 @@ use eframe::egui;
 use eframe::egui::{Color32, ComboBox, Context, RichText, ScrollArea, TextStyle, Ui, Widget};
 use flume::Sender;
 use itertools::{Either, Itertools};
-use rocket::form::validate::Contains;
 use serde::Deserialize;
 use std::future::Future;
 use std::time::Instant;

@@ -1,7 +1,7 @@
 use crate::api::client::public_client::PublicClient;
 // use crate::api::p2p_io::rgnetwork::Event;
 // use crate::api::p2p_io::P2P;
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::api::control_api::ControlClient;
 use crate::api::rosetta::models::Peer;
 use crate::api::{control_api, rosetta};
@@ -283,7 +283,7 @@ impl Node {
 
     async fn query_seed(relay: &Relay, node_config: &NodeConfig, seed: Seed) -> Result<PeerNodeInfo, ErrorInfo> {
         let api_port = seed.port_or(node_config.port_offset) + 1;
-        let client = PublicClient::from(seed.external_address.clone(), api_port, Some(relay.clone()));
+        let client = PublicClient::from(seed.external_address.clone(), api_port, Some(Box::new(relay.clone())));
         // info!("Querying with public client for node info again on: {} : {:?}", seed.external_address, api_port);
         let response = client.about().await?;
         let result = response.peer_node_info.safe_get()?;

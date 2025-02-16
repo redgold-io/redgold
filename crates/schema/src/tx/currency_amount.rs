@@ -134,6 +134,10 @@ impl CurrencyAmount {
         Self::from(MIN_RDG_SATS_FEE)
     }
 
+    pub fn std_pool_fee() -> Self {
+        Self::from(100_000)
+    }
+
     pub fn bigint_amount(&self) -> Option<BigInt>  {
         self.string_amount.as_ref().map(|s| BigInt::from_str(s).ok()).flatten()
     }

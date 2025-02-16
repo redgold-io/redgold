@@ -18,7 +18,7 @@ use tracing::debug;
 // use libp2p::Multiaddr;
 use tracing::{error, info};
 
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
 use crate::schema::structs::{ ResponseMetadata};
@@ -206,6 +206,6 @@ impl PeerOutgoingEventHandler {
 }
 
 pub async fn rest_peer(relay: &Relay, ip: String, port: i64, request: Request, intended_pk: &structs::PublicKey) -> Result<Response, ErrorInfo> {
-    let client = crate::api::client::rest::RgHttpClient::new(ip, port as u16, Some(relay.clone()));
-    client.proto_post_request(request, Some(relay), Some(intended_pk)).await
+    let client = redgold_common::client::http::RgHttpClient::new(ip, port as u16, Some(Box::new(relay.clone())));
+    client.proto_post_request(request, Some(relay.node_metadata().await?), Some(intended_pk)).await
 }

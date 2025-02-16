@@ -45,6 +45,11 @@ impl SupportedCurrency {
             .iter().any(|x| x == self)
     }
 
+    pub fn valid_stake_input(&self) -> bool {
+        vec![SupportedCurrency::Bitcoin, SupportedCurrency::Redgold, SupportedCurrency::Ethereum]
+            .iter().any(|x| x == self)
+    }
+
     pub fn valid_swap_output(&self) -> bool {
         Self::supported_swap_currencies()
             .iter().any(|x| x == self)
@@ -56,6 +61,10 @@ impl SupportedCurrency {
 
     pub fn supported_external_swap_currencies() -> Vec<SupportedCurrency> {
         vec![SupportedCurrency::Bitcoin, SupportedCurrency::Ethereum]
+    }
+
+    pub fn quote_pair_usd(&self) -> String {
+        format!("{}-USD", self.abbreviated())
     }
 
     pub fn abbreviated(&self) -> String {

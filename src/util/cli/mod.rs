@@ -6,3 +6,4 @@ pub mod apply_args_to_config;
 pub mod load_config;
 pub mod immediate_commands;
 pub mod swap;
+pub mod stake;

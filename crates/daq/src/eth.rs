@@ -7,13 +7,15 @@ use redgold_common_no_wasm::stream_handlers::IntervalFoldOrReceive;
 use redgold_rpc_integ::eth::historical_client::EthHistoricalClient;
 use redgold_rpc_integ::eth::ws_rpc::{EthereumWsProvider, TimestampedEthereumTransaction};
 use redgold_schema::conf::node_config::NodeConfig;
-use redgold_schema::RgResult;
+use redgold_schema::{ErrorInfoContext, RgResult};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;
 use redgold_schema::helpers::easy_json::EasyJson;
+use redgold_schema::observability::errors::{EnhanceErrorInfo, Loggable};
+use redgold_schema::util::lang_util::JsonCombineResult;
 
 #[derive(Clone, Default)]
 pub struct EthDaq {
@@ -24,10 +26,11 @@ pub struct EthDaq {
 
 
 #[async_trait]
-impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
-    async fn interval_fold_or_recv(&mut self, message: Either<TimestampedEthereumTransaction, ()>) -> RgResult<()> {
+impl IntervalFoldOrReceive<RgResult<TimestampedEthereumTransaction>> for EthDaq {
+    async fn interval_fold_or_recv(&mut self, message: Either<RgResult<TimestampedEthereumTransaction>, ()>) -> RgResult<()> {
         match message {
             Either::Left(t) => {
+                let t = t?;
                 let addrs = self.daq.subscribed_address_filter.read();
                 let t_addrs = t.addrs();
                 if !t_addrs.iter().any(|a| addrs.contains(a)) {
@@ -37,11 +40,9 @@ impl IntervalFoldOrReceive<TimestampedEthereumTransaction> for EthDaq {
                 counter!("redgold_daq_eth_tx").increment(1);
                 let ett = EthereumWsProvider::convert_transaction(
                     &addrs, t
-                );
+                ).log_error();
                 if let Ok(ett) = ett {
-                    // print!("{}", ett.json_or());
-                    if let Some(_) = ett.self_address.as_ref() {
-                    }
+                    self.daq.add_new_tx(ett.clone());
                 }
             }
             _ => {
@@ -76,8 +77,13 @@ impl EthDaq {
     pub async fn from_eth_provider_stream(
         &self,
         e: RgResult<EthereumWsProvider>,
-        duration: Duration,
-    ) -> RgResult<JoinHandle<RgResult<()>>> {
+        interval_duration: Option<Duration>,
+        historical_post_fill_duration: Option<Duration>,
+    ) -> RgResult<()> {
+
+        let interval_duration = interval_duration.unwrap_or(Duration::from_secs(60));
+        let historical_post_fill_duration = historical_post_fill_duration.unwrap_or(Duration::from_secs(60));
+
         let provider = e?;
 
         let mut s = self.clone();
@@ -89,34 +95,65 @@ impl EthDaq {
 
         // Run at start
         s.interval_fold_or_recv(Either::Right(())).await?;
+        let s2 = s.clone();
 
-        Ok(tokio::spawn(async move  {
+        let mut handle = tokio::spawn(async move {
             let init_stream = provider.subscribe_transactions().await?;
             let stream = init_stream
                 .map(|x| Ok(Either::Left(x)));
-            let interval = tokio::time::interval(duration);
+            let interval = tokio::time::interval(interval_duration);
             let interval_stream = IntervalStream::new(interval).map(|_| Ok(Either::Right(())));
             stream.merge(interval_stream).try_fold(
-                s, |mut ob, o| async {
+                s2, |mut ob, o| async {
                     ob.interval_fold_or_recv(o).await.map(|_| ob)
                 }
             ).await.map(|_| ())
-        }))
+        });
+
+        tokio::select! {
+            res = &mut handle => {
+                res.error_info("join error")??;
+            }
+            _ = tokio::time::sleep(historical_post_fill_duration) => {
+                for a in addrs.iter() {
+                   s.clone().add_address_and_backfill_historical(a.clone()).await?;
+                }
+            }
+        }
+        handle.await.error_info("Failed to join handle")??;
+        Ok(())
     }
     pub async fn start(
         &self,
         nc: &NodeConfig
-    ) -> Option<RgResult<JoinHandle<RgResult<()>>>> {
-        // let duration = nc.config_data.node.as_ref()
-        //     .and_then(|n| n.daq.as_ref())
-        //     .and_then(|n| n.poll_duration_seconds.clone())
-        //     .unwrap_or(600);
-        let duration = 60;
+    ) -> JoinHandle<RgResult<()>> {
 
-        if let Some(p) = EthereumWsProvider::new_from_config(nc).await {
-            Some(self.from_eth_provider_stream(p, Duration::from_secs(duration as u64)).await)
-        } else {
-            None
+        let nc = nc.clone();
+        let daq = self.clone();
+        tokio::spawn(async move {
+            let daq = daq;
+            let nc = nc;
+            Self::retry_loop(daq, &nc).await
+        })
+    }
+
+    pub async fn retry_loop(daq: Self, nc: &NodeConfig) -> RgResult<()> {
+        let config_rpcs = EthereumWsProvider::config_to_rpc_urls(nc);
+        let fallback_rpcs = EthereumWsProvider::providers_for_network(&nc.network);
+        let mut all_rpcs = config_rpcs.clone();
+        all_rpcs.extend(fallback_rpcs);
+        let mut provider_idx = 0;
+        loop {
+            let latest_provider = all_rpcs.get(provider_idx).cloned();
+            match latest_provider {
+                None => { provider_idx = 0 }
+                Some(p) => {
+                    provider_idx += 1;
+                    if let Ok(ws) = EthereumWsProvider::new(p).await.log_error().bubble_abort()? {
+                        daq.from_eth_provider_stream(Ok(ws), None, None).await.log_error().bubble_abort()?.ok();
+                    };
+                }
+            }
         }
     }
 }
@@ -126,11 +163,11 @@ impl EthDaq {
 pub async fn test_eth_daq() {
 
     let provider = EthereumWsProvider::sepolioa_infura_test().await;
+    // let provider = EthereumWsProvider::sepolioa_infura_test().await;
     let daq = EthDaq::default();
-    let duration = Duration::from_secs(60);
-    let result = daq.from_eth_provider_stream(Ok(provider), duration).await.unwrap();
-
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    let duration = Duration::from_secs(5);
+    // let result = daq.from_eth_provider_stream(Ok(provider), Some(duration), Some(duration)).await.unwrap();
+    // tokio::time::sleep(Duration::from_secs(20)).await;
 
 
     //

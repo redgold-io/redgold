@@ -10,13 +10,14 @@ use redgold_schema::message::Request;
 use redgold_schema::{empty_public_request, SafeOption};
 use std::time::Duration;
 use tracing::{debug, info};
+use redgold_common::client::http::{self, RequestResponseAuth};
 
 #[derive(Clone)]
 pub struct PublicClient {
     pub url: String,
     pub port: u16,
     pub timeout: Duration,
-    pub relay: Option<Relay>
+    pub auth: Option<Box<dyn RequestResponseAuth>>
 }
 
 impl PublicClient {
@@ -24,25 +25,25 @@ impl PublicClient {
     //     PublicClient::local(3030)
     // }
 
-    pub fn client_wrapper(&self) -> rest::RgHttpClient {
-        rest::RgHttpClient::new(self.url.clone(), self.port as u16, self.relay.clone())
+    pub fn client_wrapper(&self) -> http::RgHttpClient {
+        http::RgHttpClient::new(self.url.clone(), self.port as u16, self.auth.clone())
     }
 
-    pub fn local(port: u16, _relay: Option<Relay>) -> Self {
+    pub fn local(port: u16, _relay: Option<Box<dyn RequestResponseAuth>>) -> Self {
         Self {
             url: "localhost".to_string(),
             port,
             timeout: Duration::from_secs(120),
-            relay: None,
+            auth: None,
         }
     }
 
-    pub fn from(url: String, port: u16, relay: Option<Relay>) -> Self {
+    pub fn from(url: String, port: u16, auth: Option<Box<dyn RequestResponseAuth>>) -> Self {
         Self {
             url,
             port,
             timeout: Duration::from_secs(120),
-            relay,
+            auth,
         }
     }
 

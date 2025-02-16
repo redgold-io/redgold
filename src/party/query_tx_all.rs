@@ -1,4 +1,4 @@
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use async_trait::async_trait;
 use redgold_schema::party::address_event::TransactionWithObservationsAndPrice;
 use redgold_schema::structs::Address;

@@ -6,7 +6,7 @@
 //! We demonstrate the various permutations of values that can be passed in the macro calls, all of
 //! which are documented in detail for the respective macro.
 
-use crate::observability::metrics_help::WithMetrics;
+use redgold_schema::errors::helpers::WithMetrics;
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, KeyName, SharedString};
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn, Key, Recorder, Unit};
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder};

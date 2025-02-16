@@ -30,11 +30,12 @@ use redgold_schema::{error_info, from_hex, ErrorInfoContext, RgResult, SafeOptio
 use tokio::runtime::Runtime;
 use tracing::{error, info, trace};
 
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
+use redgold_common::log::{init_logger, init_logger_main};
 use crate::observability::metrics_registry;
 use crate::schema::structs::NetworkEnvironment;
 use crate::util::cli::{args, commands, immediate_commands};
-use crate::util::{init_logger, init_logger_main, ip_lookup, not_local_debug_mode, sha256_vec};
+use crate::util::{ip_lookup, not_local_debug_mode, sha256_vec};
 use crate::{e2e, gui, util};
 use redgold_keys::word_pass_support::WordsPassNodeConfig;
 use redgold_schema::conf::node_config::NodeConfig;

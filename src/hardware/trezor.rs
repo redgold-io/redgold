@@ -1,4 +1,4 @@
-use crate::util::init_logger_once;
+use redgold_common::log::init_logger_once;
 use crate::util::keys::{public_key_from_bytes, ToPublicKeyFromLib};
 use bdk::bitcoin::util::bip32::ExtendedPubKey;
 use bdk::bitcoin::util::psbt::serialize::Serialize;
@@ -15,7 +15,7 @@ use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{AddressInfo, CurrencyAmount, ErrorInfo, Hash, Input, NetworkEnvironment, Output, Proof, Signature, Transaction, UtxoEntry, UtxoId};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
-use redgold_schema::{error_info, structs, ErrorInfoContext, SafeOption};
+use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::string::ToString;
@@ -162,7 +162,7 @@ impl PublicNodeResponse {
         let public_key_parse_test = public_key_from_bytes(&h).error_info("Failed to parse public key")?;
         Ok(public_key_parse_test.to_struct_public_key())
     }
-    pub fn xpub(&self) -> anyhow::Result<ExtendedPubKey, ErrorInfo> {
+    pub fn xpub(&self) -> RgResult<ExtendedPubKey> {
         ExtendedPubKey::from_str(&self.xpub).error_info("Failed to parse xpub")
     }
 }

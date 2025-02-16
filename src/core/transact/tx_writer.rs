@@ -1,5 +1,5 @@
 use crate::core::relay::Relay;
-use crate::observability::metrics_help::WithMetrics;
+use redgold_schema::errors::helpers::WithMetrics;
 use crate::util;
 use async_trait::async_trait;
 use metrics::counter;

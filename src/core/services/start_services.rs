@@ -26,6 +26,7 @@ use redgold_common::external_resources::ExternalNetworkResources;
 use redgold_common_no_wasm::stream_handlers::{run_interval_fold, run_interval_fold_or_recv, run_recv_concurrent, run_recv_single};
 use redgold_schema::error_info;
 use std::time::Duration;
+use redgold_crawler_native::coinbase_ws::run_decoded_coinbase_ws;
 
 impl Node {
     /**
@@ -48,10 +49,11 @@ impl Node {
 
         let mut sjh = ServiceJoinHandles::default();
 
-        if node_config.enable_party_mode() {
-            sjh.add("CoinbaseWsStatus", 
-            tokio::spawn(redgold_crawler_native::coinbase_ws::run_coinbase_ws_status(relay.coinbase_ws_status.sender.clone())));
-        }
+        // if node_config.network.is_main_stage_network() {
+        let ticker = run_decoded_coinbase_ws(relay.coinbase_ticker.clone()).await;
+        sjh.add("CoinbaseWsDecoder", ticker.decoder_thread);
+        sjh.add("CoinbaseWsTicker", ticker.ws_thread);
+        // }
 
         let agent = PortfolioFullfillmentAgent::new(
             &relay, external_network_resources.clone());
@@ -187,10 +189,7 @@ impl Node {
             RecentParityCheck::new(&relay), Duration::from_secs(3600), false
         ));
 
-        if let Some(jh) = relay.eth_daq.start(&relay.node_config).await {
-            let result = jh.expect("eth_daq start failed");
-            sjh.add("EthDaq", result);
-        }
+        sjh.add("EthDaq", relay.eth_daq.start(&relay.node_config).await);
 
         sjh.handles
     }

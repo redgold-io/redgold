@@ -206,6 +206,7 @@ pub enum RgTopLevelSubcommand {
     Balance(BalanceCli),
     GenerateConfig(GenerateConfig),
     Swap(Swap),
+    Stake(Stake),
     Debug(DebugCommand)
 }
 
@@ -515,6 +516,24 @@ pub struct Swap {
     /// the amount as a FRACTION of a whole token. I.e. 0.01 ETH will be parsed as equivalent to ~30 USD
     #[clap(long)]
     pub not_usd: bool
+}
+
+/// Issue a staking request
+#[derive(Args, Debug, Clone, Serialize, Deserialize)]
+pub struct Stake {
+    /// Amount to stake estimated in USD from latest pricing data, please use "not-usd" to avoid conversions.
+    pub amount: f64,
+    /// Input currency to be used as source of funds, for instance Redgold or Ethereum or Bitcoin
+    /// or lowercase or abbreviated, redgold, rdg, ETH, eth, BTC, bitcoin, etc.
+    pub input_currency: Option<String>,
+    /// Skip use of price conversions in formatting amounts, this will default instead to parsing
+    /// the amount as a FRACTION of a whole token. I.e. 0.01 ETH will be parsed as equivalent to ~30 USD
+    #[clap(long)]
+    pub not_usd: bool,
+    /// The party proposer key address or group instance address to use, defaults to most popular
+    #[clap(long)]
+    pub party_id: Option<String>
+
 }
 
 /// Generate a mnemonic from a password (minimum 128 bits of entropy required)

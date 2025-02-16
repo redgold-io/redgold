@@ -10,7 +10,7 @@ use crate::core::discover::peer_discovery::DiscoveryMessage;
 use crate::core::internal_message::{PeerMessage, TransactionMessage};
 use crate::core::relay::Relay;
 use crate::data::download::process_download_request;
-use crate::observability::metrics_help::WithMetrics;
+use redgold_schema::errors::helpers::WithMetrics;
 use crate::party::order_fulfillment::handle_multisig_request;
 use crate::schema::response_metadata;
 use crate::schema::structs::ResponseMetadata;
@@ -41,7 +41,6 @@ use redgold_schema::structs::{AboutNodeRequest, AboutNodeResponse, ErrorInfo, Ge
 use redgold_schema::util::lang_util::{SameResult, WithMaxLengthString};
 use redgold_schema::util::timers::PerfTimer;
 use redgold_schema::{error_info, structs, RgResult, SafeOption};
-use rocket::yansi::Paint;
 // use svg::Node;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
@@ -159,6 +158,24 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
         let mut response = Response::empty_success();
 
         let auth_required = request.auth_required();
+
+        if let Some(r) = &request.multisig_request {
+            // r.proposer_party_key
+            if let Ok(pk) = verified.as_ref() {
+            //     if relay.node_config.non_self_seeds_pk().contains(&pk) {
+                    response.multisig_response = Some(handle_multisig_request(r, &relay, &e, pk).await.log_error()?);
+                // }
+            }
+        }
+        if let Some(r) = &request.notify_multisig_creation_request {
+            if let Ok(pk) = verified.as_ref() {
+                if relay.node_config.non_self_seeds_pk().contains(&pk) {
+                    if let Some(pmd) = r.party_metadata.as_ref() {
+                        relay.new_multisig_metadata.lock().await.push((pk.clone(), pmd.clone()));
+                    }
+                }
+            }
+        }
 
         if let Some(r) = &request.get_party_metadata_request {
             let option = relay.ds.config_store.get_json("party_metadata").await?.clone();
@@ -376,18 +393,7 @@ impl<E> PeerRxEventHandler<E> where E: ExternalNetworkResources + Send + 'static
         if auth_required {
             match verified {
                 Ok(pk) => {
-                    if let Some(r) = &request.multisig_request {
-                        if relay.node_config.non_self_seeds_pk().contains(&pk) {
-                            response.multisig_response = Some(handle_multisig_request(r, &relay, &e).await.log_error()?);
-                        }
-                    }
-                    if let Some(r) = &request.notify_multisig_creation_request {
-                        if relay.node_config.non_self_seeds_pk().contains(&pk) {
-                            if let Some(pmd) = r.party_metadata.as_ref() {
-                                relay.new_multisig_metadata.lock().await.push((pk.clone(), pmd.clone()));
-                            }
-                        }
-                    }
+
                 }
                 Err(e) => { return Err(e).add("Unable to process request, authorization required and failed").log_error(); }
             }

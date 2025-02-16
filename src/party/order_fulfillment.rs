@@ -37,7 +37,8 @@ use crate::util;
 pub async fn handle_multisig_request<E: ExternalNetworkResources>(
     multisig_request: &MultisigRequest,
     relay: &Relay,
-    ext: &E
+    ext: &E,
+    request_origin: &PublicKey
 ) -> RgResult<MultisigResponse> {
     let pk = multisig_request.proposer_party_key.safe_get_msg("Missing proposer party key")?;
     let data = relay.external_network_shared_data.clone_read().await;

@@ -2,6 +2,7 @@ use crate::conf::rg_args::RgTopLevelSubcommand;
 use crate::config_data::{ConfigData, RpcUrl};
 use crate::constants::{OBSERVATION_FORMATION_TIME_MILLIS, REWARD_POLL_INTERVAL, STANDARD_FINALIZATION_INTERVAL_MILLIS};
 use crate::data_folder::{DataFolder, EnvDataFolder};
+use crate::keys::words_pass::WordsPass;
 use crate::observability::errors::Loggable;
 use crate::proto_serde::ProtoSerde;
 use crate::seeds::get_seeds_by_env_time;
@@ -144,7 +145,6 @@ pub struct NodeConfig {
     pub enable_logging: bool,
     pub discovery_interval: Duration,
     pub shuffle_interval: Duration,
-    // pub opts: Arc<RgArgs>,
     pub mempool: MempoolConfig,
     pub tx_config: TransactionProcessingConfig,
     pub observation: ObservationConfig,
@@ -158,10 +158,29 @@ pub struct NodeConfig {
     pub top_level_subcommand: Option<Box<RgTopLevelSubcommand>>
 }
 
+
+
 impl NodeConfig {
+
+    // pub fn cli_get_words_pass(&self) -> WordsPass {
+    //     self.config_data.cli.as_ref().and_then(|c| c.
+    // }
+
     pub fn allowed_proxy_origins(&self) -> Vec<String> {
         self.config_data.node.as_ref().and_then(|n| n.allowed_http_proxy_origins.clone()).unwrap_or(vec![])
     }
+
+
+    pub fn websocket_rpcs(&self, cur: SupportedCurrency) -> Vec<String> {
+        self.config_data.external.as_ref()
+            .and_then(|e| e.rpcs.as_ref())
+            .map(|r| r.iter()
+                .filter(|r| r.currency == cur)
+                .filter(|r| r.url.starts_with("ws"))
+                .map(|r| r.url.clone()).collect::<Vec<String>>()
+            ).unwrap_or_default()
+    }
+
 }
 
 impl NodeConfig {

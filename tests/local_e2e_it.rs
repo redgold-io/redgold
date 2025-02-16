@@ -1,4 +1,3 @@
-use rocket::form::validate::Len;
 
 use redgold::api::client::public_client::PublicClient;
 
@@ -13,7 +12,7 @@ use redgold_schema::SafeOption;
 #[tokio::test]
 async fn local_e2e_it() -> Result<(), ErrorInfo> {
 
-    util::init_logger_once();
+    redgold_common::log::init_logger_once();
 
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     println!("Local E2E IT from inside test");
