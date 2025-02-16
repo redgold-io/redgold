@@ -10,7 +10,7 @@ use bdk::bitcoin::psbt::PartiallySignedTransaction;
 use bdk::bitcoin::EcdsaSighashType;
 use bdk::database::{BatchDatabase, MemoryDatabase};
 use bdk::sled::Tree;
-use itertools::Itertools;
+use itertools::{all, Itertools};
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter, PartyCreationResult, PeerBroadcast};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
 use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
@@ -148,6 +148,14 @@ impl ExternalNetworkResourcesImpl {
         let descriptor = SingleKeyBitcoinWallet::<Tree>::multisig_descriptor_create(
             &self_pk, peer_pks, threshold
         )?;
+
+
+        let mut all_pks = vec![self_pk.clone()];
+        all_pks.extend(peer_pks.clone());
+        let all_pks_unique = all_pks.iter().unique().cloned().collect_vec();
+
+        let peer_pks = all_pks_unique.iter().filter(|pk| pk != &&self_pk).cloned().collect_vec();
+        info!("Btc multisig wallet called with all_pks len {} and unique len {} and peer key len {}", all_pks.len(), all_pks_unique.len());
         let mut guard = self.multisig_btc_wallets.lock().await;
         let result = guard.get(&descriptor);
         let mutex = match result {

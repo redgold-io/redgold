@@ -92,6 +92,7 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn handle_order_fulfillment(&mut self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
 
+        
         for (key,v ) in data.iter_mut() {
             let mut done_orders = vec![];
             let v2 = v.clone();

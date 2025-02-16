@@ -10,7 +10,7 @@ use redgold_schema::party::party_events::PartyEvents;
 use redgold_schema::party::party_internal_data::PartyInternalData;
 use redgold_schema::structs::{NetworkEnvironment, PublicKey};
 use redgold_schema::{message, RgResult};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 use tracing::info;
 use warp::http::Request;
@@ -41,6 +41,10 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn tick(&mut self) -> RgResult<()> {
 
         let mut other_seeds = self.relay.node_config.non_self_seeds_pk();
+        if other_seeds.iter().collect::<HashSet<&PublicKey>>().len() != other_seeds.len() {
+            info!("Duplicate seeds in non_self_seeds_pk");
+            other_seeds = other_seeds.iter().unique().cloned().collect();
+        }
 
         // info!("Party watcher tick on node {}", self.relay.node_config.short_id().expect("Node ID"));
         let mut party_metadata = self.relay.ds.config_store

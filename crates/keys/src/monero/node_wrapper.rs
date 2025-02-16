@@ -584,6 +584,9 @@ async fn local_three_node() {
     
     let addr = one_rpc_replicated.any_multisig_addr_creation().unwrap();
     println!("Restored wallet address {}", addr);
+
+    let balance_of_multisig = one_rpc_replicated.wallet_rpc.get_balance().await.unwrap();
+    println!("Balance of multisig: {:?}", balance_of_multisig.to_fractional());
     
     println!("Done");
     
@@ -596,6 +599,13 @@ async fn local_three_node() {
     println!("Balance: {:?}", b);
     println!("Balance: {:?}", b.to_fractional());
     println!("Address {}", four_rpc.wallet_rpc.self_address_str().unwrap());
+    //
+    // let destinations = vec![
+    //     (Address::from_monero_external(&addr),
+    //     CurrencyAmount::from_fractional_cur(0.05f64, SupportedCurrency::Monero).unwrap())
+    // ];
+    // let tx = four_rpc.wallet_rpc.send(destinations).await.unwrap();
+    // println!("Tx: {}", tx);
 
     // let amt = b.to_fractional() / 10;
 

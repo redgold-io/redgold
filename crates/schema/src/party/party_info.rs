@@ -85,7 +85,7 @@ impl PartyMetadata {
         }
     }
 
-    pub fn members_of(&self, address: &Address) -> Vec<PublicKey> {
+    pub fn members_of(&self, address: &Address) -> HashSet<PublicKey> {
         self.memberships.iter()
             .filter(|m| m.participate.iter().any(|p| p.address.as_ref() == Some(address)))
             .map(|m| m.public_key.clone().unwrap())
