@@ -1,5 +1,8 @@
 pub mod external_resources;
 pub mod flume_send_help;
+pub mod client;
+pub mod log;
+pub mod trace_setup;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

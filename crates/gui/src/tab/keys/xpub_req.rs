@@ -1,17 +1,15 @@
-use crate::hardware::trezor;
+
 use eframe::egui;
 use eframe::egui::{Color32, ComboBox, RichText, Ui};
 use flume::Sender;
-use redgold_gui::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
-use redgold_gui::components::derivation_path_sel::DerivationPathInputState;
-use redgold_gui::dependencies::gui_depends::GuiDepends;
-use redgold_gui::state::local_state::LocalStateUpdate;
-use redgold_keys::xpub_wrapper::XpubWrapper;
+use crate::common::{bounded_text_area_size, copy_to_clipboard, editable_text_input_copy};
+use crate::components::derivation_path_sel::DerivationPathInputState;
+use crate::dependencies::gui_depends::GuiDepends;
+use crate::state::local_state::LocalStateUpdate;
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::observability::errors::Loggable;
 use redgold_schema::{error_info, RgResult};
-use rocket::serde::Serialize;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 
@@ -120,7 +118,7 @@ impl RequestXpubState {
                         let xpub = match self.xpub_type {
                             XPubLikeRequestType::Cold => {
                                 self.message = "Awaiting input on device...".to_string();
-                                get_cold_xpub(self.derivation_path.derivation_path.clone())
+                                G::get_cold_xpub(self.derivation_path.derivation_path.clone())
                             }
                             XPubLikeRequestType::QR => {
                                 Err(error_info("QR code not yet supported"))
@@ -182,13 +180,5 @@ impl RequestXpubState {
             });
         add_named_xpubs
     }
-}
-
-
-pub fn get_cold_xpub(dp: String) -> RgResult<String> {
-    let node = trezor::get_public_node(dp)?;
-    let w = XpubWrapper::new(node.xpub);
-    w.public_at(0, 0)?;
-    Ok(w.xpub)
 }
 

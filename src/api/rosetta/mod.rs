@@ -5,9 +5,10 @@ use redgold_schema::RgResult;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::future::Future;
+use std::time::Duration;
 use warp::Filter;
 
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::api::rosetta::models::*;
 use crate::api::rosetta::spec::Rosetta;
 use crate::core::relay::Relay;
@@ -19,6 +20,7 @@ use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::helpers::with_metadata_hashable::WithMetadataHashable;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::proto_serde::ProtoHashable;
+use redgold_schema::structs::ErrorInfo;
 // use crate::genesis::create_test_genesis_transaction;
 use redgold_schema::util::lang_util::SameResult;
 
@@ -37,7 +39,7 @@ where
       F: FnOnce(Resp) -> () {
     tokio::select! {
         _ = server => {}
-        res = RgHttpClient::test_request::<Req, Resp>(relay.node_config.rosetta_port(), &req, endpoint) => {
+        res = test_request::<Req, Resp>(relay.node_config.rosetta_port(), &req, endpoint) => {
             res
             // .map( |r|
             //     log::info!("Test request response: {}", serde_json::to_string(&r.clone()).expect("ser"))
@@ -59,6 +61,16 @@ async fn rosetta_relay() -> Relay {
     let port = random_port();
     relay.node_config.rosetta_port = Some(port);
     relay.clone()
+}
+
+pub async fn test_request<Req, Resp>(port: u16, req: &Req, endpoint: String) -> Result<Resp, ErrorInfo>
+where
+    Req: Serialize + ?Sized,
+    Resp: DeserializeOwned
+{
+    let client = RgHttpClient::new("localhost".to_string(), port, None);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    client.json_post::<Req, Resp>(&req, endpoint).await
 }
 
 #[ignore]

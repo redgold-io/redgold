@@ -1,5 +1,5 @@
 use crate::api::client::public_client::PublicClient;
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::api::control_api::ControlClient;
 use crate::core::relay::Relay;
 use crate::e2e::tx_submit::TransactionSubmitter;
@@ -30,7 +30,6 @@ use redgold_schema::proto_serde::{ProtoHashable, ProtoSerde};
 use redgold_schema::structs::{Address, ControlMultipartyKeygenResponse, ControlMultipartySigningRequest, CurrencyAmount, ErrorInfo, Hash, InitiateMultipartySigningRequest, NetworkEnvironment, Proof, PublicKey, Seed, SupportedCurrency, TestContractInternalState, Transaction, UtxoEntry};
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{bytes_data, structs, ErrorInfoContext, RgResult, SafeOption};
-use rocket::yansi::Paint;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
@@ -44,7 +43,7 @@ use redgold_rpc_integ::examples::example::dev_ci_kp;
 #[test]
 fn e2e() {
 // async fn e2e() {
-    util::init_logger_once();
+    redgold_common::log::init_logger_once();
 
     let result = big_thread().spawn(|| {
         let runtime = build_simple_runtime(num_cpus::get(), "config");

@@ -1,4 +1,4 @@
-use crate::gui::app_loop::LocalState;
+use redgold_gui::state::local_state::LocalState;
 use eframe::egui;
 use eframe::egui::{ComboBox, Context, RichText};
 use redgold_common::external_resources::ExternalNetworkResources;

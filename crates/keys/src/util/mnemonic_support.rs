@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use redgold_schema::conf::local_stored_state::{AccountKeySource, XPubLikeRequestType};
 use redgold_schema::constants::{default_node_internal_derivation_path, redgold_keypair_change_path};
-use redgold_schema::keys::words_pass::WordsPass;
+use redgold_schema::keys::words_pass::{WordsPass, WordsPassBtcMessageAccountMetadata, WordsPassMetadata};
 use redgold_schema::observability::errors::EnhanceErrorInfo;
 use redgold_schema::proto_serde::ProtoSerde;
 use redgold_schema::structs::{Address, Hash, NetworkEnvironment, PeerId};
@@ -63,37 +63,6 @@ pub trait MnemonicSupport {
     fn to_all_addresses_default(&self, net: &NetworkEnvironment) -> RgResult<Vec<Address>>;
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct WordsPassBtcMessageAccountMetadata {
-    pub derivation_path: String,
-    pub account: u32,
-    pub rdg_address: String,
-    pub rdg_btc_main_address: String,
-    pub rdg_btc_test_address: String,
-    pub xpub: String,
-    pub public_hex: String
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct WordsPassMetadata {
-    pub checksum: String,
-    pub checksum_words: String,
-    pub btc_84h_0h_0h_0_0_address: String,
-    pub btc_84h_0h_0h_0_0_xpub: String,
-    pub eth_44h_60h_0h_0_0_address: String,
-    pub eth_44h_60h_0h_0_0_xpub: String,
-    pub rdg_44h_16180h_0h_0_0_address: String,
-    pub rdg_44h_16180h_0h_0_0_xpub: String,
-    pub rdg_btc_message_account_metadata: Vec<WordsPassBtcMessageAccountMetadata>,
-    pub executable_checksum: String
-}
-
-impl WordsPassMetadata {
-    pub fn with_exe_checksum(&mut self, sum: impl Into<String>) -> &mut WordsPassMetadata {
-        self.executable_checksum = sum.into();
-        self
-    }
-}
 
 impl MnemonicSupport for WordsPass {
 

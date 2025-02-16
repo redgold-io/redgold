@@ -9,7 +9,7 @@ use crate::parties::{PartyState, PartyInfo, PartyMetadata, PartyInstance};
 
 
 // All events associated with a 'party' composed of multiple addresses across networks.
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct PartyInternalData {
     pub self_key: PublicKey,
     pub proposer_key: PublicKey,

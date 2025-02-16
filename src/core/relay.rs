@@ -2,6 +2,7 @@ use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bdk::sled::Tree;
 use crossbeam::atomic::AtomicCell;
+use redgold_common::client::http::RequestResponseAuth;
 use redgold_common::external_resources::PeerBroadcast;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -30,8 +31,6 @@ use redgold_schema::message::Response;
 use redgold_schema::message::Request;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{error_info, struct_metadata_new, structs, ErrorInfoContext, RgResult};
-use rocket::form::FromForm;
-use rocket::http::ext::IntoCollection;
 use strum::IntoEnumIterator;
 use tokio::runtime::Runtime;
 use tokio::sync::MutexGuard;
@@ -142,6 +141,22 @@ impl<T> ReadManyWriteOne<T> where T: Clone  {
 }
 
 
+impl RequestResponseAuth for Relay {
+    fn sign_request(&self, r: &Request) -> RgResult<Request> {
+        let mut rr = r.clone();
+        Ok(rr.with_auth(&self.node_config.keypair()))
+    }
+
+    fn verify(&self, response: Response, intended_pk: Option<&PublicKey>) -> RgResult<Response> {   
+        response.verify_auth(intended_pk)
+    }
+
+    fn clone_box(&self) -> Box<dyn RequestResponseAuth> {
+        Box::new(self.clone())
+    }
+}
+
+
 #[derive(Clone)]
 pub struct Relay {
     /// Internal configuration
@@ -197,7 +212,7 @@ pub struct Relay {
     pub peer_info: PeerInfo,
     pub eth_daq: EthDaq,
     pub monero_wallet_messages: Channel<MoneroSyncInteraction>,
-    pub coinbase_ws_status: Channel<String>,
+    pub coinbase_ticker: WriteOneReadAll<CoinbaseWsTicker>,
     // pub latest_prices: Arc<Mutex<HashMap<SupportedCurrency, f64>>>,
 }
 
@@ -474,6 +489,9 @@ are instantiated by the node
 */
 
 use redgold_common::flume_send_help::SendErrorInfo;
+use redgold_common_no_wasm::arc_swap_wrapper::WriteOneReadAll;
+use redgold_crawler::coinbase::ticker_schema::TickerMessage;
+use redgold_crawler_native::coinbase_ws::CoinbaseWsTicker;
 use redgold_daq::eth::EthDaq;
 use redgold_keys::address_external::ToEthereumAddress;
 use redgold_node_core::services::monero_wallet_messages::{MoneroSyncInteraction, MoneroWalletMessage};
@@ -1263,7 +1281,7 @@ impl Relay {
             // eth_daq: Default::default(),
             eth_daq: Default::default(),
             monero_wallet_messages: Default::default(),
-            coinbase_ws_status: flume_send_help::new_channel::<String>(),
+            coinbase_ticker: Default::default(),
         }
     }
 }

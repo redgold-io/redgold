@@ -37,7 +37,8 @@ use crate::util;
 pub async fn handle_multisig_request<E: ExternalNetworkResources>(
     multisig_request: &MultisigRequest,
     relay: &Relay,
-    ext: &E
+    ext: &E,
+    request_origin: &PublicKey
 ) -> RgResult<MultisigResponse> {
     let pk = multisig_request.proposer_party_key.safe_get_msg("Missing proposer party key")?;
     let data = relay.external_network_shared_data.clone_read().await;
@@ -46,6 +47,10 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
     let party_address = multisig_request.mp_address.safe_get_msg("Missing mp address")?;
     let party_instance = party.metadata.instance_of_address(party_address).ok_msg("Missing instances of address")?;
     let party_members = party.metadata.members_of(party_address);
+
+    if party_members.iter().find(|m| m == &request_origin).is_none() {
+        return "Not a party member".to_error();
+    }
 
     let dest = multisig_request.destination.safe_get_msg("Missing destination")?;
     let amount = multisig_request.amount.safe_get_msg("Missing amount")?;
@@ -81,7 +86,7 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
 
     let mut response = ext.participate_multisig_send(
                 multisig_request.clone(),
-                &party_members,
+                &party_members.iter().cloned().collect_vec(),
                 party_instance.threshold.safe_get_msg("Missing threshold")?.value
     ).await?;
     response.currency = cur as i32;
@@ -91,6 +96,7 @@ pub async fn handle_multisig_request<E: ExternalNetworkResources>(
 impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
     pub async fn handle_order_fulfillment(&mut self, data: &mut HashMap<PublicKey, PartyInternalData>) -> RgResult<()> {
 
+        
         for (key,v ) in data.iter_mut() {
             let mut done_orders = vec![];
             let v2 = v.clone();
@@ -157,13 +163,14 @@ impl<T> PartyWatcher<T> where T: ExternalNetworkResources + Send {
 
                         let amm_addr = ps.address_for_currency(&cur).ok_msg("Missing address for currency")?;
                         let all_members = v2.metadata.members_of(&amm_addr);
+                        let members_vec = all_members.iter().map(|x| x.clone()).collect_vec();
                         let peers = all_members.clone()
                             .into_iter().filter(|pk| pk != key)
                             .collect_vec();
                         let option = v2.metadata.instance_of_address(&amm_addr).ok_msg("Missing instances of address")?;
                         let thresh = option.threshold.as_ref().ok_msg("Missing threshold")?;
                         let threshold = thresh.value;
-                        let descriptor = AddressDescriptor::from_multisig_public_keys_and_threshold(&all_members, threshold);
+                        let descriptor = AddressDescriptor::from_multisig_public_keys_and_threshold(&members_vec, threshold);
                         if cur == SupportedCurrency::Redgold {
                             for (dest, amt, o) in o {
                                 let mut builder = TransactionBuilder::new(&self.relay.node_config);

@@ -1,5 +1,4 @@
-use crate::api::client::rest::RgHttpClient;
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
+use redgold_common::client::http::RgHttpClient;
 use crate::infra::deploy::default_deploy;
 use crate::infra::{deploy, multiparty_backup};
 use eframe::egui;
@@ -23,6 +22,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::{error, info};
+use redgold_gui::state::local_state::LocalState;
 
 pub trait ServerClient {
     fn client(&self, network_environment: &NetworkEnvironment) -> RgHttpClient;
@@ -35,7 +35,7 @@ impl ServerClient for ServerOldFormat {
         } else {
             self.host.clone()
         };
-        RgHttpClient::from_env(h, network_environment)
+        RgHttpClient::from_env(h, network_environment, None)
     }
 }
 

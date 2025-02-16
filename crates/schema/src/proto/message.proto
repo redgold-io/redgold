@@ -52,6 +52,11 @@ message Request {
   structs.MultisigRequest multisig_request = 45;
   NotifyMultisigCreationRequest notify_multisig_creation_request = 46;
   GetPartyMetadataRequest get_party_metadata_request = 47;
+  ExtendedNodeMetadataRequest extended_node_metadata_request = 48;
+}
+
+message ExtendedNodeMetadataRequest {
+
 }
 
 
@@ -94,6 +99,12 @@ message Response {
   optional string monero_multisig_formation_response = 33;
   structs.MultisigResponse multisig_response = 34;
   GetPartyMetadataResponse get_party_metadata_response = 35;
+  ExtendedNodeMetadataResponse extended_node_metadata_response = 36;
+}
+
+
+message ExtendedNodeMetadataResponse {
+  repeated structs.Address addresses = 1;
 }
 
 

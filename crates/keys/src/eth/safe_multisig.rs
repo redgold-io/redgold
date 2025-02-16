@@ -1,3 +1,4 @@
+use log::info;
 use redgold_common_no_wasm::cmd::run_bash_async;
 use redgold_schema::structs::{Address, NetworkEnvironment};
 use redgold_schema::{structs, ErrorInfoContext, RgResult, SafeOption};
@@ -77,8 +78,12 @@ impl SafeMultisig {
         let private_key = self.private_hex.clone();
         let cmd = format!("docker run -it safeglobal/safe-cli safe-creator \
             --owners {owners_str} --threshold {threshold} {rpc} {private_key}");
-        println!("cmd: {}", cmd);
+        info!("Safe cmd: {}", cmd);
 
+        // Create temporary directory
+        let temp_dir = std::env::temp_dir();
+        let expect_script_path = temp_dir.join("safe_temp.exp");
+        info!("Using temporary script path: {:?}", expect_script_path);
 
         // Create expect script
         let expect_script = format!(
@@ -100,29 +105,34 @@ expect {{
 expect eof"#
         );
 
-        println!("Writing expect script: {}", expect_script.clone());
+        info!("Writing expect script: {}", expect_script.clone());
 
-        std::fs::write("temp.exp", expect_script).error_info("write expect script")?;
-        // std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
+        std::fs::write(&expect_script_path, expect_script).error_info("write expect script")?;
 
         #[cfg(unix)] {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions("temp.exp", std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
+            std::fs::set_permissions(&expect_script_path, std::fs::Permissions::from_mode(0o755)).error_info("chmod")?;
         }
 
         #[cfg(windows)]
         {
-            let mut perms = std::fs::metadata("temp.exp").error_info("get metadata")?.permissions();
+            let mut perms = std::fs::metadata(&expect_script_path).error_info("get metadata")?.permissions();
             perms.set_readonly(false);
-            std::fs::set_permissions("temp.exp", perms).error_info("set permissions")?;
+            std::fs::set_permissions(&expect_script_path, perms).error_info("set permissions")?;
         }
 
-        let cmd = "./temp.exp";
+        let cmd = expect_script_path.to_str().ok_msg("Invalid path")?.to_string();
         let (stdout, stderr) = run_bash_async(
-            cmd
+            &cmd
         ).await?;
-        println!("stdout: {}", stdout);
-        println!("stderr: {}", stderr);
+        
+        // Clean up the temporary file
+        if let Err(e) = std::fs::remove_file(&expect_script_path) {
+            info!("Failed to remove temporary expect script: {}", e);
+        }
+        
+        info!("Safe creation stdout: {}", stdout);
+        info!("stderr: {}", stderr);
         Self::extract_creation_info(&stdout)
     }
 

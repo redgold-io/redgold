@@ -22,6 +22,7 @@ use redgold_schema::helpers::easy_json::EasyJson;
 use redgold_schema::{ErrorInfoContext, SafeOption};
 use tokio::sync::Mutex;
 use tracing::{error, info};
+use redgold::util::cli::stake::cli_stake;
 use redgold_schema::conf::node_config::NodeConfig;
 use redgold_schema::conf::rg_args::RgTopLevelSubcommand;
 use redgold_schema::config_data::ConfigData;
@@ -78,6 +79,10 @@ async fn load_configs() -> (Box<NodeConfig>, bool) {
             RgTopLevelSubcommand::Swap(s) =>  {
                 cli_swap(s, &nc).await.unwrap();
             }
+            RgTopLevelSubcommand::Stake(s) =>  {
+                cli_stake(s, &nc).await.unwrap();
+            }
+
             RgTopLevelSubcommand::ColdMix(c) => {
                 commands::cold_mix(c, &nc).await.unwrap();
             }

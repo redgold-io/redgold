@@ -15,8 +15,8 @@
         <a class="navbar-brand brand" href="https://discord.gg/86fzxJg8ce">
           Discord
         </a>
-        <a class="navbar-brand brand" href="/pools">
-          Pools
+        <a class="navbar-brand brand" href="/parties">
+          Parties
         </a>
         <a class="navbar-brand brand" href="/faucet" v-if="!isMainnet">
           Faucet
@@ -59,10 +59,10 @@
       <div class="col-10">
 
         <div class="hash-container">
-          <div>Swap Deposit Address: {{ btcSwapAddress ? '' : 'loading...' }} </div>
-          <HashLink v-if="btcSwapAddress !== ''" :data="btcSwapAddress" :shorten=false />
-          <div>{{ rgdBtcStr }} RDG/BTC</div>
-          <div>${{ usdRdgStr }} USD/RDG</div>
+          <div>Top Party: {{ topPartyKey ? '' : 'loading...' }}</div>
+          <HashLink v-if="topPartyKey !== ''" :data="topPartyKey" :shorten=false />
+<!--          <div>{{ rgdBtcStr }} RDG/BTC</div>-->
+<!--          <div>${{ usdRdgStr }} USD/RDG</div>-->
           <div>${{ usdBtcStr }} USD/BTC</div>
           <div>${{ usdEthStr }} USD/ETH</div>
         </div>
@@ -96,7 +96,7 @@ export default {
   data() {
     return {
       searchValue: '',
-      btcSwapAddress: '',
+      topPartyKey: '',
       rgdBtc: 600.012312,
       rgdBtcStr: '600.012312',
       usdRdg: 100.012312,
@@ -130,7 +130,7 @@ export default {
     this.usdEthStr = this.usdEth.toFixed(2);
     let swapInfo = await this.fetchSwapInfo();
     if (swapInfo != null) {
-      this.btcSwapAddress = swapInfo.addresses['Bitcoin'];
+      this.topPartyKey = swapInfo['public_key'];
       if ('Bitcoin' in swapInfo.central_prices) {
         this.usdRdg = swapInfo.central_prices['Bitcoin'].min_ask_estimated
         this.rgdBtc = swapInfo.central_prices['Bitcoin'].min_ask

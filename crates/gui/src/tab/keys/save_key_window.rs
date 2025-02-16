@@ -1,19 +1,19 @@
-use crate::gui::app_loop::{LocalState, LocalStateAddons};
-use bdk::bitcoin::PrivateKey;
 use eframe::egui;
 use eframe::egui::Ui;
 use redgold_common::external_resources::ExternalNetworkResources;
-use redgold_gui::common::{editable_text_input_copy, valid_label};
-use redgold_keys::util::mnemonic_support::MnemonicSupport;
+use crate::common::{editable_text_input_copy, valid_label};
 use redgold_schema::conf::local_stored_state::{StoredMnemonic, StoredPrivateKey};
 use redgold_schema::keys::words_pass::WordsPass;
 use std::str::FromStr;
+use crate::dependencies::gui_depends::GuiDepends;
+use crate::state::local_state::{LocalState, LocalStateAddons};
 
-pub fn save_key_window<E>(
+pub fn save_key_window<E, G>(
     _ui: &mut Ui,
     ls: &mut LocalState<E>,
     ctx: &egui::Context,
-) where E: ExternalNetworkResources + 'static + Sync + Send + Clone{
+    g: &G
+) where E: ExternalNetworkResources + 'static + Sync + Send + Clone, G: GuiDepends {
     let mut add_new_key_window = ls.wallet.add_new_key_window;
     egui::Window::new("Add Mnemonic/Private Key")
         .open(&mut add_new_key_window)
@@ -32,9 +32,14 @@ pub fn save_key_window<E>(
                     let name = ls.wallet.mnemonic_save_name.clone();
                     let data = ls.wallet.mnemonic_save_data.clone();
                     let mut is_mnemonic: Option<bool> = None;
-                    if WordsPass::new(data.clone(), None).mnemonic().is_ok() {
+                    let wp = WordsPass::new(data.clone(), None);
+                    let ok = G::validate_mnemonic(wp.clone());
+
+                    let as_hex = data.as_str();
+                    let pk_parsed = g.private_hex_to_public_key(as_hex);
+                    if ok.is_ok() {
                         is_mnemonic = Some(true);
-                    } else if PrivateKey::from_str(data.as_str()).is_ok() {
+                    } else if pk_parsed.is_ok() {
                         is_mnemonic = Some(false);
                     }
                     ls.wallet.is_mnemonic_or_kp = is_mnemonic.clone();

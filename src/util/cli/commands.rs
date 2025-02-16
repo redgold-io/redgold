@@ -44,7 +44,6 @@ use redgold_schema::structs::{Address, CurrencyAmount, ErrorInfo, Hash, NetworkE
 use redgold_schema::transaction::rounded_balance_i64;
 use redgold_schema::tx::tx_builder::TransactionBuilder;
 use redgold_schema::{error_info, ErrorInfoContext, RgResult, SafeOption};
-use rocket::form::FromForm;
 use tokio::task::JoinHandle;
 use tracing::{error, info};
 

@@ -18,7 +18,7 @@ const routes = [
     { path: '/hash/:param', component: HashDetails },
     { path: '/', component: Dashboard},
     { path: '/faucet', component: FaucetRequest},
-    { path: '/pools', component: PoolParties},
+    { path: '/parties', component: PoolParties},
 ]
 
 // Create router

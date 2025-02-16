@@ -1,5 +1,5 @@
 use crate::api::client::public_client::PublicClient;
-use crate::api::client::rest::RgHttpClient;
+use redgold_common::client::http::RgHttpClient;
 use crate::schema::structs::{NetworkEnvironment, Transaction};
 use crate::util::cli::arg_parse_config::ArgTranslate;
 use crate::util::cli::load_config::load_full_config;

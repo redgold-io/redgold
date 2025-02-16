@@ -1,6 +1,6 @@
 use crate::core::internal_message::PeerMessage;
 use crate::core::relay::Relay;
-use crate::observability::metrics_help::WithMetrics;
+use redgold_schema::errors::helpers::WithMetrics;
 // use crate::genesis::create_test_genesis_transaction;
 use crate::schema::structs::{
     DownloadDataType, DownloadRequest, DownloadResponse, NodeState

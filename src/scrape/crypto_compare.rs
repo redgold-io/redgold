@@ -4,7 +4,7 @@ use itertools::Itertools;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
 use redgold_schema::structs::SupportedCurrency;
 use redgold_schema::{ErrorInfoContext, RgResult, SafeOption};
-use rocket::serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 

@@ -88,6 +88,10 @@ serde_with = { version = "3.2.0", features = ["hex"] }
 serde_cbor = "0.11.2"
 serde_arrow = { version = "0.12.3", features = ["arrow-54"] }
 toml = "0.8.12"
+uuid = { version = "1.3.3", features = ["serde", "v4", "v1"] }
+
+reqwest = { version = "0.11", features = ["json"] }
+
 
 num-bigint = "0.4"
 num-traits = "0.2"
@@ -137,7 +141,7 @@ redgold-ops = {workspace = true}
 redgold-rpc-integ = {workspace = true}
 
 crossterm = "0.25"
-
+reqwest = {workspace = true}
 arc-swap = {workspace = true}
 sha3 = {workspace = true}
 flume = {workspace = true}
@@ -158,7 +162,6 @@ dashmap = "5.5.0"
 # Deprecate after moving into data module -- only for build
 
 crossbeam = "0.8.1"
-uuid = { version = "1.3.3", features = ["serde", "v4", "v1"] }
 # GUI Alone
 # TODO: remove these in favor of the module
 eframe = "0.30.0" # Gives us egui, epi and web+native backends
@@ -167,6 +170,7 @@ egui_extras = {version = "0.30.0", features = ["default", "image", "all_loaders"
 image = { version = "0.24.6", default-features = false, features = ["jpeg", "png"] }
 rqrr = "0.6.0"
 
+uuid = {workspace = true}
 #zxcvbn = '2.1.1'
 rand = { workspace = true}
 clap = { version = "4.5.21", features = ["derive", "env"] }
@@ -179,7 +183,6 @@ async-trait = { workspace = true }
 env_logger = "0.10.0"
 #structopt = "0.3.21"
 warp = {version = "0.3", features = ["tls", "default"]}
-reqwest = { version = "0.11", features = ["json"] }
 serde = "1.0.130"
 serde_json = "1.0.59"
 base64 = "0.21.2"
@@ -204,16 +207,6 @@ config = { version = "0.14.0", features = ["toml"] }
 
 itertools = "0.10.1"
 bytes = "1.1.0"
-
-#Dependencies for multiparty threshold ecdsa
-multi-party-ecdsa = "0.8.1"
-anyhow = "1"
-round-based = { version = "0.1.4", features = [] }
-async-sse = "5"
-rocket = { version = "0.5.0-rc.3", default-features = false, features = ["json"] }
-thiserror = "1.0.23"
-surf = "2"
-curv-kzen = { version = "0.9", default-features = false }
 
 # conflict with multi-party-ecdsa
 tokio = { workspace = true }
@@ -306,13 +299,13 @@ dns-lookup = "2.0.2" #Dependencies for email sending
 #rustflags = ["-C", "link-args=-Wl,-stack_size,128000000"]
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-args=-Wl,-z,stack-size=128000000"]
+rustflags = ["-C", "link-args=-Wl,-z,stack-size=128000000", "-A", "warnings"]
 
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "link-args=/STACK:128000000"]
+rustflags = ["-C", "link-args=/STACK:128000000", "-A", "warnings"]
 
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "link-args=-Wl,-stack_size,128000000"]
+rustflags = ["-C", "link-args=-Wl,-stack_size,128000000", "-A", "warnings"]
 
 
 #[target.'cfg(target_os = "macos")']

@@ -85,7 +85,7 @@ impl PartyMetadata {
         }
     }
 
-    pub fn members_of(&self, address: &Address) -> Vec<PublicKey> {
+    pub fn members_of(&self, address: &Address) -> HashSet<PublicKey> {
         self.memberships.iter()
             .filter(|m| m.participate.iter().any(|p| p.address.as_ref() == Some(address)))
             .map(|m| m.public_key.clone().unwrap())
@@ -97,6 +97,7 @@ impl PartyMetadata {
             .into_iter()
             .filter(|(k, _)| k.is_some())
             .map(|(k, v)| (k.clone().unwrap(), v
+                .sorted_by(|a, b| a.creation_time.cmp(&b.creation_time))
                 .map(|a| a.address.as_ref().unwrap()).cloned().collect()))
             .collect()
     }
@@ -175,6 +176,10 @@ impl PartyMetadata {
 
     pub fn latest_instance_by(&self, cur: SupportedCurrency) -> Option<&PartyInstance> {
         self.instances_of(&cur).max_by_key(|i| i.creation_time)
+    }
+
+    pub fn address(&self, cur: &SupportedCurrency) -> Option<Address> {
+        self.address_by_currency().get(cur).and_then(|a| a.last().map(|a| a.clone()))
     }
 
     pub fn add_instance_equal_members(&mut self, instance: &PartyInstance, equal_members: &Vec<PublicKey>) {
