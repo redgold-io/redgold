@@ -5,6 +5,7 @@ use redgold_schema::errors::into_error::ToErrorInfo;
 use redgold_schema::{ErrorInfoContext, RgResult};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tracing::{info, error};
 use flume::{Sender, Receiver};
 
@@ -52,134 +53,70 @@ impl BitcoinZmqSubscriber {
         };
         s        
     }
-    pub async fn run(self) -> RgResult<()> {
+    pub fn run(self) -> RgResult<()> {
         let tracker = self.confirmation_tracker.clone();
-    
-        // Setup ZMQ context and socket in the spawned thread
-        let context = zmq::Context::new();
-        let socket = context.socket(zmq::SUB).error_info("Bad socket")?;
-    
+        
+        let context = tmq::Context::new();
+        let mut socket = context.socket(zmq::SUB).expect("Failed to create socket");
+        
         let tx_addr = format!("tcp://{}:{}", self.config.host, self.config.zmq_tx_port);
         let block_addr = format!("tcp://{}:{}", self.config.host, self.config.zmq_block_port);
         
         info!("Connecting to BTC ZMQ endpoints: {} and {}", tx_addr, block_addr);
         
-        // Connect with retry logic
-        let mut retry_count = 0;
-        let max_retries = 5;
+        // Connect to endpoints
+        socket.connect(&tx_addr).expect("Failed to connect to tx endpoint");
+        socket.connect(&block_addr).expect("Failed to connect to block endpoint");
         
-        while retry_count < max_retries {
-            match (socket.connect(&tx_addr), socket.connect(&block_addr)) {
-                (Ok(_), Ok(_)) => {
-                    info!("Successfully connected to ZMQ endpoints");
-                    break;
-                }
-                (Err(e1), Err(e2)) => {
-                    error!("Failed to connect to ZMQ ports: {} and {}", e1, e2);
-                    retry_count += 1;
-                    if retry_count == max_retries {
-                        error!("Max retries reached, giving up");
-                        return "Max retries".to_error();
-                    }
-                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                    continue;
-                }
-                (Err(e), _) | (_, Err(e)) => {
-                    error!("Failed to connect to one ZMQ port: {}", e);
-                    retry_count += 1;
-                    if retry_count == max_retries {
-                        error!("Max retries reached, giving up");
-                        return "Max retries".to_error();
-                    }
-                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                    continue;
-                }
-            }
-    }
-    
-        // Subscribe to both transaction and block topics
-        if let Err(e) = socket.set_subscribe(b"rawtx") {
-            error!("Failed to subscribe to transactions: {}", e);
-            return "Failed to subscribe to transactions".to_error();
-        }
-        if let Err(e) = socket.set_subscribe(b"rawblock") {
-            error!("Failed to subscribe to blocks: {}", e);
-            return "Failed to subscribe to blocks".to_error();
-        }
-
+        // Set subscriptions
+        socket.set_subscribe(b"rawtx").expect("Failed to subscribe to rawtx");
+        socket.set_subscribe(b"rawblock").expect("Failed to subscribe to rawblock");
+        
         // Setup RPC client
         let rpc_url = format!("http://{}:{}", self.config.host, self.config.rpc_port);
-        let _rpc_client = match Client::new(&rpc_url, Auth::None) {
-            Ok(client) => client,
-            Err(e) => {
-                error!("Failed to create RPC client: {}", e);
-                return "Failed to create RPC client".to_error();
-            }
-        };
-        
-       loop {
-            let topic = match socket.recv_bytes(0) {
-                Ok(t) => t,
-                Err(e) => {
-                    error!("Error receiving topic: {}", e);
-                    continue;
-                }
-            };
-            let content = match socket.recv_bytes(0) {
-                Ok(c) => c,
-                Err(e) => {
-                    error!("Error receiving content: {}", e);
-                    continue;
-                }
-            };
+        let _rpc_client = Client::new(&rpc_url, Auth::None)
+            .error_info("Failed to create RPC client")?;
+            
+        loop {
 
-            match topic.as_slice() {
-                b"rawtx" => {
-                    if let Ok(tx) = encode::deserialize::<Transaction>(&content) {
-                        let txid = tx.compute_txid().to_string();
-                        info!("Received new transaction: {}", txid);
-                        
-                        // Store initial confirmation count
-                        if let Ok(mut tracker) = tracker.lock() {
-                            tracker.insert(txid.clone(), 0);
-                        }
-                        
-                        // Send message through channel
-                        if let Err(e) = self.message_sender.send(ZmqMessage::Transaction(txid.clone())) {
-                            error!("Failed to send transaction message: {}", e);
-                        }
-
-                        // // Decode and process transaction
-                        // for (i, output) in tx.output.iter().enumerate() {
-                        //     info!("Output {}: {} satoshis", i, output.value);
-                        //     if let Ok(address) = bitcoin::Address::from_script(&output.script_pubkey, bitcoin::Network::Bitcoin) {
-                        //         info!("  Address: {}", address);
-                        //     }
-                        // }
-                    }
-                }
-                b"rawblock" => {
-                    // When we receive a new block, increment confirmation count for all tracked transactions
+            // Use tmq's async recv
+            let topic = socket.recv_bytes(0).expect("Error receiving topic");
+            let content = socket.recv_bytes(0).unwrap_or_default();
+            
+            if topic.starts_with(b"rawtx") {
+                if let Ok(tx) = encode::deserialize::<Transaction>(&content) {
+                    let txid = tx.compute_txid().to_string();
+                    info!("Received new transaction: {}", txid);
+                    
+                    // Store initial confirmation count
                     if let Ok(mut tracker) = tracker.lock() {
-                        for count in tracker.values_mut() {
-                            *count += 1;
-                        }
-                        
-                        // Log confirmation levels
-                        for (txid, confirmations) in tracker.iter() {
-                            info!("Transaction {} has {} confirmations", txid, confirmations);
-                        }
-                        
-                        // Send block message
-                        if let Err(e) = self.message_sender.send(ZmqMessage::Block) {
-                            error!("Failed to send block message: {}", e);
-                        }
+                        tracker.insert(txid.clone(), 0);
+                    }
+                    
+                    // Send message through channel
+                    if let Err(e) = self.message_sender.send(ZmqMessage::Transaction(txid.clone())) {
+                        error!("Failed to send transaction message: {}", e);
                     }
                 }
-                _ => {}
+            } else if topic.starts_with(b"rawblock") {
+                // When we receive a new block, increment confirmation count for all tracked transactions
+                if let Ok(mut tracker) = tracker.lock() {
+                    for count in tracker.values_mut() {
+                        *count += 1;
+                    }
+                    
+                    // Log confirmation levels
+                    for (txid, confirmations) in tracker.iter() {
+                        info!("Transaction {} has {} confirmations", txid, confirmations);
+                    }
+                    
+                    // Send block message
+                    if let Err(e) = self.message_sender.send(ZmqMessage::Block) {
+                        error!("Failed to send block message: {}", e);
+                    }
+                }
             }
         }
-        Ok(())
     }
 }
 
@@ -208,8 +145,9 @@ mod tests {
         let subscriber_clone = subscriber.clone();
         info!("Running subscriber");
         
-        // // Run the subscriber in the background
-        let handle = tokio::spawn(subscriber_clone.run());
+        let handle = std::thread::spawn(move || {
+            subscriber_clone.run();
+        });
 
         for i in 0..5 {
             info!("Waiting for message {}", i);
@@ -226,7 +164,6 @@ mod tests {
                 }
             }
         }
-        handle.abort();
         info!("Subscriber aborted");  
 
         // handle.abort();
