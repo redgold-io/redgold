@@ -121,7 +121,7 @@ qrencode = "0.14.0"
 csscolorparser = "0.6.2"
 # enum stuff
 strum = "0.26.3"
-strum_macros = "0.26.4"
+strum_macros = "0.27.1"
 
 
 [dependencies]
