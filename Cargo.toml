@@ -99,7 +99,7 @@ parquet_derive = "54.0.0"
 hex = "0.4.3"
 sha3 = "0.10.8"
 
-itertools = "0.10.1"
+itertools = "0.14.0"
 rand = '0.8.4'
 
 log = "0.4.14"
@@ -205,7 +205,7 @@ config = { version = "0.14.0", features = ["toml"] }
 
 #priority-queue = "1.2.0"
 
-itertools = "0.10.1"
+itertools = "0.14.0"
 bytes = "1.1.0"
 
 # conflict with multi-party-ecdsa
