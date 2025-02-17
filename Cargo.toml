@@ -103,7 +103,7 @@ itertools = "0.10.1"
 rand = '0.8.4'
 
 log = "0.4.14"
-metrics = "0.22.0"
+metrics = "0.24.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dirs = "5.0.1"
