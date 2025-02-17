@@ -1,6 +1,6 @@
 use crate::btc::btc_wallet::SingleKeyBitcoinWallet;
 use bdk::bitcoin::{Address, Network, TxIn, TxOut};
-use bdk::blockchain::GetTx;
+use bdk::blockchain::{ElectrumBlockchain, GetTx};
 use bdk::database::BatchDatabase;
 use bdk::{Balance, TransactionDetails};
 use itertools::Itertools;
@@ -35,7 +35,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
         res
     }
 
-    pub fn outputs_convert_static(outs: &Vec<TxOut>, network: NetworkEnvironment) -> Vec<(String, u64)> {
+    pub fn outputs_convert_static(outs: &Vec<TxOut>, network: &NetworkEnvironment) -> Vec<(String, u64)> {
         let mut res = vec![];
         for o in outs {
             let a = Address::from_script(&o.script_pubkey, Self::convert_network(&network)).ok();
@@ -47,16 +47,25 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
     }
 
     pub fn convert_tx_inputs_address(&self, tx_ins: &Vec<TxIn>) -> RgResult<Vec<(String, u64)>> {
+        Self::convert_tx_inputs_address_static(tx_ins, &self.client, &self.network_environment)
+    }
+
+    pub fn convert_tx_inputs_address_static(
+        tx_ins: &Vec<TxIn>,
+        client: &ElectrumBlockchain,
+        network: &NetworkEnvironment
+    ) -> RgResult<Vec<(String, u64)>> {
+        let network = Self::convert_network(&network);
         let mut res = vec![];
         for i in tx_ins {
             let txid = i.previous_output.txid;
             let vout = i.previous_output.vout;
-            let prev_tx = self.client.get_tx(&txid).error_info("Error getting tx")?;
+            let prev_tx = client.get_tx(&txid).error_info("Error getting tx")?;
             let prev_tx = prev_tx.safe_get_msg("No tx found")?;
             let prev_output = prev_tx.output.get(vout as usize);
             let prev_output = prev_output.safe_get_msg("Error getting output")?;
             let amount = prev_output.value;
-            let a = Address::from_script(&prev_output.script_pubkey, self.network).ok();
+            let a = Address::from_script(&prev_output.script_pubkey, network).ok();
             // println!("{}", format!("TxIn address: {:?}", a));
             if let Some(a) = a {
                 let a = a.to_string();
@@ -79,11 +88,18 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
     }
 
     pub fn extract_ett(&self, transaction_details: &TransactionDetails) -> Result<Option<ExternalTimedTransaction>, ErrorInfo> {
+        let net = self.network_environment.clone();
+        let client = &self.client;
         let self_addr_typed = self.get_descriptor_address_typed()?;
+        Self::extract_ett_static(transaction_details, &self_addr_typed, client, &net)
+    }
+    pub fn extract_ett_static(transaction_details: &TransactionDetails, self_addr_typed: &structs::Address,
+    client: &ElectrumBlockchain, net: &NetworkEnvironment) -> Result<Option<ExternalTimedTransaction>, ErrorInfo> {
+
         let self_addr = self_addr_typed.render_string()?;
 
         let tx = transaction_details.transaction.safe_get_msg("Error getting transaction")?;
-        let output_amounts = self.outputs_convert(&tx.output);
+        let output_amounts = Self::outputs_convert_static(&tx.output, net);
         let other_output_addresses = output_amounts.iter().filter_map(|(output_address, _y)| {
             if output_address != &self_addr {
                 Some(output_address.clone())
@@ -91,7 +107,7 @@ impl<D: BatchDatabase> SingleKeyBitcoinWallet<D> {
                 None
             }
         }).collect();
-        let input_addrs = self.convert_tx_inputs_address(&tx.input)?;
+        let input_addrs = Self::convert_tx_inputs_address_static(&tx.input, client, net)?;
 
         // Not needed?
         // let has_self_output = output_amounts.iter().filter(|(x,y)| x != &self_addr).next().is_some();

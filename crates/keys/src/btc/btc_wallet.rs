@@ -10,12 +10,12 @@ use crate::util::mnemonic_support::MnemonicSupport;
 use bdk::bitcoin::hashes::Hash;
 use bdk::bitcoin::util::psbt::PartiallySignedTransaction;
 use bdk::bitcoin::{Address, EcdsaSighashType, Network, PrivateKey};
-use bdk::blockchain::{Blockchain, ElectrumBlockchain};
+use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetBlockHash, GetTx};
 use bdk::database::{BatchDatabase, MemoryDatabase};
-use bdk::electrum_client::{Client, Config};
+use bdk::electrum_client::{Client, Config, ElectrumApi};
 use bdk::signer::{SignerContext, SignerOrdering, SignerWrapper};
 use bdk::sled::Tree;
-use bdk::{sled, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
+use bdk::{sled, BlockTime, FeeRate, KeychainKind, SignOptions, SyncOptions, TransactionDetails, Wallet};
 use itertools::Itertools;
 // use crate::util::cli::commands::send;
 use redgold_schema::helpers::easy_json::EasyJsonDeser;
@@ -26,6 +26,7 @@ use redgold_schema::structs::{ErrorInfo, NetworkEnvironment, Proof, PublicKey};
 // use crate::util::cli::commands::send;
 use redgold_schema::{error_info, structs, ErrorInfoContext, RgResult, SafeOption};
 use hex;
+use redgold_schema::tx::external_tx::ExternalTimedTransaction;
 
 pub fn struct_public_to_address(pk: structs::PublicKey, network: Network) -> Result<Address, ErrorInfo> {
     let pk2 = bdk::bitcoin::util::key::PublicKey::from_slice(&*pk.raw_bytes()?)
@@ -136,6 +137,49 @@ impl SingleKeyBitcoinWallet<MemoryDatabase> {
         Ok(bitcoin_wallet)
     }
 }
+
+pub fn get_all_tx_electrum(network: &NetworkEnvironment, address: &structs::Address) -> RgResult<Vec<ExternalTimedTransaction>> {
+    let addr = address.render_string()?;
+    let btc_addr = Address::from_str(&*addr).error_info("Unable to parse address")?;
+    let backend = network_to_backends(network).get(0).unwrap().clone();
+    let client = Client::new(&*backend)
+        .error_info("Error building bdk client")?;
+    let client = ElectrumBlockchain::from(client);
+    // Get the script_pubkey directly from the address
+    let script = btc_addr.script_pubkey();
+    // Call script_get_history with the script
+    let mut res = vec![];
+    for entry in client.script_get_history(&script).error_info("Error getting history")? {
+        let hash = entry.tx_hash;
+        let tx = client.get_tx(&hash).error_info("Error getting tx")?;
+        let tx = tx.ok_msg("No tx found").with_detail("txid", hash.to_string())?;
+        let fee = entry.fee;
+        let height = entry.height;
+        let header = client.block_header(height as usize).error_info("Error getting block header")?;
+        let timestamp = header.time;
+        let det = TransactionDetails {
+            transaction: Some(tx.clone()),
+            txid: tx.txid(),
+            received: 0,
+            sent: 0,
+            fee,
+            confirmation_time: Some(BlockTime{
+                height: height as u32,
+                timestamp: timestamp as u64,
+            }),
+        };
+
+        let ret = SingleKeyBitcoinWallet::<MemoryDatabase>::extract_ett_static(
+            &det,
+            address,
+            &client,
+            network
+        )?.ok_msg("No transaction found")?;
+        res.push(ret);
+    }
+    Ok(res)
+}
+
 impl SingleKeyBitcoinWallet<Tree> {
 
     pub fn new_wallet_db_backed(
@@ -155,6 +199,7 @@ impl SingleKeyBitcoinWallet<Tree> {
         let client = Client::from_config(&*backend, config)
             .error_info("Error building bdk client")?;
         let client = ElectrumBlockchain::from(client);
+
         // KeyValueDatabase
         // Create a database (using default sled type) to store wallet data
         let mut database = sled::open(database_path.clone()).error_info("Sled database open error");
