@@ -13,7 +13,7 @@ use bdk::sled::Tree;
 use itertools::{all, Itertools};
 use redgold_common::external_resources::{EncodedTransactionPayload, ExternalNetworkResources, NetworkDataFilter, PartyCreationResult, PeerBroadcast};
 use redgold_keys::address_external::{get_checksum_address, ToBitcoinAddress, ToEthereumAddress};
-use redgold_keys::btc::btc_wallet::SingleKeyBitcoinWallet;
+use redgold_keys::btc::btc_wallet::{get_all_tx_electrum, SingleKeyBitcoinWallet};
 use redgold_keys::word_pass_support::NodeConfigKeyPair;
 use redgold_keys::{KeyPair, TestConstants};
 use redgold_rpc_integ::eth::eth_wallet::EthWalletWrapper;
@@ -54,6 +54,7 @@ use redgold_schema::util::times::ToTimeString;
 use crate::core::internal_message::RecvAsyncErrorInfoTimeout;
 use crate::core::transact::tx_builder_supports::{TxBuilderApiConvert, TxBuilderApiSupport};
 use redgold_schema::errors::helpers::WithMetrics;
+use crate::node_config::EnvDefaultNodeConfig;
 use crate::util;
 
 #[derive(Clone)]
@@ -129,7 +130,7 @@ impl ExternalNetworkResourcesImpl {
                     None,
                     None,
                     Some(addr.clone())
-                )?;
+                ).with_detail("address_only_descriptor", addr.render_string()?)?;
                 // println!("New wallet created");
                 let w = Arc::new(tokio::sync::Mutex::new(new_wallet));
                 guard.insert(addr.clone(), w.clone());
@@ -314,9 +315,10 @@ async fn get_all_tx_for_pk(&self, pk: &PublicKey, currency: SupportedCurrency, f
                                -> RgResult<Vec<ExternalTimedTransaction>> {
         match currency {
             SupportedCurrency::Bitcoin => {
-                let arc = self.btc_wallet_for_address(address).await?;
-                let guard = arc.lock().await;
-                guard.get_all_tx()
+                get_all_tx_electrum(&self.node_config.network, address)
+                // let arc = self.btc_wallet_for_address(address).await?;
+                // let guard = arc.lock().await;
+                // guard.get_all_tx()
             },
             SupportedCurrency::Ethereum => {
                 let eth = EthHistoricalClient::new(&self.node_config.network).ok_msg("eth client creation")??;
@@ -776,7 +778,9 @@ impl ExternalNetworkResources for MockExternalResources {
 
                 let this_btc_addr = pk.to_bitcoin_address_typed(&self.node_config.network)?;
                 let this_btc_addr_str = this_btc_addr.render_string()?;
-                let outputs = SingleKeyBitcoinWallet::<MemoryDatabase>::outputs_convert_static(&tx.output, self.node_config.network.clone());
+                let outputs = SingleKeyBitcoinWallet::<MemoryDatabase>::outputs_convert_static(
+                    &tx.output, &self.node_config.network.clone()
+                );
                 let other_outputs = outputs.iter()
                     .filter(|(ad, am)| ad != &this_btc_addr_str)
                     .filter(|(ad, am)| ad != &dev_ci)
@@ -1060,8 +1064,14 @@ impl ExternalNetworkResources for MockExternalResources {
     }
 }
 
-#[test]
-fn generate_dummy_key() {
-    let tc = TestConstants::new();
-    tc.key_pair().to_private_hex().print();
+#[tokio::test]
+async fn test_get_all_btc_txs() {
+    let kp = dev_ci_kp().unwrap();
+    let network = NetworkEnvironment::Dev;
+    let pk = kp.1.public_key();
+    let addr = pk.to_bitcoin_address_typed(&network).unwrap();
+    let nc = NodeConfig::by_env_with_args(NetworkEnvironment::Dev).await;
+    let n = ExternalNetworkResourcesImpl::new(&nc, None).unwrap();
+    let txs = n.get_all_tx_for_address(&addr, SupportedCurrency::Bitcoin, None).await.unwrap();
+    assert!(txs.len() > 0);
 }
