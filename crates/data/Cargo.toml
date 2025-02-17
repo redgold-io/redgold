@@ -36,5 +36,5 @@ tokio = { version = "1.36.0", features = ["rt", "process"]}
 [build-dependencies]
 sqlx = { version = "0.7.2", features = [ "runtime-tokio-native-tls" , "sqlite"] } # Tokio:
 tokio = { workspace = true }
-rusqlite = "0.29.0"
+rusqlite = "0.33.0"
 dirs = {workspace = true}
