@@ -1,0 +1,33 @@
+{
+  "name": "xchainjs-estimate-swap",
+  "private": true,
+  "version": "1.0.24",
+  "scripts": {
+    "listPools": "npx ts-node listPools.ts",
+    "estimateSwap": "npx ts-node estimateSwap.ts",
+    "doSwap": "npx ts-node doSwap.ts",
+    "build": "tsc --noEmit"
+  },
+  "description": "Test folder for xchainjs thorchain-amm package",
+  "main": "index.js",
+  "author": "THORIANITE",
+  "license": "MIT",
+  "dependencies": {
+    "@xchainjs/xchain-client": "1.0.10",
+    "@xchainjs/xchain-crypto": "0.3.7",
+    "@xchainjs/xchain-midgard": "0.5.13",
+    "@xchainjs/xchain-midgard-query": "1.0.11",
+    "@xchainjs/xchain-thorchain-query": "1.0.13",
+    "@xchainjs/xchain-thornode": "0.3.22",
+    "@xchainjs/xchain-util": "1.0.8",
+    "axios": "1.7.4",
+    "axios-retry": "^3.2.5",
+    "bignumber.js": "9.0.1",
+    "rimraf": "~3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.28",
+    "ts-node": "10.9.2",
+    "typescript": "^5.0.4"
+  }
+}
