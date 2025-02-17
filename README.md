@@ -1,4 +1,4 @@
-# <img src="src/resources/svg_rg_2_crop.png" width="9%" height="9%"> Redgold
+# <img src="src/resources/images/historical/design_one/logo_orig_crop.png" width="5%" height="5%" style="vertical-align: middle"> Redgold
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Dev](https://github.com/redgold-io/redgold/actions/workflows/ci.yml/badge.svg?branch=dev)
@@ -11,11 +11,12 @@
 [Run A Node](https://dev.docs.redgold.io/guides/node-setup) | 
 [Security Procedures](https://dev.docs.redgold.io/introduction/security-procedures)
 
-Redgold is a fully peer-to-peer decentralized portfolio contract platform. 
-It is designed to act as a financial data and computation layer for the cryptocurrency ecosystem, specifically as 
-a data-lake and execution layer for multiparty portfolio contracts. The primary use case is focused around ETFs & Portfolio target models, but the platform is designed to be general purpose as a decentralized data lake and SQL compute engine for crypto related contracts.
+Redgold is a crypto portfolio contract platform designed around data lake transforms and executors. 
+Uses multiparty native contracts for asset management. Primary use case is ETFs & Portfolio target models (expressing a desired 
+portfolio allocation as a function and having validators automatically fulfill it,) but the platform is designed to 
+be general purpose as a decentralized data lake and relational algebra compute engine for crypto related contracts.
 
-It is inspired heavily by Spark and pandas like data transformations on conventional 
+Heavily inspired by Spark and pandas/polars like data transformations on conventional 
 parquet data lakes, with the key distinguishing factor being the ability to support multi-tenant compute with 
 arbitrary secure UDFs compiled by anyone. WASM executors are used for secure remote code execution to chain together
 transforms operating on SQL-like data loading functions as inputs. Protobuf is used for relational algebra descriptors 

@@ -16,7 +16,7 @@
 <!--            justify-content-center -->
             <a href="https://dev.docs.redgold.io/introduction/getting-started" class="btn btn-primary intro-button">Start</a>
             <a href="https://dev.docs.redgold.io/whitepaper/introduction" class="btn btn-primary intro-button" >Paper</a>
-            <a href="https://dev.docs.redgold.io/guides/amm-swaps-exchange" class="btn btn-primary intro-button" >Buy</a>
+            <a href="https://dev.docs.redgold.io/guides/amm-swaps-exchange" class="btn btn-primary intro-button" >Swap</a>
           </div>
         </div>
       </div>

@@ -121,6 +121,13 @@ expect eof"#
             std::fs::set_permissions(&expect_script_path, perms).error_info("set permissions")?;
         }
 
+        // After writing the file
+        info!("File exists: {}", expect_script_path.exists());
+        info!("File permissions: {:?}", std::fs::metadata(&expect_script_path).ok());
+        info!("File contents: {}", std::fs::read_to_string(&expect_script_path).unwrap_or("".to_string()));
+
+        info!("Ensure apt install {:?}", run_bash_async("sudo apt install -y expect").await);
+
         let cmd = expect_script_path.to_str().ok_msg("Invalid path")?.to_string();
         let (stdout, stderr) = run_bash_async(
             &cmd
@@ -132,7 +139,7 @@ expect eof"#
         }
         
         info!("Safe creation stdout: {}", stdout);
-        info!("stderr: {}", stderr);
+        info!("Safe creation stderr: {}", stderr);
         Self::extract_creation_info(&stdout)
     }
 

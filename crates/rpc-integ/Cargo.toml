@@ -15,6 +15,7 @@ categories.workspace = true
 [dependencies]
 redgold-schema = { workspace = true}
 redgold-keys = { workspace = true}
+redgold-common = { workspace = true}
 tracing = {workspace = true}
 ethers = { version = "2.0.13", features = ["ws"]}
 foundry-block-explorers = "0.2.3"
@@ -32,7 +33,11 @@ serde_cbor = { workspace = true }
 serde = {workspace = true}
 #arrow = "54.0.0"
 #serde_par
-#bitcoincore-rpc = "0.19.0"
-#bitcoin = "0.32.5"
+bitcoincore-rpc = "0.19.0"
+bitcoin = "0.32.5"
 tokio-tungstenite = "0.21.0"
 url = "2.5.0"
+
+zmq = "0.10"
+flume = "0.11"
+tmq = "0.5.0"

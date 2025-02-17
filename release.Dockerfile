@@ -8,7 +8,7 @@ RUN apt install -y automake libtool libssl-dev \
  autoconf libxcb-xrm0 libxcb-xrm-dev automake libxcb-shape0-dev \
  g++ \
  sqlite3 libsqlite3-dev wget \
- libudev-dev pkg-config
+ libudev-dev pkg-config expect
 
 # Docker install for pulling images with auto update process.
 RUN apt install -y \

@@ -575,17 +575,20 @@ async fn local_three_node() {
     }
     
     let history = rpc_vecs[0].history.clone();
-    
-    let mut one_rpc_replicated = MoneroNodeRpcInterfaceWrapper::from_config(
-        &one, s.clone(), "/disk/monerotw2","~/wallet.exp".to_string(), Some(true)
-    ).unwrap().unwrap();
-    
-    one_rpc_replicated.restore_from_history(history, &"test_filename_differenet".to_string()).await.unwrap();
-    
-    let addr = one_rpc_replicated.any_multisig_addr_creation().unwrap();
-    println!("Restored wallet address {}", addr);
+    //
+    // let mut one_rpc_replicated = MoneroNodeRpcInterfaceWrapper::from_config(
+    //     &one, s.clone(), "/disk/monerotw2","~/wallet.exp".to_string(), Some(true)
+    // ).unwrap().unwrap();
+    //
+    // one_rpc_replicated.restore_from_history(history, &"test_filename_differenet".to_string()).await.unwrap();
+    //
+    // let addr = one_rpc_replicated.any_multisig_addr_creation().unwrap();
+    // println!("Restored wallet address {}", addr);
 
-    let balance_of_multisig = one_rpc_replicated.wallet_rpc.get_balance().await.unwrap();
+
+    let msig = rpc_vecs[0].clone();
+    let addr = msig.any_multisig_addr_creation().unwrap();
+    let balance_of_multisig = msig.wallet_rpc.get_balance().await.unwrap();
     println!("Balance of multisig: {:?}", balance_of_multisig.to_fractional());
     
     println!("Done");
@@ -599,13 +602,13 @@ async fn local_three_node() {
     println!("Balance: {:?}", b);
     println!("Balance: {:?}", b.to_fractional());
     println!("Address {}", four_rpc.wallet_rpc.self_address_str().unwrap());
-    //
-    // let destinations = vec![
-    //     (Address::from_monero_external(&addr),
-    //     CurrencyAmount::from_fractional_cur(0.002f64, SupportedCurrency::Monero).unwrap())
-    // ];
-    // let tx = four_rpc.wallet_rpc.send(destinations).await.unwrap();
-    // println!("Tx: {}", tx);
+
+    let destinations = vec![
+        (Address::from_monero_external(&addr),
+        CurrencyAmount::from_fractional_cur(0.002f64, SupportedCurrency::Monero).unwrap())
+    ];
+    let tx = four_rpc.wallet_rpc.send(destinations).await.unwrap();
+    println!("Tx: {}", tx);
 
     // let amt = b.to_fractional() / 10;
 

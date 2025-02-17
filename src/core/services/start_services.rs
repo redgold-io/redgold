@@ -189,7 +189,9 @@ impl Node {
             RecentParityCheck::new(&relay), Duration::from_secs(3600), false
         ));
 
-        sjh.add("EthDaq", relay.eth_daq.start(&relay.node_config).await);
+        if node_config.network.is_main_stage_network() {
+            sjh.add("EthDaq", relay.eth_daq.start(&relay.node_config).await);
+        }
 
         sjh.handles
     }
