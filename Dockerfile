@@ -17,7 +17,7 @@ RUN apt install -y automake libtool libssl-dev \
  sqlite3 libsqlite3-dev \
  nasm \
  ca-certificates \
- awscli wget
+ awscli wget expect
 
 
 RUN wget https://redgold-public.s3.us-west-1.amazonaws.com/monero-wallet-cli -O /usr/bin/monero-wallet-cli

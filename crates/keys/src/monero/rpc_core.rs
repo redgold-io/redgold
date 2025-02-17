@@ -288,7 +288,7 @@ impl MoneroRpcWrapper {
             to,
             TransferPriority::Default,
             TransferOptions {
-                do_not_relay: Some(true),
+                do_not_relay: Some(false),
                 ..Default::default()
             }
         ).await
